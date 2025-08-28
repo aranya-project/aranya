@@ -8,7 +8,7 @@
 )]
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs,
     net::Ipv4Addr,
     ops::{Deref, DerefMut},
@@ -245,19 +245,21 @@ impl TestCtx {
             let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let (psk_store, active_team_rx) = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
+            let hello_subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
-            let (syncer, conn_map, conn_rx, effects_recv) = {
+            let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);
-                let (syncer, _sync_peers, conn_map, conn_rx) = TestSyncer::new(
+                let (syncer, sync_peers, conn_map, conn_rx) = TestSyncer::new(
                     client.clone(),
                     send_effects,
                     InvalidGraphs::default(),
                     psk_store.clone(),
                     Addr::from((Ipv4Addr::LOCALHOST, 0)),
                     caches.clone(),
+                    hello_subscriptions.clone(),
                 )?;
 
-                (syncer, conn_map, conn_rx, effect_recv)
+                (syncer, sync_peers, conn_map, conn_rx, effect_recv)
             };
 
             let server: TestServer = TestServer::new(
@@ -268,6 +270,8 @@ impl TestCtx {
                 conn_rx,
                 active_team_rx,
                 caches.clone(),
+                sync_peers,
+                hello_subscriptions.clone(),
             )
             .await?;
             let local_addr = server.local_addr()?;

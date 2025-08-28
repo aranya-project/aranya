@@ -11,9 +11,12 @@
 
 mod common;
 
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    config::{CreateTeamConfig, SyncPeerConfig},
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::Role;
 use test_log::test;
@@ -463,7 +466,7 @@ async fn test_multi_team_sync() -> Result<()> {
 }
 
 /// Tests hello subscription functionality by demonstrating that devices can subscribe
-/// to and unsubscribe from hello notifications from peers.
+/// to hello notifications from peers and automatically sync when receiving notifications.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_hello_subscription() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -477,39 +480,117 @@ async fn test_hello_subscription() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     // Grab addresses for testing
-    let owner_addr = devices.owner.aranya_local_addr().await?;
     let admin_addr = devices.admin.aranya_local_addr().await?;
-    let operator_addr = devices.operator.aranya_local_addr().await?;
 
     // Grab the shorthand for the teams we need to operate on.
-    let owner_team = devices.owner.client.team(team_id);
-    let admin_team = devices.admin.client.team(team_id);
-    let operator_team = devices.operator.client.team(team_id);
     let membera_team = devices.membera.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
 
-    info!("testing hello subscription between owner and admin");
+    let sync_config = SyncPeerConfig::builder()
+        .interval(Duration::from_secs(300)) // 5 minutes - long enough to not interfere with test
+        .sync_now(false) // Don't sync immediately when adding peer
+        .sync_on_hello(true) // Enable sync on hello messages
+        .build()?;
 
-    // Admin subscribes to hello notifications from Owner with 1-second delay
+    membera_team
+        .add_sync_peer(admin_addr.into(), sync_config)
+        .await?;
+    info!("membera added admin as sync peer with sync_on_hello=true");
+
+    // MemberA subscribes to hello notifications from Admin
+    membera_team
+        .hello_subscribe(admin_addr.into(), 100) // Short delay for faster testing
+        .await?;
+    info!("membera subscribed to hello notifications from admin");
+
+    // Wait a moment to ensure the subscription is active
+    common::sleep(Duration::from_millis(200)).await;
+
+    // Before the action, verify that MemberA doesn't know about any labels created by admin
+    // (This will be our way to test if sync worked)
+    info!("verifying initial state - membera should not see any labels created by admin");
+    let queries = membera_team.queries();
+    let initial_labels = queries.labels().await?;
+    let initial_label_count = initial_labels.iter().count();
+    info!(
+        "initial label count as seen by membera: {}",
+        initial_label_count
+    );
+
+    // Admin performs an action that will update their graph - create a label
+    // (admin has permission to create labels)
+    info!("admin creating a test label");
+    let test_label = admin_team
+        .create_label(aranya_daemon_api::text!("sync_hello_test_label"))
+        .await?;
+    info!("admin created test label: {:?}", test_label);
+
+    // Wait for hello message to be sent and sync to be triggered
+    // The hello message should be sent, membera should receive it,
+    // check that the command doesn't exist locally, and trigger a sync
+    info!("waiting for hello message and automatic sync...");
+
+    // Poll every 100ms for up to 10 seconds for the label count to increase
+    let poll_start = std::time::Instant::now();
+    let poll_timeout = Duration::from_millis(10_000);
+    let poll_interval = Duration::from_millis(100);
+
+    let final_label_count = loop {
+        let current_labels = queries.labels().await?;
+        let current_count = current_labels.iter().count();
+
+        if current_count > initial_label_count {
+            info!(
+                "sync detected - label count increased from {} to {} after {:?}",
+                initial_label_count,
+                current_count,
+                poll_start.elapsed()
+            );
+            break current_count;
+        }
+
+        if poll_start.elapsed() >= poll_timeout {
+            bail!(
+                "Sync on hello failed: timeout after {:?} - expected label count to increase from {} but it remained at {}",
+                poll_timeout,
+                initial_label_count,
+                current_count
+            );
+        }
+
+        common::sleep(poll_interval).await;
+    };
+
+    // Verify that MemberA now knows about the label created by admin (sync succeeded)
+    info!("checking if sync worked - membera should now see the new label");
+    let final_labels = queries.labels().await?;
+    info!(
+        "final label count as seen by membera: {}",
+        final_label_count
+    );
+
+    // Additionally, verify that the specific label created by admin is visible
+    let label_exists = final_labels
+        .iter()
+        .any(|label| label.name.as_str() == "sync_hello_test_label");
+
+    if !label_exists {
+        bail!("Sync on hello failed: the test label created by admin is not visible to membera");
+    }
+
+    info!("sync_on_hello test succeeded - membera automatically synced after receiving hello notification");
+
+    // Test basic subscription/unsubscription functionality for completeness
+    info!("testing basic subscription functionality");
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let operator_team = devices.operator.client.team(team_id);
+
+    // Admin subscribes to hello notifications from Owner
     admin_team.hello_subscribe(owner_addr.into(), 1000).await?;
     info!("admin subscribed to hello notifications from owner");
 
-    // Owner subscribes to hello notifications from Admin with 500ms delay
-    owner_team.hello_subscribe(admin_addr.into(), 500).await?;
-    info!("owner subscribed to hello notifications from admin");
-
-    // Test that the subscriptions don't interfere with normal operations
-    // Create a label to generate graph changes that might trigger hello notifications
-    let label1 = operator_team
-        .create_label(aranya_daemon_api::text!("hello_test_label"))
-        .await?;
-    info!("created test label to generate graph activity");
-
-    // Wait a bit to allow any hello notifications to be exchanged
-    common::sleep(std::time::Duration::from_millis(1500)).await;
-
-    info!("testing multiple subscriptions");
-
-    // Operator subscribes to both owner and admin
+    // Test multiple subscriptions
     operator_team
         .hello_subscribe(owner_addr.into(), 2000)
         .await?;
@@ -518,65 +599,19 @@ async fn test_hello_subscription() -> Result<()> {
         .await?;
     info!("operator subscribed to both owner and admin");
 
-    // MemberA subscribes to operator
-    membera_team
-        .hello_subscribe(operator_addr.into(), 800)
-        .await?;
-    info!("membera subscribed to operator");
-
-    // Generate more graph activity
-    operator_team
-        .assign_label(
-            devices.membera.id,
-            label1,
-            aranya_daemon_api::ChanOp::SendRecv,
-        )
-        .await?;
-    info!("assigned label to generate more graph activity");
-
-    // Wait for potential hello notifications
-    common::sleep(std::time::Duration::from_millis(2500)).await;
-
-    info!("testing unsubscribe functionality");
-
-    // Test unsubscribing - should not cause errors
+    // Test unsubscribing
     admin_team.hello_unsubscribe(owner_addr.into()).await?;
-    info!("admin unsubscribed from owner");
-
-    owner_team.hello_unsubscribe(admin_addr.into()).await?;
-    info!("owner unsubscribed from admin");
-
-    // Test unsubscribing multiple subscriptions
     operator_team.hello_unsubscribe(owner_addr.into()).await?;
     operator_team.hello_unsubscribe(admin_addr.into()).await?;
-    info!("operator unsubscribed from owner and admin");
+    membera_team.hello_unsubscribe(admin_addr.into()).await?;
+    info!("all devices unsubscribed");
 
-    membera_team.hello_unsubscribe(operator_addr.into()).await?;
-    info!("membera unsubscribed from operator");
-
-    // Test that operations still work after unsubscribing
-    operator_team
-        .revoke_label(devices.membera.id, label1)
-        .await?;
-    info!("revoked test label assignment");
-
-    // Wait a bit to ensure unsubscriptions are processed
-    common::sleep(std::time::Duration::from_millis(500)).await;
-
-    info!("testing edge cases");
-
-    // Test subscribing and immediately unsubscribing
+    // Test edge cases
     admin_team.hello_subscribe(owner_addr.into(), 100).await?;
     admin_team.hello_unsubscribe(owner_addr.into()).await?;
     info!("tested immediate subscribe/unsubscribe");
 
-    // Test multiple subscribes to the same peer (should replace previous subscription)
-    owner_team.hello_subscribe(admin_addr.into(), 1000).await?;
-    owner_team.hello_subscribe(admin_addr.into(), 2000).await?; // This should replace the previous one
-    owner_team.hello_unsubscribe(admin_addr.into()).await?;
-    info!("tested multiple subscribes to same peer");
-
-    // Test unsubscribing from non-subscribed peer (should not cause errors)
+    // Test unsubscribing from non-subscribed peer
     let memberb_addr = devices.memberb.aranya_local_addr().await?;
     admin_team.hello_unsubscribe(memberb_addr.into()).await?;
     info!("tested unsubscribing from non-subscribed peer");

@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
@@ -18,7 +18,7 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::GraphId;
+use aranya_runtime::{Address, Command, GraphId, Segment, Storage, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
@@ -27,7 +27,10 @@ use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::{net::UnixListener, sync::mpsc};
+use tokio::{
+    net::UnixListener,
+    sync::{mpsc, Mutex},
+};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
@@ -94,6 +97,9 @@ impl DaemonApiServer {
         let aqc = Arc::new(aqc);
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
+            client: Some(client.clone()),
+            peers: Some(peers.clone()),
+            prev_head_addresses: Arc::new(Mutex::new(HashMap::new())),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -103,7 +109,7 @@ impl DaemonApiServer {
             effect_handler,
             invalid,
             aqc,
-            crypto: tokio::sync::Mutex::new(crypto),
+            crypto: Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
@@ -174,6 +180,10 @@ impl DaemonApiServer {
 #[derive(Clone, Debug)]
 struct EffectHandler {
     aqc: Arc<Aqc<CE, KS>>,
+    client: Option<Client>,
+    peers: Option<SyncPeers>,
+    /// Stores the previous head address for each graph to detect changes
+    prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
 }
 
 impl EffectHandler {
@@ -224,6 +234,160 @@ impl EffectHandler {
                 QueryAqcNetworkNamesOutput(_) => {}
             }
         }
+
+        // Debug: Log all effects for debugging
+        for effect in effects {
+            debug!(?effect, "processing effect");
+        }
+
+        // Check if the graph head address has changed
+        if let Some(current_head) = self.get_graph_head_address(graph).await {
+            let mut prev_addresses = self.prev_head_addresses.lock().await;
+            let has_graph_changes = match prev_addresses.get(&graph) {
+                Some(prev_head) => prev_head != &current_head,
+                None => true, // First time seeing this graph
+            };
+
+            debug!(
+                ?graph,
+                ?current_head,
+                ?has_graph_changes,
+                effects_count = effects.len(),
+                "checking for graph head address changes"
+            );
+
+            if has_graph_changes {
+                debug!(
+                    ?graph,
+                    ?current_head,
+                    "graph head address changed, triggering hello notification broadcast"
+                );
+                // Update stored head address
+                prev_addresses.insert(graph, current_head);
+                drop(prev_addresses); // Release the lock before async call
+
+                self.broadcast_hello_notifications(graph, current_head)
+                    .await?;
+            } else {
+                debug!(
+                    ?graph,
+                    "graph head address unchanged, no hello broadcast needed"
+                );
+            }
+        } else {
+            warn!(?graph, "unable to get current graph head address");
+        }
+
+        Ok(())
+    }
+
+    /// Gets the current graph head address using the proper Location->Segment->Command->Address flow.
+    async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
+        let client = self.client.as_ref()?;
+
+        let mut aranya = client.aranya.lock().await;
+        let storage = match aranya.provider().get_storage(graph_id) {
+            Ok(storage) => storage,
+            Err(e) => {
+                trace!(error = %e, ?graph_id, "unable to get storage for graph");
+                return None;
+            }
+        };
+
+        // Get the head location
+        let head_location = match storage.get_head() {
+            Ok(location) => location,
+            Err(e) => {
+                trace!(error = %e, ?graph_id, "unable to get head location");
+                return None;
+            }
+        };
+
+        // Get the segment at the head location
+        let segment = match storage.get_segment(head_location) {
+            Ok(segment) => segment,
+            Err(e) => {
+                warn!(error = %e, ?graph_id, "unable to get segment at head location");
+                return None;
+            }
+        };
+
+        // Get the command from the segment
+        let command = match segment.get_command(head_location) {
+            Some(command) => command,
+            None => {
+                warn!(?graph_id, "no command found at head location");
+                return None;
+            }
+        };
+        // Create the address from the command
+        match command.address() {
+            Ok(address) => Some(address),
+            Err(e) => {
+                warn!(error = %e, ?graph_id, "unable to get address from command");
+                None
+            }
+        }
+    }
+
+    /// Broadcasts hello notifications to subscribers when the graph changes.
+    async fn broadcast_hello_notifications(
+        &self,
+        graph_id: GraphId,
+        head: Address,
+    ) -> anyhow::Result<()> {
+        info!(
+            ?graph_id,
+            ?head,
+            "Starting broadcast_hello_notifications in api.rs"
+        );
+
+        // Use the SyncPeers interface to trigger hello broadcasting
+        // This will be handled by the QUIC syncer which has access to the subscription data
+
+        if let Err(e) = self.trigger_hello_broadcast(graph_id, head).await {
+            warn!(
+                error = %e,
+                ?graph_id,
+                ?head,
+                "Failed to trigger hello broadcast"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Triggers hello notification broadcasting via the SyncPeers interface.
+    async fn trigger_hello_broadcast(
+        &self,
+        graph_id: GraphId,
+        head: Address,
+    ) -> anyhow::Result<()> {
+        info!(
+            ?graph_id,
+            ?head,
+            has_peers = self.peers.is_some(),
+            "Starting trigger_hello_broadcast"
+        );
+
+        if let Some(peers) = &self.peers {
+            info!(?graph_id, ?head, "Calling peers.broadcast_hello");
+            if let Err(e) = peers.broadcast_hello(graph_id, head).await {
+                warn!(
+                    error = %e,
+                    ?graph_id,
+                    ?head,
+                    "peers.broadcast_hello failed"
+                );
+                return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
+            }
+        } else {
+            warn!(
+                ?graph_id,
+                ?head,
+                "No peers interface available for hello broadcasting"
+            );
+        }
         Ok(())
     }
 }
@@ -247,7 +411,7 @@ struct ApiInner {
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
     #[derive_where(skip(Debug))]
-    crypto: tokio::sync::Mutex<Crypto>,
+    crypto: Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
 }
@@ -486,7 +650,7 @@ impl DaemonApi for Api {
             };
             let enc_sk: EncryptionKey<CS> = crypto
                 .aranya_store
-                .get_key(&mut crypto.engine, enc_pk.id()?.into_id())
+                .get_key(&mut crypto.engine, enc_pk.id()?.into())
                 .context("keystore error")?
                 .context("missing enc_sk for encrypt seed")?;
             (seed, enc_sk)
@@ -769,17 +933,34 @@ impl DaemonApi for Api {
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 
+        let graph = GraphId::from(team.into_id());
+
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_label(label_name)
             .await
             .context("unable to create AQC label")?;
-        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label_id.into())
+        info!(
+            ?graph,
+            effects_count = effects.len(),
+            "create_label action completed, processing effects"
+        );
+
+        let label_id = if let Some(Effect::LabelCreated(e)) =
+            find_effect!(&effects, Effect::LabelCreated(_e))
+        {
+            e.label_id.into()
         } else {
-            Err(anyhow!("unable to create AQC label").into())
-        }
+            warn!("No LabelCreated effect found!");
+            return Err(anyhow!("unable to create AQC label").into());
+        };
+
+        // Send effects to the effect handler for processing (including hello notifications)
+
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        Ok(label_id)
     }
 
     /// Delete a label.

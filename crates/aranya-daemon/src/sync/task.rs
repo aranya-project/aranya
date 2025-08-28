@@ -14,14 +14,14 @@ use std::{
 
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Engine, PeerCache, Sink};
+use aranya_runtime::{storage::GraphId, Address, Engine, PeerCache, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, instrument, trace, warn};
+use tracing::{error, info, instrument, trace, warn};
 
 use super::Result as SyncResult;
 use crate::{
@@ -52,6 +52,13 @@ enum Msg {
     },
     HelloUnsubscribe {
         peer: SyncPeer,
+    },
+    SyncOnHello {
+        peer: SyncPeer,
+    },
+    BroadcastHello {
+        graph_id: GraphId,
+        head: Address,
     },
 }
 type Request = (Msg, oneshot::Sender<Reply>);
@@ -154,6 +161,17 @@ impl SyncPeers {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::HelloUnsubscribe { peer }).await
     }
+
+    /// Trigger sync with a peer based on hello message.
+    pub(crate) async fn sync_on_hello(&self, addr: Addr, graph_id: GraphId) -> Reply {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::SyncOnHello { peer }).await
+    }
+
+    /// Broadcast hello notifications to all subscribers of a graph.
+    pub(crate) async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Reply {
+        self.send(Msg::BroadcastHello { graph_id, head }).await
+    }
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
@@ -233,6 +251,13 @@ pub trait SyncState: Sized {
         id: GraphId,
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<()>> + Send;
+
+    /// Broadcast hello notifications to all subscribers of a graph.
+    fn broadcast_hello_notifications(
+        syncer: &mut Syncer<Self>,
+        graph_id: GraphId,
+        head: Address,
+    ) -> impl Future<Output = SyncResult<()>> + Send;
 }
 
 impl<ST> Syncer<ST> {
@@ -249,6 +274,12 @@ impl<ST> Syncer<ST> {
         if let Some((_, key)) = self.peers.remove(&peer) {
             self.queue.remove(&key);
         }
+    }
+
+    /// Updates the server address to the actual listening address.
+    /// This should be called after the server starts and we know its actual listening address.
+    pub fn update_server_addr(&mut self, actual_addr: std::net::SocketAddr) {
+        self.server_addr = actual_addr.into();
     }
 }
 
@@ -292,6 +323,37 @@ impl<ST: SyncState> Syncer<ST> {
                     Msg::HelloUnsubscribe { peer } => {
                         self.hello_unsubscribe(&peer).await
                     }
+                    Msg::SyncOnHello { peer } => {
+                        // Check if sync_on_hello is enabled for this peer
+                        if let Some((cfg, _)) = self.peers.get(&peer) {
+                            if cfg.sync_on_hello {
+                                match self.sync(&peer).await {
+                                    Ok(_) => {
+                                        Ok(())
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            error = %e,
+                                            ?peer,
+                                            "SyncOnHello sync failed"
+                                        );
+                                        Err(e)
+                                    }
+                                }
+                            } else {
+                                Ok(())
+                            }
+                        } else {
+                            warn!(
+                                ?peer,
+                                "Peer not found in our configuration, ignoring SyncOnHello"
+                            );
+                            Ok(())
+                        }
+                    }
+                    Msg::BroadcastHello { graph_id, head } => {
+                        ST::broadcast_hello_notifications(self, graph_id, head).await
+                    }
                 };
                 if let Err(reply) = tx.send(reply) {
                     warn!("syncer operation did not wait for reply");
@@ -313,13 +375,22 @@ impl<ST: SyncState> Syncer<ST> {
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
-        trace!("syncing with peer");
         let mut sink = VecSink::new();
+
         let cmd_count = ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
             .await
             .inspect_err(|err| {
+                warn!(
+                    error = %err,
+                    ?peer,
+                    "ST::sync_impl failed"
+                );
                 // If a finalization error has occurred, remove all sync peers for that team.
                 if err.is_parallel_finalize() {
+                    warn!(
+                        ?peer,
+                        "Parallel finalize error, removing sync peers for graph"
+                    );
                     // Remove sync peers for graph that had finalization error.
                     self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
@@ -336,11 +407,18 @@ impl<ST: SyncState> Syncer<ST> {
             .collect()
             .context("could not collect effects from sync")?;
         let n = effects.len();
+
         self.send_effects
             .send((peer.graph_id, effects))
             .await
             .context("unable to send effects")?;
-        trace!(?n, "completed sync");
+
+        info!(
+            ?peer,
+            cmd_count,
+            effects_count = n,
+            "Sync completed successfully"
+        );
         Ok(cmd_count)
     }
 
