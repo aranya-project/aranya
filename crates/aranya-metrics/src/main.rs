@@ -189,7 +189,7 @@ impl ClientCtx {
                 .aqc_server_addr(&any_addr)
                 .connect()
         })
-        .retry(ExponentialBuilder::new())
+        .retry(ExponentialBuilder::default())
         .await
         .context("unable to initialize client")?;
 
