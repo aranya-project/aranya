@@ -48,7 +48,10 @@ use s2n_quic::{
     Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{io::AsyncReadExt, sync::mpsc};
+use tokio::{
+    io::AsyncReadExt,
+    sync::{mpsc, Mutex},
+};
 use tokio_util::time::DelayQueue;
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
@@ -81,6 +84,15 @@ pub struct HelloSubscription {
 /// Type alias for hello subscription storage
 /// Maps from (team_id, subscriber_address) to subscription details
 pub type HelloSubscriptions = HashMap<(GraphId, SocketAddr), HelloSubscription>;
+
+/// Hello-related information combining subscriptions and sync peers.
+#[derive(Debug, Clone)]
+pub struct HelloInfo {
+    /// Storage for sync hello subscriptions
+    pub subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    /// Interface to trigger sync operations
+    pub sync_peers: SyncPeers,
+}
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -129,7 +141,7 @@ pub struct State {
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
     /// Shared reference to hello subscriptions for broadcasting notifications
-    hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+    hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
 }
 
 impl SyncState for State {
@@ -277,7 +289,7 @@ impl State {
     fn new(
         psk_store: Arc<PskStore>,
         conns: SharedConnectionMap,
-        hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -316,7 +328,7 @@ impl Syncer<State> {
         psk_store: Arc<PskStore>,
         server_addr: Addr,
         caches: PeerCacheMap,
-        hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
         SyncPeers,
@@ -669,7 +681,7 @@ pub struct Server<EN, SP> {
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Storage for sync hello subscriptions
-    hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+    hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     /// Interface to trigger sync operations
     sync_peers: SyncPeers,
 }
@@ -681,7 +693,7 @@ impl<EN, SP> Server<EN, SP> {
     }
 
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
-    pub fn hello_subscriptions(&self) -> Arc<tokio::sync::Mutex<HelloSubscriptions>> {
+    pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         Arc::clone(&self.hello_subscriptions)
     }
 }
@@ -707,8 +719,7 @@ where
         conns: SharedConnectionMap,
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
         caches: PeerCacheMap,
-        sync_peers: SyncPeers,
-        hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+        hello_info: HelloInfo,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -741,8 +752,8 @@ where
             conns,
             conn_rx,
             caches,
-            hello_subscriptions,
-            sync_peers,
+            hello_subscriptions: hello_info.subscriptions,
+            sync_peers: hello_info.sync_peers,
         })
     }
 
@@ -851,7 +862,7 @@ where
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
-        hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncPeers,
     ) -> SyncResult<()> {
         let mut recv_buf = Vec::new();
@@ -909,7 +920,7 @@ where
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
-        hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncPeers,
     ) -> SyncResult<Box<[u8]>> {
         let sync_type: SyncType<Addr> =
@@ -987,7 +998,7 @@ where
         caches: PeerCacheMap,
         peer_addr: Addr,
         active_team: &TeamId,
-        hello_subscriptions: Arc<tokio::sync::Mutex<HelloSubscriptions>>,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncPeers,
     ) {
         use aranya_runtime::SyncHelloType;

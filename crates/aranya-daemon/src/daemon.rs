@@ -34,7 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, State as QuicSyncClientState, SyncParams},
+        quic::{HelloInfo, PskStore, State as QuicSyncClientState, SyncParams},
         PeerCacheMap, SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -378,8 +378,10 @@ impl Daemon {
             conns,
             conn_rx,
             caches,
-            peers.clone(),
-            hello_subscriptions,
+            HelloInfo {
+                subscriptions: hello_subscriptions,
+                sync_peers: peers.clone(),
+            },
         )
         .await
         .context("unable to initialize QUIC sync server")?;

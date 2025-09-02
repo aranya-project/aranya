@@ -47,7 +47,10 @@ use crate::{
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::{quic::PskStore, PeerCacheKey, PeerCacheMap, SyncPeer},
+        task::{
+            quic::{HelloInfo, PskStore},
+            PeerCacheKey, PeerCacheMap, SyncPeer,
+        },
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,
@@ -269,8 +272,10 @@ impl TestCtx {
                 conn_map,
                 conn_rx,
                 caches.clone(),
-                sync_peers,
-                hello_subscriptions.clone(),
+                HelloInfo {
+                    subscriptions: hello_subscriptions.clone(),
+                    sync_peers,
+                },
             )
             .await?;
             let local_addr = server.local_addr()?;

@@ -464,7 +464,6 @@ async fn test_multi_team_sync() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_hello_subscription() -> Result<()> {
     // Set up our team context so we can run the test.
-    let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut devices = DevicesCtx::new("test_hello_subscription").await?;
 
     // Create the initial team, and get our TeamId.
