@@ -632,10 +632,6 @@ criteria = "safe-to-deploy"
 version = "0.7.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.raw-cpuid]]
-version = "11.5.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.redox_syscall]]
 version = "0.5.8"
 criteria = "safe-to-run"
@@ -645,20 +641,12 @@ version = "1.11.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.regex-automata]]
-version = "0.1.10"
-criteria = "safe-to-deploy"
-
-[[exemptions.regex-automata]]
 version = "0.4.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.regex-lite]]
 version = "0.1.6"
 criteria = "safe-to-run"
-
-[[exemptions.regex-syntax]]
-version = "0.6.29"
-criteria = "safe-to-deploy"
 
 [[exemptions.ring]]
 version = "0.17.14"
