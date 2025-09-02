@@ -30,9 +30,10 @@ use tarpc::{
 use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
+#[cfg(feature = "aqc")]
+use crate::aqc::Aqc;
 use crate::{
     actions::Actions,
-    aqc::Aqc,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -72,28 +73,48 @@ pub(crate) struct DaemonApiServer {
     api: Api,
 }
 
+pub(crate) struct DaemonApiServerArgs {
+    pub(crate) client: Client,
+    pub(crate) local_addr: SocketAddr,
+    pub(crate) uds_path: PathBuf,
+    pub(crate) sk: ApiKey<CS>,
+    pub(crate) pk: PublicKeys<CS>,
+    pub(crate) peers: SyncPeers,
+    pub(crate) recv_effects: EffectReceiver,
+    pub(crate) invalid: InvalidGraphs,
+    #[cfg(feature = "aqc")]
+    pub(crate) aqc: Aqc<CE, KS>,
+    pub(crate) crypto: Crypto,
+    pub(crate) seed_id_dir: SeedDir,
+    pub(crate) quic: Option<quic_sync::Data>,
+}
+
 impl DaemonApiServer {
     /// Creates a `DaemonApiServer`.
     // TODO(eric): Clean up the arguments.
     #[instrument(skip_all)]
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        client: Client,
-        local_addr: SocketAddr,
-        uds_path: PathBuf,
-        sk: ApiKey<CS>,
-        pk: PublicKeys<CS>,
-        peers: SyncPeers,
-        recv_effects: EffectReceiver,
-        invalid: InvalidGraphs,
-        aqc: Aqc<CE, KS>,
-        crypto: Crypto,
-        seed_id_dir: SeedDir,
-        quic: Option<quic_sync::Data>,
+        DaemonApiServerArgs {
+            client,
+            local_addr,
+            uds_path,
+            sk,
+            pk,
+            peers,
+            recv_effects,
+            invalid,
+            #[cfg(feature = "aqc")]
+            aqc,
+            crypto,
+            seed_id_dir,
+            quic,
+        }: DaemonApiServerArgs,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
+        #[cfg(feature = "aqc")]
         let aqc = Arc::new(aqc);
         let effect_handler = EffectHandler {
+            #[cfg(feature = "aqc")]
             aqc: Arc::clone(&aqc),
         };
         let api = Api(Arc::new(ApiInner {
@@ -103,6 +124,7 @@ impl DaemonApiServer {
             peers,
             effect_handler,
             invalid,
+            #[cfg(feature = "aqc")]
             aqc,
             crypto: tokio::sync::Mutex::new(crypto),
             seed_id_dir,
@@ -174,6 +196,7 @@ impl DaemonApiServer {
 /// Handles effects from an Aranya action.
 #[derive(Clone, Debug)]
 struct EffectHandler {
+    #[cfg(feature = "aqc")]
     aqc: Arc<Aqc<CE, KS>>,
 }
 
@@ -201,16 +224,21 @@ impl EffectHandler {
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
                 LabelRevoked(_) => {}
-                AqcNetworkNameSet(e) => {
+                AqcNetworkNameSet(_e) => {
+                    #[cfg(feature = "aqc")]
                     self.aqc
                         .add_peer(
                             graph,
-                            api::NetIdentifier(e.net_identifier.clone()),
-                            e.device_id.into(),
+                            api::NetIdentifier(_e.net_identifier.clone()),
+                            _e.device_id.into(),
                         )
                         .await;
                 }
-                AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
+                AqcNetworkNameUnset(_e) =>
+                {
+                    #[cfg(feature = "aqc")]
+                    self.aqc.remove_peer(graph, _e.device_id.into()).await
+                }
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
@@ -246,6 +274,7 @@ struct ApiInner {
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
+    #[cfg(feature = "aqc")]
     aqc: Arc<Aqc<CE, KS>>,
     #[derive_where(skip(Debug))]
     crypto: tokio::sync::Mutex<Crypto>,
@@ -544,6 +573,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn assign_aqc_net_identifier(
         self,
@@ -566,6 +596,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn remove_aqc_net_identifier(
         self,
@@ -584,6 +615,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn create_aqc_bidi_channel(
         self,
@@ -625,6 +657,7 @@ impl DaemonApi for Api {
         Ok((ctrl, psks))
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn create_aqc_uni_channel(
         self,
@@ -666,6 +699,7 @@ impl DaemonApi for Api {
         Ok((ctrl, psks))
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn delete_aqc_bidi_channel(
         self,
@@ -676,6 +710,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn delete_aqc_uni_channel(
         self,
@@ -686,6 +721,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn receive_aqc_ctrl(
         self,
@@ -930,6 +966,7 @@ impl DaemonApi for Api {
     }
 
     /// Query AQC network ID.
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn query_aqc_net_identifier(
         self,

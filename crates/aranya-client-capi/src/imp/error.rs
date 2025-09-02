@@ -4,6 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
+#[cfg(feature = "aqc")]
 use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
@@ -48,12 +49,14 @@ pub enum Error {
     Other(#[from] anyhow::Error),
 }
 
+#[cfg(feature = "aqc")]
 impl From<AqcError> for Error {
     fn from(value: AqcError) -> Self {
         Self::Client(aranya_client::Error::Aqc(value))
     }
 }
 
+#[cfg(feature = "aqc")]
 impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
@@ -64,6 +67,7 @@ impl From<TryReceiveError<AqcError>> for Error {
     }
 }
 
+#[cfg(feature = "aqc")]
 impl From<TryReceiveError<aranya_client::Error>> for Error {
     fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
         match value {

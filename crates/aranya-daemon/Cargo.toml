@@ -16,6 +16,8 @@ workspace = true
 [features]
 default = []
 
+aqc = ["aranya-daemon-api/aqc"]
+
 
 [dependencies]
 aranya-daemon-api = { workspace = true }

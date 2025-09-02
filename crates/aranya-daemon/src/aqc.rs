@@ -1,3 +1,5 @@
+#![cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;

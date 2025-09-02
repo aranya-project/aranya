@@ -96,6 +96,7 @@ style = "both"
 "target_os = linux" = "__linux__"
 "target_os = vxworks" = "__VXWORKS__"
 "target_arch = x86_64" = "__x86_64__"
+"feature = aqc" = "ENABLE_AQC"
 
 [export]
 renaming_overrides_prefixing = true
@@ -124,7 +125,7 @@ clean = true
 
 [parse.expand]
 default_features = false
-features = []
+features = ["aqc"]
 crates = ["aranya-client-capi"]
 
 [ptr]
