@@ -251,8 +251,6 @@ skip = [
     "rand_chacha@0.3.1",
     "rand_core@0.6.4",
     "rand_core@0.5.1",
-    "regex-automata@0.1.10",
-    "regex-syntax@0.6.29",
     "rustix@0.38.44",
     "rustc-hash@1.1.0",
     "self_cell@0.10.3",

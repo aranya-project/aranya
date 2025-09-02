@@ -226,10 +226,20 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.4.25 -> 0.4.26"
 
+[[audits.matchers]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.2.0"
+
 [[audits.miniz_oxide]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.8.4 -> 0.8.5"
+
+[[audits.nu-ansi-term]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.46.0 -> 0.50.1"
 
 [[audits.object]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -598,6 +608,11 @@ delta = "2.4.0 -> 2.5.0"
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.7.13 -> 0.7.15"
+
+[[audits.tracing-subscriber]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.19 -> 0.3.20"
 
 [[audits.type-map]]
 who = "gknopf <gknopf@spideroak.com>"
