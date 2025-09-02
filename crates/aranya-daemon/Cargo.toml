@@ -30,6 +30,7 @@ aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
 aranya-envelope-ffi = { workspace = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"] }
 aranya-idam-ffi = { workspace = true }
 aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }

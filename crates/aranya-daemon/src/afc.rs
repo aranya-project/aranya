@@ -1,14 +1,17 @@
-//! Implementation of daemon's AQC handler.
-use std::{collections::BTreeMap, sync::Arc};
+//! Implementation of daemon's AFC handler.
+
+use std::{
+    collections::BTreeMap,
+    sync::{atomic::AtomicU32, Arc},
+};
 
 use anyhow::Result;
-use aranya_aqc_util::{
-    BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
+use aranya_afc_util::{
+    BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler, UniChannelCreated,
+    UniChannelReceived, UniKey,
 };
-use aranya_crypto::{DeviceId, Engine, KeyStore};
-use aranya_daemon_api::{
-    AqcBidiPsk, AqcBidiPsks, AqcPsks, AqcUniPsk, AqcUniPsks, Directed, NetIdentifier, Secret,
-};
+use aranya_crypto::{afc::UniAuthorSecret, DeviceId, Engine, KeyStore};
+use aranya_daemon_api::{Directed, NetIdentifier, Secret};
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
 use buggy::{bug, BugExt};
@@ -19,15 +22,55 @@ use tracing::{debug, instrument};
 use crate::{
     keystore::AranyaStore,
     policy::{
-        AqcBidiChannelCreated, AqcBidiChannelReceived, AqcUniChannelCreated, AqcUniChannelReceived,
+        AfcBidiChannelCreated, AfcBidiChannelReceived, AfcUniChannelCreated, AfcUniChannelReceived,
     },
 };
 
 type PeerMap = BTreeMap<GraphId, Peers>;
 type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
+/// AFC shared memory.
+#[cfg(all(feature = "afc", feature = "unstable"))]
+#[derive(Debug)]
+pub struct AfcShm {
+    cfg: AfcConfig,
+    write: WriteState<CS, Rng>,
+}
+
+impl AfcShm {
+    fn new(cfg: AfcConfig) -> Result<Self> {
+        // TODO: issue stellar-tapestry#34
+        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
+        debug!(shm_path = cfg.shm_path, "setting up afc shm write side");
+        let write = {
+            let path = aranya_util::ShmPathBuf::from_str(&cfg.shm_path)
+                .context("unable to parse AFC shared memory path")?;
+            if cfg.unlink_on_startup && cfg.create {
+                let _ = shm::unlink(&path);
+            }
+            WriteState::open(&path, Flag::Create, Mode::ReadWrite, cfg.max_chans, Rng)
+                .context("unable to open `WriteState`")?
+        };
+
+        Ok(Self { cfg, write })
+    }
+}
+
+impl Drop for AfcShm {
+    fn drop(&mut self) {
+        #[cfg(all(feature = "afc", feature = "unstable"))]
+        {
+            if self.cfg.unlink_at_exit {
+                if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.shm_path) {
+                    let _ = shm::unlink(path);
+                }
+            }
+        }
+    }
+}
+
 #[derive_where(Debug)]
-pub(crate) struct Aqc<E, KS> {
+pub(crate) struct Afc<E, KS> {
     /// Our device ID.
     device_id: DeviceId,
     /// All the peers that we have channels with.
@@ -36,10 +79,20 @@ pub(crate) struct Aqc<E, KS> {
     handler: Mutex<Handler<AranyaStore<KS>>>,
     #[derive_where(skip(Debug))]
     eng: Mutex<E>,
+    /// Channel ID counter.
+    channel_id: AtomicU32,
+    /// AFC shared memory.
+    shm: AfcShm,
 }
 
-impl<E, KS> Aqc<E, KS> {
-    pub(crate) fn new<I>(eng: E, device_id: DeviceId, store: AranyaStore<KS>, peers: I) -> Self
+impl<E, KS> Afc<E, KS> {
+    pub(crate) fn new<I>(
+        eng: E,
+        device_id: DeviceId,
+        store: AranyaStore<KS>,
+        peers: I,
+        cfg: AfcConfig,
+    ) -> Self
     where
         I: IntoIterator<Item = (GraphId, Peers)>,
     {
@@ -48,6 +101,8 @@ impl<E, KS> Aqc<E, KS> {
             peers: Arc::new(Mutex::new(PeerMap::from_iter(peers))),
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
+            channel_id: AtomicU32::new(0),
+            shm: AfcShm::new(cfg),
         }
     }
 
@@ -98,60 +153,48 @@ impl<E, KS> Aqc<E, KS> {
     }
 }
 
-impl<E, KS> Aqc<E, KS>
+impl<E, KS> Afc<E, KS>
 where
     E: Engine,
     KS: KeyStore,
 {
-    /// Handles the [`AqcBidiChannelCreated`] effect, returning
+    /// Handles the [`AfcBidiChannelCreated`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn bidi_channel_created(
-        &self,
-        e: &AqcBidiChannelCreated,
-    ) -> Result<AqcBidiPsks> {
+    pub(crate) async fn bidi_channel_created(&self, e: &AfcBidiChannelCreated) -> Result<()> {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the bidi channel");
         }
 
         let info = BidiChannelCreated {
+            key_id: e.author_enc_key_id,
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             peer_id: e.peer_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
-            channel_id: e.channel_id.into(),
-            author_secrets_id: e.author_secrets_id.into(),
-            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let secret = self
+        let BidiKeys { seal, open } = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, (*secret.id()).into());
-
-        AqcBidiPsks::try_from_fn(info.channel_id, |suite| {
-            secret.generate_psk(suite).map(|psk| AqcBidiPsk {
-                identity: *psk.identity(),
-                secret: Secret::from(psk.raw_secret_bytes()),
-            })
-        })
+        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        self.shm
+            .lock()
+            .await
+            .add(channel_id, Directed::Bidirectional { seal, open })
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
     }
 
-    /// Handles the [`AqcBidiChannelReceived`] effect, returning
+    /// Handles the [`AfcBidiChannelReceived`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn bidi_channel_received(
-        &self,
-        e: &AqcBidiChannelReceived,
-    ) -> Result<AqcPsks> {
+    pub(crate) async fn bidi_channel_received(&self, e: &AfcBidiChannelReceived) -> Result<()> {
         if e.peer_id != self.device_id.into() {
             bug!("not the peer of the bidi channel");
         }
 
         let info = BidiChannelReceived {
-            channel_id: e.channel_id.into(),
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_pk: &e.author_enc_pk,
@@ -159,27 +202,24 @@ where
             peer_enc_key_id: e.peer_enc_key_id.into(),
             label_id: e.label_id.into(),
             encap: &e.encap,
-            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let secret = self
+        let BidiKeys { seal, open } = self
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, (*secret.id()).into());
+        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        self.shm
+            .lock()
+            .await
+            .add(channel_id, Directed::Bidirectional { seal, open })
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
 
-        let psks = AqcBidiPsks::try_from_fn(info.channel_id, |suite| {
-            secret.generate_psk(suite).map(|psk| AqcBidiPsk {
-                identity: *psk.identity(),
-                secret: Secret::from(psk.raw_secret_bytes()),
-            })
-        })?;
-        Ok(AqcPsks::Bidi(psks))
+        Ok(())
     }
 
-    /// Handles the [`AqcUniChannelCreated`] effect, returning
+    /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn uni_channel_created(&self, e: &AqcUniChannelCreated) -> Result<AqcUniPsks> {
+    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<()> {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the uni channel");
         }
@@ -188,45 +228,39 @@ where
         }
 
         let info = UniChannelCreated {
+            key_id: e.author_enc_key_id,
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
-            send_id: e.sender_id.into(),
-            recv_id: e.receiver_id.into(),
+            seal_id: e.sender_id.into(),
+            open_id: e.receiver_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
-            channel_id: e.channel_id.into(),
-            author_secrets_id: e.author_secrets_id.into(),
-            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let secret = self
+        let key: UniKey = self
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, (*secret.id()).into());
+        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
 
-        let psks = AqcUniPsks::try_from_fn(info.channel_id, |suite| {
-            if self.device_id == info.send_id {
-                secret.generate_send_only_psk(suite).map(|psk| {
-                    let identity = *psk.identity();
-                    let secret = Directed::Send(Secret::from(psk.raw_secret_bytes()));
-                    AqcUniPsk { identity, secret }
-                })
+        let secret = UniKey::try_from_fn(info.key_id, |suite| {
+            if self.device_id == info.seal_id {
+                Directed::Send(key);
             } else {
-                secret.generate_recv_only_psk(suite).map(|psk| {
-                    let identity = *psk.identity();
-                    let secret = Directed::Recv(Secret::from(psk.raw_secret_bytes()));
-                    AqcUniPsk { identity, secret }
-                })
+                Directed::Recv(key);
             }
         })?;
-        Ok(psks)
+        self.shm
+            .lock()
+            .await
+            .add(channel_id, secret)
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        Ok(())
     }
 
-    /// Handles the [`AqcUniChannelReceived`] effect, returning
+    /// Handles the [`AfcUniChannelReceived`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn uni_channel_received(&self, e: &AqcUniChannelReceived) -> Result<AqcPsks> {
+    pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<()> {
         if e.author_id == self.device_id.into() {
             bug!("not the peer of the uni channel");
         }
@@ -235,38 +269,31 @@ where
         }
 
         let info = UniChannelReceived {
-            channel_id: e.channel_id.into(),
             parent_cmd_id: e.parent_cmd_id,
-            send_id: e.sender_id.into(),
-            recv_id: e.receiver_id.into(),
+            seal_id: e.sender_id.into(),
+            open_id: e.receiver_id.into(),
             author_id: e.author_id.into(),
             author_enc_pk: &e.author_enc_pk,
             peer_enc_key_id: e.peer_enc_key_id.into(),
             label_id: e.label_id.into(),
             encap: &e.encap,
-            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let secret = self
+        let key = self
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, (*secret.id()).into());
 
-        let psks = AqcUniPsks::try_from_fn(info.channel_id, |suite| {
-            if self.device_id == info.send_id {
-                secret.generate_send_only_psk(suite).map(|psk| {
-                    let identity = *psk.identity();
-                    let secret = Directed::Send(Secret::from(psk.raw_secret_bytes()));
-                    AqcUniPsk { identity, secret }
-                })
+        let secret = UniKey::try_from_fn(info.key_id, |suite| {
+            if self.device_id == info.seal_id {
+                Directed::Send(key);
             } else {
-                secret.generate_recv_only_psk(suite).map(|psk| {
-                    let identity = *psk.identity();
-                    let secret = Directed::Recv(Secret::from(psk.raw_secret_bytes()));
-                    AqcUniPsk { identity, secret }
-                })
+                Directed::Recv(key);
             }
         })?;
-        Ok(AqcPsks::Uni(psks))
+        self.shm
+            .lock()
+            .await
+            .add(channel_id, secret)
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        Ok(())
     }
 }

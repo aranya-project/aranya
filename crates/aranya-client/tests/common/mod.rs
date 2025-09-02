@@ -179,6 +179,13 @@ impl DeviceCtx {
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
             aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
+            afc: Toggle::Enabled(daemon_cfg::AfcConfig {
+                shm_path: "/test_daemon1".to_owned(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            }),
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
             },

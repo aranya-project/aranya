@@ -1,3 +1,5 @@
+#[cfg(all(feature = "afc", feature = "unstable"))]
+use std::str::FromStr;
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -7,6 +9,8 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
+#[cfg(all(feature = "afc", feature = "unstable"))]
+use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -18,8 +22,14 @@ use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
+#[cfg(all(feature = "afc", feature = "unstable"))]
+use tracing::debug;
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(all(feature = "afc", feature = "unstable"))]
+use crate::afc::Afc;
+#[cfg(all(feature = "afc", feature = "unstable"))]
+use crate::config::AfcConfig;
 use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
@@ -234,14 +244,19 @@ impl Daemon {
                     }
                     peers
                 };
-                // TODO: use AFC shm key store
-                Aqc::new(
+                let Toggle::Enabled(afc_cfg) = &cfg.afc else {
+                    anyhow::bail!(
+                        "AFC is currently required, set `afc.enable = true` in daemon config."
+                    )
+                };
+                Afc::new(
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
                     peers,
+                    afc_cfg.clone(),
                 )
             };
 
@@ -521,7 +536,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
+    use crate::config::{AfcConfig, AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -541,6 +556,13 @@ mod tests {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
             aqc: Toggle::Enabled(AqcConfig {}),
+            afc: Toggle::Enabled(AfcConfig {
+                shm_path: "/test_daemon1".to_owned(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            }),
         };
         for dir in [
             &cfg.runtime_dir,

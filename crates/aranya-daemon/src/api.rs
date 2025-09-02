@@ -87,7 +87,7 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
-        #[cfg(all(feature = "afc", feature = "unstable"))] afc: Aqc<CE, KS>,
+        #[cfg(all(feature = "afc", feature = "unstable"))] afc: Afc<CE, KS>,
         crypto: Crypto,
         seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,

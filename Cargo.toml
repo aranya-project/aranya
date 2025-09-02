@@ -35,6 +35,7 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
+aranya-fast-channels = { version = "0.11.0" }
 aranya-afc-util = { version = "0.12.0" }
 aranya-aqc-util = { version = "0.7.0", features = ["alloc"] }
 aranya-capi-core = { version = "0.4.4" }
@@ -109,6 +110,7 @@ tag-message = ""
 tag-prefix = ""
 
 [patch.crates-io]
+#aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
 aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
 aranya-policy-module = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
 aranya-aqc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }

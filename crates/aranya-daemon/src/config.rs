@@ -106,6 +106,10 @@ pub struct Config {
     #[serde(default)]
     pub aqc: Toggle<AqcConfig>,
 
+    /// AFC configuration.
+    #[serde(default)]
+    pub afc: Toggle<AfcConfig>,
+
     /// QUIC syncer config
     #[serde(default)]
     pub sync: SyncConfig,
@@ -198,6 +202,27 @@ pub struct SyncConfig {
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
 
+/// AFC configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AfcConfig {
+    /// Shared memory path.
+    pub shm_path: String,
+    /// Unlink `shm_path` before creating the shared memory?
+    ///
+    /// Ignored if `create` is false.
+    pub unlink_on_startup: bool,
+    /// Unlink `shm_path` before on exit?
+    ///
+    /// If false, the shared memory will persist across daemon
+    /// restarts.
+    pub unlink_at_exit: bool,
+    /// Create the shared memory?
+    pub create: bool,
+    /// Maximum number of channels AFC should support.
+    pub max_chans: usize,
+}
+
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -246,6 +271,13 @@ mod tests {
                 }),
             },
             aqc: Toggle::Enabled(AqcConfig {}),
+            afc: Toggle::Enabled(AfcConfig {
+                shm_path: "/afc".to_owned(),
+                unlink_on_startup: false,
+                unlink_at_exit: false,
+                create: true,
+                max_chans: 100,
+            }),
         };
         assert_eq!(got, want);
 
