@@ -38,6 +38,7 @@ pub mod policy;
 pub mod sync;
 pub mod vm_policy;
 
+#[cfg(all(feature = "afc", feature = "unstable"))]
 mod afc;
 mod api;
 mod aqc;
