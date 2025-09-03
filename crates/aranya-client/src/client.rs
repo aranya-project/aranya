@@ -89,7 +89,7 @@ impl ClientBuilder<'_> {
     /// # async fn main() -> anyhow::Result<()> {
     /// let client = Client::builder()
     ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
-    ///     .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
+    ///     // .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
     ///     .connect()
     ///     .await?;
     /// #    Ok(())
