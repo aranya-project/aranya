@@ -390,6 +390,38 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    // TODO(#468): Improve docs
+    /// Finalize the team's current graph state.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error when the device doesn't have the permission
+    /// to create a `FinalizeTeam` command.
+    ///
+    /// See <https://aranya-project.github.io/glossary#finalization>
+    #[cfg(feature = "unstable")]
+    pub async fn finalize_team(&self) -> Result<()> {
+        self.client
+            .daemon
+            .finalize_team(context::current(), self.team_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Assigns the finalize permission to a device.
+    ///
+    /// Only devices with the `Owner` role can assign this permission
+    #[cfg(feature = "unstable")]
+    pub async fn assign_finalize_perm(&self, device: DeviceId) -> Result<()> {
+        self.client
+            .daemon
+            .assign_finalize(context::current(), self.team_id, device)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client

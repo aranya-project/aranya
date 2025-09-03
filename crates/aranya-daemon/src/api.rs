@@ -188,6 +188,7 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
+                TeamFinalized(_team_finalized) => {}
                 TeamTerminated(_team_terminated) => {}
                 MemberAdded(_member_added) => {}
                 MemberRemoved(_member_removed) => {}
@@ -197,6 +198,7 @@ impl EffectHandler {
                 OwnerRevoked(_owner_revoked) => {}
                 AdminRevoked(_admin_revoked) => {}
                 OperatorRevoked(_operator_revoked) => {}
+                FinalizePermAssigned(_revoked) => {}
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
@@ -287,10 +289,9 @@ impl Deref for Api {
 impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
-    async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<()> {
+    async fn check_team_valid(&self, team: api::TeamId) -> api::Result<()> {
         if self.invalid.contains(team.into_id().into()) {
-            // TODO: return custom daemon error type
-            anyhow::bail!("team {team} invalid due to graph finalization error")
+            return Err(api::Error::ParallelFinalize(Some(team)));
         }
         Ok(())
     }
@@ -436,6 +437,39 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         todo!();
+    }
+
+    #[instrument(skip(self), err)]
+    #[cfg(feature = "unstable")]
+    async fn finalize_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .finalize_team()
+            .await
+            .context("unable to finalize team")?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    #[cfg(feature = "unstable")]
+    async fn assign_finalize(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .assign_finalize_perm(device.into_id().into())
+            .await
+            .context("unable to assign finalize permission")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self), err)]

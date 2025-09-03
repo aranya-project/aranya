@@ -1254,6 +1254,51 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     Ok(())
 }
 
+// TODO(#468): Improve docs
+/// Finalize the team's current graph state.
+///
+/// This function will return an error when the device doesn't have the permission
+/// to create a `FinalizeTeam` command.
+///
+/// See <https://aranya-project.github.io/glossary#finalization>
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "unstable")]
+pub fn finalize_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).finalize_team())?;
+    Ok(())
+}
+
+/// Assigns the finalize permission to a device.
+///
+/// Only devices with the `Owner` role can assign this permission
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "unstable")]
+pub fn assign_finalize_perm(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_finalize_perm(device.into()),
+    )?;
+    Ok(())
+}
+
 /// Add a device to the team with the default role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.

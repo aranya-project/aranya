@@ -15,7 +15,7 @@ workspace = true
 
 [features]
 default = []
-
+unstable = ["aranya-daemon-api/unstable"]
 
 [dependencies]
 aranya-daemon-api = { workspace = true }

@@ -23,6 +23,7 @@ higher role back down to `Member`.
 
 * Owner:
   * Initialize/terminate Team.
+  * Finalize graph state.
   * Add (new) / remove Members.
   * Assign/revoke Owner role.
   * Assign/revoke Admin role.
@@ -117,7 +118,7 @@ struct KeyIds {
 
 ```policy
 // A device on the team.
-fact Device[device_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
+fact Device[device_id id]=>{role enum Role, sign_key_id id, enc_key_id id, can_finalize bool}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -402,7 +403,7 @@ command CreateTeam {
         check author_id == owner_key_ids.device_id
 
         finish {
-            add_new_device(this.owner_keys, owner_key_ids, Role::Owner)
+            add_new_device(this.owner_keys, owner_key_ids, Role::Owner, true)
 
             emit TeamCreated {
                 owner_id: author_id,
@@ -412,11 +413,12 @@ command CreateTeam {
 }
 
 // Adds the device to the Team.
-finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
+finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role, can_finalize bool) {
     create Device[device_id: key_ids.device_id]=>{
         role: role,
         sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
+        can_finalize: can_finalize
     }
 
     create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
@@ -434,7 +436,70 @@ finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyId
 **Invariants:**
 
 - This is the initial command in the graph.
-- Only an Owner will create this event.
+- Only an Owner will create this command.
+
+
+## FinalizeTeam
+
+Finalizes the current state of the team's graph.
+
+```policy
+fact Epoch[]=>{count int}
+
+action finalize_team() {
+    publish FinalizeTeam {}
+}
+
+effect TeamFinalized {
+    owner_id id,
+}
+
+command FinalizeTeam {
+    fields {}
+    attributes {
+        finalize: true
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // Check that the author is able to create commands that finalize
+        check author.can_finalize
+
+        let maybe_epoch = query Epoch[]
+
+        if maybe_epoch is Some {
+            let epoch = unwrap maybe_epoch
+            let new_count = epoch.count + 1
+            finish {
+                update Epoch[]=>{count: epoch.count} to {count: new_count}
+                emit TeamFinalized {
+                    owner_id: author.device_id,
+                }
+            }
+
+        } else {
+            finish {
+                create Epoch[]=>{count: 1}
+                emit TeamFinalized {
+                    owner_id: author.device_id,
+                }
+            }
+        }
+    }
+}
+```
+
+**Invariants:**
+
+- Only an Owner will create this command.
+
 
 ## TerminateTeam
 
@@ -478,7 +543,7 @@ command TerminateTeam {
 **Invariants:**
 
 - This is the final command in the graph.
-- Only an Owner can create this event.
+- Only an Owner can create this command.
 - Once terminated, no further communication will occur over the team graph.
 
 
@@ -524,7 +589,7 @@ command AddMember {
         check find_existing_device(device_key_ids.device_id) is None
 
         finish {
-            add_new_device(this.device_keys, device_key_ids, Role::Member)
+            add_new_device(this.device_keys, device_key_ids, Role::Member, false)
 
             emit MemberAdded {
                 device_id: device_key_ids.device_id,
@@ -601,6 +666,64 @@ finish function remove_device(device_id id) {
 
 - Members can only be removed by Operators and Owners.
 - Removing non-Members requires revoking their higher role so the device is made into a Member first.
+
+## AssignFinalizePerm
+
+Assigns the finalize permission to a device.
+
+```policy
+effect FinalizePermAssigned {
+    device_id id,
+}
+
+action assign_finalize_perm(device_id id){
+    publish AssignFinalizePerm { device_id: device_id }
+}
+
+command AssignFinalizePerm {
+    fields {
+        // The assigned device's ID.
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = get_valid_device(this.device_id)
+
+        // Only an Owner can assign the Owner role.
+        check is_owner(author.role)
+        // The device must not already have the finalize permission.
+        check device.can_finalize != true
+
+        finish {
+            update Device[device_id: device.device_id]=>{
+            role: device.role,
+            sign_key_id: device.sign_key_id,
+            enc_key_id: device.enc_key_id,
+            can_finalize: false,
+            } to {
+                role: device.role,
+                sign_key_id: device.sign_key_id,
+                enc_key_id: device.enc_key_id,
+                can_finalize: true,
+            }
+
+            emit FinalizePermAssigned {
+                device_id: this.device_id,
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Only the owner can create this command
 
 
 ## AssignRole
@@ -680,10 +803,12 @@ finish function assign_role(device struct Device, role enum Role) {
         role: device.role,
         sign_key_id: device.sign_key_id,
         enc_key_id: device.enc_key_id,
+        can_finalize: device.can_finalize
         } to {
             role: role,
             sign_key_id: device.sign_key_id,
             enc_key_id: device.enc_key_id,
+            can_finalize: device.can_finalize,
         }
 }
 ```
@@ -855,10 +980,12 @@ finish function revoke_role(device struct Device) {
         role: device.role,
         sign_key_id: device.sign_key_id,
         enc_key_id: device.enc_key_id,
+        can_finalize: device.can_finalize,
         } to {
             role: Role::Member,
             sign_key_id: device.sign_key_id,
             enc_key_id: device.enc_key_id,
+            can_finalize: device.can_finalize,
             }
 }
 ```

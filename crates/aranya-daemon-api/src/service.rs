@@ -36,17 +36,19 @@ pub type CE = DefaultEngine;
 pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
-// TODO: enum?
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Error(String);
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum Error {
+    ParallelFinalize(Option<TeamId>),
+    Other(String),
+}
 
 impl Error {
     pub fn from_msg(err: &str) -> Self {
-        Self(err.into())
+        Self::Other(err.into())
     }
 
     pub fn from_err<E: error::Error>(err: E) -> Self {
-        Self(ReportExt::report(&err).to_string())
+        Self::Other(ReportExt::report(&err).to_string())
     }
 }
 
@@ -58,7 +60,7 @@ impl From<Bug> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
-        Self(format!("{err:?}"))
+        Self::Other(format!("{err:?}"))
     }
 }
 
@@ -76,7 +78,15 @@ impl From<IdError> for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        match self {
+            Self::Other(s) => s.fmt(f),
+            Self::ParallelFinalize(Some(team)) => {
+                write!(f, "team {team} invalid due to graph finalization error")
+            }
+            Self::ParallelFinalize(None) => {
+                write!(f, "team invalid due to graph finalization error")
+            }
+        }
     }
 }
 
@@ -663,6 +673,14 @@ pub trait DaemonApi {
     async fn create_team(cfg: CreateTeamConfig) -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
+
+    /// Finalize the team's current graph state.
+    #[cfg(feature = "unstable")]
+    async fn finalize_team(team: TeamId) -> Result<()>;
+
+    /// Assigns the finalize permission to a device.
+    #[cfg(feature = "unstable")]
+    async fn assign_finalize(team: TeamId, device: DeviceId) -> Result<()>;
 
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,

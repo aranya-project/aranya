@@ -2081,6 +2081,68 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
+ * Finalize the team's current graph state.
+ *
+ * This function will return an error when the device doesn't have the permission
+ * to create a `FinalizeTeam` command.
+ *
+ * See <https://aranya-project.github.io/glossary#finalization>
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_finalize_team(const struct AranyaClient *client,
+                                 const struct AranyaTeamId *team);
+
+/**
+ * Finalize the team's current graph state.
+ *
+ * This function will return an error when the device doesn't have the permission
+ * to create a `FinalizeTeam` command.
+ *
+ * See <https://aranya-project.github.io/glossary#finalization>
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_finalize_team_ext(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Assigns the finalize permission to a device.
+ *
+ * Only devices with the `Owner` role can assign this permission
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_finalize_perm(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaDeviceId *device);
+
+/**
+ * Assigns the finalize permission to a device.
+ *
+ * Only devices with the `Owner` role can assign this permission
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_finalize_perm_ext(const struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            const struct AranyaDeviceId *device,
+                                            struct AranyaExtError *__ext_err);
+
+/**
  * Add a device to the team with the default role.
  *
  * Permission to perform this operation is checked against the Aranya policy.

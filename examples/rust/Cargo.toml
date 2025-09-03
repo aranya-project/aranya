@@ -37,6 +37,9 @@ undocumented_unsafe_blocks = "warn"
 unwrap_used = "warn"
 wildcard_imports = "warn"
 
+[features]
+unstable = ["aranya-client/unstable", "aranya-daemon-api/unstable"]
+
 [dependencies]
 aranya-client = { path = "../../crates/aranya-client" }
 aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }

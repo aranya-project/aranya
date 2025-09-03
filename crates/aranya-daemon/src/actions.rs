@@ -177,6 +177,31 @@ where
         .in_current_span()
     }
 
+    /// Finalizes the team's current graph state.
+    #[instrument(skip_all)]
+    #[cfg(feature = "unstable")]
+    fn finalize_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(|actor| {
+            actor.finalize_team()?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Assigns the finalize permission to a device.
+    #[instrument(skip_all)]
+    #[cfg(feature = "unstable")]
+    fn assign_finalize_perm(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_finalize_perm(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Adds a Member instance to the team.
     #[instrument(skip_all)]
     fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
