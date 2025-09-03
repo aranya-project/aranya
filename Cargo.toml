@@ -110,7 +110,7 @@ tag-message = ""
 tag-prefix = ""
 
 [patch.crates-io]
-#aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
 aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
 aranya-policy-module = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }
 aranya-aqc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "label-id-ffis" }

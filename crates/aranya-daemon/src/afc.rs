@@ -2,23 +2,38 @@
 
 use std::{
     collections::BTreeMap,
-    sync::{atomic::AtomicU32, Arc},
+    fmt::Debug,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{
     BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler, UniChannelCreated,
-    UniChannelReceived, UniKey,
+    UniChannelReceived,
 };
-use aranya_crypto::{afc::UniAuthorSecret, DeviceId, Engine, KeyStore};
-use aranya_daemon_api::{Directed, NetIdentifier, Secret};
+#[cfg(all(feature = "afc", feature = "preview"))]
+use aranya_crypto::Rng;
+use aranya_crypto::{DeviceId, Engine, KeyStore};
+use aranya_daemon_api::NetIdentifier;
+#[cfg(all(feature = "afc", feature = "preview"))]
+use aranya_fast_channels::shm::WriteState;
+use aranya_fast_channels::{
+    shm::{self, Flag, Mode},
+    AranyaState, ChannelId, Directed,
+};
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
-use buggy::{bug, BugExt};
+use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
+#[cfg(all(feature = "afc", feature = "preview"))]
+use crate::{config::AfcConfig, CS};
 use crate::{
     keystore::AranyaStore,
     policy::{
@@ -30,8 +45,6 @@ type PeerMap = BTreeMap<GraphId, Peers>;
 type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
 /// AFC shared memory.
-#[cfg(all(feature = "afc", feature = "unstable"))]
-#[derive(Debug)]
 pub struct AfcShm {
     cfg: AfcConfig,
     write: WriteState<CS, Rng>,
@@ -58,7 +71,7 @@ impl AfcShm {
 
 impl Drop for AfcShm {
     fn drop(&mut self) {
-        #[cfg(all(feature = "afc", feature = "unstable"))]
+        #[cfg(all(feature = "afc", feature = "preview"))]
         {
             if self.cfg.unlink_at_exit {
                 if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.shm_path) {
@@ -66,6 +79,13 @@ impl Drop for AfcShm {
                 }
             }
         }
+    }
+}
+
+impl Debug for AfcShm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: debug write field.
+        f.debug_struct("AfcShm").field("cfg", &self.cfg).finish()
     }
 }
 
@@ -82,7 +102,7 @@ pub(crate) struct Afc<E, KS> {
     /// Channel ID counter.
     channel_id: AtomicU32,
     /// AFC shared memory.
-    shm: AfcShm,
+    shm: Mutex<AfcShm>,
 }
 
 impl<E, KS> Afc<E, KS> {
@@ -92,18 +112,18 @@ impl<E, KS> Afc<E, KS> {
         store: AranyaStore<KS>,
         peers: I,
         cfg: AfcConfig,
-    ) -> Self
+    ) -> Result<Self>
     where
         I: IntoIterator<Item = (GraphId, Peers)>,
     {
-        Self {
+        Ok(Self {
             device_id,
             peers: Arc::new(Mutex::new(PeerMap::from_iter(peers))),
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
             channel_id: AtomicU32::new(0),
-            shm: AfcShm::new(cfg),
-        }
+            shm: Mutex::new(AfcShm::new(cfg)?),
+        })
     }
 
     /// Returns the peer's device ID that corresponds to
@@ -160,42 +180,57 @@ where
 {
     /// Handles the [`AfcBidiChannelCreated`] effect, returning
     /// the channel's PSKs.
-    #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn bidi_channel_created(&self, e: &AfcBidiChannelCreated) -> Result<()> {
+    #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
+    pub(crate) async fn bidi_channel_created(
+        &self,
+        e: &AfcBidiChannelCreated,
+    ) -> Result<ChannelId> {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the bidi channel");
         }
 
         let info = BidiChannelCreated {
-            key_id: e.author_enc_key_id,
-            parent_cmd_id: e.parent_cmd_id,
+            key_id: e.author_enc_key_id.into(),
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             peer_id: e.peer_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
         };
-        let BidiKeys { seal, open } = self
+        let keys = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
         self.shm
             .lock()
             .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
+            .write
+            .add(
+                channel_id.into(),
+                Directed::Bidirectional {
+                    seal: keys.seal,
+                    open: keys.open,
+                },
+                info.label_id,
+            )
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        Ok(channel_id.into())
     }
 
     /// Handles the [`AfcBidiChannelReceived`] effect, returning
     /// the channel's PSKs.
-    #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn bidi_channel_received(&self, e: &AfcBidiChannelReceived) -> Result<()> {
+    #[instrument(skip_all, fields(id = %e.label_id))]
+    pub(crate) async fn bidi_channel_received(
+        &self,
+        e: &AfcBidiChannelReceived,
+    ) -> Result<ChannelId> {
         if e.peer_id != self.device_id.into() {
             bug!("not the peer of the bidi channel");
         }
 
         let info = BidiChannelReceived {
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_pk: &e.author_enc_pk,
             peer_id: e.peer_id.into(),
@@ -210,16 +245,21 @@ where
         self.shm
             .lock()
             .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
+            .write
+            .add(
+                channel_id.into(),
+                Directed::Bidirectional { seal, open },
+                info.label_id,
+            )
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
 
-        Ok(())
+        Ok(channel_id.into())
     }
 
     /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel's PSKs.
-    #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<()> {
+    #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
+    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId> {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the uni channel");
         }
@@ -228,8 +268,8 @@ where
         }
 
         let info = UniChannelCreated {
-            key_id: e.author_enc_key_id,
-            parent_cmd_id: e.parent_cmd_id,
+            key_id: e.author_enc_key_id.into(),
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             seal_id: e.sender_id.into(),
@@ -237,30 +277,26 @@ where
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
         };
-        let key: UniKey = self
+        let key = self
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-
-        let secret = UniKey::try_from_fn(info.key_id, |suite| {
-            if self.device_id == info.seal_id {
-                Directed::Send(key);
-            } else {
-                Directed::Recv(key);
-            }
-        })?;
         self.shm
             .lock()
             .await
-            .add(channel_id, secret)
+            .write
+            .add(channel_id.into(), key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-        Ok(())
+        Ok(channel_id.into())
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
     /// the channel's PSKs.
-    #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<()> {
+    #[instrument(skip_all, fields(id = %e.label_id))]
+    pub(crate) async fn uni_channel_received(
+        &self,
+        e: &AfcUniChannelReceived,
+    ) -> Result<ChannelId> {
         if e.author_id == self.device_id.into() {
             bug!("not the peer of the uni channel");
         }
@@ -269,7 +305,7 @@ where
         }
 
         let info = UniChannelReceived {
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             seal_id: e.sender_id.into(),
             open_id: e.receiver_id.into(),
             author_id: e.author_id.into(),
@@ -281,19 +317,22 @@ where
         let key = self
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
-
-        let secret = UniKey::try_from_fn(info.key_id, |suite| {
-            if self.device_id == info.seal_id {
-                Directed::Send(key);
-            } else {
-                Directed::Recv(key);
-            }
-        })?;
+        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
         self.shm
             .lock()
             .await
-            .add(channel_id, secret)
+            .write
+            .add(channel_id.into(), key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-        Ok(())
+        Ok(channel_id.into())
+    }
+
+    pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()> {
+        self.shm
+            .lock()
+            .await
+            .write
+            .remove(channel_id)
+            .map_err(|err| anyhow!("unable to removfe AFC channel: {err}"))
     }
 }

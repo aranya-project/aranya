@@ -8,6 +8,12 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["afc", "preview"]
+# Preview features
+preview = ["afc"]
+# Aranya Fast Channels
+afc = []
 
 [lints]
 workspace = true

@@ -1,10 +1,10 @@
 //! General utility functions and types.
 
-#[cfg(all(feature = "afc", feature = "unstable"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 use std::str::FromStr;
 use std::{fs::Permissions, os::unix::fs::PermissionsExt, path::Path};
 
-#[cfg(all(feature = "afc", feature = "unstable"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 use aranya_fast_channels::shm;
 use tokio::{fs, io};
 use tracing::warn;
@@ -65,7 +65,7 @@ pub async fn create_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
 ///
 /// The `FromStr` and `TryFrom` implementations return `shm::InvalidPathError`
 /// if the input string is not a valid shared memory path.
-#[cfg(all(feature = "afc", feature = "unstable"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 #[derive(Clone, Debug)]
 pub struct ShmPathBuf(Vec<u8>);
 

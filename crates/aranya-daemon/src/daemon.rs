@@ -1,5 +1,3 @@
-#[cfg(all(feature = "afc", feature = "unstable"))]
-use std::str::FromStr;
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -9,8 +7,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-#[cfg(all(feature = "afc", feature = "unstable"))]
-use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
+#[cfg(all(feature = "afc", feature = "preview"))]
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -22,14 +19,10 @@ use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
-#[cfg(all(feature = "afc", feature = "unstable"))]
-use tracing::debug;
 use tracing::{error, info, info_span, Instrument as _};
 
-#[cfg(all(feature = "afc", feature = "unstable"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 use crate::afc::Afc;
-#[cfg(all(feature = "afc", feature = "unstable"))]
-use crate::config::AfcConfig;
 use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
@@ -229,7 +222,7 @@ impl Daemon {
                 )
             };
 
-            #[cfg(all(feature = "afc", feature = "unstable"))]
+            #[cfg(all(feature = "afc", feature = "preview"))]
             let afc = {
                 let peers = {
                     let mut peers = BTreeMap::new();
@@ -257,7 +250,7 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     peers,
                     afc_cfg.clone(),
-                )
+                )?
             };
 
             let data = QSData { psk_store };
@@ -278,7 +271,7 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
-                #[cfg(all(feature = "afc", feature = "unstable"))]
+                #[cfg(all(feature = "afc", feature = "preview"))]
                 afc,
                 crypto,
                 seed_id_dir,

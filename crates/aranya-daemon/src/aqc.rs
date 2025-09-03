@@ -115,7 +115,7 @@ where
         }
 
         let info = BidiChannelCreated {
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             peer_id: e.peer_id.into(),
@@ -152,7 +152,7 @@ where
 
         let info = BidiChannelReceived {
             channel_id: e.channel_id.into(),
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_pk: &e.author_enc_pk,
             peer_id: e.peer_id.into(),
@@ -188,7 +188,7 @@ where
         }
 
         let info = UniChannelCreated {
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             send_id: e.sender_id.into(),
@@ -236,7 +236,7 @@ where
 
         let info = UniChannelReceived {
             channel_id: e.channel_id.into(),
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             send_id: e.sender_id.into(),
             recv_id: e.receiver_id.into(),
             author_id: e.author_id.into(),
