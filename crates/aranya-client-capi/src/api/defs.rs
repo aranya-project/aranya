@@ -459,10 +459,12 @@ impl Addr {
 /// A network identifier for an Aranya client.
 ///
 /// E.g. "localhost:8080", "127.0.0.1:8080"
+#[cfg(feature = "aqc")]
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct NetIdentifier(*const c_char);
 
+#[cfg(feature = "aqc")]
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.

@@ -105,3 +105,6 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "capi-cfg-assoc" }

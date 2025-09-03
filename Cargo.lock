@@ -154,8 +154,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c0850521343f0b22cff93107d4c0d33f76c9ca6d7ebc3f0955f9d7f9186e499"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=capi-cfg-assoc#0e32841bc6cfa25f2601c1a4885f832d8cf6da31"
 dependencies = [
  "aho-corasick",
  "anyhow",
