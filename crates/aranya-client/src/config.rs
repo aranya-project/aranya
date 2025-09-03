@@ -14,6 +14,7 @@ pub use team::*;
 pub struct SyncPeerConfig {
     interval: Duration,
     sync_now: bool,
+    sync_on_hello: bool,
 }
 
 impl SyncPeerConfig {
@@ -28,6 +29,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
         Self {
             interval: value.interval,
             sync_now: value.sync_now,
+            sync_on_hello: value.sync_on_hello,
         }
     }
 }
@@ -37,6 +39,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
+    sync_on_hello: bool,
 }
 
 impl SyncPeerConfigBuilder {
@@ -58,6 +61,7 @@ impl SyncPeerConfigBuilder {
         Ok(SyncPeerConfig {
             interval,
             sync_now: self.sync_now,
+            sync_on_hello: self.sync_on_hello,
         })
     }
 
@@ -77,6 +81,15 @@ impl SyncPeerConfigBuilder {
         self.sync_now = sync_now;
         self
     }
+
+    /// Configures whether to automatically sync when a hello message is received from this peer
+    /// indicating they have a head that we don't have.
+    ///
+    /// By default, sync on hello is disabled.
+    pub fn sync_on_hello(mut self, sync_on_hello: bool) -> Self {
+        self.sync_on_hello = sync_on_hello;
+        self
+    }
 }
 
 impl Default for SyncPeerConfigBuilder {
@@ -84,6 +97,7 @@ impl Default for SyncPeerConfigBuilder {
         Self {
             interval: None,
             sync_now: true,
+            sync_on_hello: false,
         }
     }
 }
