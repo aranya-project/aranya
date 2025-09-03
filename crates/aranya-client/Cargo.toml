@@ -40,7 +40,7 @@ tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
-aranya-daemon = { path = "../aranya-daemon" }
+aranya-daemon = { path = "../aranya-daemon", features = ["aqc"] }
 
 backon = { workspace = true }
 serial_test = { workspace = true }

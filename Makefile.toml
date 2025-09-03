@@ -22,7 +22,14 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 category = "build"
 description = "Build Code"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}"]
+args = [
+    "build",
+    "--verbose",
+    "--release",
+    "--package=aranya-daemon",
+    "--features=aqc",
+    "${@}",
+]
 
 [tasks.tgz-daemon]
 category = "build"
