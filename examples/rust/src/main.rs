@@ -431,9 +431,6 @@ async fn main() -> Result<()> {
         .hello_subscribe(membera_addr.into(), 1500)
         .await?;
 
-    // Let them exchange hello notifications for a bit
-    sleep(sleep_interval * 2).await;
-
     // Unsubscribe before AQC demo
     info!("members unsubscribing from hello notifications");
     membera_team.hello_unsubscribe(memberb_addr.into()).await?;

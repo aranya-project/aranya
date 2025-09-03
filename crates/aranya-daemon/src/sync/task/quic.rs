@@ -471,7 +471,13 @@ impl Syncer<State> {
         delay_milliseconds: u64,
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
-        debug!("client sending subscribe request to QUIC sync server");
+        debug!(
+            ?peer,
+            ?id,
+            delay_milliseconds,
+            ?subscriber_server_addr,
+            "client sending subscribe request to QUIC sync server"
+        );
 
         // Create the subscribe message
         let hello_msg = SyncHelloType::Subscribe {
@@ -485,11 +491,21 @@ impl Syncer<State> {
 
         // Connect to the peer
         let stream = self.connect(peer, id).await?;
-        let (_recv, mut send) = stream.split();
+        let (mut recv, mut send) = stream.split();
 
         // Send the message
         send.send(Bytes::from(data)).await.map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
+
+        // Read the response to avoid race condition with server
+        let mut response_buf = Vec::new();
+        recv.read_to_end(&mut response_buf)
+            .await
+            .context("failed to read hello subscribe response")?;
+        debug!(
+            response_len = response_buf.len(),
+            "received hello subscribe response"
+        );
 
         debug!("sent subscribe request");
         Ok(())
@@ -528,11 +544,21 @@ impl Syncer<State> {
 
         // Connect to the peer
         let stream = self.connect(peer, id).await?;
-        let (_recv, mut send) = stream.split();
+        let (mut recv, mut send) = stream.split();
 
         // Send the message
         send.send(Bytes::from(data)).await.map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
+
+        // Read the response to avoid race condition with server
+        let mut response_buf = Vec::new();
+        recv.read_to_end(&mut response_buf)
+            .await
+            .context("failed to read hello unsubscribe response")?;
+        debug!(
+            response_len = response_buf.len(),
+            "received hello unsubscribe response"
+        );
 
         debug!("sent unsubscribe request");
         Ok(())
@@ -581,7 +607,7 @@ impl Syncer<State> {
             );
             e
         })?;
-        let (_recv, mut send) = stream.split();
+        let (mut recv, mut send) = stream.split();
 
         send.send(Bytes::from(data)).await.map_err(|e| {
             warn!(
@@ -600,6 +626,16 @@ impl Syncer<State> {
             );
             Error::from(e)
         })?;
+
+        // Read the response to avoid race condition with server
+        let mut response_buf = Vec::new();
+        recv.read_to_end(&mut response_buf)
+            .await
+            .context("failed to read hello notification response")?;
+        debug!(
+            response_len = response_buf.len(),
+            "received hello notification response"
+        );
 
         Ok(())
     }
@@ -627,6 +663,12 @@ impl Syncer<State> {
             .await
             .context("failed to read sync response")?;
         debug!(n = recv_buf.len(), "received sync response");
+
+        // Check for empty response (which indicates a hello message response)
+        if recv_buf.is_empty() {
+            debug!("received empty response, likely from hello message - ignoring");
+            return Ok(0);
+        }
 
         // process the sync response.
         let resp = postcard::from_bytes(&recv_buf)
@@ -883,14 +925,7 @@ where
         )
         .await;
         let resp = match sync_response_res {
-            Ok(data) => {
-                if data.is_empty() {
-                    // No data to send, return early
-                    send.close().await.map_err(Error::from)?;
-                    return Ok(());
-                }
-                SyncResponse::Ok(data)
-            }
+            Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 let error = err.report().to_string();
                 error!(%error, "error responding to sync request");
@@ -923,8 +958,23 @@ where
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncPeers,
     ) -> SyncResult<Box<[u8]>> {
-        let sync_type: SyncType<Addr> =
-            postcard::from_bytes(request_data).map_err(|e| anyhow::anyhow!(e))?;
+        debug!(
+            request_data_len = request_data.len(),
+            ?addr,
+            ?active_team,
+            "Server received sync request"
+        );
+
+        let sync_type: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| {
+            error!(
+                error = %e,
+                request_data_len = request_data.len(),
+                ?addr,
+                ?active_team,
+                "Failed to deserialize sync request"
+            );
+            anyhow::anyhow!(e)
+        })?;
 
         match sync_type {
             SyncType::Poll {
@@ -972,6 +1022,7 @@ where
                 bug!("Push messages are not implemented")
             }
             SyncType::Hello(hello_msg) => {
+                debug!(?hello_msg, ?addr, ?active_team, "Processing hello message");
                 Self::process_hello_message(
                     hello_msg,
                     client,
@@ -983,6 +1034,7 @@ where
                 )
                 .await;
                 // Hello messages are fire-and-forget, return empty response
+                // Note: returning empty response which will be ignored by client
                 Ok(Box::new([]))
             }
         }
