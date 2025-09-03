@@ -1022,7 +1022,6 @@ where
                 bug!("Push messages are not implemented")
             }
             SyncType::Hello(hello_msg) => {
-                debug!(?hello_msg, ?addr, ?active_team, "Processing hello message");
                 Self::process_hello_message(
                     hello_msg,
                     client,
