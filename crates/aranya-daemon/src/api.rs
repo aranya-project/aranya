@@ -9,7 +9,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
     default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
-    Engine as _, KeyStore as _, KeyStoreExt as _, Rng,
+    Engine, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
@@ -30,7 +30,7 @@ use tarpc::{
 use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(all(feature = "afc", feature = "preview"))]
+#[cfg(any(feature = "afc", feature = "preview"))]
 use crate::afc::Afc;
 use crate::{
     actions::Actions,
@@ -89,18 +89,18 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
-        #[cfg(all(feature = "afc", feature = "preview"))] afc: Afc<CE, KS>,
+        #[cfg(any(feature = "afc", feature = "preview"))] afc: Afc<CE, CS, KS>,
         crypto: Crypto,
         seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
-        #[cfg(all(feature = "afc", feature = "preview"))]
+        #[cfg(any(feature = "afc", feature = "preview"))]
         let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
-            #[cfg(all(feature = "afc", feature = "preview"))]
+            #[cfg(any(feature = "afc", feature = "preview"))]
             afc: Arc::clone(&afc),
         };
         let api = Api(Arc::new(ApiInner {
@@ -111,7 +111,7 @@ impl DaemonApiServer {
             effect_handler,
             invalid,
             aqc,
-            #[cfg(all(feature = "afc", feature = "preview"))]
+            #[cfg(any(feature = "afc", feature = "preview"))]
             afc,
             crypto: tokio::sync::Mutex::new(crypto),
             seed_id_dir,
@@ -184,8 +184,8 @@ impl DaemonApiServer {
 #[derive(Clone, Debug)]
 struct EffectHandler {
     aqc: Arc<Aqc<CE, KS>>,
-    #[cfg(all(feature = "afc", feature = "preview"))]
-    afc: Arc<Afc<CE, KS>>,
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    afc: Arc<Afc<CE, CS, KS>>,
 }
 
 impl EffectHandler {
@@ -223,9 +223,9 @@ impl EffectHandler {
                         .await;
                 }
                 AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
-                #[cfg(all(feature = "afc", feature = "preview"))]
+                #[cfg(any(feature = "afc", feature = "preview"))]
                 AfcNetworkNameSet(e) => {
-                    self.aqc
+                    self.afc
                         .add_peer(
                             graph,
                             api::NetIdentifier(e.net_identifier.clone()),
@@ -233,7 +233,7 @@ impl EffectHandler {
                         )
                         .await;
                 }
-                #[cfg(all(feature = "afc", feature = "preview"))]
+                #[cfg(any(feature = "afc", feature = "preview"))]
                 AfcNetworkNameUnset(e) => self.afc.remove_peer(graph, e.device_id.into()).await,
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
@@ -253,7 +253,7 @@ impl EffectHandler {
                 QueryAqcNetworkNamesOutput(_) => {}
                 QueryAfcNetIdentifierResult(_) => {}
                 QueryAfcNetworkNamesOutput(_) => {}
-                #[cfg(not(feature = "preview"))]
+                #[cfg(not(any(feature = "afc", feature = "preview")))]
                 _ => {}
             }
         }
@@ -279,8 +279,8 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
-    #[cfg(all(feature = "afc", feature = "preview"))]
-    afc: Arc<Afc<CE, KS>>,
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
     crypto: tokio::sync::Mutex<Crypto>,
     seed_id_dir: SeedDir,
@@ -653,7 +653,7 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let psks = self.aqc.bidi_channel_created(&e).await?;
+        let psks = self.aqc.bidi_channel_created(e).await?;
         info!(num = psks.len(), "bidi channel created");
 
         Ok((ctrl, psks))
@@ -694,7 +694,7 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let psks = self.aqc.uni_channel_created(&e).await?;
+        let psks = self.aqc.uni_channel_created(e).await?;
         info!(num = psks.len(), "aqc uni channel created");
 
         Ok((ctrl, psks))
@@ -743,7 +743,7 @@ impl DaemonApi for Api {
         Err(anyhow!("unable to find AQC effect").into())
     }
 
-    #[cfg(all(feature = "afc", feature = "preview"))]
+    #[cfg(any(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn assign_afc_net_identifier(
         self,
@@ -766,7 +766,19 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[cfg(all(feature = "afc", feature = "preview"))]
+    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn assign_afc_net_identifier(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+        name: api::NetIdentifier,
+    ) -> api::Result<()> {
+        todo!()
+    }
+
+    #[cfg(any(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn remove_afc_net_identifier(
         self,
@@ -785,7 +797,19 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[cfg(all(feature = "afc", feature = "preview"))]
+    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn remove_afc_net_identifier(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+        name: api::NetIdentifier,
+    ) -> api::Result<()> {
+        todo!()
+    }
+
+    #[cfg(any(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn create_afc_bidi_channel(
         self,
@@ -821,13 +845,25 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let channel_id = self.afc.bidi_channel_created(&e).await?;
+        let channel_id = self.afc.bidi_channel_created(e).await?;
         info!("afc bidi channel created");
 
         Ok((ctrl, channel_id))
     }
 
-    #[cfg(all(feature = "afc", feature = "preview"))]
+    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn create_afc_bidi_channel(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer: api::NetIdentifier,
+        label: api::LabelId,
+    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+        todo!()
+    }
+
+    #[cfg(any(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn create_afc_uni_channel(
         self,
@@ -869,49 +905,93 @@ impl DaemonApi for Api {
         Ok((ctrl, channel_id))
     }
 
-    #[cfg(all(feature = "afc", feature = "preview"))]
+    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn create_afc_uni_channel(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer: api::NetIdentifier,
+        label: api::LabelId,
+    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+        todo!()
+    }
+
+    #[cfg(any(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn delete_afc_channel(
         self,
         _: context::Context,
         chan: api::AfcChannelId,
     ) -> api::Result<()> {
-        self.afc.delete_channel(chan);
+        self.afc.delete_channel(chan).await?;
         info!("afc channel deleted");
         Ok(())
     }
 
-    /// Reacts to a bidirectional AFC channel being created.
-    #[cfg(all(feature = "afc", feature = "preview"))]
-    #[instrument(skip(self), fields(effect = ?v))]
-    #[cfg(any())]
-    async fn afc_bidi_channel_created(&self, v: &AfcBidiChannelCreatedEffect) -> Result<()> {
-        debug!("received BidiChannelCreated effect");
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
-        // TODO: don't clone the eng.
-        let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_created(
-            &mut self.eng.clone(),
-            &AfcBidiChannelCreated {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into(),
-                author_enc_key_id: v.author_enc_key_id.into(),
-                peer_id: v.peer_id.into(),
-                peer_enc_pk: &v.peer_enc_pk,
-                label,
-                key_id: v.channel_key_id.into(),
-            },
-        )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
-        debug!(%channel_id, "created AFC bidi channel `ChannelId`");
-        self.afc
-            .lock()
-            .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-        Ok(())
+    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn delete_afc_channel(
+        self,
+        _: context::Context,
+        chan: api::AfcChannelId,
+    ) -> api::Result<()> {
+        todo!()
+    }
+
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    #[instrument(skip(self), err)]
+    async fn receive_afc_ctrl(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        ctrl: api::AfcCtrl,
+    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
+        self.check_team_valid(team).await?;
+
+        let graph = GraphId::from(team.into_id());
+        let mut session = self.client.session_new(&graph).await?;
+        for cmd in ctrl {
+            let our_device_id = self.device_id()?;
+
+            let effects = self.client.session_receive(&mut session, &cmd).await?;
+            self.effect_handler.handle_effects(graph, &effects).await?;
+
+            let effect = effects.iter().find(|e| match e {
+                Effect::AfcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
+                Effect::AfcUniChannelReceived(e) => {
+                    e.sender_id != our_device_id.into() && e.receiver_id == our_device_id.into()
+                }
+                _ => false,
+            });
+            match effect {
+                Some(Effect::AfcBidiChannelReceived(e)) => {
+                    let channel_id = self.afc.bidi_channel_received(e).await?;
+                    // NB: Each action should only produce one
+                    // ephemeral command.
+                    return Ok((e.label_id.into(), channel_id));
+                }
+                Some(Effect::AfcUniChannelReceived(e)) => {
+                    let channel_id = self.afc.uni_channel_received(e).await?;
+                    // NB: Each action should only produce one
+                    // ephemeral command.
+                    return Ok((e.label_id.into(), channel_id));
+                }
+                Some(_) | None => {}
+            }
+        }
+        Err(anyhow!("unable to find AFC effect").into())
+    }
+
+    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn receive_afc_ctrl(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        ctrl: api::AfcCtrl,
+    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
+        todo!()
     }
 
     /// Create a label.

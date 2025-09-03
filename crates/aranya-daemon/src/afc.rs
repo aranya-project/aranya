@@ -15,14 +15,13 @@ use aranya_afc_util::{
     BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler, UniChannelCreated,
     UniChannelReceived,
 };
-#[cfg(all(feature = "afc", feature = "preview"))]
-use aranya_crypto::Rng;
-use aranya_crypto::{DeviceId, Engine, KeyStore};
+use aranya_crypto::{
+    afc::{RawOpenKey, RawSealKey},
+    CipherSuite, DeviceId, Engine, KeyStore, Rng,
+};
 use aranya_daemon_api::NetIdentifier;
-#[cfg(all(feature = "afc", feature = "preview"))]
-use aranya_fast_channels::shm::WriteState;
 use aranya_fast_channels::{
-    shm::{self, Flag, Mode},
+    shm::{self, Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
 };
 use aranya_runtime::GraphId;
@@ -32,9 +31,8 @@ use derive_where::derive_where;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
-#[cfg(all(feature = "afc", feature = "preview"))]
-use crate::{config::AfcConfig, CS};
 use crate::{
+    config::AfcConfig,
     keystore::AranyaStore,
     policy::{
         AfcBidiChannelCreated, AfcBidiChannelReceived, AfcUniChannelCreated, AfcUniChannelReceived,
@@ -45,12 +43,15 @@ type PeerMap = BTreeMap<GraphId, Peers>;
 type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
 /// AFC shared memory.
-pub struct AfcShm {
+pub struct AfcShm<C> {
     cfg: AfcConfig,
-    write: WriteState<CS, Rng>,
+    write: WriteState<C, Rng>,
 }
 
-impl AfcShm {
+impl<C> AfcShm<C>
+where
+    C: CipherSuite,
+{
     fn new(cfg: AfcConfig) -> Result<Self> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
@@ -62,19 +63,18 @@ impl AfcShm {
                 let _ = shm::unlink(&path);
             }
             WriteState::open(&path, Flag::Create, Mode::ReadWrite, cfg.max_chans, Rng)
-                .context("unable to open `WriteState`")?
+                .context(format!("unable to open `WriteState`: {:?}", cfg.shm_path))?
         };
 
         Ok(Self { cfg, write })
     }
 }
 
-impl Drop for AfcShm {
+impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
-        #[cfg(all(feature = "afc", feature = "preview"))]
         {
             if self.cfg.unlink_at_exit {
-                if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.shm_path) {
+                if let Ok(path) = aranya_util::shm::ShmPathBuf::from_str(&self.cfg.shm_path) {
                     let _ = shm::unlink(path);
                 }
             }
@@ -82,7 +82,7 @@ impl Drop for AfcShm {
     }
 }
 
-impl Debug for AfcShm {
+impl<E> Debug for AfcShm<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // TODO: debug write field.
         f.debug_struct("AfcShm").field("cfg", &self.cfg).finish()
@@ -90,7 +90,7 @@ impl Debug for AfcShm {
 }
 
 #[derive_where(Debug)]
-pub(crate) struct Afc<E, KS> {
+pub(crate) struct Afc<E, C, KS> {
     /// Our device ID.
     device_id: DeviceId,
     /// All the peers that we have channels with.
@@ -102,10 +102,10 @@ pub(crate) struct Afc<E, KS> {
     /// Channel ID counter.
     channel_id: AtomicU32,
     /// AFC shared memory.
-    shm: Mutex<AfcShm>,
+    shm: Mutex<AfcShm<C>>,
 }
 
-impl<E, KS> Afc<E, KS> {
+impl<E, C, KS> Afc<E, C, KS> {
     pub(crate) fn new<I>(
         eng: E,
         device_id: DeviceId,
@@ -114,6 +114,8 @@ impl<E, KS> Afc<E, KS> {
         cfg: AfcConfig,
     ) -> Result<Self>
     where
+        E: Engine,
+        C: CipherSuite,
         I: IntoIterator<Item = (GraphId, Peers)>,
     {
         Ok(Self {
@@ -173,18 +175,19 @@ impl<E, KS> Afc<E, KS> {
     }
 }
 
-impl<E, KS> Afc<E, KS>
+impl<E, C, KS> Afc<E, C, KS>
 where
     E: Engine,
+    C: CipherSuite,
     KS: KeyStore,
 {
     /// Handles the [`AfcBidiChannelCreated`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn bidi_channel_created(
-        &self,
-        e: &AfcBidiChannelCreated,
-    ) -> Result<ChannelId> {
+    pub(crate) async fn bidi_channel_created(&self, e: &AfcBidiChannelCreated) -> Result<ChannelId>
+    where
+        E: Engine<CS = C>,
+    {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the bidi channel");
         }
@@ -198,7 +201,7 @@ where
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
         };
-        let keys = self
+        let keys: BidiKeys<RawSealKey<<E as Engine>::CS>, RawOpenKey<<E as Engine>::CS>> = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
@@ -224,7 +227,10 @@ where
     pub(crate) async fn bidi_channel_received(
         &self,
         e: &AfcBidiChannelReceived,
-    ) -> Result<ChannelId> {
+    ) -> Result<ChannelId>
+    where
+        E: Engine<CS = C>,
+    {
         if e.peer_id != self.device_id.into() {
             bug!("not the peer of the bidi channel");
         }
@@ -259,7 +265,10 @@ where
     /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId> {
+    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId>
+    where
+        E: Engine<CS = C>,
+    {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the uni channel");
         }
@@ -293,10 +302,10 @@ where
     /// Handles the [`AfcUniChannelReceived`] effect, returning
     /// the channel's PSKs.
     #[instrument(skip_all, fields(id = %e.label_id))]
-    pub(crate) async fn uni_channel_received(
-        &self,
-        e: &AfcUniChannelReceived,
-    ) -> Result<ChannelId> {
+    pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<ChannelId>
+    where
+        E: Engine<CS = C>,
+    {
         if e.author_id == self.device_id.into() {
             bug!("not the peer of the uni channel");
         }
@@ -327,7 +336,10 @@ where
         Ok(channel_id.into())
     }
 
-    pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()> {
+    pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>
+    where
+        E: Engine<CS = C>,
+    {
         self.shm
             .lock()
             .await

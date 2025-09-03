@@ -7,7 +7,6 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-#[cfg(all(feature = "afc", feature = "preview"))]
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -21,7 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
-#[cfg(all(feature = "afc", feature = "preview"))]
+#[cfg(any(feature = "afc", feature = "preview"))]
 use crate::afc::Afc;
 use crate::{
     actions::Actions,
@@ -222,7 +221,7 @@ impl Daemon {
                 )
             };
 
-            #[cfg(all(feature = "afc", feature = "preview"))]
+            #[cfg(any(feature = "afc", feature = "preview"))]
             let afc = {
                 let peers = {
                     let mut peers = BTreeMap::new();
@@ -271,7 +270,7 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
-                #[cfg(all(feature = "afc", feature = "preview"))]
+                #[cfg(any(feature = "afc", feature = "preview"))]
                 afc,
                 crypto,
                 seed_id_dir,
@@ -550,7 +549,7 @@ mod tests {
             },
             aqc: Toggle::Enabled(AqcConfig {}),
             afc: Toggle::Enabled(AfcConfig {
-                shm_path: "/test_daemon1".to_owned(),
+                shm_path: "/test_daemon_run".to_owned(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,

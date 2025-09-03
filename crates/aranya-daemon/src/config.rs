@@ -273,7 +273,7 @@ mod tests {
             aqc: Toggle::Enabled(AqcConfig {}),
             afc: Toggle::Enabled(AfcConfig {
                 shm_path: "/afc".to_owned(),
-                unlink_on_startup: false,
+                unlink_on_startup: true,
                 unlink_at_exit: false,
                 create: true,
                 max_chans: 100,

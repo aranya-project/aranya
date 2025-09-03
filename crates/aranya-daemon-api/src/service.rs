@@ -21,7 +21,6 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
-#[cfg(all(feature = "afc", feature = "preview"))]
 pub use aranya_fast_channels::ChannelId as AfcChannelId;
 pub use aranya_policy_text::{text, Text};
 use aranya_util::{error::ReportExt, Addr};
@@ -182,6 +181,9 @@ impl fmt::Display for NetIdentifier {
 
 /// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
+
+/// A serialized command for AFC.
+pub type AfcCtrl = Vec<Box<[u8]>>;
 
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
@@ -723,36 +725,33 @@ pub trait DaemonApi {
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
 
     /// Create a bidirectional AFC channel.
-    #[cfg(all(feature = "afc", feature = "preview"))]
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC channel.
-    #[cfg(all(feature = "afc", feature = "preview"))]
     async fn create_afc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AfcChannelId)>;
     /// Delete a AFC channel.
-    #[cfg(all(feature = "afc", feature = "preview"))]
     async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
     /// Assign a AFC network identifier to a device.
-    #[cfg(all(feature = "afc", feature = "preview"))]
     async fn assign_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
     /// Remove a AFC network identifier from a device.
-    #[cfg(all(feature = "afc", feature = "preview"))]
     async fn remove_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
+    /// Receive AFC ctrl message.
+    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<(LabelId, AfcChannelId)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
