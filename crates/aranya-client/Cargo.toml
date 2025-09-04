@@ -12,7 +12,11 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
+default = ["afc", "preview"]
+# Preview features
+preview = ["afc"]
+# Aranya Fast Channels
+afc = []
 
 # Enable debugging.
 debug = []

@@ -10,6 +10,7 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
     SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
 };
+use aranya_client::afc::{AfcChannel, AfcUniChannel, Seal, Open};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -475,6 +476,30 @@ async fn main() -> Result<()> {
     admin_team.delete_label(label3).await?;
 
     info!("completed aqc demo");
+
+    // Demo AFC.
+
+    // membera creates AFC channel.
+    let (send, ctrl) = membera.client.afc().create_bidi_channel(label3).expect("expected to create afc bidi channel");
+
+    // memberb receives AFC channel.
+    let chan = memberb.client.afc().receive_channel(ctrl).expect("expected to receive afc channel");
+
+    // membera seals data for memberb.
+    let data = "hello world".as_bytes();
+    let mut ciphertext = Vec::new();
+    send.seal(&data, &mut ciphertext).expect("expected to seal afc data");
+
+    // This is where membera would send the ciphertext to memberb via the network.
+
+    // memberb opens data from membera.
+    let mut plaintext = Vec::new();
+    let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = chan else {
+        bail!("expected a unidirectional receive channel");
+    };
+    recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");
+
+    info!("completed afc demo");
 
     info!("completed example Aranya application");
 

@@ -18,6 +18,8 @@ use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
 
+#[cfg(any(feature = "afc", feature = "preview"))]
+use crate::afc::AfcChannels;
 use crate::{
     aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
@@ -301,6 +303,12 @@ impl Client {
     /// Get access to Aranya QUIC Channels.
     pub fn aqc(&self) -> AqcChannels<'_> {
         AqcChannels::new(self)
+    }
+
+    /// Get access to Aranya Fast Channels.
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    pub fn afc(&self) -> AfcChannels<'_> {
+        AfcChannels::new(self)
     }
 }
 

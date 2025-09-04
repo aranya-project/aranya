@@ -26,6 +26,8 @@
 #[cfg(not(feature = "default"))]
 compile_error!("'default' feature must be enabled!");
 
+#[cfg(any(feature = "afc", feature = "preview"))]
+pub mod afc;
 pub mod aqc;
 pub mod client;
 pub mod config;

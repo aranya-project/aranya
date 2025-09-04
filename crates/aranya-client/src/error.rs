@@ -164,3 +164,28 @@ impl From<Infallible> for AqcError {
 pub(crate) fn no_addr() -> AqcError {
     AqcError::AddrResolution(io::Error::new(io::ErrorKind::NotFound, "no address found"))
 }
+
+/// Possible errors that could happen when using Aranya Fast Channels.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum AfcError {
+    /// Unable to seal datagram.
+    #[error("unable to seal datagram")]
+    Seal,
+
+    /// Unable to open datagram.
+    #[error("unable to open datagram")]
+    Open,
+
+    /// No channel info found.
+    #[error("no channel info found")]
+    NoChannelInfoFound,
+
+    /// Error parsing control message.
+    #[error("failed to parse control message")]
+    InvalidCtrlMessage(postcard::Error),
+
+    /// An internal bug was discovered.
+    #[error(transparent)]
+    Bug(#[from] buggy::Bug),
+}
