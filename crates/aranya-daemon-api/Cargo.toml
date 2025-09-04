@@ -13,6 +13,7 @@ rust-version.workspace = true
 workspace = true
 
 [features]
+unstable = []
 aqc = ["aranya-crypto/aqc"]
 
 [dependencies]

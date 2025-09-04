@@ -16,6 +16,10 @@ workspace = true
 [features]
 default = []
 
+unstable = [
+    "aranya-daemon-api/unstable"
+]
+
 aqc = ["aranya-daemon-api/aqc"]
 
 

@@ -7,6 +7,11 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(all(feature = "aqc", not(feature = "unstable")))]
+compile_error!(
+    "AQC is currently experimental. Enable the 'unstable' feature to opt into unstable APIs."
+);
+
 pub mod crypto;
 mod service;
 

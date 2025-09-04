@@ -10,5 +10,10 @@
     missing_docs
 )]
 
+#[cfg(all(feature = "aqc", not(feature = "unstable")))]
+compile_error!(
+    "AQC is currently experimental. Enable the 'unstable' feature to opt into unstable APIs."
+);
+
 pub mod api;
 pub(crate) mod imp;
