@@ -28,6 +28,10 @@ pub enum Error {
     #[error("AQC error")]
     Aqc(#[from] AqcError),
 
+    /// An Aranya Fast Channel error happened.
+    #[error("AFC error")]
+    Afc(#[from] AfcError),
+
     /// An unexpected internal error happened.
     #[error(transparent)]
     Bug(#[from] buggy::Bug),
@@ -176,6 +180,10 @@ pub enum AfcError {
     /// Unable to open datagram.
     #[error("unable to open datagram")]
     Open,
+
+    /// Unable to parse shared-memory path.
+    #[error("unable initialize shm")]
+    Shm(anyhow::Error),
 
     /// No channel info found.
     #[error("no channel info found")]

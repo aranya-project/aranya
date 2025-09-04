@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path};
+use std::{fmt::Debug, io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -15,11 +15,11 @@ use aranya_daemon_api::{
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
 use tarpc::context;
-use tokio::{fs, net::UnixStream};
+use tokio::{fs, net::UnixStream, sync::Mutex};
 use tracing::{debug, error, info, instrument};
 
 #[cfg(any(feature = "afc", feature = "preview"))]
-use crate::afc::AfcChannels;
+use crate::afc::{AfcChannels, AfcShm};
 use crate::{
     aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
@@ -68,8 +68,11 @@ pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
     daemon_uds_path: Option<&'a Path>,
-    // AQC address.
+    /// AQC address.
     aqc_server_addr: Option<&'a Addr>,
+    /// AFC shared-memory path.
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    afc_shm_path: Option<&'a String>,
 }
 
 impl ClientBuilder<'_> {
@@ -95,9 +98,25 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        Client::connect(sock, aqc_addr)
-            .await
-            .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
+
+        #[cfg(any(feature = "afc", feature = "preview"))]
+        let Some(afc_shm_path) = &self.afc_shm_path
+        else {
+            return Err(IpcError::new(InvalidArg::new(
+                "afc_shm_path",
+                "must specify the AFC shm path",
+            ))
+            .into());
+        };
+
+        Client::connect(
+            sock,
+            aqc_addr,
+            #[cfg(any(feature = "afc", feature = "preview"))]
+            afc_shm_path,
+        )
+        .await
+        .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
     }
 }
 
@@ -124,12 +143,24 @@ impl<'a> ClientBuilder<'a> {
 /// a platform-specific IPC mechanism.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
-#[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     pub(crate) aqc: AqcClient,
+    /// AFC shared-memory containing channel keys.
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    pub(crate) shm: Arc<Mutex<AfcShm>>,
+}
+
+// TODO: derive Debug on [`Client`] when `shm` implements it.
+impl Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client")
+            .field("daemon", &self.daemon)
+            .field("aqc", &self.aqc)
+            .finish()
+    }
 }
 
 impl Client {
@@ -154,7 +185,11 @@ impl Client {
     /// #    Ok(())
     /// # }
     #[instrument(skip_all)]
-    async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
+    async fn connect(
+        uds_path: &Path,
+        aqc_addr: &Addr,
+        #[cfg(any(feature = "afc", feature = "preview"))] shm_path: &String,
+    ) -> Result<Self> {
         info!(path = ?uds_path, "connecting to daemon");
 
         let daemon = {
@@ -210,7 +245,14 @@ impl Client {
             .next()
             .expect("expected AQC server address");
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
-        let client = Self { daemon, aqc };
+        #[cfg(any(feature = "afc", feature = "preview"))]
+        let shm = Arc::new(Mutex::new(AfcShm::new(shm_path.to_string(), 100)?));
+        let client = Self {
+            daemon,
+            aqc,
+            #[cfg(any(feature = "afc", feature = "preview"))]
+            shm,
+        };
 
         Ok(client)
     }
