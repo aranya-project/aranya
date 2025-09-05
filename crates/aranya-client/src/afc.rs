@@ -3,7 +3,7 @@ use std::{fmt::Debug, str::FromStr};
 
 use anyhow::Context;
 use aranya_crypto::{default::DefaultCipherSuite, CipherSuite};
-use aranya_daemon_api::{AfcChannelId, ChanOp, LabelId, NetIdentifier, TeamId, CS};
+use aranya_daemon_api::{AfcChannelId, ChanOp, DeviceId, LabelId, TeamId, CS};
 use aranya_fast_channels::shm::{Flag, Mode, ReadState};
 use tarpc::context;
 use tracing::debug;
@@ -33,13 +33,13 @@ impl<'a> AfcChannels<'a> {
     pub async fn create_bidi_channel(
         &mut self,
         team_id: TeamId,
-        peer: NetIdentifier,
+        peer_id: DeviceId,
         label_id: LabelId,
     ) -> crate::Result<(AfcBidiChannel<'_>, Ctrl)> {
         let (ctrl, channel_id) = self
             .client
             .daemon
-            .create_afc_bidi_channel(context::current(), team_id, peer, label_id)
+            .create_afc_bidi_channel(context::current(), team_id, peer_id, label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -59,13 +59,13 @@ impl<'a> AfcChannels<'a> {
     pub async fn create_uni_channel(
         &mut self,
         team_id: TeamId,
-        peer: NetIdentifier,
+        peer_id: DeviceId,
         label_id: LabelId,
     ) -> crate::Result<(AfcSendChannel<'_>, Ctrl)> {
         let (ctrl, channel_id) = self
             .client
             .daemon
-            .create_afc_uni_channel(context::current(), team_id, peer, label_id)
+            .create_afc_uni_channel(context::current(), team_id, peer_id, label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
