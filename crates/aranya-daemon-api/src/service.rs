@@ -727,29 +727,17 @@ pub trait DaemonApi {
     /// Create a bidirectional AFC channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
-        peer: NetIdentifier,
+        peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC channel.
     async fn create_afc_uni_channel(
         team: TeamId,
-        peer: NetIdentifier,
+        peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AfcChannelId)>;
     /// Delete a AFC channel.
     async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
-    /// Assign a AFC network identifier to a device.
-    async fn assign_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-    /// Remove a AFC network identifier from a device.
-    async fn remove_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
     /// Receive AFC ctrl message.
     async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<(LabelId, AfcChannelId)>;
 

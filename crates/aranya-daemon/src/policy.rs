@@ -39,8 +39,6 @@ pub enum Effect {
     AdminRevoked(AdminRevoked),
     AfcBidiChannelCreated(AfcBidiChannelCreated),
     AfcBidiChannelReceived(AfcBidiChannelReceived),
-    AfcNetworkNameSet(AfcNetworkNameSet),
-    AfcNetworkNameUnset(AfcNetworkNameUnset),
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
     AqcBidiChannelCreated(AqcBidiChannelCreated),
@@ -61,8 +59,6 @@ pub enum Effect {
     OwnerRevoked(OwnerRevoked),
     QueriedLabel(QueriedLabel),
     QueriedLabelAssignment(QueriedLabelAssignment),
-    QueryAfcNetIdentifierResult(QueryAfcNetIdentifierResult),
-    QueryAfcNetworkNamesOutput(QueryAfcNetworkNamesOutput),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
@@ -103,17 +99,6 @@ pub struct AfcBidiChannelReceived {
     pub peer_enc_key_id: Id,
     pub label_id: Id,
     pub encap: Vec<u8>,
-}
-/// AfcNetworkNameSet policy effect.
-#[effect]
-pub struct AfcNetworkNameSet {
-    pub device_id: Id,
-    pub net_identifier: Text,
-}
-/// AfcNetworkNameUnset policy effect.
-#[effect]
-pub struct AfcNetworkNameUnset {
-    pub device_id: Id,
 }
 /// AfcUniChannelCreated policy effect.
 #[effect]
@@ -281,17 +266,6 @@ pub struct QueriedLabelAssignment {
     pub label_name: Text,
     pub label_author_id: Id,
 }
-/// QueryAfcNetIdentifierResult policy effect.
-#[effect]
-pub struct QueryAfcNetIdentifierResult {
-    pub net_identifier: Text,
-}
-/// QueryAfcNetworkNamesOutput policy effect.
-#[effect]
-pub struct QueryAfcNetworkNamesOutput {
-    pub net_identifier: Text,
-    pub device_id: Id,
-}
 /// QueryAqcNetIdentifierResult policy effect.
 #[effect]
 pub struct QueryAqcNetIdentifierResult {
@@ -375,8 +349,6 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn query_afc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_afc_network_names(&mut self) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
@@ -388,17 +360,11 @@ pub trait ActorExt {
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
-    fn set_afc_network_name(
-        &mut self,
-        device_id: Id,
-        net_identifier: Text,
-    ) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,
         net_identifier: Text,
     ) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
-    fn unset_afc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
 }
