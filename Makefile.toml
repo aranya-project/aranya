@@ -27,7 +27,7 @@ args = [
     "--verbose",
     "--release",
     "--package=aranya-daemon",
-    "--features=aqc",
+    "--features=unstable,aqc",
     "${@}",
 ]
 
@@ -75,7 +75,7 @@ category = "build"
 description = "Build C API shared library"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release", "--features=aqc"]
+args = ["build", "--release", "--features=unstable,aqc"]
 
 [tasks.tgz-capi]
 category = "build"

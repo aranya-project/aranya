@@ -22,7 +22,7 @@ doctest = false
 default = []
 
 unstable = [
-    "aranya-client/unstable"
+    "aranya-client/unstable",
 ]
 
 aqc = ["aranya-client/aqc"]
