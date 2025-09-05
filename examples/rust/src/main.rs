@@ -484,7 +484,7 @@ async fn main() -> Result<()> {
     // membera creates AFC channel.
     let mut membera_afc = membera.client.afc();
     // TODO: don't use net identifiers for AFC.
-    let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.aqc_net_id(), label3).await.expect("expected to create afc bidi channel");
+    let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
 
     // memberb receives AFC channel.
     let mut memberb_afc = memberb.client.afc();
