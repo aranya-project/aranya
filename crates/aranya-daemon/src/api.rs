@@ -100,8 +100,6 @@ impl DaemonApiServer {
         let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
-            #[cfg(any(feature = "afc", feature = "preview"))]
-            afc: Arc::clone(&afc),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -184,8 +182,6 @@ impl DaemonApiServer {
 #[derive(Clone, Debug)]
 struct EffectHandler {
     aqc: Arc<Aqc<CE, KS>>,
-    #[cfg(any(feature = "afc", feature = "preview"))]
-    afc: Arc<Afc<CE, CS, KS>>,
 }
 
 impl EffectHandler {
@@ -223,18 +219,6 @@ impl EffectHandler {
                         .await;
                 }
                 AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
-                #[cfg(any(feature = "afc", feature = "preview"))]
-                AfcNetworkNameSet(e) => {
-                    self.afc
-                        .add_peer(
-                            graph,
-                            api::NetIdentifier(e.net_identifier.clone()),
-                            e.device_id.into(),
-                        )
-                        .await;
-                }
-                #[cfg(any(feature = "afc", feature = "preview"))]
-                AfcNetworkNameUnset(e) => self.afc.remove_peer(graph, e.device_id.into()).await,
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
@@ -251,10 +235,6 @@ impl EffectHandler {
                 QueryLabelExistsResult(_) => {}
                 QueryAqcNetIdentifierResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
-                QueryAfcNetIdentifierResult(_) => {}
-                QueryAfcNetworkNamesOutput(_) => {}
-                #[cfg(not(any(feature = "afc", feature = "preview")))]
-                _ => {}
             }
         }
         Ok(())
@@ -745,77 +725,11 @@ impl DaemonApi for Api {
 
     #[cfg(any(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
-    async fn assign_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        name: api::NetIdentifier,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .set_afc_network_name(device.into_id().into(), name.0)
-            .await
-            .context("unable to assign afc network identifier")?;
-        self.effect_handler
-            .handle_effects(GraphId::from(team.into_id()), &effects)
-            .await?;
-        Ok(())
-    }
-
-    #[cfg(not(any(feature = "afc", feature = "preview")))]
-    #[instrument(skip(self), err)]
-    async fn assign_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        name: api::NetIdentifier,
-    ) -> api::Result<()> {
-        todo!()
-    }
-
-    #[cfg(any(feature = "afc", feature = "preview"))]
-    #[instrument(skip(self), err)]
-    async fn remove_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        name: api::NetIdentifier,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        self.client
-            .actions(&team.into_id().into())
-            .unset_afc_network_name(device.into_id().into())
-            .await
-            .context("unable to remove afc net identifier")?;
-        Ok(())
-    }
-
-    #[cfg(not(any(feature = "afc", feature = "preview")))]
-    #[instrument(skip(self), err)]
-    async fn remove_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        name: api::NetIdentifier,
-    ) -> api::Result<()> {
-        todo!()
-    }
-
-    #[cfg(any(feature = "afc", feature = "preview"))]
-    #[instrument(skip(self), err)]
     async fn create_afc_bidi_channel(
         self,
         _: context::Context,
         team: api::TeamId,
-        peer: api::NetIdentifier,
+        peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
@@ -824,16 +738,10 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
 
-        let peer_id = self
-            .aqc
-            .find_device_id(graph, &peer)
-            .await
-            .context("did not find peer")?;
-
         let (ctrl, effects): (_, _) = self
             .client
             .actions(&graph)
-            .create_afc_bidi_channel_off_graph(peer_id, label.into_id().into())
+            .create_afc_bidi_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
             .await?;
         let id = self.device_id()?;
 
@@ -857,7 +765,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        peer: api::NetIdentifier,
+        peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
         todo!()
@@ -869,7 +777,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        peer: api::NetIdentifier,
+        peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
@@ -878,17 +786,11 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
 
-        let peer_id = self
-            .aqc
-            .find_device_id(graph, &peer)
-            .await
-            .context("did not find peer")?;
-
         let id = self.device_id()?;
         let (ctrl, effects): (_, _) = self
             .client
             .actions(&graph)
-            .create_afc_uni_channel_off_graph(id, peer_id, label.into_id().into())
+            .create_afc_uni_channel_off_graph(id, peer_id.into_id().into(), label.into_id().into())
             .await?;
 
         let Some(Effect::AfcUniChannelCreated(e)) =
@@ -911,7 +813,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        peer: api::NetIdentifier,
+        peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
         todo!()

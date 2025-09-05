@@ -223,19 +223,6 @@ impl Daemon {
 
             #[cfg(any(feature = "afc", feature = "preview"))]
             let afc = {
-                let peers = {
-                    let mut peers = BTreeMap::new();
-                    for graph_id in &graph_ids {
-                        let graph_peers = BiBTreeMap::from_iter(
-                            client
-                                .actions(graph_id)
-                                .query_afc_network_names_off_graph()
-                                .await?,
-                        );
-                        peers.insert(*graph_id, graph_peers);
-                    }
-                    peers
-                };
                 let Toggle::Enabled(afc_cfg) = &cfg.afc else {
                     anyhow::bail!(
                         "AFC is currently required, set `afc.enable = true` in daemon config."
@@ -247,7 +234,6 @@ impl Daemon {
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
-                    peers,
                     afc_cfg.clone(),
                 )?
             };

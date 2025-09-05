@@ -1,13 +1,9 @@
 //! Implementation of daemon's AFC handler.
 
 use std::{
-    collections::BTreeMap,
     fmt::Debug,
     str::FromStr,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -19,13 +15,10 @@ use aranya_crypto::{
     afc::{RawOpenKey, RawSealKey},
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
-use aranya_daemon_api::NetIdentifier;
 use aranya_fast_channels::{
     shm::{self, Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
 };
-use aranya_runtime::GraphId;
-use bimap::BiBTreeMap;
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
@@ -38,9 +31,6 @@ use crate::{
         AfcBidiChannelCreated, AfcBidiChannelReceived, AfcUniChannelCreated, AfcUniChannelReceived,
     },
 };
-
-type PeerMap = BTreeMap<GraphId, Peers>;
-type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
 /// AFC shared memory.
 pub struct AfcShm<C> {
@@ -93,8 +83,6 @@ impl<E> Debug for AfcShm<E> {
 pub(crate) struct Afc<E, C, KS> {
     /// Our device ID.
     device_id: DeviceId,
-    /// All the peers that we have channels with.
-    peers: Arc<Mutex<PeerMap>>,
     #[derive_where(skip(Debug))]
     handler: Mutex<Handler<AranyaStore<KS>>>,
     #[derive_where(skip(Debug))]
@@ -106,63 +94,23 @@ pub(crate) struct Afc<E, C, KS> {
 }
 
 impl<E, C, KS> Afc<E, C, KS> {
-    pub(crate) fn new<I>(
+    pub(crate) fn new(
         eng: E,
         device_id: DeviceId,
         store: AranyaStore<KS>,
-        peers: I,
         cfg: AfcConfig,
     ) -> Result<Self>
     where
         E: Engine,
         C: CipherSuite,
-        I: IntoIterator<Item = (GraphId, Peers)>,
     {
         Ok(Self {
             device_id,
-            peers: Arc::new(Mutex::new(PeerMap::from_iter(peers))),
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
             channel_id: AtomicU32::new(0),
             shm: Mutex::new(AfcShm::new(cfg)?),
         })
-    }
-
-    /// Returns the peer's device ID that corresponds to
-    /// `net_id`.
-    #[instrument(skip(self))]
-    pub(crate) async fn find_device_id(&self, graph: GraphId, net_id: &str) -> Option<DeviceId> {
-        debug!("looking for peer's device ID");
-
-        self.peers
-            .lock()
-            .await
-            .get(&graph)
-            .and_then(|map| map.get_by_left(net_id))
-            .copied()
-    }
-
-    /// Adds a peer.
-    #[instrument(skip(self))]
-    pub(crate) async fn add_peer(&self, graph: GraphId, net_id: NetIdentifier, id: DeviceId) {
-        debug!("adding peer");
-
-        self.peers
-            .lock()
-            .await
-            .entry(graph)
-            .or_default()
-            .insert(net_id, id);
-    }
-
-    /// Removes a peer.
-    #[instrument(skip(self))]
-    pub(crate) async fn remove_peer(&self, graph: GraphId, id: DeviceId) {
-        debug!("removing peer");
-
-        self.peers.lock().await.entry(graph).and_modify(|entry| {
-            entry.remove_by_right(&id);
-        });
     }
 
     async fn while_locked<'a, F, R>(&'a self, f: F) -> R

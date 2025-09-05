@@ -307,37 +307,6 @@ where
         .in_current_span()
     }
 
-    /// Sets an AFC network name.
-    #[cfg(any(feature = "afc", feature = "preview"))]
-    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
-    fn set_afc_network_name(
-        &self,
-        device_id: DeviceId,
-        net_identifier: Text,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %net_identifier, "setting AFC network name");
-        self.with_actor(move |actor| {
-            actor.set_afc_network_name(device_id.into(), net_identifier)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Unsets an AFC network name.
-    #[cfg(any(feature = "afc", feature = "preview"))]
-    #[instrument(skip(self), fields(device_id = %device_id))]
-    fn unset_afc_network_name(
-        &self,
-        device_id: DeviceId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, "unsetting AFC network name");
-        self.with_actor(move |actor| {
-            actor.unset_afc_network_name(device_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
     /// Queries all AQC network names off-graph.
     #[instrument(skip(self))]
     fn query_aqc_network_names_off_graph(
@@ -353,34 +322,6 @@ where
                     .into_iter()
                     .map(|eff| {
                         let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
-                            anyhow::bail!("bad effect in query_network_names");
-                        };
-                        Ok((
-                            NetIdentifier(eff.net_identifier),
-                            DeviceId::from(eff.device_id),
-                        ))
-                    })
-                    .collect(),
-            )
-        })
-        .in_current_span()
-    }
-
-    /// Queries all AFC network names off-graph.
-    #[instrument(skip(self))]
-    fn query_afc_network_names_off_graph(
-        &self,
-    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_afc_network_names"),
-            args: Cow::Owned(vec![]),
-        })
-        .and_then(|(_, effects)| {
-            std::future::ready(
-                effects
-                    .into_iter()
-                    .map(|eff| {
-                        let Effect::QueryAfcNetworkNamesOutput(eff) = eff else {
                             anyhow::bail!("bad effect in query_network_names");
                         };
                         Ok((
