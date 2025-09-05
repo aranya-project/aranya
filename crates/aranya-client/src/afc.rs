@@ -4,7 +4,10 @@ use std::{fmt::Debug, str::FromStr};
 use anyhow::Context;
 use aranya_crypto::{default::DefaultCipherSuite, CipherSuite};
 use aranya_daemon_api::{AfcChannelId, ChanOp, DeviceId, LabelId, TeamId, CS};
-use aranya_fast_channels::shm::{Flag, Mode, ReadState};
+use aranya_fast_channels::{
+    shm::{Flag, Mode, ReadState},
+    Client as AfcClient,
+};
 use tarpc::context;
 use tracing::debug;
 
@@ -128,6 +131,12 @@ impl<'a> AfcChannels<'a> {
             .map_err(aranya_error)?;
         Ok(())
     }
+
+    /// Return ciphertext overhead.
+    /// The ciphertext buffer should allocate plaintext.len() + overhead bytes.
+    pub fn overhead(&self) -> usize {
+        AfcClient::<ReadState<DefaultCipherSuite>>::OVERHEAD
+    }
 }
 
 /// An AFC channel.
@@ -156,9 +165,19 @@ pub struct AfcBidiChannel<'a> {
     label_id: LabelId,
 }
 
+impl Channel for AfcBidiChannel<'_> {
+    fn channel_id(&self) -> AfcChannelId {
+        self.channel_id
+    }
+
+    fn label_id(&self) -> LabelId {
+        self.label_id
+    }
+}
+
 impl Seal for AfcBidiChannel<'_> {
     fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
-        debug!(?self.channel_id, "seal");
+        debug!(?self.channel_id, ?self.label_id, "seal");
         self.client
             .afc
             .seal(
@@ -174,7 +193,7 @@ impl Seal for AfcBidiChannel<'_> {
 
 impl Open for AfcBidiChannel<'_> {
     fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
-        debug!(?self.channel_id, "open");
+        debug!(?self.channel_id, ?self.label_id, "open");
         self.client
             .afc
             .open(
@@ -194,6 +213,16 @@ pub struct AfcSendChannel<'a> {
     client: &'a mut Client,
     channel_id: AfcChannelId,
     label_id: LabelId,
+}
+
+impl Channel for AfcSendChannel<'_> {
+    fn channel_id(&self) -> AfcChannelId {
+        self.channel_id
+    }
+
+    fn label_id(&self) -> LabelId {
+        self.label_id
+    }
 }
 
 impl Seal for AfcSendChannel<'_> {
@@ -219,6 +248,16 @@ pub struct AfcReceiveChannel<'a> {
     label_id: LabelId,
 }
 
+impl Channel for AfcReceiveChannel<'_> {
+    fn channel_id(&self) -> AfcChannelId {
+        self.channel_id
+    }
+
+    fn label_id(&self) -> LabelId {
+        self.label_id
+    }
+}
+
 impl Open for AfcReceiveChannel<'_> {
     fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
         self.client
@@ -232,6 +271,15 @@ impl Open for AfcReceiveChannel<'_> {
             .map_err(AfcError::Open)?;
         Ok(())
     }
+}
+
+/// AFC channels should all implement this trait.
+pub trait Channel {
+    /// AFC channel ID.
+    fn channel_id(&self) -> AfcChannelId;
+
+    /// AFC label ID.
+    fn label_id(&self) -> LabelId;
 }
 
 /// AFC channels that can seal datagrams should implement this trait.

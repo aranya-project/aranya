@@ -10,7 +10,7 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
     SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
 };
-use aranya_client::afc::{AfcChannel, AfcUniChannel, Seal, Open};
+use aranya_client::afc::{AfcChannel, Seal, Open};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -478,6 +478,7 @@ async fn main() -> Result<()> {
     // membera creates AFC channel.
     info!("creating afc bidi channel");
     let mut membera_afc = membera.client.afc();
+    let overhead = membera_afc.overhead();
     let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
 
     // memberb receives AFC channel.
@@ -486,20 +487,23 @@ async fn main() -> Result<()> {
     let chan = memberb_afc.receive_channel(team_id, ctrl).await.expect("expected to receive afc channel");
 
     // membera seals data for memberb.
-    info!("membera sealing data for memberb");
-    let data = "hello world".as_bytes();
-    let mut ciphertext = Vec::new();
+    let data = "afc msg".as_bytes();
+    info!(?data, "membera sealing data for memberb");
+    let mut ciphertext = vec![0u8; data.len() + overhead];
     send.seal(&data, &mut ciphertext).expect("expected to seal afc data");
+    info!(?data, "membera sealed data for memberb");
 
     // This is where membera would send the ciphertext to memberb via the network.
 
     // memberb opens data from membera.
-    info!("memberb opening data from membera");
-    let mut plaintext = Vec::new();
-    let AfcChannel::Uni(AfcUniChannel::Receive(mut recv)) = chan else {
-        bail!("expected a unidirectional receive channel");
+    info!("memberb receiving bidi channel from membera");
+    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
+    let AfcChannel::Bidi(mut recv) = chan else {
+        bail!("expected a bidirectional receive channel");
     };
+    info!("memberb opening data from membera");
     recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");
+    info!(?plaintext, "memberb opened data from membera");
 
     info!("completed afc demo");
 
