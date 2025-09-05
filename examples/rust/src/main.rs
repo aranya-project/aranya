@@ -470,13 +470,6 @@ async fn main() -> Result<()> {
         .delete_bidi_channel(&mut created_aqc_chan)
         .await?;
 
-    info!("revoking label from membera");
-    operator_team.revoke_label(membera.id, label3).await?;
-    info!("revoking label from memberb");
-    operator_team.revoke_label(memberb.id, label3).await?;
-    info!("deleting label");
-    admin_team.delete_label(label3).await?;
-
     info!("completed aqc demo");
 
     // Demo AFC.
@@ -509,6 +502,13 @@ async fn main() -> Result<()> {
     recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");
 
     info!("completed afc demo");
+
+    info!("revoking label from membera");
+    operator_team.revoke_label(membera.id, label3).await?;
+    info!("revoking label from memberb");
+    operator_team.revoke_label(memberb.id, label3).await?;
+    info!("deleting label");
+    admin_team.delete_label(label3).await?;
 
     info!("completed example Aranya application");
 
