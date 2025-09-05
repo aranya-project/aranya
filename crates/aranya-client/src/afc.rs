@@ -2,9 +2,9 @@
 use std::{fmt::Debug, str::FromStr};
 
 use anyhow::Context;
-use aranya_crypto::{default::DefaultCipherSuite, CipherSuite, Rng};
+use aranya_crypto::{default::DefaultCipherSuite, CipherSuite};
 use aranya_daemon_api::{AfcChannelId, ChanOp, LabelId, NetIdentifier, TeamId, CS};
-use aranya_fast_channels::shm::{Flag, Mode, WriteState};
+use aranya_fast_channels::shm::{Flag, Mode, ReadState};
 use tarpc::context;
 use tracing::debug;
 
@@ -211,7 +211,7 @@ pub trait Open {
 /// AFC shared memory.
 pub struct AfcShm {
     /// Handle to shared-memory with RW permissions.
-    pub write: WriteState<DefaultCipherSuite, Rng>,
+    pub read: ReadState<DefaultCipherSuite>,
 }
 
 impl AfcShm
@@ -222,17 +222,17 @@ where
     pub fn new(shm_path: String, max_chans: usize) -> Result<Self, AfcError> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
-        debug!(?shm_path, "setting up afc shm write side");
-        let write = {
+        debug!(?shm_path, "setting up afc shm read side");
+        let read = {
             let path = aranya_util::ShmPathBuf::from_str(&shm_path)
                 .context("unable to parse AFC shared memory path")
                 .map_err(AfcError::Shm)?;
-            WriteState::open(&path, Flag::Create, Mode::ReadWrite, max_chans, Rng)
+            ReadState::open(&path, Flag::Create, Mode::ReadWrite, max_chans)
                 .context(format!("unable to open `WriteState`: {:?}", shm_path))
                 .map_err(AfcError::Shm)?
         };
 
-        Ok(Self { write })
+        Ok(Self { read })
     }
 }
 
