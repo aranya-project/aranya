@@ -345,6 +345,6 @@ where
             .await
             .write
             .remove(channel_id)
-            .map_err(|err| anyhow!("unable to removfe AFC channel: {err}"))
+            .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
     }
 }
