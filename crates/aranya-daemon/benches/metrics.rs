@@ -39,6 +39,7 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                     }),
                 },
                 aqc: Toggle::Enabled(AqcConfig {}),
+                afc: Toggle::Disabled,
             };
 
             for dir in [

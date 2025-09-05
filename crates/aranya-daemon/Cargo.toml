@@ -14,23 +14,29 @@ workspace = true
 
 
 [features]
-default = []
-
+default = ["afc", "preview"]
+# Preview features
+preview = ["afc"]
+# Aranya Fast Channels
+afc = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
+aranya-afc-util = { workspace = true }
 aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
 aranya-envelope-ffi = { workspace = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"] }
 aranya-idam-ffi = { workspace = true }
 aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }
 aranya-policy-ifgen = { workspace = true }
 aranya-policy-lang = { workspace = true }
+aranya-policy-module = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }

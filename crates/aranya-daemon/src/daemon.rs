@@ -20,6 +20,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(any(feature = "afc", feature = "preview"))]
+use crate::afc::Afc;
 use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
@@ -219,6 +221,23 @@ impl Daemon {
                 )
             };
 
+            #[cfg(any(feature = "afc", feature = "preview"))]
+            let afc = {
+                let Toggle::Enabled(afc_cfg) = &cfg.afc else {
+                    anyhow::bail!(
+                        "AFC is currently required, set `afc.enable = true` in daemon config."
+                    )
+                };
+                Afc::new(
+                    eng.clone(),
+                    pks.ident_pk.id()?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    afc_cfg.clone(),
+                )?
+            };
+
             let data = QSData { psk_store };
 
             let crypto = crate::api::Crypto {
@@ -237,6 +256,8 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
+                #[cfg(any(feature = "afc", feature = "preview"))]
+                afc,
                 crypto,
                 seed_id_dir,
                 Some(data),
@@ -493,7 +514,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
+    use crate::config::{AfcConfig, AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -513,6 +534,13 @@ mod tests {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
             aqc: Toggle::Enabled(AqcConfig {}),
+            afc: Toggle::Enabled(AfcConfig {
+                shm_path: "/test_daemon_run".to_owned(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            }),
         };
         for dir in [
             &cfg.runtime_dir,

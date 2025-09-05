@@ -21,6 +21,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
+pub use aranya_fast_channels::ChannelId as AfcChannelId;
 pub use aranya_policy_text::{text, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
@@ -180,6 +181,9 @@ impl fmt::Display for NetIdentifier {
 
 /// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
+
+/// A serialized command for AFC.
+pub type AfcCtrl = Vec<Box<[u8]>>;
 
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
@@ -679,19 +683,6 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assign a QUIC channels network identifier to a device.
-    async fn assign_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-    /// Remove a QUIC channels network identifier from a device.
-    async fn remove_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-
     // Create a label.
     async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
     // Delete a label.
@@ -706,6 +697,18 @@ pub trait DaemonApi {
     // Revoke a label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
 
+    /// Assign a QUIC channels network identifier to a device.
+    async fn assign_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+    /// Remove a QUIC channels network identifier from a device.
+    async fn remove_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
         team: TeamId,
@@ -718,12 +721,25 @@ pub trait DaemonApi {
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcUniPsks)>;
-    /// Delete a QUIC bidi channel.
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
-    /// Delete a QUIC uni channel.
-    async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
+
+    /// Create a bidirectional AFC channel.
+    async fn create_afc_bidi_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AqcCtrl, AfcChannelId)>;
+    /// Create a unidirectional AFC channel.
+    async fn create_afc_uni_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AqcCtrl, AfcChannelId)>;
+    /// Delete a AFC channel.
+    async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
+    /// Receive AFC ctrl message.
+    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<(LabelId, AfcChannelId)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;

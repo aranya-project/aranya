@@ -76,6 +76,7 @@ impl ClientCtx {
         let work_dir = TempDir::with_prefix(user_name)?;
 
         let daemon = {
+            let shm = format!("/shm_{}", user_name);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -94,7 +95,7 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-                name = "daemon"
+                name = {user_name:?}
                 runtime_dir = {runtime_dir:?}
                 state_dir = {state_dir:?}
                 cache_dir = {cache_dir:?}
@@ -102,6 +103,14 @@ impl ClientCtx {
                 config_dir = {config_dir:?}
 
                 aqc.enable = true
+
+                [afc]
+                enable = true
+                shm_path = {shm:?}
+                unlink_on_startup = true
+                unlink_at_exit = true
+                create = true
+                max_chans = 100
 
                 [sync.quic]
                 enable = true
