@@ -158,6 +158,7 @@ pub struct AfcBidiChannel<'a> {
 
 impl Seal for AfcBidiChannel<'_> {
     fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+        debug!(?self.channel_id, "seal");
         self.client
             .afc
             .seal(
@@ -173,6 +174,7 @@ impl Seal for AfcBidiChannel<'_> {
 
 impl Open for AfcBidiChannel<'_> {
     fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
+        debug!(?self.channel_id, "open");
         self.client
             .afc
             .open(

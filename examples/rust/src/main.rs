@@ -480,17 +480,20 @@ async fn main() -> Result<()> {
     info!("completed aqc demo");
 
     // Demo AFC.
+    info!("demo afc functionality");
 
     // membera creates AFC channel.
+    info!("creating afc bidi channel");
     let mut membera_afc = membera.client.afc();
-    // TODO: don't use net identifiers for AFC.
     let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
 
     // memberb receives AFC channel.
+    info!("receiving afc bidi channel");
     let mut memberb_afc = memberb.client.afc();
     let chan = memberb_afc.receive_channel(team_id, ctrl).await.expect("expected to receive afc channel");
 
     // membera seals data for memberb.
+    info!("membera sealing data for memberb");
     let data = "hello world".as_bytes();
     let mut ciphertext = Vec::new();
     send.seal(&data, &mut ciphertext).expect("expected to seal afc data");
@@ -498,6 +501,7 @@ async fn main() -> Result<()> {
     // This is where membera would send the ciphertext to memberb via the network.
 
     // memberb opens data from membera.
+    info!("memberb opening data from membera");
     let mut plaintext = Vec::new();
     let AfcChannel::Uni(AfcUniChannel::Receive(mut recv)) = chan else {
         bail!("expected a unidirectional receive channel");
