@@ -26,6 +26,11 @@
 #[cfg(not(feature = "default"))]
 compile_error!("'default' feature must be enabled!");
 
+#[cfg(all(feature = "aqc", not(feature = "unstable")))]
+compile_error!(
+    "AQC is currently experimental. Enable the 'unstable' feature to opt into unstable APIs."
+);
+
 pub mod aqc;
 pub mod client;
 pub mod config;

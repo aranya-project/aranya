@@ -16,6 +16,12 @@ workspace = true
 [features]
 default = []
 
+unstable = [
+    "aranya-daemon-api/unstable",
+]
+
+aqc = ["aranya-daemon-api/aqc"]
+
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
@@ -82,3 +88,7 @@ test = false
 [[bench]]
 name = "metrics"
 harness = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["unstable"]

@@ -1,3 +1,6 @@
+#![cfg(feature = "aqc")]
+#![cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+
 //! Aranya QUIC Channels (AQC).
 
 mod api;
