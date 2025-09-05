@@ -130,7 +130,7 @@ where
     KS: KeyStore,
 {
     /// Handles the [`AfcBidiChannelCreated`] effect, returning
-    /// the channel's PSKs.
+    /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
     pub(crate) async fn bidi_channel_created(&self, e: &AfcBidiChannelCreated) -> Result<ChannelId>
     where
@@ -153,6 +153,7 @@ where
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        debug!(?channel_id, "creating bidi channel");
         self.shm
             .lock()
             .await
@@ -170,7 +171,7 @@ where
     }
 
     /// Handles the [`AfcBidiChannelReceived`] effect, returning
-    /// the channel's PSKs.
+    /// the channel ID.
     #[instrument(skip_all, fields(id = %e.label_id))]
     pub(crate) async fn bidi_channel_received(
         &self,
@@ -196,6 +197,7 @@ where
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        debug!(?channel_id, "receiving bidi channel");
         self.shm
             .lock()
             .await
@@ -211,7 +213,7 @@ where
     }
 
     /// Handles the [`AfcUniChannelCreated`] effect, returning
-    /// the channel's PSKs.
+    /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
     pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId>
     where
@@ -238,6 +240,7 @@ where
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        debug!(?channel_id, "creating uni channel");
         self.shm
             .lock()
             .await
@@ -248,7 +251,7 @@ where
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
-    /// the channel's PSKs.
+    /// the channel ID.
     #[instrument(skip_all, fields(id = %e.label_id))]
     pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<ChannelId>
     where
@@ -275,6 +278,7 @@ where
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        debug!(?channel_id, "receiving uni channel");
         self.shm
             .lock()
             .await
