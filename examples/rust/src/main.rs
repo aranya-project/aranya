@@ -76,8 +76,9 @@ impl ClientCtx {
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
+        let afc_shm_path = format!("/shm_{}", user_name);
+
         let daemon = {
-            let shm = format!("/shm_{}", user_name);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -107,7 +108,7 @@ impl ClientCtx {
 
                 [afc]
                 enable = true
-                shm_path = {shm:?}
+                shm_path = {afc_shm_path:?}
                 unlink_on_startup = true
                 unlink_at_exit = true
                 create = true
@@ -134,6 +135,7 @@ impl ClientCtx {
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
+                .afc_shm_path(&afc_shm_path)
                 .aqc_server_addr(&any_addr)
                 .connect()
         })
@@ -220,8 +222,8 @@ async fn main() -> Result<()> {
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
     let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
     let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -480,10 +482,13 @@ async fn main() -> Result<()> {
     // Demo AFC.
 
     // membera creates AFC channel.
-    let (send, ctrl) = membera.client.afc().create_bidi_channel(label3).expect("expected to create afc bidi channel");
+    let mut membera_afc = membera.client.afc();
+    // TODO: don't use net identifiers for AFC.
+    let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.aqc_net_id(), label3).await.expect("expected to create afc bidi channel");
 
     // memberb receives AFC channel.
-    let chan = memberb.client.afc().receive_channel(ctrl).expect("expected to receive afc channel");
+    let mut memberb_afc = memberb.client.afc();
+    let chan = memberb_afc.receive_channel(team_id, ctrl).await.expect("expected to receive afc channel");
 
     // membera seals data for memberb.
     let data = "hello world".as_bytes();
@@ -494,7 +499,7 @@ async fn main() -> Result<()> {
 
     // memberb opens data from membera.
     let mut plaintext = Vec::new();
-    let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = chan else {
+    let AfcChannel::Uni(AfcUniChannel::Receive(mut recv)) = chan else {
         bail!("expected a unidirectional receive channel");
     };
     recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");

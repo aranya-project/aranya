@@ -990,7 +990,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
+    ) -> api::Result<(api::LabelId, api::AfcChannelId, api::ChanOp)> {
         todo!()
     }
 

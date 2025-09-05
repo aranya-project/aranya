@@ -19,11 +19,11 @@ pub type Ctrl = Vec<Box<[u8]>>;
 /// Aranya Fast Channels handler for managing channels which allow encrypting/decrypting application data buffers.
 #[derive(Debug)]
 pub struct AfcChannels<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
 }
 
 impl<'a> AfcChannels<'a> {
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: &'a mut Client) -> Self {
         Self { client }
     }
 
@@ -31,7 +31,7 @@ impl<'a> AfcChannels<'a> {
     ///
     /// Returns the channel object and a `ctrl` message to send to the peer.
     pub async fn create_bidi_channel(
-        &self,
+        &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
@@ -57,7 +57,7 @@ impl<'a> AfcChannels<'a> {
     ///
     /// Returns the channel object and a `ctrl` message to send to the peer.
     pub async fn create_uni_channel(
-        &self,
+        &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
@@ -81,7 +81,7 @@ impl<'a> AfcChannels<'a> {
 
     /// Receive a `ctrl` message from a peer to create an AFC channel.
     pub async fn receive_channel(
-        &self,
+        &mut self,
         team_id: TeamId,
         ctrl: Ctrl,
     ) -> crate::Result<AfcChannel<'_>> {
@@ -151,61 +151,97 @@ pub enum AfcUniChannel<'a> {
 /// A bidirectional AFC channel.
 #[derive(Debug)]
 pub struct AfcBidiChannel<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
-impl Open for AfcBidiChannel<'_> {
-    fn open(&self, _ciphertext: &[u8], _plaintext: &mut [u8]) -> Result<(), AfcError> {
-        todo!()
+impl Seal for AfcBidiChannel<'_> {
+    fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+        self.client
+            .afc
+            .seal(
+                self.channel_id,
+                self.label_id.into_id().into(),
+                ciphertext,
+                plaintext,
+            )
+            .map_err(AfcError::Seal)?;
+        Ok(())
     }
 }
 
-impl Seal for AfcBidiChannel<'_> {
-    fn seal(&self, _plaintext: &[u8], _ciphertext: &mut [u8]) -> Result<(), AfcError> {
-        todo!()
+impl Open for AfcBidiChannel<'_> {
+    fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
+        self.client
+            .afc
+            .open(
+                self.channel_id,
+                self.label_id.into_id().into(),
+                plaintext,
+                ciphertext,
+            )
+            .map_err(AfcError::Open)?;
+        Ok(())
     }
 }
 
 /// A unidirectional AFC channel that can only send.
 #[derive(Debug)]
 pub struct AfcSendChannel<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl Seal for AfcSendChannel<'_> {
-    fn seal(&self, _plaintext: &[u8], _ciphertext: &mut [u8]) -> Result<(), AfcError> {
-        todo!()
+    fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+        self.client
+            .afc
+            .seal(
+                self.channel_id,
+                self.label_id.into_id().into(),
+                ciphertext,
+                plaintext,
+            )
+            .map_err(AfcError::Seal)?;
+        Ok(())
     }
 }
 
 /// A unidirectional AFC channel that can only receive.
 #[derive(Debug)]
 pub struct AfcReceiveChannel<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl Open for AfcReceiveChannel<'_> {
-    fn open(&self, _ciphertext: &[u8], _plaintext: &mut [u8]) -> Result<(), AfcError> {
-        todo!()
+    fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
+        self.client
+            .afc
+            .open(
+                self.channel_id,
+                self.label_id.into_id().into(),
+                plaintext,
+                ciphertext,
+            )
+            .map_err(AfcError::Open)?;
+        Ok(())
     }
 }
 
 /// AFC channels that can seal datagrams should implement this trait.
 pub trait Seal {
     /// Seal a plaintext datagram into ciphertext.
-    fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError>;
+    fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError>;
 }
 
 /// AFC channels that can open datagrams should implement this trait.
 pub trait Open {
     /// Open a ciphertext datagram and return the plaintext.
-    fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError>;
+    fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError>;
 }
 
 /// AFC shared memory.
@@ -227,7 +263,7 @@ where
             let path = aranya_util::ShmPathBuf::from_str(&shm_path)
                 .context("unable to parse AFC shared memory path")
                 .map_err(AfcError::Shm)?;
-            ReadState::open(&path, Flag::Create, Mode::ReadWrite, max_chans)
+            ReadState::open(&path, Flag::OpenOnly, Mode::ReadWrite, max_chans)
                 .context(format!("unable to open `WriteState`: {:?}", shm_path))
                 .map_err(AfcError::Shm)?
         };

@@ -1,8 +1,10 @@
 //! Client-daemon connection.
 
-use std::{fmt::Debug, io, net::SocketAddr, path::Path, sync::Arc};
+use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
+#[cfg(any(feature = "afc", feature = "preview"))]
+use aranya_crypto::default::DefaultCipherSuite;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     crypto::{
@@ -12,10 +14,12 @@ use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
     Text, Version, CS,
 };
+#[cfg(any(feature = "afc", feature = "preview"))]
+use aranya_fast_channels::{shm::ReadState, Client as AfcClient};
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
 use tarpc::context;
-use tokio::{fs, net::UnixStream, sync::Mutex};
+use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
 
 #[cfg(any(feature = "afc", feature = "preview"))]
@@ -134,6 +138,13 @@ impl<'a> ClientBuilder<'a> {
         self.aqc_server_addr = Some(addr);
         self
     }
+
+    /// Specifies the AFC shm path.
+    #[cfg(any(feature = "afc", feature = "preview"))]
+    pub fn afc_shm_path(mut self, afc_shm_path: &'a String) -> Self {
+        self.afc_shm_path = Some(afc_shm_path);
+        self
+    }
 }
 
 /// A client for invoking actions on and processing effects from
@@ -150,7 +161,7 @@ pub struct Client {
     pub(crate) aqc: AqcClient,
     /// AFC shared-memory containing channel keys.
     #[cfg(any(feature = "afc", feature = "preview"))]
-    pub(crate) shm: Arc<Mutex<AfcShm>>,
+    pub(crate) afc: AfcClient<ReadState<DefaultCipherSuite>>,
 }
 
 // TODO: derive Debug on [`Client`] when `shm` implements it.
@@ -245,13 +256,17 @@ impl Client {
             .next()
             .expect("expected AQC server address");
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
+
         #[cfg(any(feature = "afc", feature = "preview"))]
-        let shm = Arc::new(Mutex::new(AfcShm::new(shm_path.to_string(), 100)?));
+        let read = AfcShm::new(shm_path.to_string(), 100)?.read;
+
+        #[cfg(any(feature = "afc", feature = "preview"))]
+        let afc = AfcClient::new(read);
         let client = Self {
             daemon,
             aqc,
             #[cfg(any(feature = "afc", feature = "preview"))]
-            shm,
+            afc,
         };
 
         Ok(client)
@@ -349,7 +364,7 @@ impl Client {
 
     /// Get access to Aranya Fast Channels.
     #[cfg(any(feature = "afc", feature = "preview"))]
-    pub fn afc(&self) -> AfcChannels<'_> {
+    pub fn afc(&mut self) -> AfcChannels<'_> {
         AfcChannels::new(self)
     }
 }

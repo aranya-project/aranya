@@ -14,12 +14,14 @@ current_dir="$(pwd)"
 
 echo "Building aranya-example..."
 cargo build \
+    --all-features \
     --release \
     --manifest-path "examples/rust/Cargo.toml" \
     --locked
 
 echo "Building aranya-daemon..."
 cargo build \
+    --all-features \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-daemon

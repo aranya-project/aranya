@@ -175,11 +175,11 @@ pub(crate) fn no_addr() -> AqcError {
 pub enum AfcError {
     /// Unable to seal datagram.
     #[error("unable to seal datagram")]
-    Seal,
+    Seal(aranya_fast_channels::Error),
 
     /// Unable to open datagram.
     #[error("unable to open datagram")]
-    Open,
+    Open(aranya_fast_channels::Error),
 
     /// Unable to parse shared-memory path.
     #[error("unable initialize shm")]
