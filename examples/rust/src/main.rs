@@ -10,6 +10,7 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
     SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
 };
+use aranya_client::afc::{AfcChannel, Seal, Open};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -75,8 +76,9 @@ impl ClientCtx {
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
+        let afc_shm_path = format!("/shm_{}", user_name);
+
         let daemon = {
-            let shm = format!("/shm_{}", user_name);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -106,7 +108,7 @@ impl ClientCtx {
 
                 [afc]
                 enable = true
-                shm_path = {shm:?}
+                shm_path = {afc_shm_path:?}
                 unlink_on_startup = true
                 unlink_at_exit = true
                 create = true
@@ -133,6 +135,7 @@ impl ClientCtx {
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
+                .afc_shm_path(&afc_shm_path)
                 .aqc_server_addr(&any_addr)
                 .connect()
         })
@@ -219,8 +222,8 @@ async fn main() -> Result<()> {
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
     let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
     let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -467,14 +470,49 @@ async fn main() -> Result<()> {
         .delete_bidi_channel(&mut created_aqc_chan)
         .await?;
 
+    info!("completed aqc demo");
+
+    // Demo AFC.
+    info!("demo afc functionality");
+
+    // membera creates AFC channel.
+    info!("creating afc bidi channel");
+    let mut membera_afc = membera.client.afc();
+    let overhead = membera_afc.overhead();
+    let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
+
+    // memberb receives AFC channel.
+    info!("receiving afc bidi channel");
+    let mut memberb_afc = memberb.client.afc();
+    let chan = memberb_afc.receive_channel(team_id, ctrl).await.expect("expected to receive afc channel");
+
+    // membera seals data for memberb.
+    let data = "afc msg".as_bytes();
+    info!(?data, "membera sealing data for memberb");
+    let mut ciphertext = vec![0u8; data.len() + overhead];
+    send.seal(&data, &mut ciphertext).expect("expected to seal afc data");
+    info!(?data, "membera sealed data for memberb");
+
+    // This is where membera would send the ciphertext to memberb via the network.
+
+    // memberb opens data from membera.
+    info!("memberb receiving bidi channel from membera");
+    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
+    let AfcChannel::Bidi(mut recv) = chan else {
+        bail!("expected a bidirectional receive channel");
+    };
+    info!("memberb opening data from membera");
+    recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");
+    info!(?plaintext, "memberb opened data from membera");
+
+    info!("completed afc demo");
+
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;
     info!("revoking label from memberb");
     operator_team.revoke_label(memberb.id, label3).await?;
     info!("deleting label");
     admin_team.delete_label(label3).await?;
-
-    info!("completed aqc demo");
 
     info!("completed example Aranya application");
 

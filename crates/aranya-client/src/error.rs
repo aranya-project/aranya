@@ -28,6 +28,10 @@ pub enum Error {
     #[error("AQC error")]
     Aqc(#[from] AqcError),
 
+    /// An Aranya Fast Channel error happened.
+    #[error("AFC error")]
+    Afc(#[from] AfcError),
+
     /// An unexpected internal error happened.
     #[error(transparent)]
     Bug(#[from] buggy::Bug),
@@ -163,4 +167,33 @@ impl From<Infallible> for AqcError {
 
 pub(crate) fn no_addr() -> AqcError {
     AqcError::AddrResolution(io::Error::new(io::ErrorKind::NotFound, "no address found"))
+}
+
+/// Possible errors that could happen when using Aranya Fast Channels.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum AfcError {
+    /// Unable to seal datagram.
+    #[error("unable to seal datagram")]
+    Seal(aranya_fast_channels::Error),
+
+    /// Unable to open datagram.
+    #[error("unable to open datagram")]
+    Open(aranya_fast_channels::Error),
+
+    /// Unable to parse shared-memory path.
+    #[error("unable initialize shm")]
+    Shm(anyhow::Error),
+
+    /// No channel info found.
+    #[error("no channel info found")]
+    NoChannelInfoFound,
+
+    /// Error parsing control message.
+    #[error("failed to parse control message")]
+    InvalidCtrlMessage(postcard::Error),
+
+    /// An internal bug was discovered.
+    #[error(transparent)]
+    Bug(#[from] buggy::Bug),
 }

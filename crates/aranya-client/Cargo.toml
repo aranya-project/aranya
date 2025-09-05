@@ -12,13 +12,18 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
+default = ["afc", "preview"]
+# Preview features
+preview = ["afc"]
+# Aranya Fast Channels
+afc = []
 
 # Enable debugging.
 debug = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
+aranya-fast-channels = { workspace = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }

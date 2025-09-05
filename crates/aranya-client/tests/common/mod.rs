@@ -222,6 +222,7 @@ impl DeviceCtx {
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_path)
+                .afc_shm_path(&afc_shm_path)
                 .aqc_server_addr(&addr_any)
                 .connect()
         })

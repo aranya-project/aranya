@@ -22,7 +22,7 @@ use aranya_fast_channels::{
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 use crate::{
     config::AfcConfig,
@@ -141,7 +141,7 @@ where
         }
 
         let info = BidiChannelCreated {
-            key_id: e.author_enc_key_id.into(),
+            key_id: e.channel_key_id.into(),
             parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -149,11 +149,12 @@ where
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
         };
+        info!("handling create bidi channel");
         let keys: BidiKeys<RawSealKey<<E as Engine>::CS>, RawOpenKey<<E as Engine>::CS>> = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        debug!(?channel_id, "creating bidi channel");
+        info!(?channel_id, "creating bidi channel");
         self.shm
             .lock()
             .await
@@ -197,7 +198,7 @@ where
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        debug!(?channel_id, "receiving bidi channel");
+        info!(?channel_id, "receiving bidi channel");
         self.shm
             .lock()
             .await
@@ -227,7 +228,7 @@ where
         }
 
         let info = UniChannelCreated {
-            key_id: e.author_enc_key_id.into(),
+            key_id: e.channel_key_id.into(),
             parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -240,7 +241,7 @@ where
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        debug!(?channel_id, "creating uni channel");
+        info!(?channel_id, "creating uni channel");
         self.shm
             .lock()
             .await
@@ -278,7 +279,7 @@ where
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        debug!(?channel_id, "receiving uni channel");
+        info!(?channel_id, "receiving uni channel");
         self.shm
             .lock()
             .await

@@ -312,25 +312,22 @@ pub struct TeamTerminated {
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
+    fn create_team(
+        &mut self,
+        owner_keys: KeyBundle,
+        nonce: Vec<u8>,
+    ) -> Result<(), ClientError>;
+    fn terminate_team(&mut self) -> Result<(), ClientError>;
     fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
-    fn assign_label(
+    fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn assign_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
+    fn revoke_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
+    fn set_aqc_network_name(
         &mut self,
         device_id: Id,
-        label_id: Id,
-        op: ChanOp,
+        net_identifier: Text,
     ) -> Result<(), ClientError>;
-    fn assign_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
-    fn create_afc_bidi_channel(
-        &mut self,
-        peer_id: Id,
-        label_id: Id,
-    ) -> Result<(), ClientError>;
-    fn create_afc_uni_channel(
-        &mut self,
-        sender_id: Id,
-        receiver_id: Id,
-        label_id: Id,
-    ) -> Result<(), ClientError>;
+    fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_aqc_bidi_channel(
         &mut self,
         peer_id: Id,
@@ -342,29 +339,32 @@ pub trait ActorExt {
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
-    fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
-    fn create_team(
+    fn create_afc_bidi_channel(
         &mut self,
-        owner_keys: KeyBundle,
-        nonce: Vec<u8>,
+        peer_id: Id,
+        label_id: Id,
     ) -> Result<(), ClientError>;
+    fn create_afc_uni_channel(
+        &mut self,
+        sender_id: Id,
+        receiver_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
-    fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
-    fn revoke_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
-    fn set_aqc_network_name(
+    fn assign_label(
         &mut self,
         device_id: Id,
-        net_identifier: Text,
+        label_id: Id,
+        op: ChanOp,
     ) -> Result<(), ClientError>;
-    fn terminate_team(&mut self) -> Result<(), ClientError>;
-    fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
+    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_labels(&mut self) -> Result<(), ClientError>;
+    fn query_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
+    fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
 }
