@@ -751,7 +751,10 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
     /// Receive AFC ctrl message.
-    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<(LabelId, AfcChannelId)>;
+    async fn receive_afc_ctrl(
+        team: TeamId,
+        ctrl: AfcCtrl,
+    ) -> Result<(LabelId, AfcChannelId, ChanOp)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
