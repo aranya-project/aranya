@@ -88,3 +88,7 @@ test = false
 [[bench]]
 name = "metrics"
 harness = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["unstable"]

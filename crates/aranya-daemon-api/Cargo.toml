@@ -39,3 +39,7 @@ postcard = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["unstable"]
