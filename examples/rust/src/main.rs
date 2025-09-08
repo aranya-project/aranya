@@ -10,7 +10,7 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
     SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
 };
-use aranya_client::afc::{AfcChannel, Seal, Open};
+use aranya_client::afc::{AfcChannels, AfcChannel, Seal, Open};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -478,7 +478,7 @@ async fn main() -> Result<()> {
     // membera creates AFC channel.
     info!("creating afc bidi channel");
     let mut membera_afc = membera.client.afc();
-    let overhead = membera_afc.overhead();
+    let overhead = AfcChannels::overhead();
     let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
 
     // memberb receives AFC channel.

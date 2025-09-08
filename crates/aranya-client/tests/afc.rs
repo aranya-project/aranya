@@ -2,7 +2,7 @@
 
 mod common;
 use anyhow::{bail, Context, Result};
-use aranya_client::afc::{AfcChannel, AfcUniChannel, Channel, Open, Seal};
+use aranya_client::afc::{AfcChannel, AfcChannels, AfcUniChannel, Channel, Open, Seal};
 use aranya_daemon_api::{text, ChanOp};
 
 use crate::common::DevicesCtx;
@@ -114,7 +114,7 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 
     let mut membera_afc = devices.membera.client.afc();
     let mut memberb_afc = devices.memberb.client.afc();
-    let overhead = membera_afc.overhead();
+    let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
     let (mut chan, ctrl) = membera_afc
@@ -190,7 +190,7 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     let mut membera_afc = devices.membera.client.afc();
     let mut memberb_afc = devices.memberb.client.afc();
-    let overhead = membera_afc.overhead();
+    let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
     let (mut chan, ctrl) = membera_afc
@@ -348,7 +348,7 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 
     let mut membera_afc = devices.membera.client.afc();
     let mut memberb_afc = devices.memberb.client.afc();
-    let overhead = membera_afc.overhead();
+    let overhead = AfcChannels::overhead();
 
     // Create uni channel.
     let (mut chan, ctrl) = membera_afc
@@ -424,7 +424,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     let mut membera_afc = devices.membera.client.afc();
     let mut memberb_afc = devices.memberb.client.afc();
-    let overhead = membera_afc.overhead();
+    let overhead = AfcChannels::overhead();
 
     // Create uni channel.
     let (mut chan, ctrl) = membera_afc

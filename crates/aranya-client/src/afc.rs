@@ -127,7 +127,7 @@ impl<'a> AfcChannels<'a> {
 
     /// Return ciphertext overhead.
     /// The ciphertext buffer should allocate plaintext.len() + overhead bytes.
-    pub fn overhead(&self) -> usize {
+    pub fn overhead() -> usize {
         AfcClient::<ReadState<DefaultCipherSuite>>::OVERHEAD
     }
 }
@@ -277,13 +277,19 @@ pub trait Channel {
 
 /// AFC channels that can seal datagrams should implement this trait.
 pub trait Seal {
-    /// Seal a plaintext datagram into ciphertext.
+    /// Seal a plaintext datagram into a ciphertext buffer.
+    ///
+    /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
+    /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
     fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError>;
 }
 
 /// AFC channels that can open datagrams should implement this trait.
 pub trait Open {
-    /// Open a ciphertext datagram and return the plaintext.
+    /// Open a ciphertext datagram and return the plaintext buffer.
+    ///
+    /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
+    /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
     fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError>;
 }
 
