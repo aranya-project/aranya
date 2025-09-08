@@ -22,7 +22,14 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 category = "build"
 description = "Build Code"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}"]
+args = [
+    "build",
+    "--verbose",
+    "--release",
+    "--package=aranya-daemon",
+    "--features=preview,afc",
+    "${@}",
+]
 
 [tasks.tgz-daemon]
 category = "build"
@@ -65,8 +72,8 @@ category = "build"
 description = "Build C API shared library"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release"]
 dependencies = ["install-nightly"]
+args = ["build", "--release", "--features=preview,afc"]
 
 [tasks.tgz-capi]
 category = "build"

@@ -115,14 +115,7 @@ impl<'a> AfcChannels<'a> {
     }
 
     /// Create an AFC channel by removing channel key entry from shared memory.
-    pub async fn delete_channel(&self, chan: AfcChannel<'_>) -> crate::Result<()> {
-        let channel_id = match chan {
-            AfcChannel::Bidi(chan) => chan.channel_id,
-            AfcChannel::Uni(chan) => match chan {
-                AfcUniChannel::Send(chan) => chan.channel_id,
-                AfcUniChannel::Receive(chan) => chan.channel_id,
-            },
-        };
+    pub async fn delete_channel(&self, channel_id: AfcChannelId) -> crate::Result<()> {
         self.client
             .daemon
             .delete_afc_channel(context::current(), channel_id)
