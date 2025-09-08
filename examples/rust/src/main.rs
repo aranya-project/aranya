@@ -487,11 +487,11 @@ async fn main() -> Result<()> {
     let chan = memberb_afc.receive_channel(team_id, ctrl).await.expect("expected to receive afc channel");
 
     // membera seals data for memberb.
-    let data = "afc msg".as_bytes();
-    info!(?data, "membera sealing data for memberb");
-    let mut ciphertext = vec![0u8; data.len() + overhead];
-    send.seal(&data, &mut ciphertext).expect("expected to seal afc data");
-    info!(?data, "membera sealed data for memberb");
+    let afc_msg = "afc msg".as_bytes();
+    info!(?afc_msg, "membera sealing data for memberb");
+    let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
+    send.seal(&afc_msg, &mut ciphertext).expect("expected to seal afc data");
+    info!(?afc_msg, "membera sealed data for memberb");
 
     // This is where membera would send the ciphertext to memberb via the network.
 
@@ -504,6 +504,7 @@ async fn main() -> Result<()> {
     info!("memberb opening data from membera");
     recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");
     info!(?plaintext, "memberb opened data from membera");
+    assert_eq!(afc_msg, plaintext);
 
     info!("completed afc demo");
 
