@@ -3,8 +3,6 @@
 use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
-#[cfg(any(feature = "afc", feature = "preview"))]
-use aranya_crypto::default::DefaultCipherSuite;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     crypto::{
@@ -14,8 +12,6 @@ use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
     Text, Version, CS,
 };
-#[cfg(any(feature = "afc", feature = "preview"))]
-use aranya_fast_channels::{shm::ReadState, Client as AfcClient};
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
 use tarpc::context;
@@ -154,24 +150,15 @@ impl<'a> ClientBuilder<'a> {
 /// a platform-specific IPC mechanism.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
+#[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     pub(crate) aqc: AqcClient,
-    /// AFC shared-memory containing channel keys.
+    /// AFC shared-memory path.
     #[cfg(any(feature = "afc", feature = "preview"))]
-    pub(crate) afc: AfcClient<ReadState<DefaultCipherSuite>>,
-}
-
-// TODO: derive Debug on [`Client`] when `shm` implements it.
-impl Debug for Client {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Client")
-            .field("daemon", &self.daemon)
-            .field("aqc", &self.aqc)
-            .finish()
-    }
+    pub(crate) shm_path: String,
 }
 
 impl Client {
@@ -257,16 +244,10 @@ impl Client {
             .expect("expected AQC server address");
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
 
-        #[cfg(any(feature = "afc", feature = "preview"))]
-        let read = AfcShm::new(shm_path.to_string(), 100)?.read;
-
-        #[cfg(any(feature = "afc", feature = "preview"))]
-        let afc = AfcClient::new(read);
         let client = Self {
             daemon,
             aqc,
-            #[cfg(any(feature = "afc", feature = "preview"))]
-            afc,
+            shm_path: shm_path.to_string(),
         };
 
         Ok(client)
@@ -364,8 +345,9 @@ impl Client {
 
     /// Get access to Aranya Fast Channels.
     #[cfg(any(feature = "afc", feature = "preview"))]
-    pub fn afc(&mut self) -> AfcChannels<'_> {
-        AfcChannels::new(self)
+    pub fn afc(&mut self) -> Result<AfcChannels<'_>> {
+        let shm = AfcShm::new(self.shm_path.to_string(), 100)?;
+        Ok(AfcChannels::new(self, shm))
     }
 }
 
