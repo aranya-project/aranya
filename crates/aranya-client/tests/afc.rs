@@ -382,7 +382,7 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 /// Demonstrate deleting a unidirectional AFC channel.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_delete() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_afc_uni_chan_seal_open").await?;
+    let mut devices = DevicesCtx::new("test_afc_uni_chan_delete").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
