@@ -1788,9 +1788,6 @@ command AfcCreateUniChannel {
         receiver_id id,
         // The label applied to the channel.
         label_id id,
-        // A unique ID that the author can use to look up the
-        // channel's secrets.
-        author_secrets_id id,
         // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
         // The ID of the AFC channel key.
