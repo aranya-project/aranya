@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path};
+use std::{io, net::SocketAddr, path::Path, time::Duration};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -373,11 +373,11 @@ impl Team<'_> {
     /// Subscribe to hello notifications from a sync peer.
     ///
     /// This will request the peer to send hello notifications when their graph head changes.
-    /// The `delay_milliseconds` parameter specifies the minimum delay between notifications.
-    pub async fn sync_hello_subscribe(&self, addr: Addr, delay_milliseconds: u64) -> Result<()> {
+    /// The `delay` parameter specifies the minimum delay between notifications.
+    pub async fn sync_hello_subscribe(&self, peer: Addr, delay: Duration) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_subscribe(context::current(), addr, self.team_id, delay_milliseconds)
+            .sync_hello_subscribe(context::current(), peer, self.team_id, delay)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -386,10 +386,10 @@ impl Team<'_> {
     /// Unsubscribe from hello notifications from a sync peer.
     ///
     /// This will stop receiving hello notifications from the specified peer.
-    pub async fn sync_hello_unsubscribe(&self, addr: Addr) -> Result<()> {
+    pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_unsubscribe(context::current(), addr, self.team_id)
+            .sync_hello_unsubscribe(context::current(), peer, self.team_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

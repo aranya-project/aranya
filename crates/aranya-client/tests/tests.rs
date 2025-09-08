@@ -492,7 +492,7 @@ async fn test_hello_subscription() -> Result<()> {
 
     // MemberA subscribes to hello notifications from Admin
     membera_team
-        .sync_hello_subscribe(admin_addr.into(), 100) // Short delay for faster testing
+        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(100)) // Short delay for faster testing
         .await?;
     info!("membera subscribed to hello notifications from admin");
 
@@ -581,16 +581,16 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Admin subscribes to hello notifications from Owner
     admin_team
-        .sync_hello_subscribe(owner_addr.into(), 1000)
+        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(1000))
         .await?;
     info!("admin subscribed to hello notifications from owner");
 
     // Test multiple subscriptions
     operator_team
-        .sync_hello_subscribe(owner_addr.into(), 2000)
+        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(2000))
         .await?;
     operator_team
-        .sync_hello_subscribe(admin_addr.into(), 1500)
+        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(1500))
         .await?;
     info!("operator subscribed to both owner and admin");
 
@@ -609,7 +609,7 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Test edge cases
     admin_team
-        .sync_hello_subscribe(owner_addr.into(), 100)
+        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(100))
         .await?;
     admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
     info!("tested immediate subscribe/unsubscribe");

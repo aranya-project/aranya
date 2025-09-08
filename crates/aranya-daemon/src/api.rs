@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
@@ -522,12 +522,12 @@ impl DaemonApi for Api {
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
-        delay_milliseconds: u64,
+        delay: Duration,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         self.peers
-            .sync_hello_subscribe(peer, team.into_id().into(), delay_milliseconds)
+            .sync_hello_subscribe(peer, team.into_id().into(), delay)
             .await?;
         Ok(())
     }

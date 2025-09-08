@@ -185,21 +185,21 @@ impl SyncState for State {
         Ok(cmd_count)
     }
 
-    /// Subscribe to hello notifications from a peer.
+    /// Subscribe to hello notifications from a sync peer.
     #[instrument(skip_all)]
     async fn sync_hello_subscribe_impl(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         peer: &Addr,
-        delay_milliseconds: u64,
+        delay: Duration,
     ) -> SyncResult<()> {
         syncer.state.store.set_team(id.into_id().into());
         syncer
-            .send_sync_hello_subscribe_request(peer, id, delay_milliseconds, syncer.server_addr)
+            .send_sync_hello_subscribe_request(peer, id, delay, syncer.server_addr)
             .await
     }
 
-    /// Unsubscribe from hello notifications from a peer.
+    /// Unsubscribe from hello notifications from a sync peer.
     #[instrument(skip_all)]
     async fn sync_hello_unsubscribe_impl(
         syncer: &mut Syncer<Self>,
@@ -468,9 +468,10 @@ impl Syncer<State> {
         &mut self,
         peer: &Addr,
         id: GraphId,
-        delay_milliseconds: u64,
+        delay: Duration,
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
+        let delay_milliseconds = delay.as_millis() as u64;
         debug!(
             ?peer,
             ?id,

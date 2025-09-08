@@ -1361,28 +1361,28 @@ pub unsafe fn remove_sync_peer(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] addr the peer's Aranya network address [`Addr`].
-/// @param[in] delay_milliseconds minimum delay between notifications in milliseconds.
+/// @param[in] delay minimum delay between notifications.
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_hello_subscribe(
     client: &Client,
     team: &TeamId,
-    addr: Addr,
-    delay_milliseconds: u64,
+    peer: Addr,
+    delay: Duration,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
-    let addr = unsafe { addr.as_underlying() }?;
+    let addr = unsafe { peer.as_underlying() }?;
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .sync_hello_subscribe(addr, delay_milliseconds),
+            .sync_hello_subscribe(addr, delay.into()),
     )?;
     Ok(())
 }
 
-/// Unsubscribe from hello notifications from a peer.
+/// Unsubscribe from hello notifications from a sync peer.
 ///
 /// This will stop receiving hello notifications from the specified peer.
 ///
@@ -1394,11 +1394,11 @@ pub unsafe fn sync_hello_subscribe(
 pub unsafe fn sync_hello_unsubscribe(
     client: &Client,
     team: &TeamId,
-    addr: Addr,
+    peer: Addr,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
-    let addr = unsafe { addr.as_underlying() }?;
+    let addr = unsafe { peer.as_underlying() }?;
     client
         .rt
         .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
