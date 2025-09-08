@@ -187,7 +187,7 @@ impl SyncState for State {
 
     /// Subscribe to hello notifications from a peer.
     #[instrument(skip_all)]
-    async fn hello_subscribe_impl(
+    async fn sync_hello_subscribe_impl(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         peer: &Addr,
@@ -195,13 +195,13 @@ impl SyncState for State {
     ) -> SyncResult<()> {
         syncer.state.store.set_team(id.into_id().into());
         syncer
-            .send_hello_subscribe_request(peer, id, delay_milliseconds, syncer.server_addr)
+            .send_sync_hello_subscribe_request(peer, id, delay_milliseconds, syncer.server_addr)
             .await
     }
 
     /// Unsubscribe from hello notifications from a peer.
     #[instrument(skip_all)]
-    async fn hello_unsubscribe_impl(
+    async fn sync_hello_unsubscribe_impl(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         peer: &Addr,
@@ -464,7 +464,7 @@ impl Syncer<State> {
     /// * `Ok(())` if the subscribe request was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    async fn send_hello_subscribe_request(
+    async fn send_sync_hello_subscribe_request(
         &mut self,
         peer: &Addr,
         id: GraphId,

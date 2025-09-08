@@ -1353,7 +1353,7 @@ pub unsafe fn remove_sync_peer(
     Ok(())
 }
 
-/// Subscribe to hello notifications from a peer.
+/// Subscribe to hello notifications from a sync peer.
 ///
 /// This will request the peer to send hello notifications when their graph head changes.
 /// The `delay_milliseconds` parameter specifies the minimum delay between notifications.
@@ -1364,7 +1364,7 @@ pub unsafe fn remove_sync_peer(
 /// @param[in] delay_milliseconds minimum delay between notifications in milliseconds.
 ///
 /// @relates AranyaClient.
-pub unsafe fn hello_subscribe(
+pub unsafe fn sync_hello_subscribe(
     client: &Client,
     team: &TeamId,
     addr: Addr,
@@ -1377,7 +1377,7 @@ pub unsafe fn hello_subscribe(
         client
             .inner
             .team(team.into())
-            .hello_subscribe(addr, delay_milliseconds),
+            .sync_hello_subscribe(addr, delay_milliseconds),
     )?;
     Ok(())
 }
@@ -1391,7 +1391,7 @@ pub unsafe fn hello_subscribe(
 /// @param[in] addr the peer's Aranya network address [`Addr`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn hello_unsubscribe(
+pub unsafe fn sync_hello_unsubscribe(
     client: &Client,
     team: &TeamId,
     addr: Addr,
@@ -1401,7 +1401,7 @@ pub unsafe fn hello_unsubscribe(
     let addr = unsafe { addr.as_underlying() }?;
     client
         .rt
-        .block_on(client.inner.team(team.into()).hello_unsubscribe(addr))?;
+        .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
     Ok(())
 }
 

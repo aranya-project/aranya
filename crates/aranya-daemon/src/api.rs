@@ -517,7 +517,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn hello_subscribe(
+    async fn sync_hello_subscribe(
         self,
         _: context::Context,
         peer: Addr,
@@ -527,13 +527,13 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .hello_subscribe(peer, team.into_id().into(), delay_milliseconds)
+            .sync_hello_subscribe(peer, team.into_id().into(), delay_milliseconds)
             .await?;
         Ok(())
     }
 
     #[instrument(skip(self), err)]
-    async fn hello_unsubscribe(
+    async fn sync_hello_unsubscribe(
         self,
         _: context::Context,
         peer: Addr,
@@ -542,7 +542,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .hello_unsubscribe(peer, team.into_id().into())
+            .sync_hello_unsubscribe(peer, team.into_id().into())
             .await?;
         Ok(())
     }

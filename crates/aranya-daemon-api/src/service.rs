@@ -654,10 +654,10 @@ pub trait DaemonApi {
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
 
     /// Subscribe to hello notifications from a peer.
-    async fn hello_subscribe(addr: Addr, team: TeamId, delay_milliseconds: u64) -> Result<()>;
+    async fn sync_hello_subscribe(addr: Addr, team: TeamId, delay_milliseconds: u64) -> Result<()>;
 
     /// Unsubscribe from hello notifications from a peer.
-    async fn hello_unsubscribe(addr: Addr, team: TeamId) -> Result<()>;
+    async fn sync_hello_unsubscribe(addr: Addr, team: TeamId) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;

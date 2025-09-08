@@ -492,7 +492,7 @@ async fn test_hello_subscription() -> Result<()> {
 
     // MemberA subscribes to hello notifications from Admin
     membera_team
-        .hello_subscribe(admin_addr.into(), 100) // Short delay for faster testing
+        .sync_hello_subscribe(admin_addr.into(), 100) // Short delay for faster testing
         .await?;
     info!("membera subscribed to hello notifications from admin");
 
@@ -580,33 +580,45 @@ async fn test_hello_subscription() -> Result<()> {
     let operator_team = devices.operator.client.team(team_id);
 
     // Admin subscribes to hello notifications from Owner
-    admin_team.hello_subscribe(owner_addr.into(), 1000).await?;
+    admin_team
+        .sync_hello_subscribe(owner_addr.into(), 1000)
+        .await?;
     info!("admin subscribed to hello notifications from owner");
 
     // Test multiple subscriptions
     operator_team
-        .hello_subscribe(owner_addr.into(), 2000)
+        .sync_hello_subscribe(owner_addr.into(), 2000)
         .await?;
     operator_team
-        .hello_subscribe(admin_addr.into(), 1500)
+        .sync_hello_subscribe(admin_addr.into(), 1500)
         .await?;
     info!("operator subscribed to both owner and admin");
 
     // Test unsubscribing
-    admin_team.hello_unsubscribe(owner_addr.into()).await?;
-    operator_team.hello_unsubscribe(owner_addr.into()).await?;
-    operator_team.hello_unsubscribe(admin_addr.into()).await?;
-    membera_team.hello_unsubscribe(admin_addr.into()).await?;
+    admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
+    operator_team
+        .sync_hello_unsubscribe(owner_addr.into())
+        .await?;
+    operator_team
+        .sync_hello_unsubscribe(admin_addr.into())
+        .await?;
+    membera_team
+        .sync_hello_unsubscribe(admin_addr.into())
+        .await?;
     info!("all devices unsubscribed");
 
     // Test edge cases
-    admin_team.hello_subscribe(owner_addr.into(), 100).await?;
-    admin_team.hello_unsubscribe(owner_addr.into()).await?;
+    admin_team
+        .sync_hello_subscribe(owner_addr.into(), 100)
+        .await?;
+    admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
     info!("tested immediate subscribe/unsubscribe");
 
     // Test unsubscribing from non-subscribed peer
     let memberb_addr = devices.memberb.aranya_local_addr().await?;
-    admin_team.hello_unsubscribe(memberb_addr.into()).await?;
+    admin_team
+        .sync_hello_unsubscribe(memberb_addr.into())
+        .await?;
     info!("tested unsubscribing from non-subscribed peer");
 
     info!("hello subscription test completed successfully");

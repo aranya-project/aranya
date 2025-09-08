@@ -294,12 +294,14 @@ async fn main() -> Result<()> {
 
     // Admin subscribes to hello notifications from Owner with 2-second delay
     info!("admin subscribing to hello notifications from owner");
-    admin_team.hello_subscribe(owner_addr.into(), 2000).await?;
+    admin_team
+        .sync_hello_subscribe(owner_addr.into(), 2000)
+        .await?;
 
     // Operator subscribes to hello notifications from Admin with 1-second delay
     info!("operator subscribing to hello notifications from admin");
     operator_team
-        .hello_subscribe(admin_addr.into(), 1000)
+        .sync_hello_subscribe(admin_addr.into(), 1000)
         .await?;
 
     sleep(sleep_interval).await;
@@ -423,12 +425,12 @@ async fn main() -> Result<()> {
     // Members subscribe to each other with different delays
     info!("membera subscribing to hello notifications from memberb");
     membera_team
-        .hello_subscribe(memberb_addr.into(), 500)
+        .sync_hello_subscribe(memberb_addr.into(), 500)
         .await?;
 
     info!("memberb subscribing to hello notifications from membera");
     memberb_team
-        .hello_subscribe(membera_addr.into(), 1500)
+        .sync_hello_subscribe(membera_addr.into(), 1500)
         .await?;
 
     // Unsubscribe before AQC demo
