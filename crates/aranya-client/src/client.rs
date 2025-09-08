@@ -374,10 +374,16 @@ impl Team<'_> {
     ///
     /// This will request the peer to send hello notifications when their graph head changes.
     /// The `delay` parameter specifies the minimum delay between notifications.
-    pub async fn sync_hello_subscribe(&self, peer: Addr, delay: Duration) -> Result<()> {
+    /// The `duration` parameter specifies how long the subscription should last.
+    pub async fn sync_hello_subscribe(
+        &self,
+        peer: Addr,
+        delay: Duration,
+        duration: Duration,
+    ) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_subscribe(context::current(), peer, self.team_id, delay)
+            .sync_hello_subscribe(context::current(), peer, self.team_id, delay, duration)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

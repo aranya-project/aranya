@@ -79,6 +79,8 @@ pub struct HelloSubscription {
     delay_milliseconds: u64,
     /// Last notification time for delay management
     last_notified: Option<Instant>,
+    /// Expiration time of the subscription
+    expires_at: Instant,
 }
 
 /// Type alias for hello subscription storage
@@ -192,10 +194,11 @@ impl SyncState for State {
         id: GraphId,
         peer: &Addr,
         delay: Duration,
+        duration: Duration,
     ) -> SyncResult<()> {
         syncer.state.store.set_team(id.into_id().into());
         syncer
-            .send_sync_hello_subscribe_request(peer, id, delay, syncer.server_addr)
+            .send_sync_hello_subscribe_request(peer, id, delay, duration, syncer.server_addr)
             .await
     }
 
@@ -234,6 +237,15 @@ impl SyncState for State {
 
         // Send hello notification to each subscriber
         for (subscriber_addr, subscription) in subscribers.iter() {
+            // Check if subscription has expired
+            if Instant::now() >= subscription.expires_at {
+                // Remove expired subscription
+                let mut subscriptions = syncer.state.hello_subscriptions.lock().await;
+                subscriptions.remove(&(graph_id, *subscriber_addr));
+                debug!(?subscriber_addr, ?graph_id, "Removed expired subscription");
+                continue;
+            }
+
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
                 let delay = Duration::from_millis(subscription.delay_milliseconds);
@@ -469,6 +481,7 @@ impl Syncer<State> {
         peer: &Addr,
         id: GraphId,
         delay: Duration,
+        duration: Duration,
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
         let delay_milliseconds = delay.as_millis() as u64;
@@ -481,8 +494,10 @@ impl Syncer<State> {
         );
 
         // Create the subscribe message
+        let duration_milliseconds = duration.as_millis() as u64;
         let hello_msg = SyncHelloType::Subscribe {
             delay_milliseconds,
+            duration_milliseconds,
             address: subscriber_server_addr,
         };
         let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
@@ -1060,6 +1075,7 @@ where
         match hello_msg {
             SyncHelloType::Subscribe {
                 delay_milliseconds,
+                duration_milliseconds,
                 address,
             } => {
                 // Use the subscriber server address directly from the message
@@ -1076,9 +1092,13 @@ where
                     }
                 };
 
+                // Calculate expiration time
+                let expires_at = Instant::now() + Duration::from_millis(duration_milliseconds);
+
                 let subscription = HelloSubscription {
                     delay_milliseconds,
                     last_notified: None,
+                    expires_at,
                 };
 
                 // Store subscription (replaces any existing subscription for this peer+team)

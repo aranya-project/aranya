@@ -50,6 +50,7 @@ enum Msg {
     HelloSubscribe {
         peer: SyncPeer,
         delay: Duration,
+        duration: Duration,
     },
     HelloUnsubscribe {
         peer: SyncPeer,
@@ -149,12 +150,18 @@ impl SyncPeers {
         peer_addr: Addr,
         graph_id: GraphId,
         delay: Duration,
+        duration: Duration,
     ) -> Reply {
         let peer = SyncPeer {
             addr: peer_addr,
             graph_id,
         };
-        self.send(Msg::HelloSubscribe { peer, delay }).await
+        self.send(Msg::HelloSubscribe {
+            peer,
+            delay,
+            duration,
+        })
+        .await
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
@@ -249,6 +256,7 @@ pub trait SyncState: Sized {
         id: GraphId,
         peer: &Addr,
         delay: Duration,
+        duration: Duration,
     ) -> impl Future<Output = SyncResult<()>> + Send;
 
     /// Unsubscribe from hello notifications from a sync peer.
@@ -323,8 +331,8 @@ impl<ST: SyncState> Syncer<ST> {
                         self.remove_peer(peer);
                         Ok(())
                     }
-                    Msg::HelloSubscribe { peer, delay } => {
-                        self.sync_hello_subscribe(&peer, delay).await
+                    Msg::HelloSubscribe { peer, delay, duration } => {
+                        self.sync_hello_subscribe(&peer, delay, duration).await
                     }
                     Msg::HelloUnsubscribe { peer } => {
                         self.sync_hello_unsubscribe(&peer).await
@@ -430,9 +438,14 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Subscribe to hello notifications from a sync peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    async fn sync_hello_subscribe(&mut self, peer: &SyncPeer, delay: Duration) -> SyncResult<()> {
+    async fn sync_hello_subscribe(
+        &mut self,
+        peer: &SyncPeer,
+        delay: Duration,
+        duration: Duration,
+    ) -> SyncResult<()> {
         trace!("subscribing to hello notifications from peer");
-        ST::sync_hello_subscribe_impl(self, peer.graph_id, &peer.addr, delay).await
+        ST::sync_hello_subscribe_impl(self, peer.graph_id, &peer.addr, delay, duration).await
     }
 
     /// Unsubscribe from hello notifications from a sync peer.

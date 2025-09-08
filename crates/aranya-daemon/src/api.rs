@@ -506,11 +506,12 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
         delay: Duration,
+        duration: Duration,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         self.peers
-            .sync_hello_subscribe(peer, team.into_id().into(), delay)
+            .sync_hello_subscribe(peer, team.into_id().into(), delay, duration)
             .await?;
         Ok(())
     }

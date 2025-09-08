@@ -1369,6 +1369,7 @@ pub unsafe fn sync_hello_subscribe(
     team: &TeamId,
     peer: Addr,
     delay: Duration,
+    duration: Duration,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
@@ -1377,7 +1378,7 @@ pub unsafe fn sync_hello_subscribe(
         client
             .inner
             .team(team.into())
-            .sync_hello_subscribe(addr, delay.into()),
+            .sync_hello_subscribe(addr, delay.into(), duration.into()),
     )?;
     Ok(())
 }
