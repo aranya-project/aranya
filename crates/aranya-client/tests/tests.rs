@@ -528,7 +528,7 @@ async fn test_hello_subscription() -> Result<()> {
     let poll_timeout = Duration::from_millis(10_000);
     let poll_interval = Duration::from_millis(100);
 
-    let final_label_count = loop {
+    let (final_labels, final_label_count) = loop {
         let current_labels = queries.labels().await?;
         let current_count = current_labels.iter().count();
 
@@ -539,7 +539,7 @@ async fn test_hello_subscription() -> Result<()> {
                 current_count,
                 poll_start.elapsed()
             );
-            break current_count;
+            break (current_labels, current_count);
         }
 
         if poll_start.elapsed() >= poll_timeout {
@@ -554,15 +554,7 @@ async fn test_hello_subscription() -> Result<()> {
         common::sleep(poll_interval).await;
     };
 
-    // Verify that MemberA now knows about the label created by admin (sync succeeded)
-    info!("checking if sync worked - membera should now see the new label");
-    let final_labels = queries.labels().await?;
-    info!(
-        "final label count as seen by membera: {}",
-        final_label_count
-    );
-
-    // Additionally, verify that the specific label created by admin is visible
+    // Verify that the specific label created by admin is visible
     let label_exists = final_labels
         .iter()
         .any(|label| label.name.as_str() == "sync_hello_test_label");
@@ -621,6 +613,5 @@ async fn test_hello_subscription() -> Result<()> {
         .await?;
     info!("tested unsubscribing from non-subscribed peer");
 
-    info!("hello subscription test completed successfully");
     Ok(())
 }

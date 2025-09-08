@@ -236,11 +236,6 @@ impl EffectHandler {
             }
         }
 
-        // Debug: Log all effects for debugging
-        for effect in effects {
-            debug!(?effect, "processing effect");
-        }
-
         // Check if the graph head address has changed
         if let Some(current_head) = self.get_graph_head_address(graph).await {
             let mut prev_addresses = self.prev_head_addresses.lock().await;
@@ -332,22 +327,16 @@ impl EffectHandler {
     }
 
     /// Broadcasts hello notifications to subscribers when the graph changes.
+    #[instrument(skip(self), err)]
     async fn broadcast_hello_notifications(
         &self,
         graph_id: GraphId,
         head: Address,
     ) -> anyhow::Result<()> {
-        info!(
-            ?graph_id,
-            ?head,
-            "Starting broadcast_hello_notifications in api.rs"
-        );
-
         // Use the SyncPeers interface to trigger hello broadcasting
         // This will be handled by the QUIC syncer which has access to the subscription data
-
         if let Err(e) = self.trigger_hello_broadcast(graph_id, head).await {
-            warn!(
+            trace!(
                 error = %e,
                 ?graph_id,
                 ?head,
@@ -359,22 +348,16 @@ impl EffectHandler {
     }
 
     /// Triggers hello notification broadcasting via the SyncPeers interface.
+    #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
     async fn trigger_hello_broadcast(
         &self,
         graph_id: GraphId,
         head: Address,
     ) -> anyhow::Result<()> {
-        info!(
-            ?graph_id,
-            ?head,
-            has_peers = self.peers.is_some(),
-            "Starting trigger_hello_broadcast"
-        );
-
         if let Some(peers) = &self.peers {
             info!(?graph_id, ?head, "Calling peers.broadcast_hello");
             if let Err(e) = peers.broadcast_hello(graph_id, head).await {
-                warn!(
+                trace!(
                     error = %e,
                     ?graph_id,
                     ?head,
@@ -383,7 +366,7 @@ impl EffectHandler {
                 return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
             }
         } else {
-            warn!(
+            trace!(
                 ?graph_id,
                 ?head,
                 "No peers interface available for hello broadcasting"
@@ -958,7 +941,6 @@ impl DaemonApi for Api {
         };
 
         // Send effects to the effect handler for processing (including hello notifications)
-
         self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(label_id)
