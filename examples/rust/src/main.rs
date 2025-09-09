@@ -4,7 +4,8 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-
+use std::str::FromStr;
+use aranya_util::ShmPathBuf;
 use anyhow::{Context as _, Result, bail};
 use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
@@ -132,6 +133,8 @@ impl ClientCtx {
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
+        let afc_shm_path = ShmPathBuf::from_str(&afc_shm_path)
+            .context("unable to parse AFC shared memory path")?;
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
@@ -222,8 +225,8 @@ async fn main() -> Result<()> {
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
     let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
     let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -477,20 +480,20 @@ async fn main() -> Result<()> {
 
     // membera creates AFC channel.
     info!("creating afc bidi channel");
-    let mut membera_afc = membera.client.afc();
+    let membera_afc = membera.client.afc()?;
     let overhead = AfcChannels::overhead();
-    let (mut send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
+    let (send, ctrl) = membera_afc.create_bidi_channel(team_id, memberb.id, label3).await.expect("expected to create afc bidi channel");
 
     // memberb receives AFC channel.
     info!("receiving afc bidi channel");
-    let mut memberb_afc = memberb.client.afc();
+    let memberb_afc = memberb.client.afc()?;
     let chan = memberb_afc.receive_channel(team_id, ctrl).await.expect("expected to receive afc channel");
 
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
     let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
-    send.seal(&afc_msg, &mut ciphertext).expect("expected to seal afc data");
+    send.seal(&afc_msg, &mut ciphertext).await.expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
 
     // This is where membera would send the ciphertext to memberb via the network.
@@ -498,11 +501,11 @@ async fn main() -> Result<()> {
     // memberb opens data from membera.
     info!("memberb receiving bidi channel from membera");
     let mut plaintext = vec![0u8; ciphertext.len() - overhead];
-    let AfcChannel::Bidi(mut recv) = chan else {
+    let AfcChannel::Bidi(recv) = chan else {
         bail!("expected a bidirectional receive channel");
     };
     info!("memberb opening data from membera");
-    recv.open(&ciphertext, &mut plaintext).expect("expected to open afc data");
+    recv.open(&ciphertext, &mut plaintext).await.expect("expected to open afc data");
     info!(?plaintext, "memberb opened data from membera");
     assert_eq!(afc_msg, plaintext);
 

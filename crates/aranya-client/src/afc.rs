@@ -1,13 +1,14 @@
 //! AFC support.
-use std::{fmt::Debug, str::FromStr, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::{default::DefaultCipherSuite, CipherSuite};
 use aranya_daemon_api::{AfcChannelId, ChanOp, DeviceId, LabelId, TeamId, CS};
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
-    Client as AfcClient,
+    Client as AfcClient, Seq,
 };
+use aranya_util::ShmPathBuf;
 use tarpc::context;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -145,7 +146,7 @@ impl<'a> AfcChannels<'a> {
 
     /// Return ciphertext overhead.
     /// The ciphertext buffer should allocate plaintext.len() + overhead bytes.
-    pub fn overhead() -> usize {
+    pub const fn overhead() -> usize {
         AfcClient::<ReadState<DefaultCipherSuite>>::OVERHEAD
     }
 }
@@ -198,7 +199,7 @@ impl Channel for AfcBidiChannel<'_> {
 }
 
 impl Seal for AfcBidiChannel<'_> {
-    async fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+    async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.shm
             .lock()
@@ -216,7 +217,7 @@ impl Seal for AfcBidiChannel<'_> {
 }
 
 impl Open for AfcBidiChannel<'_> {
-    async fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
+    async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
         self.shm
             .lock()
@@ -228,8 +229,7 @@ impl Open for AfcBidiChannel<'_> {
                 plaintext,
                 ciphertext,
             )
-            .map_err(AfcError::Open)?;
-        Ok(())
+            .map_err(AfcError::Open)
     }
 }
 
@@ -263,7 +263,7 @@ impl Channel for AfcSendChannel<'_> {
 }
 
 impl Seal for AfcSendChannel<'_> {
-    async fn seal(&mut self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+    async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
         self.shm
             .lock()
             .await
@@ -309,7 +309,7 @@ impl Channel for AfcReceiveChannel<'_> {
 }
 
 impl Open for AfcReceiveChannel<'_> {
-    async fn open(&mut self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<(), AfcError> {
+    async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
         self.shm
             .lock()
             .await
@@ -320,8 +320,7 @@ impl Open for AfcReceiveChannel<'_> {
                 plaintext,
                 ciphertext,
             )
-            .map_err(AfcError::Open)?;
-        Ok(())
+            .map_err(AfcError::Open)
     }
 }
 
@@ -345,7 +344,7 @@ pub trait Seal {
     /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
     /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
     fn seal(
-        &mut self,
+        &self,
         plaintext: &[u8],
         ciphertext: &mut [u8],
     ) -> impl std::future::Future<Output = Result<(), AfcError>> + Send;
@@ -358,10 +357,10 @@ pub trait Open {
     /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
     /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
     fn open(
-        &mut self,
+        &self,
         ciphertext: &[u8],
         plaintext: &mut [u8],
-    ) -> impl std::future::Future<Output = Result<(), AfcError>> + Send;
+    ) -> impl std::future::Future<Output = Result<Seq, AfcError>> + Send;
 }
 
 /// AFC shared memory.
@@ -372,15 +371,12 @@ where
     CS: CipherSuite,
 {
     /// Open shared-memory to daemon's channel key list.
-    pub fn new(shm_path: String, max_chans: usize) -> Result<Self, AfcError> {
+    pub fn new(shm_path: &ShmPathBuf, max_chans: usize) -> Result<Self, AfcError> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
         debug!(?shm_path, "setting up afc shm read side");
         let read = {
-            let path = aranya_util::ShmPathBuf::from_str(&shm_path)
-                .context("unable to parse AFC shared memory path")
-                .map_err(AfcError::Shm)?;
-            ReadState::open(&path, Flag::OpenOnly, Mode::ReadWrite, max_chans)
+            ReadState::open(shm_path, Flag::OpenOnly, Mode::ReadWrite, max_chans)
                 .context(format!("unable to open `WriteState`: {:?}", shm_path))
                 .map_err(AfcError::Shm)?
         };

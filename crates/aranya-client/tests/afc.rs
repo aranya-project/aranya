@@ -117,13 +117,13 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
     let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
-    let (mut chan, ctrl) = membera_afc
+    let (chan, ctrl) = membera_afc
         .create_bidi_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc bidi channel")?;
 
     // Receive bidi channel.
-    let AfcChannel::Bidi(mut recv) = memberb_afc
+    let AfcChannel::Bidi(recv) = memberb_afc
         .receive_channel(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?
@@ -195,13 +195,13 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
     let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
-    let (mut chan, ctrl) = membera_afc
+    let (chan, ctrl) = membera_afc
         .create_bidi_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc bidi channel")?;
 
     // Receive bidi channel.
-    let AfcChannel::Bidi(mut recv) = memberb_afc
+    let AfcChannel::Bidi(recv) = memberb_afc
         .receive_channel(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?
@@ -296,19 +296,19 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     let overhead = AfcChannels::overhead();
 
     // Create first bidi channel.
-    let (mut chan1, ctrl1) = membera_afc
+    let (chan1, ctrl1) = membera_afc
         .create_bidi_channel(team_id, devices.memberb.id, label_id1)
         .await
         .context("unable to create afc bidi channel")?;
 
     // Create second bidi channel.
-    let (mut chan2, ctrl2) = memberb_afc
+    let (chan2, ctrl2) = memberb_afc
         .create_bidi_channel(team_id, devices.membera.id, label_id2)
         .await
         .context("unable to create afc bidi channel")?;
 
     // Receive first bidi channel.
-    let AfcChannel::Bidi(mut recv1) = memberb_afc
+    let AfcChannel::Bidi(recv1) = memberb_afc
         .receive_channel(team_id, ctrl1)
         .await
         .context("unable to receive afc bidi channel")?
@@ -317,7 +317,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     };
 
     // Receive second bidi channel.
-    let AfcChannel::Bidi(mut recv2) = membera_afc
+    let AfcChannel::Bidi(recv2) = membera_afc
         .receive_channel(team_id, ctrl2)
         .await
         .context("unable to receive afc bidi channel")?
@@ -493,13 +493,13 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
     let overhead = AfcChannels::overhead();
 
     // Create uni channel.
-    let (mut chan, ctrl) = membera_afc
+    let (chan, ctrl) = membera_afc
         .create_uni_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(mut recv)) = memberb_afc
+    let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = memberb_afc
         .receive_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
@@ -571,13 +571,13 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     let overhead = AfcChannels::overhead();
 
     // Create uni channel.
-    let (mut chan, ctrl) = membera_afc
+    let (chan, ctrl) = membera_afc
         .create_uni_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(mut recv)) = memberb_afc
+    let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = memberb_afc
         .receive_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
@@ -672,19 +672,19 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
     let overhead = AfcChannels::overhead();
 
     // Create first bidi channel.
-    let (mut chan1, ctrl1) = membera_afc
+    let (chan1, ctrl1) = membera_afc
         .create_uni_channel(team_id, devices.memberb.id, label_id1)
         .await
         .context("unable to create afc uni channel")?;
 
     // Create second bidi channel.
-    let (mut chan2, ctrl2) = memberb_afc
+    let (chan2, ctrl2) = memberb_afc
         .create_uni_channel(team_id, devices.membera.id, label_id2)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive first bidi channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(mut recv1)) = memberb_afc
+    let AfcChannel::Uni(AfcUniChannel::Receive(recv1)) = memberb_afc
         .receive_channel(team_id, ctrl1)
         .await
         .context("unable to receive afc uni channel")?
@@ -693,7 +693,7 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
     };
 
     // Receive second bidi channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(mut recv2)) = membera_afc
+    let AfcChannel::Uni(AfcUniChannel::Receive(recv2)) = membera_afc
         .receive_channel(team_id, ctrl2)
         .await
         .context("unable to receive afc uni channel")?

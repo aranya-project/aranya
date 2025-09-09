@@ -30,7 +30,7 @@ use tarpc::{
 use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(any(feature = "afc", feature = "preview"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 use crate::afc::Afc;
 use crate::{
     actions::Actions,
@@ -89,14 +89,14 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
-        #[cfg(any(feature = "afc", feature = "preview"))] afc: Afc<CE, CS, KS>,
+        #[cfg(all(feature = "afc", feature = "preview"))] afc: Afc<CE, CS, KS>,
         crypto: Crypto,
         seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
-        #[cfg(any(feature = "afc", feature = "preview"))]
+        #[cfg(all(feature = "afc", feature = "preview"))]
         let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
@@ -109,7 +109,7 @@ impl DaemonApiServer {
             effect_handler,
             invalid,
             aqc,
-            #[cfg(any(feature = "afc", feature = "preview"))]
+            #[cfg(all(feature = "afc", feature = "preview"))]
             afc,
             crypto: tokio::sync::Mutex::new(crypto),
             seed_id_dir,
@@ -259,7 +259,7 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
-    #[cfg(any(feature = "afc", feature = "preview"))]
+    #[cfg(all(feature = "afc", feature = "preview"))]
     afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
     crypto: tokio::sync::Mutex<Crypto>,
@@ -723,7 +723,7 @@ impl DaemonApi for Api {
         Err(anyhow!("unable to find AQC effect").into())
     }
 
-    #[cfg(any(feature = "afc", feature = "preview"))]
+    #[cfg(all(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn create_afc_bidi_channel(
         self,
@@ -771,7 +771,7 @@ impl DaemonApi for Api {
         todo!()
     }
 
-    #[cfg(any(feature = "afc", feature = "preview"))]
+    #[cfg(all(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn create_afc_uni_channel(
         self,
@@ -819,7 +819,7 @@ impl DaemonApi for Api {
         todo!()
     }
 
-    #[cfg(any(feature = "afc", feature = "preview"))]
+    #[cfg(all(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn delete_afc_channel(
         self,
@@ -841,7 +841,7 @@ impl DaemonApi for Api {
         todo!()
     }
 
-    #[cfg(any(feature = "afc", feature = "preview"))]
+    #[cfg(all(feature = "afc", feature = "preview"))]
     #[instrument(skip(self), err)]
     async fn receive_afc_ctrl(
         self,
