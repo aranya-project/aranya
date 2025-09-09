@@ -98,7 +98,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.9.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 dependencies = [
  "buggy",
  "byteorder",
@@ -159,7 +159,7 @@ dependencies = [
 [[package]]
 name = "aranya-fast-channels"
 version = "0.11.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 dependencies = [
  "aranya-crypto",
  "buggy",
@@ -230,7 +230,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text"
 version = "0.1.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 dependencies = [
  "aranya-policy-text-macro",
  "serde",
@@ -240,7 +240,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text-macro"
 version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 dependencies = [
  "macro-string",
  "proc-macro2",
@@ -2867,79 +2867,79 @@ dependencies = [
 [[patch.unused]]
 name = "aranya-afc-util"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-aqc-util"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-capi-codegen"
 version = "0.3.3"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-capi-core"
 version = "0.4.4"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-crypto-ffi"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-device-ffi"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-envelope-ffi"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-idam-ffi"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-perspective-ffi"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-policy-compiler"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-policy-ifgen"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-policy-ifgen-build"
 version = "0.6.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-policy-lang"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-policy-module"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-policy-vm"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"
 
 [[patch.unused]]
 name = "aranya-runtime"
 version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#0c9e00f0d1066fff5560eb8a509bb25dc44b1570"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=label-id-ffis#9d45bbe1cbdf431c430c38aa4112aee99b7b8341"

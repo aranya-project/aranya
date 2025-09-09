@@ -3,12 +3,11 @@ use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::{default::DefaultCipherSuite, CipherSuite};
-use aranya_daemon_api::{AfcChannelId, ChanOp, DeviceId, LabelId, TeamId, CS};
+use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DeviceId, LabelId, TeamId, CS};
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
     Client as AfcClient, Seq,
 };
-use aranya_util::ShmPathBuf;
 use tarpc::context;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -371,14 +370,25 @@ where
     CS: CipherSuite,
 {
     /// Open shared-memory to daemon's channel key list.
-    pub fn new(shm_path: &ShmPathBuf, max_chans: usize) -> Result<Self, AfcError> {
+    pub fn new(afc_shm_info: &AfcShmInfo) -> Result<Self, AfcError> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
-        debug!(?shm_path, "setting up afc shm read side");
+        debug!(
+            "setting up afc shm read side: {:?}",
+            afc_shm_info.path.clone()
+        );
         let read = {
-            ReadState::open(shm_path, Flag::OpenOnly, Mode::ReadWrite, max_chans)
-                .context(format!("unable to open `WriteState`: {:?}", shm_path))
-                .map_err(AfcError::Shm)?
+            ReadState::open(
+                afc_shm_info.path.clone(),
+                Flag::OpenOnly,
+                Mode::ReadWrite,
+                afc_shm_info.max_chans,
+            )
+            .context(format!(
+                "unable to open `WriteState`: {:?}",
+                afc_shm_info.path
+            ))
+            .map_err(AfcError::Shm)?
         };
 
         Ok(Self(AfcClient::new(read)))

@@ -6,12 +6,10 @@ use aranya_client::{
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
-use aranya_util::ShmPathBuf;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
 use bytes::Bytes;
 use futures_util::future::try_join;
-use std::str::FromStr;
 use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
@@ -132,13 +130,9 @@ impl ClientCtx {
         sleep(Duration::from_millis(100)).await;
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-
-        let afc_shm_path = ShmPathBuf::from_str(&afc_shm_path)
-            .context("unable to parse AFC shared memory path")?;
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
-                .afc_shm_path(&afc_shm_path)
                 .aqc_server_addr(&any_addr)
                 .connect()
         })

@@ -1,7 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
-    str::FromStr,
     time::Duration,
 };
 
@@ -19,7 +18,7 @@ use aranya_daemon::{
     Daemon, DaemonHandle,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
-use aranya_util::{Addr, ShmPathBuf};
+use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use tempfile::TempDir;
@@ -220,12 +219,9 @@ impl DeviceCtx {
             .context("unable to start daemon")?;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
-        let afc_shm_path = ShmPathBuf::from_str(&afc_shm_path)
-            .context("unable to parse AFC shared memory path")?;
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_path)
-                .afc_shm_path(&afc_shm_path)
                 .aqc_server_addr(&addr_any)
                 .connect()
         })

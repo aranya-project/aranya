@@ -4,6 +4,8 @@ use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
+#[cfg(all(feature = "afc", feature = "preview"))]
+use aranya_daemon_api::AfcShmInfo;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
@@ -12,8 +14,6 @@ use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
     Text, Version, CS,
 };
-#[cfg(all(feature = "afc", feature = "preview"))]
-use aranya_util::ShmPathBuf;
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
 use tarpc::context;
@@ -72,9 +72,6 @@ pub struct ClientBuilder<'a> {
     daemon_uds_path: Option<&'a Path>,
     /// AQC address.
     aqc_server_addr: Option<&'a Addr>,
-    /// AFC shared-memory path.
-    #[cfg(all(feature = "afc", feature = "preview"))]
-    afc_shm_path: Option<&'a ShmPathBuf>,
 }
 
 impl ClientBuilder<'_> {
@@ -101,24 +98,9 @@ impl ClientBuilder<'_> {
             .into());
         };
 
-        #[cfg(all(feature = "afc", feature = "preview"))]
-        let Some(afc_shm_path) = &self.afc_shm_path
-        else {
-            return Err(IpcError::new(InvalidArg::new(
-                "afc_shm_path",
-                "must specify the AFC shm path",
-            ))
-            .into());
-        };
-
-        Client::connect(
-            sock,
-            aqc_addr,
-            #[cfg(all(feature = "afc", feature = "preview"))]
-            afc_shm_path,
-        )
-        .await
-        .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
+        Client::connect(sock, aqc_addr)
+            .await
+            .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
     }
 }
 
@@ -134,13 +116,6 @@ impl<'a> ClientBuilder<'a> {
     /// Specifies the AQC server address.
     pub fn aqc_server_addr(mut self, addr: &'a Addr) -> Self {
         self.aqc_server_addr = Some(addr);
-        self
-    }
-
-    /// Specifies the AFC shm path.
-    #[cfg(all(feature = "afc", feature = "preview"))]
-    pub fn afc_shm_path(mut self, afc_shm_path: &'a ShmPathBuf) -> Self {
-        self.afc_shm_path = Some(afc_shm_path);
         self
     }
 }
@@ -160,7 +135,7 @@ pub struct Client {
     pub(crate) aqc: AqcClient,
     /// AFC shared-memory path.
     #[cfg(all(feature = "afc", feature = "preview"))]
-    pub(crate) shm_path: ShmPathBuf,
+    pub(crate) afc_shm_info: AfcShmInfo,
 }
 
 impl Client {
@@ -185,11 +160,7 @@ impl Client {
     /// #    Ok(())
     /// # }
     #[instrument(skip_all)]
-    async fn connect(
-        uds_path: &Path,
-        aqc_addr: &Addr,
-        #[cfg(all(feature = "afc", feature = "preview"))] shm_path: &ShmPathBuf,
-    ) -> Result<Self> {
+    async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
         info!(path = ?uds_path, "connecting to daemon");
 
         let daemon = {
@@ -246,10 +217,17 @@ impl Client {
             .expect("expected AQC server address");
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
 
+        let afc_shm_info = daemon
+            .afc_shm_info(context::current())
+            .await
+            .map_err(IpcError::new)?
+            .context("unable to retrieve afc shm info")
+            .map_err(error::other)?;
+
         let client = Self {
             daemon,
             aqc,
-            shm_path: shm_path.clone(),
+            afc_shm_info,
         };
 
         Ok(client)
@@ -348,7 +326,7 @@ impl Client {
     /// Get access to Aranya Fast Channels.
     #[cfg(all(feature = "afc", feature = "preview"))]
     pub fn afc(&self) -> Result<AfcChannels<'_>> {
-        let shm = AfcShm::new(&self.shm_path, 100)?;
+        let shm = AfcShm::new(&self.afc_shm_info)?;
         Ok(AfcChannels::new(self, shm))
     }
 }
