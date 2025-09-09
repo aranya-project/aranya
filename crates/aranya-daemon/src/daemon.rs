@@ -20,7 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
-#[cfg(any(feature = "afc", feature = "preview"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 use crate::afc::Afc;
 use crate::{
     actions::Actions,
@@ -221,7 +221,7 @@ impl Daemon {
                 )
             };
 
-            #[cfg(any(feature = "afc", feature = "preview"))]
+            #[cfg(all(feature = "afc", feature = "preview"))]
             let afc = {
                 let Toggle::Enabled(afc_cfg) = &cfg.afc else {
                     anyhow::bail!(
@@ -256,7 +256,7 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
-                #[cfg(any(feature = "afc", feature = "preview"))]
+                #[cfg(all(feature = "afc", feature = "preview"))]
                 afc,
                 crypto,
                 seed_id_dir,

@@ -38,7 +38,7 @@ pub mod policy;
 pub mod sync;
 pub mod vm_policy;
 
-#[cfg(any(feature = "afc", feature = "preview"))]
+#[cfg(all(feature = "afc", feature = "preview"))]
 mod afc;
 mod api;
 mod aqc;

@@ -3,6 +3,7 @@
 use std::str::FromStr;
 
 use aranya_fast_channels::shm;
+use serde::{Deserialize, Serialize};
 
 /// An owned, validated buffer representing a shared memory path string.
 ///
@@ -17,7 +18,7 @@ use aranya_fast_channels::shm;
 ///
 /// The `FromStr` and `TryFrom` implementations return `shm::InvalidPathError`
 /// if the input string is not a valid shared memory path.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ShmPathBuf(Vec<u8>);
 
 impl AsRef<shm::Path> for ShmPathBuf {

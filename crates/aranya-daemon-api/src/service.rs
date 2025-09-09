@@ -23,7 +23,7 @@ use aranya_crypto::{
 };
 pub use aranya_fast_channels::ChannelId as AfcChannelId;
 pub use aranya_policy_text::{text, Text};
-use aranya_util::{error::ReportExt, Addr};
+use aranya_util::{error::ReportExt, Addr, ShmPathBuf};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -634,6 +634,14 @@ pub struct Label {
     pub name: Text,
 }
 
+/// AFC shared-memory info.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+
+pub struct AfcShmInfo {
+    pub path: ShmPathBuf,
+    pub max_chans: usize,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Returns the daemon's version.
@@ -647,6 +655,9 @@ pub trait DaemonApi {
 
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
+
+    /// Gets AFC shared-memory configuration info.
+    async fn afc_shm_info() -> Result<AfcShmInfo>;
 
     /// Adds the peer for automatic periodic syncing.
     async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
