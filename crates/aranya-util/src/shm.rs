@@ -2,7 +2,13 @@
 
 use std::str::FromStr;
 
-use aranya_fast_channels::shm;
+use aranya_fast_channels::{
+    crypto::aranya_crypto::{
+        dangerous::spideroak_crypto::{hash::Hash, rust::Sha256},
+        id::ToBase58,
+    },
+    shm,
+};
 use serde::{Deserialize, Serialize};
 
 /// An owned, validated buffer representing a shared memory path string.
@@ -34,7 +40,7 @@ impl FromStr for ShmPathBuf {
     type Err = shm::InvalidPathError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut path = s.as_bytes().to_vec();
+        let mut path = get_shm_path(s.into()).as_bytes().to_vec();
         path.push(0);
         shm::Path::validate(&path[..])?;
         Ok(ShmPathBuf(path))
@@ -45,7 +51,7 @@ impl TryFrom<&str> for ShmPathBuf {
     type Error = shm::InvalidPathError;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        s.parse::<Self>()
+        get_shm_path(s.into()).parse::<Self>()
     }
 }
 
@@ -53,6 +59,16 @@ impl TryFrom<String> for ShmPathBuf {
     type Error = shm::InvalidPathError;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        s.parse::<Self>()
+        get_shm_path(s).parse::<Self>()
     }
+}
+
+fn get_shm_path(path: String) -> String {
+    if cfg!(target_os = "macos") && path.len() > 31 {
+        // Shrink the size of the shm path down to 22 bytes to work within macOS's limits.
+        let d = Sha256::hash(path.as_bytes());
+        let t: [u8; 16] = d[..16].try_into().expect("expected shm path");
+        return format!("/{}", t.to_base58());
+    };
+    path
 }

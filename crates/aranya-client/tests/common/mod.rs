@@ -9,10 +9,6 @@ use aranya_client::{
     client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
     CreateTeamQuicSyncConfig,
 };
-use aranya_crypto::{
-    dangerous::spideroak_crypto::{hash::Hash, rust::Sha256},
-    id::ToBase58,
-};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
@@ -174,7 +170,7 @@ impl DeviceCtx {
     async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let afc_shm_path = get_shm_path(format!("/{team_name}_{name}"));
+        let afc_shm_path = format!("/{team_name}_{name}");
 
         // Setup daemon config.
         let cfg = Config {
@@ -256,14 +252,4 @@ impl DeviceCtx {
                 .expect("socket addr is valid text"),
         )
     }
-}
-
-fn get_shm_path(path: String) -> String {
-    if cfg!(target_os = "macos") && path.len() > 31 {
-        // Shrink the size of the team name down to 22 bytes to work within macOS's limits.
-        let d = Sha256::hash(path.as_bytes());
-        let t: [u8; 16] = d[..16].try_into().expect("expected shm path");
-        return format!("/{}", t.to_base58());
-    };
-    path
 }
