@@ -313,7 +313,6 @@ dependencies = [
  "aranya-policy-ifgen",
  "aranya-policy-ifgen-build",
  "aranya-policy-lang",
- "aranya-policy-module",
  "aranya-policy-vm",
  "aranya-runtime",
  "aranya-util",

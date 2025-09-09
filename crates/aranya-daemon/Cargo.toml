@@ -36,7 +36,6 @@ aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }
 aranya-policy-ifgen = { workspace = true }
 aranya-policy-lang = { workspace = true }
-aranya-policy-module = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
