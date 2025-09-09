@@ -15,10 +15,12 @@ use aranya_crypto::{
     afc::{RawOpenKey, RawSealKey},
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
+use aranya_daemon_api::{self as api};
 use aranya_fast_channels::{
     shm::{self, Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
 };
+use aranya_util::ShmPathBuf;
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
@@ -35,6 +37,7 @@ use crate::{
 /// AFC shared memory.
 pub struct AfcShm<C> {
     cfg: AfcConfig,
+    path: ShmPathBuf,
     write: WriteState<C, Rng>,
 }
 
@@ -43,12 +46,10 @@ where
     C: CipherSuite,
 {
     fn new(cfg: AfcConfig) -> Result<Self> {
-        // TODO: issue stellar-tapestry#34
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
         debug!(shm_path = cfg.shm_path, "setting up afc shm write side");
+        let path = ShmPathBuf::from_str(&cfg.shm_path)
+            .context("unable to parse AFC shared memory path")?;
         let write = {
-            let path = aranya_util::ShmPathBuf::from_str(&cfg.shm_path)
-                .context("unable to parse AFC shared memory path")?;
             if cfg.unlink_on_startup && cfg.create {
                 let _ = shm::unlink(&path);
             }
@@ -56,7 +57,7 @@ where
                 .context(format!("unable to open `WriteState`: {:?}", cfg.shm_path))?
         };
 
-        Ok(Self { cfg, write })
+        Ok(Self { cfg, path, write })
     }
 }
 
@@ -64,7 +65,7 @@ impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
         {
             if self.cfg.unlink_at_exit {
-                if let Ok(path) = aranya_util::shm::ShmPathBuf::from_str(&self.cfg.shm_path) {
+                if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
                     let _ = shm::unlink(path);
                 }
             }
@@ -299,5 +300,13 @@ where
             .write
             .remove(channel_id)
             .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
+    }
+
+    pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
+        let shm = self.shm.lock().await;
+        api::AfcShmInfo {
+            path: shm.path.clone(),
+            max_chans: shm.cfg.max_chans,
+        }
     }
 }

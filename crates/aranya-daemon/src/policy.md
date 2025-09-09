@@ -137,9 +137,6 @@ fact TeamEnd[]=>{}
 
 // Stores a Member's associated network identifier for AQC.
 fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
-
-// Stores a Member's associated network identifier for AFC.
-fact AfcMemberNetworkId[device_id id]=>{net_identifier string}
 ```
 
 ### Functions
@@ -2573,7 +2570,7 @@ action query_aqc_network_names() {
 }
 
 effect QueryAqcNetworkNamesOutput {
-    // AFC network name assigned to device.
+    // AQC network name assigned to device.
     net_identifier string,
     // Device ID of device with assigned network name.
     device_id id,
@@ -2581,7 +2578,7 @@ effect QueryAqcNetworkNamesOutput {
 
 command QueryAqcNetworkNamesCommand {
     fields {
-        // AFC network name assigned to device.
+        // AQC network name assigned to device.
         net_identifier string,
         // Device ID of device with assigned network name.
         device_id id,

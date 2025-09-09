@@ -334,6 +334,24 @@ impl DaemonApi for Api {
         self.device_id().map(|id| id.into_id().into())
     }
 
+    #[cfg(all(feature = "afc", feature = "preview"))]
+    #[instrument(skip(self), err)]
+    async fn afc_shm_info(
+        self,
+        context: ::tarpc::context::Context,
+    ) -> api::Result<api::AfcShmInfo> {
+        Ok(self.afc.get_shm_info().await)
+    }
+
+    #[cfg(not(all(feature = "afc", feature = "preview")))]
+    #[instrument(skip(self), err)]
+    async fn afc_shm_info(
+        self,
+        context: ::tarpc::context::Context,
+    ) -> api::Result<api::AfcShmInfo> {
+        todo!()
+    }
+
     #[instrument(skip(self), err)]
     async fn add_sync_peer(
         self,
@@ -759,7 +777,7 @@ impl DaemonApi for Api {
         Ok((ctrl, channel_id))
     }
 
-    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[cfg(not(all(feature = "afc", feature = "preview")))]
     #[instrument(skip(self), err)]
     async fn create_afc_bidi_channel(
         self,
@@ -807,7 +825,7 @@ impl DaemonApi for Api {
         Ok((ctrl, channel_id))
     }
 
-    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[cfg(not(all(feature = "afc", feature = "preview")))]
     #[instrument(skip(self), err)]
     async fn create_afc_uni_channel(
         self,
@@ -831,7 +849,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[cfg(not(all(feature = "afc", feature = "preview")))]
     #[instrument(skip(self), err)]
     async fn delete_afc_channel(
         self,
@@ -885,7 +903,7 @@ impl DaemonApi for Api {
         Err(anyhow!("unable to find AFC effect").into())
     }
 
-    #[cfg(not(any(feature = "afc", feature = "preview")))]
+    #[cfg(not(all(feature = "afc", feature = "preview")))]
     #[instrument(skip(self), err)]
     async fn receive_afc_ctrl(
         self,
