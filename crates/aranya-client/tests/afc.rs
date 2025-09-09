@@ -112,8 +112,8 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut membera_afc = devices.membera.client.afc()?;
-    let mut memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
     let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
@@ -190,8 +190,8 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut membera_afc = devices.membera.client.afc()?;
-    let mut memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
     let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
@@ -291,8 +291,8 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut membera_afc = devices.membera.client.afc()?;
-    let mut memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
     let overhead = AfcChannels::overhead();
 
     // Create first bidi channel.
@@ -488,8 +488,8 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut membera_afc = devices.membera.client.afc()?;
-    let mut memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
     let overhead = AfcChannels::overhead();
 
     // Create uni channel.
@@ -566,8 +566,8 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut membera_afc = devices.membera.client.afc()?;
-    let mut memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
     let overhead = AfcChannels::overhead();
 
     // Create uni channel.
@@ -667,8 +667,8 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut membera_afc = devices.membera.client.afc()?;
-    let mut memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
     let overhead = AfcChannels::overhead();
 
     // Create first bidi channel.

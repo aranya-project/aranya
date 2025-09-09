@@ -185,6 +185,10 @@ pub enum AfcError {
     #[error("unable initialize shm")]
     Shm(anyhow::Error),
 
+    /// Unable to delete channel.
+    #[error("unable to delete channel")]
+    Delete(#[from] AranyaError),
+
     /// No channel info found.
     #[error("no channel info found")]
     NoChannelInfoFound,
