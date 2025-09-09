@@ -19,7 +19,11 @@ doctest = false
 
 
 [features]
-default = []
+default = ["afc", "preview"]
+# Preview features
+preview = ["afc"]
+# Aranya Fast Channels
+afc = []
 
 
 [dependencies]
