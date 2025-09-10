@@ -20,6 +20,10 @@
 #include <stddef.h>
 #include <sys/socket.h>
 
+#if defined(ENABLE_AQC) && !defined(ENABLE_ARANYA_UNSTABLE)
+    #error "AQC is currently experimental. Set 'ENABLE_ARANYA_UNSTABLE' to opt into unstable APIs."
+#endif
+
 #ifndef __has_attribute
     #define __has_attribute(x) 0
 #endif /* __has_attribute */
