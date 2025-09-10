@@ -480,7 +480,7 @@ async fn test_hello_subscription() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
 
     let sync_config = SyncPeerConfig::builder()
-        .interval(Duration::from_secs(300)) // 5 minutes - long enough to not interfere with test
+        .interval(Duration::MAX) // Long interval to ensure sync on hello is triggered
         .sync_now(false) // Don't sync immediately when adding peer
         .sync_on_hello(true) // Enable sync on hello messages
         .build()?;
@@ -492,7 +492,11 @@ async fn test_hello_subscription() -> Result<()> {
 
     // MemberA subscribes to hello notifications from Admin
     membera_team
-        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(100)) // Short delay for faster testing
+        .sync_hello_subscribe(
+            admin_addr.into(),
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+        ) // Short delay for faster testing
         .await?;
     info!("membera subscribed to hello notifications from admin");
 
@@ -528,7 +532,7 @@ async fn test_hello_subscription() -> Result<()> {
     let poll_timeout = Duration::from_millis(10_000);
     let poll_interval = Duration::from_millis(100);
 
-    let (final_labels, final_label_count) = loop {
+    let final_labels = loop {
         let current_labels = queries.labels().await?;
         let current_count = current_labels.iter().count();
 
@@ -539,7 +543,7 @@ async fn test_hello_subscription() -> Result<()> {
                 current_count,
                 poll_start.elapsed()
             );
-            break (current_labels, current_count);
+            break current_labels;
         }
 
         if poll_start.elapsed() >= poll_timeout {
@@ -573,16 +577,28 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Admin subscribes to hello notifications from Owner
     admin_team
-        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(1000))
+        .sync_hello_subscribe(
+            owner_addr.into(),
+            Duration::from_millis(1000),
+            Duration::from_millis(1000),
+        )
         .await?;
     info!("admin subscribed to hello notifications from owner");
 
     // Test multiple subscriptions
     operator_team
-        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(2000))
+        .sync_hello_subscribe(
+            owner_addr.into(),
+            Duration::from_millis(2000),
+            Duration::from_millis(1000),
+        )
         .await?;
     operator_team
-        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(1500))
+        .sync_hello_subscribe(
+            admin_addr.into(),
+            Duration::from_millis(1500),
+            Duration::from_millis(1000),
+        )
         .await?;
     info!("operator subscribed to both owner and admin");
 
@@ -601,7 +617,11 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Test edge cases
     admin_team
-        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(100))
+        .sync_hello_subscribe(
+            owner_addr.into(),
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+        )
         .await?;
     admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
     info!("tested immediate subscribe/unsubscribe");

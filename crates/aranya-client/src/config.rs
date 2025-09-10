@@ -4,6 +4,8 @@
 
 use core::time::Duration;
 
+use tracing::warn;
+
 use crate::{error::InvalidArg, ConfigError, Result};
 
 pub mod team;
@@ -58,8 +60,21 @@ impl SyncPeerConfigBuilder {
             .into());
         };
 
+        // Cap the interval at 1 year to prevent overflow when adding to Instant::now()
+        // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+        let one_year = Duration::from_secs(365 * 24 * 60 * 60); // 365 days
+        let capped_interval = if interval > one_year {
+            warn!(
+                "SyncPeerConfig interval capped at 1 year (was {:?})",
+                interval
+            );
+            one_year
+        } else {
+            interval
+        };
+
         Ok(SyncPeerConfig {
-            interval,
+            interval: capped_interval,
             sync_now: self.sync_now,
             sync_on_hello: self.sync_on_hello,
         })

@@ -336,7 +336,7 @@ impl EffectHandler {
         // Use the SyncPeers interface to trigger hello broadcasting
         // This will be handled by the QUIC syncer which has access to the subscription data
         if let Err(e) = self.trigger_hello_broadcast(graph_id, head).await {
-            trace!(
+            debug!(
                 error = %e,
                 ?graph_id,
                 ?head,

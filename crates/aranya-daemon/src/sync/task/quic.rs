@@ -550,10 +550,9 @@ impl Syncer<State> {
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
-        let hello_msg = SyncHelloType::Unsubscribe {
+        let sync_type: SyncType<Addr> = SyncType::Hello(SyncHelloType::Unsubscribe {
             address: subscriber_server_addr,
-        };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+        });
 
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
@@ -997,42 +996,21 @@ where
                 request: request_msg,
                 address: peer_server_addr,
             } => {
-                let mut resp = SyncResponder::new(addr);
-                let storage_id = check_request(active_team, &request_msg)?;
-
-                resp.receive(request_msg).context("sync recv failed")?;
-
-                let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-                let len = {
-                    // Must lock aranya then caches to prevent deadlock.
-                    let mut aranya = client.aranya.lock().await;
-                    let key = PeerCacheKey::new(peer_server_addr, storage_id);
-                    let mut caches = caches.lock().await;
-                    let cache = caches.entry(key).or_default();
-
-                    resp.poll(&mut buf, aranya.provider(), cache)
-                        .or_else(|err| {
-                            if matches!(
-                                err,
-                                aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
-                            ) {
-                                warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
-                                Ok(0)
-                            } else {
-                                Err(err)
-                            }
-                        })
-                        .context("sync resp poll failed")?
-                };
-                debug!(len = len, "sync poll finished");
-                buf.truncate(len);
-                Ok(buf.into())
+                Self::process_poll_message(
+                    request_msg,
+                    client,
+                    caches,
+                    addr,
+                    peer_server_addr,
+                    active_team,
+                )
+                .await
             }
             SyncType::Subscribe { .. } => {
-                bug!("Subscribe messages are not implemented")
+                bug!("Push subscribe messages are not implemented")
             }
             SyncType::Unsubscribe { .. } => {
-                bug!("Unsubscribe messages are not implemented")
+                bug!("Push unsubscribe messages are not implemented")
             }
             SyncType::Push { .. } => {
                 bug!("Push messages are not implemented")
@@ -1053,6 +1031,50 @@ where
                 Ok(Box::new([]))
             }
         }
+    }
+
+    /// Processes a poll message.
+    ///
+    /// Handles sync poll requests and generates sync responses.
+    #[instrument(skip_all)]
+    async fn process_poll_message(
+        request_msg: SyncRequestMessage,
+        client: AranyaClient<EN, SP>,
+        caches: PeerCacheMap,
+        peer_addr: Addr,
+        peer_server_addr: Addr,
+        active_team: &TeamId,
+    ) -> SyncResult<Box<[u8]>> {
+        let mut resp = SyncResponder::new(peer_addr);
+        let storage_id = check_request(active_team, &request_msg)?;
+
+        resp.receive(request_msg).context("sync recv failed")?;
+
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        let len = {
+            // Must lock aranya then caches to prevent deadlock.
+            let mut aranya = client.aranya.lock().await;
+            let key = PeerCacheKey::new(peer_server_addr, storage_id);
+            let mut caches = caches.lock().await;
+            let cache = caches.entry(key).or_default();
+
+            resp.poll(&mut buf, aranya.provider(), cache)
+                        .or_else(|err| {
+                            if matches!(
+                                err,
+                                aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                            ) {
+                                warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
+                                Ok(0)
+                            } else {
+                                Err(err)
+                            }
+                        })
+                        .context("sync resp poll failed")?
+        };
+        debug!(len = len, "sync poll finished");
+        buf.truncate(len);
+        Ok(buf.into())
     }
 
     /// Processes a hello message.
