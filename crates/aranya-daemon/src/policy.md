@@ -868,7 +868,7 @@ represented as non-empty tuples where the element(s) are the
 _context_. For example, the `CanManageLabel(label_id)` fact
 grants devices permission to manage a specific label.
 
-### Role Management
+### Role Ownership
 
 As previously mentioned, each role is "owned" by zero or more
 other roles, called the _owning roles_. The owning roles are
@@ -1045,6 +1045,8 @@ command RemoveRoleOwner {
     }
 }
 ```
+
+### Role Management
 
 The owning roles for a role are allowed to delegate the following
 permissions to other roles, including to themselves:
@@ -2988,7 +2990,7 @@ action assign_label_to_role(role_id id, label_id id, op enum ChanOp) {
 
 // Emitted when the `AssignLabelToRole` command is successfully
 // processed.
-effect LabelAssignedToRole {
+effect AssignedLabelToRole {
     // The ID of the role that was assigned the label.
     role_id id,
     // The ID of the label that was assigned.
@@ -3046,12 +3048,12 @@ command AssignLabelToRole {
         // - `this.role_id` refers to a role that exists
         // - `this.label_id` refers to a label that exists
         finish {
-            create AssignedLabelToRole[
+            create LabelAssignedToRole[
                 label_id: this.label_id,
                 role_id: this.role_id,
             ]=>{op: this.op}
 
-            emit LabelAssignedToRole {
+            emit AssignedLabelToRole {
                 role_id: this.role_id,
                 label_id: label.label_id,
                 author_id: author.device_id,
@@ -3105,7 +3107,7 @@ action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
 
 // Emitted when the `AssignLabelToDevice` command is successfully
 // processed.
-effect LabelAssignedToDevice {
+effect AssignedLabelToDevice {
     // The ID of the device that was assigned the label.
     device id,
     // The ID of the label that was assigned.
@@ -3155,12 +3157,12 @@ command AssignLabelToDevice {
         // - `this.device_id` refers to a device that exists
         // - `this.label_id` refers to a label that exists
         finish {
-            create AssignedLabelToDevice[
+            create LabelAssignedToDevice[
                 label_id: label.label_id,
                 device_id: target.device_id,
             ]=>{op: this.op}
 
-            emit LabelAssignedToDevice {
+            emit AssignedLabelToDevice {
                 device_id: this.device_id,
                 label_id: this.label_id,
                 author_id: author.device_id,
@@ -3185,13 +3187,13 @@ command AssignLabelToDevice {
 // - `RevokeLabel`
 // - `CanManageLabel(label_id)`
 action revoke_label_from_role(role_id id, label_id id) {
-    publish RevokeLabelFromDevice {
+    publish RevokeLabelFromRole {
         role_id: role_id,
         label_id: label_id,
     }
 }
 
-// Emitted when the `RevokeLabel` command is successfully
+// Emitted when the `RevokeLabelFromRole` command is successfully
 // processed.
 effect LabelRevokedFromRole {
     // The ID of the role that had the label revoked.
@@ -3202,7 +3204,7 @@ effect LabelRevokedFromRole {
     author_id id,
 }
 
-command RevokeLabelFromDevice {
+command RevokeLabelFromRole {
     fields {
         // The target role.
         role_id id,
@@ -3259,8 +3261,8 @@ action revoke_label_from_device(device_id id, label_id id) {
     }
 }
 
-// Emitted when the `RevokeLabel` command is successfully
-// processed.
+// Emitted when the `RevokeLabelFromDevice` command is
+// successfully processed.
 effect LabelRevokedFromDevice {
     // The ID of the label that was revoked.
     label_id id,

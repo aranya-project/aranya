@@ -56,8 +56,8 @@ pub enum Effect {
     LabelManagingRoleRevoked(LabelManagingRoleRevoked),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
-    LabelAssignedToRole(LabelAssignedToRole),
-    LabelAssignedToDevice(LabelAssignedToDevice),
+    AssignedLabelToRole(AssignedLabelToRole),
+    AssignedLabelToDevice(AssignedLabelToDevice),
     LabelRevokedFromRole(LabelRevokedFromRole),
     LabelRevokedFromDevice(LabelRevokedFromDevice),
     QueryLabelResult(QueryLabelResult),
@@ -228,16 +228,16 @@ pub struct LabelDeleted {
     pub label_id: Id,
     pub author_id: Id,
 }
-/// LabelAssignedToRole policy effect.
+/// AssignedLabelToRole policy effect.
 #[effect]
-pub struct LabelAssignedToRole {
+pub struct AssignedLabelToRole {
     pub role_id: Id,
     pub label_id: Id,
     pub author_id: Id,
 }
-/// LabelAssignedToDevice policy effect.
+/// AssignedLabelToDevice policy effect.
 #[effect]
-pub struct LabelAssignedToDevice {
+pub struct AssignedLabelToDevice {
     pub device: Id,
     pub label_id: Id,
     pub author_id: Id,

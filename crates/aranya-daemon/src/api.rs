@@ -214,9 +214,9 @@ impl EffectHandler {
                 DeviceRemoved(_) => {}
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
-                LabelAssignedToDevice(_) => {}
+                AssignedLabelToDevice(_) => {}
                 LabelRevokedFromDevice(_) => {}
-                LabelAssignedToRole(_) => {}
+                AssignedLabelToRole(_) => {}
                 LabelRevokedFromRole(_) => {}
                 AqcNetworkNameSet(e) => {
                     self.aqc
@@ -986,7 +986,7 @@ impl DaemonApi for Api {
             .assign_label_to_role(role.into_id().into(), label.into_id().into(), op.into())
             .await
             .context("unable to assign label to role")?;
-        find_exactly_one!(effects, Effect::LabelAssignedToRole)?;
+        find_exactly_one!(effects, Effect::AssignedLabelToRole)?;
         Ok(())
     }
 
@@ -1059,7 +1059,7 @@ impl DaemonApi for Api {
             .assign_label_to_device(device.into_id().into(), label.into_id().into(), op.into())
             .await
             .context("unable to assign label to device")?;
-        find_exactly_one!(effects, Effect::LabelAssignedToDevice)?;
+        find_exactly_one!(effects, Effect::AssignedLabelToDevice)?;
         Ok(())
     }
 

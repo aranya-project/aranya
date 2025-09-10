@@ -3,7 +3,10 @@ macro_rules! custom_id {
         $(#[$meta:meta])*
         $vis:vis struct $name:ident;
     ) => {
-        $crate::util::custom_id!($vis struct $name => $name;);
+        $crate::util::custom_id! {
+            $(#[$meta])*
+            $vis struct $name => $name;
+        }
     };
     (
         $(#[$meta:meta])*

@@ -9,8 +9,8 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
-    client::Client, DeviceId, NetIdentifier, QuicSyncConfig, Role, SyncPeerConfig, TeamConfig,
-    TeamId,
+    client::Client, text, DeviceId, NetIdentifier, QuicSyncConfig, Role, SyncPeerConfig,
+    TeamConfig, TeamId,
 };
 use aranya_daemon::{Config, Daemon, DaemonHandle};
 use aranya_daemon_api::{KeyBundle, SEED_IKM_SIZE};
@@ -108,8 +108,6 @@ impl TeamCtx {
         debug!(?roles, "default roles set up");
 
         let mappings = [
-            // owner -> admin
-            ("owner -> admin", roles.admin().id, roles.owner().id),
             // admin -> operator
             ("admin -> operator", roles.operator().id, roles.admin().id),
             // admin -> member
@@ -119,7 +117,7 @@ impl TeamCtx {
             self.owner
                 .client
                 .team(team_id)
-                .assign_role_management_permission(role, manager, todo!())
+                .assign_role_management_permission(role, manager, text!("CanAssignRole"))
                 .await
                 .with_context(|| format!("{name}: unable to change managing role"))?;
         }
