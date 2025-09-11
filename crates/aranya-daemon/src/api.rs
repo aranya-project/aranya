@@ -20,6 +20,7 @@ use aranya_daemon_api::{
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
+use cfg_if::cfg_if;
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
@@ -224,20 +225,29 @@ impl EffectHandler {
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
                 LabelRevoked(_) => {}
-                AqcNetworkNameSet(_e) => {
-                    #[cfg(feature = "aqc")]
-                    self.aqc
-                        .add_peer(
-                            graph,
-                            api::NetIdentifier(_e.net_identifier.clone()),
-                            _e.device_id.into(),
-                        )
-                        .await;
+                AqcNetworkNameSet(e) => {
+                    cfg_if! {
+                        if #[cfg(feature = "aqc")] {
+                            self.aqc
+                                .add_peer(
+                                    graph,
+                                    api::NetIdentifier(e.net_identifier.clone()),
+                                    e.device_id.into(),
+                                )
+                                .await;
+                        } else {
+                            tracing::warn!(effect = ?e, "received AQC effect when not enabled");
+                        }
+                    }
                 }
-                AqcNetworkNameUnset(_e) =>
-                {
-                    #[cfg(feature = "aqc")]
-                    self.aqc.remove_peer(graph, _e.device_id.into()).await
+                AqcNetworkNameUnset(e) => {
+                    cfg_if! {
+                        if #[cfg(feature = "aqc")] {
+                            self.aqc.remove_peer(graph, e.device_id.into()).await;
+                        } else {
+                            tracing::warn!(effect = ?e, "received AQC effect when not enabled")
+                        }
+                    }
                 }
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}

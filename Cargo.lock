@@ -306,6 +306,7 @@ dependencies = [
  "bimap",
  "buggy",
  "bytes",
+ "cfg-if",
  "ciborium",
  "clap",
  "derive-where",
