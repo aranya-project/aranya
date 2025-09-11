@@ -656,9 +656,6 @@ pub trait DaemonApi {
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
 
-    /// Gets AFC shared-memory configuration info.
-    async fn afc_shm_info() -> Result<AfcShmInfo>;
-
     /// Adds the peer for automatic periodic syncing.
     async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
 
@@ -735,14 +732,22 @@ pub trait DaemonApi {
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
 
+    /// Gets AFC shared-memory configuration info.
+    async fn afc_shm_info() -> Result<AfcShmInfo>;
     /// Create a bidirectional AFC channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AfcChannelId)>;
-    /// Create a unidirectional AFC channel.
-    async fn create_afc_uni_channel(
+    /// Create a unidirectional AFC send-only channel.
+    async fn create_afc_uni_send_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AqcCtrl, AfcChannelId)>;
+    /// Create a unidirectional AFC receive-only channel.
+    async fn create_afc_uni_recv_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
