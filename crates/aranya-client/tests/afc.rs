@@ -2,7 +2,7 @@
 
 mod common;
 use anyhow::{bail, Context, Result};
-use aranya_client::afc::{AfcChannel, AfcChannels, AfcUniChannel, Channel, Open, Seal};
+use aranya_client::afc::{AfcChannel, AfcChannels, AfcUniChannel};
 use aranya_daemon_api::{text, ChanOp};
 
 use crate::common::DevicesCtx;

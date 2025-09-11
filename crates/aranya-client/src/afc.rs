@@ -23,6 +23,7 @@ pub type Ctrl = Vec<Box<[u8]>>;
 /// Aranya Fast Channels handler for managing channels which allow encrypting/decrypting application data buffers.
 pub struct AfcChannels<'a> {
     client: &'a Client,
+    // TODO: don't use mutex for shm reader aranya-core#399
     shm: Arc<Mutex<AfcShm>>,
 }
 
@@ -177,28 +178,22 @@ pub struct AfcBidiChannel<'a> {
     label_id: LabelId,
 }
 
-impl Channel for AfcBidiChannel<'_> {
-    async fn delete(&self) -> Result<(), crate::Error> {
-        self.client
-            .daemon
-            .delete_afc_channel(context::current(), self.channel_id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        Ok(())
-    }
-
-    fn channel_id(&self) -> AfcChannelId {
+impl AfcBidiChannel<'_> {
+    /// The AFC channel ID.
+    pub fn channel_id(&self) -> AfcChannelId {
         self.channel_id
     }
 
-    fn label_id(&self) -> LabelId {
+    /// The AFC channel's label ID.
+    pub fn label_id(&self) -> LabelId {
         self.label_id
     }
-}
 
-impl Seal for AfcBidiChannel<'_> {
-    async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+    /// Seal a plaintext datagram into a ciphertext buffer.
+    ///
+    /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
+    /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
+    pub async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.shm
             .lock()
@@ -213,10 +208,12 @@ impl Seal for AfcBidiChannel<'_> {
             .map_err(AfcError::Seal)?;
         Ok(())
     }
-}
 
-impl Open for AfcBidiChannel<'_> {
-    async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
+    /// Open a ciphertext datagram and return the plaintext buffer.
+    ///
+    /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
+    /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
+    pub async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
         self.shm
             .lock()
@@ -230,6 +227,17 @@ impl Open for AfcBidiChannel<'_> {
             )
             .map_err(AfcError::Open)
     }
+
+    /// Delete the AFC channel.
+    pub async fn delete(&self) -> Result<(), crate::Error> {
+        self.client
+            .daemon
+            .delete_afc_channel(context::current(), self.channel_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
 }
 
 /// A unidirectional AFC channel that can only send.
@@ -241,28 +249,22 @@ pub struct AfcSendChannel<'a> {
     label_id: LabelId,
 }
 
-impl Channel for AfcSendChannel<'_> {
-    async fn delete(&self) -> Result<(), crate::Error> {
-        self.client
-            .daemon
-            .delete_afc_channel(context::current(), self.channel_id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        Ok(())
-    }
-
-    fn channel_id(&self) -> AfcChannelId {
+impl AfcSendChannel<'_> {
+    /// The AFC channel ID.
+    pub fn channel_id(&self) -> AfcChannelId {
         self.channel_id
     }
 
-    fn label_id(&self) -> LabelId {
+    /// The AFC channel's label ID.
+    pub fn label_id(&self) -> LabelId {
         self.label_id
     }
-}
 
-impl Seal for AfcSendChannel<'_> {
-    async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+    /// Seal a plaintext datagram into a ciphertext buffer.
+    ///
+    /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
+    /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
+    pub async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
         self.shm
             .lock()
             .await
@@ -276,6 +278,17 @@ impl Seal for AfcSendChannel<'_> {
             .map_err(AfcError::Seal)?;
         Ok(())
     }
+
+    /// Delete the AFC channel.
+    pub async fn delete(&self) -> Result<(), crate::Error> {
+        self.client
+            .daemon
+            .delete_afc_channel(context::current(), self.channel_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
 }
 
 /// A unidirectional AFC channel that can only receive.
@@ -287,28 +300,22 @@ pub struct AfcReceiveChannel<'a> {
     label_id: LabelId,
 }
 
-impl Channel for AfcReceiveChannel<'_> {
-    async fn delete(&self) -> Result<(), crate::Error> {
-        self.client
-            .daemon
-            .delete_afc_channel(context::current(), self.channel_id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        Ok(())
-    }
-
-    fn channel_id(&self) -> AfcChannelId {
+impl AfcReceiveChannel<'_> {
+    /// The AFC channel ID.
+    pub fn channel_id(&self) -> AfcChannelId {
         self.channel_id
     }
 
-    fn label_id(&self) -> LabelId {
+    /// The AFC channel's label ID.
+    pub fn label_id(&self) -> LabelId {
         self.label_id
     }
-}
 
-impl Open for AfcReceiveChannel<'_> {
-    async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
+    /// Open a ciphertext datagram and return the plaintext buffer.
+    ///
+    /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
+    /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
+    pub async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
         self.shm
             .lock()
             .await
@@ -321,45 +328,17 @@ impl Open for AfcReceiveChannel<'_> {
             )
             .map_err(AfcError::Open)
     }
-}
 
-/// AFC channels should all implement this trait.
-pub trait Channel {
-    /// Delete the channel.
-    // TODO: return AfcError
-    fn delete(&self) -> impl std::future::Future<Output = Result<(), crate::Error>> + Send;
-
-    /// AFC channel ID.
-    fn channel_id(&self) -> AfcChannelId;
-
-    /// AFC label ID.
-    fn label_id(&self) -> LabelId;
-}
-
-/// AFC channels that can seal datagrams should implement this trait.
-pub trait Seal {
-    /// Seal a plaintext datagram into a ciphertext buffer.
-    ///
-    /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
-    /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
-    fn seal(
-        &self,
-        plaintext: &[u8],
-        ciphertext: &mut [u8],
-    ) -> impl std::future::Future<Output = Result<(), AfcError>> + Send;
-}
-
-/// AFC channels that can open datagrams should implement this trait.
-pub trait Open {
-    /// Open a ciphertext datagram and return the plaintext buffer.
-    ///
-    /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
-    /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
-    fn open(
-        &self,
-        ciphertext: &[u8],
-        plaintext: &mut [u8],
-    ) -> impl std::future::Future<Output = Result<Seq, AfcError>> + Send;
+    /// Delete the AFC channel.
+    pub async fn delete(&self) -> Result<(), crate::Error> {
+        self.client
+            .daemon
+            .delete_afc_channel(context::current(), self.channel_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
 }
 
 /// AFC shared memory.
