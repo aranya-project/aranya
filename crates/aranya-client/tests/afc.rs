@@ -62,7 +62,7 @@ async fn test_afc_bidi_chan_create() -> Result<()> {
         .memberb
         .client
         .afc()?
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?;
 
@@ -124,7 +124,7 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 
     // Receive bidi channel.
     let AfcChannel::Bidi(recv) = memberb_afc
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?
     else {
@@ -202,7 +202,7 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     // Receive bidi channel.
     let AfcChannel::Bidi(recv) = memberb_afc
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?
     else {
@@ -309,7 +309,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     // Receive first bidi channel.
     let AfcChannel::Bidi(recv1) = memberb_afc
-        .receive_channel(team_id, ctrl1)
+        .recv_ctrl(team_id, ctrl1)
         .await
         .context("unable to receive afc bidi channel")?
     else {
@@ -318,7 +318,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     // Receive second bidi channel.
     let AfcChannel::Bidi(recv2) = membera_afc
-        .receive_channel(team_id, ctrl2)
+        .recv_ctrl(team_id, ctrl2)
         .await
         .context("unable to receive afc bidi channel")?
     else {
@@ -438,7 +438,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .memberb
         .client
         .afc()?
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -500,7 +500,7 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 
     // Receive uni channel.
     let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = memberb_afc
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
     else {
@@ -578,7 +578,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     // Receive uni channel.
     let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = memberb_afc
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
     else {
@@ -685,7 +685,7 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
 
     // Receive first bidi channel.
     let AfcChannel::Uni(AfcUniChannel::Receive(recv1)) = memberb_afc
-        .receive_channel(team_id, ctrl1)
+        .recv_ctrl(team_id, ctrl1)
         .await
         .context("unable to receive afc uni channel")?
     else {
@@ -694,7 +694,7 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
 
     // Receive second bidi channel.
     let AfcChannel::Uni(AfcUniChannel::Receive(recv2)) = membera_afc
-        .receive_channel(team_id, ctrl2)
+        .recv_ctrl(team_id, ctrl2)
         .await
         .context("unable to receive afc uni channel")?
     else {

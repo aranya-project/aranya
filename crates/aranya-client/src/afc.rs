@@ -2,7 +2,7 @@
 use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Context;
-use aranya_crypto::{default::DefaultCipherSuite, CipherSuite};
+use aranya_crypto::CipherSuite;
 use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DeviceId, LabelId, TeamId, CS};
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
@@ -13,9 +13,38 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
-    error::{aranya_error, AfcError, IpcError},
+    error::{aranya_error, IpcError},
     Client,
 };
+
+/// Possible errors that could happen when using Aranya Fast Channels.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum AfcError {
+    /// Unable to seal datagram.
+    #[error("unable to seal datagram")]
+    Seal(aranya_fast_channels::Error),
+
+    /// Unable to open datagram.
+    #[error("unable to open datagram")]
+    Open(aranya_fast_channels::Error),
+
+    /// Unable to parse shared-memory path.
+    #[error("unable initialize shm")]
+    Shm(anyhow::Error),
+
+    /// No channel info found.
+    #[error("no channel info found")]
+    NoChannelInfoFound,
+
+    /// Error parsing control message.
+    #[error("failed to parse control message")]
+    InvalidCtrlMessage(postcard::Error),
+
+    /// An internal bug was discovered.
+    #[error(transparent)]
+    Bug(#[from] buggy::Bug),
+}
 
 /// AFC control message sent to a peer when creating a channel.
 pub type Ctrl = Vec<Box<[u8]>>;
@@ -99,11 +128,7 @@ impl<'a> AfcChannels<'a> {
     }
 
     /// Receive a `ctrl` message from a peer to create an AFC channel.
-    pub async fn receive_channel(
-        &self,
-        team_id: TeamId,
-        ctrl: Ctrl,
-    ) -> crate::Result<AfcChannel<'_>> {
+    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: Ctrl) -> crate::Result<AfcChannel<'_>> {
         let (label_id, channel_id, op) = self
             .client
             .daemon
@@ -147,7 +172,7 @@ impl<'a> AfcChannels<'a> {
     /// Return ciphertext overhead.
     /// The ciphertext buffer should allocate plaintext.len() + overhead bytes.
     pub const fn overhead() -> usize {
-        AfcClient::<ReadState<DefaultCipherSuite>>::OVERHEAD
+        AfcClient::<ReadState<CS>>::OVERHEAD
     }
 }
 
@@ -342,7 +367,7 @@ impl AfcReceiveChannel<'_> {
 }
 
 /// AFC shared memory.
-pub struct AfcShm(AfcClient<ReadState<DefaultCipherSuite>>);
+pub(crate) struct AfcShm(AfcClient<ReadState<CS>>);
 
 impl AfcShm
 where

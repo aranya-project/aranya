@@ -485,7 +485,7 @@ async fn main() -> Result<()> {
     info!("receiving afc bidi channel");
     let memberb_afc = memberb.client.afc()?;
     let chan = memberb_afc
-        .receive_channel(team_id, ctrl)
+        .recv_ctrl(team_id, ctrl)
         .await
         .expect("expected to receive afc channel");
 
