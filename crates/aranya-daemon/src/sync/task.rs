@@ -31,6 +31,7 @@ use crate::{
     InvalidGraphs,
 };
 
+pub mod hello;
 pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
