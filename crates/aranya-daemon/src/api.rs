@@ -18,7 +18,7 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::{Address, Command, GraphId, Segment, Storage, StorageProvider};
+use aranya_runtime::{Address, GraphId, Storage, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
@@ -299,28 +299,15 @@ impl EffectHandler {
             }
         };
 
-        // Get the segment at the head location
-        let segment = match storage.get_segment(head_location) {
-            Ok(segment) => segment,
-            Err(e) => {
-                warn!(error = %e, ?graph_id, "unable to get segment at head location");
-                return None;
-            }
-        };
-
-        // Get the command from the segment
-        let command = match segment.get_command(head_location) {
-            Some(command) => command,
-            None => {
+        // Get the address of the command at the head location using the convenience method
+        match storage.get_command_address_at_location(head_location) {
+            Ok(Some(address)) => Some(address),
+            Ok(None) => {
                 warn!(?graph_id, "no command found at head location");
-                return None;
+                None
             }
-        };
-        // Create the address from the command
-        match command.address() {
-            Ok(address) => Some(address),
             Err(e) => {
-                warn!(error = %e, ?graph_id, "unable to get address from command");
+                warn!(error = %e, ?graph_id, "unable to get command address at head location");
                 None
             }
         }
