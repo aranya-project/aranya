@@ -295,23 +295,23 @@ async fn main() -> Result<()> {
     // Admin subscribes to hello notifications from Owner with 2-second delay
     info!("admin subscribing to hello notifications from owner");
     admin_team
-        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(2000))
+        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(2000), Duration::from_secs(30))
         .await?;
 
     // Operator subscribes to hello notifications from Admin with 1-second delay
     info!("operator subscribing to hello notifications from admin");
     operator_team
-        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(1000))
+        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(1000), Duration::from_secs(30))
         .await?;
 
     sleep(sleep_interval).await;
 
     // Later, unsubscribe from hello notifications
     info!("admin unsubscribing from hello notifications from owner");
-    admin_team.hello_unsubscribe(owner_addr.into()).await?;
+    admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
 
     info!("operator unsubscribing from hello notifications from admin");
-    operator_team.hello_unsubscribe(admin_addr.into()).await?;
+    operator_team.sync_hello_unsubscribe(admin_addr.into()).await?;
 
     sleep(sleep_interval).await;
 
@@ -425,18 +425,18 @@ async fn main() -> Result<()> {
     // Members subscribe to each other with different delays
     info!("membera subscribing to hello notifications from memberb");
     membera_team
-        .sync_hello_subscribe(memberb_addr.into(), Duration::from_millis(500))
+        .sync_hello_subscribe(memberb_addr.into(), Duration::from_millis(500), Duration::from_secs(30))
         .await?;
 
     info!("memberb subscribing to hello notifications from membera");
     memberb_team
-        .sync_hello_subscribe(membera_addr.into(), Duration::from_millis(1500))
+        .sync_hello_subscribe(membera_addr.into(), Duration::from_millis(1500), Duration::from_secs(30))
         .await?;
 
     // Unsubscribe before AQC demo
     info!("members unsubscribing from hello notifications");
-    membera_team.hello_unsubscribe(memberb_addr.into()).await?;
-    memberb_team.hello_unsubscribe(membera_addr.into()).await?;
+    membera_team.sync_hello_unsubscribe(memberb_addr.into()).await?;
+    memberb_team.sync_hello_unsubscribe(membera_addr.into()).await?;
 
     sleep(sleep_interval).await;
 
