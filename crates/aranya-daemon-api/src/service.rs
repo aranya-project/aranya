@@ -268,7 +268,7 @@ pub struct Label {
     pub name: Text,
 }
 
-// TODO: fix tarpc
+// TODO(jdygert): tarpc does not cfg return types properly.
 #[cfg(not(feature = "aqc"))]
 use stub::{AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks};
 #[cfg(not(feature = "aqc"))]
