@@ -23,7 +23,7 @@ cargo build \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-daemon \
-    --features unstable,aqc
+    --features experimental,aqc
 
 daemon="${current_dir}/target/release/aranya-daemon"
 example="${current_dir}/examples/rust/target/release/aranya-example"

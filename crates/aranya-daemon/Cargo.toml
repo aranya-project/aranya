@@ -16,8 +16,8 @@ workspace = true
 [features]
 default = []
 
-unstable = [
-    "aranya-daemon-api/unstable",
+experimental = [
+    "aranya-daemon-api/experimental",
 ]
 
 aqc = ["aranya-daemon-api/aqc"]
@@ -91,4 +91,4 @@ harness = false
 
 
 [package.metadata.cargo-all-features]
-always_include_features = ["unstable"]
+always_include_features = ["experimental"]

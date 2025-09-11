@@ -14,7 +14,7 @@ workspace = true
 
 [features]
 aqc = ["aranya-crypto/aqc"]
-unstable = []
+experimental = []
 
 [dependencies]
 aranya-crypto = { workspace = true }
@@ -42,4 +42,4 @@ tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
 
 [package.metadata.cargo-all-features]
-always_include_features = ["unstable"]
+always_include_features = ["experimental"]

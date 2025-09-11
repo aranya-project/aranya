@@ -21,8 +21,8 @@ doctest = false
 [features]
 default = []
 
-unstable = [
-    "aranya-client/unstable",
+experimental = [
+    "aranya-client/experimental",
 ]
 
 aqc = ["aranya-client/aqc"]
@@ -54,4 +54,4 @@ syn = "2"
 
 
 [package.metadata.cargo-all-features]
-always_include_features = ["unstable"]
+always_include_features = ["experimental"]

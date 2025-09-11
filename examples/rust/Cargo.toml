@@ -38,7 +38,7 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [dependencies]
-aranya-client = { path = "../../crates/aranya-client", features = ["aqc", "unstable"] }
+aranya-client = { path = "../../crates/aranya-client", features = ["aqc", "experimental"] }
 aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
 aranya-util = { path = "../../crates/aranya-util" }
 

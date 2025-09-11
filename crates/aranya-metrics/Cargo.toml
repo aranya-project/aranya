@@ -18,7 +18,7 @@ prometheus = ["dep:metrics-exporter-prometheus"]
 tcp = ["dep:metrics-exporter-tcp"]
 
 [dependencies]
-aranya-client = { workspace = true, features = ["aqc", "unstable"] }
+aranya-client = { workspace = true, features = ["aqc", "experimental"] }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }

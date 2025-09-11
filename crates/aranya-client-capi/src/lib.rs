@@ -10,9 +10,9 @@
     missing_docs
 )]
 
-#[cfg(all(feature = "aqc", not(feature = "unstable")))]
+#[cfg(all(feature = "aqc", not(feature = "experimental")))]
 compile_error!(
-    "AQC is currently experimental. Enable the 'unstable' feature to opt into unstable APIs."
+    "AQC is currently experimental. Enable the 'experimental' feature to opt into experimental APIs."
 );
 
 pub mod api;

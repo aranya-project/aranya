@@ -30,7 +30,7 @@ add_compile_options(
 )
 
 add_compile_options(-DENABLE_AQC)
-add_compile_options(-DENABLE_ARANYA_UNSTABLE)
+add_compile_options(-DENABLE_ARANYA_EXPERIMENTAL)
 
 # Apple and Windows system linkers do not recognize these options.
 if(NOT APPLE AND NOT WIN32)
