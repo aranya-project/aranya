@@ -2,12 +2,12 @@
 use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Context;
-use aranya_crypto::CipherSuite;
 use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DeviceId, LabelId, TeamId, CS};
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
     Client as AfcClient, Seq,
 };
+use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -16,6 +16,19 @@ use crate::{
     error::{aranya_error, IpcError},
     Client,
 };
+
+/// AFC sequence number identifying the position of a ciphertext in a channel.
+#[derive(Debug)]
+pub struct AfcSeq {
+    seq: Seq,
+}
+
+impl AfcSeq {
+    /// Convert AFC sequence object to `u64`.
+    pub fn to_u64(&self) -> u64 {
+        self.seq.to_u64()
+    }
+}
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
@@ -47,7 +60,18 @@ pub enum AfcError {
 }
 
 /// AFC control message sent to a peer when creating a channel.
-pub type Ctrl = Vec<Box<[u8]>>;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AfcCtrl {
+    data: Vec<Box<[u8]>>,
+}
+
+impl AfcCtrl {
+    /// Convert AFC control message to bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        // TODO: implement this.
+        todo!()
+    }
+}
 
 /// Aranya Fast Channels handler for managing channels which allow encrypting/decrypting application data buffers.
 pub struct AfcChannels<'a> {
@@ -61,16 +85,17 @@ impl Debug for AfcChannels<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AfcChannels")
             .field("client", &self.client)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl<'a> AfcChannels<'a> {
-    pub(crate) fn new(client: &'a Client, shm: AfcShm) -> Self {
-        Self {
-            client,
-            shm: Arc::new(Mutex::new(shm)),
-        }
+    /// The number of additional octets required to encrypt
+    /// plaintext data.
+    pub const OVERHEAD: usize = AfcClient::<ReadState<CS>>::OVERHEAD;
+
+    pub(crate) fn new(client: &'a Client, shm: Arc<Mutex<AfcShm>>) -> Self {
+        Self { client, shm }
     }
 
     /// Create a bidirectional AFC channel.
@@ -81,7 +106,7 @@ impl<'a> AfcChannels<'a> {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(AfcBidiChannel<'_>, Ctrl)> {
+    ) -> crate::Result<(AfcBidiChannel<'_>, AfcCtrl)> {
         let (ctrl, channel_id) = self
             .client
             .daemon
@@ -96,7 +121,7 @@ impl<'a> AfcChannels<'a> {
                 channel_id,
                 label_id,
             },
-            ctrl,
+            AfcCtrl { data: ctrl },
         ))
     }
 
@@ -108,7 +133,7 @@ impl<'a> AfcChannels<'a> {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(AfcSendChannel<'_>, Ctrl)> {
+    ) -> crate::Result<(AfcSendChannel<'_>, AfcCtrl)> {
         let (ctrl, channel_id) = self
             .client
             .daemon
@@ -123,16 +148,16 @@ impl<'a> AfcChannels<'a> {
                 channel_id,
                 label_id,
             },
-            ctrl,
+            AfcCtrl { data: ctrl },
         ))
     }
 
     /// Receive a `ctrl` message from a peer to create an AFC channel.
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: Ctrl) -> crate::Result<AfcChannel<'_>> {
+    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: AfcCtrl) -> crate::Result<AfcChannel<'_>> {
         let (label_id, channel_id, op) = self
             .client
             .daemon
-            .receive_afc_ctrl(context::current(), team_id, ctrl)
+            .receive_afc_ctrl(context::current(), team_id, ctrl.data)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -167,12 +192,6 @@ impl<'a> AfcChannels<'a> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(())
-    }
-
-    /// Return ciphertext overhead.
-    /// The ciphertext buffer should allocate plaintext.len() + overhead bytes.
-    pub const fn overhead() -> usize {
-        AfcClient::<ReadState<CS>>::OVERHEAD
     }
 }
 
@@ -214,11 +233,12 @@ impl AfcBidiChannel<'_> {
         self.label_id
     }
 
-    /// Seal a plaintext datagram into a ciphertext buffer.
+    /// Encrypts and authenticates `plaintext` for a channel.
     ///
-    /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
-    /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
-    pub async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+    /// The resulting ciphertext is written to `dst`, which must
+    /// be at least `plaintext.len() + AfcChannels::OVERHEAD` bytes
+    /// long.
+    pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), AfcError> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.shm
             .lock()
@@ -227,30 +247,38 @@ impl AfcBidiChannel<'_> {
             .seal(
                 self.channel_id,
                 self.label_id.into_id().into(),
-                ciphertext,
+                dst,
                 plaintext,
             )
             .map_err(AfcError::Seal)?;
         Ok(())
     }
 
-    /// Open a ciphertext datagram and return the plaintext buffer.
+    /// Decrypts and authenticates `ciphertext` received from
+    /// from `peer`.
     ///
-    /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
-    /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
-    pub async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
+    /// The resulting plaintext is written to `dst`, which must
+    /// be at least `ciphertext.len() - AfcChannels::OVERHEAD` bytes
+    /// long.
+    ///
+    /// It returns the cryptographically verified label and
+    /// sequence number associated with the ciphertext.
+    pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<AfcSeq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
-        self.shm
-            .lock()
-            .await
-            .0
-            .open(
-                self.channel_id,
-                self.label_id.into_id().into(),
-                plaintext,
-                ciphertext,
-            )
-            .map_err(AfcError::Open)
+        Ok(AfcSeq {
+            seq: self
+                .shm
+                .lock()
+                .await
+                .0
+                .open(
+                    self.channel_id,
+                    self.label_id.into_id().into(),
+                    dst,
+                    ciphertext,
+                )
+                .map_err(AfcError::Open)?,
+        })
     }
 
     /// Delete the AFC channel.
@@ -285,11 +313,13 @@ impl AfcSendChannel<'_> {
         self.label_id
     }
 
-    /// Seal a plaintext datagram into a ciphertext buffer.
+    /// Encrypts and authenticates `plaintext` for a channel.
     ///
-    /// The ciphertext buffer must have `AfcChannels::overhead()` more bytes allocated to it than the plaintext buffer:
-    /// ciphertext.len() = plaintext.len() + AfcChannels::overhead()
-    pub async fn seal(&self, plaintext: &[u8], ciphertext: &mut [u8]) -> Result<(), AfcError> {
+    /// The resulting ciphertext is written to `dst`, which must
+    /// be at least `plaintext.len() + AfcChannels::OVERHEAD` bytes
+    /// long.
+    pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), AfcError> {
+        debug!(?self.channel_id, ?self.label_id, "seal");
         self.shm
             .lock()
             .await
@@ -297,7 +327,7 @@ impl AfcSendChannel<'_> {
             .seal(
                 self.channel_id,
                 self.label_id.into_id().into(),
-                ciphertext,
+                dst,
                 plaintext,
             )
             .map_err(AfcError::Seal)?;
@@ -336,22 +366,31 @@ impl AfcReceiveChannel<'_> {
         self.label_id
     }
 
-    /// Open a ciphertext datagram and return the plaintext buffer.
+    /// Decrypts and authenticates `ciphertext` received from
+    /// from `peer`.
     ///
-    /// The plaintext buffer must have `AfcChannels::overhead()` fewer bytes allocated to it than the ciphertext buffer:
-    /// plaintext.len() = plaintext.len() - AfcChannels::overhead()
-    pub async fn open(&self, ciphertext: &[u8], plaintext: &mut [u8]) -> Result<Seq, AfcError> {
-        self.shm
-            .lock()
-            .await
-            .0
-            .open(
-                self.channel_id,
-                self.label_id.into_id().into(),
-                plaintext,
-                ciphertext,
-            )
-            .map_err(AfcError::Open)
+    /// The resulting plaintext is written to `dst`, which must
+    /// be at least `ciphertext.len() - AfcChannels::OVERHEAD` bytes
+    /// long.
+    ///
+    /// It returns the cryptographically verified label and
+    /// sequence number associated with the ciphertext.
+    pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<AfcSeq, AfcError> {
+        debug!(?self.channel_id, ?self.label_id, "open");
+        Ok(AfcSeq {
+            seq: self
+                .shm
+                .lock()
+                .await
+                .0
+                .open(
+                    self.channel_id,
+                    self.label_id.into_id().into(),
+                    dst,
+                    ciphertext,
+                )
+                .map_err(AfcError::Open)?,
+        })
     }
 
     /// Delete the AFC channel.
@@ -369,10 +408,7 @@ impl AfcReceiveChannel<'_> {
 /// AFC shared memory.
 pub(crate) struct AfcShm(AfcClient<ReadState<CS>>);
 
-impl AfcShm
-where
-    CS: CipherSuite,
-{
+impl AfcShm {
     /// Open shared-memory to daemon's channel key list.
     pub fn new(afc_shm_info: &AfcShmInfo) -> Result<Self, AfcError> {
         // TODO: issue stellar-tapestry#34
@@ -401,6 +437,6 @@ where
 
 impl Debug for AfcShm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AfcShm").finish()
+        f.debug_struct("AfcShm").finish_non_exhaustive()
     }
 }

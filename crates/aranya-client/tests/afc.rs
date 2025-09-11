@@ -1,13 +1,17 @@
 #![allow(clippy::panic)]
-
+#[cfg(feature = "afc")]
 mod common;
-use anyhow::{bail, Context, Result};
-use aranya_client::afc::{AfcChannel, AfcChannels, AfcUniChannel};
-use aranya_daemon_api::{text, ChanOp};
 
-use crate::common::DevicesCtx;
+#[cfg(feature = "afc")]
+use {
+    crate::common::DevicesCtx,
+    anyhow::{bail, Context, Result},
+    aranya_client::afc::{AfcChannel, AfcChannels, AfcUniChannel},
+    aranya_daemon_api::{text, ChanOp},
+};
 
 /// Demonstrate creating a bidirectional AFC channel.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_bidi_chan_create() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_bidi_chan_create").await?;
@@ -70,6 +74,7 @@ async fn test_afc_bidi_chan_create() -> Result<()> {
 }
 
 /// Demonstrate seal/open with bidirectional AFC channel.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_bidi_chan_seal_open() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_bidi_chan_seal_open").await?;
@@ -114,7 +119,6 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 
     let membera_afc = devices.membera.client.afc()?;
     let memberb_afc = devices.memberb.client.afc()?;
-    let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
     let (chan, ctrl) = membera_afc
@@ -133,14 +137,14 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
-    chan.seal(afc_msg, &mut ciphertext)
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
-    recv.open(&ciphertext, &mut plaintext)
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
 
@@ -148,6 +152,7 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 }
 
 /// Demonstrate deleting a bidirectional AFC channel.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_bidi_chan_delete() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_bidi_chan_delete").await?;
@@ -192,7 +197,6 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     let membera_afc = devices.membera.client.afc()?;
     let memberb_afc = devices.memberb.client.afc()?;
-    let overhead = AfcChannels::overhead();
 
     // Create bidi channel.
     let (chan, ctrl) = membera_afc
@@ -211,14 +215,14 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
-    chan.seal(afc_msg, &mut ciphertext)
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
-    recv.open(&ciphertext, &mut plaintext)
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
 
@@ -238,6 +242,7 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 }
 
 /// Demonstrate open/seal with multiple bidirectional AFC channels.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_bidi_multi_chans() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_bidi_multi_chans").await?;
@@ -293,7 +298,6 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     let membera_afc = devices.membera.client.afc()?;
     let memberb_afc = devices.memberb.client.afc()?;
-    let overhead = AfcChannels::overhead();
 
     // Create first bidi channel.
     let (chan1, ctrl1) = membera_afc
@@ -327,31 +331,31 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext1 = vec![0u8; afc_msg.len() + overhead];
+    let mut ciphertext1 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     chan1
-        .seal(afc_msg, &mut ciphertext1)
+        .seal(&mut ciphertext1, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext1 = vec![0u8; ciphertext1.len() - overhead];
+    let mut plaintext1 = vec![0u8; ciphertext1.len() - AfcChannels::OVERHEAD];
     recv1
-        .open(&ciphertext1, &mut plaintext1)
+        .open(&mut plaintext1, &ciphertext1)
         .await
         .context("unable to open afc message")?;
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext2 = vec![0u8; afc_msg.len() + overhead];
+    let mut ciphertext2 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     chan2
-        .seal(afc_msg, &mut ciphertext2)
+        .seal(&mut ciphertext2, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext2 = vec![0u8; ciphertext2.len() - overhead];
+    let mut plaintext2 = vec![0u8; ciphertext2.len() - AfcChannels::OVERHEAD];
     recv2
-        .open(&ciphertext2, &mut plaintext2)
+        .open(&mut plaintext2, &ciphertext2)
         .await
         .context("unable to open afc message")?;
 
@@ -382,6 +386,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 }
 
 /// Demonstrate creating a unidirectional AFC channel.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_create() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_create").await?;
@@ -446,6 +451,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
 }
 
 /// Demonstrate seal/open with unidirectional AFC channel.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_seal_open() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_seal_open").await?;
@@ -490,7 +496,6 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 
     let membera_afc = devices.membera.client.afc()?;
     let memberb_afc = devices.memberb.client.afc()?;
-    let overhead = AfcChannels::overhead();
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
@@ -509,14 +514,14 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
-    chan.seal(afc_msg, &mut ciphertext)
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
-    recv.open(&ciphertext, &mut plaintext)
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
 
@@ -524,6 +529,7 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 }
 
 /// Demonstrate deleting a unidirectional AFC channel.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_delete() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_delete").await?;
@@ -568,7 +574,6 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     let membera_afc = devices.membera.client.afc()?;
     let memberb_afc = devices.memberb.client.afc()?;
-    let overhead = AfcChannels::overhead();
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
@@ -587,14 +592,14 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
-    chan.seal(afc_msg, &mut ciphertext)
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
-    recv.open(&ciphertext, &mut plaintext)
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
 
@@ -614,6 +619,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 }
 
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
+#[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_multi_chans() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_multi_chans").await?;
@@ -669,7 +675,6 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
 
     let membera_afc = devices.membera.client.afc()?;
     let memberb_afc = devices.memberb.client.afc()?;
-    let overhead = AfcChannels::overhead();
 
     // Create first bidi channel.
     let (chan1, ctrl1) = membera_afc
@@ -703,31 +708,31 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext1 = vec![0u8; afc_msg.len() + overhead];
+    let mut ciphertext1 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     chan1
-        .seal(afc_msg, &mut ciphertext1)
+        .seal(&mut ciphertext1, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext1 = vec![0u8; ciphertext1.len() - overhead];
+    let mut plaintext1 = vec![0u8; ciphertext1.len() - AfcChannels::OVERHEAD];
     recv1
-        .open(&ciphertext1, &mut plaintext1)
+        .open(&mut plaintext1, &ciphertext1)
         .await
         .context("unable to open afc message")?;
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext2 = vec![0u8; afc_msg.len() + overhead];
+    let mut ciphertext2 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     chan2
-        .seal(afc_msg, &mut ciphertext2)
+        .seal(&mut ciphertext2, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext2 = vec![0u8; ciphertext2.len() - overhead];
+    let mut plaintext2 = vec![0u8; ciphertext2.len() - AfcChannels::OVERHEAD];
     recv2
-        .open(&ciphertext2, &mut plaintext2)
+        .open(&mut plaintext2, &ciphertext2)
         .await
         .context("unable to open afc message")?;
 

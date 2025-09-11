@@ -5,6 +5,7 @@ use std::{convert::Infallible, io};
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
+#[cfg(feature = "afc")]
 use crate::afc::AfcError;
 
 /// The type returned by fallible Aranya operations.
@@ -31,6 +32,7 @@ pub enum Error {
     Aqc(#[from] AqcError),
 
     /// An Aranya Fast Channel error happened.
+    #[cfg(feature = "afc")]
     #[error("AFC error: {0}")]
     Afc(#[from] AfcError),
 

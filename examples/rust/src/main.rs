@@ -475,7 +475,6 @@ async fn main() -> Result<()> {
     // membera creates AFC channel.
     info!("creating afc bidi channel");
     let membera_afc = membera.client.afc()?;
-    let overhead = AfcChannels::overhead();
     let (send, ctrl) = membera_afc
         .create_bidi_channel(team_id, memberb.id, label3)
         .await
@@ -492,8 +491,8 @@ async fn main() -> Result<()> {
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
-    let mut ciphertext = vec![0u8; afc_msg.len() + overhead];
-    send.seal(&afc_msg, &mut ciphertext)
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    send.seal(&mut ciphertext, &afc_msg)
         .await
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
@@ -502,12 +501,12 @@ async fn main() -> Result<()> {
 
     // memberb opens data from membera.
     info!("memberb receiving bidi channel from membera");
-    let mut plaintext = vec![0u8; ciphertext.len() - overhead];
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
     let AfcChannel::Bidi(recv) = chan else {
         bail!("expected a bidirectional receive channel");
     };
     info!("memberb opening data from membera");
-    recv.open(&ciphertext, &mut plaintext)
+    recv.open(&mut plaintext, &ciphertext)
         .await
         .expect("expected to open afc data");
     info!(?plaintext, "memberb opened data from membera");
