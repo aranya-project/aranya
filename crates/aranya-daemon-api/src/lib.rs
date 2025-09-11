@@ -7,6 +7,11 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(all(feature = "aqc", not(feature = "experimental")))]
+compile_error!(
+    "AQC is currently experimental. Enable the 'experimental' feature to opt into experimental APIs."
+);
+
 pub mod crypto;
 mod service;
 

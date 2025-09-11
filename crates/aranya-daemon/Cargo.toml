@@ -16,6 +16,12 @@ workspace = true
 [features]
 default = []
 
+experimental = [
+    "aranya-daemon-api/experimental",
+]
+
+aqc = ["aranya-daemon-api/aqc"]
+
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
@@ -40,6 +46,7 @@ buggy = { workspace = true }
 anyhow = { workspace = true }
 bimap = "0.6"
 bytes = { workspace = true }
+cfg-if = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
 derive-where = { workspace = true }
@@ -82,3 +89,7 @@ test = false
 [[bench]]
 name = "metrics"
 harness = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["experimental"]
