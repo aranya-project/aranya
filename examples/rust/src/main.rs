@@ -474,7 +474,7 @@ async fn main() -> Result<()> {
 
     // membera creates AFC channel.
     info!("creating afc bidi channel");
-    let membera_afc = membera.client.afc()?;
+    let membera_afc = membera.client.afc();
     let (send, ctrl) = membera_afc
         .create_bidi_channel(team_id, memberb.id, label3)
         .await
@@ -482,7 +482,7 @@ async fn main() -> Result<()> {
 
     // memberb receives AFC channel.
     info!("receiving afc bidi channel");
-    let memberb_afc = memberb.client.afc()?;
+    let memberb_afc = memberb.client.afc();
     let chan = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await

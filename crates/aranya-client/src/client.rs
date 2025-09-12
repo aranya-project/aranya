@@ -332,8 +332,8 @@ impl Client {
 
     /// Get access to Aranya Fast Channels.
     #[cfg(feature = "afc")]
-    pub fn afc(&self) -> Result<AfcChannels<'_>> {
-        Ok(AfcChannels::new(self, self.shm.clone()))
+    pub fn afc(&self) -> AfcChannels<'_> {
+        AfcChannels::new(self, self.shm.clone())
     }
 }
 

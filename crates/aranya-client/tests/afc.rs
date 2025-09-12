@@ -57,7 +57,7 @@ async fn test_afc_bidi_chan_create() -> Result<()> {
     let (_chan, ctrl) = devices
         .membera
         .client
-        .afc()?
+        .afc()
         .create_bidi_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc bidi channel")?;
@@ -65,7 +65,7 @@ async fn test_afc_bidi_chan_create() -> Result<()> {
     devices
         .memberb
         .client
-        .afc()?
+        .afc()
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?;
@@ -117,8 +117,8 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create bidi channel.
     let (chan, ctrl) = membera_afc
@@ -195,8 +195,8 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create bidi channel.
     let (chan, ctrl) = membera_afc
@@ -296,8 +296,8 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create first bidi channel.
     let (chan1, ctrl1) = membera_afc
@@ -433,7 +433,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     let (_chan, ctrl) = devices
         .membera
         .client
-        .afc()?
+        .afc()
         .create_uni_send_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -442,7 +442,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     devices
         .memberb
         .client
-        .afc()?
+        .afc()
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
@@ -494,8 +494,8 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
@@ -572,8 +572,8 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
     let (recv, ctrl) = membera_afc
@@ -650,8 +650,8 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
@@ -751,8 +751,8 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let membera_afc = devices.membera.client.afc()?;
-    let memberb_afc = devices.memberb.client.afc()?;
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
 
     // Create first bidi channel.
     let (chan1, ctrl1) = membera_afc
