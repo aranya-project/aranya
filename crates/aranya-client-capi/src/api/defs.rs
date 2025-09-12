@@ -1353,6 +1353,60 @@ pub unsafe fn remove_sync_peer(
     Ok(())
 }
 
+/// Subscribe to hello notifications from a sync peer.
+///
+/// This will request the peer to send hello notifications when their graph head changes.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] peer the peer's Aranya network address [`Addr`].
+/// @param[in] delay minimum delay between notifications.
+/// @param[in] duration how long the subscription should remain active.
+///
+/// @relates AranyaClient.
+pub unsafe fn sync_hello_subscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+    delay: Duration,
+    duration: Duration,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_subscribe(
+            addr,
+            delay.into(),
+            duration.into(),
+        ))?;
+    Ok(())
+}
+
+/// Unsubscribe from hello notifications from a sync peer.
+///
+/// This will stop receiving hello notifications from the specified peer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
+///
+/// @relates AranyaClient.
+pub unsafe fn sync_hello_unsubscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
+    Ok(())
+}
+
 /// Sync with peer immediately.
 ///
 /// If a peer is not reachable on the network, sync errors

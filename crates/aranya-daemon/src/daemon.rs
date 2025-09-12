@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, io, path::Path, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io,
+    path::Path,
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -29,7 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, State as QuicSyncClientState, SyncParams},
+        quic::{HelloInfo, PskStore, State as QuicSyncClientState, SyncParams},
         PeerCacheMap, SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -351,14 +356,18 @@ impl Daemon {
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
+        // Create shared hello subscriptions for both server and syncer
+        let hello_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+
         // Initialize the syncer
-        let (syncer, peers, conns, conn_rx) = Syncer::new(
+        let (mut syncer, peers, conns, conn_rx) = Syncer::new(
             client.clone(),
             send_effects,
             invalid_graphs,
             Arc::clone(&psk_store),
             server_addr,
             Arc::clone(&caches),
+            Arc::clone(&hello_subscriptions),
         )?;
 
         info!(addr = %server_addr, "starting QUIC sync server");
@@ -369,11 +378,21 @@ impl Daemon {
             conns,
             conn_rx,
             caches,
+            HelloInfo {
+                subscriptions: hello_subscriptions,
+                sync_peers: peers.clone(),
+            },
         )
         .await
         .context("unable to initialize QUIC sync server")?;
 
-        info!(device_id = %device_id, "set up Aranya");
+        // Update the syncer with the actual server listening address
+        let actual_server_addr = server
+            .local_addr()
+            .context("unable to get server local address")?;
+        syncer.update_server_addr(actual_server_addr);
+
+        info!(device_id = %device_id, actual_server_addr = %actual_server_addr, "set up Aranya");
 
         Ok((client, server, syncer, peers, recv_effects))
     }

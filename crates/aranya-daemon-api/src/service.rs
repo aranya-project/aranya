@@ -607,6 +607,9 @@ pub struct SyncPeerConfig {
     pub interval: Duration,
     /// Determines if a peer should be synced with immediately after they're added
     pub sync_now: bool,
+    /// Determines if the peer should be synced with when a hello message is received
+    /// indicating they have a head that we don't have
+    pub sync_on_hello: bool,
 }
 
 /// Valid channel operations for a label assignment.
@@ -649,6 +652,17 @@ pub trait DaemonApi {
 
     /// Sync with peer immediately.
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
+
+    /// Subscribe to hello notifications from a sync peer.
+    async fn sync_hello_subscribe(
+        peer: Addr,
+        team: TeamId,
+        delay: Duration,
+        duration: Duration,
+    ) -> Result<()>;
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    async fn sync_hello_unsubscribe(peer: Addr, team: TeamId) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
