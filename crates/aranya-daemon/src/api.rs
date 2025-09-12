@@ -928,7 +928,9 @@ impl DaemonApi for Api {
             let effect = effects.iter().find(|e| match e {
                 Effect::AfcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
                 Effect::AfcUniChannelReceived(e) => {
-                    e.sender_id != our_device_id.into() && e.receiver_id == our_device_id.into()
+                    (e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into())
+                        || (e.sender_id == our_device_id.into()
+                            && e.receiver_id != our_device_id.into())
                 }
                 _ => false,
             });
