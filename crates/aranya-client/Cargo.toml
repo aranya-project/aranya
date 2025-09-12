@@ -54,4 +54,4 @@ path = "tests/tests.rs"
 
 [package.metadata.cargo-all-features]
 # TODO: remove in #448
-always_include_features = ["default"]
+always_include_features = ["default", "preview", "afc"]

@@ -943,7 +943,12 @@ impl DaemonApi for Api {
                     let channel_id = self.afc.uni_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((e.label_id.into(), channel_id, api::ChanOp::RecvOnly));
+                    let op = if e.sender_id == self.device_id()?.into() {
+                        api::ChanOp::SendOnly
+                    } else {
+                        api::ChanOp::RecvOnly
+                    };
+                    return Ok((e.label_id.into(), channel_id, op));
                 }
                 Some(_) | None => {}
             }

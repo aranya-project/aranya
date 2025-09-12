@@ -14,7 +14,9 @@ workspace = true
 
 
 [features]
-default = []
+# TODO: don't enable preview features or afc in daemon by default.
+# Enabled them because unit tests in aranya-client aren't passing without this.
+default = ["afc", "preview"]
 # Preview features
 preview = ["afc"]
 # Aranya Fast Channels
@@ -87,3 +89,6 @@ test = false
 [[bench]]
 name = "metrics"
 harness = false
+
+[package.metadata.cargo-all-features]
+always_include_features = ["preview", "afc"]

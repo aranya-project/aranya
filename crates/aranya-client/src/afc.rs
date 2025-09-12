@@ -125,10 +125,10 @@ impl<'a> AfcChannels<'a> {
         ))
     }
 
-    /// Create a unidirectional AFC channel.
+    /// Create a unidirectional AFC send-only channel.
     ///
     /// Returns the channel object and a `ctrl` message to send to the peer.
-    pub async fn create_uni_channel(
+    pub async fn create_uni_send_channel(
         &self,
         team_id: TeamId,
         peer_id: DeviceId,
@@ -137,12 +137,39 @@ impl<'a> AfcChannels<'a> {
         let (ctrl, channel_id) = self
             .client
             .daemon
-            .create_afc_uni_channel(context::current(), team_id, peer_id, label_id)
+            .create_afc_uni_send_channel(context::current(), team_id, peer_id, label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok((
             AfcSendChannel {
+                client: self.client,
+                shm: self.shm.clone(),
+                channel_id,
+                label_id,
+            },
+            AfcCtrl { data: ctrl },
+        ))
+    }
+
+    /// Create a unidirectional AFC receive-only channel.
+    ///
+    /// Returns the channel object and a `ctrl` message to send to the peer.
+    pub async fn create_uni_recv_channel(
+        &self,
+        team_id: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> crate::Result<(AfcReceiveChannel<'_>, AfcCtrl)> {
+        let (ctrl, channel_id) = self
+            .client
+            .daemon
+            .create_afc_uni_recv_channel(context::current(), team_id, peer_id, label_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok((
+            AfcReceiveChannel {
                 client: self.client,
                 shm: self.shm.clone(),
                 channel_id,

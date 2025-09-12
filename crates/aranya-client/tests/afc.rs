@@ -434,7 +434,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .membera
         .client
         .afc()?
-        .create_uni_channel(team_id, devices.memberb.id, label_id)
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
@@ -450,11 +450,11 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     Ok(())
 }
 
-/// Demonstrate seal/open with unidirectional AFC channel.
+/// Demonstrate seal/open with unidirectional AFC send channel.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_afc_uni_chan_seal_open() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_afc_uni_chan_seal_open").await?;
+async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_send_chan_seal_open").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -499,7 +499,7 @@ async fn test_afc_uni_chan_seal_open() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_channel(team_id, devices.memberb.id, label_id)
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
@@ -577,7 +577,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_channel(team_id, devices.memberb.id, label_id)
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
@@ -621,7 +621,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_afc_uni_multi_chans() -> Result<()> {
+async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_multi_chans").await?;
 
     // create team.
@@ -678,13 +678,13 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
 
     // Create first bidi channel.
     let (chan1, ctrl1) = membera_afc
-        .create_uni_channel(team_id, devices.memberb.id, label_id1)
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id1)
         .await
         .context("unable to create afc uni channel")?;
 
     // Create second bidi channel.
     let (chan2, ctrl2) = memberb_afc
-        .create_uni_channel(team_id, devices.membera.id, label_id2)
+        .create_uni_send_channel(team_id, devices.membera.id, label_id2)
         .await
         .context("unable to create afc uni channel")?;
 
@@ -722,7 +722,6 @@ async fn test_afc_uni_multi_chans() -> Result<()> {
         .context("unable to open afc message")?;
 
     // Seal data.
-    let afc_msg = "afc msg".as_bytes();
     let mut ciphertext2 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     chan2
         .seal(&mut ciphertext2, afc_msg)
