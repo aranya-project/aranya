@@ -528,6 +528,84 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     Ok(())
 }
 
+/// Demonstrate seal/open with unidirectional AFC recv channel.
+#[cfg(feature = "afc")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_recv_chan_seal_open").await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id).await?;
+
+    let operator_team = devices.operator.client.team(team_id);
+    operator_team
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
+        .await?;
+
+    let label_id = operator_team.create_label(text!("label1")).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(devices.membera.id, label_id, op)
+        .await?;
+    operator_team
+        .assign_label(devices.memberb.id, label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    let membera_afc = devices.membera.client.afc()?;
+    let memberb_afc = devices.memberb.client.afc()?;
+
+    // Create uni channel.
+    let (recv, ctrl) = membera_afc
+        .create_uni_recv_channel(team_id, devices.memberb.id, label_id)
+        .await
+        .context("unable to create afc uni recv channel")?;
+
+    // Receive uni channel.
+    let AfcChannel::Uni(AfcUniChannel::Send(send)) = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .context("unable to receive afc uni send channel")?
+    else {
+        bail!("expected a unidirectional send channel");
+    };
+
+    // Seal data.
+    let afc_msg = "afc msg".as_bytes();
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    send.seal(&mut ciphertext, afc_msg)
+        .await
+        .context("unable to seal afc message")?;
+
+    // Open data.
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
+        .await
+        .context("unable to open afc message")?;
+
+    Ok(())
+}
+
 /// Demonstrate deleting a unidirectional AFC channel.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
