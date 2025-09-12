@@ -212,7 +212,7 @@ impl DeviceCtx {
             .context("unable to load daemon")?
             .spawn()
             .await
-            .context("unanble to start daemon")?;
+            .context("unable to start daemon")?;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {

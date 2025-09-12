@@ -1,32 +1,32 @@
+use anyhow::{bail, Context as _, Result};
+use aranya_client::afc::{AfcChannel, AfcChannels};
+use aranya_client::{
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+};
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_util::Addr;
+use backon::{ExponentialBuilder, Retryable};
+use buggy::BugExt;
+use bytes::Bytes;
+use futures_util::future::try_join;
 use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     time::Duration,
 };
-
-use anyhow::{Context as _, Result, bail};
-use aranya_client::{
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
-    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
-};
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
-use aranya_util::Addr;
-use backon::{ExponentialBuilder, Retryable};
-use buggy::BugExt;
-use bytes::Bytes;
-use futures_util::future::try_join;
 use tempfile::TempDir;
 use tokio::{
     fs,
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{Metadata, debug, info};
+use tracing::{debug, info, Metadata};
 use tracing_subscriber::{
-    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
+    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -75,8 +75,9 @@ impl ClientCtx {
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
+        let afc_shm_path = format!("/shm_{}", user_name);
+
         let daemon = {
-            let shm = format!("/shm_{}", user_name);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -106,7 +107,7 @@ impl ClientCtx {
 
                 [afc]
                 enable = true
-                shm_path = {shm:?}
+                shm_path = {afc_shm_path:?}
                 unlink_on_startup = true
                 unlink_at_exit = true
                 create = true
@@ -129,7 +130,6 @@ impl ClientCtx {
         sleep(Duration::from_millis(100)).await;
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
@@ -467,14 +467,59 @@ async fn main() -> Result<()> {
         .delete_bidi_channel(&mut created_aqc_chan)
         .await?;
 
+    info!("completed aqc demo");
+
+    // Demo AFC.
+    info!("demo afc functionality");
+
+    // membera creates AFC channel.
+    info!("creating afc bidi channel");
+    let membera_afc = membera.client.afc();
+    let (send, ctrl) = membera_afc
+        .create_bidi_channel(team_id, memberb.id, label3)
+        .await
+        .expect("expected to create afc bidi channel");
+
+    // memberb receives AFC channel.
+    info!("receiving afc bidi channel");
+    let memberb_afc = memberb.client.afc();
+    let chan = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .expect("expected to receive afc channel");
+
+    // membera seals data for memberb.
+    let afc_msg = "afc msg".as_bytes();
+    info!(?afc_msg, "membera sealing data for memberb");
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    send.seal(&mut ciphertext, &afc_msg)
+        .await
+        .expect("expected to seal afc data");
+    info!(?afc_msg, "membera sealed data for memberb");
+
+    // This is where membera would send the ciphertext to memberb via the network.
+
+    // memberb opens data from membera.
+    info!("memberb receiving bidi channel from membera");
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let AfcChannel::Bidi(recv) = chan else {
+        bail!("expected a bidirectional receive channel");
+    };
+    info!("memberb opening data from membera");
+    recv.open(&mut plaintext, &ciphertext)
+        .await
+        .expect("expected to open afc data");
+    info!(?plaintext, "memberb opened data from membera");
+    assert_eq!(afc_msg, plaintext);
+
+    info!("completed afc demo");
+
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;
     info!("revoking label from memberb");
     operator_team.revoke_label(memberb.id, label3).await?;
     info!("deleting label");
     admin_team.delete_label(label3).await?;
-
-    info!("completed aqc demo");
 
     info!("completed example Aranya application");
 

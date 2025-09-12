@@ -13,12 +13,17 @@ workspace = true
 
 [features]
 default = []
+# Preview features
+preview = ["afc"]
+# Aranya Fast Channels
+afc = []
 
 # Enable debugging.
 debug = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
+aranya-fast-channels = { workspace = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
@@ -49,4 +54,4 @@ path = "tests/tests.rs"
 
 [package.metadata.cargo-all-features]
 # TODO: remove in #448
-always_include_features = ["default"]
+always_include_features = ["default", "preview", "afc"]

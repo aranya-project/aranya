@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path};
+use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -17,6 +17,12 @@ use buggy::BugExt as _;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
+#[cfg(feature = "afc")]
+use {
+    crate::afc::{AfcChannels, AfcShm},
+    std::sync::Arc,
+    tokio::sync::Mutex,
+};
 
 use crate::{
     aqc::{AqcChannels, AqcClient},
@@ -66,7 +72,7 @@ pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
     daemon_uds_path: Option<&'a Path>,
-    // AQC address.
+    /// AQC address.
     aqc_server_addr: Option<&'a Addr>,
 }
 
@@ -93,6 +99,7 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
+
         Client::connect(sock, aqc_addr)
             .await
             .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
@@ -128,6 +135,9 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     pub(crate) aqc: AqcClient,
+    /// AFC shared-memory.
+    #[cfg(feature = "afc")]
+    pub(crate) shm: Arc<Mutex<AfcShm>>,
 }
 
 impl Client {
@@ -208,7 +218,24 @@ impl Client {
             .next()
             .expect("expected AQC server address");
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
-        let client = Self { daemon, aqc };
+
+        #[cfg(feature = "afc")]
+        let shm = {
+            let afc_shm_info = daemon
+                .afc_shm_info(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .context("unable to retrieve afc shm info")
+                .map_err(error::other)?;
+            Arc::new(Mutex::new(AfcShm::new(&afc_shm_info)?))
+        };
+
+        let client = Self {
+            daemon,
+            aqc,
+            #[cfg(feature = "afc")]
+            shm,
+        };
 
         Ok(client)
     }
@@ -301,6 +328,12 @@ impl Client {
     /// Get access to Aranya QUIC Channels.
     pub fn aqc(&self) -> AqcChannels<'_> {
         AqcChannels::new(self)
+    }
+
+    /// Get access to Aranya Fast Channels.
+    #[cfg(feature = "afc")]
+    pub fn afc(&self) -> AfcChannels<'_> {
+        AfcChannels::new(self, self.shm.clone())
     }
 }
 
