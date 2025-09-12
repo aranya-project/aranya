@@ -142,7 +142,7 @@ where
         }
 
         let info = BidiChannelCreated {
-            key_id: e.author_enc_key_id.into(),
+            key_id: e.channel_key_id.into(),
             parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -228,7 +228,7 @@ where
         }
 
         let info = UniChannelCreated {
-            key_id: e.author_enc_key_id.into(),
+            key_id: e.channel_key_id.into(),
             parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),

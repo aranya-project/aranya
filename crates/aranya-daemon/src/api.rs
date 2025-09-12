@@ -914,7 +914,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
+    ) -> api::Result<(api::LabelId, api::AfcChannelId, api::ChanOp)> {
         self.check_team_valid(team).await?;
 
         let graph = GraphId::from(team.into_id());
@@ -939,13 +939,18 @@ impl DaemonApi for Api {
                     let channel_id = self.afc.bidi_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((e.label_id.into(), channel_id));
+                    return Ok((e.label_id.into(), channel_id, api::ChanOp::SendRecv));
                 }
                 Some(Effect::AfcUniChannelReceived(e)) => {
                     let channel_id = self.afc.uni_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((e.label_id.into(), channel_id));
+                    let op = if e.sender_id == self.device_id()?.into() {
+                        api::ChanOp::SendOnly
+                    } else {
+                        api::ChanOp::RecvOnly
+                    };
+                    return Ok((e.label_id.into(), channel_id, op));
                 }
                 Some(_) | None => {}
             }
@@ -960,7 +965,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
+    ) -> api::Result<(api::LabelId, api::AfcChannelId, api::ChanOp)> {
         todo!()
     }
 
