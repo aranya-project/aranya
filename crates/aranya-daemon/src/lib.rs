@@ -38,6 +38,8 @@ pub mod policy;
 pub mod sync;
 pub mod vm_policy;
 
+#[cfg(feature = "afc")]
+mod afc;
 mod api;
 mod aqc;
 mod daemon;

@@ -167,8 +167,10 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
+
+        let afc_shm_path = format!("/{team_name}_{name}");
 
         // Setup daemon config.
         let cfg = Config {
@@ -179,6 +181,13 @@ impl DeviceCtx {
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
             aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
+            afc: Toggle::Enabled(daemon_cfg::AfcConfig {
+                shm_path: afc_shm_path.clone(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            }),
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
             },
