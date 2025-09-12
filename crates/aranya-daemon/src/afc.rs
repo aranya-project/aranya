@@ -24,7 +24,7 @@ use aranya_util::ShmPathBuf;
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument};
+use tracing::{debug, instrument};
 
 use crate::{
     config::AfcConfig,
@@ -150,12 +150,11 @@ where
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
         };
-        info!("handling create bidi channel");
         let keys: BidiKeys<RawSealKey<<E as Engine>::CS>, RawOpenKey<<E as Engine>::CS>> = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        info!(?channel_id, "creating bidi channel");
+        debug!(?channel_id, "creating bidi channel");
         self.shm
             .lock()
             .await
@@ -199,7 +198,7 @@ where
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        info!(?channel_id, "receiving bidi channel");
+        debug!(?channel_id, "receiving bidi channel");
         self.shm
             .lock()
             .await
@@ -242,7 +241,7 @@ where
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        info!(?channel_id, "creating uni channel");
+        debug!(?channel_id, "creating uni channel");
         self.shm
             .lock()
             .await
@@ -280,7 +279,7 @@ where
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
         let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        info!(?channel_id, "receiving uni channel");
+        debug!(?channel_id, "receiving uni channel");
         self.shm
             .lock()
             .await
