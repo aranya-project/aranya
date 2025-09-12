@@ -2213,44 +2213,46 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
                                         struct AranyaExtError *__ext_err);
 
 /**
- * Subscribe to hello notifications from a peer.
+ * Subscribe to hello notifications from a sync peer.
  *
  * This will request the peer to send hello notifications when their graph head changes.
- * The `delay_milliseconds` parameter specifies the minimum delay between notifications.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param[in] delay_milliseconds minimum delay between notifications in milliseconds.
+ * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] delay minimum delay between notifications.
+ * @param[in] duration how long the subscription should remain active.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_hello_subscribe(const struct AranyaClient *client,
-                                   const struct AranyaTeamId *team,
-                                   AranyaAddr addr,
-                                   uint64_t delay_milliseconds);
+AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        AranyaAddr peer,
+                                        AranyaDuration delay,
+                                        AranyaDuration duration);
 
 /**
- * Subscribe to hello notifications from a peer.
+ * Subscribe to hello notifications from a sync peer.
  *
  * This will request the peer to send hello notifications when their graph head changes.
- * The `delay_milliseconds` parameter specifies the minimum delay between notifications.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param[in] delay_milliseconds minimum delay between notifications in milliseconds.
+ * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] delay minimum delay between notifications.
+ * @param[in] duration how long the subscription should remain active.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_hello_subscribe_ext(const struct AranyaClient *client,
-                                       const struct AranyaTeamId *team,
-                                       AranyaAddr addr,
-                                       uint64_t delay_milliseconds,
-                                       struct AranyaExtError *__ext_err);
+AranyaError aranya_sync_hello_subscribe_ext(const struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            AranyaAddr peer,
+                                            AranyaDuration delay,
+                                            AranyaDuration duration,
+                                            struct AranyaExtError *__ext_err);
 
 /**
- * Unsubscribe from hello notifications from a peer.
+ * Unsubscribe from hello notifications from a sync peer.
  *
  * This will stop receiving hello notifications from the specified peer.
  *
@@ -2260,12 +2262,12 @@ AranyaError aranya_hello_subscribe_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_hello_unsubscribe(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team,
-                                     AranyaAddr addr);
+AranyaError aranya_sync_hello_unsubscribe(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team,
+                                          AranyaAddr peer);
 
 /**
- * Unsubscribe from hello notifications from a peer.
+ * Unsubscribe from hello notifications from a sync peer.
  *
  * This will stop receiving hello notifications from the specified peer.
  *
@@ -2275,10 +2277,10 @@ AranyaError aranya_hello_unsubscribe(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_hello_unsubscribe_ext(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         AranyaAddr addr,
-                                         struct AranyaExtError *__ext_err);
+AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
+                                              const struct AranyaTeamId *team,
+                                              AranyaAddr peer,
+                                              struct AranyaExtError *__ext_err);
 
 /**
  * Sync with peer immediately.
