@@ -536,9 +536,6 @@ mod tests {
             aqc: Toggle::Enabled(AqcConfig {}),
             afc: Toggle::Enabled(AfcConfig {
                 shm_path: "/test_daemon_run".to_owned(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
                 max_chans: 100,
             }),
         };

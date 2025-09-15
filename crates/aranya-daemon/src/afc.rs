@@ -16,15 +16,17 @@ use aranya_crypto::{
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
 use aranya_daemon_api::{self as api};
+#[cfg(test)]
+use aranya_fast_channels::shm;
 use aranya_fast_channels::{
-    shm::{self, Flag, Mode, WriteState},
+    shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
 };
 use aranya_util::ShmPathBuf;
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::{
     config::AfcConfig,
@@ -50,11 +52,30 @@ where
         let path = ShmPathBuf::from_str(&cfg.shm_path)
             .context("unable to parse AFC shared memory path")?;
         let write = {
+            // TODO: issue#483
+            /*
             if cfg.unlink_on_startup && cfg.create {
                 let _ = shm::unlink(&path);
             }
-            WriteState::open(&path, Flag::Create, Mode::ReadWrite, cfg.max_chans, Rng)
-                .context(format!("unable to open `WriteState`: {:?}", cfg.shm_path))?
+            */
+            #[cfg(test)]
+            let _ = shm::unlink(&path);
+            // TODO: check if shm path exists first?
+            match WriteState::open(&path, Flag::Create, Mode::ReadWrite, cfg.max_chans, Rng)
+                .context(format!(
+                    "unable to create new `WriteState`: {:?}",
+                    cfg.shm_path
+                )) {
+                Ok(w) => w,
+                Err(e) => {
+                    warn!(?e);
+                    WriteState::open(&path, Flag::OpenOnly, Mode::ReadWrite, cfg.max_chans, Rng)
+                        .context(format!(
+                            "unable to open existing `WriteState`: {:?}",
+                            cfg.shm_path
+                        ))?
+                }
+            }
         };
 
         Ok(Self { cfg, path, write })
@@ -64,10 +85,17 @@ where
 impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
         {
+            // TODO: issue#483
+            /*
             if self.cfg.unlink_at_exit {
                 if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
                     let _ = shm::unlink(path);
                 }
+            }
+            */
+            #[cfg(test)]
+            if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
+                let _ = shm::unlink(path);
             }
         }
     }

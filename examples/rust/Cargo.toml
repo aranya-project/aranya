@@ -40,6 +40,7 @@ wildcard_imports = "warn"
 [dependencies]
 aranya-client = { path = "../../crates/aranya-client" }
 aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
+aranya-fast-channels = { version = "0.11.0" }
 aranya-util = { path = "../../crates/aranya-util" }
 
 anyhow = { version = "1.0.97" }

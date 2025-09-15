@@ -2,16 +2,18 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    str::FromStr,
     time::Duration,
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
-    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
-use aranya_util::Addr;
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_fast_channels::shm;
+use aranya_util::{Addr, ShmPathBuf};
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
 use bytes::Bytes;
@@ -22,11 +24,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{Metadata, debug, info};
+use tracing::{debug, info, Metadata};
 use tracing_subscriber::{
-    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
+    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -77,6 +79,9 @@ impl ClientCtx {
 
         let daemon = {
             let shm = format!("/shm_{}", user_name);
+            let shm_path =
+                ShmPathBuf::from_str(&shm).context("unable to parse AFC shared memory path")?;
+            let _ = shm::unlink(&shm_path);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -107,9 +112,6 @@ impl ClientCtx {
                 [afc]
                 enable = true
                 shm_path = {shm:?}
-                unlink_on_startup = true
-                unlink_at_exit = true
-                create = true
                 max_chans = 100
 
                 [sync.quic]

@@ -58,9 +58,6 @@ aqc.enable = true
 [afc]
 enable = true
 shm_path = "/shm_${device}"
-unlink_on_startup = true
-unlink_at_exit = true
-create = true
 max_chans = 100
 
 [sync.quic]

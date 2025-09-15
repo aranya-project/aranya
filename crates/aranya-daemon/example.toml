@@ -87,9 +87,6 @@ enable = true
 [afc]
 enable = true
 shm_path = "/afc"
-unlink_on_startup = true
-unlink_at_exit = false
-create = true
 max_chans = 100
 
 [sync.quic]
