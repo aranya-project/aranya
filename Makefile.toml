@@ -54,6 +54,7 @@ run_task = { name = [
 category = "build"
 description = "Build C API header"
 cwd = "crates/aranya-client-capi"
+# Fake nightly support to enable macro expansion, so we don't have to pin to nightly 1.86 (see above).
 env.RUSTC_BOOTSTRAP = "1"
 command = "cbindgen"
 args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
