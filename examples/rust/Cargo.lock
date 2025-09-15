@@ -145,6 +145,7 @@ dependencies = [
  "anyhow",
  "aranya-client",
  "aranya-daemon-api",
+ "aranya-fast-channels",
  "aranya-util",
  "backon",
  "buggy",

@@ -183,9 +183,6 @@ impl DeviceCtx {
             aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
             afc: Toggle::Enabled(daemon_cfg::AfcConfig {
                 shm_path: afc_shm_path.clone(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
                 max_chans: 100,
             }),
             sync: daemon_cfg::SyncConfig {
