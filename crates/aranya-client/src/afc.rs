@@ -2,7 +2,9 @@
 use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Context;
-use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DeviceId, LabelId, TeamId, CS};
+use aranya_daemon_api::{
+    AfcChannelId, AfcShmInfo, ChanOp, DaemonApiClient, DeviceId, LabelId, TeamId, CS,
+};
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
     Client as AfcClient, Seq,
@@ -12,10 +14,7 @@ use tarpc::context;
 use tokio::sync::Mutex;
 use tracing::debug;
 
-use crate::{
-    error::{aranya_error, IpcError},
-    Client,
-};
+use crate::error::{aranya_error, IpcError};
 
 /// AFC sequence number identifying the position of a ciphertext in a channel.
 #[derive(Debug)]
@@ -74,28 +73,28 @@ impl AfcCtrl {
 }
 
 /// Aranya Fast Channels handler for managing channels which allow encrypting/decrypting application data buffers.
-pub struct AfcChannels<'a> {
-    client: &'a Client,
+pub struct AfcChannels {
+    daemon: DaemonApiClient,
     // TODO: don't use mutex for shm reader aranya-core#399
     shm: Arc<Mutex<AfcShm>>,
 }
 
 // TODO: derive Debug on [`shm`] when [`AfcClient`] implements it.
-impl Debug for AfcChannels<'_> {
+impl Debug for AfcChannels {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AfcChannels")
-            .field("client", &self.client)
+            .field("daemon", &self.daemon)
             .finish_non_exhaustive()
     }
 }
 
-impl<'a> AfcChannels<'a> {
+impl AfcChannels {
     /// The number of additional octets required to encrypt
     /// plaintext data.
     pub const OVERHEAD: usize = AfcClient::<ReadState<CS>>::OVERHEAD;
 
-    pub(crate) fn new(client: &'a Client, shm: Arc<Mutex<AfcShm>>) -> Self {
-        Self { client, shm }
+    pub(crate) fn new(daemon: DaemonApiClient, shm: Arc<Mutex<AfcShm>>) -> Self {
+        Self { daemon, shm }
     }
 
     /// Create a bidirectional AFC channel.
@@ -106,9 +105,8 @@ impl<'a> AfcChannels<'a> {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(AfcBidiChannel<'_>, AfcCtrl)> {
+    ) -> crate::Result<(AfcBidiChannel, AfcCtrl)> {
         let (ctrl, channel_id) = self
-            .client
             .daemon
             .create_afc_bidi_channel(context::current(), team_id, peer_id, label_id)
             .await
@@ -116,7 +114,7 @@ impl<'a> AfcChannels<'a> {
             .map_err(aranya_error)?;
         Ok((
             AfcBidiChannel {
-                client: self.client,
+                daemon: self.daemon.clone(),
                 shm: self.shm.clone(),
                 channel_id,
                 label_id,
@@ -133,9 +131,8 @@ impl<'a> AfcChannels<'a> {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(AfcSendChannel<'_>, AfcCtrl)> {
+    ) -> crate::Result<(AfcSendChannel, AfcCtrl)> {
         let (ctrl, channel_id) = self
-            .client
             .daemon
             .create_afc_uni_send_channel(context::current(), team_id, peer_id, label_id)
             .await
@@ -143,7 +140,7 @@ impl<'a> AfcChannels<'a> {
             .map_err(aranya_error)?;
         Ok((
             AfcSendChannel {
-                client: self.client,
+                daemon: self.daemon.clone(),
                 shm: self.shm.clone(),
                 channel_id,
                 label_id,
@@ -160,9 +157,8 @@ impl<'a> AfcChannels<'a> {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(AfcReceiveChannel<'_>, AfcCtrl)> {
+    ) -> crate::Result<(AfcReceiveChannel, AfcCtrl)> {
         let (ctrl, channel_id) = self
-            .client
             .daemon
             .create_afc_uni_recv_channel(context::current(), team_id, peer_id, label_id)
             .await
@@ -170,7 +166,7 @@ impl<'a> AfcChannels<'a> {
             .map_err(aranya_error)?;
         Ok((
             AfcReceiveChannel {
-                client: self.client,
+                daemon: self.daemon.clone(),
                 shm: self.shm.clone(),
                 channel_id,
                 label_id,
@@ -180,9 +176,8 @@ impl<'a> AfcChannels<'a> {
     }
 
     /// Receive a `ctrl` message from a peer to create an AFC channel.
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: AfcCtrl) -> crate::Result<AfcChannel<'_>> {
+    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: AfcCtrl) -> crate::Result<AfcChannel> {
         let (label_id, channel_id, op) = self
-            .client
             .daemon
             .receive_afc_ctrl(context::current(), team_id, ctrl.data)
             .await
@@ -190,19 +185,19 @@ impl<'a> AfcChannels<'a> {
             .map_err(aranya_error)?;
         match op {
             ChanOp::RecvOnly => Ok(AfcChannel::Uni(AfcUniChannel::Receive(AfcReceiveChannel {
-                client: self.client,
+                daemon: self.daemon.clone(),
                 shm: self.shm.clone(),
                 channel_id,
                 label_id,
             }))),
             ChanOp::SendOnly => Ok(AfcChannel::Uni(AfcUniChannel::Send(AfcSendChannel {
-                client: self.client,
+                daemon: self.daemon.clone(),
                 shm: self.shm.clone(),
                 channel_id,
                 label_id,
             }))),
             ChanOp::SendRecv => Ok(AfcChannel::Bidi(AfcBidiChannel {
-                client: self.client,
+                daemon: self.daemon.clone(),
                 shm: self.shm.clone(),
                 channel_id,
                 label_id,
@@ -212,8 +207,7 @@ impl<'a> AfcChannels<'a> {
 
     /// Create an AFC channel by removing channel key entry from shared memory.
     pub async fn delete_channel(&self, channel_id: AfcChannelId) -> crate::Result<()> {
-        self.client
-            .daemon
+        self.daemon
             .delete_afc_channel(context::current(), channel_id)
             .await
             .map_err(IpcError::new)?
@@ -224,32 +218,32 @@ impl<'a> AfcChannels<'a> {
 
 /// An AFC channel.
 #[derive(Debug)]
-pub enum AfcChannel<'a> {
+pub enum AfcChannel {
     /// A bidirectional channel.
-    Bidi(AfcBidiChannel<'a>),
+    Bidi(AfcBidiChannel),
     /// A unidirectional channel.
-    Uni(AfcUniChannel<'a>),
+    Uni(AfcUniChannel),
 }
 
 /// An unidirectional AFC channel.
 #[derive(Debug)]
-pub enum AfcUniChannel<'a> {
+pub enum AfcUniChannel {
     /// A send channel.
-    Send(AfcSendChannel<'a>),
+    Send(AfcSendChannel),
     /// A receive channel.
-    Receive(AfcReceiveChannel<'a>),
+    Receive(AfcReceiveChannel),
 }
 
 /// A bidirectional AFC channel.
 #[derive(Debug)]
-pub struct AfcBidiChannel<'a> {
-    client: &'a Client,
+pub struct AfcBidiChannel {
+    daemon: DaemonApiClient,
     shm: Arc<Mutex<AfcShm>>,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
-impl AfcBidiChannel<'_> {
+impl AfcBidiChannel {
     /// The AFC channel ID.
     pub fn channel_id(&self) -> AfcChannelId {
         self.channel_id
@@ -310,8 +304,7 @@ impl AfcBidiChannel<'_> {
 
     /// Delete the AFC channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
-        self.client
-            .daemon
+        self.daemon
             .delete_afc_channel(context::current(), self.channel_id)
             .await
             .map_err(IpcError::new)?
@@ -322,14 +315,14 @@ impl AfcBidiChannel<'_> {
 
 /// A unidirectional AFC channel that can only send.
 #[derive(Debug)]
-pub struct AfcSendChannel<'a> {
-    client: &'a Client,
+pub struct AfcSendChannel {
+    daemon: DaemonApiClient,
     shm: Arc<Mutex<AfcShm>>,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
-impl AfcSendChannel<'_> {
+impl AfcSendChannel {
     /// The AFC channel ID.
     pub fn channel_id(&self) -> AfcChannelId {
         self.channel_id
@@ -363,8 +356,7 @@ impl AfcSendChannel<'_> {
 
     /// Delete the AFC channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
-        self.client
-            .daemon
+        self.daemon
             .delete_afc_channel(context::current(), self.channel_id)
             .await
             .map_err(IpcError::new)?
@@ -375,14 +367,14 @@ impl AfcSendChannel<'_> {
 
 /// A unidirectional AFC channel that can only receive.
 #[derive(Debug)]
-pub struct AfcReceiveChannel<'a> {
-    client: &'a Client,
+pub struct AfcReceiveChannel {
+    daemon: DaemonApiClient,
     shm: Arc<Mutex<AfcShm>>,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
-impl AfcReceiveChannel<'_> {
+impl AfcReceiveChannel {
     /// The AFC channel ID.
     pub fn channel_id(&self) -> AfcChannelId {
         self.channel_id
@@ -422,8 +414,7 @@ impl AfcReceiveChannel<'_> {
 
     /// Delete the AFC channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
-        self.client
-            .daemon
+        self.daemon
             .delete_afc_channel(context::current(), self.channel_id)
             .await
             .map_err(IpcError::new)?
