@@ -52,12 +52,6 @@ where
         let path = ShmPathBuf::from_str(&cfg.shm_path)
             .context("unable to parse AFC shared memory path")?;
         let write = {
-            // TODO: issue#483
-            /*
-            if cfg.unlink_on_startup && cfg.create {
-                let _ = shm::unlink(&path);
-            }
-            */
             #[cfg(test)]
             let _ = shm::unlink(&path);
             // TODO: check if shm path exists first?
@@ -85,14 +79,6 @@ where
 impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
         {
-            // TODO: issue#483
-            /*
-            if self.cfg.unlink_at_exit {
-                if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
-                    let _ = shm::unlink(path);
-                }
-            }
-            */
             #[cfg(test)]
             if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
                 let _ = shm::unlink(path);
