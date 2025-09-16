@@ -61,14 +61,13 @@ pub enum AfcError {
 /// AFC control message sent to a peer when creating a channel.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AfcCtrl {
-    data: Vec<Box<[u8]>>,
+    data: Box<[u8]>,
 }
 
 impl AfcCtrl {
     /// Convert AFC control message to bytes.
     pub fn as_bytes(&self) -> &[u8] {
-        // TODO: implement this.
-        todo!()
+        &self.data
     }
 }
 
