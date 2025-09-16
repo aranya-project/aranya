@@ -1091,7 +1091,7 @@ author, and sends the encapsulations through the `AqcCreateBidiChannel` command.
 command, the device will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action create_aqc_bidi_channel(peer_id id, label_id id) {
+ephemeral action create_aqc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
@@ -1171,7 +1171,7 @@ effect AqcBidiChannelReceived {
     psk_length_in_bytes int,
 }
 
-command AqcCreateBidiChannel {
+ephemeral command AqcCreateBidiChannel {
     fields {
         // Uniquely identifies the channel.
         channel_id id,
@@ -1281,7 +1281,7 @@ the encapsulation through the `AqcCreateUniChannel` command. When processing the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
+ephemeral action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
@@ -1366,7 +1366,7 @@ effect AqcUniChannelReceived {
     psk_length_in_bytes int,
 }
 
-command AqcCreateUniChannel {
+ephemeral command AqcCreateUniChannel {
     fields {
         // Uniquely identifies the channel.
         channel_id id,
@@ -1802,13 +1802,13 @@ Queries whether a label exists.
 
 ```policy
 // Emits `LabelExistsResult` for label if it exists.
-action query_label_exists(label_id id) {
+ephemeral action query_label_exists(label_id id) {
     publish QueryLabelExists {
         label_id: label_id,
     }
 }
 
-command QueryLabelExists {
+ephemeral command QueryLabelExists {
     fields {
         label_id id,
     }
@@ -1853,7 +1853,7 @@ Queries for a list of all created labels.
 
 ```policy
 // Emits `QueriedLabel` for all labels.
-action query_labels() {
+ephemeral action query_labels() {
     map Label[label_id: ?] as f {
         publish QueryLabel {
             label_id: f.label_id,
@@ -1863,7 +1863,7 @@ action query_labels() {
     }
 }
 
-command QueryLabel {
+ephemeral command QueryLabel {
     fields {
         label_id id,
         label_name string,
@@ -1903,7 +1903,7 @@ Queries for a list labels assigned to a device.
 ```policy
 // Emits `QueriedLabelAssignment` for all labels the device has
 // been granted permission to use.
-action query_label_assignments(device_id id) {
+ephemeral action query_label_assignments(device_id id) {
     // TODO: make this query more efficient when policy supports it.
     // The key order is optimized for `delete AssignedLabel`.
     map AssignedLabel[label_id: ?, device_id: ?] as f {
@@ -1919,7 +1919,7 @@ action query_label_assignments(device_id id) {
     }
 }
 
-command QueryLabelAssignment {
+ephemeral command QueryLabelAssignment {
     fields {
         device_id id,
         label_id id,
@@ -1966,7 +1966,7 @@ effect QueriedLabelAssignment {
 Queries for a list devices on the team.
 
 ```policy
-action query_devices_on_team() {
+ephemeral action query_devices_on_team() {
     map Device[device_id:?] as f {
         publish QueryDevicesOnTeam { device_id: f.device_id }
     }
@@ -1976,7 +1976,7 @@ effect QueryDevicesOnTeamResult {
     device_id id,
 }
 
-command QueryDevicesOnTeam {
+ephemeral command QueryDevicesOnTeam {
     fields {
         device_id id,
     }
@@ -2007,7 +2007,7 @@ command QueryDevicesOnTeam {
 Queries device role.
 
 ```policy
-action query_device_role(device_id id) {
+ephemeral action query_device_role(device_id id) {
     publish QueryDeviceRole {
         device_id: device_id,
     }
@@ -2017,7 +2017,7 @@ effect QueryDeviceRoleResult {
     role enum Role,
 }
 
-command QueryDeviceRole {
+ephemeral command QueryDeviceRole {
     fields {
         device_id id,
     }
@@ -2065,7 +2065,7 @@ function get_device_keybundle(device_id id) struct KeyBundle {
     }
 }
 
-action query_device_keybundle(device_id id) {
+ephemeral action query_device_keybundle(device_id id) {
     publish QueryDeviceKeyBundle {
         device_id: device_id,
     }
@@ -2075,7 +2075,7 @@ effect QueryDeviceKeyBundleResult {
     device_keys struct KeyBundle,
 }
 
-command QueryDeviceKeyBundle {
+ephemeral command QueryDeviceKeyBundle {
     fields {
         device_id id,
     }
@@ -2117,7 +2117,7 @@ function get_aqc_net_identifier(device_id id) string {
     return net_identifier.net_identifier
 }
 
-action query_aqc_net_identifier(device_id id) {
+ephemeral action query_aqc_net_identifier(device_id id) {
     publish QueryAqcNetIdentifier {
         device_id: device_id,
     }
@@ -2127,7 +2127,7 @@ effect QueryAqcNetIdentifierResult {
     net_identifier string,
 }
 
-command QueryAqcNetIdentifier {
+ephemeral command QueryAqcNetIdentifier {
     fields {
         device_id id,
     }
@@ -2161,7 +2161,7 @@ command QueryAqcNetIdentifier {
 Queries all associated AQC network names from the fact database.
 
 ```policy
-action query_aqc_network_names() {
+ephemeral action query_aqc_network_names() {
     map AqcMemberNetworkId[device_id: ?] as f {
         publish QueryAqcNetworkNamesCommand {
             net_identifier: f.net_identifier,
@@ -2175,7 +2175,7 @@ effect QueryAqcNetworkNamesOutput {
     device_id id,
 }
 
-command QueryAqcNetworkNamesCommand {
+ephemeral command QueryAqcNetworkNamesCommand {
     fields {
         net_identifier string,
         device_id id,
