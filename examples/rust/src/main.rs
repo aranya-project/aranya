@@ -13,7 +13,7 @@ use aranya_client::{
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_fast_channels::shm;
-use aranya_util::{Addr, ShmPathBuf};
+use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
 use bytes::Bytes;
@@ -79,8 +79,7 @@ impl ClientCtx {
 
         let daemon = {
             let shm = format!("/shm_{}", user_name);
-            let shm_path =
-                ShmPathBuf::from_str(&shm).context("unable to parse AFC shared memory path")?;
+            let shm_path: &shm::Path = shm.as_str().try_into().context("unable to parse AFC shared memory path")?
             let _ = shm::unlink(&shm_path);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;

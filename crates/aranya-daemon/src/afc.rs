@@ -22,7 +22,6 @@ use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
 };
-use aranya_util::ShmPathBuf;
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
@@ -39,7 +38,7 @@ use crate::{
 /// AFC shared memory.
 pub struct AfcShm<C> {
     cfg: AfcConfig,
-    path: ShmPathBuf,
+    path: shm::Path,
     write: WriteState<C, Rng>,
 }
 
@@ -49,17 +48,21 @@ where
 {
     fn new(cfg: AfcConfig) -> Result<Self> {
         debug!(shm_path = cfg.shm_path, "setting up afc shm write side");
-        let path = ShmPathBuf::from_str(&cfg.shm_path)
-            .context("unable to parse AFC shared memory path")?;
         let write = {
             #[cfg(test)]
             let _ = shm::unlink(&path);
             // TODO: check if shm path exists first?
-            match WriteState::open(&path, Flag::Create, Mode::ReadWrite, cfg.max_chans, Rng)
-                .context(format!(
-                    "unable to create new `WriteState`: {:?}",
-                    cfg.shm_path
-                )) {
+            match WriteState::open(
+                &cfg.shm_path,
+                Flag::Create,
+                Mode::ReadWrite,
+                cfg.max_chans,
+                Rng,
+            )
+            .context(format!(
+                "unable to create new `WriteState`: {:?}",
+                cfg.shm_path
+            )) {
                 Ok(w) => w,
                 Err(e) => {
                     warn!(?e);
@@ -80,9 +83,7 @@ impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
         {
             #[cfg(test)]
-            if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
-                let _ = shm::unlink(path);
-            }
+            let _ = shm::unlink(&self.cfg.shm_path);
         }
     }
 }

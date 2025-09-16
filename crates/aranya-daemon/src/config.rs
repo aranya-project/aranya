@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use aranya_fast_channels::shm;
 use aranya_util::Addr;
 use serde::{
     de::{self, DeserializeOwned},
@@ -207,7 +208,7 @@ pub struct AqcConfig {}
 #[serde(deny_unknown_fields)]
 pub struct AfcConfig {
     /// Shared memory path.
-    pub shm_path: String,
+    pub shm_path: Box<shm::Path>,
     /// Maximum number of channels AFC should support.
     pub max_chans: usize,
 }
