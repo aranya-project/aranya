@@ -843,7 +843,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
         todo!()
     }
 

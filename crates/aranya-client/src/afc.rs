@@ -264,12 +264,7 @@ impl AfcBidiChannel {
             .lock()
             .await
             .0
-            .seal(
-                self.channel_id,
-                self.label_id.into_id().into(),
-                dst,
-                plaintext,
-            )
+            .seal(self.channel_id, dst, plaintext)
             .map_err(AfcError::Seal)?;
         Ok(())
     }
@@ -291,12 +286,7 @@ impl AfcBidiChannel {
                 .lock()
                 .await
                 .0
-                .open(
-                    self.channel_id,
-                    self.label_id.into_id().into(),
-                    dst,
-                    ciphertext,
-                )
+                .open(self.channel_id, dst, ciphertext)
                 .map_err(AfcError::Open)?,
         })
     }
@@ -343,12 +333,7 @@ impl AfcSendChannel {
             .lock()
             .await
             .0
-            .seal(
-                self.channel_id,
-                self.label_id.into_id().into(),
-                dst,
-                plaintext,
-            )
+            .seal(self.channel_id, dst, plaintext)
             .map_err(AfcError::Seal)?;
         Ok(())
     }
@@ -401,12 +386,7 @@ impl AfcReceiveChannel {
                 .lock()
                 .await
                 .0
-                .open(
-                    self.channel_id,
-                    self.label_id.into_id().into(),
-                    dst,
-                    ciphertext,
-                )
+                .open(self.channel_id, dst, ciphertext)
                 .map_err(AfcError::Open)?,
         })
     }
