@@ -21,9 +21,10 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
+use aranya_fast_channels::shm;
 pub use aranya_fast_channels::ChannelId as AfcChannelId;
 pub use aranya_policy_text::{text, Text};
-use aranya_util::{error::ReportExt, Addr, ShmPathBuf};
+use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -638,7 +639,7 @@ pub struct Label {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 
 pub struct AfcShmInfo {
-    pub path: ShmPathBuf,
+    pub path: Box<shm::Path>,
     pub max_chans: usize,
 }
 

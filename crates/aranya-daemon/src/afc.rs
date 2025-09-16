@@ -2,7 +2,6 @@
 
 use std::{
     fmt::Debug,
-    str::FromStr,
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -22,7 +21,6 @@ use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
 };
-use aranya_util::ShmPathBuf;
 use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
@@ -39,7 +37,6 @@ use crate::{
 /// AFC shared memory.
 pub struct AfcShm<C> {
     cfg: AfcConfig,
-    path: ShmPathBuf,
     write: WriteState<C, Rng>,
 }
 
@@ -48,31 +45,41 @@ where
     C: CipherSuite,
 {
     fn new(cfg: AfcConfig) -> Result<Self> {
-        debug!(shm_path = cfg.shm_path, "setting up afc shm write side");
-        let path = ShmPathBuf::from_str(&cfg.shm_path)
-            .context("unable to parse AFC shared memory path")?;
+        debug!("setting up afc shm write side: {:?}", cfg.shm_path);
         let write = {
             #[cfg(test)]
-            let _ = shm::unlink(&path);
+            let _ = shm::unlink(&cfg.shm_path);
             // TODO: check if shm path exists first?
-            match WriteState::open(&path, Flag::Create, Mode::ReadWrite, cfg.max_chans, Rng)
-                .context(format!(
-                    "unable to create new `WriteState`: {:?}",
-                    cfg.shm_path
-                )) {
+            match WriteState::open(
+                cfg.shm_path.clone(),
+                Flag::Create,
+                Mode::ReadWrite,
+                cfg.max_chans,
+                Rng,
+            )
+            .context(format!(
+                "unable to create new `WriteState`: {:?}",
+                cfg.shm_path
+            )) {
                 Ok(w) => w,
                 Err(e) => {
                     warn!(?e);
-                    WriteState::open(&path, Flag::OpenOnly, Mode::ReadWrite, cfg.max_chans, Rng)
-                        .context(format!(
-                            "unable to open existing `WriteState`: {:?}",
-                            cfg.shm_path
-                        ))?
+                    WriteState::open(
+                        cfg.shm_path.clone(),
+                        Flag::OpenOnly,
+                        Mode::ReadWrite,
+                        cfg.max_chans,
+                        Rng,
+                    )
+                    .context(format!(
+                        "unable to open existing `WriteState`: {:?}",
+                        cfg.shm_path
+                    ))?
                 }
             }
         };
 
-        Ok(Self { cfg, path, write })
+        Ok(Self { cfg, write })
     }
 }
 
@@ -80,9 +87,7 @@ impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
         {
             #[cfg(test)]
-            if let Ok(path) = ShmPathBuf::from_str(&self.cfg.shm_path) {
-                let _ = shm::unlink(path);
-            }
+            let _ = shm::unlink(&self.cfg.shm_path);
         }
     }
 }
@@ -318,7 +323,7 @@ where
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
         let shm = self.shm.lock().await;
         api::AfcShmInfo {
-            path: shm.path.clone(),
+            path: shm.cfg.shm_path.clone(),
             max_chans: shm.cfg.max_chans,
         }
     }

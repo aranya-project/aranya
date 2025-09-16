@@ -280,15 +280,14 @@ impl AfcBidiChannel {
     /// sequence number associated with the ciphertext.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<AfcSeq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
-        Ok(AfcSeq {
-            seq: self
-                .shm
-                .lock()
-                .await
-                .0
-                .open(self.channel_id, dst, ciphertext)
-                .map_err(AfcError::Open)?,
-        })
+        let (_, seq) = self
+            .shm
+            .lock()
+            .await
+            .0
+            .open(self.channel_id, dst, ciphertext)
+            .map_err(AfcError::Open)?;
+        Ok(AfcSeq { seq })
     }
 
     /// Delete the AFC channel.
@@ -380,15 +379,14 @@ impl AfcReceiveChannel {
     /// sequence number associated with the ciphertext.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<AfcSeq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
-        Ok(AfcSeq {
-            seq: self
-                .shm
-                .lock()
-                .await
-                .0
-                .open(self.channel_id, dst, ciphertext)
-                .map_err(AfcError::Open)?,
-        })
+        let (_, seq) = self
+            .shm
+            .lock()
+            .await
+            .0
+            .open(self.channel_id, dst, ciphertext)
+            .map_err(AfcError::Open)?;
+        Ok(AfcSeq { seq })
     }
 
     /// Delete the AFC channel.
