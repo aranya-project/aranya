@@ -78,7 +78,7 @@ impl ClientCtx {
         let work_dir = TempDir::with_prefix(user_name)?;
 
         let daemon = {
-            let shm = format!("/shm_{}", user_name);
+            let shm = format!("/shm_{}\0", user_name);
             let shm_path: &shm::Path = shm.as_str().try_into().context("unable to parse AFC shared memory path")?
             let _ = shm::unlink(&shm_path);
             let work_dir = work_dir.path().join("daemon");
