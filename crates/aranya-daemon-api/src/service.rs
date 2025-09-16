@@ -183,7 +183,7 @@ impl fmt::Display for NetIdentifier {
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
 /// A serialized command for AFC.
-pub type AfcCtrl = Vec<Box<[u8]>>;
+pub type AfcCtrl = Box<[u8]>;
 
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
@@ -739,19 +739,19 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AfcChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC send-only channel.
     async fn create_afc_uni_send_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AfcChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC receive-only channel.
     async fn create_afc_uni_recv_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AfcChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Delete a AFC channel.
     async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
     /// Receive AFC ctrl message.
