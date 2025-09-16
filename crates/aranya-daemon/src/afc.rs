@@ -49,7 +49,7 @@ where
             let _ = shm::unlink(&cfg.shm_path);
             // TODO: check if shm path exists first?
             match WriteState::open(
-                &cfg.shm_path.clone(),
+                cfg.shm_path.clone(),
                 Flag::Create,
                 Mode::ReadWrite,
                 cfg.max_chans,
@@ -63,7 +63,7 @@ where
                 Err(e) => {
                     warn!(?e);
                     WriteState::open(
-                        &cfg.shm_path.clone(),
+                        cfg.shm_path.clone(),
                         Flag::OpenOnly,
                         Mode::ReadWrite,
                         cfg.max_chans,
