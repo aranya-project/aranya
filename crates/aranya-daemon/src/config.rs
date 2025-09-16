@@ -204,7 +204,7 @@ pub struct SyncConfig {
 pub struct AqcConfig {}
 
 /// AFC configuration.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AfcConfig {
     /// Shared memory path.

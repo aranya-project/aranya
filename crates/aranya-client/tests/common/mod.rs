@@ -170,7 +170,7 @@ impl DeviceCtx {
     async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let afc_shm_path = format!("/{team_name}_{name}");
+        let afc_shm_path = format!("/{team_name}_{name}\0");
 
         // Setup daemon config.
         let cfg = Config {
@@ -182,7 +182,10 @@ impl DeviceCtx {
             config_dir: work_dir.join("config"),
             aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
             afc: Toggle::Enabled(daemon_cfg::AfcConfig {
-                shm_path: afc_shm_path.clone(),
+                shm_path: afc_shm_path
+                    .as_str()
+                    .try_into()
+                    .context("unable to parse AFC shared memory path")?,
                 max_chans: 100,
             }),
             sync: daemon_cfg::SyncConfig {

@@ -2,7 +2,6 @@
 
 use std::{
     fmt::Debug,
-    str::FromStr,
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -16,8 +15,6 @@ use aranya_crypto::{
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
 use aranya_daemon_api::{self as api};
-#[cfg(test)]
-use aranya_fast_channels::shm;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
@@ -38,7 +35,6 @@ use crate::{
 /// AFC shared memory.
 pub struct AfcShm<C> {
     cfg: AfcConfig,
-    path: shm::Path,
     write: WriteState<C, Rng>,
 }
 
@@ -47,13 +43,13 @@ where
     C: CipherSuite,
 {
     fn new(cfg: AfcConfig) -> Result<Self> {
-        debug!(shm_path = cfg.shm_path, "setting up afc shm write side");
+        debug!("setting up afc shm write side: {:?}", cfg.shm_path);
         let write = {
             #[cfg(test)]
-            let _ = shm::unlink(&path);
+            let _ = shm::unlink(&cfg.shm_path);
             // TODO: check if shm path exists first?
             match WriteState::open(
-                &cfg.shm_path,
+                &cfg.shm_path.clone(),
                 Flag::Create,
                 Mode::ReadWrite,
                 cfg.max_chans,
@@ -66,16 +62,22 @@ where
                 Ok(w) => w,
                 Err(e) => {
                     warn!(?e);
-                    WriteState::open(&path, Flag::OpenOnly, Mode::ReadWrite, cfg.max_chans, Rng)
-                        .context(format!(
-                            "unable to open existing `WriteState`: {:?}",
-                            cfg.shm_path
-                        ))?
+                    WriteState::open(
+                        &cfg.shm_path.clone(),
+                        Flag::OpenOnly,
+                        Mode::ReadWrite,
+                        cfg.max_chans,
+                        Rng,
+                    )
+                    .context(format!(
+                        "unable to open existing `WriteState`: {:?}",
+                        cfg.shm_path
+                    ))?
                 }
             }
         };
 
-        Ok(Self { cfg, path, write })
+        Ok(Self { cfg, write })
     }
 }
 
@@ -319,7 +321,7 @@ where
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
         let shm = self.shm.lock().await;
         api::AfcShmInfo {
-            path: shm.path.clone(),
+            path: shm.cfg.shm_path.clone(),
             max_chans: shm.cfg.max_chans,
         }
     }
