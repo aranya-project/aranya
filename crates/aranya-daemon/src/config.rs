@@ -262,7 +262,9 @@ mod tests {
             },
             aqc: Toggle::Enabled(AqcConfig {}),
             afc: Toggle::Enabled(AfcConfig {
-                shm_path: "/afc".to_owned(),
+                shm_path: "/afc\0"
+                    .try_into()
+                    .context("unable to parse AFC shared memory path")?,
                 max_chans: 100,
             }),
         };

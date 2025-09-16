@@ -15,6 +15,8 @@ use aranya_crypto::{
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
 use aranya_daemon_api::{self as api};
+#[cfg(test)]
+use aranya_fast_channels::shm;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,

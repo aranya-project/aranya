@@ -535,7 +535,9 @@ mod tests {
             },
             aqc: Toggle::Enabled(AqcConfig {}),
             afc: Toggle::Enabled(AfcConfig {
-                shm_path: "/test_daemon_run".to_owned(),
+                shm_path: "/test_daemon_run\0"
+                    .try_into()
+                    .expect("should be able to parse AFC shared memory path"),
                 max_chans: 100,
             }),
         };
