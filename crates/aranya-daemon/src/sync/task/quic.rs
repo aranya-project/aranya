@@ -17,7 +17,7 @@ use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Address, Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
-    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    SyncRequester, SyncResponder, SyncType, PushSyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     error::ReportExt as _,
@@ -754,13 +754,13 @@ where
                 )
                 .await
             }
-            SyncType::Subscribe { .. } => {
+            SyncType::Push(PushSyncType::Subscribe { .. }) => {
                 bug!("Push subscribe messages are not implemented")
             }
-            SyncType::Unsubscribe { .. } => {
+            SyncType::Push(PushSyncType::Unsubscribe { .. }) => {
                 bug!("Push unsubscribe messages are not implemented")
             }
-            SyncType::Push { .. } => {
+            SyncType::Push(PushSyncType::Push { .. }) => {
                 bug!("Push messages are not implemented")
             }
             SyncType::Hello(hello_msg) => {

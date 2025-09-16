@@ -106,3 +106,28 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+# Patch all aranya-core dependencies to use local checkout
+[patch.crates-io]
+aranya-aqc-util = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-aqc-util" }
+aranya-capi-core = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-capi-core" }
+aranya-capi-codegen = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-capi-codegen" }
+aranya-crypto = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-crypto" }
+aranya-crypto-ffi = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-crypto-ffi" }
+aranya-device-ffi = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-device-ffi" }
+aranya-envelope-ffi = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-envelope-ffi" }
+aranya-idam-ffi = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-idam-ffi" }
+aranya-perspective-ffi = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-perspective-ffi" }
+aranya-policy-ast = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-ast" }
+aranya-policy-compiler = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-compiler" }
+aranya-policy-derive = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-derive" }
+aranya-policy-ifgen = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-ifgen" }
+aranya-policy-ifgen-build = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-ifgen-build" }
+aranya-policy-ifgen-macro = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-ifgen-macro" }
+aranya-policy-lang = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-lang" }
+aranya-policy-module = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-module" }
+aranya-policy-text = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-text" }
+aranya-policy-text-macro = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-text-macro" }
+aranya-policy-vm = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-vm" }
+aranya-policy-vm-explorer = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-policy-vm-explorer" }
+aranya-runtime = { path = "/Users/benzimmerman/git/aranya-core/crates/aranya-runtime" }
