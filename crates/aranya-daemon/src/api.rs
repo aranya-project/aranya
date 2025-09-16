@@ -282,35 +282,9 @@ impl EffectHandler {
         let client = self.client.as_ref()?;
 
         let mut aranya = client.aranya.lock().await;
-        let storage = match aranya.provider().get_storage(graph_id) {
-            Ok(storage) => storage,
-            Err(e) => {
-                trace!(error = %e, ?graph_id, "unable to get storage for graph");
-                return None;
-            }
-        };
+        let storage = aranya.provider().get_storage(graph_id).ok()?;
 
-        // Get the head location
-        let head_location = match storage.get_head() {
-            Ok(location) => location,
-            Err(e) => {
-                trace!(error = %e, ?graph_id, "unable to get head location");
-                return None;
-            }
-        };
-
-        // Get the address of the command at the head location using the convenience method
-        match storage.get_command_address_at_location(head_location) {
-            Ok(Some(address)) => Some(address),
-            Ok(None) => {
-                warn!(?graph_id, "no command found at head location");
-                None
-            }
-            Err(e) => {
-                warn!(error = %e, ?graph_id, "unable to get command address at head location");
-                None
-            }
-        }
+        storage.get_head_address().ok()
     }
 
     /// Broadcasts hello notifications to subscribers when the graph changes.
