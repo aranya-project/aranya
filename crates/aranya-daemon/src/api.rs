@@ -749,7 +749,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
         info!("creating afc bidi channel");
@@ -774,6 +774,11 @@ impl DaemonApi for Api {
         let channel_id = self.afc.bidi_channel_created(e).await?;
         info!("afc bidi channel created");
 
+        let ctrl = ctrl
+            .first()
+            .ok_or(anyhow!("too many ctrl commands"))?
+            .clone();
+
         Ok((ctrl, channel_id))
     }
 
@@ -785,7 +790,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
         todo!()
     }
 
@@ -797,7 +802,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
@@ -822,6 +827,11 @@ impl DaemonApi for Api {
         let channel_id = self.afc.uni_channel_created(e).await?;
         info!("afc uni channel created");
 
+        let ctrl = ctrl
+            .first()
+            .ok_or(anyhow!("too many ctrl commands"))?
+            .clone();
+
         Ok((ctrl, channel_id))
     }
 
@@ -845,7 +855,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
@@ -870,6 +880,11 @@ impl DaemonApi for Api {
         let channel_id = self.afc.uni_channel_created(e).await?;
         info!("afc uni channel created");
 
+        let ctrl = ctrl
+            .first()
+            .ok_or(anyhow!("too many ctrl commands"))?
+            .clone();
+
         Ok((ctrl, channel_id))
     }
 
@@ -881,7 +896,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
         todo!()
     }
 
@@ -919,41 +934,39 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
-        for cmd in ctrl {
-            let our_device_id = self.device_id()?;
+        let our_device_id = self.device_id()?;
 
-            let effects = self.client.session_receive(&mut session, &cmd).await?;
-            self.effect_handler.handle_effects(graph, &effects).await?;
+        let effects = self.client.session_receive(&mut session, &ctrl).await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
-            let effect = effects.iter().find(|e| match e {
-                Effect::AfcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
-                Effect::AfcUniChannelReceived(e) => {
-                    (e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into())
-                        || (e.sender_id == our_device_id.into()
-                            && e.receiver_id != our_device_id.into())
-                }
-                _ => false,
-            });
-            match effect {
-                Some(Effect::AfcBidiChannelReceived(e)) => {
-                    let channel_id = self.afc.bidi_channel_received(e).await?;
-                    // NB: Each action should only produce one
-                    // ephemeral command.
-                    return Ok((e.label_id.into(), channel_id, api::ChanOp::SendRecv));
-                }
-                Some(Effect::AfcUniChannelReceived(e)) => {
-                    let channel_id = self.afc.uni_channel_received(e).await?;
-                    // NB: Each action should only produce one
-                    // ephemeral command.
-                    let op = if e.sender_id == self.device_id()?.into() {
-                        api::ChanOp::SendOnly
-                    } else {
-                        api::ChanOp::RecvOnly
-                    };
-                    return Ok((e.label_id.into(), channel_id, op));
-                }
-                Some(_) | None => {}
+        let effect = effects.iter().find(|e| match e {
+            Effect::AfcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
+            Effect::AfcUniChannelReceived(e) => {
+                (e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into())
+                    || (e.sender_id == our_device_id.into()
+                        && e.receiver_id != our_device_id.into())
             }
+            _ => false,
+        });
+        match effect {
+            Some(Effect::AfcBidiChannelReceived(e)) => {
+                let channel_id = self.afc.bidi_channel_received(e).await?;
+                // NB: Each action should only produce one
+                // ephemeral command.
+                return Ok((e.label_id.into(), channel_id, api::ChanOp::SendRecv));
+            }
+            Some(Effect::AfcUniChannelReceived(e)) => {
+                let channel_id = self.afc.uni_channel_received(e).await?;
+                // NB: Each action should only produce one
+                // ephemeral command.
+                let op = if e.sender_id == self.device_id()?.into() {
+                    api::ChanOp::SendOnly
+                } else {
+                    api::ChanOp::RecvOnly
+                };
+                return Ok((e.label_id.into(), channel_id, op));
+            }
+            Some(_) | None => {}
         }
         Err(anyhow!("unable to find AFC effect").into())
     }
