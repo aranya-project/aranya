@@ -20,9 +20,26 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 # Build
 [tasks.build]
 category = "build"
-description = "Build Code"
+description = "Build Code with default features"
 command = "cargo"
 args = ["build", "--verbose", "--release", "${@}"]
+
+[tasks.build-default]
+category = "build"
+description = "Build Code with default features"
+dependencies = ["build"]
+
+[tasks.build-preview]
+category = "build"
+description = "Build Code with preview features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "${@}", "--features", "preview, afc, experimental, aqc"]
+
+[tasks.build-experimental]
+category = "build"
+description = "Build Code with experimental features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "${@}", "--features", "experimental, aqc"]
 
 [tasks.tgz-daemon]
 category = "build"
@@ -62,10 +79,31 @@ script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/
 
 [tasks.build-capi-lib]
 category = "build"
-description = "Build C API shared library"
+description = "Build C API shared library with default features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release"]
+dependencies = ["install-nightly"]
+
+[tasks.build-capi-lib-default]
+category = "build"
+description = "Build C API shared library with default features"
+dependencies = ["build-capi-lib"]
+
+[tasks.build-capi-lib-preview]
+category = "build"
+description = "Build C API shared library with preview features"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features", "preview, afc, experimental, aqc"]
+dependencies = ["install-nightly"]
+
+[tasks.build-capi-lib-experimental]
+category = "build"
+description = "Build C API shared library with experimental features"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features", "experimental, aqc"]
 dependencies = ["install-nightly"]
 
 [tasks.tgz-capi]
