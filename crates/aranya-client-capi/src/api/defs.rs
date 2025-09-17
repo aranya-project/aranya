@@ -1225,7 +1225,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(&keybundle.encoding),
+            .encrypt_psk_seed_for_peer(&keybundle.encoding()),
     )?;
 
     if *seed_len < wrapped_seed.len() {

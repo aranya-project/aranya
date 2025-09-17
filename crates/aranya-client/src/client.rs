@@ -10,7 +10,7 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    DaemonApiClient, KeyBundle, Label, NetIdentifier, Text, Version, CS,
+    DaemonApiClient, Label, NetIdentifier, Text, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
@@ -114,6 +114,17 @@ impl From<Role> for api::Role {
             Role::Operator => api::Role::Operator,
             Role::Member => api::Role::Member,
         }
+    }
+}
+
+/// A device's public key bundle.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct KeyBundle(api::KeyBundle);
+
+impl KeyBundle {
+    /// Return public encoding key bytes.
+    pub fn encoding(&self) -> Vec<u8> {
+        self.0.encoding.clone()
     }
 }
 
@@ -343,11 +354,13 @@ impl Client {
 
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&self) -> Result<KeyBundle> {
-        self.daemon
-            .get_key_bundle(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+        Ok(KeyBundle(
+            self.daemon
+                .get_key_bundle(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Gets the public device ID for this device.
@@ -533,7 +546,7 @@ impl Team<'_> {
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.team_id.into_id().into(), keys)
+            .add_device_to_team(context::current(), self.team_id.into_id().into(), keys.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -744,16 +757,18 @@ impl Queries<'_> {
 
     /// Returns the keybundle of the current device.
     pub async fn device_keybundle(&self, device_id: DeviceId) -> Result<KeyBundle> {
-        self.client
-            .daemon
-            .query_device_keybundle(
-                context::current(),
-                self.team_id.into_id().into(),
-                device_id.into_id().into(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+        Ok(KeyBundle(
+            self.client
+                .daemon
+                .query_device_keybundle(
+                    context::current(),
+                    self.team_id.into_id().into(),
+                    device_id.into_id().into(),
+                )
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Returns a list of labels assiged to the current device.
