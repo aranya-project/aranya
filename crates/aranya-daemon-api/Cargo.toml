@@ -11,9 +11,9 @@ rust-version.workspace = true
 [features]
 default = []
 # Preview features
-preview = ["aranya-util/preview"]
+preview = []
 # Aranya Fast Channels
-afc = ["aranya-util/afc"]
+afc = []
 
 [lints]
 workspace = true
