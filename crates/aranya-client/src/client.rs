@@ -19,7 +19,7 @@ use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
 #[cfg(feature = "afc")]
 use {
-    crate::afc::{Channels as AfcChannels, Shm as AfcShm},
+    crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
     std::sync::Arc,
     tokio::sync::Mutex,
 };
@@ -135,9 +135,9 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     pub(crate) aqc: AqcClient,
-    /// AFC shared-memory.
+    /// AFC channel keys.
     #[cfg(feature = "afc")]
-    pub(crate) shm: Arc<Mutex<AfcShm>>,
+    afc_keys: Arc<Mutex<AfcChannelKeys>>,
 }
 
 impl Client {
@@ -220,21 +220,21 @@ impl Client {
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
 
         #[cfg(feature = "afc")]
-        let shm = {
+        let afc_keys = {
             let afc_shm_info = daemon
                 .afc_shm_info(context::current())
                 .await
                 .map_err(IpcError::new)?
                 .context("unable to retrieve afc shm info")
                 .map_err(error::other)?;
-            Arc::new(Mutex::new(AfcShm::new(&afc_shm_info)?))
+            Arc::new(Mutex::new(AfcChannelKeys::new(&afc_shm_info)?))
         };
 
         let client = Self {
             daemon,
             aqc,
             #[cfg(feature = "afc")]
-            shm,
+            afc_keys,
         };
 
         Ok(client)
@@ -333,7 +333,7 @@ impl Client {
     /// Get access to Aranya Fast Channels.
     #[cfg(feature = "afc")]
     pub fn afc(&self) -> AfcChannels {
-        AfcChannels::new(self.daemon.clone(), self.shm.clone())
+        AfcChannels::new(self.daemon.clone(), self.afc_keys.clone())
     }
 }
 

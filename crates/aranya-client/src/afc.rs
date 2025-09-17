@@ -14,7 +14,10 @@ use tarpc::context;
 use tokio::sync::Mutex;
 use tracing::debug;
 
-use crate::error::{aranya_error, IpcError};
+use crate::{
+    error::{aranya_error, IpcError},
+    Result,
+};
 
 /// AFC sequence number identifying the position of a ciphertext in a channel.
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -41,17 +44,13 @@ pub enum Error {
     #[error("unable to open datagram")]
     Open(aranya_fast_channels::Error),
 
-    /// Unable to parse shared-memory path.
-    #[error("unable initialize shm")]
-    Shm(anyhow::Error),
+    /// Unable to connect to AFC channel keys IPC.
+    #[error("unable to connect to AFC channel keys IPC")]
+    AfcIpc(anyhow::Error),
 
     /// No channel info found.
     #[error("no channel info found")]
     NoChannelInfoFound,
-
-    /// Error parsing control message.
-    #[error("failed to parse control message")]
-    InvalidCtrlMessage(postcard::Error),
 
     /// An internal bug was discovered.
     #[error(transparent)]
@@ -75,7 +74,7 @@ impl Ctrl {
 pub struct Channels {
     daemon: DaemonApiClient,
     // TODO: don't use mutex for shm reader aranya-core#399
-    shm: Arc<Mutex<Shm>>,
+    keys: Arc<Mutex<ChannelKeys>>,
 }
 
 // TODO: derive Debug on [`shm`] when [`AfcClient`] implements it.
@@ -92,8 +91,8 @@ impl Channels {
     /// plaintext data.
     pub const OVERHEAD: usize = AfcClient::<ReadState<CS>>::OVERHEAD;
 
-    pub(crate) fn new(daemon: DaemonApiClient, shm: Arc<Mutex<Shm>>) -> Self {
-        Self { daemon, shm }
+    pub(crate) fn new(daemon: DaemonApiClient, keys: Arc<Mutex<ChannelKeys>>) -> Self {
+        Self { daemon, keys }
     }
 
     /// Create a bidirectional AFC channel.
@@ -104,22 +103,20 @@ impl Channels {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(BidiChannel, Ctrl)> {
+    ) -> Result<(BidiChannel, Ctrl)> {
         let (ctrl, channel_id) = self
             .daemon
             .create_afc_bidi_channel(context::current(), team_id, peer_id, label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        Ok((
-            BidiChannel {
-                daemon: self.daemon.clone(),
-                shm: self.shm.clone(),
-                channel_id,
-                label_id,
-            },
-            Ctrl { data: ctrl },
-        ))
+        let chan = BidiChannel {
+            daemon: self.daemon.clone(),
+            keys: self.keys.clone(),
+            channel_id,
+            label_id,
+        };
+        Ok((chan, Ctrl { data: ctrl }))
     }
 
     /// Create a unidirectional AFC send-only channel.
@@ -130,22 +127,20 @@ impl Channels {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(SendChannel, Ctrl)> {
+    ) -> Result<(SendChannel, Ctrl)> {
         let (ctrl, channel_id) = self
             .daemon
             .create_afc_uni_send_channel(context::current(), team_id, peer_id, label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        Ok((
-            SendChannel {
-                daemon: self.daemon.clone(),
-                shm: self.shm.clone(),
-                channel_id,
-                label_id,
-            },
-            Ctrl { data: ctrl },
-        ))
+        let chan = SendChannel {
+            daemon: self.daemon.clone(),
+            keys: self.keys.clone(),
+            channel_id,
+            label_id,
+        };
+        Ok((chan, Ctrl { data: ctrl }))
     }
 
     /// Create a unidirectional AFC receive-only channel.
@@ -156,26 +151,24 @@ impl Channels {
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> crate::Result<(ReceiveChannel, Ctrl)> {
+    ) -> Result<(ReceiveChannel, Ctrl)> {
         let (ctrl, channel_id) = self
             .daemon
             .create_afc_uni_recv_channel(context::current(), team_id, peer_id, label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        Ok((
-            ReceiveChannel {
-                daemon: self.daemon.clone(),
-                shm: self.shm.clone(),
-                channel_id,
-                label_id,
-            },
-            Ctrl { data: ctrl },
-        ))
+        let chan = ReceiveChannel {
+            daemon: self.daemon.clone(),
+            keys: self.keys.clone(),
+            channel_id,
+            label_id,
+        };
+        Ok((chan, Ctrl { data: ctrl }))
     }
 
     /// Receive a `ctrl` message from a peer to create an AFC channel.
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: Ctrl) -> crate::Result<Channel> {
+    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: Ctrl) -> Result<Channel> {
         let (label_id, channel_id, op) = self
             .daemon
             .receive_afc_ctrl(context::current(), team_id, ctrl.data)
@@ -185,27 +178,27 @@ impl Channels {
         match op {
             ChanOp::RecvOnly => Ok(Channel::Uni(UniChannel::Receive(ReceiveChannel {
                 daemon: self.daemon.clone(),
-                shm: self.shm.clone(),
+                keys: self.keys.clone(),
                 channel_id,
                 label_id,
             }))),
             ChanOp::SendOnly => Ok(Channel::Uni(UniChannel::Send(SendChannel {
                 daemon: self.daemon.clone(),
-                shm: self.shm.clone(),
+                keys: self.keys.clone(),
                 channel_id,
                 label_id,
             }))),
             ChanOp::SendRecv => Ok(Channel::Bidi(BidiChannel {
                 daemon: self.daemon.clone(),
-                shm: self.shm.clone(),
+                keys: self.keys.clone(),
                 channel_id,
                 label_id,
             })),
         }
     }
 
-    /// Delete an AFC channel by removing channel key entry from shared memory.
-    pub async fn delete_channel(&self, channel_id: AfcChannelId) -> crate::Result<()> {
+    /// Delete an AFC channel by removing channel key entry from the AFC IPC.
+    pub async fn delete_channel(&self, channel_id: AfcChannelId) -> Result<()> {
         self.daemon
             .delete_afc_channel(context::current(), channel_id)
             .await
@@ -237,7 +230,7 @@ pub enum UniChannel {
 #[derive(Clone, Debug)]
 pub struct BidiChannel {
     daemon: DaemonApiClient,
-    shm: Arc<Mutex<Shm>>,
+    keys: Arc<Mutex<ChannelKeys>>,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
@@ -260,7 +253,7 @@ impl BidiChannel {
     /// long.
     pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.channel_id, ?self.label_id, "seal");
-        self.shm
+        self.keys
             .lock()
             .await
             .0
@@ -281,7 +274,7 @@ impl BidiChannel {
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
-            .shm
+            .keys
             .lock()
             .await
             .0
@@ -306,7 +299,7 @@ impl BidiChannel {
 #[derive(Clone, Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
-    shm: Arc<Mutex<Shm>>,
+    keys: Arc<Mutex<ChannelKeys>>,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
@@ -329,7 +322,7 @@ impl SendChannel {
     /// long.
     pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.channel_id, ?self.label_id, "seal");
-        self.shm
+        self.keys
             .lock()
             .await
             .0
@@ -353,7 +346,7 @@ impl SendChannel {
 #[derive(Clone, Debug)]
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
-    shm: Arc<Mutex<Shm>>,
+    keys: Arc<Mutex<ChannelKeys>>,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
@@ -381,7 +374,7 @@ impl ReceiveChannel {
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
-            .shm
+            .keys
             .lock()
             .await
             .0
@@ -402,11 +395,11 @@ impl ReceiveChannel {
     }
 }
 
-/// AFC shared memory.
-pub(crate) struct Shm(AfcClient<ReadState<CS>>);
+/// AFC Channel Keys.
+pub(crate) struct ChannelKeys(AfcClient<ReadState<CS>>);
 
-impl Shm {
-    /// Open shared-memory to daemon's channel key list.
+impl ChannelKeys {
+    /// Open shared-memory client to daemon's channel key list.
     pub fn new(afc_shm_info: &AfcShmInfo) -> Result<Self, Error> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
@@ -425,15 +418,15 @@ impl Shm {
                 "unable to open `WriteState`: {:?}",
                 afc_shm_info.path
             ))
-            .map_err(Error::Shm)?
+            .map_err(Error::AfcIpc)?
         };
 
         Ok(Self(AfcClient::new(read)))
     }
 }
 
-impl Debug for Shm {
+impl Debug for ChannelKeys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AfcShm").finish_non_exhaustive()
+        f.debug_struct("AfcChannelKeys").finish_non_exhaustive()
     }
 }
