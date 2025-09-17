@@ -20,6 +20,10 @@ doctest = false
 
 [features]
 default = []
+# Preview features
+preview = ["aranya-client/preview"]
+# Aranya Fast Channels
+afc = ["aranya-client/afc"]
 
 
 [dependencies]
