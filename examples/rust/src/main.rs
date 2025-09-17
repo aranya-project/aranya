@@ -419,27 +419,6 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // Demo hello subscription with members
-    info!("demonstrating hello subscription with members");
-
-    // Members subscribe to each other with different delays
-    info!("membera subscribing to hello notifications from memberb");
-    membera_team
-        .sync_hello_subscribe(memberb_addr.into(), Duration::from_millis(500), Duration::from_secs(30))
-        .await?;
-
-    info!("memberb subscribing to hello notifications from membera");
-    memberb_team
-        .sync_hello_subscribe(membera_addr.into(), Duration::from_millis(1500), Duration::from_secs(30))
-        .await?;
-
-    // Unsubscribe before AQC demo
-    info!("members unsubscribing from hello notifications");
-    membera_team.sync_hello_unsubscribe(memberb_addr.into()).await?;
-    memberb_team.sync_hello_unsubscribe(membera_addr.into()).await?;
-
-    sleep(sleep_interval).await;
-
     info!("demo aqc functionality");
     info!("creating aqc label");
     let label3 = operator_team.create_label(text!("label3")).await?;

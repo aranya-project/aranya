@@ -4,8 +4,6 @@
 
 use core::time::Duration;
 
-use tracing::warn;
-
 use crate::{error::InvalidArg, ConfigError, Result};
 
 pub mod team;
@@ -60,27 +58,27 @@ impl SyncPeerConfigBuilder {
             .into());
         };
 
-        // Cap the interval at 1 year to prevent overflow when adding to Instant::now()
+        // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
         // in DelayQueue::insert() (which calculates deadline as current_time + interval)
         let one_year = Duration::from_secs(365 * 24 * 60 * 60); // 365 days
-        let capped_interval = if interval > one_year {
-            warn!(
-                "SyncPeerConfig interval capped at 1 year (was {:?})",
-                interval
-            );
-            one_year
-        } else {
-            interval
-        };
+        if interval > one_year {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "interval",
+                "must not exceed 1 year to prevent overflow",
+            ))
+            .into());
+        }
 
         Ok(SyncPeerConfig {
-            interval: capped_interval,
+            interval,
             sync_now: self.sync_now,
             sync_on_hello: self.sync_on_hello,
         })
     }
 
     /// Sets the interval at which syncing occurs.
+    ///
+    /// The interval must be less than 1 year to prevent overflow when calculating deadlines.
     ///
     /// By default, the interval is not set. It is an error to call [`build`][Self::build] before
     /// setting the interval with this method
