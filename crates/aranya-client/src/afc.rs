@@ -77,7 +77,7 @@ pub struct Channels {
     keys: Arc<Mutex<ChannelKeys>>,
 }
 
-// TODO: derive Debug on [`shm`] when [`AfcClient`] implements it.
+// TODO: derive Debug on [`keys`] when [`AfcClient`] implements it.
 impl Debug for Channels {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AfcChannels")
@@ -95,9 +95,21 @@ impl Channels {
         Self { daemon, keys }
     }
 
-    /// Create a bidirectional AFC channel.
+    /// Create a bidirectional AFC channel [`BidiChannel`] between two peers.
     ///
-    /// Returns the channel object and a `ctrl` message to send to the peer.
+    /// The creator of the channel will have a bidirectional channel [`BidiChannel`] that can `open()` and `seal()` data.
+    ///
+    /// Once the peer processes the [`Ctrl`] message with `recv_ctrl()`,
+    /// it will have a corresponding bidirectional channel [`BidiChannel`] object that can also `open()` and `seal()` data.
+    ///
+    /// To send data from one peer to the other:
+    /// - Invoke `seal()` on the data to obtain a ciphertext buffer.
+    /// - Send the ciphertext to the peer via any network transport.
+    /// - On the peer, invoke `open()` on the ciphertext to obtain the plaintext.
+    ///
+    /// Returns:
+    /// - A bidirectional channel object that can `open()` and `seal()` data.
+    /// - A [`Ctrl`] message to send to the peer.
     pub async fn create_bidi_channel(
         &self,
         team_id: TeamId,
@@ -119,9 +131,21 @@ impl Channels {
         Ok((chan, Ctrl { data: ctrl }))
     }
 
-    /// Create a unidirectional AFC send-only channel.
+    /// Create a unidirectional AFC send-only channel [`SendChannel`].
     ///
-    /// Returns the channel object and a `ctrl` message to send to the peer.
+    /// The creator of the channel will have a unidirectional channel [`SendChannel`] that can only `seal()` data.
+    ///
+    /// Once the peer processes the [`Ctrl`] message with `recv_ctrl()`,
+    /// it will have a corresponding unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
+    ///
+    /// To send data from the creator of the channel to the peer:
+    /// - Invoke `seal()` on the data to obtain a ciphertext buffer.
+    /// - Send the ciphertext to the peer via any network transport.
+    /// - On the peer, invoke `open()` on the ciphertext to obtain the plaintext.
+    ///
+    /// Returns:
+    /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
+    /// - A [`Ctrl`] message to send to the peer.
     pub async fn create_uni_send_channel(
         &self,
         team_id: TeamId,
@@ -143,9 +167,21 @@ impl Channels {
         Ok((chan, Ctrl { data: ctrl }))
     }
 
-    /// Create a unidirectional AFC receive-only channel.
+    /// Create a unidirectional AFC receive-only channel [`ReceiveChannel`].
     ///
-    /// Returns the channel object and a `ctrl` message to send to the peer.
+    /// The creator of the channel will have a unidirectional channel [`ReceiveChannel`] that can only `open()` data.
+    ///
+    /// Once the peer processes the [`Ctrl`] message with `recv_ctrl()`,
+    /// it will have a corresponding unidirectional channel [`SendChannel`] object that can only `seal()` data.
+    ///
+    /// To send data from the peer to the creator of the channel:
+    /// - On the peer, invoke `seal()` on the data to obtain a ciphertext buffer.
+    /// - Send the ciphertext to the creator of the channel via any network transport.
+    /// - On the creator, invoke `open()` on the ciphertext to obtain the plaintext.
+    ///
+    /// Returns:
+    /// - A unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
+    /// - A [`Ctrl`] message to send to the peer.
     pub async fn create_uni_recv_channel(
         &self,
         team_id: TeamId,
@@ -167,7 +203,17 @@ impl Channels {
         Ok((chan, Ctrl { data: ctrl }))
     }
 
-    /// Receive a `ctrl` message from a peer to create an AFC channel.
+    /// Receive a [`Ctrl`] message from a peer to create a corresponding AFC channel.
+    ///
+    /// The type of channel returned by this method depends on which type of channel the peer created:
+    /// - If the peer created a [`BidiChannel`], this will return a [`BidiChannel`]
+    /// - If the peer created a [`SendChannel`], this will return a [`ReceiveChannel`]
+    /// - If the peer created a [`ReceiveChannel`], this will return a [`SendChannel`]
+    ///
+    /// Returns a [`Channel`] enum that can be matched into any of the following channel types:
+    /// - [`BidiChannel`]
+    /// - [`SendChannel`]
+    /// - [`ReceiveChannel`]
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: Ctrl) -> Result<Channel> {
         let (label_id, channel_id, op) = self
             .daemon
