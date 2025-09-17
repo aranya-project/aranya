@@ -1547,7 +1547,7 @@ author, and sends the encapsulations through the `AfcCreateBidiChannel` command.
 command, the device will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action create_afc_bidi_channel(peer_id id, label_id id) {
+ephemeral action create_afc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
@@ -1610,7 +1610,7 @@ effect AfcBidiChannelReceived {
     encap bytes,
 }
 
-command AfcCreateBidiChannel {
+ephemeral command AfcCreateBidiChannel {
     fields {
         // The channel peer's device ID.
         peer_id id,
@@ -1709,7 +1709,7 @@ the encapsulation through the `AfcCreateUniChannel` command. When processing the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
+ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
@@ -1776,7 +1776,7 @@ effect AfcUniChannelReceived {
     // The channel peer's encapsulated KEM shared secret.
     encap bytes,
 }
-command AfcCreateUniChannel {
+ephemeral command AfcCreateUniChannel {
     fields {
         // The device ID of the participant that can send data.
         sender_id id,
