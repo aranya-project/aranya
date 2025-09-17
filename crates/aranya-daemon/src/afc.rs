@@ -86,7 +86,7 @@ where
         let mut out = 0;
         self.write.remove_if(|ch_id| {
             let inner = ch_id.to_u32();
-            if inner > out {
+            if inner >= out {
                 out = inner + 1;
             }
 
