@@ -81,6 +81,20 @@ where
 
         Ok(Self { cfg, write })
     }
+
+    fn next_unused_id(&self) -> Result<u32> {
+        let mut out = 0;
+        self.write.remove_if(|ch_id| {
+            let inner = ch_id.to_u32();
+            if inner > out {
+                out = inner + 1;
+            }
+
+            false
+        })?;
+
+        Ok(out)
+    }
 }
 
 impl<E> Drop for AfcShm<E> {
@@ -124,12 +138,15 @@ impl<E, C, KS> Afc<E, C, KS> {
         E: Engine,
         C: CipherSuite,
     {
+        let shm = AfcShm::new(cfg)?;
+        let channel_id = shm.next_unused_id()?;
+
         Ok(Self {
             device_id,
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
-            channel_id: AtomicU32::new(0),
-            shm: Mutex::new(AfcShm::new(cfg)?),
+            channel_id: AtomicU32::new(channel_id),
+            shm: Mutex::new(shm),
         })
     }
 
