@@ -730,7 +730,7 @@ pub trait DaemonApi {
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcUniPsks)>;
-     /// Delete a QUIC bidi channel.
+    /// Delete a QUIC bidi channel.
     async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
@@ -738,28 +738,40 @@ pub trait DaemonApi {
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
 
     /// Gets AFC shared-memory configuration info.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn afc_shm_info() -> Result<AfcShmInfo>;
     /// Create a bidirectional AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC send-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn create_afc_uni_send_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC receive-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn create_afc_uni_recv_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Delete a AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
     /// Receive AFC ctrl message.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn receive_afc_ctrl(
         team: TeamId,
         ctrl: AfcCtrl,

@@ -11,9 +11,9 @@ rust-version.workspace = true
 [features]
 default = []
 # Preview features
-preview = ["afc"]
+preview = ["aranya-util/preview"]
 # Aranya Fast Channels
-afc = []
+afc = ["aranya-util/afc"]
 
 [lints]
 workspace = true
@@ -45,4 +45,4 @@ test-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
 [package.metadata.cargo-all-features]
-always_include_features = ["preview", "afc"]
+always_include_features = ["preview"]

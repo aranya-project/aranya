@@ -336,20 +336,8 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn afc_shm_info(
-        self,
-        context: ::tarpc::context::Context,
-    ) -> api::Result<api::AfcShmInfo> {
+    async fn afc_shm_info(self, context: context::Context) -> api::Result<api::AfcShmInfo> {
         Ok(self.afc.get_shm_info().await)
-    }
-
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip(self), err)]
-    async fn afc_shm_info(
-        self,
-        context: ::tarpc::context::Context,
-    ) -> api::Result<api::AfcShmInfo> {
-        todo!()
     }
 
     #[instrument(skip(self), err)]
@@ -802,18 +790,6 @@ impl DaemonApi for Api {
         Ok((ctrl, channel_id))
     }
 
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip(self), err)]
-    async fn create_afc_bidi_channel(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer_id: api::DeviceId,
-        label: api::LabelId,
-    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
-        todo!()
-    }
-
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
     async fn create_afc_uni_send_channel(
@@ -853,18 +829,6 @@ impl DaemonApi for Api {
             .clone();
 
         Ok((ctrl, channel_id))
-    }
-
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip(self), err)]
-    async fn create_afc_uni_send_channel(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer_id: api::DeviceId,
-        label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AfcChannelId)> {
-        todo!()
     }
 
     #[cfg(feature = "afc")]
@@ -908,18 +872,6 @@ impl DaemonApi for Api {
         Ok((ctrl, channel_id))
     }
 
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip(self), err)]
-    async fn create_afc_uni_recv_channel(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer_id: api::DeviceId,
-        label: api::LabelId,
-    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
-        todo!()
-    }
-
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
     async fn delete_afc_channel(
@@ -930,16 +882,6 @@ impl DaemonApi for Api {
         self.afc.delete_channel(chan).await?;
         info!("afc channel deleted");
         Ok(())
-    }
-
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip(self), err)]
-    async fn delete_afc_channel(
-        self,
-        _: context::Context,
-        chan: api::AfcChannelId,
-    ) -> api::Result<()> {
-        todo!()
     }
 
     #[cfg(feature = "afc")]
@@ -989,17 +931,6 @@ impl DaemonApi for Api {
             Some(_) | None => {}
         }
         Err(anyhow!("unable to find AFC effect").into())
-    }
-
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip(self), err)]
-    async fn receive_afc_ctrl(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcChannelId, api::ChanOp)> {
-        todo!()
     }
 
     /// Create a label.

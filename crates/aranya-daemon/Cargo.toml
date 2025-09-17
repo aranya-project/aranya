@@ -18,9 +18,9 @@ workspace = true
 # Enabled them because unit tests in aranya-client aren't passing without this.
 default = ["afc", "preview"]
 # Preview features
-preview = ["afc"]
+preview = ["aranya-daemon-api/preview", "aranya-util/preview"]
 # Aranya Fast Channels
-afc = []
+afc = ["aranya-daemon-api/afc", "aranya-util/afc"]
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
@@ -91,4 +91,4 @@ name = "metrics"
 harness = false
 
 [package.metadata.cargo-all-features]
-always_include_features = ["preview", "afc"]
+always_include_features = ["preview"]
