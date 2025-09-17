@@ -6,7 +6,7 @@ use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
 #[cfg(feature = "afc")]
-use crate::afc::AfcError;
+use crate::afc::Error as AfcError;
 
 /// The type returned by fallible Aranya operations.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

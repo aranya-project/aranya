@@ -19,7 +19,7 @@ use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
 #[cfg(feature = "afc")]
 use {
-    crate::afc::{AfcChannels, AfcShm},
+    crate::afc::{Channels as AfcChannels, Shm as AfcShm},
     std::sync::Arc,
     tokio::sync::Mutex,
 };

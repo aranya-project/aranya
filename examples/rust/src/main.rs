@@ -1,6 +1,5 @@
 use anyhow::{bail, Context as _, Result};
-use aranya_client::afc::AfcChannel;
-use aranya_client::afc::AfcChannels;
+use aranya_client::afc::{Channel as AfcChannel, Channels as AfcChannels};
 use aranya_client::{
     aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
     CreateTeamQuicSyncConfig, Error, SyncPeerConfig,

@@ -6,7 +6,7 @@ mod common;
 use {
     crate::common::DevicesCtx,
     anyhow::{bail, Context, Result},
-    aranya_client::afc::{AfcChannel, AfcChannels, AfcUniChannel},
+    aranya_client::afc::{Channel, Channels, UniChannel},
     aranya_daemon_api::{text, ChanOp},
 };
 
@@ -127,7 +127,7 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
         .context("unable to create afc bidi channel")?;
 
     // Receive bidi channel.
-    let AfcChannel::Bidi(recv) = memberb_afc
+    let Channel::Bidi(recv) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?
@@ -137,13 +137,13 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
@@ -205,7 +205,7 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
         .context("unable to create afc bidi channel")?;
 
     // Receive bidi channel.
-    let AfcChannel::Bidi(recv) = memberb_afc
+    let Channel::Bidi(recv) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc bidi channel")?
@@ -215,13 +215,13 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
@@ -312,7 +312,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .context("unable to create afc bidi channel")?;
 
     // Receive first bidi channel.
-    let AfcChannel::Bidi(recv1) = memberb_afc
+    let Channel::Bidi(recv1) = memberb_afc
         .recv_ctrl(team_id, ctrl1)
         .await
         .context("unable to receive afc bidi channel")?
@@ -321,7 +321,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     };
 
     // Receive second bidi channel.
-    let AfcChannel::Bidi(recv2) = membera_afc
+    let Channel::Bidi(recv2) = membera_afc
         .recv_ctrl(team_id, ctrl2)
         .await
         .context("unable to receive afc bidi channel")?
@@ -331,14 +331,14 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext1 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext1 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan1
         .seal(&mut ciphertext1, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext1 = vec![0u8; ciphertext1.len() - AfcChannels::OVERHEAD];
+    let mut plaintext1 = vec![0u8; ciphertext1.len() - Channels::OVERHEAD];
     recv1
         .open(&mut plaintext1, &ciphertext1)
         .await
@@ -346,14 +346,14 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext2 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext2 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan2
         .seal(&mut ciphertext2, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext2 = vec![0u8; ciphertext2.len() - AfcChannels::OVERHEAD];
+    let mut plaintext2 = vec![0u8; ciphertext2.len() - Channels::OVERHEAD];
     recv2
         .open(&mut plaintext2, &ciphertext2)
         .await
@@ -504,7 +504,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = memberb_afc
+    let Channel::Uni(UniChannel::Receive(recv)) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
@@ -514,13 +514,13 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
@@ -582,7 +582,7 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
         .context("unable to create afc uni recv channel")?;
 
     // Receive uni channel.
-    let AfcChannel::Uni(AfcUniChannel::Send(send)) = memberb_afc
+    let Channel::Uni(UniChannel::Send(send)) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni send channel")?
@@ -592,13 +592,13 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     send.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
@@ -660,7 +660,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(recv)) = memberb_afc
+    let Channel::Uni(UniChannel::Receive(recv)) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
@@ -670,13 +670,13 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
@@ -767,7 +767,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .context("unable to create afc uni channel")?;
 
     // Receive first bidi channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(recv1)) = memberb_afc
+    let Channel::Uni(UniChannel::Receive(recv1)) = memberb_afc
         .recv_ctrl(team_id, ctrl1)
         .await
         .context("unable to receive afc uni channel")?
@@ -776,7 +776,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     };
 
     // Receive second bidi channel.
-    let AfcChannel::Uni(AfcUniChannel::Receive(recv2)) = membera_afc
+    let Channel::Uni(UniChannel::Receive(recv2)) = membera_afc
         .recv_ctrl(team_id, ctrl2)
         .await
         .context("unable to receive afc uni channel")?
@@ -786,28 +786,28 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
 
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
-    let mut ciphertext1 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext1 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan1
         .seal(&mut ciphertext1, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext1 = vec![0u8; ciphertext1.len() - AfcChannels::OVERHEAD];
+    let mut plaintext1 = vec![0u8; ciphertext1.len() - Channels::OVERHEAD];
     recv1
         .open(&mut plaintext1, &ciphertext1)
         .await
         .context("unable to open afc message")?;
 
     // Seal data.
-    let mut ciphertext2 = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    let mut ciphertext2 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan2
         .seal(&mut ciphertext2, afc_msg)
         .await
         .context("unable to seal afc message")?;
 
     // Open data.
-    let mut plaintext2 = vec![0u8; ciphertext2.len() - AfcChannels::OVERHEAD];
+    let mut plaintext2 = vec![0u8; ciphertext2.len() - Channels::OVERHEAD];
     recv2
         .open(&mut plaintext2, &ciphertext2)
         .await
