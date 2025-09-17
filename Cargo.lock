@@ -692,7 +692,6 @@ name = "aranya-util"
 version = "2.0.0"
 dependencies = [
  "anyhow",
- "aranya-fast-channels",
  "aranya-internal-s2n-quic",
  "buggy",
  "bytes",

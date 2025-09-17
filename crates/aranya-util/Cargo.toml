@@ -20,7 +20,6 @@ workspace = true
 
 
 [dependencies]
-aranya-fast-channels = { workspace = true, features = ["posix"] }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
