@@ -17,14 +17,14 @@ use tracing::debug;
 use crate::error::{aranya_error, IpcError};
 
 /// AFC sequence number identifying the position of a ciphertext in a channel.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AfcSeq {
     seq: Seq,
 }
 
 impl AfcSeq {
     /// Convert AFC sequence object to `u64`.
-    pub fn to_u64(&self) -> u64 {
+    pub fn to_u64(self) -> u64 {
         self.seq.to_u64()
     }
 }
@@ -59,7 +59,7 @@ pub enum AfcError {
 }
 
 /// AFC control message sent to a peer when creating a channel.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AfcCtrl {
     data: Box<[u8]>,
 }
@@ -204,7 +204,7 @@ impl AfcChannels {
         }
     }
 
-    /// Create an AFC channel by removing channel key entry from shared memory.
+    /// Delete an AFC channel by removing channel key entry from shared memory.
     pub async fn delete_channel(&self, channel_id: AfcChannelId) -> crate::Result<()> {
         self.daemon
             .delete_afc_channel(context::current(), channel_id)
@@ -216,7 +216,7 @@ impl AfcChannels {
 }
 
 /// An AFC channel.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AfcChannel {
     /// A bidirectional channel.
     Bidi(AfcBidiChannel),
@@ -225,7 +225,7 @@ pub enum AfcChannel {
 }
 
 /// An unidirectional AFC channel.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AfcUniChannel {
     /// A send channel.
     Send(AfcSendChannel),
@@ -234,7 +234,7 @@ pub enum AfcUniChannel {
 }
 
 /// A bidirectional AFC channel.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AfcBidiChannel {
     daemon: DaemonApiClient,
     shm: Arc<Mutex<AfcShm>>,
@@ -280,13 +280,14 @@ impl AfcBidiChannel {
     /// sequence number associated with the ciphertext.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<AfcSeq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
-        let (_, seq) = self
+        let (label_id, seq) = self
             .shm
             .lock()
             .await
             .0
             .open(self.channel_id, dst, ciphertext)
             .map_err(AfcError::Open)?;
+        debug_assert_eq!(label_id.into_id(), self.label_id.into_id());
         Ok(AfcSeq { seq })
     }
 
@@ -302,7 +303,7 @@ impl AfcBidiChannel {
 }
 
 /// A unidirectional AFC channel that can only send.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AfcSendChannel {
     daemon: DaemonApiClient,
     shm: Arc<Mutex<AfcShm>>,
@@ -349,7 +350,7 @@ impl AfcSendChannel {
 }
 
 /// A unidirectional AFC channel that can only receive.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AfcReceiveChannel {
     daemon: DaemonApiClient,
     shm: Arc<Mutex<AfcShm>>,
@@ -379,13 +380,14 @@ impl AfcReceiveChannel {
     /// sequence number associated with the ciphertext.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<AfcSeq, AfcError> {
         debug!(?self.channel_id, ?self.label_id, "open");
-        let (_, seq) = self
+        let (label_id, seq) = self
             .shm
             .lock()
             .await
             .0
             .open(self.channel_id, dst, ciphertext)
             .map_err(AfcError::Open)?;
+        debug_assert_eq!(label_id.into_id(), self.label_id.into_id());
         Ok(AfcSeq { seq })
     }
 
