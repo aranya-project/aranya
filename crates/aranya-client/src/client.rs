@@ -10,7 +10,7 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, KeyBundle, Label, NetIdentifier, Text, Version, CS,
+    DaemonApiClient, KeyBundle, Label, NetIdentifier, Text, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
@@ -46,6 +46,40 @@ custom_id! {
     ///
     /// Both peers must have the same label ID assigned to them before creating a channel between themselves with that label ID.
     pub struct LabelId;
+}
+
+/// Valid channel operations for a label assignment.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    RecvOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    SendOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    SendRecv,
+}
+
+impl From<api::ChanOp> for ChanOp {
+    fn from(value: api::ChanOp) -> Self {
+        match value {
+            api::ChanOp::SendRecv => ChanOp::SendRecv,
+            api::ChanOp::RecvOnly => ChanOp::RecvOnly,
+            api::ChanOp::SendOnly => ChanOp::SendOnly,
+        }
+    }
+}
+
+impl From<ChanOp> for api::ChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::SendRecv => api::ChanOp::SendRecv,
+            ChanOp::RecvOnly => api::ChanOp::RecvOnly,
+            ChanOp::SendOnly => api::ChanOp::SendOnly,
+        }
+    }
 }
 
 /// A device's role on the team.
@@ -636,7 +670,7 @@ impl Team<'_> {
                 self.team_id.into_id().into(),
                 device_id.into_id().into(),
                 label_id.into_id().into(),
-                op,
+                op.into(),
             )
             .await
             .map_err(IpcError::new)?

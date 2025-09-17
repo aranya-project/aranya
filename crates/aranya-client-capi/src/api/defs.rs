@@ -378,6 +378,16 @@ pub enum ChanOp {
     SendRecv,
 }
 
+impl From<ChanOp> for aranya_client::client::ChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::RecvOnly => Self::RecvOnly,
+            ChanOp::SendOnly => Self::SendOnly,
+            ChanOp::SendRecv => Self::SendRecv,
+        }
+    }
+}
+
 impl From<ChanOp> for aranya_daemon_api::ChanOp {
     fn from(value: ChanOp) -> Self {
         match value {

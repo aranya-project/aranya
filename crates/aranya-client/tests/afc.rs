@@ -7,7 +7,8 @@ use {
     crate::common::DevicesCtx,
     anyhow::{bail, Context, Result},
     aranya_client::afc::{Channel, Channels, UniChannel},
-    aranya_daemon_api::{text, ChanOp},
+    aranya_client::client::ChanOp,
+    aranya_daemon_api::text,
 };
 
 /// Demonstrate creating a bidirectional AFC channel.
