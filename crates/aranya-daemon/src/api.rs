@@ -699,6 +699,26 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn delete_aqc_bidi_channel(
+        self,
+        _: context::Context,
+        chan: api::AqcBidiChannelId,
+    ) -> api::Result<api::AqcCtrl> {
+        // TODO: remove AQC bidi channel from Aranya.
+        todo!();
+    }
+
+    #[instrument(skip(self), err)]
+    async fn delete_aqc_uni_channel(
+        self,
+        _: context::Context,
+        chan: api::AqcUniChannelId,
+    ) -> api::Result<api::AqcCtrl> {
+        // TODO: remove AQC uni channel from Aranya.
+        todo!();
+    }
+
+    #[instrument(skip(self), err)]
     async fn receive_aqc_ctrl(
         self,
         _: context::Context,
