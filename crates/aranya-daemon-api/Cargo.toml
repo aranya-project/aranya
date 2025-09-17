@@ -21,7 +21,7 @@ workspace = true
 
 [dependencies]
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true, features = ["posix"] }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix"] }
 aranya-policy-text = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
