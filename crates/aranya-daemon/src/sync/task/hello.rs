@@ -158,13 +158,6 @@ impl Syncer<State> {
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
         let delay_milliseconds = delay.as_millis() as u64;
-        debug!(
-            ?peer,
-            ?id,
-            delay_milliseconds,
-            ?subscriber_server_addr,
-            "client sending subscribe request to QUIC sync server"
-        );
 
         // Create the subscribe message
         let duration_milliseconds = duration.as_millis() as u64;

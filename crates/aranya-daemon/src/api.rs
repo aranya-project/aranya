@@ -887,12 +887,6 @@ impl DaemonApi for Api {
             .create_label(label_name)
             .await
             .context("unable to create AQC label")?;
-        info!(
-            ?graph,
-            effects_count = effects.len(),
-            "create_label action completed, processing effects"
-        );
-
         let label_id = if let Some(Effect::LabelCreated(e)) =
             find_effect!(&effects, Effect::LabelCreated(_e))
         {
