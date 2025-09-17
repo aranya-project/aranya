@@ -299,8 +299,8 @@ pub struct TeamId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::TeamId> for TeamId {
-    fn from(value: aranya_daemon_api::TeamId) -> Self {
+impl From<aranya_client::client::TeamId> for TeamId {
+    fn from(value: aranya_client::client::TeamId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -309,7 +309,7 @@ impl From<aranya_daemon_api::TeamId> for TeamId {
     }
 }
 
-impl From<&TeamId> for aranya_daemon_api::TeamId {
+impl From<&TeamId> for aranya_client::client::TeamId {
     fn from(value: &TeamId) -> Self {
         value.id.bytes.into()
     }
@@ -322,8 +322,8 @@ pub struct DeviceId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::DeviceId> for DeviceId {
-    fn from(value: aranya_daemon_api::DeviceId) -> Self {
+impl From<aranya_client::client::DeviceId> for DeviceId {
+    fn from(value: aranya_client::client::DeviceId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -332,7 +332,7 @@ impl From<aranya_daemon_api::DeviceId> for DeviceId {
     }
 }
 
-impl From<&DeviceId> for aranya_daemon_api::DeviceId {
+impl From<&DeviceId> for aranya_client::client::DeviceId {
     fn from(value: &DeviceId) -> Self {
         value.id.bytes.into()
     }
@@ -352,7 +352,7 @@ pub enum Role {
     Member,
 }
 
-impl From<Role> for aranya_daemon_api::Role {
+impl From<Role> for aranya_client::client::Role {
     fn from(value: Role) -> Self {
         match value {
             Role::Owner => Self::Owner,
@@ -406,6 +406,22 @@ impl From<aranya_daemon_api::LabelId> for LabelId {
 }
 
 impl From<&LabelId> for aranya_daemon_api::LabelId {
+    fn from(value: &LabelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl From<aranya_client::client::LabelId> for LabelId {
+    fn from(value: aranya_client::client::LabelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&LabelId> for aranya_client::client::LabelId {
     fn from(value: &LabelId) -> Self {
         value.id.bytes.into()
     }

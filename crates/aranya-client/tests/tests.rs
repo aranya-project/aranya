@@ -13,9 +13,9 @@ mod common;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    client::Role, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfig,
 };
-use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
 

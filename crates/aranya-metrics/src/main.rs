@@ -10,10 +10,10 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error,
+    aqc::AqcPeerChannel, client::Role, AddTeamConfig, AddTeamQuicSyncConfig, Client,
+    CreateTeamConfig, CreateTeamQuicSyncConfig, DeviceId, Error,
 };
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{text, ChanOp, KeyBundle, NetIdentifier};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use buggy::BugExt as _;
