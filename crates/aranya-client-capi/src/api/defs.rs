@@ -9,13 +9,11 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
-use aranya_client::{
-    aqc::{self, AqcPeerStream},
-    Text,
-};
-use aranya_crypto::dangerous::spideroak_crypto::hex;
+use aranya_client::aqc::{self, AqcPeerStream};
+use aranya_daemon_api::Text;
+use aranya_util::error::ReportExt as _;
 use bytes::Bytes;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::imp::{self, aqc::consume_bytes};
 
@@ -89,7 +87,7 @@ pub enum Error {
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(?err);
+        debug!(error = %err.report(), "Aranya client C API error");
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
@@ -145,7 +143,36 @@ pub fn error_to_str(err: u32) -> *const c_char {
     }
 }
 
+/// * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
+/// *
+/// * Functions suffixed with `_ext` accept an extra
+/// * `struct AranyaExtError *ext_err` parameter for extended error information.
+/// *
+/// * - `ext_err` must be a valid, non-NULL pointer.
+/// * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
+/// *   `*ext_err` is populated with additional error details.
+/// * - On success, the content of `ext_err` is unchanged.
+/// * - To extract a human-readable message:
+/// *
+/// *       AranyaError aranya_ext_error_msg(
+/// *           const struct AranyaExtError *err,
+/// *           char *msg,
+/// *           size_t *msg_len
+/// *       );
+/// *
+/// * Example:
+/// *     struct AranyaExtError ext_err;
+/// *     AranyaError rc = aranya_get_device_id_ext(client, &id, &ext_err);
+/// *     if (rc != ARANYA_ERROR_SUCCESS) {
+/// *         size_t len = 0;
+/// *         aranya_ext_error_msg(&ext_err, NULL, &len);
+/// *         char *buf = malloc(len);
+/// *         aranya_ext_error_msg(&ext_err, buf, &len);
+/// *         // `buf` now holds the detailed error message
+/// *     }
+/// * ──────────────────────────────────────────────────────────────────────────────
 /// Extended error information.
+#[allow(rustdoc::invalid_rust_codeblocks)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 88, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
@@ -221,8 +248,8 @@ pub unsafe fn client_init(
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
         aranya_client::Client::builder()
-            .with_daemon_uds_path(daemon_socket)
-            .with_daemon_aqc_addr(&aqc_addr)
+            .daemon_uds_path(daemon_socket)
+            .aqc_server_addr(&aqc_addr)
             .connect()
     })?;
 
@@ -686,35 +713,54 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 
 /// QUIC syncer configuration.
 ///
-/// Use a [`QuicSyncConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
+/// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
-/// A builder for initializing a [`QuicSyncConfig`].
+/// QUIC syncer configuration.
 ///
-/// The [`QuicSyncConfig`] is an optional part of initializing a [`TeamConfig`].
+/// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 288, align = 8)]
+pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
+
+/// A builder for initializing an [`AddTeamQuicSyncConfig`].
+///
+/// The [`AddTeamQuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
+pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 
-/// Attempts to set PSK seed generation mode value on [`QuicSyncConfigBuilder`].
+/// A builder for initializing a [`CreateTeamQuicSyncConfig`].
+///
+/// The [`CreateTeamQuicSyncConfig`] is an optional part of initializing a [`CreateTeamConfig`].
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
+
+/// Attempts to set PSK seed generation mode value on [`CreateTeamQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
+/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+pub fn create_team_quic_sync_config_generate(
+    cfg: &mut CreateTeamQuicSyncConfigBuilder,
+) -> Result<(), imp::Error> {
     cfg.generate();
     Ok(())
 }
 
-/// Attempts to set wrapped PSK seed value on [`QuicSyncConfigBuilder`].
+/// Attempts to set wrapped PSK seed value on [`AddTeamQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_wrapped_seed(
-    cfg: &mut QuicSyncConfigBuilder,
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
+/// @relates AranyaAddTeamQuicSyncConfigBuilder.
+pub fn add_team_quic_sync_config_wrapped_seed(
+    cfg: &mut AddTeamQuicSyncConfigBuilder,
     encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
     cfg.wrapped_seed(encap_seed)?;
@@ -728,80 +774,172 @@ pub struct SeedIkm {
     bytes: [u8; ARANYA_SEED_IKM_LEN],
 }
 
-/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`QuicSyncConfigBuilder`].
+/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateTeamQuicSyncConfigBuilder`].
 ///
-/// @param[in,out] cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
+/// @param[in,out] cfg a pointer to the quic sync config builder [`CreateTeamQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_raw_seed_ikm(
-    cfg: &mut QuicSyncConfigBuilder,
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
+/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+pub fn create_team_quic_sync_config_raw_seed_ikm(
+    cfg: &mut CreateTeamQuicSyncConfigBuilder,
     ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(&ikm.bytes)?;
+    cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
-/// Attempts to construct a [`QuicSyncConfig`].
+/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddTeamQuicSyncConfigBuilder`].
+///
+/// @param[in,out] cfg a pointer to the quic sync config builder [`AddTeamQuicSyncConfigBuilder`]
+/// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
+/// @relates AranyaAddTeamQuicSyncConfigBuilder.
+pub fn add_team_quic_sync_config_raw_seed_ikm(
+    cfg: &mut AddTeamQuicSyncConfigBuilder,
+    ikm: &SeedIkm,
+) -> Result<(), imp::Error> {
+    cfg.raw_seed_ikm(ikm.bytes);
+    Ok(())
+}
+
+/// Attempts to construct a [`CreateTeamQuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`QuicSyncConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder [`CreateTeamQuicSyncConfigBuilder`]
+/// @param[out] out a pointer to write the QUIC sync config to [`CreateTeamQuicSyncConfig`]
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_build(
-    cfg: OwnedPtr<QuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<QuicSyncConfig>,
+/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+pub fn create_team_quic_sync_config_build(
+    cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
     Ok(())
 }
 
-/// Team configuration.
-///
-/// Use a [`TeamConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type TeamConfig = Safe<imp::TeamConfig>;
-
-/// A builder for initializing a [`TeamConfig`].
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
-
-/// Configures QUIC syncer for [`TeamConfigBuilder`].
-///
-/// By default, the QUIC syncer config is not set. It is an error to call
-/// [`team_config_build`] before setting the interval with
-/// this function
-///
-/// @param[in,out] cfg a pointer to the builder for a team config [`TeamConfigBuilder`]
-/// @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
-///
-/// @relates AranyaTeamConfigBuilder.
-pub fn team_config_builder_set_quic_syncer(
-    cfg: &mut TeamConfigBuilder,
-    quic: OwnedPtr<QuicSyncConfig>,
-) {
-    // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
-}
-
-/// Attempts to construct a [`TeamConfig`].
+/// Attempts to construct an [`AddTeamQuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the team config builder [`TeamConfigBuilder`]
-/// @param[out] out a pointer to write the team config to [`TeamConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder [`AddTeamQuicSyncConfigBuilder`]
+/// @param[out] out a pointer to write the QUIC sync config to [`AddTeamQuicSyncConfig`]
 ///
-/// @relates AranyaTeamConfigBuilder.
-pub fn team_config_build(
-    cfg: OwnedPtr<TeamConfigBuilder>,
-    out: &mut MaybeUninit<TeamConfig>,
+/// @relates AranyaAddTeamQuicSyncConfigBuilder.
+pub fn add_team_quic_sync_config_build(
+    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
+) -> Result<(), imp::Error> {
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
+    Ok(())
+}
+
+/// Team configuration used when joining a team.
+///
+/// Use an [`AddTeamConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 320, align = 8)]
+pub type AddTeamConfig = Safe<imp::AddTeamConfig>;
+
+/// A builder for initializing an [`AddTeamConfig`].
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 328, align = 8)]
+pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
+
+/// Team configuration used when creating a team.
+///
+/// Use a [`CreateTeamConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
+
+/// A builder for initializing a [`CreateTeamConfig`].
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
+
+/// Configures QUIC syncer for [`AddTeamConfigBuilder`].
+///
+/// By default, the QUIC syncer config is not set.
+///
+/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
+/// @param[in] quic set the QUIC syncer config [`AddTeamQuicSyncConfig`]
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub fn add_team_config_builder_set_quic_syncer(
+    cfg: &mut AddTeamConfigBuilder,
+    quic: OwnedPtr<AddTeamQuicSyncConfig>,
+) {
+    // SAFETY: the user is responsible for passing in a valid AddTeamQuicSyncConfig pointer.
+    let quic = unsafe { quic.read() };
+    cfg.quic(quic.imp());
+}
+
+/// Configures team ID field for [`AddTeamConfigBuilder`].
+///
+/// By default, the team ID is not set.
+///
+/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
+/// @param[in] id a pointer to a [`TeamId`]
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &TeamId) {
+    cfg.id(*team_id);
+}
+
+/// Attempts to construct an [`AddTeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param[in] cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`AddTeamConfig`]
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub fn add_team_config_build(
+    cfg: OwnedPtr<AddTeamConfigBuilder>,
+    out: &mut MaybeUninit<AddTeamConfig>,
+) -> Result<(), imp::Error> {
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
+    Ok(())
+}
+
+/// Configures QUIC syncer for [`CreateTeamConfigBuilder`].
+///
+/// By default, the QUIC syncer config is not set.
+///
+/// @param[in,out] cfg a pointer to the builder for a team config [`CreateTeamConfigBuilder`]
+/// @param[in] quic set the QUIC syncer config [`CreateTeamQuicSyncConfig`]
+///
+/// @relates AranyaCreateTeamConfigBuilder.
+pub fn create_team_config_builder_set_quic_syncer(
+    cfg: &mut CreateTeamConfigBuilder,
+    quic: OwnedPtr<CreateTeamQuicSyncConfig>,
+) {
+    // SAFETY: the user is responsible for passing in a valid CreateTeamQuicSyncConfig pointer.
+    let quic = unsafe { quic.read() };
+    cfg.quic(quic.imp());
+}
+
+/// Attempts to construct a [`CreateTeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param[in] cfg a pointer to the team config builder [`CreateTeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`CreateTeamConfig`]
+///
+/// @relates AranyaCreateTeamConfigBuilder.
+pub fn create_team_config_build(
+    cfg: OwnedPtr<CreateTeamConfigBuilder>,
+    out: &mut MaybeUninit<CreateTeamConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
@@ -1055,14 +1193,13 @@ pub fn revoke_label(
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param[in] client the Aranya Client [`Client`].
-/// @param[in] cfg the Team Configuration [`TeamConfig`].
+/// @param[in] cfg the Team Configuration [`CreateTeamConfig`].
 /// @param[out] __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
-    let cfg: &imp::TeamConfig = cfg.deref();
+    let cfg: &imp::CreateTeamConfig = cfg.deref();
     let team_id = client
         .rt
         .block_on(client.inner.create_team(cfg.into()))?
@@ -1103,6 +1240,8 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
 ///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
 /// @relates AranyaClient.
 pub unsafe fn encrypt_psk_seed_for_peer(
     client: &Client,
@@ -1137,17 +1276,13 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// Add a team to the local device store.
 ///
 /// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] cfg the Team Configuration [`TeamConfig`].
+/// @param[in] cfg the Team Configuration [`AddTeamConfig`].
 ///
 /// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
+pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
-    let cfg: &imp::TeamConfig = cfg.deref();
-    client
-        .rt
-        .block_on(client.inner.add_team(team.into(), cfg.into()))?;
+    let cfg: &imp::AddTeamConfig = cfg.deref();
+    client.rt.block_on(client.inner.add_team(cfg.into()))?;
     Ok(())
 }
 
@@ -1201,7 +1336,7 @@ pub unsafe fn add_device_to_team(
         client
             .inner
             .team(team.into())
-            .add_device_to_team(keybundle, role_id.map(Into::into)),
+            .add_device(keybundle, role_id.map(Into::into)),
     )?;
     Ok(())
 }
@@ -1470,13 +1605,13 @@ pub unsafe fn query_label_exists(
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
     let client = client.imp();
-    let exists = client.rt.block_on(
+    let label_result = client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .queries()
-            .label_exists(label.into()),
+            .label(label.into()),
     )?;
+    let exists = label_result.is_some();
     Ok(exists)
 }
 
@@ -1501,8 +1636,8 @@ pub unsafe fn query_aqc_net_identifier(
         client
             .inner
             .team(team.into())
-            .queries()
-            .aqc_net_identifier(device.into()),
+            .device(device.into())
+            .aqc_net_id(),
     )?
     else {
         return Ok(false);
@@ -1537,7 +1672,8 @@ pub unsafe fn aqc_assign_net_identifier(
         client
             .inner
             .team(team.into())
-            .assign_aqc_net_identifier(device.into(), net_identifier),
+            .device(device.into())
+            .assign_aqc_net_identifier(net_identifier),
     )?;
     Ok(())
 }
@@ -1563,7 +1699,8 @@ pub unsafe fn aqc_remove_net_identifier(
         client
             .inner
             .team(team.into())
-            .remove_aqc_net_identifier(device.into(), net_identifier),
+            .device(device.into())
+            .remove_aqc_net_identifier(net_identifier),
     )?;
     Ok(())
 }
@@ -1574,7 +1711,7 @@ pub unsafe fn aqc_remove_net_identifier(
 /// `try_receive_channel`, and is invalidated after calling
 /// `get_bidi_channel`/`get_receive_channel`.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 168, align = 8)]
 pub type AqcPeerChannel = Safe<imp::AqcPeerChannel>;
 
 /// An enum containing all [`AqcPeerChannel`] variants.
@@ -1587,32 +1724,32 @@ pub enum AqcChannelType {
 
 /// An AQC Bidirectional Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
 /// An AQC Sender Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcSendChannel = Safe<imp::AqcSendChannel>;
 
 /// An AQC Receiver Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcBidiStream = Safe<imp::AqcBidiStream>;
 
 /// An AQC Sender Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
 /// An AQC Receiver Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 
 /// Create a bidirectional AQC channel between this device and a peer.
@@ -1674,8 +1811,8 @@ pub unsafe fn aqc_create_uni_channel(
 }
 
 /// Delete a bidirectional AQC channel.
-///
-/// Note that this function takes ownership of the [`AqcBidiChannel`] and invalidates any further use.
+/// Zeroizes PSKs associated with the channel.
+/// Closes all associated QUIC connections and streams.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
@@ -1683,37 +1820,56 @@ pub unsafe fn aqc_create_uni_channel(
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
     client: &Client,
-    channel: OwnedPtr<AqcBidiChannel>,
+    channel: &mut AqcBidiChannel,
 ) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
-    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
-
     let client = client.imp();
     client
         .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(channel))?;
+        .block_on(client.inner.aqc().delete_bidi_channel(&mut channel.inner))?;
     Ok(())
 }
 
-/// Delete a unidirectional AQC channel.
-///
-/// Note that this function takes ownership of the [`AqcSendChannel`] and invalidates any further use.
+/// Delete a send unidirectional AQC channel.
+/// Zeroizes PSKs associated with the channel.
+/// Closes all associated QUIC connections and streams.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_uni_channel(
+pub fn aqc_delete_send_uni_channel(
     client: &Client,
-    channel: OwnedPtr<AqcSendChannel>,
+    channel: &mut AqcSendChannel,
 ) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
-    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
-
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.aqc().delete_uni_channel(channel))?;
+    client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .delete_send_uni_channel(&mut channel.inner),
+    )?;
+    Ok(())
+}
+
+/// Delete a receive unidirectional AQC channel.
+/// Zeroizes PSKs associated with the channel.
+/// Closes all associated QUIC connections and streams.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] channel the AQC Channel [`AqcReceiveChannel`] to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_receive_uni_channel(
+    client: &Client,
+    channel: &mut AqcReceiveChannel,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .delete_receive_uni_channel(&mut channel.inner),
+    )?;
     Ok(())
 }
 

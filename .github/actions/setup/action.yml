@@ -13,6 +13,10 @@ runs:
         gcc --version
         cmake --version
 
+    - name: Update dependencies
+      shell: bash
+      run: sudo apt-get update
+
     - name: patchelf
       shell: bash
       run: |
@@ -42,3 +46,9 @@ runs:
     - name: Install cargo-make
       run: cargo install --version '0.37.23' --locked cargo-make
       shell: bash
+
+    - name: Install Protoc
+      shell: bash
+      run: |
+        sudo apt-get install -y protobuf-compiler
+        protoc --version

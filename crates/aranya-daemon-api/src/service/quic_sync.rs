@@ -7,24 +7,55 @@ use crate::{Ikm, CS};
 
 pub const SEED_IKM_SIZE: usize = 32;
 
+/// Configuration for creating a new team with QUIC synchronization.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct QuicSyncConfig {
-    pub seed_mode: SeedMode,
+pub struct CreateTeamQuicSyncConfig {
+    pub seed_mode: CreateSeedMode,
 }
 
-/// Specifies how PSK seeds are provided when creating or joining teams.
+/// Configuration for adding members to an existing team with QUIC synchronization.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddTeamQuicSyncConfig {
+    pub seed_mode: AddSeedMode,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Specifies how PSK seeds are provided when creating a new team.
 ///
 /// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
 /// for QUIC connections between team members.
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
-pub enum SeedMode {
+///
+/// This type will be removed soon since certificates will be used instead of PSKs in the future.
+pub enum CreateSeedMode {
     /// Generates a new random seed.
     ///
     /// Used by team owners in the `create_team` API when establishing a new team.
-    #[default]
     Generate,
 
+    /// Provides raw input key material to derive a seed.
+    ///
+    /// The IKM must be exactly 32 bytes. This mode is available in both:
+    /// - `create_team`: Allows team owners to specify deterministic seed material
+    /// - `add_team`: Allows non-owners to join using pre-shared key material
+    IKM(Ikm),
+}
+
+impl Default for CreateSeedMode {
+    fn default() -> Self {
+        Self::Generate
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Specifies how PSK seeds are provided when joining teams.
+///
+/// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
+/// for QUIC connections between team members.
+///
+/// This type will be removed soon since certificates will be used instead of PSKs in the future.
+pub enum AddSeedMode {
     /// Provides raw input key material to derive a seed.
     ///
     /// The IKM must be exactly 32 bytes. This mode is available in both:

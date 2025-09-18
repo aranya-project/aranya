@@ -444,13 +444,13 @@ command QueryDeviceRole {
 
         let device = get_device(this.device_id)
 
-        let assigned_role = get_assigned_role(device.device_id)
+        let assigned_role = try_get_assigned_role(device.device_id)
         if assigned_role is None {
             finish {}
         } else {
             let role = unwrap assigned_role
             finish {
-                emit QueryDeviceRolesResult {
+                emit QueryDeviceRoleResult {
                     role_id: role.role_id,
                     name: role.name,
                     author_id: role.author_id,
@@ -600,6 +600,7 @@ enum SimplePerm {
     // Roles
     AssignRole,
     RevokeRole,
+    SetupDefaultRole,
 
     // Labels
     CreateLabel,
@@ -617,7 +618,7 @@ enum SimplePerm {
 }
 
 // Converts `perm` to a string.
-function simple_perm_to_string(perm enum SimplePerm) string {
+function simple_perm_to_str(perm enum SimplePerm) string {
     match perm {
         SimplePerm::AddDevice => { return "AddDevice" }
         SimplePerm::RemoveDevice => { return "RemoveDevice" }
@@ -625,6 +626,7 @@ function simple_perm_to_string(perm enum SimplePerm) string {
 
         SimplePerm::AssignRole => { return "AssignRole" }
         SimplePerm::RevokeRole => { return "RevokeRole" }
+        SimplePerm::SetupDefaultRole => { return "SetupDefaultRole" }
 
         SimplePerm::CreateLabel => { return "CreateLabel" }
         SimplePerm::DeleteLabel => { return "DeleteLabel" }
@@ -699,10 +701,15 @@ fact RoleHasPerm[role_id id, perm string]=>{}
 
 // A wrapper for `create RoleHasPerm` that converts `perm` to
 // a string.
-finish function assign_perm_to_role(role_id id, perm enum SimplePerm) {
+//
+// TODO(eric): This should be
+//    finish function assign_perm_to_role(role_id id, perm enum SimplePerm)
+// but we cannot call `simple_perm_to_str` in a finish function,
+// nor can we even use `match`.
+finish function assign_perm_to_role(role_id id, perm string) {
     create RoleHasPerm[
         role_id: role_id,
-        perm: simple_perm_to_string(perm),
+        perm: perm,
     ]=>{}
 }
 
@@ -716,7 +723,7 @@ function role_has_simple_perm(role_id id, perm enum SimplePerm) bool {
 
     return exists RoleHasPerm[
         role_id: role_id,
-        perm: simple_perm_to_string(perm),
+        perm: simple_perm_to_str(perm),
     ]
 }
 
@@ -899,7 +906,7 @@ fact OwnsRole[target_role_id id, owning_role_id id]=>{}
 // - This function does NOT check whether the device exists.
 // - This function does NOT check whether the role exists.
 function device_owns_role(device_id id, target_role_id id) bool {
-    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+    let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
     //
@@ -934,7 +941,7 @@ action add_role_owner(
 ) {
     publish AddRoleOwner {
         target_role_id: target_role_id,
-        owning_role_id: owning_role_id,
+        new_role_owner: new_owning_role,
     }
 }
 
@@ -978,7 +985,7 @@ command AddRoleOwner {
             ]=>{}
 
             emit RoleOwnerAdded {
-                target_role_id: target_role.role_id,
+                target_role_id: this.target_role_id,
                 new_role_owner: this.new_role_owner,
                 author_id: author.device_id,
             }
@@ -1081,7 +1088,7 @@ fact CanAssignRole[target_role_id id, managing_role_id id]=>{}
 // - This function does NOT check whether the device exists.
 // - This function does NOT check whether the role exists.
 function can_assign_role(device_id id, target_role_id id) bool {
-    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+    let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
     //
@@ -1122,7 +1129,7 @@ fact CanRevokeRole[target_role_id id, managing_role_id id]=>{}
 // - This function does NOT check whether the device exists.
 // - This function does NOT check whether the role exists.
 function can_revoke_role(device_id id, target_role_id id) bool {
-    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+    let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
     //
@@ -1163,7 +1170,7 @@ fact CanChangeRolePerms[target_role_id id, managing_role_id id]=>{}
 // - This function does NOT check whether the device exists.
 // - This function does NOT check whether the role exists.
 function can_change_role_perms(device_id id, target_role_id id) bool {
-    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+    let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
     //
@@ -1194,6 +1201,26 @@ enum RoleManagementPerm {
     CanChangeRolePerms,
 }
 
+// Converts `RoleManagementPerm` to a string.
+function role_management_perm_to_str(perm enum RoleManagementPerm) string {
+    match perm {
+        RoleManagementPerm::CanAssignRole => { return "CanAssignRole" }
+        RoleManagementPerm::CanRevokeRole => { return "CanRevokeRole" }
+        RoleManagementPerm::CanChangeRolePerms => { return "CanChangeRolePerms" }
+    }
+}
+
+// Returns the `RoleManagementPerm` enum value corresponding to `perm`
+// if `perm` is valid.
+function try_parse_role_management_perm(perm string) optional enum RoleManagementPerm {
+    match perm {
+        "CanAssignRole" => { return Some(RoleManagementPerm::CanAssignRole) }
+        "CanRevokeRole" => { return Some(RoleManagementPerm::CanRevokeRole) }
+        "CanChangeRolePerms" => { return Some(RoleManagementPerm::CanChangeRolePerms) }
+        _ => { return None }
+    }
+}
+
 // Assigns a role management permission to a role.
 //
 // `perm` must be one of
@@ -1209,10 +1236,11 @@ action assign_role_management_perm(
     managing_role_id id,
     perm string,
 ) {
+    let perm_enum = check_unwrap try_parse_role_management_perm(perm)
     publish AssignRoleManagementPerm {
         target_role_id: target_role_id,
         managing_role_id: managing_role_id,
-        perm: perm,
+        perm: perm_enum,
     }
 }
 
@@ -1261,6 +1289,8 @@ command AssignRoleManagementPerm {
         check exists Role[role_id: this.target_role_id]
         check exists Role[role_id: this.managing_role_id]
 
+        let perm = role_management_perm_to_str(this.perm)
+
         // At this point we believe the following to be true:
         //
         // - `author` is authorized to assign management
@@ -1278,7 +1308,7 @@ command AssignRoleManagementPerm {
                     emit RoleManagementPermAssigned {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: this.perm,
+                        perm: perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1293,7 +1323,7 @@ command AssignRoleManagementPerm {
                     emit RoleManagementPermAssigned {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: this.perm,
+                        perm: perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1308,7 +1338,7 @@ command AssignRoleManagementPerm {
                     emit RoleManagementPermAssigned {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: this.perm,
+                        perm: perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1333,10 +1363,11 @@ action revoke_role_management_perm(
     managing_role_id id,
     perm string,
 ) {
+    let perm_enum = check_unwrap try_parse_role_management_perm(perm)
     publish RevokeRoleManagementPerm {
         target_role_id: target_role_id,
         managing_role_id: managing_role_id,
-        perm: perm,
+        perm: perm_enum,
     }
 }
 
@@ -1349,8 +1380,10 @@ effect RoleManagementPermRevoked {
     // The ID of the role that had its management permission
     // removed.
     managing_role_id id,
-    // The permission that was removed.
-    perm enum RoleManagementPerm,
+    // The permission that was revoked.
+    // TODO(eric): Should we convert this to an enum? That would
+    // make `RoleManagementPerm` part of the public API.
+    perm string,
     // The ID of the device that changed the management
     // permissions.
     author_id id,
@@ -1377,6 +1410,8 @@ command RevokeRoleManagementPerm {
         let author = get_author(envelope)
         check device_owns_role(author.device_id, this.target_role_id)
 
+        let perm = role_management_perm_to_str(this.perm)
+
         // At this point we believe the following to be true:
         //
         // - `author` is authorized to remove management
@@ -1394,7 +1429,7 @@ command RevokeRoleManagementPerm {
                     emit RoleManagementPermRevoked {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: simple_perm_to_string(this.perm),
+                        perm: perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1409,7 +1444,7 @@ command RevokeRoleManagementPerm {
                     emit RoleManagementPermRevoked {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: simple_perm_to_string(this.perm),
+                        perm: perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1424,7 +1459,7 @@ command RevokeRoleManagementPerm {
                     emit RoleManagementPermRevoked {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: simple_perm_to_string(this.perm),
+                        perm: perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1549,6 +1584,14 @@ enum DefaultRoleName {
     Member,
 }
 
+function default_role_name_to_str(name enum DefaultRoleName) string {
+    match name {
+        DefaultRoleName::Admin => { return "admin" }
+        DefaultRoleName::Operator => { return "operator" }
+        DefaultRoleName::Member => { return "member" }
+    }
+}
+
 // Setup default roles on a team.
 action setup_default_roles(owning_role_id id) {
     publish SetupDefaultRole {
@@ -1582,27 +1625,34 @@ command SetupDefaultRole {
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::SetupDefaultRole)
 
+        let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope)
 
         match this.name {
             DefaultRoleName::Admin => {
+                let add_device_perm = simple_perm_to_str(SimplePerm::AddDevice)
+                let remove_device_perm = simple_perm_to_str(SimplePerm::RemoveDevice)
+                let create_label_perm = simple_perm_to_str(SimplePerm::CreateLabel)
+                let delete_label_perm = simple_perm_to_str(SimplePerm::DeleteLabel)
+                let change_label_managing_role_perm = simple_perm_to_str(SimplePerm::ChangeLabelManagingRole)
+
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
-                        name: this.name,
+                        name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                     })
 
-                    assign_perm_to_role(role_id, SimplePerm::AddDevice)
-                    assign_perm_to_role(role_id, SimplePerm::RemoveDevice)
-                    assign_perm_to_role(role_id, SimplePerm::CreateLabel)
-                    assign_perm_to_role(role_id, SimplePerm::DeleteLabel)
-                    assign_perm_to_role(role_id, SimplePerm::ChangeLabelManagingRole)
+                    assign_perm_to_role(role_id, add_device_perm)
+                    assign_perm_to_role(role_id, remove_device_perm)
+                    assign_perm_to_role(role_id, create_label_perm)
+                    assign_perm_to_role(role_id, delete_label_perm)
+                    assign_perm_to_role(role_id, change_label_managing_role_perm)
 
                     emit RoleCreated {
                         role_id: role_id,
-                        name: this.name,
+                        name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                         default: true,
@@ -1610,22 +1660,27 @@ command SetupDefaultRole {
                 }
             }
             DefaultRoleName::Operator => {
+                let assign_label_perm = simple_perm_to_str(SimplePerm::AssignLabel)
+                let revoke_label_perm = simple_perm_to_str(SimplePerm::RevokeLabel)
+                let set_aqc_network_name_perm = simple_perm_to_str(SimplePerm::SetAqcNetworkName)
+                let unset_aqc_network_name_perm = simple_perm_to_str(SimplePerm::UnsetAqcNetworkName)
+
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
-                        name: this.name,
+                        name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                     })
 
-                    assign_perm_to_role(role_id, SimplePerm::AssignLabel)
-                    assign_perm_to_role(role_id, SimplePerm::RevokeLabel)
-                    assign_perm_to_role(role_id, SimplePerm::SetAqcNetworkName)
-                    assign_perm_to_role(role_id, SimplePerm::UnsetAqcNetworkName)
+                    assign_perm_to_role(role_id, assign_label_perm)
+                    assign_perm_to_role(role_id, revoke_label_perm)
+                    assign_perm_to_role(role_id, set_aqc_network_name_perm)
+                    assign_perm_to_role(role_id, unset_aqc_network_name_perm)
 
                     emit RoleCreated {
                         role_id: role_id,
-                        name: this.name,
+                        name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                         default: true,
@@ -1633,20 +1688,23 @@ command SetupDefaultRole {
                 }
             }
             DefaultRoleName::Member => {
+                let create_aqc_uni_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcUniChannel)
+                let create_aqc_bidi_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcBidiChannel)
+
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
-                        name: this.name,
+                        name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                     })
 
-                    assign_perm_to_role(role_id, SimplePerm::CreateAqcUniChannel)
-                    assign_perm_to_role(role_id, SimplePerm::CreateAqcBidiChannel)
+                    assign_perm_to_role(role_id, create_aqc_uni_channel_perm)
+                    assign_perm_to_role(role_id, create_aqc_bidi_channel_perm)
 
                     emit RoleCreated {
                         role_id: role_id,
-                        name: this.name,
+                        name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                         default: true,
@@ -1906,7 +1964,7 @@ command ChangeRole {
                 role_id: this.new_role_id,
             }
 
-            emit RoleChange {
+            emit RoleChanged {
                 device_id: this.device_id,
                 new_role_id: this.new_role_id,
                 old_role_id: this.old_role_id,
@@ -1972,14 +2030,11 @@ command RevokeRole {
         // - `author` has the `RevokeRole` permission
         // - `author` is allowed to manage `this.role_id`
         finish {
-            delete AssignedRole[
-                device_id: this.device_id,
-                role_id: this.role_id,
-            ]
+            delete AssignedRole[device_id: this.device_id]
 
             emit RoleRevoked {
-                device_id: target.device_id,
-                role_id: role.role_id,
+                device_id: this.device_id,
+                role_id: this.role_id,
                 author_id: author.device_id,
             }
         }
@@ -2034,11 +2089,11 @@ command QueryTeamRoles {
         check team_exists()
 
         finish {
-            emit QueryTreamRolesResult {
-                role_id: role.role_id,
-                name: role.name,
-                author_id: role.author_id,
-                default: role.default,
+            emit QueryTeamRolesResult {
+                role_id: this.role_id,
+                name: this.name,
+                author_id: this.author_id,
+                default: this.default,
             }
         }
     }
@@ -2225,7 +2280,7 @@ command CreateTeam {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
-                managing_role_id: owner_role_id,
+                owning_role_id: owner_role_id,
                 default: true,
             }
             emit RoleAssigned {
@@ -2304,7 +2359,7 @@ command TerminateTeam {
         //
         // - `author` has the `TerminateTeam` permission
         finish {
-            delete TeamStart[]=>{team_id: team_id}
+            delete TeamStart[]
 
             emit TeamTerminated {
                 team_id: this.team_id,
@@ -2623,7 +2678,7 @@ fact CanManageLabel[label_id id, managing_role_id id]=>{}
 // - This function does NOT check whether the device exists.
 // - This function does NOT check whether the label exists.
 function can_manage_label(device_id id, label_id id) bool {
-    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+    let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
     //
@@ -2692,8 +2747,8 @@ command AddLabelManagingRole {
         // - `this.label_id` refers to a label that exists
         finish {
             create CanManageLabel[
-                label_id: label.label_id,
-                managing_role_id: new_managing_role_id,
+                label_id: this.label_id,
+                managing_role_id: this.managing_role_id,
             ]=>{}
 
             emit LabelManagingRoleAdded {
@@ -2831,7 +2886,7 @@ command CreateLabel {
             }
             create CanManageLabel[
                 label_id: label_id,
-                managing_role_id: this.role_id,
+                managing_role_id: this.managing_role_id,
             ]=>{}
 
             emit LabelCreated {
@@ -2891,7 +2946,7 @@ command DeleteLabel {
 
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::DeleteLabel)
-        check can_manage_label(author.device_id, label.label_id)
+        check can_manage_label(author.device_id, this.label_id)
 
         // We can't query the label after it's been deleted, so
         // make sure we pull all of its info out of the fact
@@ -2982,7 +3037,7 @@ fact LabelAssignedToRole[label_id id, role_id id]=>{op enum ChanOp}
 // - `CanUseAqc`
 action assign_label_to_role(role_id id, label_id id, op enum ChanOp) {
     publish AssignLabelToRole {
-        device_id: device_id,
+        role_id: role_id,
         label_id: label_id,
         op: op,
     }
@@ -3055,7 +3110,7 @@ command AssignLabelToRole {
 
             emit AssignedLabelToRole {
                 role_id: this.role_id,
-                label_id: label.label_id,
+                label_id: this.label_id,
                 author_id: author.device_id,
             }
         }
@@ -3098,7 +3153,7 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp}
 // - `AssignLabel`
 // - `CanManageLabel(label_id)`
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
-    publish AssignLabel {
+    publish AssignLabelToDevice {
         device_id: device_id,
         label_id: label_id,
         op: op,
@@ -3158,12 +3213,12 @@ command AssignLabelToDevice {
         // - `this.label_id` refers to a label that exists
         finish {
             create LabelAssignedToDevice[
-                label_id: label.label_id,
-                device_id: target.device_id,
+                label_id: this.label_id,
+                device_id: this.device_id,
             ]=>{op: this.op}
 
             emit AssignedLabelToDevice {
-                device_id: this.device_id,
+                device: this.device_id,
                 label_id: this.label_id,
                 author_id: author.device_id,
             }
@@ -3228,13 +3283,13 @@ command RevokeLabelFromRole {
         // - `author` is allowed to manage `this.label_id`
         finish {
             delete LabelAssignedToRole[
-                label_id: label.label_id,
-                device_id: target.device_id,
+                label_id: this.label_id,
+                role_id: this.role_id,
             ]
 
             emit LabelRevokedFromRole {
                 role_id: this.role_id,
-                label_id: label.label_id,
+                label_id: this.label_id,
                 author_id: author.device_id,
             }
         }
@@ -3292,19 +3347,23 @@ command RevokeLabelFromDevice {
         check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
         check can_manage_label(author.device_id, this.label_id)
 
+        // We need to get label info before deleting
+        let label = check_unwrap query Label[label_id: this.label_id]
+
         // At this point we believe the following to be true:
         //
         // - `author` has the `RevokeLabel` permission
         // - `author` is allowed to manage `this.label_id`
         finish {
-            delete AssignedLabelToDevice[
-                label_id: label.label_id,
-                device_id: target.device_id,
+            delete LabelAssignedToDevice[
+                label_id: this.label_id,
+                device_id: this.device_id,
             ]
 
             emit LabelRevokedFromDevice {
-                device_id: this.device_id,
-                label_id: label.label_id,
+                label_id: this.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
                 author_id: author.device_id,
             }
         }
@@ -3360,7 +3419,7 @@ command QueryLabel {
         } else {
             let label = unwrap maybe_label
             finish {
-                emit QueryLabelExistsResult {
+                emit QueryLabelResult {
                     label_id: label.label_id,
                     label_name: label.name,
                     label_author_id: label.author_id,
@@ -3438,11 +3497,11 @@ a particular role.
 action query_labels_assigned_to_role(role_id id) {
     // TODO: make this query more efficient when policy supports
     // it. The key order is optimized for `delete`.
-    map AssignedLabelToRole[label_id: ?, role_id: ?] as f {
-        if f.device_id == device_id {
+    map LabelAssignedToRole[label_id: ?, role_id: ?] as f {
+        if f.role_id == role_id {
             let label = check_unwrap query Label[label_id: f.label_id]
             publish QueryLabelsAssignedToRole {
-                device_id: f.device_id,
+                role_id: f.role_id,
                 label_id: f.label_id,
                 label_name: label.name,
                 label_author_id: label.author_id,
@@ -3503,7 +3562,7 @@ command QueryLabelsAssignedToRole {
 action query_labels_assigned_to_device(device_id id) {
     // TODO: make this query more efficient when policy supports
     // it. The key order is optimized for `delete`.
-    map AssignedLabel[label_id: ?, device_id: ?] as f {
+    map LabelAssignedToDevice[label_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
             let label = check_unwrap query Label[label_id: f.label_id]
             publish QueryLabelsAssignedToDevice {
@@ -3543,18 +3602,16 @@ command QueryLabelsAssignedToDevice {
     policy {
         check team_exists()
 
-        finish {
-            if !exists Device[device_id: this.device_id] {
-                // TODO(eric): Or should we raise a check error?
-                finish {}
-            } else {
-                finish {
-                    emit QueryLabelsAssignedToDeviceResult {
-                        device_id: this.device_id,
-                        label_id: this.label_id,
-                        label_name: this.label_name,
-                        label_author_id: this.label_author_id,
-                    }
+        if !exists Device[device_id: this.device_id] {
+            // TODO(eric): Or should we raise a check error?
+            finish {}
+        } else {
+            finish {
+                emit QueryLabelsAssignedToDeviceResult {
+                    device_id: this.device_id,
+                    label_id: this.label_id,
+                    label_name: this.label_name,
+                    label_author_id: this.label_author_id,
                 }
             }
         }
@@ -3735,7 +3792,7 @@ command QueryAqcNetId {
         let net_id = aqc_net_id(author.device_id)
 
         finish {
-            emit QueryAqcNetIdentifierResult {
+            emit QueryAqcNetIdResult {
                 net_id: net_id,
             }
         }
@@ -3775,7 +3832,7 @@ command QueryAqcNetworkNames {
 
     policy {
         finish {
-            emit QueryAqcNetworkNamesOutput {
+            emit QueryAqcNetworkNamesResult {
                 net_id: this.net_id,
                 device_id: this.device_id,
             }
@@ -3814,14 +3871,43 @@ action create_aqc_bidi_channel(peer_id id, label_id id) {
     }
 }
 
-// Returns the channel operation for a particular label.
-function get_allowed_chan_op_for_label(device_id id, label_id id) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
-    return assigned_label.op
+// Returns the channel operation for a particular label, or `None`
+// if the device does not have permission to use the label.
+//
+// # Caveats
+//
+// - It does NOT check whether the device exists.
+function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum ChanOp {
+    // First test to see if the device's role has been granted
+    // permission to use the label.
+    let role_id = get_assigned_role_id(device_id)
+    let assigned_to_role = query LabelAssignedToRole[
+        label_id: label_id,
+        role_id: role_id,
+    ]
+    if assigned_to_role is Some {
+        return Some((unwrap assigned_to_role).op)
+    }
+
+    // Nope. Now see if the device was directly granted permission
+    // to use the label.
+
+    let assigned_to_dev = query LabelAssignedToDevice[
+        label_id: label_id,
+        device_id: device_id,
+    ]
+    if assigned_to_dev is Some {
+        return Some((unwrap assigned_to_dev).op)
+    }
+    return None
 }
 
 // Reports whether the devices have permission to create
 // a bidirectional AQC channel with each other.
+//
+// # Caveats
+//
+// - It does NOT check whether the devices exist.
 function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
     // Devices cannot create channels with themselves.
     //
@@ -3832,12 +3918,18 @@ function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
     // Both devices must have permissions to read (recv) and
     // write (send) data.
     let device1_op = get_allowed_chan_op_for_label(device1, label_id)
-    if device1_op != ChanOp::SendRecv {
+    if device1_op is None {
+        return false
+    }
+    if (unwrap device1_op) != ChanOp::SendRecv {
         return false
     }
 
     let device2_op = get_allowed_chan_op_for_label(device2, label_id)
-    if device2_op != ChanOp::SendRecv {
+    if device2_op is None {
+        return false
+    }
+    if (unwrap device2_op) != ChanOp::SendRecv {
         return false
     }
 
@@ -4195,7 +4287,10 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
 
     // The writer must have permissions to write (send) data.
     let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
-    match writer_op {
+    if writer_op is None {
+        return false
+    }
+    match unwrap writer_op {
         ChanOp::RecvOnly => { return false }
         ChanOp::SendOnly => {}
         ChanOp::SendRecv => {}
@@ -4203,7 +4298,10 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
 
     // The reader must have permission to read (receive) data.
     let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id)
-    match reader_op {
+    if reader_op is None {
+        return false
+    }
+    match unwrap reader_op {
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
         ChanOp::SendRecv => {}

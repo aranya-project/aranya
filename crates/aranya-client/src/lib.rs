@@ -12,25 +12,40 @@
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![warn(
+    clippy::alloc_instead_of_core,
+    clippy::implicit_saturating_sub,
+    clippy::missing_panics_doc,
+    clippy::ptr_as_ptr,
+    clippy::string_slice,
+    clippy::unimplemented,
+    missing_docs
+)]
+
+// TODO: https://github.com/aranya-project/aranya/issues/448
+#[cfg(not(feature = "default"))]
+compile_error!("'default' feature must be enabled!");
 
 pub mod aqc;
 pub mod client;
 pub mod config;
 pub mod error;
-pub mod sync;
+// pub mod sync; // Temporarily disabled due to API changes
 mod util;
 
+pub use aranya_daemon_api::KeyBundle;
 pub use aranya_policy_text::{text, Text};
 
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, DeviceId, InvalidNetIdentifier, KeyBundle, Label, LabelId, Labels,
+        ChanOp, Client, Device, DeviceId, Devices, InvalidNetIdentifier, Label, LabelId, Labels,
         NetIdentifier, Role, RoleId, Roles, Team, TeamId,
     },
     config::{
-        QuicSyncConfig, QuicSyncConfigBuilder, SyncPeerConfig, SyncPeerConfigBuilder, TeamConfig,
-        TeamConfigBuilder,
+        AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
+        CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+        SyncPeerConfig, SyncPeerConfigBuilder,
     },
     error::{ConfigError, Error, Result},
 };

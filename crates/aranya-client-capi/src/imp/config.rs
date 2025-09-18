@@ -1,16 +1,17 @@
+//! Client configuration for C API.
+
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_client::{
-    self as client,
-    sync::{SeedMode, SEED_IKM_SIZE},
-};
 
 use super::Error;
 use crate::api::defs::{self, Duration};
+
+pub(crate) mod team;
+pub(crate) use team::*;
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -224,147 +225,5 @@ impl Default for SyncPeerConfigBuilder {
             interval: None,
             sync_now: true,
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct QuicSyncConfig {
-    cfg: client::QuicSyncConfig,
-}
-
-impl QuicSyncConfig {
-    /// Useful for deref coercion.
-    pub(crate) fn imp(&self) -> Self {
-        self.clone()
-    }
-
-    pub fn builder() -> QuicSyncConfigBuilder {
-        QuicSyncConfigBuilder::default()
-    }
-}
-
-impl Typed for QuicSyncConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
-}
-
-impl From<QuicSyncConfig> for client::QuicSyncConfig {
-    fn from(value: QuicSyncConfig) -> Self {
-        value.cfg
-    }
-}
-
-#[derive(Default)]
-pub struct QuicSyncConfigBuilder {
-    builder: client::QuicSyncConfigBuilder,
-}
-
-impl QuicSyncConfigBuilder {
-    /// Sets the PSK seed mode.
-    pub fn mode(&mut self, mode: SeedMode) {
-        self.builder = self.builder.clone().mode(mode);
-    }
-
-    /// Sets mode to generate PSK seed.
-    pub fn generate(&mut self) {
-        self.builder = self.builder.clone().gen_seed();
-    }
-
-    /// Sets wrapped PSK seed.
-    pub fn wrapped_seed(&mut self, wrapped: &[u8]) -> Result<(), Error> {
-        self.builder = self.builder.clone().wrapped_seed(wrapped)?;
-        Ok(())
-    }
-
-    /// Sets raw PSK seed IKM.
-    pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
-        self.builder = self.builder.clone().seed_ikm(*ikm);
-        Ok(())
-    }
-
-    /// Builds the config.
-    pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        self.builder
-            .build()
-            .map_err(Into::into)
-            .map(|cfg| QuicSyncConfig { cfg })
-    }
-}
-
-impl Typed for QuicSyncConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
-}
-
-impl Builder for QuicSyncConfigBuilder {
-    type Output = defs::QuicSyncConfig;
-    type Error = Error;
-
-    /// # Safety
-    ///
-    /// No special considerations.
-    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, self.build()?);
-        Ok(())
-    }
-}
-
-/// Configuration info when creating or adding a team in Aranya
-#[derive(Clone, Debug)]
-pub struct TeamConfig {
-    quic_sync: Option<QuicSyncConfig>,
-}
-
-impl From<TeamConfig> for client::TeamConfig {
-    fn from(value: TeamConfig) -> Self {
-        let mut builder = Self::builder();
-        if let Some(cfg) = value.quic_sync {
-            builder = builder.quic_sync(cfg.into());
-        }
-
-        builder.build().expect("All fields set")
-    }
-}
-
-impl From<&TeamConfig> for client::TeamConfig {
-    fn from(value: &TeamConfig) -> Self {
-        Self::from(value.to_owned())
-    }
-}
-
-impl Typed for TeamConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
-}
-
-/// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default)]
-pub struct TeamConfigBuilder {
-    quic_sync: Option<QuicSyncConfig>,
-}
-
-impl Typed for TeamConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
-}
-
-impl TeamConfigBuilder {
-    /// Sets the QUIC syncer config.
-    pub fn quic(&mut self, quic: QuicSyncConfig) {
-        self.quic_sync = Some(quic.clone());
-    }
-}
-
-impl Builder for TeamConfigBuilder {
-    type Output = defs::TeamConfig;
-    type Error = Error;
-
-    /// # Safety
-    ///
-    /// No special considerations.
-    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(
-            out,
-            TeamConfig {
-                quic_sync: self.quic_sync,
-            },
-        );
-        Ok(())
     }
 }

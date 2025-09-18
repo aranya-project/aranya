@@ -32,19 +32,19 @@ pub enum Error {
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
 
-    #[error("addr error: {0}")]
+    #[error(transparent)]
     Addr(#[from] aranya_util::AddrError),
 
-    #[error("client error: {0}")]
+    #[error(transparent)]
     Client(#[from] aranya_client::Error),
 
-    #[error("config error: {0}")]
+    #[error(transparent)]
     Config(#[from] aranya_client::ConfigError),
 
-    #[error("serialization errors: {0}")]
+    #[error("serialization error")]
     Serialization(#[from] postcard::Error),
 
-    #[error("{0}")]
+    #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
@@ -84,7 +84,7 @@ impl From<WriteCStrError> for Error {
 }
 
 /// Underlying type for [`ExtError`][crate::api::ExtError].
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ExtError {
     err: Option<Error>,
 }

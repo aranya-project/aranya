@@ -24,11 +24,10 @@ use aranya_crypto::{
     EncryptionPublicKey, Engine, Id,
 };
 pub use aranya_policy_text::{text, InvalidText, Text};
-use aranya_util::Addr;
+use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 pub mod quic_sync;
 pub use quic_sync::*;
@@ -45,48 +44,41 @@ pub struct Error(String);
 
 impl Error {
     pub fn from_msg(err: &str) -> Self {
-        error!(?err);
         Self(err.into())
     }
 
     pub fn from_err<E: error::Error>(err: E) -> Self {
-        error!(?err);
-        Self(format!("{err:?}"))
+        Self(ReportExt::report(&err).to_string())
     }
 }
 
 impl From<Bug> for Error {
     fn from(err: Bug) -> Self {
-        error!(?err);
-        Self(format!("{err:?}"))
+        Self::from_err(err)
     }
 }
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
-        error!(?err);
         Self(format!("{err:?}"))
     }
 }
 
 impl From<InvalidText> for Error {
     fn from(err: InvalidText) -> Self {
-        error!(?err);
         Self(format!("{err:?}"))
     }
 }
 
 impl From<semver::Error> for Error {
     fn from(err: semver::Error) -> Self {
-        error!(?err);
-        Self(format!("{err:?}"))
+        Self::from_err(err)
     }
 }
 
 impl From<IdError> for Error {
     fn from(err: IdError) -> Self {
-        error!(%err);
-        Self(err.to_string())
+        Self::from_err(err)
     }
 }
 
@@ -146,10 +138,18 @@ impl fmt::Debug for KeyBundle {
 }
 
 // Note: any fields added to this type should be public
-/// A configuration for creating or adding a team to a daemon.
+/// A configuration for adding a team in the daemon.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TeamConfig {
-    pub quic_sync: Option<QuicSyncConfig>,
+pub struct AddTeamConfig {
+    pub team_id: TeamId,
+    pub quic_sync: Option<AddTeamQuicSyncConfig>,
+}
+
+// Note: any fields added to this type should be public
+/// A configuration for creating a team in the daemon.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTeamConfig {
+    pub quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
 /// A device's network identifier.
@@ -768,30 +768,22 @@ pub trait DaemonApi {
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
+    /// add a team to the local device store that was created by someone else. Not an aranya action/command.
+    async fn add_team(cfg: AddTeamConfig) -> Result<()>;
+
+    /// Remove a team from local device storage.
+    async fn remove_team(team: TeamId) -> Result<()>;
+
+    /// Create a new graph/team with the current device as the owner.
+    async fn create_team(cfg: CreateTeamConfig) -> Result<TeamId>;
+    /// Close the team.
+    async fn close_team(team: TeamId) -> Result<()>;
+
     /// Encrypts the team's syncing PSK(s) for the peer.
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> Result<WrappedSeed>;
-
-    //
-    // Local team management
-    //
-
-    /// Add a team to the local device store that was created by
-    /// someone else. Not an aranya action/command.
-    async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
-    /// Remove a team from local device storage.
-    async fn remove_team(team: TeamId) -> Result<()>;
-
-    //
-    // Team creation
-    //
-
-    /// Creates a new team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
-    /// Close the team.
-    async fn close_team(team: TeamId) -> Result<()>;
 
     //
     // Device onboarding

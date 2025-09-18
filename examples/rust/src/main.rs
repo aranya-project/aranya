@@ -5,11 +5,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
+    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
 };
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -21,11 +22,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{debug, info, Metadata};
+use tracing::{Metadata, debug, info};
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
-    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -78,7 +79,7 @@ impl ClientCtx {
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
-            let cfg_path = work_dir.join("config.json");
+            let cfg_path = work_dir.join("config.toml");
 
             let runtime_dir = work_dir.join("run");
             let state_dir = work_dir.join("state");
@@ -93,14 +94,18 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-                name: "daemon"
-                runtime_dir: {runtime_dir:?}
-                state_dir: {state_dir:?}
-                cache_dir: {cache_dir:?}
-                logs_dir: {logs_dir:?}
-                config_dir: {config_dir:?}
-                sync_addr: "127.0.0.1:0"
-                quic_sync: {{ }}
+                name = "daemon"
+                runtime_dir = {runtime_dir:?}
+                state_dir = {state_dir:?}
+                cache_dir = {cache_dir:?}
+                logs_dir = {logs_dir:?}
+                config_dir = {config_dir:?}
+
+                aqc.enable = true
+
+                [sync.quic]
+                enable = true
+                addr = "127.0.0.1:0"
                 "#
             );
             fs::write(&cfg_path, buf).await?;
@@ -118,8 +123,8 @@ impl ClientCtx {
 
         let client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_sock)
-                .with_daemon_aqc_addr(&any_addr)
+                .daemon_uds_path(&uds_sock)
+                .aqc_server_addr(&any_addr)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
@@ -214,9 +219,11 @@ async fn main() -> Result<()> {
         owner.client.rand(&mut buf).await;
         buf
     };
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    let owner_cfg = {
+        let qs_cfg = CreateTeamQuicSyncConfig::builder()
+            .seed_ikm(seed_ikm)
+            .build()?;
+        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
 
     // get sync addresses.
@@ -233,16 +240,26 @@ async fn main() -> Result<()> {
     info!("creating team");
     let owner_team = owner
         .client
-        .create_team(cfg.clone())
+        .create_team(owner_cfg)
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    let admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
-    let operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
-    let membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
-    let memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+    let add_team_cfg = {
+        let qs_cfg = AddTeamQuicSyncConfig::builder()
+            .seed_ikm(seed_ikm)
+            .build()?;
+        AddTeamConfig::builder()
+            .quic_sync(qs_cfg)
+            .team_id(team_id)
+            .build()?
+    };
+
+    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
+    let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
+    let memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
     // setup sync peers.
     info!("adding admin to team");
@@ -432,6 +449,14 @@ async fn main() -> Result<()> {
     info!("memberb receiving acq data");
     let bytes = peer2.receive().await?.assume("no data received")?;
     assert_eq!(bytes, msg);
+
+    // membera deletes the AQC channel.
+    info!("membera deleting aqc channel");
+    membera
+        .client
+        .aqc()
+        .delete_bidi_channel(&mut created_aqc_chan)
+        .await?;
 
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;

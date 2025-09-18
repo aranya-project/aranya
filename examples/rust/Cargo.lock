@@ -75,7 +75,7 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
 name = "aranya-client"
-version = "0.7.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -96,9 +96,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6cdec0994309ae7e89ff00e7a4ec4bb23f7db1a7b576b67e93e39272a257320"
+checksum = "91c8eab5fb5519c7435aa69263c662df4cbf8ee59a6472968c86d55bd25bd978"
 dependencies = [
  "buggy",
  "byteorder",
@@ -119,7 +119,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.7.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -130,13 +130,11 @@ dependencies = [
  "ciborium",
  "futures-util",
  "pin-project",
- "postcard",
  "semver",
  "serde",
  "tarpc",
  "tokio",
  "tokio-serde",
- "tracing",
 ]
 
 [[package]]
@@ -174,9 +172,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-internal-s2n-quic"
-version = "1.58.0-psk.1"
+version = "1.58.0-psk.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "815e4ea0e80b186c21c04e3cbe2ec131c6bffbf7fbe4ed3d80613970a825eb4a"
+checksum = "588457566f9612bf6543270eb6a3ebb511370f6ce245a9c83ca874f27352406a"
 dependencies = [
  "aranya-internal-s2n-quic-rustls",
  "bytes",
@@ -198,9 +196,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-internal-s2n-quic-rustls"
-version = "0.58.0-psk.1"
+version = "0.58.0-psk.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f12f2764e3cb3fd7bfe25466fcc244028887dc8495e0ca713946d4f2a7d530bd"
+checksum = "27a4effc2301b2938e5f5001d5a7b9da0b33a1e8280c4ba7372103a115aacd2d"
 dependencies = [
  "aranya-internal-rustls",
  "bytes",
@@ -212,9 +210,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-text"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a32afb76cab14f2fd18563e234bc2c7c7bd49fcf719f03bc6066759a4bff9f04"
+checksum = "8b39a413c48e08d25f2b6b7ab9cb43bba27147563984929c4ce9b5d7007e42df"
 dependencies = [
  "aranya-policy-text-macro",
  "serde",
@@ -235,13 +233,15 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "0.7.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",
  "buggy",
+ "bytes",
  "futures-util",
  "serde",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-util",
  "tracing",

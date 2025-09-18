@@ -17,8 +17,11 @@ custom_id! {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[non_exhaustive]
 pub struct Label {
+    /// Uniquely identifies the label.
     pub id: LabelId,
+    /// The human-readable label name.
     pub name: Text,
+    /// The device that created the label.
     pub author_id: DeviceId,
 }
 
@@ -33,11 +36,13 @@ impl Label {
 }
 
 /// List of labels.
+#[derive(Clone, Debug)]
 pub struct Labels {
     pub(super) labels: Box<[Label]>,
 }
 
 impl Labels {
+    /// Returns an iterator over the labels.
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.labels.iter()
     }

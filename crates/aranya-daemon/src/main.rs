@@ -10,7 +10,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_daemon::{Config, Daemon};
+use aranya_daemon::{config::Config, Daemon};
+use aranya_util::error::ReportExt as _;
 use clap::Parser;
 use tokio::runtime::Runtime;
 use tracing::{error, info};
@@ -41,11 +42,12 @@ fn main() -> Result<()> {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
 
-        daemon.spawn().join().await?;
+        let handle = daemon.spawn().await.context("unable to start daemon")?;
+        handle.join().await?;
 
         Ok(())
     })
-    .inspect_err(|err| error!(?err))
+    .inspect_err(|err| error!(error = ?err))
 }
 
 #[derive(Debug, Parser)]
@@ -78,7 +80,7 @@ impl PidFile {
 impl Drop for PidFile {
     fn drop(&mut self) {
         if let Err(err) = fs::remove_file(&self.path) {
-            error!("unable to remove PID file: {err}")
+            error!(error = %err.report(), "unable to remove PID file")
         }
     }
 }

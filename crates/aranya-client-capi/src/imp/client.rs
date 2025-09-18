@@ -6,6 +6,7 @@ use aranya_client::KeyBundle;
 use crate::imp;
 
 /// An instance of an Aranya Client, along with an async runtime.
+#[derive(Debug)]
 pub struct Client {
     pub(crate) inner: aranya_client::Client,
     pub(crate) rt: tokio::runtime::Runtime,

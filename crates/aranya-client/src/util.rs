@@ -18,12 +18,12 @@ macro_rules! custom_id {
 
         impl $name {
             #[allow(dead_code, reason = "Depends on the type.")]
-            pub(crate) fn into_api(self) -> aranya_daemon_api::$api {
+            pub fn into_api(self) -> aranya_daemon_api::$api {
                 self.0.into_id().into()
             }
 
             #[allow(dead_code, reason = "Depends on the type.")]
-            pub(crate) fn from_api(id: aranya_daemon_api::$api) -> Self {
+            pub fn from_api(id: aranya_daemon_api::$api) -> Self {
                 Self(id.into_id().into())
             }
         }
