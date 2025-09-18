@@ -1,6 +1,7 @@
 //! Client-daemon connection.
 
-use std::{fmt::Debug, io, net::SocketAddr, path::Path};
+use core::fmt;
+use std::{fmt::Debug, io, net::SocketAddr, path::Path, str::FromStr};
 
 use anyhow::Context as _;
 use aranya_crypto::{custom_id, Csprng, EncryptionPublicKey, Rng};
@@ -10,7 +11,7 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    DaemonApiClient, Label, NetIdentifier, Text, Version, CS,
+    DaemonApiClient, Label, Text, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
@@ -29,6 +30,7 @@ use crate::{
     aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
+    Error,
 };
 
 custom_id! {
@@ -125,6 +127,27 @@ impl KeyBundle {
     /// Return public encoding key bytes.
     pub fn encoding(&self) -> Vec<u8> {
         self.0.encoding.clone()
+    }
+}
+
+/// A device's network identifier.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+// TODO: capi needs this to be pub.
+pub struct NetIdentifier(pub api::NetIdentifier);
+
+impl FromStr for NetIdentifier {
+    fn from_str(s: &str) -> Result<Self, Error> {
+        Ok(Self(api::NetIdentifier(
+            s.to_string().try_into().expect("addr is valid text"),
+        )))
+    }
+
+    type Err = Error;
+}
+
+impl fmt::Display for NetIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -612,7 +635,7 @@ impl Team<'_> {
                 context::current(),
                 self.team_id.into_id().into(),
                 device_id.into_id().into(),
-                net_identifier,
+                net_identifier.0,
             )
             .await
             .map_err(IpcError::new)?
@@ -631,7 +654,7 @@ impl Team<'_> {
                 context::current(),
                 self.team_id.into_id().into(),
                 device_id.into_id().into(),
-                net_identifier,
+                net_identifier.0,
             )
             .await
             .map_err(IpcError::new)?
@@ -789,7 +812,8 @@ impl Queries<'_> {
 
     /// Returns the AQC network identifier assigned to the current device.
     pub async fn aqc_net_identifier(&self, device_id: DeviceId) -> Result<Option<NetIdentifier>> {
-        self.client
+        let net_identifier = self
+            .client
             .daemon
             .query_aqc_net_identifier(
                 context::current(),
@@ -798,7 +822,11 @@ impl Queries<'_> {
             )
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?;
+        if let Some(net_identifier) = net_identifier {
+            return Ok(Some(NetIdentifier(net_identifier)));
+        }
+        Ok(None)
     }
 
     /// Returns whether a label exists.

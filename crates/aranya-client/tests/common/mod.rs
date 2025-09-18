@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, Role, TeamId},
+    client::{Client, DeviceId, KeyBundle, NetIdentifier, Role, TeamId},
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
@@ -18,7 +18,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{NetIdentifier, SEED_IKM_SIZE};
+use aranya_daemon_api::{self as api, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
@@ -248,14 +248,14 @@ impl DeviceCtx {
 
     #[allow(unused, reason = "module compiled for each test file")]
     pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier(
+        NetIdentifier(api::NetIdentifier(
             self.client
                 .aqc()
                 .server_addr()
                 .to_string()
                 .try_into()
                 .expect("socket addr is valid text"),
-        )
+        ))
     }
 
     fn get_shm_path(path: String) -> String {

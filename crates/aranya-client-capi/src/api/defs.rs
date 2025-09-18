@@ -475,10 +475,12 @@ impl Addr {
 pub struct NetIdentifier(*const c_char);
 
 impl NetIdentifier {
-    unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
+    unsafe fn as_underlying(self) -> Result<aranya_client::client::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?))
+        Ok(aranya_client::client::NetIdentifier(
+            aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?),
+        ))
     }
 }
 

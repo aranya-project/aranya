@@ -2,14 +2,13 @@
 
 use std::net::SocketAddr;
 
-use aranya_daemon_api::NetIdentifier;
 use tarpc::context;
 use tracing::{debug, instrument};
 
 use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
     aqc::AqcReceiveChannel,
-    client::{LabelId, TeamId},
+    client::{LabelId, NetIdentifier, TeamId},
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -61,7 +60,7 @@ impl<'a> AqcChannels<'a> {
             .create_aqc_bidi_channel(
                 context::current(),
                 team_id.into_id().into(),
-                peer.clone(),
+                peer.0.clone(),
                 label_id.into_id().into(),
             )
             .await
@@ -69,7 +68,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
+        let peer_addr = tokio::net::lookup_host(peer.0 .0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -110,7 +109,7 @@ impl<'a> AqcChannels<'a> {
             .create_aqc_uni_channel(
                 context::current(),
                 team_id.into_id().into(),
-                peer.clone(),
+                peer.0.clone(),
                 label_id.into_id().into(),
             )
             .await
@@ -118,7 +117,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
+        let peer_addr = tokio::net::lookup_host(peer.0 .0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
