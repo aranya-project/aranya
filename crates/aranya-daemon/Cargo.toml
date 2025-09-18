@@ -21,7 +21,6 @@ default = ["afc", "preview"]
 preview = ["aranya-daemon-api/preview"]
 # Aranya Fast Channels
 afc = ["aranya-daemon-api/afc"]
-example = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
