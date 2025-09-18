@@ -1,8 +1,6 @@
 //! Implementation of daemon's AFC handler.
 
-use std::{
-    fmt::Debug,
-};
+use std::fmt::Debug;
 
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{
@@ -156,7 +154,8 @@ where
         let keys: BidiKeys<RawSealKey<<E as Engine>::CS>, RawOpenKey<<E as Engine>::CS>> = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
-        let channel_id = self.shm
+        let channel_id = self
+            .shm
             .lock()
             .await
             .write
@@ -169,7 +168,7 @@ where
             )
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating bidi channel");
-        Ok(channel_id.into())
+        Ok(channel_id)
     }
 
     /// Handles the [`AfcBidiChannelReceived`] effect, returning
@@ -198,18 +197,16 @@ where
         let BidiKeys { seal, open } = self
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
-        let channel_id = self.shm
-        .lock()
-        .await
-        .write
-        .add(
-            Directed::Bidirectional { seal, open },
-            info.label_id,
-        )
-        .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-    debug!(?channel_id, "receiving bidi channel");
-    
-        Ok(channel_id.into())
+        let channel_id = self
+            .shm
+            .lock()
+            .await
+            .write
+            .add(Directed::Bidirectional { seal, open }, info.label_id)
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        debug!(?channel_id, "receiving bidi channel");
+
+        Ok(channel_id)
     }
 
     /// Handles the [`AfcUniChannelCreated`] effect, returning
@@ -239,14 +236,15 @@ where
         let key = self
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
-        let channel_id = self.shm
-        .lock()
-        .await
-        .write
-        .add(key.into(), info.label_id)
-        .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        let channel_id = self
+            .shm
+            .lock()
+            .await
+            .write
+            .add(key.into(), info.label_id)
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
-        Ok(channel_id.into())
+        Ok(channel_id)
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
@@ -276,14 +274,15 @@ where
         let key = self
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
-        let channel_id = self.shm
-        .lock()
-        .await
-        .write
-        .add(key.into(), info.label_id)
-        .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        let channel_id = self
+            .shm
+            .lock()
+            .await
+            .write
+            .add(key.into(), info.label_id)
+            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving uni channel");
-        Ok(channel_id.into())
+        Ok(channel_id)
     }
 
     pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>
