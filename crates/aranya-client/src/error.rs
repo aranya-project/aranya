@@ -37,6 +37,12 @@ pub enum Error {
     Other(#[from] OtherError),
 }
 
+impl From<Infallible> for Error {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
 /// Some other error occurred.
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]

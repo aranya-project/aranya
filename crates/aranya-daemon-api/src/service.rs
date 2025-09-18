@@ -6,22 +6,24 @@ use core::{
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Deref,
+    str::FromStr,
     time::Duration,
 };
 use std::collections::hash_map::{self, HashMap};
 
-use anyhow::bail;
+use anyhow::{bail, Context as _};
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
     custom_id,
+    dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
-pub use aranya_policy_text::{text, Text};
+pub use aranya_policy_text::{text, InvalidText, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
@@ -62,6 +64,12 @@ impl From<anyhow::Error> for Error {
     }
 }
 
+impl From<InvalidText> for Error {
+    fn from(err: InvalidText) -> Self {
+        Self(format!("{err:?}"))
+    }
+}
+
 impl From<semver::Error> for Error {
     fn from(err: semver::Error) -> Self {
         Self::from_err(err)
@@ -95,35 +103,38 @@ custom_id! {
 }
 
 custom_id! {
-    /// An AQC label ID.
-    pub struct LabelId;
+    /// A role ID.
+    pub struct RoleId;
 }
 
-custom_id! {
-    /// An AQC bidi channel ID.
-    pub struct AqcBidiChannelId;
-}
-
-custom_id! {
-    /// An AQC uni channel ID.
-    pub struct AqcUniChannelId;
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Role {
+    /// Uniquely identifies the role.
+    pub id: RoleId,
+    /// The role's friendly name.
+    pub name: Text,
+    /// The author of the role.
+    pub author_id: DeviceId,
+    /// Is this a default role?
+    pub default: bool,
 }
 
 /// A device's public key bundle.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
     pub encoding: Vec<u8>,
 }
 
-/// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
+impl fmt::Debug for KeyBundle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeyBundle")
+            .field("identity", &Hex::new(&*self.identity))
+            .field("signing", &Hex::new(&*self.signing))
+            .field("encoding", &Hex::new(&*self.encoding))
+            .finish()
+    }
 }
 
 // Note: any fields added to this type should be public
@@ -176,6 +187,29 @@ impl fmt::Display for NetIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
+}
+
+/// A label.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Label {
+    pub id: LabelId,
+    pub name: Text,
+    pub author_id: DeviceId,
+}
+
+custom_id! {
+    /// An AQC label ID.
+    pub struct LabelId;
+}
+
+custom_id! {
+    /// An AQC bidi channel ID.
+    pub struct AqcBidiChannelId;
+}
+
+custom_id! {
+    /// An AQC uni channel ID.
+    pub struct AqcUniChannelId;
 }
 
 /// A serialized command for AQC.
@@ -623,36 +657,117 @@ pub enum ChanOp {
     SendRecv,
 }
 
-/// A label.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct Label {
-    pub id: LabelId,
-    pub name: Text,
+/// Operation that can be assigned to roles.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Op {
+    AddDevice,
+    AqcCreateBidiChannel,
+    AqcCreateUniChannel,
+    AssignLabel,
+    AssignRole,
+    ChangeLabelManagingRole,
+    CreateLabel,
+    DeleteLabel,
+    RemoveDevice,
+    RevokeLabel,
+    RevokeRole,
+    SetAqcNetworkName,
+    SetupDefaultRole,
+    TerminateTeam,
+    UnsetAqcNetworkName,
+    UpdateOperation,
+    Other(Text),
+}
+
+impl Op {
+    /// Converts the op to a string.
+    pub const fn to_str(&self) -> &str {
+        match self {
+            Self::AddDevice => "AddMember",
+            Self::AqcCreateBidiChannel => "AqcCreateBidiChannel",
+            Self::AqcCreateUniChannel => "AqcCreateUniChannel",
+            Self::AssignLabel => "AssignLabel",
+            Self::AssignRole => "AssignRole",
+            Self::ChangeLabelManagingRole => "ChangeLabelManagingRole",
+            Self::CreateLabel => "CreateLabel",
+            Self::DeleteLabel => "DeleteLabel",
+            Self::RemoveDevice => "RemoveMember",
+            Self::RevokeLabel => "RevokeLabel",
+            Self::RevokeRole => "RevokeRole",
+            Self::SetAqcNetworkName => "SetAqcNetworkName",
+            Self::SetupDefaultRole => "SetupDefaultRole",
+            Self::TerminateTeam => "TerminateTeam",
+            Self::UnsetAqcNetworkName => "UnsetAqcNetworkName",
+            Self::UpdateOperation => "UpdateOperation",
+            Self::Other(op) => op.as_str(),
+        }
+    }
+
+    /// Converts the string to an op.
+    pub fn try_from_str(s: &str) -> Option<Self> {
+        let op = match s {
+            "AddMember" => Self::AddDevice,
+            "AqcCreateBidiChannel" => Self::AqcCreateBidiChannel,
+            "AqcCreateUniChannel" => Self::AqcCreateUniChannel,
+            "AssignLabel" => Self::AssignLabel,
+            "AssignRole" => Self::AssignRole,
+            "ChangeLabelManagingRole" => Self::ChangeLabelManagingRole,
+            "CreateLabel" => Self::CreateLabel,
+            "DeleteLabel" => Self::DeleteLabel,
+            "RemoveMember" => Self::RemoveDevice,
+            "RevokeLabel" => Self::RevokeLabel,
+            "RevokeRole" => Self::RevokeRole,
+            "SetAqcNetworkName" => Self::SetAqcNetworkName,
+            "SetupDefaultRole" => Self::SetupDefaultRole,
+            "TerminateTeam" => Self::TerminateTeam,
+            "UnsetAqcNetworkName" => Self::UnsetAqcNetworkName,
+            "UpdateOperation" => Self::UpdateOperation,
+            s => return Text::from_str(s).ok().map(Self::Other),
+        };
+        Some(op)
+    }
+}
+
+impl FromStr for Op {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from_str(s).context("invalid operation")
+    }
+}
+
+/// Display implementation for [`Op`]
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_str().fmt(f)
+    }
 }
 
 #[tarpc::service]
 pub trait DaemonApi {
+    //
+    // Misc
+    //
+
     /// Returns the daemon's version.
     async fn version() -> Result<Version>;
-
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
-
     /// Gets the public key bundle for this device
     async fn get_key_bundle() -> Result<KeyBundle>;
-
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
 
+    //
+    // Syncing
+    //
+
     /// Adds the peer for automatic periodic syncing.
     async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
-
     /// Sync with peer immediately.
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
-
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
-
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
     async fn add_team(cfg: AddTeamConfig) -> Result<()>;
 
@@ -664,84 +779,160 @@ pub trait DaemonApi {
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
+    /// Encrypts the team's syncing PSK(s) for the peer.
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> Result<WrappedSeed>;
 
-    /// Add device to the team.
-    async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
+    //
+    // Device onboarding
+    //
+
+    /// Adds a device to the team with optional initial roles.
+    async fn add_device_to_team(
+        team: TeamId,
+        keys: KeyBundle,
+        initial_role: Option<RoleId>,
+    ) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
+    /// Returns all the devices on the team.
+    async fn devices_on_team(team: TeamId) -> Result<Box<[DeviceId]>>;
+    /// Returns the device's key bundle.
+    async fn device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+
+    //
+    // Role creation
+    //
+
+    /// Configures the team with default roles from policy.
+    ///
+    /// It returns the default roles that were created.
+    async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the current team roles.
+    async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
+
+    //
+    // Role management
+    //
+
+    /// Adds an owning role to the target role.
+    async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Removes an owning role from the target role.
+    async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Returns the roles that own the target role.
+    async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Assigns a role management permission to a role.
+    async fn assign_role_management_perm(
+        team: TeamId,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()>;
+    /// Revokes a role management permission from a role.
+    async fn revoke_role_management_perm(
+        team: TeamId,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()>;
+
+    //
+    // Role assignment
+    //
 
     /// Assign a role to a device.
-    async fn assign_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
-    async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
+    /// Returns the role assigned to the device.
+    async fn device_role(team: TeamId, device: DeviceId) -> Result<Option<Role>>;
 
-    /// Assign a QUIC channels network identifier to a device.
-    async fn assign_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-    /// Remove a QUIC channels network identifier from a device.
-    async fn remove_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
+    //
+    // Label creation
+    //
 
-    // Create a label.
-    async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
-    // Delete a label.
+    /// Create a label.
+    async fn create_label(team: TeamId, name: Text, managing_role_id: RoleId) -> Result<LabelId>;
+    /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
-    // Assign a label to a device.
-    async fn assign_label(
+    /// Returns a specific label.
+    async fn label(team: TeamId, label: LabelId) -> Result<Option<Label>>;
+    /// Returns all labels on the team.
+    async fn labels(team: TeamId) -> Result<Vec<Label>>;
+
+    //
+    // Label assignments
+    //
+
+    /// Assigns a label to a role.
+    async fn assign_label_to_role(
         team: TeamId,
-        device: DeviceId,
-        label_id: LabelId,
+        role: RoleId,
+        label: LabelId,
         op: ChanOp,
     ) -> Result<()>;
-    // Revoke a label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
+    /// Revokes a label from a role.
+    async fn revoke_label_from_role(team: TeamId, role: RoleId, label: LabelId) -> Result<()>;
+    /// Returns all labels assigned to the role.
+    async fn labels_assigned_to_role(team: TeamId, role: RoleId) -> Result<Box<[Label]>>;
+    /// Assigns a label to a device.
+    async fn assign_label_to_device(
+        team: TeamId,
+        device: DeviceId,
+        label: LabelId,
+        op: ChanOp,
+    ) -> Result<()>;
+    /// Revokes a label from a device.
+    async fn revoke_label_from_device(team: TeamId, device: DeviceId, label: LabelId)
+        -> Result<()>;
+    /// Returns all labels assigned to the device.
+    async fn labels_assigned_to_device(team: TeamId, device: DeviceId) -> Result<Box<[Label]>>;
 
-    /// Create a bidirectional QUIC channel.
+    //
+    // AQC network identifiers
+    //
+
+    /// Assign a QUIC channels network identifier to a device.
+    async fn assign_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
+    /// Remove a QUIC channels network identifier from a device.
+    async fn remove_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
+    /// Returns a device's AQC network identifier.
+    async fn aqc_net_id(team: TeamId, device: DeviceId) -> Result<Option<NetIdentifier>>;
+
+    //
+    // AQC bidi channels
+    //
+
+    /// Creates an AQC bidi channel.
     async fn create_aqc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcBidiPsks)>;
-    /// Create a unidirectional QUIC channel.
+    /// Deletes an AQC bidi channel.
+    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
+
+    //
+    // AQC uni channels
+    //
+
+    /// Creates an AQC uni channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcUniPsks)>;
-    /// Delete a QUIC bidi channel.
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
-    /// Delete a QUIC uni channel.
+    /// Deletes an AQC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
+
+    //
+    // AQC misc
+    //
+
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
-
-    /// Query devices on team.
-    async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
-    /// Query device role.
-    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
-    /// Query device keybundle.
-    async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
-    /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
-    /// Query AQC network ID.
-    async fn query_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Option<NetIdentifier>>;
-    // Query labels on team.
-    async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
-    /// Query whether a label exists.
-    async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
 }
 
 #[cfg(test)]

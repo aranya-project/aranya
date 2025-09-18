@@ -5,9 +5,9 @@ use std::time::Duration;
 mod common;
 
 use anyhow::{Context as _, Result};
-use aranya_client::aqc::AqcPeerChannel;
+use aranya_client::{aqc::AqcPeerChannel, ChanOp};
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
-use aranya_daemon_api::{text, ChanOp};
+use aranya_daemon_api::text;
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
@@ -21,39 +21,49 @@ use crate::common::{sleep, DevicesCtx};
 /// 2. Send and receive data via AQC channels.
 /// 3. Delete AQC channels.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_aqc_chans() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_aqc_chans").await?;
+async fn test_aqc_chans_basic() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_aqc_chans_basic").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    // Setup default roles and their management permissions.
+    let roles = devices.setup_default_roles(team_id).await?;
 
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let admin_team = devices.admin.client.team(team_id);
+    // Assign AQC network identifiers to members (operator can do this)
     let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
-
-    let label1 = operator_team.create_label(text!("label1")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label1, op)
+        .device(devices.memberb.id)
+        .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    // Create labels with operator as managing role (admin can create labels, delegates management to operator)
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.operator().id)
+        .await?;
+    let label2 = admin_team
+        .create_label(text!("label2"), roles.operator().id)
+        .await?;
+
+    // Sync so operator sees the new labels and CanManageLabel facts
+    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    operator_team.sync_now(admin_addr, None).await?;
+
+    // Now operator can assign the labels to member role since operator manages these labels
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label2, op)
+        .assign_label_to_role(roles.member().id, label1, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label2, op)
+        .assign_label_to_role(roles.member().id, label2, op)
         .await?;
 
     // wait for syncing.
@@ -281,41 +291,39 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    // Setup default roles and their management permissions.
+    let roles = devices.setup_default_roles(team_id).await?;
 
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let admin_team = devices.admin.client.team(team_id);
+    // Assign AQC network identifiers to members (operator can do this)
     let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
-
-    let label1 = operator_team.create_label(text!("label1")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label1, op)
+        .device(devices.memberb.id)
+        .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label2, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label2, op)
+    // Create label with operator as managing role (admin can create labels, delegates management to operator)
+    let label3 = admin_team
+        .create_label(text!("label3"), roles.operator().id)
         .await?;
 
-    let label3 = operator_team.create_label(text!("label3")).await?;
+    // Sync so operator sees the new labels and CanManageLabel facts
+    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    operator_team.sync_now(admin_addr, None).await?;
+
+    // For this test: assign label 3 to only the receiver device (memberb), we are testing if the sender (membera)
+    // can create a channel without the label assignment
     let op = ChanOp::SendRecv;
-    // assign label 3 to only the receiver, we are testing if the sender can create
-    // a channel without the label assignment
     operator_team
-        .assign_label(devices.memberb.id, label3, op)
+        .device(devices.memberb.id)
+        .assign_label(label3, op)
         .await?;
 
     // wait for syncing.
@@ -357,41 +365,39 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    // Setup default roles and their management permissions.
+    let roles = devices.setup_default_roles(team_id).await?;
 
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let admin_team = devices.admin.client.team(team_id);
+    // Assign AQC network identifiers to members (operator can do this)
     let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
-
-    let label1 = operator_team.create_label(text!("label1")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label1, op)
+        .device(devices.memberb.id)
+        .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label2, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label2, op)
+    // Create label with operator as managing role (admin can create labels, delegates management to operator)
+    let label3 = admin_team
+        .create_label(text!("label3"), roles.operator().id)
         .await?;
 
-    let label3 = operator_team.create_label(text!("label3")).await?;
+    // Sync so operator sees the new labels and CanManageLabel facts
+    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    operator_team.sync_now(admin_addr, None).await?;
+
+    // For this test: assign label 3 to only the sender device (membera), we are testing if the receiver (memberb)
+    // can receive a channel without the label assignment
     let op = ChanOp::SendRecv;
-    // assign label 3 to only the sender, we are testing if the receiver can receive
-    // a channel without the label assignment
     operator_team
-        .assign_label(devices.membera.id, label3, op)
+        .device(devices.membera.id)
+        .assign_label(label3, op)
         .await?;
 
     // wait for syncing.
@@ -433,33 +439,43 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    // Setup default roles and their management permissions.
+    let roles = devices.setup_default_roles(team_id).await?;
 
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let admin_team = devices.admin.client.team(team_id);
+    // Assign AQC network identifiers to members (operator can do this)
     let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
-
-    let label1 = operator_team.create_label(text!("label1")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label1, op)
+        .device(devices.memberb.id)
+        .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    // Create labels with operator as managing role (admin can create labels, delegates management to operator)
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.operator().id)
+        .await?;
+    let label2 = admin_team
+        .create_label(text!("label2"), roles.operator().id)
+        .await?;
+
+    // Sync so operator sees the new labels and CanManageLabel facts
+    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    operator_team.sync_now(admin_addr, None).await?;
+
+    // Assign labels to member role so both members can use AQC channels
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label2, op)
+        .assign_label_to_role(roles.member().id, label1, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label2, op)
+        .assign_label_to_role(roles.member().id, label2, op)
         .await?;
 
     // wait for syncing.
@@ -564,33 +580,43 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    // Setup default roles and their management permissions.
+    let roles = devices.setup_default_roles(team_id).await?;
 
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let admin_team = devices.admin.client.team(team_id);
+    // Assign AQC network identifiers to members (operator can do this)
     let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
-
-    let label1 = operator_team.create_label(text!("label1")).await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(devices.membera.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(devices.memberb.id, label1, op)
+        .device(devices.memberb.id)
+        .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    // Create labels with operator as managing role (admin can create labels, delegates management to operator)
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.operator().id)
+        .await?;
+    let label2 = admin_team
+        .create_label(text!("label2"), roles.operator().id)
+        .await?;
+
+    // Sync so operator sees the new labels and CanManageLabel facts
+    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    operator_team.sync_now(admin_addr, None).await?;
+
+    // Assign labels to member role so both members can use AQC channels
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label2, op)
+        .assign_label_to_role(roles.member().id, label1, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label2, op)
+        .assign_label_to_role(roles.member().id, label2, op)
         .await?;
 
     // wait for syncing.
