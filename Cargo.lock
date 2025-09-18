@@ -170,9 +170,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-codegen"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c0850521343f0b22cff93107d4c0d33f76c9ca6d7ebc3f0955f9d7f9186e499"
+checksum = "16faed5efc7cd2c7a9d9aaf27d2bc200a6025b22f6f2db87b02e9b89f94c3a2d"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -188,9 +188,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-core"
-version = "0.4.4"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f53f23e630c1d3b58d04b3f954e4245a6ecc121517fbb8a9410e8269c9328e4f"
+checksum = "58f8f0b5d93c2a27f4a4d890224700e03ff203ef106f55bdeababda5d91cc416"
 dependencies = [
  "aranya-capi-macro",
  "aranya-libc",
@@ -204,9 +204,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-macro"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e310ddefe8ec487d7c5b7a2d3c271d3d2b92b1c448f6b803aab0ee82aea3db2"
+checksum = "68caf5ef67ac1bfa84061b5a8b0c8dc395e0ef1962930fbe89e144383ea09f77"
 dependencies = [
  "aranya-capi-codegen",
  "proc-macro2",

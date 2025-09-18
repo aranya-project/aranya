@@ -38,10 +38,9 @@ wildcard_imports = "warn"
 aranya-fast-channels = { version = "0.12.0", features = ["alloc"] }
 aranya-afc-util = { version = "0.13.0", features = ["alloc"] }
 aranya-aqc-util = { version = "0.8.0", features = ["alloc"] }
-aranya-capi-core = { version = "0.4.4" }
-aranya-capi-codegen = { version = "0.3.3" }
+aranya-capi-core = { version = "0.5.0" }
+aranya-capi-codegen = { version = "0.4.0" }
 aranya-crypto = { version = "0.10.0", features = ["alloc", "aqc", "fs-keystore", "clone-aead", "std", "tls"] }
-aranya-policy-module = { version = "0.13.0" }
 aranya-crypto-ffi = { version = "0.13.0" }
 aranya-device-ffi = { version = "0.13.0" }
 aranya-envelope-ffi = { version = "0.13.0" }
