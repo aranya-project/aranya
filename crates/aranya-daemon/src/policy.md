@@ -30,7 +30,6 @@ higher role back down to `Member`.
   * Define/undefine channel label.
   * Assign/revoke channel label.
   * Set/unset AQC address & name.
-  * Set/unset AFC address & name.
 
 * Admin:
   * Assign/revoke Operator role.
@@ -43,7 +42,6 @@ higher role back down to `Member`.
   * Define channel label.
   * Assign/revoke channel label.
   * Set/unset AQC address & name.
-  * Set/unset AFC address & name.
 
 * Member:
   * Create/delete AQC channel.
