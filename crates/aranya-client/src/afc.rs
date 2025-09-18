@@ -29,7 +29,7 @@ use crate::{
 /// number has not been tampered with. It does not verify anything else about
 /// the sequence number.
 ///
-/// Sequence numbers are [comparable][PartialEq] and can be used to implement
+/// Sequence numbers are [comparable][Ord] and can be used to implement
 /// message reordering or replay protection (by rejecting duplicate sequence numbers).
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Seq(afc::Seq);
