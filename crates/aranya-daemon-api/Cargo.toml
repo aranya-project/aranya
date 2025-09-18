@@ -13,7 +13,7 @@ default = []
 # Preview features
 preview = []
 # Aranya Fast Channels
-afc = ["dep:aranya-fast-channels"]
+afc = []
 
 [lints]
 workspace = true
@@ -21,7 +21,7 @@ workspace = true
 
 [dependencies]
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true, features = ["alloc", "posix"], optional = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix"] }
 aranya-policy-text = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }

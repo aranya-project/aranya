@@ -21,8 +21,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
-use aranya_fast_channels::shm;
-pub use aranya_fast_channels::ChannelId as AfcChannelId;
+pub use aranya_fast_channels::{shm, ChannelId as AfcChannelId};
 pub use aranya_policy_text::{text, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
