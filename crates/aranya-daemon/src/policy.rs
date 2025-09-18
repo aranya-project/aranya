@@ -378,8 +378,7 @@ pub trait ActorExt {
     fn assign_label_to_device(
         &mut self,
         device_id: Id,
-        label_id: Id,
-        op: ChanOp,
+        net_identifier: Text,
     ) -> Result<(), ClientError>;
     fn assign_label_to_role(
         &mut self,

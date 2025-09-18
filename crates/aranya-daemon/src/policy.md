@@ -3846,7 +3846,7 @@ command QueryAqcNetworkNames {
 Creates a bidirectional AQC channel for off-graph messaging.
 
 ```policy
-action create_aqc_bidi_channel(peer_id id, label_id id) {
+ephemeral action create_aqc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author = get_device(author_id)
@@ -4086,7 +4086,7 @@ command AqcCreateBidiChannel {
 Creates a unidirectional AQC channel for off-graph messaging.
 
 ```policy
-action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
+ephemeral action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author = get_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
