@@ -48,7 +48,7 @@ impl fmt::Display for ChanOp {
 }
 
 /// Engine using policy from [`policy.md`].
-pub(crate) struct PolicyEngine<E, KS> {
+pub struct PolicyEngine<E, KS> {
     /// The underlying policy.
     pub(crate) policy: VmPolicy<E>,
     _eng: PhantomData<E>,
@@ -133,7 +133,7 @@ where
 
 /// Sink for effects.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct VecSink<E> {
+pub struct VecSink<E> {
     /// Effects from executing a policy action.
     pub(crate) effects: Vec<E>,
 }

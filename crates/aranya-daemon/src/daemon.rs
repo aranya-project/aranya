@@ -1,13 +1,13 @@
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_daemon_api::NetIdentifier;
 use aranya_crypto::{
     dangerous::spideroak_crypto::{import::Import, keys::SecretKey},
     default::DefaultEngine,
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
+use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -200,21 +200,15 @@ impl Daemon {
                 let peers = {
                     let mut peers = BTreeMap::new();
                     for graph_id in &graph_ids {
-                        let effects = client
-                            .actions(graph_id)
-                            .query_aqc_network_names()
-                            .await?;
-                        let graph_peers = BiBTreeMap::from_iter(
-                            effects
-                                .into_iter()
-                                .filter_map(|e| {
-                                    if let policy::Effect::QueryAqcNetworkNamesResult(e) = e {
-                                        Some((NetIdentifier(e.net_id), e.device_id.into()))
-                                    } else {
-                                        None
-                                    }
-                                })
-                        );
+                        let effects = client.actions(graph_id).query_aqc_network_names().await?;
+                        let graph_peers =
+                            BiBTreeMap::from_iter(effects.into_iter().filter_map(|e| {
+                                if let policy::Effect::QueryAqcNetworkNamesResult(e) = e {
+                                    Some((NetIdentifier(e.net_id), e.device_id.into()))
+                                } else {
+                                    None
+                                }
+                            }));
                         peers.insert(*graph_id, graph_peers);
                     }
                     peers

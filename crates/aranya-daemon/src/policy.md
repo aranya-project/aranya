@@ -2463,8 +2463,8 @@ command AddDevice {
 
 ```policy
 // Reports whether a device can remove itself from the team.
-// Owners can only remove themselves if there are other owners remaining.
-// Other roles can always remove themselves.
+// Owners can only remove themselves if there are other owners
+// remaining. Other roles can always remove themselves.
 function can_remove_self(device_id id) bool {
     let maybe_role = try_get_assigned_role(device_id)
     if maybe_role is None {
@@ -3744,6 +3744,7 @@ command SetAqcNetworkName {
 
         let author = get_author(envelope)
         let device = get_device(this.device_id)
+        check device_has_simple_perm(author.device_id, SimplePerm::SetAqcNetworkName)
 
         let opt_net_id = aqc_net_id(this.device_id)
 
@@ -3801,6 +3802,7 @@ command UnsetAqcNetworkName {
 
         let author = get_author(envelope)
         let device = get_device(this.device_id)
+        check device_has_simple_perm(author.device_id, SimplePerm::UnsetAqcNetworkName)
 
         check exists AqcNetId[device_id: this.device_id]
 

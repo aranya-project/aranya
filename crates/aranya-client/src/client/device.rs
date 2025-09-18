@@ -32,7 +32,7 @@ impl Devices {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[DeviceId] {
-        &*self.data
+        &self.data
     }
 }
 

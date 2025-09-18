@@ -12,8 +12,6 @@ use std::{
     sync::Arc,
 };
 
-use crate::{EN, InvalidGraphs};
-
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, Engine, PeerCache, Sink};
@@ -29,6 +27,7 @@ use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
     vm_policy::VecSink,
+    InvalidGraphs, EN,
 };
 
 pub mod quic;
@@ -307,13 +306,13 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
+    pub fn client(&self) -> &crate::aranya::Client<EN, crate::SP> {
         &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, crate::SP> {
         &mut self.client
     }
 }

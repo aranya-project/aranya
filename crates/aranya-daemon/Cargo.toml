@@ -45,7 +45,6 @@ ciborium = { workspace = true }
 clap = { workspace = true }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
-itertools = { version = "0.14" }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }

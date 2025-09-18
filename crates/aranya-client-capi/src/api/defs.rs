@@ -248,8 +248,8 @@ pub unsafe fn client_init(
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
         aranya_client::Client::builder()
-            .daemon_uds_path(daemon_socket)
-            .aqc_server_addr(&aqc_addr)
+            .with_daemon_uds_path(daemon_socket)
+            .with_daemon_aqc_addr(&aqc_addr)
             .connect()
     })?;
 
@@ -342,7 +342,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 104, align = 8)]
+#[aranya_capi_core::opaque(size = 112, align = 8)]
 pub type Role = Safe<imp::Role>;
 
 /// Uniquely identifies a [`Role`].
@@ -1030,9 +1030,26 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// @relates AranyaClient.
 pub fn setup_default_riles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).setup_default_roles())?;
+
+    // First get the owner role ID by looking at existing roles
+    let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
+
+    let owner_role = roles
+        .into_iter()
+        .find(|role| role.name == "owner" && role.default)
+        .ok_or_else(|| {
+            imp::Error::InvalidArg(InvalidArg::new(
+                "setup_default_roles",
+                "owner role not found",
+            ))
+        })?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .setup_default_roles(owner_role.id),
+    )?;
     Ok(())
 }
 
@@ -1154,13 +1171,13 @@ pub fn assign_label(
     op: ChanOp,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).assign_label(
-            device.into(),
-            label_id.into(),
-            op.into(),
-        ))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .device(device.into())
+            .assign_label(label_id.into(), op.into()),
+    )?;
     Ok(())
 }
 
@@ -1185,7 +1202,8 @@ pub fn revoke_label(
         client
             .inner
             .team(team.into())
-            .revoke_label(device.into(), label_id.into()),
+            .device(device.into())
+            .revoke_label(label_id.into()),
     )?;
     Ok(())
 }
@@ -1356,12 +1374,9 @@ pub fn remove_device_from_team(
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .remove_device_from_team(device.into()),
-    )?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).remove_device(device.into()))?;
     Ok(())
 }
 
@@ -1469,7 +1484,7 @@ pub unsafe fn query_devices_on_team(
     let client = client.imp();
     let data = client
         .rt
-        .block_on(client.inner.team(team.into()).queries().devices_on_team())?;
+        .block_on(client.inner.team(team.into()).devices())?;
     let data = data.__data();
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     if *devices_len < data.len() {
@@ -1506,8 +1521,8 @@ pub unsafe fn query_device_keybundle(
         client
             .inner
             .team(team.into())
-            .queries()
-            .device_keybundle(device.into()),
+            .device(device.into())
+            .keybundle(),
     )?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
@@ -1539,8 +1554,8 @@ pub unsafe fn query_device_label_assignments(
         client
             .inner
             .team(team.into())
-            .queries()
-            .device_label_assignments(device.into()),
+            .device(device.into())
+            .label_assignments(),
     )?;
     let data = data.__data();
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
@@ -1576,7 +1591,7 @@ pub unsafe fn query_labels(
     let client = client.imp();
     let data = client
         .rt
-        .block_on(client.inner.team(team.into()).queries().labels())?;
+        .block_on(client.inner.team(team.into()).labels())?;
     let data = data.__data();
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
@@ -1605,12 +1620,9 @@ pub unsafe fn query_label_exists(
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
     let client = client.imp();
-    let label_result = client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .label(label.into()),
-    )?;
+    let label_result = client
+        .rt
+        .block_on(client.inner.team(team.into()).label(label.into()))?;
     let exists = label_result.is_some();
     Ok(exists)
 }

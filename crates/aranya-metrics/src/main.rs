@@ -389,14 +389,22 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // TODO: Need to provide a proper managing_role_id once roles are set up
     // For now, using a placeholder role ID
     let managing_role_id = aranya_client::RoleId::from([0u8; 32]); // Placeholder
-    let label3 = operator.create_label(text!("label3"), managing_role_id).await?;
+    let label3 = operator
+        .create_label(text!("label3"), managing_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
 
     info!("assigning label to membera");
-    operator.device(ctx.membera.id).assign_label(label3, op).await?;
+    operator
+        .device(ctx.membera.id)
+        .assign_label(label3, op)
+        .await?;
 
     info!("assigning label to memberb");
-    operator.device(ctx.memberb.id).assign_label(label3, op).await?;
+    operator
+        .device(ctx.memberb.id)
+        .assign_label(label3, op)
+        .await?;
 
     membera.sync_now(operator_addr.into(), None).await?;
     memberb.sync_now(operator_addr.into(), None).await?;

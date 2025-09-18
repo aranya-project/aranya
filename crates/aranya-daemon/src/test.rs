@@ -334,15 +334,72 @@ impl TestCtx {
         let membera = team.membera;
         let memberb = team.memberb;
 
-        // team setup
+        // team setup - first setup default roles
+        let _team_id = TeamId::from(*owner.graph_id.as_array());
+
+        // Get owner role ID from existing roles
+        let role_effects = owner.actions().query_team_roles().await?;
+        let roles: Vec<_> = role_effects
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryTeamRolesResult(result) = e {
+                    Some(aranya_daemon_api::Role {
+                        id: result.role_id.into(),
+                        name: result.name,
+                        author_id: result.author_id.into(),
+                        default: result.default,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let owner_role = roles
+            .into_iter()
+            .find(|role| role.name.as_str() == "owner" && role.default)
+            .context("owner role not found")?;
+
+        // Setup default roles (admin, operator, member)
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&admin.pk)?)
+            .setup_default_roles(owner_role.id.into_id().into())
+            .await
+            .context("unable to setup default roles")?;
+
+        // Now get the role IDs for admin and operator
+        let all_role_effects = owner.actions().query_team_roles().await?;
+        let all_roles: Vec<_> = all_role_effects
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryTeamRolesResult(result) = e {
+                    Some(aranya_daemon_api::Role {
+                        id: result.role_id.into(),
+                        name: result.name,
+                        author_id: result.author_id.into(),
+                        default: result.default,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let admin_role = all_roles
+            .iter()
+            .find(|role| role.name.as_str() == "admin" && role.default)
+            .context("admin role not found after setup")?;
+        let operator_role = all_roles
+            .iter()
+            .find(|role| role.name.as_str() == "operator" && role.default)
+            .context("operator role not found after setup")?;
+
+        owner
+            .actions()
+            .add_device(DeviceKeyBundle::try_from(&admin.pk)?, None)
             .await
             .context("unable to add admin member")?;
         owner
             .actions()
-            .assign_role(admin.pk.ident_pk.id()?, Role::Admin)
+            .assign_role(admin.pk.ident_pk.id()?, admin_role.id.into_id().into())
             .await
             .context("unable to elevate admin role")?;
         admin.sync_expect(owner, Some(3)).await?;
@@ -363,12 +420,15 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&operator.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&operator.pk)?, None)
             .await
             .context("unable to add operator member")?;
         owner
             .actions()
-            .assign_role(operator.pk.ident_pk.id()?, Role::Operator)
+            .assign_role(
+                operator.pk.ident_pk.id()?,
+                operator_role.id.into_id().into(),
+            )
             .await
             .context("unable to elevate operator role")?;
         operator.sync_expect(owner, Some(5)).await?;
@@ -385,13 +445,13 @@ impl TestCtx {
 
         operator
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&membera.pk)?, None)
             .await
             .context("unable to add membera member")?;
         membera.sync_expect(admin, Some(3)).await?;
         operator
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&memberb.pk)?, None)
             .await
             .context("unable to add memberb member")?;
         memberb.sync_expect(admin, Some(3)).await?;

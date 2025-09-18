@@ -5,13 +5,9 @@ use std::time::Duration;
 mod common;
 
 use anyhow::{Context as _, Result};
-use aranya_client::{
-    aqc::AqcPeerChannel,
-    client::{LabelId, NetIdentifier, TeamId},
-};
+use aranya_client::{aqc::AqcPeerChannel, ChanOp};
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
 use aranya_daemon_api::text;
-use aranya_client::ChanOp;
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
@@ -50,8 +46,12 @@ async fn test_aqc_chans_basic() -> Result<()> {
         .await?;
 
     // Create labels with operator as managing role (admin can create labels, delegates management to operator)
-    let label1 = admin_team.create_label(text!("label1"), roles.operator().id).await?;
-    let label2 = admin_team.create_label(text!("label2"), roles.operator().id).await?;
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.operator().id)
+        .await?;
+    let label2 = admin_team
+        .create_label(text!("label2"), roles.operator().id)
+        .await?;
 
     // Sync so operator sees the new labels and CanManageLabel facts
     let admin_addr = devices.admin.aranya_local_addr().await?.into();
@@ -309,10 +309,10 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    // Create labels with operator as managing role (admin can create labels, delegates management to operator)
-    let label1 = admin_team.create_label(text!("label1"), roles.operator().id).await?;
-    let label2 = admin_team.create_label(text!("label2"), roles.operator().id).await?;
-    let label3 = admin_team.create_label(text!("label3"), roles.operator().id).await?;
+    // Create label with operator as managing role (admin can create labels, delegates management to operator)
+    let label3 = admin_team
+        .create_label(text!("label3"), roles.operator().id)
+        .await?;
 
     // Sync so operator sees the new labels and CanManageLabel facts
     let admin_addr = devices.admin.aranya_local_addr().await?.into();
@@ -383,10 +383,10 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.aqc_net_id())
         .await?;
 
-    // Create labels with operator as managing role (admin can create labels, delegates management to operator)
-    let label1 = admin_team.create_label(text!("label1"), roles.operator().id).await?;
-    let label2 = admin_team.create_label(text!("label2"), roles.operator().id).await?;
-    let label3 = admin_team.create_label(text!("label3"), roles.operator().id).await?;
+    // Create label with operator as managing role (admin can create labels, delegates management to operator)
+    let label3 = admin_team
+        .create_label(text!("label3"), roles.operator().id)
+        .await?;
 
     // Sync so operator sees the new labels and CanManageLabel facts
     let admin_addr = devices.admin.aranya_local_addr().await?.into();
@@ -458,8 +458,12 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .await?;
 
     // Create labels with operator as managing role (admin can create labels, delegates management to operator)
-    let label1 = admin_team.create_label(text!("label1"), roles.operator().id).await?;
-    let label2 = admin_team.create_label(text!("label2"), roles.operator().id).await?;
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.operator().id)
+        .await?;
+    let label2 = admin_team
+        .create_label(text!("label2"), roles.operator().id)
+        .await?;
 
     // Sync so operator sees the new labels and CanManageLabel facts
     let admin_addr = devices.admin.aranya_local_addr().await?.into();
@@ -595,8 +599,12 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .await?;
 
     // Create labels with operator as managing role (admin can create labels, delegates management to operator)
-    let label1 = admin_team.create_label(text!("label1"), roles.operator().id).await?;
-    let label2 = admin_team.create_label(text!("label2"), roles.operator().id).await?;
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.operator().id)
+        .await?;
+    let label2 = admin_team
+        .create_label(text!("label2"), roles.operator().id)
+        .await?;
 
     // Sync so operator sees the new labels and CanManageLabel facts
     let admin_addr = devices.admin.aranya_local_addr().await?.into();
