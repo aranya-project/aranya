@@ -1,22 +1,24 @@
-use anyhow::{bail, Context as _, Result};
-use aranya_client::afc::{Channel as AfcChannel, Channels as AfcChannels};
-use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
-};
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
-use aranya_fast_channels::shm;
-use aranya_util::Addr;
-use backon::{ExponentialBuilder, Retryable};
-use buggy::BugExt;
-use bytes::Bytes;
-use futures_util::future::try_join;
 use std::{
+    str::FromStr,
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     time::Duration,
 };
+
+use anyhow::{bail, Context as _, Result};
+use aranya_client::afc::{Channel as AfcChannel, Channels as AfcChannels};
+use aranya_client::{
+    client::{DeviceId, KeyBundle, ChanOp, NetIdentifier, Role},
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+};
+use aranya_daemon_api::{text};
+use aranya_util::Addr;
+use backon::{ExponentialBuilder, Retryable};
+use buggy::BugExt;
+use bytes::Bytes;
+use futures_util::future::try_join;
 use tempfile::TempDir;
 use tokio::{
     fs,
@@ -78,12 +80,6 @@ impl ClientCtx {
 
         let daemon = {
             let shm = format!("/shm_{}", user_name);
-            let shm_nul = format!("{}\0", shm);
-            let shm_path: &shm::Path = shm_nul
-                .as_str()
-                .try_into()
-                .context("unable to parse AFC shared memory path")?;
-            let _ = shm::unlink(&shm_path);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -165,12 +161,8 @@ impl ClientCtx {
     }
 
     fn aqc_net_id(&self) -> NetIdentifier {
-        NetIdentifier(
-            self.aqc_addr
-                .to_string()
-                .try_into()
-                .expect("addr is valid text"),
-        )
+        NetIdentifier::from_str(self.aqc_addr.to_string().as_str())
+            .expect("expected net identifier")
     }
 }
 

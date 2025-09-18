@@ -11,9 +11,9 @@ rust-version.workspace = true
 [features]
 default = []
 # Preview features
-preview = ["afc"]
+preview = []
 # Aranya Fast Channels
-afc = []
+afc = ["dep:aranya-fast-channels"]
 
 [lints]
 workspace = true
@@ -21,7 +21,7 @@ workspace = true
 
 [dependencies]
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix"], optional = true }
 aranya-policy-text = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
@@ -45,4 +45,4 @@ test-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
 [package.metadata.cargo-all-features]
-always_include_features = ["preview", "afc"]
+always_include_features = ["preview"]

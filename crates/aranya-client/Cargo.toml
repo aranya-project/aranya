@@ -14,9 +14,9 @@ workspace = true
 [features]
 default = []
 # Preview features
-preview = ["afc"]
+preview = ["aranya-daemon-api/preview"]
 # Aranya Fast Channels
-afc = []
+afc = ["aranya-daemon-api/afc"]
 
 # Enable debugging.
 debug = []
@@ -53,5 +53,8 @@ name = "tests"
 path = "tests/tests.rs"
 
 [package.metadata.cargo-all-features]
-# TODO: remove in #448
-always_include_features = ["default", "preview", "afc"]
+always_include_features = [
+    # TODO: remove in #448
+    "default",
+    "preview",
+]

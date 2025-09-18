@@ -10,17 +10,12 @@ rust-version.workspace = true
 
 [features]
 default = []
-# Preview features
-preview = ["afc"]
-# Aranya Fast Channels
-afc = []
 
 [lints]
 workspace = true
 
 
 [dependencies]
-aranya-fast-channels = { workspace = true, features = ["posix"] }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
