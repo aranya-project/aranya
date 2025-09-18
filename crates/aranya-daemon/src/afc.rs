@@ -15,7 +15,7 @@ use aranya_crypto::{
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
 use aranya_daemon_api::{self as api};
-#[cfg(test)]
+#[cfg(any(test, feature = "example"))]
 use aranya_fast_channels::shm;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
@@ -47,7 +47,7 @@ where
     fn new(cfg: AfcConfig) -> Result<Self> {
         debug!("setting up afc shm write side: {:?}", cfg.shm_path);
         let write = {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "example"))]
             let _ = shm::unlink(&cfg.shm_path);
             // TODO: check if shm path exists first?
             match WriteState::open(
@@ -100,7 +100,7 @@ where
 impl<E> Drop for AfcShm<E> {
     fn drop(&mut self) {
         {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "example"))]
             let _ = shm::unlink(&self.cfg.shm_path);
         }
     }
