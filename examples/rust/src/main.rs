@@ -77,6 +77,7 @@ impl ClientCtx {
 
         let daemon = {
             let shm = format!("/shm_{}", user_name);
+            let _ = rustix::shm::unlink(&shm);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
