@@ -2,7 +2,6 @@
 
 use std::{
     fmt::Debug,
-    sync::atomic::{AtomicU32, Ordering},
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -81,20 +80,6 @@ where
 
         Ok(Self { cfg, write })
     }
-
-    fn next_unused_id(&self) -> Result<u32> {
-        let mut out = 0;
-        self.write.remove_if(|ch_id| {
-            let inner = ch_id.to_u32();
-            if inner >= out {
-                out = inner + 1;
-            }
-
-            false
-        })?;
-
-        Ok(out)
-    }
 }
 
 impl<E> Drop for AfcShm<E> {
@@ -121,8 +106,6 @@ pub(crate) struct Afc<E, C, KS> {
     handler: Mutex<Handler<AranyaStore<KS>>>,
     #[derive_where(skip(Debug))]
     eng: Mutex<E>,
-    /// Channel ID counter.
-    channel_id: AtomicU32,
     /// AFC shared memory.
     shm: Mutex<AfcShm<C>>,
 }
@@ -139,13 +122,10 @@ impl<E, C, KS> Afc<E, C, KS> {
         C: CipherSuite,
     {
         let shm = AfcShm::new(cfg)?;
-        let channel_id = shm.next_unused_id()?;
-
         Ok(Self {
             device_id,
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
-            channel_id: AtomicU32::new(channel_id),
             shm: Mutex::new(shm),
         })
     }
@@ -189,14 +169,11 @@ where
         let keys: BidiKeys<RawSealKey<<E as Engine>::CS>, RawOpenKey<<E as Engine>::CS>> = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
-        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        debug!(?channel_id, "creating bidi channel");
-        self.shm
+        let channel_id = self.shm
             .lock()
             .await
             .write
             .add(
-                channel_id.into(),
                 Directed::Bidirectional {
                     seal: keys.seal,
                     open: keys.open,
@@ -204,6 +181,7 @@ where
                 info.label_id,
             )
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+        debug!(?channel_id, "creating bidi channel");
         Ok(channel_id.into())
     }
 
@@ -233,19 +211,17 @@ where
         let BidiKeys { seal, open } = self
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
-        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
-        debug!(?channel_id, "receiving bidi channel");
-        self.shm
-            .lock()
-            .await
-            .write
-            .add(
-                channel_id.into(),
-                Directed::Bidirectional { seal, open },
-                info.label_id,
-            )
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-
+        let channel_id = self.shm
+        .lock()
+        .await
+        .write
+        .add(
+            Directed::Bidirectional { seal, open },
+            info.label_id,
+        )
+        .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+    debug!(?channel_id, "receiving bidi channel");
+    
         Ok(channel_id.into())
     }
 
@@ -276,14 +252,13 @@ where
         let key = self
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
-        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        let channel_id = self.shm
+        .lock()
+        .await
+        .write
+        .add(key.into(), info.label_id)
+        .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
-        self.shm
-            .lock()
-            .await
-            .write
-            .add(channel_id.into(), key.into(), info.label_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         Ok(channel_id.into())
     }
 
@@ -314,14 +289,13 @@ where
         let key = self
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
-        let channel_id = self.channel_id.fetch_add(1, Ordering::Relaxed);
+        let channel_id = self.shm
+        .lock()
+        .await
+        .write
+        .add(key.into(), info.label_id)
+        .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving uni channel");
-        self.shm
-            .lock()
-            .await
-            .write
-            .add(channel_id.into(), key.into(), info.label_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         Ok(channel_id.into())
     }
 
