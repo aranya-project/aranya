@@ -1,19 +1,21 @@
 //! Client-daemon connection.
 
-use std::{fmt::Debug, io, net::SocketAddr, path::Path};
+use core::fmt;
+use std::{fmt::Debug, io, net::SocketAddr, path::Path, str::FromStr};
 
 use anyhow::Context as _;
-use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
+use aranya_crypto::{custom_id, Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
+    self as api,
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS,
+    DaemonApiClient, Label, Text, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
+use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
@@ -28,7 +30,126 @@ use crate::{
     aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
+    Error,
 };
+
+custom_id! {
+    /// The Device ID.
+    pub struct DeviceId;
+}
+
+custom_id! {
+    /// The Team ID (a.k.a Graph ID).
+    pub struct TeamId;
+}
+
+custom_id! {
+    /// An Aranya label ID.
+    ///
+    /// Both peers must have the same label ID assigned to them before creating a channel between themselves with that label ID.
+    pub struct LabelId;
+}
+
+/// Valid channel operations for a label assignment.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    RecvOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    SendOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    SendRecv,
+}
+
+impl From<api::ChanOp> for ChanOp {
+    fn from(value: api::ChanOp) -> Self {
+        match value {
+            api::ChanOp::SendRecv => ChanOp::SendRecv,
+            api::ChanOp::RecvOnly => ChanOp::RecvOnly,
+            api::ChanOp::SendOnly => ChanOp::SendOnly,
+        }
+    }
+}
+
+impl From<ChanOp> for api::ChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::SendRecv => api::ChanOp::SendRecv,
+            ChanOp::RecvOnly => api::ChanOp::RecvOnly,
+            ChanOp::SendOnly => api::ChanOp::SendOnly,
+        }
+    }
+}
+
+/// A device's role on the team.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum Role {
+    /// Owner role.
+    Owner,
+    /// Admin role.
+    Admin,
+    /// Operator role.
+    Operator,
+    /// Member role.
+    Member,
+}
+
+impl From<api::Role> for Role {
+    fn from(value: api::Role) -> Self {
+        match value {
+            api::Role::Owner => Role::Owner,
+            api::Role::Admin => Role::Admin,
+            api::Role::Operator => Role::Operator,
+            api::Role::Member => Role::Member,
+        }
+    }
+}
+
+impl From<Role> for api::Role {
+    fn from(value: Role) -> Self {
+        match value {
+            Role::Owner => api::Role::Owner,
+            Role::Admin => api::Role::Admin,
+            Role::Operator => api::Role::Operator,
+            Role::Member => api::Role::Member,
+        }
+    }
+}
+
+/// A device's public key bundle.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct KeyBundle(api::KeyBundle);
+
+impl KeyBundle {
+    /// Return public encoding key bytes.
+    pub fn encoding(&self) -> Vec<u8> {
+        self.0.encoding.clone()
+    }
+}
+
+/// A device's network identifier.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+// TODO: capi needs this to be pub.
+pub struct NetIdentifier(pub api::NetIdentifier);
+
+impl FromStr for NetIdentifier {
+    fn from_str(s: &str) -> Result<Self, Error> {
+        Ok(Self(api::NetIdentifier(
+            s.to_string().try_into().expect("addr is valid text"),
+        )))
+    }
+
+    type Err = Error;
+}
+
+impl fmt::Display for NetIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
 
 /// List of device IDs.
 #[derive(Debug)]
@@ -256,20 +377,25 @@ impl Client {
 
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&self) -> Result<KeyBundle> {
-        self.daemon
-            .get_key_bundle(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+        Ok(KeyBundle(
+            self.daemon
+                .get_key_bundle(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&self) -> Result<DeviceId> {
-        self.daemon
+        Ok(self
+            .daemon
             .get_device_id(context::current())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            .into_id()
+            .into())
     }
 
     /// Create a new graph/team with the current device as the owner.
@@ -279,7 +405,9 @@ impl Client {
             .create_team(context::current(), cfg.into())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+            .map_err(aranya_error)?
+            .into_id()
+            .into();
         Ok(Team {
             client: self,
             team_id,
@@ -303,7 +431,7 @@ impl Client {
     /// Add a team to local device storage.
     pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
         let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
-        let team_id = cfg.team_id;
+        let team_id = cfg.team_id.into_id().into();
 
         self.daemon
             .add_team(context::current(), cfg)
@@ -319,7 +447,7 @@ impl Client {
     /// Remove a team from local device storage.
     pub async fn remove_team(&self, team_id: TeamId) -> Result<()> {
         self.daemon
-            .remove_team(context::current(), team_id)
+            .remove_team(context::current(), team_id.into_id().into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -372,7 +500,11 @@ impl Team<'_> {
         let wrapped = self
             .client
             .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.team_id, peer_enc_pk)
+            .encrypt_psk_seed_for_peer(
+                context::current(),
+                self.team_id.into_id().into(),
+                peer_enc_pk,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -384,7 +516,12 @@ impl Team<'_> {
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.team_id, config.into())
+            .add_sync_peer(
+                context::current(),
+                addr,
+                self.team_id.into_id().into(),
+                config.into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -397,7 +534,12 @@ impl Team<'_> {
     pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.team_id, cfg.map(Into::into))
+            .sync_now(
+                context::current(),
+                addr,
+                self.team_id.into_id().into(),
+                cfg.map(Into::into),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -407,7 +549,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.team_id)
+            .remove_sync_peer(context::current(), addr, self.team_id.into_id().into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -417,7 +559,7 @@ impl Team<'_> {
     pub async fn close_team(&self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.team_id)
+            .close_team(context::current(), self.team_id.into_id().into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -427,37 +569,51 @@ impl Team<'_> {
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.team_id, keys)
+            .add_device_to_team(context::current(), self.team_id.into_id().into(), keys.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Remove a device from the team.
-    pub async fn remove_device_from_team(&self, device: DeviceId) -> Result<()> {
+    pub async fn remove_device_from_team(&self, device_id: DeviceId) -> Result<()> {
         self.client
             .daemon
-            .remove_device_from_team(context::current(), self.team_id, device)
+            .remove_device_from_team(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Assign a role to a device.
-    pub async fn assign_role(&self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn assign_role(&self, device_id: DeviceId, role: Role) -> Result<()> {
         self.client
             .daemon
-            .assign_role(context::current(), self.team_id, device, role)
+            .assign_role(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+                role.into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
-    pub async fn revoke_role(&self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn revoke_role(&self, device_id: DeviceId, role: Role) -> Result<()> {
         self.client
             .daemon
-            .revoke_role(context::current(), self.team_id, device, role)
+            .revoke_role(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+                role.into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -465,17 +621,22 @@ impl Team<'_> {
 
     /// Associate a network identifier to a device for use with AQC.
     ///
-    /// If the address already exists for this device, it is replaced with the new address. Capable
+    /// If the address already exists for this device_id.into_id().into(), it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
     pub async fn assign_aqc_net_identifier(
         &self,
-        device: DeviceId,
+        device_id: DeviceId,
         net_identifier: NetIdentifier,
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_aqc_net_identifier(context::current(), self.team_id, device, net_identifier)
+            .assign_aqc_net_identifier(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+                net_identifier.0,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -484,12 +645,17 @@ impl Team<'_> {
     /// Disassociate an AQC network identifier from a device.
     pub async fn remove_aqc_net_identifier(
         &self,
-        device: DeviceId,
+        device_id: DeviceId,
         net_identifier: NetIdentifier,
     ) -> Result<()> {
         self.client
             .daemon
-            .remove_aqc_net_identifier(context::current(), self.team_id, device, net_identifier)
+            .remove_aqc_net_identifier(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+                net_identifier.0,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -497,19 +663,30 @@ impl Team<'_> {
 
     /// Create a label.
     pub async fn create_label(&self, label_name: Text) -> Result<LabelId> {
-        self.client
+        Ok(self
+            .client
             .daemon
-            .create_label(context::current(), self.team_id, label_name)
+            .create_label(
+                context::current(),
+                self.team_id.into_id().into(),
+                label_name,
+            )
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            .into_id()
+            .into())
     }
 
     /// Delete a label.
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.team_id, label_id)
+            .delete_label(
+                context::current(),
+                self.team_id.into_id().into(),
+                label_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -518,23 +695,34 @@ impl Team<'_> {
     /// Assign a label to a device.
     pub async fn assign_label(
         &self,
-        device: DeviceId,
+        device_id: DeviceId,
         label_id: LabelId,
         op: ChanOp,
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_label(context::current(), self.team_id, device, label_id, op)
+            .assign_label(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+                label_id.into_id().into(),
+                op.into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Revoke a label from a device.
-    pub async fn revoke_label(&self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    pub async fn revoke_label(&self, device_id: DeviceId, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .revoke_label(context::current(), self.team_id, device, label_id)
+            .revoke_label(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+                label_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -564,39 +752,58 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_devices_on_team(context::current(), self.team_id)
+            .query_devices_on_team(context::current(), self.team_id.into_id().into())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+            .map_err(aranya_error)?
+            .iter()
+            .map(|d| d.into_id().into())
+            .collect();
         Ok(Devices { data })
     }
 
     /// Returns the role of the current device.
-    pub async fn device_role(&self, device: DeviceId) -> Result<Role> {
-        self.client
+    pub async fn device_role(&self, device_id: DeviceId) -> Result<Role> {
+        Ok(self
+            .client
             .daemon
-            .query_device_role(context::current(), self.team_id, device)
+            .query_device_role(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            .into())
     }
 
     /// Returns the keybundle of the current device.
-    pub async fn device_keybundle(&self, device: DeviceId) -> Result<KeyBundle> {
-        self.client
-            .daemon
-            .query_device_keybundle(context::current(), self.team_id, device)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+    pub async fn device_keybundle(&self, device_id: DeviceId) -> Result<KeyBundle> {
+        Ok(KeyBundle(
+            self.client
+                .daemon
+                .query_device_keybundle(
+                    context::current(),
+                    self.team_id.into_id().into(),
+                    device_id.into_id().into(),
+                )
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Returns a list of labels assiged to the current device.
-    pub async fn device_label_assignments(&self, device: DeviceId) -> Result<Labels> {
+    pub async fn device_label_assignments(&self, device_id: DeviceId) -> Result<Labels> {
         let data = self
             .client
             .daemon
-            .query_device_label_assignments(context::current(), self.team_id, device)
+            .query_device_label_assignments(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -604,20 +811,33 @@ impl Queries<'_> {
     }
 
     /// Returns the AQC network identifier assigned to the current device.
-    pub async fn aqc_net_identifier(&self, device: DeviceId) -> Result<Option<NetIdentifier>> {
-        self.client
+    pub async fn aqc_net_identifier(&self, device_id: DeviceId) -> Result<Option<NetIdentifier>> {
+        let net_identifier = self
+            .client
             .daemon
-            .query_aqc_net_identifier(context::current(), self.team_id, device)
+            .query_aqc_net_identifier(
+                context::current(),
+                self.team_id.into_id().into(),
+                device_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?;
+        if let Some(net_identifier) = net_identifier {
+            return Ok(Some(NetIdentifier(net_identifier)));
+        }
+        Ok(None)
     }
 
     /// Returns whether a label exists.
     pub async fn label_exists(&self, label_id: LabelId) -> Result<bool> {
         self.client
             .daemon
-            .query_label_exists(context::current(), self.team_id, label_id)
+            .query_label_exists(
+                context::current(),
+                self.team_id.into_id().into(),
+                label_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -628,7 +848,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_labels(context::current(), self.team_id)
+            .query_labels(context::current(), self.team_id.into_id().into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

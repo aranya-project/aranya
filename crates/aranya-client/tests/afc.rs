@@ -7,7 +7,8 @@ use {
     crate::common::DevicesCtx,
     anyhow::{bail, Context, Result},
     aranya_client::afc::{Channel, Channels, UniChannel},
-    aranya_daemon_api::{text, ChanOp},
+    aranya_client::client::ChanOp,
+    aranya_daemon_api::text,
 };
 
 /// Demonstrate creating a bidirectional AFC channel.
@@ -227,16 +228,8 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
         .context("unable to open afc message")?;
 
     // Delete channel.
-    let membera_channel_id = chan.channel_id();
-    membera_afc
-        .delete_channel(membera_channel_id)
-        .await
-        .context("unable to delete channel")?;
-    let memberb_channel_id = recv.channel_id();
-    memberb_afc
-        .delete_channel(memberb_channel_id)
-        .await
-        .context("unable to delete channel")?;
+    chan.delete().await.context("unable to delete channel")?;
+    recv.delete().await.context("unable to delete channel")?;
 
     Ok(())
 }
@@ -360,27 +353,11 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .context("unable to open afc message")?;
 
     // Delete channels.
-    let membera_channel_id = chan1.channel_id();
-    membera_afc
-        .delete_channel(membera_channel_id)
-        .await
-        .context("unable to delete channel")?;
-    let memberb_channel_id = recv1.channel_id();
-    memberb_afc
-        .delete_channel(memberb_channel_id)
-        .await
-        .context("unable to delete channel")?;
+    chan1.delete().await.context("unable to delete channel")?;
+    recv1.delete().await.context("unable to delete channel")?;
 
-    let membera_channel_id = chan2.channel_id();
-    membera_afc
-        .delete_channel(membera_channel_id)
-        .await
-        .context("unable to delete channel")?;
-    let memberb_channel_id = recv2.channel_id();
-    memberb_afc
-        .delete_channel(memberb_channel_id)
-        .await
-        .context("unable to delete channel")?;
+    chan2.delete().await.context("unable to delete channel")?;
+    recv2.delete().await.context("unable to delete channel")?;
 
     Ok(())
 }
@@ -682,16 +659,8 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .context("unable to open afc message")?;
 
     // Delete channel.
-    let membera_channel_id = chan.channel_id();
-    membera_afc
-        .delete_channel(membera_channel_id)
-        .await
-        .context("unable to delete channel")?;
-    let memberb_channel_id = recv.channel_id();
-    memberb_afc
-        .delete_channel(memberb_channel_id)
-        .await
-        .context("unable to delete channel")?;
+    chan.delete().await.context("unable to delete channel")?;
+    recv.delete().await.context("unable to delete channel")?;
 
     Ok(())
 }
@@ -814,27 +783,11 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .context("unable to open afc message")?;
 
     // Delete channels.
-    let membera_channel_id = chan1.channel_id();
-    membera_afc
-        .delete_channel(membera_channel_id)
-        .await
-        .context("unable to delete channel")?;
-    let memberb_channel_id = recv1.channel_id();
-    memberb_afc
-        .delete_channel(memberb_channel_id)
-        .await
-        .context("unable to delete channel")?;
+    chan1.delete().await.context("unable to delete channel")?;
+    recv1.delete().await.context("unable to delete channel")?;
 
-    let membera_channel_id = chan2.channel_id();
-    membera_afc
-        .delete_channel(membera_channel_id)
-        .await
-        .context("unable to delete channel")?;
-    let memberb_channel_id = recv2.channel_id();
-    memberb_afc
-        .delete_channel(memberb_channel_id)
-        .await
-        .context("unable to delete channel")?;
+    chan2.delete().await.context("unable to delete channel")?;
+    recv2.delete().await.context("unable to delete channel")?;
 
     Ok(())
 }

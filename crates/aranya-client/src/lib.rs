@@ -35,7 +35,7 @@ pub mod error;
 
 #[doc(inline)]
 pub use crate::{
-    client::{Client, Team},
+    client::{Client, DeviceId, LabelId, Team, TeamId},
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
         CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
