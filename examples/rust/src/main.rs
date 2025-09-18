@@ -2,7 +2,6 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
-    str::FromStr,
     time::Duration,
 };
 
@@ -12,7 +11,6 @@ use aranya_client::{
     CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
-use aranya_fast_channels::shm;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -78,9 +76,7 @@ impl ClientCtx {
         let work_dir = TempDir::with_prefix(user_name)?;
 
         let daemon = {
-            let shm = format!("/shm_{}\0", user_name);
-            let shm_path: &shm::Path = shm.as_str().try_into().context("unable to parse AFC shared memory path")?
-            let _ = shm::unlink(&shm_path);
+            let shm = format!("/shm_{}", user_name);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
