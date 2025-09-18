@@ -124,13 +124,21 @@ async fn test_add_devices() -> Result<()> {
         .await
         .context("owner should be able to add admin to team")?;
 
+    admin
+        .sync_now(team.owner.aranya_local_addr().await?.into(), None)
+        .await
+        .context("admin unable to sync with owner")?;
     sleep(SLEEP_INTERVAL).await;
 
     admin
         .add_device(team.operator.pk.clone(), Some(roles.operator().id))
         .await
-        .context("owner should be able to add operator to team")?;
+        .context("admin should be able to add operator to team")?;
 
+    operator
+        .sync_now(team.admin.aranya_local_addr().await?.into(), None)
+        .await
+        .context("operator unable to sync with admin")?;
     sleep(SLEEP_INTERVAL).await;
 
     for (name, kb) in [
@@ -141,6 +149,10 @@ async fn test_add_devices() -> Result<()> {
             .add_device(kb, None)
             .await
             .with_context(|| format!("admin should be able to add `{name}` to team"))?;
+        operator
+            .sync_now(team.admin.aranya_local_addr().await?.into(), None)
+            .await
+            .context("operator unable to sync with admin")?;
         sleep(SLEEP_INTERVAL).await;
         operator
             .assign_role(team.membera.id, roles.member().id)
@@ -168,8 +180,15 @@ async fn test_remove_devices() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    devices.add_all_sync_peers(team_id)
+        .await
+        .context("unable to add all sync peers")?;
+
+    // Setup default roles and their management permissions.
+    let roles = devices.setup_default_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
     let owner = devices.owner.client.team(team_id);
@@ -214,7 +233,7 @@ async fn test_query_functions() -> Result<()> {
         .context("unable to setup default roles")?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
 
     // Test all our fact database queries.
     let memberb = devices.membera.client.team(team_id);
@@ -267,11 +286,7 @@ async fn test_add_team() -> Result<()> {
     let team_id = owner.team_id();
     info!(?team_id);
 
-    let owner_role_id = owner.roles().await?.try_into_owner_role()?.id;
-    let roles = owner
-        .setup_default_roles(owner_role_id)
-        .await?
-        .try_into_default_roles()?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     // Add the admin as a new device.
     info!("adding admin to team");
@@ -352,12 +367,12 @@ async fn test_remove_team() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    devices.add_all_sync_peers(team_id)
+        .await
+        .context("unable to add all sync peers")?;
+
     let owner = devices.owner.client.team(team_id);
-    let owner_role_id = owner.roles().await?.try_into_owner_role()?.id;
-    let roles = owner
-        .setup_default_roles(owner_role_id)
-        .await?
-        .try_into_default_roles()?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     {
         let admin = devices.admin.client.team(team_id);
@@ -442,18 +457,10 @@ async fn test_multi_team_sync() -> Result<()> {
     info!(?team_id2);
 
     // Set up roles for team1
-    let owner_role_id1 = team1.roles().await?.try_into_owner_role()?.id;
-    let roles1 = team1
-        .setup_default_roles(owner_role_id1)
-        .await?
-        .try_into_default_roles()?;
+    let roles1 = devices.setup_default_roles(team_id1).await?;
 
     // Set up roles for team2
-    let owner_role_id2 = team2.roles().await?.try_into_owner_role()?.id;
-    let roles2 = team2
-        .setup_default_roles(owner_role_id2)
-        .await?
-        .try_into_default_roles()?;
+    let roles2 = devices.setup_default_roles(team_id2).await?;
 
     // Add the admin as a new device.
     info!("adding admin to team1");

@@ -1628,6 +1628,9 @@ command SetupDefaultRole {
         let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope)
 
+        let assign_role_perm = simple_perm_to_str(SimplePerm::AssignRole)
+        let revoke_role_perm = simple_perm_to_str(SimplePerm::RevokeRole)
+
         match this.name {
             DefaultRoleName::Admin => {
                 let add_device_perm = simple_perm_to_str(SimplePerm::AddDevice)
@@ -1649,6 +1652,8 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, create_label_perm)
                     assign_perm_to_role(role_id, delete_label_perm)
                     assign_perm_to_role(role_id, change_label_managing_role_perm)
+                    assign_perm_to_role(role_id, assign_role_perm)
+                    assign_perm_to_role(role_id, revoke_role_perm)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1677,6 +1682,8 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, revoke_label_perm)
                     assign_perm_to_role(role_id, set_aqc_network_name_perm)
                     assign_perm_to_role(role_id, unset_aqc_network_name_perm)
+                    assign_perm_to_role(role_id, assign_role_perm)
+                    assign_perm_to_role(role_id, revoke_role_perm)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1688,6 +1695,7 @@ command SetupDefaultRole {
                 }
             }
             DefaultRoleName::Member => {
+                let can_use_aqc_perm = simple_perm_to_str(SimplePerm::CanUseAqc)
                 let create_aqc_uni_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcUniChannel)
                 let create_aqc_bidi_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcBidiChannel)
 
@@ -1699,6 +1707,7 @@ command SetupDefaultRole {
                         owning_role_id: this.owning_role_id,
                     })
 
+                    assign_perm_to_role(role_id, can_use_aqc_perm)
                     assign_perm_to_role(role_id, create_aqc_uni_channel_perm)
                     assign_perm_to_role(role_id, create_aqc_bidi_channel_perm)
 
@@ -1808,7 +1817,22 @@ function get_assigned_role_id(device_id id) id {
     return get_assigned_role(device_id).role_id
 }
 
+// Returns the ID of the role assigned to the device if it exists.
+//
+// # Caveats
+//
+// - It does NOT check whether the device exists.
+function try_get_assigned_role_id(device_id id) optional id {
+    let role = try_get_assigned_role(device_id)
+    if role is None {
+        return None
+    }
+    return Some((unwrap role).role_id)
+}
+
 // Assigns the specified role to the device.
+//
+// It is an error if the device has already been assigned a role.
 //
 // # Required Permissions
 //
@@ -2254,6 +2278,9 @@ command CreateTeam {
             create RoleHasPerm[role_id: owner_role_id, perm: "AssignLabel"]=>{}
             create RoleHasPerm[role_id: owner_role_id, perm: "RevokeLabel"]=>{}
 
+            create RoleHasPerm[role_id: owner_role_id, perm: "AssignRole"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "RevokeRole"]=>{}
+
             create RoleHasPerm[role_id: owner_role_id, perm: "SetAqcNetworkName"]=>{}
             create RoleHasPerm[role_id: owner_role_id, perm: "UnsetAqcNetworkName"]=>{}
 
@@ -2378,11 +2405,17 @@ command TerminateTeam {
 // # Required Permissions
 //
 // - `AddDevice`
-// - `CanAssignRole(role_id)` for the initial role, if any.
+// - `CanAssignRole(role_id)` for the initial role, if provided.
 action add_device(device_keys struct KeyBundle, initial_role_id optional id) {
     publish AddDevice {
         device_keys: device_keys,
-        initial_role_id: initial_role_id,
+    }
+    if initial_role_id is Some {
+        let role_id = unwrap initial_role_id
+        publish AssignRole {
+            device_id: derive_device_key_ids(device_keys).device_id,
+            role_id: role_id,
+        }
     }
 }
 
@@ -2398,9 +2431,6 @@ command AddDevice {
     fields {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
-        // The ID of the role that should be assigned to the
-        // device.
-        initial_role_id optional id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2413,8 +2443,6 @@ command AddDevice {
         check device_has_simple_perm(author.device_id, SimplePerm::AddDevice)
 
         let dev_key_ids = derive_device_key_ids(this.device_keys)
-
-        // TODO(eric): assign the role if provided.
 
         // At this point we believe the following to be true:
         //
@@ -2432,6 +2460,26 @@ command AddDevice {
 ```
 
 ### Removing Devices
+
+```policy
+// Reports whether a device can remove itself from the team.
+// Owners can only remove themselves if there are other owners remaining.
+// Other roles can always remove themselves.
+function can_remove_self(device_id id) bool {
+    let maybe_role = try_get_assigned_role(device_id)
+    if maybe_role is None {
+        // Device has no role, can be removed
+        return true
+    }
+    let role = unwrap maybe_role
+    if role.default && role.name == "owner" {
+        // Owner can only remove self if there are other owners
+        return at_least 2 AssignedRole[device_id: ?]=>{role_id: role.role_id}
+    }
+    // All other roles can remove themselves
+    return true
+}
+```
 
 ```policy
 // Removes a device from the team.
@@ -2463,6 +2511,14 @@ command RemoveDevice {
 
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::RemoveDevice)
+
+        // The target device must exist.
+        check exists Device[device_id: this.device_id]
+
+        // For self-removal, ensure it's allowed (e.g., owners can't remove themselves if they're the last owner)
+        if author.device_id == this.device_id {
+            check can_remove_self(this.device_id)
+        }
 
         // TODO(eric): check that author dominates target?
 
@@ -2525,6 +2581,7 @@ command RemoveDevice {
 
             emit DeviceRemoved {
                 device_id: this.device_id,
+                author_id: author.device_id,
             }
         }
     }

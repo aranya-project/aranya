@@ -11,7 +11,7 @@ use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, NetIdentifier, Role, TeamId},
     config::CreateTeamConfig,
-    text, SyncPeerConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
@@ -67,7 +67,7 @@ impl DevicesCtx {
         })
     }
 
-    pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
+    pub async fn add_all_device_roles(&mut self, team_id: TeamId, roles: &DefaultRoles) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let owner_team = self.owner.client.team(team_id);
         let admin_team = self.admin.client.team(team_id);
@@ -77,26 +77,18 @@ impl DevicesCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        owner_team.add_device(self.admin.pk.clone(), None).await?;
-        // TODO: Need to create roles first or use predefined role IDs
-        // owner_team.assign_role(self.admin.id, Role::Admin).await?;
+        owner_team.add_device(self.admin.pk.clone(), Some(roles.admin().id)).await?;
 
         // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
-            .add_device(self.operator.pk.clone(), None)
+            .add_device(self.operator.pk.clone(), Some(roles.operator().id))
             .await?;
 
         // Make sure it sees the configuration change.
         admin_team
             .sync_now(self.owner.aranya_local_addr().await?.into(), None)
             .await?;
-
-        // Assign the operator its role.
-        // TODO: Need to create roles first or use predefined role IDs
-        // admin_team
-        //     .assign_role(self.operator.id, Role::Operator)
-        //     .await?;
 
         // Make sure it sees the configuration change.
         operator_team
@@ -105,21 +97,22 @@ impl DevicesCtx {
 
         // Add member A as a new device.
         info!("adding membera to team");
-        operator_team
-            .add_device(self.membera.pk.clone(), None)
+        admin_team
+            .add_device(self.membera.pk.clone(), Some(roles.member().id))
             .await?;
 
         // Add member B as a new device.
         info!("adding memberb to team");
-        operator_team
-            .add_device(self.memberb.pk.clone(), None)
+        admin_team
+            .add_device(self.memberb.pk.clone(), Some(roles.member().id))
             .await?;
 
         // Make sure all see the configuration change.
-        let operator_addr = self.operator.aranya_local_addr().await?.into();
-        for team in [owner_team, admin_team, membera_team, memberb_team] {
-            team.sync_now(operator_addr, None).await?;
-        }
+        let admin_addr = self.admin.aranya_local_addr().await?.into();
+        owner_team.sync_now(admin_addr, None).await?;
+        operator_team.sync_now(admin_addr, None).await?;
+        membera_team.sync_now(admin_addr, None).await?;
+        memberb_team.sync_now(admin_addr, None).await?;
 
         Ok(())
     }
@@ -208,12 +201,14 @@ impl DevicesCtx {
             .try_into_owner_role()?;
         tracing::debug!(owner_role_id = %owner_role.id);
 
-        let roles = self
+        let setup_roles = self
             .owner
             .client
             .team(team_id)
             .setup_default_roles(owner_role.id)
-            .await?
+            .await?;
+
+        let roles = setup_roles
             .into_iter()
             .chain(iter::once(owner_role))
             .try_into_default_roles()
@@ -225,6 +220,8 @@ impl DevicesCtx {
             ("admin -> operator", roles.operator().id, roles.admin().id),
             // admin -> member
             ("admin -> member", roles.member().id, roles.admin().id),
+            // operator -> member
+            ("operator -> member", roles.member().id, roles.operator().id),
         ];
         for (name, role, manager) in mappings {
             self.owner
