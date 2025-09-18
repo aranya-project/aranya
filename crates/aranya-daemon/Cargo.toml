@@ -20,7 +20,7 @@ default = ["afc", "preview"]
 # Preview features
 preview = ["aranya-daemon-api/preview"]
 # Aranya Fast Channels
-afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
+afc = ["aranya-daemon-api/afc"]
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
@@ -32,7 +32,7 @@ aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
 aranya-envelope-ffi = { workspace = true }
-aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"], optional = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"] }
 aranya-idam-ffi = { workspace = true }
 aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }
