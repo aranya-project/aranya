@@ -10,19 +10,37 @@ use bytes::{Buf as _, Bytes};
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::afc;
 
-/// An AFC channel that can both send and receive data.
+/// An AFC channel.
 #[derive(Debug)]
-pub struct AfcBidiChannel {
-    pub(crate) inner: afc::BidiChannel,
+pub struct AfcChannel {
+    pub(crate) inner: afc::Channel,
 }
 
-impl Typed for AfcBidiChannel {
-    const TYPE_ID: TypeId = TypeId::new(0x7A59A0AF);
+impl Typed for AfcChannel {
+    const TYPE_ID: TypeId = TypeId::new(0xDC3130B2);
 }
 
-impl AfcBidiChannel {
-    pub fn new(channel: afc::BidiChannel) -> AfcBidiChannel {
+impl AfcChannel {
+    pub fn new(channel: afc::Channel) -> Self {
         Self { inner: channel }
+    }
+
+    pub fn new_bidi(bidi: afc::BidiChannel) -> Self {
+        Self {
+            inner: afc::Channel::Bidi(bidi),
+        }
+    }
+
+    pub fn new_send(send: afc::SendChannel) -> Self {
+        Self {
+            inner: afc::Channel::Uni(afc::UniChannel::Send(send)),
+        }
+    }
+
+    pub fn new_recv(recv: afc::ReceiveChannel) -> Self {
+        Self {
+            inner: afc::Channel::Uni(afc::UniChannel::Receive(recv)),
+        }
     }
 }
 
@@ -42,53 +60,6 @@ impl AfcCtrl {
     }
 }
 
-/// An AFC channel that can only send data.
-#[derive(Debug)]
-pub struct AfcSendChannel {
-    pub(crate) inner: afc::SendChannel,
-}
-
-impl Typed for AfcSendChannel {
-    const TYPE_ID: TypeId = TypeId::new(0xFF884EE4);
-}
-
-impl AfcSendChannel {
-    pub fn new(channel: afc::SendChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-
-/// An AFC channel that can only receive data.
-#[derive(Debug)]
-pub struct AfcReceiveChannel {
-    pub(crate) inner: afc::ReceiveChannel,
-}
-
-impl Typed for AfcReceiveChannel {
-    const TYPE_ID: TypeId = TypeId::new(0xEF92C638);
-}
-
-impl AfcReceiveChannel {
-    pub fn new(channel: afc::ReceiveChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-
-/// An AFC channel.
-#[derive(Debug)]
-pub struct AfcChannel {
-    pub(crate) inner: afc::Channel,
-}
-
-impl Typed for AfcChannel {
-    const TYPE_ID: TypeId = TypeId::new(0xDC3130B2);
-}
-
-impl AfcChannel {
-    pub fn new(channel: afc::Channel) -> Self {
-        Self { inner: channel }
-    }
-}
 /*
 /// Container for an AQC Channel variant.
 ///

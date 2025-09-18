@@ -2123,20 +2123,10 @@ pub unsafe fn aqc_recv_stream_try_recv(
     Ok(())
 }
 
-/// An AFC Bidirectional Channel Object.
+/// An AFC Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
-pub type AfcBidiChannel = Safe<imp::AfcBidiChannel>;
-
-/// An AFC Sender Channel Object.
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
-pub type AfcSendChannel = Safe<imp::AfcSendChannel>;
-
-/// An AFC Receiver Channel Object.
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
-pub type AfcReceiveChannel = Safe<imp::AfcReceiveChannel>;
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type AfcChannel = Safe<imp::AfcChannel>;
 
 /// An enum containing all [`AfcChannel`] variants.
 #[repr(u8)]
@@ -2146,11 +2136,6 @@ pub enum AfcChannelType {
     Sender,
     Receiver,
 }
-
-/// An AFC Channel Object.
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 96, align = 8)]
-pub type AfcChannel = Safe<imp::AfcChannel>;
 
 /// An AFC Control Message.
 #[aranya_capi_core::derive(Cleanup)]
@@ -2165,7 +2150,7 @@ pub type AfcCtrl = Safe<imp::AfcCtrl>;
 /// @param[in]  team_id the team's identifier [`TeamId`].
 /// @param[in]  peer_id the peer's identifier [`DeviceId`].
 /// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
-/// @param[out] channel the AFC channel object [`AfcBidiChannel`].
+/// @param[out] channel the AFC channel object [`AfcChannel`].
 /// @param[out] control the AFC control message [`AfcCtrl`]
 ///
 /// @relates AranyaClient.
@@ -2174,7 +2159,7 @@ pub fn afc_create_bidi_channel(
     team_id: &TeamId,
     peer_id: &DeviceId,
     label_id: &LabelId,
-    channel: &mut MaybeUninit<AfcBidiChannel>,
+    channel: &mut MaybeUninit<AfcChannel>,
     control: &mut MaybeUninit<AfcCtrl>,
 ) -> Result<(), imp::Error> {
     let (chan, ctrl) = client.rt.block_on(client.inner.afc().create_bidi_channel(
@@ -2183,7 +2168,7 @@ pub fn afc_create_bidi_channel(
         label_id.into(),
     ))?;
 
-    AfcBidiChannel::init(channel, imp::AfcBidiChannel::new(chan));
+    AfcChannel::init(channel, imp::AfcChannel::new_bidi(chan));
     AfcCtrl::init(control, imp::AfcCtrl::new(ctrl));
     Ok(())
 }
@@ -2196,7 +2181,7 @@ pub fn afc_create_bidi_channel(
 /// @param[in]  team_id the team's identifier [`TeamId`].
 /// @param[in]  peer_id the peer's identifier [`DeviceId`].
 /// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
-/// @param[out] channel the AFC channel object [`AfcSendChannel`].
+/// @param[out] channel the AFC channel object [`AfcChannel`].
 /// @param[out] control the AFC control message [`AfcCtrl`]
 ///
 /// @relates AranyaClient.
@@ -2205,7 +2190,7 @@ pub fn afc_create_uni_send_channel(
     team_id: &TeamId,
     peer_id: &DeviceId,
     label_id: &LabelId,
-    channel: &mut MaybeUninit<AfcSendChannel>,
+    channel: &mut MaybeUninit<AfcChannel>,
     control: &mut MaybeUninit<AfcCtrl>,
 ) -> Result<(), imp::Error> {
     let (chan, ctrl) = client
@@ -2216,7 +2201,7 @@ pub fn afc_create_uni_send_channel(
             label_id.into(),
         ))?;
 
-    AfcSendChannel::init(channel, imp::AfcSendChannel::new(chan));
+    AfcChannel::init(channel, imp::AfcChannel::new_send(chan));
     AfcCtrl::init(control, imp::AfcCtrl::new(ctrl));
     Ok(())
 }
@@ -2229,16 +2214,16 @@ pub fn afc_create_uni_send_channel(
 /// @param[in]  team_id the team's identifier [`TeamId`].
 /// @param[in]  peer_id the peer's identifier [`DeviceId`].
 /// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
-/// @param[out] channel the AFC channel object [`AfcReceiveChannel`].
+/// @param[out] channel the AFC channel object [`AfcChannel`].
 /// @param[out] control the AFC control message [`AfcCtrl`]
 ///
 /// @relates AranyaClient.
-pub async fn create_uni_recv_channel(
+pub fn create_uni_recv_channel(
     client: &Client,
     team_id: &TeamId,
     peer_id: &DeviceId,
     label_id: &LabelId,
-    channel: &mut MaybeUninit<AfcReceiveChannel>,
+    channel: &mut MaybeUninit<AfcChannel>,
     control: &mut MaybeUninit<AfcCtrl>,
 ) -> Result<(), imp::Error> {
     let (chan, ctrl) = client
@@ -2249,7 +2234,7 @@ pub async fn create_uni_recv_channel(
             label_id.into(),
         ))?;
 
-    AfcReceiveChannel::init(channel, imp::AfcReceiveChannel::new(chan));
+    AfcChannel::init(channel, imp::AfcChannel::new_recv(chan));
     AfcCtrl::init(control, imp::AfcCtrl::new(ctrl));
     Ok(())
 }
@@ -2287,7 +2272,7 @@ pub async fn create_uni_recv_channel(
 /// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
 ///
 /// @relates AranyaClient.
-pub async fn afc_recv_ctrl(
+pub fn afc_recv_ctrl(
     client: &Client,
     team_id: &TeamId,
     control: OwnedPtr<AfcCtrl>,
@@ -2310,89 +2295,18 @@ pub async fn afc_recv_ctrl(
     Ok(channel_type)
 }
 
-/// Converts the [`AfcChannel`]` into an [`AfcBidiChannel`] for sending/receiving data.
+/// Returns the [`AfcChannelType`] for a given [`AfcChannel`] container.
 ///
-/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the [`AfcChannel`] is the wrong type.
-///
-/// Note that this function takes ownership of the [`AfcChannel`] and invalidates any further use.
-///
-/// @param[in]  channel the AFC channel container [`AfcChannel`].
-/// @param[out] bidi the AFC channel object [`AfcBidiChannel`].
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
 ///
 /// @relates AranyaClient.
-pub fn afc_get_bidi_channel(
-    channel: OwnedPtr<AfcChannel>,
-    bidi: &mut MaybeUninit<AfcBidiChannel>,
-) -> Result<(), imp::Error> {
-    if let afc::Channel::Bidi(channel) =
-        // SAFETY: the user is responsible for passing in a valid `AfcChannel` pointer.
-        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
-    {
-        AfcBidiChannel::init(bidi, imp::AfcBidiChannel::new(channel));
-        Ok(())
-    } else {
-        Err(InvalidArg::new(
-            "channel",
-            "Tried to call get_bidi_channel with a `AfcChannel` that wasn't bidirectional!",
-        )
-        .into())
-    }
-}
-
-/// Converts the [`AfcChannel`]` into an [`AfcSendChannel`] for sending data.
-///
-/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the [`AfcChannel`] is the wrong type.
-///
-/// Note that this function takes ownership of the [`AfcChannel`] and invalidates any further use.
-///
-/// @param[in]  channel the AFC channel container [`AfcChannel`].
-/// @param[out] receiver the AFC channel object [`AfcSendChannel`].
-///
-/// @relates AranyaClient.
-pub fn afc_get_send_channel(
-    channel: OwnedPtr<AfcChannel>,
-    receiver: &mut MaybeUninit<AfcSendChannel>,
-) -> Result<(), imp::Error> {
-    if let afc::Channel::Uni(afc::UniChannel::Send(send)) =
-        // SAFETY: the user is responsible for passing in a valid `AfcChannel` pointer.
-        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
-    {
-        AfcSendChannel::init(receiver, imp::AfcSendChannel::new(send));
-        Ok(())
-    } else {
-        Err(InvalidArg::new(
-            "channel",
-            "Tried to call get_send_channel with a `AfcChannel` that wasn't a sender!",
-        )
-        .into())
-    }
-}
-
-/// Converts the [`AfcChannel`]` into an [`AfcReceiveChannel`] for receiving data.
-///
-/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the [`AfcChannel`] is the wrong type.
-///
-/// Note that this function takes ownership of the [`AfcChannel`] and invalidates any further use.
-///
-/// @param[in]  channel the AFC channel container [`AfcChannel`].
-/// @param[out] receiver the AFC channel object [`AfcReceiveChannel`].
-///
-/// @relates AranyaClient.
-pub fn afc_get_receive_channel(
-    channel: OwnedPtr<AfcChannel>,
-    receiver: &mut MaybeUninit<AfcReceiveChannel>,
-) -> Result<(), imp::Error> {
-    if let afc::Channel::Uni(afc::UniChannel::Receive(recv)) =
-        // SAFETY: the user is responsible for passing in a valid `AfcChannel` pointer.
-        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
-    {
-        AfcReceiveChannel::init(receiver, imp::AfcReceiveChannel::new(recv));
-        Ok(())
-    } else {
-        Err(InvalidArg::new(
-            "channel",
-            "Tried to call get_receiver_channel with a `AfcChannel` that wasn't a receiver!",
-        )
-        .into())
+pub fn afc_get_channel_type(channel: &AfcChannel) -> AfcChannelType {
+    match channel.deref().deref().inner {
+        afc::Channel::Bidi(_) => AfcChannelType::Bidirectional,
+        afc::Channel::Uni(ref uni) => match uni {
+            afc::UniChannel::Receive(_) => AfcChannelType::Receiver,
+            afc::UniChannel::Send(_) => AfcChannelType::Sender,
+        },
     }
 }
