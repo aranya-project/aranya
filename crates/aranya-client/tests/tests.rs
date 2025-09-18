@@ -11,17 +11,14 @@
 
 mod common;
 
-use std::time::Duration;
-
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::RoleId, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfig,
+    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DefaultRoles, DevicesCtx, RolesExt, SLEEP_INTERVAL};
+use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -180,7 +177,8 @@ async fn test_remove_devices() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
-    devices.add_all_sync_peers(team_id)
+    devices
+        .add_all_sync_peers(team_id)
         .await
         .context("unable to add all sync peers")?;
 
@@ -367,7 +365,8 @@ async fn test_remove_team() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
-    devices.add_all_sync_peers(team_id)
+    devices
+        .add_all_sync_peers(team_id)
         .await
         .context("unable to add all sync peers")?;
 

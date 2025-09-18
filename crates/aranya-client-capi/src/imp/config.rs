@@ -157,7 +157,7 @@ impl Typed for SyncPeerConfig {
     const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
 }
 
-impl From<SyncPeerConfig> for client::SyncPeerConfig {
+impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
             .interval(value.interval.into())
@@ -167,7 +167,7 @@ impl From<SyncPeerConfig> for client::SyncPeerConfig {
     }
 }
 
-impl From<&SyncPeerConfig> for client::SyncPeerConfig {
+impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: &SyncPeerConfig) -> Self {
         value.clone().into()
     }

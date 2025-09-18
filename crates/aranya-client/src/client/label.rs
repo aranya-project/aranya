@@ -49,7 +49,7 @@ impl Labels {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[Label] {
-        &*self.labels
+        &self.labels
     }
 
     #[doc(hidden)]

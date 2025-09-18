@@ -23,10 +23,12 @@ use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use tempfile::TempDir;
 use tokio::{fs, time};
-use tracing::{debug, info, instrument, trace};
+use tracing::{info, instrument, trace};
 
+#[allow(dead_code)]
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
+#[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
 #[instrument(skip_all)]
@@ -67,7 +69,11 @@ impl DevicesCtx {
         })
     }
 
-    pub async fn add_all_device_roles(&mut self, team_id: TeamId, roles: &DefaultRoles) -> Result<()> {
+    pub async fn add_all_device_roles(
+        &mut self,
+        team_id: TeamId,
+        roles: &DefaultRoles,
+    ) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let owner_team = self.owner.client.team(team_id);
         let admin_team = self.admin.client.team(team_id);
@@ -77,7 +83,9 @@ impl DevicesCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        owner_team.add_device(self.admin.pk.clone(), Some(roles.admin().id)).await?;
+        owner_team
+            .add_device(self.admin.pk.clone(), Some(roles.admin().id))
+            .await?;
 
         // Add the operator as a new device.
         info!("adding operator to team");
@@ -349,24 +357,21 @@ pub struct DefaultRoles {
 }
 
 impl DefaultRoles {
-    /// Returns the 'owner role.
-    pub fn owner(&self) -> &Role {
-        self.roles.get("owner").unwrap()
-    }
-
     /// Returns the 'admin' role.
     pub fn admin(&self) -> &Role {
-        self.roles.get("admin").unwrap()
+        self.roles.get("admin").expect("admin role should exist")
     }
 
     /// Returns the 'operator' role.
     pub fn operator(&self) -> &Role {
-        self.roles.get("operator").unwrap()
+        self.roles
+            .get("operator")
+            .expect("operator role should exist")
     }
 
     /// Returns the 'member' role.
     pub fn member(&self) -> &Role {
-        self.roles.get("member").unwrap()
+        self.roles.get("member").expect("member role should exist")
     }
 }
 
@@ -381,10 +386,10 @@ impl DefaultRoles {
             })
             .fold(HashMap::new(), |mut acc, role| {
                 if !names.contains(&role.name.as_str()) {
-                    unreachable!("unexpected role: {}", role.name);
+                    panic!("unexpected role: {}", role.name);
                 }
                 if acc.insert(role.name.to_string(), role.clone()).is_some() {
-                    unreachable!("duplicate role: {}", role.name);
+                    panic!("duplicate role: {}", role.name);
                 }
                 acc
             });

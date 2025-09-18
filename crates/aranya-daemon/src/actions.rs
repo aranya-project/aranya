@@ -23,6 +23,9 @@ use crate::{
     vm_policy::{MsgSink, VecSink},
 };
 
+/// Type alias for complex AQC channel creation results.
+type ChannelCreationResult = Result<(Vec<Box<[u8]>>, Vec<Effect>)>;
+
 /// Functions related to Aranya actions
 impl<EN, SP, CE> Client<EN, SP>
 where
@@ -309,7 +312,7 @@ where
         &self,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = ChannelCreationResult> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_aqc_bidi_channel"),
             args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
@@ -326,7 +329,7 @@ where
         seal_id: DeviceId,
         open_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = ChannelCreationResult> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_aqc_uni_channel"),
             args: Cow::Owned(vec![
@@ -663,6 +666,7 @@ where
 /// An implementation of [`Actor`].
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
+#[derive(Debug)]
 pub struct ActorImpl<'a, EN, SP, CE, S> {
     client: &'a mut ClientState<EN, SP>,
     sink: &'a mut S,
