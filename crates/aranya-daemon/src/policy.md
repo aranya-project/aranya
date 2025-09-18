@@ -364,7 +364,7 @@ Returns all devices on the team.
 
 ```policy
 // Emits `QueryDevicesOnTeamResult` for each device on the team.
-action query_devices_on_team() {
+ephemeral action query_devices_on_team() {
     // Publishing `QueryDevicesOnTeam` emits
     // `QueryDevicesOnTeamResult`.
     map Device[device_id: ?] as f {
@@ -381,7 +381,7 @@ effect QueryDevicesOnTeamResult {
 }
 
 // A trampoline that forwards `device_id` to the effect.
-command QueryDevicesOnTeam {
+ephemeral command QueryDevicesOnTeam {
     fields {
         device_id id,
     }
@@ -410,7 +410,7 @@ Returns the role assigned to a device.
 ```policy
 // Emits `QueryDeviceRoleResult` for each role assigned to the
 // device.
-action query_device_role(device_id id) {
+ephemeral action query_device_role(device_id id) {
     publish QueryDeviceRole {
         device_id: device_id,
     }
@@ -429,7 +429,7 @@ effect QueryDeviceRoleResult {
     default bool,
 }
 
-command QueryDeviceRole {
+ephemeral command QueryDeviceRole {
     fields {
         device_id id,
     }
@@ -469,7 +469,7 @@ Returns a device's `KeyBundle`.
 ```policy
 // Emits `QueryDeviceKeyBundleResult` with the device's key
 // bundle.
-action query_device_keybundle(device_id id) {
+ephemeral action query_device_keybundle(device_id id) {
     publish QueryDeviceKeyBundle {
         device_id: device_id,
     }
@@ -483,7 +483,7 @@ effect QueryDeviceKeyBundleResult {
     device_keys struct KeyBundle,
 }
 
-command QueryDeviceKeyBundle {
+ephemeral command QueryDeviceKeyBundle {
     fields {
         // The device whose key bundle is being queried.
         device_id id,
@@ -2048,7 +2048,7 @@ command RevokeRole {
 
 ```policy
 // Emits `QueryTeamRolesResult` for each role on the team.
-action query_team_roles() {
+ephemeral action query_team_roles() {
     map Role[role_id: ?] as f {
         publish QueryTeamRoles {
             role_id: f.role_id,
@@ -2072,7 +2072,7 @@ effect QueryTeamRolesResult {
 }
 
 // A trampoline command to forward data to `QueryTeamRolesResult`.
-command QueryTeamRoles {
+ephemeral command QueryTeamRoles {
     fields {
         role_id id,
         name string,
@@ -3385,7 +3385,7 @@ Returns a specific label if it exists.
 ```policy
 // Emits `QueryLabelResult` for the label if it exists.
 // If the label does not exist then no effects are emitted.
-action query_label(label_id id) {
+ephemeral action query_label(label_id id) {
     publish QueryLabel {
         label_id: label_id,
     }
@@ -3400,7 +3400,7 @@ effect QueryLabelResult {
     label_author_id id,
 }
 
-command QueryLabel {
+ephemeral command QueryLabel {
     fields {
         label_id id,
     }
@@ -3438,7 +3438,7 @@ Returns a list of all labels that exist in the team.
 // Emits one `QueryLabelsResult` for each label in the team.
 // If the team does not have any labels then no effects are
 // emitted.
-action query_labels() {
+ephemeral action query_labels() {
     map Label[label_id: ?] as f {
         publish QueryLabels {
             label_id: f.label_id,
@@ -3458,7 +3458,7 @@ effect QueryLabelsResult {
 }
 
 // Trampoline to forward info to `QueriedLabelsResult`.
-command QueryLabels {
+ephemeral command QueryLabels {
     fields {
         label_id id,
         label_name string,
@@ -3494,7 +3494,7 @@ a particular role.
 // have been assigned to the role.
 // If the role has not been assigned any labels, then no effects
 // are emitted.
-action query_labels_assigned_to_role(role_id id) {
+ephemeral action query_labels_assigned_to_role(role_id id) {
     // TODO: make this query more efficient when policy supports
     // it. The key order is optimized for `delete`.
     map LabelAssignedToRole[label_id: ?, role_id: ?] as f {
@@ -3521,7 +3521,7 @@ effect QueryLabelsAssignedToRoleResult {
     label_author_id id,
 }
 
-command QueryLabelsAssignedToRole {
+ephemeral command QueryLabelsAssignedToRole {
     fields {
         role_id id,
         label_id id,
@@ -3559,7 +3559,7 @@ command QueryLabelsAssignedToRole {
 ```policy
 // Emits `QueryLabelsAssignedToDeviceResult` for all labels the
 // device has been granted permission to use.
-action query_labels_assigned_to_device(device_id id) {
+ephemeral action query_labels_assigned_to_device(device_id id) {
     // TODO: make this query more efficient when policy supports
     // it. The key order is optimized for `delete`.
     map LabelAssignedToDevice[label_id: ?, device_id: ?] as f {
@@ -3586,7 +3586,7 @@ effect QueryLabelsAssignedToDeviceResult {
     label_author_id id,
 }
 
-command QueryLabelsAssignedToDevice {
+ephemeral command QueryLabelsAssignedToDevice {
     fields {
         device_id id,
         label_id id,
@@ -3763,7 +3763,7 @@ command UnsetAqcNetworkName {
 Returns the AQC nework ID for a device.
 
 ```policy
-action query_aqc_net_id(device_id id) {
+ephemeral action query_aqc_net_id(device_id id) {
     publish QueryAqcNetId {
         device_id: device_id,
     }
@@ -3773,7 +3773,7 @@ effect QueryAqcNetIdResult {
     net_id optional string,
 }
 
-command QueryAqcNetId {
+ephemeral command QueryAqcNetId {
     fields {
         device_id id,
     }
@@ -3805,7 +3805,7 @@ command QueryAqcNetId {
 Returns all associated AQC network IDs.
 
 ```policy
-action query_aqc_network_names() {
+ephemeral action query_aqc_network_names() {
     map AqcNetId[device_id: ?] as f {
         publish QueryAqcNetworkNames {
             net_id: f.net_id,
@@ -3819,7 +3819,7 @@ effect QueryAqcNetworkNamesResult {
     device_id id,
 }
 
-command QueryAqcNetworkNames {
+ephemeral command QueryAqcNetworkNames {
     fields {
         net_id string,
         device_id id,
@@ -3992,13 +3992,8 @@ effect AqcBidiChannelReceived {
 }
 ```
 
-This is an ephemeral command, which means that it can only be
-emitted within an ephemeral session so that it is not added to
-the graph of commands. Furthermore, it cannot persist any changes
-to the fact database.
-
 ```policy
-command AqcCreateBidiChannel {
+ephemeral command AqcCreateBidiChannel {
     fields {
         // Uniquely identifies the channel.
         channel_id id,
@@ -4170,13 +4165,8 @@ effect AqcUniChannelReceived {
 }
 ```
 
-This is an ephemeral command, which means that it can only be
-emitted within an ephemeral session so that it is not added to
-the graph of commands. Furthermore, it cannot persist any changes
-to the fact database.
-
 ```policy
-command AqcCreateUniChannel {
+ephemeral command AqcCreateUniChannel {
     fields {
         // Uniquely identifies the channel.
         channel_id id,

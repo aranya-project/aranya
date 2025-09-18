@@ -1173,8 +1173,16 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        // TODO: Implement assign_role_management_perm - need to call appropriate policy action
-        todo!("assign_role_management_perm not yet implemented")
+        self.client
+            .actions(&team.into_id().into())
+            .assign_role_management_perm(
+                role.into_id().into(),
+                managing_role.into_id().into(),
+                perm,
+            )
+            .await
+            .context("unable to assign role management permission")?;
+        Ok(())
     }
 
     #[instrument(skip(self), err)]
@@ -1188,8 +1196,16 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        // TODO: Implement revoke_role_management_perm - need to call appropriate policy action
-        todo!("revoke_role_management_perm not yet implemented")
+        self.client
+            .actions(&team.into_id().into())
+            .revoke_role_management_perm(
+                role.into_id().into(),
+                managing_role.into_id().into(),
+                perm,
+            )
+            .await
+            .context("unable to revoke role management permission")?;
+        Ok(())
     }
 
     #[instrument(skip(self), err)]

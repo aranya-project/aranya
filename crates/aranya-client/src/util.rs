@@ -14,14 +14,16 @@ macro_rules! custom_id {
     ) => {
         $(#[$meta])*
         #[derive(Copy, Clone, core::hash::Hash, Eq, PartialEq, Ord, PartialOrd)]
-        pub struct $name(aranya_daemon_api::$api);
+        $vis struct $name(aranya_daemon_api::$api);
 
         impl $name {
+            #[doc(hidden)]
             #[allow(dead_code, reason = "Depends on the type.")]
             pub fn into_api(self) -> aranya_daemon_api::$api {
                 self.0.into_id().into()
             }
 
+            #[doc(hidden)]
             #[allow(dead_code, reason = "Depends on the type.")]
             pub fn from_api(id: aranya_daemon_api::$api) -> Self {
                 Self(id.into_id().into())

@@ -16,10 +16,12 @@ use crate::error::{self, Error};
 pub struct NetIdentifier(pub(super) Text);
 
 impl NetIdentifier {
-    pub fn into_api(self) -> api::NetIdentifier {
+    #[doc(hidden)]
+    pub(crate) fn into_api(self) -> api::NetIdentifier {
         api::NetIdentifier(self.0)
     }
 
+    #[doc(hidden)]
     pub fn from_api(id: api::NetIdentifier) -> Self {
         Self(id.0)
     }
