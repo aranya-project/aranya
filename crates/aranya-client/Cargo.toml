@@ -23,6 +23,7 @@ debug = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
+aranya-fast-channels = { workspace = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }

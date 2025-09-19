@@ -172,7 +172,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 /// Extended error information.
 #[allow(rustdoc::invalid_rust_codeblocks)]
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
+#[aranya_capi_core::opaque(size = 96, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
@@ -299,8 +299,8 @@ pub struct TeamId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::TeamId> for TeamId {
-    fn from(value: aranya_daemon_api::TeamId) -> Self {
+impl From<aranya_client::client::TeamId> for TeamId {
+    fn from(value: aranya_client::client::TeamId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -309,7 +309,7 @@ impl From<aranya_daemon_api::TeamId> for TeamId {
     }
 }
 
-impl From<&TeamId> for aranya_daemon_api::TeamId {
+impl From<&TeamId> for aranya_client::client::TeamId {
     fn from(value: &TeamId) -> Self {
         value.id.bytes.into()
     }
@@ -322,8 +322,8 @@ pub struct DeviceId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::DeviceId> for DeviceId {
-    fn from(value: aranya_daemon_api::DeviceId) -> Self {
+impl From<aranya_client::client::DeviceId> for DeviceId {
+    fn from(value: aranya_client::client::DeviceId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -332,7 +332,7 @@ impl From<aranya_daemon_api::DeviceId> for DeviceId {
     }
 }
 
-impl From<&DeviceId> for aranya_daemon_api::DeviceId {
+impl From<&DeviceId> for aranya_client::client::DeviceId {
     fn from(value: &DeviceId) -> Self {
         value.id.bytes.into()
     }
@@ -352,7 +352,7 @@ pub enum Role {
     Member,
 }
 
-impl From<Role> for aranya_daemon_api::Role {
+impl From<Role> for aranya_client::client::Role {
     fn from(value: Role) -> Self {
         match value {
             Role::Owner => Self::Owner,
@@ -376,6 +376,16 @@ pub enum ChanOp {
     /// The device can send and receive data in channels with this
     /// label.
     SendRecv,
+}
+
+impl From<ChanOp> for aranya_client::client::ChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::RecvOnly => Self::RecvOnly,
+            ChanOp::SendOnly => Self::SendOnly,
+            ChanOp::SendRecv => Self::SendRecv,
+        }
+    }
 }
 
 impl From<ChanOp> for aranya_daemon_api::ChanOp {
@@ -406,6 +416,22 @@ impl From<aranya_daemon_api::LabelId> for LabelId {
 }
 
 impl From<&LabelId> for aranya_daemon_api::LabelId {
+    fn from(value: &LabelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl From<aranya_client::client::LabelId> for LabelId {
+    fn from(value: aranya_client::client::LabelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&LabelId> for aranya_client::client::LabelId {
     fn from(value: &LabelId) -> Self {
         value.id.bytes.into()
     }
@@ -449,10 +475,12 @@ impl Addr {
 pub struct NetIdentifier(*const c_char);
 
 impl NetIdentifier {
-    unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
+    unsafe fn as_underlying(self) -> Result<aranya_client::client::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?))
+        Ok(aranya_client::client::NetIdentifier::from_str(
+            cstr.to_str()?,
+        )?)
     }
 }
 
@@ -1199,7 +1227,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(&keybundle.encoding),
+            .encrypt_psk_seed_for_peer(&keybundle.encoding()),
     )?;
 
     if *seed_len < wrapped_seed.len() {
