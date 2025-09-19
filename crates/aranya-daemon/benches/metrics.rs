@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use aranya_daemon::{
-    config::{AqcConfig, Config, QuicSyncConfig, SyncConfig, Toggle},
+    config::{Config, QuicSyncConfig, SyncConfig, Toggle},
     Daemon,
 };
 use aranya_util::Addr;
@@ -38,7 +38,8 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
                     }),
                 },
-                aqc: Toggle::Enabled(AqcConfig {}),
+                #[cfg(feature = "aqc")]
+                aqc: Toggle::Enabled(crate::config::AqcConfig {}),
             };
 
             for dir in [
