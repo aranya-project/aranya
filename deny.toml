@@ -102,7 +102,6 @@ allow = [
     "OpenSSL",
     "Unicode-3.0",
     "Zlib",
-    "AGPL-3.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
