@@ -624,7 +624,7 @@ impl DaemonApi for Api {
             .await
             .context("did not find peer")?;
 
-        let (ctrl, effects): (_, _) = self
+        let (ctrl, effects) = self
             .client
             .actions(&graph)
             .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
@@ -666,7 +666,7 @@ impl DaemonApi for Api {
             .context("did not find peer")?;
 
         let id = self.device_id()?;
-        let (ctrl, effects): (_, _) = self
+        let (ctrl, effects) = self
             .client
             .actions(&graph)
             .create_aqc_uni_channel_off_graph(id, peer_id, label.into_id().into())
@@ -764,7 +764,7 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
 
-        let (ctrl, effects): (_, _) = self
+        let (ctrl, effects) = self
             .client
             .actions(&graph)
             .create_afc_bidi_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
@@ -806,7 +806,7 @@ impl DaemonApi for Api {
         let graph = GraphId::from(team.into_id());
 
         let id = self.device_id()?;
-        let (ctrl, effects): (_, _) = self
+        let (ctrl, effects) = self
             .client
             .actions(&graph)
             .create_afc_uni_channel_off_graph(id, peer_id.into_id().into(), label.into_id().into())
@@ -847,7 +847,7 @@ impl DaemonApi for Api {
         let graph = GraphId::from(team.into_id());
 
         let id = self.device_id()?;
-        let (ctrl, effects): (_, _) = self
+        let (ctrl, effects) = self
             .client
             .actions(&graph)
             .create_afc_uni_channel_off_graph(peer_id.into_id().into(), id, label.into_id().into())

@@ -41,38 +41,37 @@ where
 {
     fn new(cfg: AfcConfig) -> Result<Self> {
         debug!("setting up afc shm write side: {:?}", cfg.shm_path);
-        let write = {
-            // TODO: check if shm path exists first?
-            match WriteState::open(
-                cfg.shm_path.clone(),
-                Flag::Create,
-                Mode::ReadWrite,
-                cfg.max_chans,
-                Rng,
-            )
-            .context(format!(
-                "unable to create new `WriteState`: {:?}",
-                cfg.shm_path
-            )) {
-                Ok(w) => w,
-                Err(e) => {
-                    warn!(?e);
-                    WriteState::open(
-                        cfg.shm_path.clone(),
-                        Flag::OpenOnly,
-                        Mode::ReadWrite,
-                        cfg.max_chans,
-                        Rng,
-                    )
-                    .context(format!(
-                        "unable to open existing `WriteState`: {:?}",
-                        cfg.shm_path
-                    ))?
-                }
-            }
-        };
+        // TODO: check if shm path exists first?
+        let open_res = WriteState::open(
+            cfg.shm_path.clone(),
+            Flag::Create,
+            Mode::ReadWrite,
+            cfg.max_chans,
+            Rng,
+        )
+        .context(format!(
+            "unable to create new `WriteState`: {:?}",
+            cfg.shm_path
+        ));
+        match open_res {
+            Ok(w) => return Ok(Self { cfg, write: w }),
+            Err(e) => {
+                warn!(?e);
+                let w = WriteState::open(
+                    cfg.shm_path.clone(),
+                    Flag::OpenOnly,
+                    Mode::ReadWrite,
+                    cfg.max_chans,
+                    Rng,
+                )
+                .context(format!(
+                    "unable to open existing `WriteState`: {:?}",
+                    cfg.shm_path
+                ))?;
 
-        Ok(Self { cfg, write })
+                return Ok(Self { cfg, write: w });
+            }
+        }
     }
 }
 
