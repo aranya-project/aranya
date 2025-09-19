@@ -54,7 +54,7 @@ where
             cfg.shm_path
         ));
         match open_res {
-            Ok(w) => return Ok(Self { cfg, write: w }),
+            Ok(w) => Ok(Self { cfg, write: w }),
             Err(e) => {
                 warn!(?e);
                 let w = WriteState::open(
@@ -69,7 +69,7 @@ where
                     cfg.shm_path
                 ))?;
 
-                return Ok(Self { cfg, write: w });
+                Ok(Self { cfg, write: w })
             }
         }
     }
