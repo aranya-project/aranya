@@ -524,6 +524,15 @@ mod tests {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
 
+        #[cfg(feature = "afc")]
+        let shm_path = {
+            let path = "/test_daemon_run\0"
+                .try_into()
+                .expect("should be able to parse AFC shared memory path");
+            let _ = aranya_fast_channels::shm::unlink(&path);
+            path
+        };
+
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "test-daemon-run".into(),
@@ -538,9 +547,7 @@ mod tests {
             aqc: Toggle::Enabled(AqcConfig {}),
             #[cfg(feature = "afc")]
             afc: Toggle::Enabled(AfcConfig {
-                shm_path: "/test_daemon_run\0"
-                    .try_into()
-                    .expect("should be able to parse AFC shared memory path"),
+                shm_path,
                 max_chans: 100,
             }),
         };
