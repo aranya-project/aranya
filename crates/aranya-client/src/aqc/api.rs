@@ -68,7 +68,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0 .0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -117,7 +117,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0 .0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()

@@ -132,8 +132,7 @@ impl KeyBundle {
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-// TODO: capi needs this to be pub.
-pub struct NetIdentifier(pub api::NetIdentifier);
+pub struct NetIdentifier(pub(crate) api::NetIdentifier);
 
 impl FromStr for NetIdentifier {
     fn from_str(s: &str) -> Result<Self, Error> {
