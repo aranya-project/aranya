@@ -7,6 +7,11 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(all(feature = "afc", not(feature = "preview")))]
+compile_error!(
+    "AFC is currently a preview feature. Enable the 'preview' feature to opt into preview APIs."
+);
+
 pub mod crypto;
 mod service;
 

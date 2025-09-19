@@ -3,6 +3,7 @@
 use std::{fmt, marker::PhantomData, str::FromStr};
 
 use anyhow::{anyhow, Context, Result};
+use aranya_afc_util::Ffi as AfcFfi;
 use aranya_aqc_util::Ffi as AqcFfi;
 use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
@@ -71,6 +72,7 @@ where
         let module = Compiler::new(&ast)
             .ffi_modules(&[
                 AqcFfi::<Store>::SCHEMA,
+                AfcFfi::<Store>::SCHEMA,
                 CryptoFfi::<Store>::SCHEMA,
                 DeviceFfi::SCHEMA,
                 EnvelopeFfi::SCHEMA,
@@ -81,9 +83,10 @@ where
             .context("should be able to compile policy")?;
         let machine = Machine::from_module(module).context("should be able to create machine")?;
 
-        // select which FFI moddules to use.
+        // select which FFI modules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AqcFfi::new(store.try_clone()?)),
+            Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),

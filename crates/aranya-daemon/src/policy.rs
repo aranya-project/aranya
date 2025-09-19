@@ -37,6 +37,10 @@ pub enum Role {
 pub enum Effect {
     AdminAssigned(AdminAssigned),
     AdminRevoked(AdminRevoked),
+    AfcBidiChannelCreated(AfcBidiChannelCreated),
+    AfcBidiChannelReceived(AfcBidiChannelReceived),
+    AfcUniChannelCreated(AfcUniChannelCreated),
+    AfcUniChannelReceived(AfcUniChannelReceived),
     AqcBidiChannelCreated(AqcBidiChannelCreated),
     AqcBidiChannelReceived(AqcBidiChannelReceived),
     AqcNetworkNameSet(AqcNetworkNameSet),
@@ -73,6 +77,52 @@ pub struct AdminAssigned {
 #[effect]
 pub struct AdminRevoked {
     pub device_id: Id,
+}
+/// AfcBidiChannelCreated policy effect.
+#[effect]
+pub struct AfcBidiChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub channel_key_id: Id,
+}
+/// AfcBidiChannelReceived policy effect.
+#[effect]
+pub struct AfcBidiChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_id: Id,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
+}
+/// AfcUniChannelCreated policy effect.
+#[effect]
+pub struct AfcUniChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub channel_key_id: Id,
+}
+/// AfcUniChannelReceived policy effect.
+#[effect]
+pub struct AfcUniChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
 }
 /// AqcBidiChannelCreated policy effect.
 #[effect]
@@ -284,6 +334,17 @@ pub trait ActorExt {
         label_id: Id,
     ) -> Result<(), ClientError>;
     fn create_aqc_uni_channel(
+        &mut self,
+        sender_id: Id,
+        receiver_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_afc_bidi_channel(
+        &mut self,
+        peer_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_afc_uni_channel(
         &mut self,
         sender_id: Id,
         receiver_id: Id,

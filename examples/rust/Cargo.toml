@@ -47,6 +47,7 @@ backon = { version = "1.4.0" }
 buggy = { version = "0.1.0" }
 bytes = { version = "1.10.0" }
 futures-util = { version = "0.3" }
+rustix = { version = "1.1.2", features = ["shm"] }
 tempfile = { version = "3.17.1" }
 tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { version = "0.1.41" }

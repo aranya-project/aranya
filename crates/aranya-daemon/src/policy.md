@@ -29,7 +29,7 @@ higher role back down to `Member`.
   * Assign/revoke Operator role.
   * Define/undefine channel label.
   * Assign/revoke channel label.
-  * Set/unset AQC address&name.
+  * Set/unset AQC address & name.
 
 * Admin:
   * Assign/revoke Operator role.
@@ -41,10 +41,11 @@ higher role back down to `Member`.
   * Add (new) / remove Member.
   * Define channel label.
   * Assign/revoke channel label.
-  * Set/unset AQC address&name.
+  * Set/unset AQC address & name.
 
 * Member:
   * Create/delete AQC channel.
+  * Create/delete AFC channel.
 
 **Invariants**:
 
@@ -63,6 +64,7 @@ higher role back down to `Member`.
 ### Imports & Global Constants
 
 ```policy
+use afc
 use aqc
 use crypto
 use device
@@ -310,6 +312,62 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
     // Devices cannot create channels with themselves.
     //
     // This should have been caught by the AQC FFI, so check
+    // instead of just returning false.
+    check sender_id != receiver_id
+
+    // The writer must have permissions to write (send) data.
+    let writer_op = get_allowed_op(sender_id, label_id)
+    match writer_op {
+        ChanOp::RecvOnly => { return false }
+        ChanOp::SendOnly => {}
+        ChanOp::SendRecv => {}
+    }
+
+    // The reader must have permission to read (receive) data.
+    let reader_op = get_allowed_op(receiver_id, label_id)
+    match reader_op {
+        ChanOp::RecvOnly => {}
+        ChanOp::SendOnly => { return false }
+        ChanOp::SendRecv => {}
+    }
+
+    return true
+}
+```
+
+##### AFC Channel Functions
+
+```policy
+// Reports whether the devices have permission to create
+// a bidirectional AFC channel with each other.
+function can_create_afc_bidi_channel(device1 id, device2 id, label_id id) bool {
+    // Devices cannot create channels with themselves.
+    //
+    // This should have been caught by the AFC FFI, so check
+    // instead of just returning false.
+    check device1 != device2
+
+    // Both devices must have permissions to read (recv) and
+    // write (send) data.
+    let device1_op = get_allowed_op(device1, label_id)
+    if device1_op != ChanOp::SendRecv {
+        return false
+    }
+
+    let device2_op = get_allowed_op(device2, label_id)
+    if device2_op != ChanOp::SendRecv {
+        return false
+    }
+
+    return true
+}
+
+// Reports whether the devices have permission to create
+// a unidirectional AFC channel with each other.
+function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) bool {
+    // Devices cannot create channels with themselves.
+    //
+    // This should have been caught by the AFC FFI, so check
     // instead of just returning false.
     check sender_id != receiver_id
 
@@ -1072,7 +1130,7 @@ command UnsetAqcNetworkName {
 
 **Invariants**:
 
-- Only Owners and Operators Operators can unset AQC network names from Members.
+- Only Owners and Operators can unset AQC network names from Members.
 
 ## CreateChannel
 
@@ -1270,7 +1328,7 @@ ephemeral command AqcCreateBidiChannel {
 
 #### AqcCreateUniChannel
 
-Creates a bidirectional AQC channel for off-graph messaging.
+Creates a unidirectional AQC channel for off-graph messaging.
 This is an ephemeral command, which means that it can only be
 emitted within an ephemeral session so that it is not added to
 the graph of commands. Furthermore, it cannot persist any changes
@@ -1464,6 +1522,343 @@ ephemeral command AqcCreateUniChannel {
             // communicating peers should process this command.
             check false
         }
+    }
+}
+```
+
+**Invariants**:
+
+- Members can only create channels for the labels they've been assigned.
+- Members can only create unidirectional channels when the writer side has either
+  `ChanOp::SendRecv` or `ChanOp::SendOnly` permissions for the label and the reader side has
+  either `ChanOp::SendRecv` or `ChanOp::RecvOnly` permissions for the label.
+
+### AfcCreateChannel
+
+### AfcCreateBidiChannel
+Creates a bidirectional AFC channel for off-graph messaging. This is an ephemeral command, which
+means that it can only be emitted within an ephemeral session so that it is not added to the graph
+of commands. Furthermore, it cannot persist any changes to the factDB.
+
+The `create_afc_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
+author, and sends the encapsulations through the `AfcCreateBidiChannel` command. When processing the
+command, the device will decapsulate their keys and store them in the shared memory DB.
+
+```policy
+ephemeral action create_afc_bidi_channel(peer_id id, label_id id) {
+    let parent_cmd_id = perspective::head_id()
+    let author_id = device::current_device_id()
+    let author = get_valid_device(author_id)
+    let peer_enc_pk = get_enc_pk(peer_id)
+
+    let channel = afc::create_bidi_channel(
+        parent_cmd_id,
+        author.enc_key_id,
+        author_id,
+        peer_enc_pk,
+        peer_id,
+        label_id,
+    )
+
+    publish AfcCreateBidiChannel {
+        peer_id: peer_id,
+        label_id: label_id,
+        peer_encap: channel.peer_encap,
+        channel_key_id: channel.key_id,
+    }
+}
+
+// The effect that is emitted when the author of a bidirectional
+// AFC channel successfully processes the `AfcCreateBidiChannel`
+// command.
+effect AfcBidiChannelCreated {
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The channel author's encryption key ID.
+    author_enc_key_id id,
+    // The channel peer's device Id.
+    peer_id id,
+    // The channel peer's encoded public encryption key.
+    peer_enc_pk bytes,
+    // The channel label.
+    label_id id,
+    // The channel key ID.
+    channel_key_id id,
+}
+
+// The effect that is emitted when the peer of a bidirectional
+// AFC channel successfully processes the `AfcCreateBidiChannel`
+// command.
+effect AfcBidiChannelReceived {
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The channel author's encoded public encryption key.
+    author_enc_pk bytes,
+    // The channel peer's device Id.
+    peer_id id,
+    // The channel peer's encryption key ID.
+    peer_enc_key_id id,
+    // The channel label.
+    label_id id,
+    // The channel peer's encapsulated KEM shared secret.
+    encap bytes,
+}
+
+ephemeral command AfcCreateBidiChannel {
+    fields {
+        // The channel peer's device ID.
+        peer_id id,
+        // The label applied to the channel.
+        label_id id,
+        // The channel peer's encapsulated KEM shared secret.
+        peer_encap bytes,
+        // The channel key ID.
+        channel_key_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+        let peer = get_valid_device(this.peer_id)
+
+        // The label must exist.
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Only Members can create AFC channels with other peer Members
+        check is_member(author.role)
+        check is_member(peer.role)
+
+        // Check that both devices have been assigned to the label and have correct send/recv permissions.
+        check can_create_afc_bidi_channel(author.device_id, peer.device_id, this.label_id)
+
+        let parent_cmd_id = envelope::parent_id(envelope)
+        let current_device_id = device::current_device_id()
+
+        // We authored this command.
+        if current_device_id == author.device_id {
+            // We're the channel author.
+            let peer_enc_pk = get_enc_pk(peer.device_id)
+
+            finish {
+                emit AfcBidiChannelCreated {
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    author_enc_key_id: author.enc_key_id,
+                    peer_id: peer.device_id,
+                    peer_enc_pk: peer_enc_pk,
+                    label_id: this.label_id,
+                    channel_key_id: this.channel_key_id,
+                }
+            }
+        }
+        // We're the intended recipient of this command.
+        else if current_device_id == peer.device_id {
+            // We're the channel peer.
+            let author_enc_pk = get_enc_pk(author.device_id)
+            
+            finish {
+                emit AfcBidiChannelReceived {
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    author_enc_pk: author_enc_pk,
+                    peer_id: peer.device_id,
+                    peer_enc_key_id: peer.enc_key_id,
+                    label_id: this.label_id,
+                    encap: this.peer_encap,
+                }
+            }
+        }
+        // This is an off-graph session command, so only the
+        // communicating peers should process this command.
+        else {
+            check false
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Devices can only create channels for the labels they've been
+  assigned.
+- A device can only write data to a uni channel if it has been
+  granted either the `ChanOp::SendOnly` or `ChanOp::SendRecv`
+  permission for the label assigned to the channel.
+- A device can only read data from a uni channel if it has been
+  granted either the `ChanOp::RecvOnly` or `ChanOp::SendRecv`
+  permission for the label assigned to the channel.
+
+
+### AfcCreateUniChannel
+Creates a unidirectional AFC channel. This is an ephemeral command, which means that it can only
+be emitted within an ephemeral session and is not added to the graph of commands. Furthermore, it
+does not persist any changes to the factDB.
+
+The `create_afc_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
+the encapsulation through the `AfcCreateUniChannel` command. When processing the command, the
+corresponding recipient will decapsulate their key and store it in the shared memory DB.
+
+```policy
+ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
+    let parent_cmd_id = perspective::head_id()
+    let author = get_valid_device(device::current_device_id())
+    let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
+    let peer_enc_pk = get_enc_pk(peer_id)
+
+    let ch = afc::create_uni_channel(
+        parent_cmd_id,
+        author.enc_key_id,
+        peer_enc_pk,
+        sender_id,
+        receiver_id,
+        label_id,
+    )
+
+    publish AfcCreateUniChannel {
+        sender_id: sender_id,
+        receiver_id: receiver_id,
+        label_id: label_id,
+        peer_encap: ch.peer_encap,
+        channel_key_id: ch.key_id,
+    }
+}
+
+// The effect that is emitted when the author of a unidirectional
+// AFC channel successfully processes the `AfcCreateUniChannel`
+// command.
+effect AfcUniChannelCreated {
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The device ID of the participant that can send data.
+    sender_id id,
+    // The device ID of the participant that can receive data.
+    receiver_id id,
+    // The channel author's encryption key ID.
+    author_enc_key_id id,
+    // The channel peer's encoded public encryption key.
+    peer_enc_pk bytes,
+    // The channel label.
+    label_id id,
+    // The channel key ID.
+    channel_key_id id,
+}
+
+// The effect that is emitted when the peer of a unidirectional
+// AFC channel successfully processes the `AfcCreateUniChannel`
+// command.
+effect AfcUniChannelReceived {
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The device ID of the participant that can send data.
+    sender_id id,
+    // The device ID of the participant that can receive data.
+    receiver_id id,
+    // The channel author's encryption key ID.
+    author_enc_pk bytes,
+    // The channel peer's encryption key ID.
+    peer_enc_key_id id,
+    // The channel label.
+    label_id id,
+    // The channel peer's encapsulated KEM shared secret.
+    encap bytes,
+}
+ephemeral command AfcCreateUniChannel {
+    fields {
+        // The device ID of the participant that can send data.
+        sender_id id,
+        // The device ID of the participant that can receive
+        // data.
+        receiver_id id,
+        // The label applied to the channel.
+        label_id id,
+        // The channel peer's encapsulated KEM shared secret.
+        peer_encap bytes,
+        // The ID of the AFC channel key.
+        channel_key_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+       
+        // Ensure that the author is one of the channel
+        // participants.
+        check author.device_id == this.sender_id ||
+              author.device_id == this.receiver_id
+
+        let peer_id = if author.device_id == this.sender_id {
+            :this.receiver_id
+        } else {
+            :this.sender_id
+        }
+        let peer = check_unwrap find_existing_device(peer_id)
+        
+        // The label must exist.
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Only Members can create AFC channels with other peer Members
+        check is_member(author.role)
+        check is_member(peer.role)
+        
+        // Check that both devices have been assigned to the label and have correct send/recv permissions.
+        check can_create_afc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
+        
+        let parent_cmd_id = envelope::parent_id(envelope)
+        let current_device_id = device::current_device_id()
+        
+        if current_device_id == author.device_id {
+            // We authored this command.
+            let peer_enc_pk = get_enc_pk(peer_id)
+
+            finish {
+                emit AfcUniChannelCreated {
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    sender_id: this.sender_id,
+                    receiver_id: this.receiver_id,
+                    author_enc_key_id: author.enc_key_id,
+                    peer_enc_pk: peer_enc_pk,
+                    label_id: this.label_id,
+                    channel_key_id: this.channel_key_id,
+                }
+            }
+        }
+        else if current_device_id == peer.device_id {
+            // We're the intended recipient of this command.
+            let author_enc_pk = get_enc_pk(author.device_id)
+
+            finish {
+                emit AfcUniChannelReceived {
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    sender_id: this.sender_id,
+                    receiver_id: this.receiver_id,
+                    author_enc_pk: author_enc_pk,
+                    peer_enc_key_id: peer.enc_key_id,
+                    label_id: this.label_id,
+                    encap: this.peer_encap,
+                }
+            }
+        }
+        // This is an off-graph session command, so only the
+        // communicating peers should process this command.
+        else { check false}
     }
 }
 ```
@@ -2124,11 +2519,13 @@ ephemeral action query_aqc_net_identifier(device_id id) {
 }
 
 effect QueryAqcNetIdentifierResult {
+    // Network name assigned to the device.
     net_identifier string,
 }
 
 ephemeral command QueryAqcNetIdentifier {
     fields {
+        // ID of device whose network name is being queried.
         device_id id,
     }
 
@@ -2153,7 +2550,7 @@ ephemeral command QueryAqcNetIdentifier {
 
 **Invariants**:
 
-- For a net identifier to be returned, it must have been created with the `SetAqcNetworkName` command.
+- For an AQC net identifier to be returned, it must have been created with the `SetAqcNetworkName` command.
 - If `UnsetAqcNetworkName` has been invoked for the device, no network identifier will be returned.
 
 ## QueryAqcNetworkNames
@@ -2171,17 +2568,23 @@ ephemeral action query_aqc_network_names() {
 }
 
 effect QueryAqcNetworkNamesOutput {
+    // AQC network name assigned to device.
     net_identifier string,
+    // Device ID of device with assigned network name.
     device_id id,
 }
 
 ephemeral command QueryAqcNetworkNamesCommand {
     fields {
+        // AQC network name assigned to device.
         net_identifier string,
+        // Device ID of device with assigned network name.
         device_id id,
     }
+
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
+    
     policy {
         finish {
             emit QueryAqcNetworkNamesOutput {
@@ -2195,5 +2598,5 @@ ephemeral command QueryAqcNetworkNamesCommand {
 
 **Invariants**:
 
-- A device's net identifier will only be returned if it was created by `SetAqcNetworkName` and
+- A device's AQC net identifier will only be returned if it was created by `SetAqcNetworkName` and
  wasn't yet removed by `UnsetAqcNetworkName`.
