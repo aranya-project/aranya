@@ -39,7 +39,7 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                     }),
                 },
                 #[cfg(feature = "aqc")]
-                aqc: Toggle::Enabled(crate::config::AqcConfig {}),
+                aqc: Toggle::Enabled(aranya_daemon::config::AqcConfig {}),
             };
 
             for dir in [
