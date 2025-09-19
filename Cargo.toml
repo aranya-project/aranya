@@ -47,12 +47,12 @@ aranya-envelope-ffi = { version = "0.13.0" }
 aranya-idam-ffi = { version = "0.13.0" }
 aranya-perspective-ffi = { version = "0.13.0" }
 aranya-policy-compiler = { version = "0.13.0" }
-aranya-policy-ifgen = { version = "0.13.0", features = ["serde"] }
+aranya-policy-ifgen = { version = "0.14.0", features = ["serde"] }
 aranya-policy-ifgen-build = { version = "0.7.0" }
 aranya-policy-lang = { version = "0.8.0" }
 aranya-policy-text = { version = "0.1.2" }
 aranya-policy-vm = { version = "0.13.0", features = ["std"] }
-aranya-runtime = { version = "0.13.0", features = ["std", "libc"] }
+aranya-runtime = { version = "0.14.0", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
 
