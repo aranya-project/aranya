@@ -137,9 +137,9 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
 name = "aranya-afc-util"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7560089ef5613b1920058d2a1336a73bd573c87d790f133a6a5155e75477ad3c"
+checksum = "8e22316f9f397c26704b1db4b3d6e757285975b49bf33cf7b3ee1c69bdb14205"
 dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
@@ -266,7 +266,8 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.10.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=driveby%2Fafc-chan-id-ctr#f8717a5455fff7f461f13d283f49177ee889b9bf"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea871d7a5fbcb9a7afdf2a282f8003035bb4125310e5404dcfeef5725e0a7425"
 dependencies = [
  "buggy",
  "byteorder",
@@ -394,8 +395,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-fast-channels"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=driveby%2Fafc-chan-id-ctr#f8717a5455fff7f461f13d283f49177ee889b9bf"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4224a3070e7603ea40623fb836ed549958a012c99d194c162cf7f71d5361d86c"
 dependencies = [
  "aranya-crypto",
  "buggy",
