@@ -139,13 +139,6 @@ impl Daemon {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
-            // TODO: Make aqc optional.
-            let Toggle::Enabled(_) = &cfg.aqc else {
-                anyhow::bail!(
-                    "AQC is currently required, set `aqc.enable = true` in daemon config."
-                )
-            };
-
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
@@ -190,7 +183,7 @@ impl Daemon {
             let local_addr = sync_server.local_addr()?;
 
             #[cfg(feature = "aqc")]
-            let aqc = {
+            let aqc = if let Toggle::Enabled(_) = &cfg.aqc {
                 let graph_ids = client
                     .aranya
                     .lock()
@@ -213,14 +206,16 @@ impl Daemon {
                     }
                     peers
                 };
-                Aqc::new(
+                Some(Aqc::new(
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
                     peers,
-                )
+                ))
+            } else {
+                None
             };
 
             let data = QSData { psk_store };
@@ -498,7 +493,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
+    use crate::config::{QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -517,7 +512,8 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
-            aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "aqc")]
+            aqc: Toggle::Enabled(crate::config::AqcConfig {}),
         };
         for dir in [
             &cfg.runtime_dir,

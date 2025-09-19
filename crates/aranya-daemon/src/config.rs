@@ -17,7 +17,6 @@ pub use toggle::Toggle;
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     /// The name of the daemon, used for logging and debugging
     /// purposes.
@@ -103,6 +102,8 @@ pub struct Config {
     pub config_dir: PathBuf,
 
     /// AQC configuration.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[serde(default)]
     pub aqc: Toggle<AqcConfig>,
 
@@ -194,6 +195,8 @@ pub struct SyncConfig {
 }
 
 /// AQC configuration.
+#[cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
@@ -245,6 +248,7 @@ mod tests {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                 }),
             },
+            #[cfg(feature = "aqc")]
             aqc: Toggle::Enabled(AqcConfig {}),
         };
         assert_eq!(got, want);

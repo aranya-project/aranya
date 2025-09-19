@@ -46,7 +46,6 @@ buggy = { workspace = true }
 anyhow = { workspace = true }
 bimap = "0.6"
 bytes = { workspace = true }
-cfg-if = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
 derive-where = { workspace = true }
