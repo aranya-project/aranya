@@ -26,6 +26,11 @@
 #[cfg(not(feature = "default"))]
 compile_error!("'default' feature must be enabled!");
 
+#[cfg(all(feature = "aqc", not(feature = "experimental")))]
+compile_error!(
+    "AQC is currently experimental. Enable the 'experimental' feature to opt into experimental APIs."
+);
+
 pub mod aqc;
 pub mod client;
 pub mod config;

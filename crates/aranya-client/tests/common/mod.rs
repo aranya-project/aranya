@@ -13,7 +13,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
+use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
@@ -207,10 +207,13 @@ impl DeviceCtx {
 
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {
-            Client::builder()
-                .daemon_uds_path(&uds_path)
-                .aqc_server_addr(&addr_any)
-                .connect()
+            let mut builder = Client::builder();
+            builder = builder.daemon_uds_path(&uds_path);
+            #[cfg(feature = "aqc")]
+            {
+                builder = builder.aqc_server_addr(&addr_any);
+            }
+            builder.connect()
         })
         .retry(ExponentialBuilder::default())
         .await
@@ -230,17 +233,5 @@ impl DeviceCtx {
 
     pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
-    }
-
-    #[allow(unused, reason = "module compiled for each test file")]
-    pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier(
-            self.client
-                .aqc()
-                .server_addr()
-                .to_string()
-                .try_into()
-                .expect("socket addr is valid text"),
-        )
     }
 }

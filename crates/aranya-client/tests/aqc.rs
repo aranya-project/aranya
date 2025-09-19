@@ -1,3 +1,4 @@
+#![cfg(feature = "aqc")]
 #![allow(clippy::panic)]
 
 use std::time::Duration;
@@ -7,13 +8,26 @@ mod common;
 use anyhow::{Context as _, Result};
 use aranya_client::aqc::AqcPeerChannel;
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
-use aranya_daemon_api::{text, ChanOp};
+use aranya_daemon_api::{text, ChanOp, NetIdentifier};
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
 
-use crate::common::{sleep, DevicesCtx};
+use crate::common::{sleep, DeviceCtx, DevicesCtx};
+
+impl DeviceCtx {
+    pub fn aqc_net_id(&mut self) -> NetIdentifier {
+        NetIdentifier(
+            self.client
+                .aqc()
+                .server_addr()
+                .to_string()
+                .try_into()
+                .expect("socket addr is valid text"),
+        )
+    }
+}
 
 /// Demonstrate nominal usage of AQC channels.
 ///
