@@ -514,7 +514,9 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
+    #[cfg(feature = "afc")]
+    use crate::config::AfcConfig;
+    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -534,6 +536,7 @@ mod tests {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
             aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "afc")]
             afc: Toggle::Enabled(AfcConfig {
                 shm_path: "/test_daemon_run\0"
                     .try_into()

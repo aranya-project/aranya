@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+#[cfg(feature = "afc")]
 use aranya_fast_channels::shm;
 use aranya_util::Addr;
 use serde::{
@@ -18,7 +19,6 @@ pub use toggle::Toggle;
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     /// The name of the daemon, used for logging and debugging
     /// purposes.
@@ -108,6 +108,8 @@ pub struct Config {
     pub aqc: Toggle<AqcConfig>,
 
     /// AFC configuration.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     #[serde(default)]
     pub afc: Toggle<AfcConfig>,
 
@@ -204,6 +206,8 @@ pub struct SyncConfig {
 pub struct AqcConfig {}
 
 /// AFC configuration.
+#[cfg(feature = "afc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AfcConfig {
@@ -261,6 +265,7 @@ mod tests {
                 }),
             },
             aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "afc")]
             afc: Toggle::Enabled(AfcConfig {
                 shm_path: "/afc\0"
                     .try_into()

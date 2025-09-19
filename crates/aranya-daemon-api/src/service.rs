@@ -21,15 +21,19 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
-pub use aranya_fast_channels::{shm, ChannelId as AfcChannelId};
 pub use aranya_policy_text::{text, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
+pub mod afc;
 pub mod quic_sync;
+
 pub use quic_sync::*;
+
+#[cfg(feature = "afc")]
+pub use self::afc::*;
 
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
@@ -181,9 +185,6 @@ impl fmt::Display for NetIdentifier {
 
 /// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
-
-/// A serialized command for AFC.
-pub type AfcCtrl = Box<[u8]>;
 
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
@@ -634,12 +635,16 @@ pub struct Label {
     pub name: Text,
 }
 
-/// AFC shared-memory info.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-
-pub struct AfcShmInfo {
-    pub path: Box<shm::Path>,
-    pub max_chans: usize,
+// TODO: tarpc does not cfg return types properly.
+#[cfg(not(feature = "afc"))]
+use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
+#[cfg(not(feature = "afc"))]
+mod afc_stub {
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    pub enum Never {}
+    pub type AfcCtrl = Never;
+    pub type AfcShmInfo = Never;
+    pub type AfcChannelId = Never;
 }
 
 #[tarpc::service]
