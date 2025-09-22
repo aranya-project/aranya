@@ -270,4 +270,14 @@ impl DeviceCtx {
         };
         path
     }
+
+    fn get_shm_path(path: String) -> String {
+        if cfg!(target_os = "macos") && path.len() > 31 {
+            // Shrink the size of the team name down to 22 bytes to work within macOS's limits.
+            let d = Sha256::hash(path.as_bytes());
+            let t: [u8; 16] = d[..16].try_into().expect("expected shm path");
+            return format!("/{}\0", t.to_base58());
+        };
+        path
+    }
 }
