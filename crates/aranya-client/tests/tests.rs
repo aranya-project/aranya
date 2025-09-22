@@ -223,8 +223,11 @@ async fn test_remove_devices() -> Result<()> {
         .await
         .context("unable to add all sync peers")?;
 
-    // Setup default roles and their management permissions.
-    let roles = devices.setup_default_roles(team_id).await?;
+    // Setup default roles and ensure delegations exist for helper routines.
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices.add_all_device_roles(team_id, &roles).await?;
@@ -635,7 +638,10 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
     let mut devices = DevicesCtx::new("test_setup_default_roles_single_use").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await
+        .context("unable to setup default roles without delegation")?;
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team.setup_default_roles(roles.owner().id).await {
@@ -671,7 +677,9 @@ async fn test_assign_role_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
@@ -692,7 +700,9 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
@@ -713,7 +723,9 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_requires_delegation").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let admin_team = devices.admin.client.team(team_id);
