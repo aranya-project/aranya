@@ -2731,6 +2731,10 @@ command AddDevice {
 
 ### Removing Devices
 
+Removing the final owner would leave the team without a break-glass
+principal, so any attempt to remove the last owner is rejected even if
+initiated by another device.
+
 ```policy
 // Removes a device from the team.
 //
@@ -2791,7 +2795,7 @@ command RemoveDevice {
             let role = check_unwrap query Role[role_id: role_id]
 
             // Ensure that a team always has at least one owner.
-            if is_owner(role) && author.device_id == this.device_id {
+            if is_owner(role) {
                 check at_least 2 RoleAssignmentIndex[
                     role_id: role_id,
                     device_id: ?,

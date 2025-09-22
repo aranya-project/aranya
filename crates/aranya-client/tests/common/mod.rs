@@ -200,6 +200,24 @@ impl DevicesCtx {
     /// by [`Client::setup_default_roles`].
     #[instrument(skip(self))]
     pub async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
+        self.setup_default_roles_inner(team_id, true).await
+    }
+
+    /// Sets up default roles without creating any management delegations.
+    #[instrument(skip(self))]
+    pub async fn setup_default_roles_without_delegation(
+        &self,
+        team_id: TeamId,
+    ) -> Result<DefaultRoles> {
+        self.setup_default_roles_inner(team_id, false).await
+    }
+
+    #[instrument(skip(self, grant_delegations))]
+    async fn setup_default_roles_inner(
+        &self,
+        team_id: TeamId,
+        grant_delegations: bool,
+    ) -> Result<DefaultRoles> {
         let owner_role = self
             .owner
             .client
@@ -223,21 +241,23 @@ impl DevicesCtx {
             .context("unable to parse `DefaultRoles`")?;
         tracing::debug!(?roles, "default roles set up");
 
-        let mappings = [
-            // admin -> operator
-            ("admin -> operator", roles.operator().id, roles.admin().id),
-            // admin -> member
-            ("admin -> member", roles.member().id, roles.admin().id),
-            // operator -> member
-            ("operator -> member", roles.member().id, roles.operator().id),
-        ];
-        for (name, role, manager) in mappings {
-            self.owner
-                .client
-                .team(team_id)
-                .assign_role_management_permission(role, manager, text!("CanAssignRole"))
-                .await
-                .with_context(|| format!("{name}: unable to change managing role"))?;
+        if grant_delegations {
+            let mappings = [
+                // admin -> operator
+                ("admin -> operator", roles.operator().id, roles.admin().id),
+                // admin -> member
+                ("admin -> member", roles.member().id, roles.admin().id),
+                // operator -> member
+                ("operator -> member", roles.member().id, roles.operator().id),
+            ];
+            for (name, role, manager) in mappings {
+                self.owner
+                    .client
+                    .team(team_id)
+                    .assign_role_management_permission(role, manager, text!("CanAssignRole"))
+                    .await
+                    .with_context(|| format!("{name}: unable to change managing role"))?;
+            }
         }
 
         Ok(roles)

@@ -167,6 +167,44 @@ async fn test_add_devices() -> Result<()> {
     Ok(())
 }
 
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
+    let mut devices =
+        DevicesCtx::new("test_add_device_with_initial_role_requires_delegation").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await
+        .context("unable to setup default roles")?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await
+        .context("owner should be able to add admin to team")?;
+
+    admin_team
+        .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
+        .await
+        .context("admin unable to sync with owner")?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match admin_team
+        .add_device(devices.membera.pk.clone(), Some(roles.member().id))
+        .await
+    {
+        Ok(_) => bail!("expected delegated add_device to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected error: {err:?}"),
+    }
+
+    Ok(())
+}
+
 /// Tests that devices can be removed from the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
@@ -734,6 +772,38 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
         Ok(_) => bail!("expected assigning management perm without ownership to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected assign_role_management_permission error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Deleting a label requires `DeleteLabel` and label management rights.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_delete_label_requires_permission() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_delete_label_requires_permission").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.add_all_sync_peers(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+
+    let label = owner_team
+        .create_label(text!("delete-label-guard"), roles.owner().id)
+        .await?;
+
+    operator_team
+        .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
+        .await
+        .context("operator unable to sync owner state")?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match operator_team.delete_label(label).await {
+        Ok(_) => bail!("expected delete_label without permission to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected delete_label error: {err:?}"),
     }
 
     Ok(())

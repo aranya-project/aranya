@@ -480,6 +480,113 @@ async fn test_create_team() -> Result<()> {
     Ok(())
 }
 
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_default_roles_seed_expected_permissions() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let roles = load_default_roles(owner).await?;
+    let admin_role = role_id_by_name(&roles, "admin");
+    let operator_role = role_id_by_name(&roles, "operator");
+    let member_role = role_id_by_name(&roles, "member");
+
+    for (role, perm, message) in [
+        (
+            admin_role,
+            text!("AddDevice"),
+            "admin should already grant AddDevice",
+        ),
+        (
+            admin_role,
+            text!("RemoveDevice"),
+            "admin should already grant RemoveDevice",
+        ),
+        (
+            admin_role,
+            text!("CreateLabel"),
+            "admin should already grant CreateLabel",
+        ),
+        (
+            admin_role,
+            text!("DeleteLabel"),
+            "admin should already grant DeleteLabel",
+        ),
+        (
+            admin_role,
+            text!("ChangeLabelManagingRole"),
+            "admin should already grant ChangeLabelManagingRole",
+        ),
+        (
+            admin_role,
+            text!("AssignRole"),
+            "admin should already grant AssignRole",
+        ),
+        (
+            admin_role,
+            text!("RevokeRole"),
+            "admin should already grant RevokeRole",
+        ),
+        (
+            operator_role,
+            text!("AssignLabel"),
+            "operator should already grant AssignLabel",
+        ),
+        (
+            operator_role,
+            text!("RevokeLabel"),
+            "operator should already grant RevokeLabel",
+        ),
+        (
+            operator_role,
+            text!("SetAqcNetworkName"),
+            "operator should already grant SetAqcNetworkName",
+        ),
+        (
+            operator_role,
+            text!("UnsetAqcNetworkName"),
+            "operator should already grant UnsetAqcNetworkName",
+        ),
+        (
+            operator_role,
+            text!("AssignRole"),
+            "operator should already grant AssignRole",
+        ),
+        (
+            operator_role,
+            text!("RevokeRole"),
+            "operator should already grant RevokeRole",
+        ),
+        (
+            member_role,
+            text!("CanUseAqc"),
+            "member should already grant CanUseAqc",
+        ),
+        (
+            member_role,
+            text!("CreateAqcUniChannel"),
+            "member should already grant CreateAqcUniChannel",
+        ),
+        (
+            member_role,
+            text!("CreateAqcBidiChannel"),
+            "member should already grant CreateAqcBidiChannel",
+        ),
+    ] {
+        let err = owner
+            .actions()
+            .add_perm_to_role(role, perm)
+            .await
+            .expect_err(message);
+        expect_not_authorized(err);
+    }
+
+    Ok(())
+}
+
 async fn load_default_roles(owner: &mut TestDevice) -> Result<HashMap<String, RoleId>> {
     let effects = owner.actions().query_team_roles().await?;
     let mut roles = HashMap::new();
@@ -543,6 +650,39 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
+async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let admin = team.admin;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    admin
+        .sync_expect(owner, None)
+        .await
+        .context("admin unable to sync owner state")?;
+
+    let (candidate, _store) = ctx
+        .new_client("candidate", owner.graph_id)
+        .await
+        .context("unable to create candidate device")?;
+
+    let err = admin
+        .actions()
+        .add_device(DeviceKeyBundle::try_from(&candidate.pk)?, Some(member_role))
+        .await
+        .expect_err("expected add_device with initial role to fail without delegation");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
 async fn test_assign_role_requires_unassigned_device() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
@@ -559,6 +699,61 @@ async fn test_assign_role_requires_unassigned_device() -> Result<()> {
         .assign_role(device_id(admin)?, operator_role)
         .await
         .expect_err("expected assigning second role to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_assign_role_rejects_unknown_device() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    let (extra, _store) = ctx
+        .new_client("unknown-device", owner.graph_id)
+        .await
+        .context("unable to create extra device")?;
+    let bogus_device_id = extra.pk.ident_pk.id()?;
+
+    let err = owner
+        .actions()
+        .assign_role(bogus_device_id, member_role)
+        .await
+        .expect_err("expected assigning role to unknown device to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_assign_role_rejects_unknown_role() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let membera = team.membera;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    let mut bogus_role_bytes: [u8; 32] = member_role.into_id().into();
+    bogus_role_bytes[0] ^= 0xFF;
+    let bogus_role = RoleId::from(bogus_role_bytes);
+
+    let err = owner
+        .actions()
+        .assign_role(device_id(membera)?, bogus_role)
+        .await
+        .expect_err("expected assigning unknown role to fail");
     expect_not_authorized(err);
 
     Ok(())
@@ -681,6 +876,32 @@ async fn test_assign_role_management_perm_requires_ownership() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
+async fn test_create_label_requires_existing_managing_role() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+
+    let mut bogus_role_bytes: [u8; 32] = owner_role.into_id().into();
+    bogus_role_bytes[0] ^= 0x55;
+    let bogus_role = RoleId::from(bogus_role_bytes);
+
+    let err = owner
+        .actions()
+        .create_label(text!("MISSING_MANAGER"), bogus_role)
+        .await
+        .expect_err("expected create_label with unknown manager to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
 async fn test_add_label_managing_role_is_unique() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
@@ -724,6 +945,151 @@ async fn test_add_label_managing_role_is_unique() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
+async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let operator = team.operator;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+
+    let effects = owner
+        .actions()
+        .create_label(text!("DELETE_LABEL_GUARD"), owner_role)
+        .await
+        .context("label creation should succeed")?;
+    let label_id: LabelId = effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            _ => None,
+        })
+        .expect("expected label created effect");
+
+    operator
+        .sync_expect(owner, None)
+        .await
+        .context("operator unable to sync owner state")?;
+
+    let err = operator
+        .actions()
+        .delete_label(label_id)
+        .await
+        .expect_err("expected delete_label without rights to fail");
+    expect_not_authorized(err);
+
+    owner
+        .actions()
+        .delete_label(label_id)
+        .await
+        .context("owner should be able to delete label")?;
+
+    let err = owner
+        .actions()
+        .assign_label_to_role(owner_role, label_id, ChanOp::SendRecv)
+        .await
+        .expect_err("expected assigning deleted label to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_add_label_managing_role_requires_delegation() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let admin = team.admin;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+    let operator_role = role_id_by_name(&roles, "operator");
+
+    let effects = owner
+        .actions()
+        .create_label(text!("LABEL_DELEGATION"), owner_role)
+        .await
+        .context("label creation should succeed")?;
+    let label_id: LabelId = effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            _ => None,
+        })
+        .expect("expected label created effect");
+
+    admin
+        .sync_expect(owner, None)
+        .await
+        .context("admin unable to sync owner state")?;
+
+    let err = admin
+        .actions()
+        .add_label_managing_role(label_id, operator_role)
+        .await
+        .expect_err("expected add_label_managing_role without delegation to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_add_label_managing_role_requires_existing_ids() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+    let admin_role = role_id_by_name(&roles, "admin");
+
+    let effects = owner
+        .actions()
+        .create_label(text!("LABEL_FOREIGN_KEY"), owner_role)
+        .await
+        .context("label creation should succeed")?;
+    let label_id: LabelId = effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            _ => None,
+        })
+        .expect("expected label created effect");
+
+    let bogus_label = LabelId::from([0x33; 32]);
+
+    let mut bogus_role_bytes: [u8; 32] = admin_role.into_id().into();
+    bogus_role_bytes[0] ^= 0x77;
+    let bogus_role = RoleId::from(bogus_role_bytes);
+
+    let err = owner
+        .actions()
+        .add_label_managing_role(bogus_label, admin_role)
+        .await
+        .expect_err("expected add_label_managing_role with unknown label to fail");
+    expect_not_authorized(err);
+
+    let err = owner
+        .actions()
+        .add_label_managing_role(label_id, bogus_role)
+        .await
+        .expect_err("expected add_label_managing_role with unknown role to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
 async fn test_assign_role_requires_delegated_permission() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
@@ -746,6 +1112,78 @@ async fn test_assign_role_requires_delegated_permission() -> Result<()> {
         .assign_role(device_id(membera)?, member_role)
         .await
         .expect_err("expected assigning role without delegation to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_add_perm_to_role_requires_management_delegation() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let admin = team.admin;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    admin
+        .sync_expect(owner, None)
+        .await
+        .context("admin unable to sync owner state")?;
+
+    let err = admin
+        .actions()
+        .add_perm_to_role(member_role, text!("CanUseAqc"))
+        .await
+        .expect_err("expected add_perm_to_role without delegation to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_add_perm_to_role_rejects_invalid_permission() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    let err = owner
+        .actions()
+        .add_perm_to_role(member_role, text!("DefinitelyNotAPerm"))
+        .await
+        .expect_err("expected invalid permission to be rejected");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_remove_perm_from_role_requires_existing_permission() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    let err = owner
+        .actions()
+        .remove_perm_from_role(member_role, text!("AssignLabel"))
+        .await
+        .expect_err("expected remove_perm_from_role on missing perm to fail");
     expect_not_authorized(err);
 
     Ok(())
@@ -932,6 +1370,65 @@ async fn test_change_role_requires_remaining_owner() -> Result<()> {
         .change_role(device_id(owner)?, owner_role, admin_role)
         .await
         .expect_err("expected changing last owner to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_change_role_rejects_same_role_transition() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let membera = team.membera;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+
+    owner
+        .actions()
+        .assign_role(device_id(membera)?, member_role)
+        .await
+        .context("assigning member role should succeed")?;
+
+    let err = owner
+        .actions()
+        .change_role(device_id(membera)?, member_role, member_role)
+        .await
+        .expect_err("expected no-op change_role to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_change_role_rejects_mismatched_current_role() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let membera = team.membera;
+
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+    let operator_role = role_id_by_name(&roles, "operator");
+
+    owner
+        .actions()
+        .assign_role(device_id(membera)?, member_role)
+        .await
+        .context("assigning member role should succeed")?;
+
+    let err = owner
+        .actions()
+        .change_role(device_id(membera)?, operator_role, member_role)
+        .await
+        .expect_err("expected change_role with wrong old_role to fail");
     expect_not_authorized(err);
 
     Ok(())
@@ -1188,6 +1685,123 @@ async fn test_remove_device_invalidates_direct_labels() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
+async fn test_assign_label_to_device_updates_after_readdition() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let membera = team.membera;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+    let member_role = role_id_by_name(&roles, "member");
+
+    owner
+        .actions()
+        .assign_role(device_id(membera)?, member_role)
+        .await
+        .context("assigning member role should succeed")?;
+    membera.sync_expect(owner, None).await?;
+
+    owner
+        .actions()
+        .set_aqc_network_name(device_id(membera)?, text!("membera.readd"))
+        .await
+        .context("setting network name should succeed")?;
+
+    let effects = owner
+        .actions()
+        .create_label(text!("LABEL_READD"), owner_role)
+        .await
+        .context("label creation should succeed")?;
+    let label_id: LabelId = effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            _ => None,
+        })
+        .expect("expected label created effect");
+
+    owner
+        .actions()
+        .assign_label_to_device(device_id(membera)?, label_id, ChanOp::SendRecv)
+        .await
+        .context("initial label assignment should succeed")?;
+
+    owner
+        .actions()
+        .remove_device(device_id(membera)?)
+        .await
+        .context("device removal should succeed")?;
+
+    owner
+        .actions()
+        .add_device(DeviceKeyBundle::try_from(&membera.pk)?, None)
+        .await
+        .context("re-adding device should succeed")?;
+
+    owner
+        .actions()
+        .assign_role(device_id(membera)?, member_role)
+        .await
+        .context("reassigning member role should succeed")?;
+
+    owner
+        .actions()
+        .set_aqc_network_name(device_id(membera)?, text!("membera.readd"))
+        .await
+        .context("resetting network name should succeed")?;
+
+    let query_effects = owner
+        .actions()
+        .query_labels_assigned_to_device(device_id(membera)?)
+        .await
+        .context("querying labels should succeed")?;
+    let has_results = query_effects
+        .into_iter()
+        .any(|effect| matches!(effect, Effect::QueryLabelsAssignedToDeviceResult(_)));
+    assert!(
+        !has_results,
+        "expected no active label assignments before reassignment"
+    );
+
+    owner
+        .actions()
+        .assign_label_to_device(device_id(membera)?, label_id, ChanOp::SendRecv)
+        .await
+        .context("label reassignment should succeed after generation bump")?;
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_set_aqc_network_name_requires_existing_device() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let (extra, _store) = ctx
+        .new_client("missing-device", owner.graph_id)
+        .await
+        .context("unable to create extra client")?;
+    let bogus_device_id = extra.pk.ident_pk.id()?;
+
+    let err = owner
+        .actions()
+        .set_aqc_network_name(bogus_device_id, text!("ghost.net"))
+        .await
+        .expect_err("expected setting network name for unknown device to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
 async fn test_set_aqc_network_name_requires_permission() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
@@ -1212,6 +1826,54 @@ async fn test_set_aqc_network_name_requires_permission() -> Result<()> {
         .await
         .expect_err("expected setting network name without permission to fail");
     expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_remove_device_clears_network_id() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let membera = team.membera;
+
+    owner
+        .actions()
+        .set_aqc_network_name(device_id(membera)?, text!("membera.cleanup"))
+        .await
+        .context("setting network name should succeed")?;
+
+    owner
+        .actions()
+        .remove_device(device_id(membera)?)
+        .await
+        .context("device removal should succeed")?;
+
+    owner
+        .actions()
+        .add_device(DeviceKeyBundle::try_from(&membera.pk)?, None)
+        .await
+        .context("re-adding device should succeed")?;
+
+    let query_effects = owner
+        .actions()
+        .query_aqc_net_id(device_id(membera)?)
+        .await
+        .context("querying network id should succeed")?;
+    let mut saw_result = false;
+    for effect in query_effects {
+        if let Effect::QueryAqcNetIdResult(result) = effect {
+            saw_result = true;
+            assert!(
+                result.net_id.is_none(),
+                "expected no network id after device re-addition"
+            );
+        }
+    }
+    assert!(saw_result, "expected query_aqc_net_id to emit a result");
 
     Ok(())
 }
@@ -1243,6 +1905,30 @@ async fn test_query_aqc_network_names_requires_active_team() -> Result<()> {
         .query_aqc_network_names()
         .await
         .expect_err("expected query on terminated team to fail");
+    expect_not_authorized(err);
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_terminate_team_requires_matching_id() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+
+    let team_id = TeamId::from(*owner.graph_id.as_array());
+    let mut bogus_team_bytes: [u8; 32] = team_id.into_id().into();
+    bogus_team_bytes[0] ^= 0x24;
+    let bogus_team = TeamId::from(bogus_team_bytes);
+
+    let err = owner
+        .actions()
+        .terminate_team(bogus_team.into_id())
+        .await
+        .expect_err("expected terminate_team with mismatched id to fail");
     expect_not_authorized(err);
 
     Ok(())
