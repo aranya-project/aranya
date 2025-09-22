@@ -228,10 +228,21 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
+    assert_eq!(afc_msg, plaintext);
 
     // Delete channel.
     chan.delete().await.context("unable to delete channel")?;
     recv.delete().await.context("unable to delete channel")?;
+
+    // Try open/seal after delete.
+    chan.seal(&mut ciphertext, afc_msg)
+        .await
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv.open(&mut plaintext, &ciphertext)
+        .await
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
 
     Ok(())
 }
@@ -364,6 +375,29 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
 
     chan2.delete().await.context("unable to delete channel")?;
     recv2.delete().await.context("unable to delete channel")?;
+
+    // Try open/seal after delete.
+    chan1
+        .seal(&mut ciphertext1, afc_msg)
+        .await
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv1
+        .open(&mut plaintext1, &ciphertext1)
+        .await
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
+    chan2
+        .seal(&mut ciphertext2, afc_msg)
+        .await
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv2
+        .open(&mut plaintext2, &ciphertext2)
+        .await
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
 
     Ok(())
 }
@@ -672,6 +706,16 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     chan.delete().await.context("unable to delete channel")?;
     recv.delete().await.context("unable to delete channel")?;
 
+    // Try open/seal after delete.
+    chan.seal(&mut ciphertext, afc_msg)
+        .await
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv.open(&mut plaintext, &ciphertext)
+        .await
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
     Ok(())
 }
 
@@ -800,6 +844,29 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
 
     chan2.delete().await.context("unable to delete channel")?;
     recv2.delete().await.context("unable to delete channel")?;
+
+    // Try open/seal after delete.
+    chan1
+        .seal(&mut ciphertext1, afc_msg)
+        .await
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv1
+        .open(&mut plaintext1, &ciphertext1)
+        .await
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
+    chan2
+        .seal(&mut ciphertext2, afc_msg)
+        .await
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv2
+        .open(&mut plaintext2, &ciphertext2)
+        .await
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
 
     Ok(())
 }
