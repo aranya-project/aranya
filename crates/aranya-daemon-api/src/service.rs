@@ -27,8 +27,13 @@ use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
+pub mod afc;
 pub mod quic_sync;
+
 pub use quic_sync::*;
+
+#[cfg(feature = "afc")]
+pub use self::afc::*;
 
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
@@ -630,6 +635,18 @@ pub struct Label {
     pub name: Text,
 }
 
+// TODO: tarpc does not cfg return types properly.
+#[cfg(not(feature = "afc"))]
+use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
+#[cfg(not(feature = "afc"))]
+mod afc_stub {
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    pub enum Never {}
+    pub type AfcCtrl = Never;
+    pub type AfcShmInfo = Never;
+    pub type AfcChannelId = Never;
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Returns the daemon's version.
@@ -679,19 +696,6 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assign a QUIC channels network identifier to a device.
-    async fn assign_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-    /// Remove a QUIC channels network identifier from a device.
-    async fn remove_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-
     // Create a label.
     async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
     // Delete a label.
@@ -706,6 +710,18 @@ pub trait DaemonApi {
     // Revoke a label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
 
+    /// Assign a QUIC channels network identifier to a device.
+    async fn assign_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+    /// Remove a QUIC channels network identifier from a device.
+    async fn remove_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
         team: TeamId,
@@ -724,6 +740,46 @@ pub trait DaemonApi {
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
+
+    /// Gets AFC shared-memory configuration info.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn afc_shm_info() -> Result<AfcShmInfo>;
+    /// Create a bidirectional AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn create_afc_bidi_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    /// Create a unidirectional AFC send-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn create_afc_uni_send_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    /// Create a unidirectional AFC receive-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn create_afc_uni_recv_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    /// Delete a AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
+    /// Receive AFC ctrl message.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn receive_afc_ctrl(
+        team: TeamId,
+        ctrl: AfcCtrl,
+    ) -> Result<(LabelId, AfcChannelId, ChanOp)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
