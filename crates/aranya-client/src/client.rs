@@ -30,7 +30,6 @@ use crate::{
     aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
-    Error,
 };
 
 custom_id! {
@@ -124,9 +123,9 @@ impl From<Role> for api::Role {
 pub struct KeyBundle(api::KeyBundle);
 
 impl KeyBundle {
-    /// Return public encoding key bytes.
-    pub fn encoding(&self) -> Vec<u8> {
-        self.0.encoding.clone()
+    /// Return public encryption key bytes.
+    pub fn encryption(&self) -> Vec<u8> {
+        self.0.encryption.clone()
     }
 }
 
@@ -135,13 +134,11 @@ impl KeyBundle {
 pub struct NetIdentifier(pub(crate) api::NetIdentifier);
 
 impl FromStr for NetIdentifier {
-    fn from_str(s: &str) -> Result<Self, Error> {
-        Ok(Self(api::NetIdentifier(
-            s.to_string().try_into().expect("addr is valid text"),
-        )))
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        Ok(Self(api::NetIdentifier(s.to_string().try_into()?)))
     }
 
-    type Err = Error;
+    type Err = anyhow::Error;
 }
 
 impl fmt::Display for NetIdentifier {
@@ -620,7 +617,7 @@ impl Team<'_> {
 
     /// Associate a network identifier to a device for use with AQC.
     ///
-    /// If the address already exists for this device_id.into_id().into(), it is replaced with the new address. Capable
+    /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
     pub async fn assign_aqc_net_identifier(
@@ -811,7 +808,7 @@ impl Queries<'_> {
 
     /// Returns the AQC network identifier assigned to the current device.
     pub async fn aqc_net_identifier(&self, device_id: DeviceId) -> Result<Option<NetIdentifier>> {
-        let net_identifier = self
+        Ok(self
             .client
             .daemon
             .query_aqc_net_identifier(
@@ -821,11 +818,8 @@ impl Queries<'_> {
             )
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        if let Some(net_identifier) = net_identifier {
-            return Ok(Some(NetIdentifier(net_identifier)));
-        }
-        Ok(None)
+            .map_err(aranya_error)?
+            .map(NetIdentifier))
     }
 
     /// Returns whether a label exists.

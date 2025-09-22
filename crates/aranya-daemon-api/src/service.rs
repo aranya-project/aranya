@@ -119,7 +119,7 @@ custom_id! {
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
-    pub encoding: Vec<u8>,
+    pub encryption: Vec<u8>,
 }
 
 /// A device's role on the team.
