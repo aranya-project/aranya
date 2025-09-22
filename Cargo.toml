@@ -35,8 +35,8 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-fast-channels = { version = "0.12.0", features = ["alloc"] }
-aranya-afc-util = { version = "0.13.0", features = ["alloc"] }
+aranya-fast-channels = { version = "0.13.0", features = ["alloc"] }
+aranya-afc-util = { version = "0.14.0", features = ["alloc"] }
 aranya-aqc-util = { version = "0.8.0", features = ["alloc"] }
 aranya-capi-core = { version = "0.5.0" }
 aranya-capi-codegen = { version = "0.4.0" }
@@ -47,12 +47,12 @@ aranya-envelope-ffi = { version = "0.13.0" }
 aranya-idam-ffi = { version = "0.13.0" }
 aranya-perspective-ffi = { version = "0.13.0" }
 aranya-policy-compiler = { version = "0.13.0" }
-aranya-policy-ifgen = { version = "0.13.0", features = ["serde"] }
+aranya-policy-ifgen = { version = "0.14.0", features = ["serde"] }
 aranya-policy-ifgen-build = { version = "0.7.0" }
 aranya-policy-lang = { version = "0.8.0" }
 aranya-policy-text = { version = "0.1.2" }
 aranya-policy-vm = { version = "0.13.0", features = ["std"] }
-aranya-runtime = { version = "0.13.0", features = ["std", "libc"] }
+aranya-runtime = { version = "0.14.0", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
 
@@ -107,7 +107,3 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
-
-[patch.crates-io]
-aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "driveby/afc-chan-id-ctr" }
-aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "driveby/afc-chan-id-ctr" }
