@@ -325,6 +325,8 @@ impl BidiChannel {
     /// The resulting ciphertext is written to `dst`, which must
     /// be at least `plaintext.len() + Channels::OVERHEAD` bytes
     /// long.
+    ///
+    /// Note: this operation is invalid if the channel has been deleted.
     pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
@@ -345,6 +347,8 @@ impl BidiChannel {
     ///
     /// It returns the cryptographically verified label and
     /// sequence number associated with the ciphertext.
+    ///
+    /// Note: this operation is invalid if the channel has been deleted.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
@@ -395,6 +399,8 @@ impl SendChannel {
     /// The resulting ciphertext is written to `dst`, which must
     /// be at least `plaintext.len() + Channels::OVERHEAD` bytes
     /// long.
+    ///
+    /// Note: this operation is invalid if the channel has been deleted.
     pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
@@ -447,6 +453,8 @@ impl ReceiveChannel {
     ///
     /// It returns the cryptographically verified label and
     /// sequence number associated with the ciphertext.
+    ///
+    /// Note: this operation is invalid if the channel has been deleted.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
