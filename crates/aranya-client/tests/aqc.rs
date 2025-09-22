@@ -4,13 +4,14 @@ use std::time::Duration;
 
 mod common;
 
-use anyhow::{Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{aqc::AqcPeerChannel, ChanOp};
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
 use aranya_daemon_api::text;
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
+use common::SLEEP_INTERVAL;
 use futures_util::{future::try_join, FutureExt};
 
 use crate::common::{sleep, DevicesCtx};
@@ -279,6 +280,132 @@ async fn test_aqc_chans_basic() -> Result<()> {
             .aqc()
             .delete_bidi_channel(&mut bidi_chan2)
             .await?;
+    }
+
+    Ok(())
+}
+
+/// Operators should not be able to create unidirectional channels without the explicit permission.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_operator_cannot_create_uni_channel_without_permission() -> Result<()> {
+    let mut devices =
+        DevicesCtx::new("test_operator_cannot_create_uni_channel_without_permission").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.add_all_sync_peers(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let operator_net = devices.operator.aqc_net_id();
+    let membera_net = devices.membera.aqc_net_id();
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+    let membera_team = devices.membera.client.team(team_id);
+
+    operator_team
+        .device(devices.operator.id)
+        .assign_aqc_net_identifier(operator_net.clone())
+        .await?;
+    operator_team
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(membera_net.clone())
+        .await?;
+
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    owner_team.sync_now(operator_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    let label = owner_team
+        .create_label(text!("uni-no-perm"), roles.owner().id)
+        .await?;
+    owner_team
+        .device(devices.operator.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await?;
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    operator_team.sync_now(owner_addr, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match devices
+        .operator
+        .client
+        .aqc()
+        .create_uni_channel(team_id, membera_net, label)
+        .await
+    {
+        Ok(_) => bail!("expected operator uni-channel creation to fail without permission"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected channel creation error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Operators should not be able to create bidirectional channels without the explicit permission.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_operator_cannot_create_bidi_channel_without_permission() -> Result<()> {
+    let mut devices =
+        DevicesCtx::new("test_operator_cannot_create_bidi_channel_without_permission").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.add_all_sync_peers(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let operator_net = devices.operator.aqc_net_id();
+    let membera_net = devices.membera.aqc_net_id();
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+    let membera_team = devices.membera.client.team(team_id);
+
+    operator_team
+        .device(devices.operator.id)
+        .assign_aqc_net_identifier(operator_net.clone())
+        .await?;
+    operator_team
+        .device(devices.membera.id)
+        .assign_aqc_net_identifier(membera_net.clone())
+        .await?;
+
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    owner_team.sync_now(operator_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    let label = owner_team
+        .create_label(text!("bidi-no-perm"), roles.owner().id)
+        .await?;
+    owner_team
+        .device(devices.operator.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await?;
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    operator_team.sync_now(owner_addr, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match devices
+        .operator
+        .client
+        .aqc()
+        .create_bidi_channel(team_id, membera_net, label)
+        .await
+    {
+        Ok(_) => bail!("expected operator bidi-channel creation to fail without permission"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected channel creation error: {err:?}"),
     }
 
     Ok(())

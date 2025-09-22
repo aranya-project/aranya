@@ -170,7 +170,7 @@ impl State {
 
         let client = QuicClient::builder()
             .with_tls(provider)?
-            .with_io((Ipv4Addr::UNSPECIFIED, 0))
+            .with_io((Ipv4Addr::LOCALHOST, 0))
             .assume("can set quic client address")?
             .start()
             .map_err(Error::ClientStart)?;

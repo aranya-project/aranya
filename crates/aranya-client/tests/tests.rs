@@ -13,8 +13,11 @@ mod common;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    client::{ChanOp, RoleId},
+    config::CreateTeamConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
+use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
@@ -138,9 +141,9 @@ async fn test_add_devices() -> Result<()> {
         .context("operator unable to sync with admin")?;
     sleep(SLEEP_INTERVAL).await;
 
-    for (name, kb) in [
-        ("membera", team.membera.pk.clone()),
-        ("memberb", team.memberb.pk.clone()),
+    for (name, kb, device_id) in [
+        ("membera", team.membera.pk.clone(), team.membera.id),
+        ("memberb", team.memberb.pk.clone(), team.memberb.id),
     ] {
         admin
             .add_device(kb, None)
@@ -152,7 +155,7 @@ async fn test_add_devices() -> Result<()> {
             .context("operator unable to sync with admin")?;
         sleep(SLEEP_INTERVAL).await;
         operator
-            .assign_role(team.membera.id, roles.member().id)
+            .assign_role(device_id, roles.member().id)
             .await
             .with_context(|| {
                 format!("operator should be able to assign member role to `{name}`")
@@ -584,6 +587,450 @@ async fn test_multi_team_sync() -> Result<()> {
         .assign_role(devices.operator.id, roles2.operator().id)
         .await
         .context("Assigning a role should not fail here!")?;
+
+    Ok(())
+}
+
+/// Enforces that default roles can only be seeded once per team.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_setup_default_roles_single_use() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_setup_default_roles_single_use").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    match owner_team.setup_default_roles(roles.owner().id).await {
+        Ok(_) => bail!("expected replayed setup_default_roles to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected error re-running setup_default_roles: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Verifies that the managing role supplied to setup_default_roles must exist.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_setup_default_roles_rejects_unknown_owner").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let bogus_role = RoleId::from([0x55; 32]);
+
+    match owner_team.setup_default_roles(bogus_role).await {
+        Ok(_) => bail!("expected setup_default_roles to reject unknown owner role"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected error when using bogus owner role: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Prevents devices from assigning roles to themselves.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_role_self_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    match owner_team
+        .assign_role(devices.owner.id, roles.owner().id)
+        .await
+    {
+        Ok(_) => bail!("expected assigning role to self to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Prevents the sole owner from revoking its own owner role.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    match owner_team
+        .revoke_role(devices.owner.id, roles.owner().id)
+        .await
+    {
+        Ok(_) => bail!("expected revoking owner role from self to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected revoke_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Requires role management delegation before assigning a role.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_role_requires_delegation() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_role_requires_delegation").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+    owner_team
+        .add_device(devices.membera.pk.clone(), None)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match admin_team
+        .assign_role(devices.membera.id, roles.member().id)
+        .await
+    {
+        Ok(_) => bail!("expected assigning role without delegation to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Role management changes require the caller to own the role.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_role_management_permission_requires_ownership() -> Result<()> {
+    let mut devices =
+        DevicesCtx::new("test_assign_role_management_permission_requires_ownership").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match admin_team
+        .assign_role_management_permission(
+            roles.member().id,
+            roles.operator().id,
+            text!("CanAssignRole"),
+        )
+        .await
+    {
+        Ok(_) => bail!("expected assigning management perm without ownership to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_role_management_permission error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Assigning a label to a role requires the role to have CanUseAqc.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_label_to_role_requires_can_use_aqc() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_label_to_role_requires_can_use_aqc").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label = owner_team
+        .create_label(text!("role-needs-aqc"), roles.owner().id)
+        .await?;
+
+    match owner_team
+        .assign_label_to_role(roles.admin().id, label, ChanOp::SendRecv)
+        .await
+    {
+        Ok(_) => bail!("expected assigning label to non-AQC role to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_label_to_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Devices cannot assign labels to themselves.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_label_to_device_self_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_net = devices.owner.aqc_net_id();
+    let owner_id = devices.owner.id;
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .device(owner_id)
+        .assign_aqc_net_identifier(owner_net)
+        .await?;
+
+    let label = owner_team
+        .create_label(text!("device-self-label"), roles.owner().id)
+        .await?;
+
+    match owner_team
+        .device(owner_id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+    {
+        Ok(_) => bail!("expected assigning label to self to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_label error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Enforces that devices must have an AQC network identifier before labels can be assigned.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_label_to_device_requires_network_id() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_label_to_device_requires_network_id").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .add_device(devices.membera.pk.clone(), None)
+        .await?;
+
+    let label = owner_team
+        .create_label(text!("device-needs-net"), roles.owner().id)
+        .await?;
+
+    match owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+    {
+        Ok(_) => bail!("expected assigning label without network id to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_label error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Setting a network identifier requires the appropriate simple permission.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_set_aqc_network_name_requires_permission() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_set_aqc_network_name_requires_permission").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let membera_net = devices.membera.aqc_net_id();
+    let membera_id = devices.membera.id;
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .add_device(devices.membera.pk.clone(), Some(roles.member().id))
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let membera_team = devices.membera.client.team(team_id);
+    membera_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match membera_team
+        .device(membera_id)
+        .assign_aqc_net_identifier(membera_net)
+        .await
+    {
+        Ok(_) => bail!("expected setting network name without permission to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_aqc_net_identifier error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Unsetting a network identifier requires that one is present.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_unset_aqc_network_name_requires_entry() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_unset_aqc_network_name_requires_entry").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_net = devices.owner.aqc_net_id();
+    let owner_id = devices.owner.id;
+    let owner_team = devices.owner.client.team(team_id);
+    match owner_team
+        .device(owner_id)
+        .remove_aqc_net_identifier(owner_net)
+        .await
+    {
+        Ok(_) => bail!("expected removing missing network name to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected remove_aqc_net_identifier error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Ensures the last owner cannot be removed by another device.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_admin_cannot_remove_last_owner() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_admin_cannot_remove_last_owner").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.add_all_sync_peers(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let admin_team = devices.admin.client.team(team_id);
+    match admin_team.remove_device(devices.owner.id).await {
+        Ok(_) => bail!("expected removing the final owner to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected remove_device error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Confirms that managing-role changes require an explicit permission grant.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_role_owner_change_requires_permission() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_role_owner_change_requires_permission").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.add_all_sync_peers(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .add_role_owner(roles.member().id, roles.admin().id)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    match admin_team
+        .add_role_owner(roles.member().id, roles.operator().id)
+        .await
+    {
+        Ok(_) => bail!("expected add_role_owner to require additional permission"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected add_role_owner error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Duplicate role-owner entries must be rejected before attempting storage writes.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_role_owner_duplicate_rejected").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .add_role_owner(roles.member().id, roles.admin().id)
+        .await?;
+
+    match owner_team
+        .add_role_owner(roles.member().id, roles.admin().id)
+        .await
+    {
+        Ok(_) => bail!("expected duplicate role owner addition to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected add_role_owner duplicate error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Removing a non-existent owning role should produce a policy failure, not a runtime error.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_remove_role_owner_missing_entry() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_remove_role_owner_missing_entry").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    match owner_team
+        .remove_role_owner(roles.member().id, roles.operator().id)
+        .await
+    {
+        Ok(_) => bail!("expected removing absent role owner to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected remove_role_owner error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Duplicate label assignment to a role must fail cleanly.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_label_to_role_duplicate_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_label_to_role_duplicate_rejected").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label = owner_team
+        .create_label(text!("dup-role-label"), roles.owner().id)
+        .await?;
+    owner_team
+        .assign_label_to_role(roles.member().id, label, ChanOp::SendRecv)
+        .await?;
+
+    match owner_team
+        .assign_label_to_role(roles.member().id, label, ChanOp::SendRecv)
+        .await
+    {
+        Ok(_) => bail!("expected duplicate label assignment to role to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected assign_label_to_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Revoking an unassigned label from a role should surface a policy error.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_revoke_label_from_role_missing_entry() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_revoke_label_from_role_missing_entry").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label = owner_team
+        .create_label(text!("missing-role-label"), roles.owner().id)
+        .await?;
+
+    match owner_team
+        .revoke_label_from_role(roles.member().id, label)
+        .await
+    {
+        Ok(_) => bail!("expected revoking unassigned label to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected revoke_label_from_role error: {err:?}"),
+    }
 
     Ok(())
 }
