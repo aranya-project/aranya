@@ -96,9 +96,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91c8eab5fb5519c7435aa69263c662df4cbf8ee59a6472968c86d55bd25bd978"
+checksum = "ea871d7a5fbcb9a7afdf2a282f8003035bb4125310e5404dcfeef5725e0a7425"
 dependencies = [
  "buggy",
  "byteorder",
