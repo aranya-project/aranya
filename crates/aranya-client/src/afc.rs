@@ -45,6 +45,22 @@ impl Ctrl {
     }
 }
 
+/// A channel ID.
+#[derive(Copy, Clone, Debug)]
+pub struct ChannelId(aranya_daemon_api::AfcGlobalChannelId);
+
+impl From<aranya_daemon_api::AfcGlobalChannelId> for ChannelId {
+    fn from(value: aranya_daemon_api::AfcGlobalChannelId) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ChannelId> for aranya_daemon_api::AfcGlobalChannelId {
+    fn from(value: ChannelId) -> Self {
+        value.0
+    }
+}
+
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -116,7 +132,7 @@ impl Channels {
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(BidiChannel, Ctrl)> {
-        let (ctrl, channel_id) = self
+        let (ctrl, local_channel_id, channel_id) = self
             .daemon
             .create_afc_bidi_channel(
                 context::current(),
@@ -130,7 +146,8 @@ impl Channels {
         let chan = BidiChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id,
+            channel_id: channel_id.into(),
+            local_channel_id,
             label_id: label_id.__into_id().into(),
         };
         Ok((chan, Ctrl(ctrl)))
@@ -157,7 +174,7 @@ impl Channels {
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(SendChannel, Ctrl)> {
-        let (ctrl, channel_id) = self
+        let (ctrl, local_channel_id, channel_id) = self
             .daemon
             .create_afc_uni_send_channel(
                 context::current(),
@@ -171,7 +188,8 @@ impl Channels {
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id,
+            channel_id: channel_id.into(),
+            local_channel_id,
             label_id: label_id.__into_id().into(),
         };
         Ok((chan, Ctrl(ctrl)))
@@ -198,7 +216,7 @@ impl Channels {
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(ReceiveChannel, Ctrl)> {
-        let (ctrl, channel_id) = self
+        let (ctrl, local_channel_id, channel_id) = self
             .daemon
             .create_afc_uni_recv_channel(
                 context::current(),
@@ -212,7 +230,8 @@ impl Channels {
         let chan = ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id,
+            channel_id: channel_id.into(),
+            local_channel_id,
             label_id: label_id.__into_id().into(),
         };
         Ok((chan, Ctrl(ctrl)))
@@ -230,7 +249,7 @@ impl Channels {
     /// - [`SendChannel`]
     /// - [`ReceiveChannel`]
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: Ctrl) -> Result<Channel> {
-        let (label_id, channel_id, op) = self
+        let (label_id, local_channel_id, channel_id, op) = self
             .daemon
             .receive_afc_ctrl(context::current(), team_id.__into_id().into(), ctrl.0)
             .await
@@ -240,19 +259,22 @@ impl Channels {
             ChanOp::RecvOnly => Ok(Channel::Uni(UniChannel::Receive(ReceiveChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
-                channel_id,
+                channel_id: channel_id.into(),
+                local_channel_id,
                 label_id: label_id.into_id().into(),
             }))),
             ChanOp::SendOnly => Ok(Channel::Uni(UniChannel::Send(SendChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
-                channel_id,
+                channel_id: channel_id.into(),
+                local_channel_id,
                 label_id: label_id.into_id().into(),
             }))),
             ChanOp::SendRecv => Ok(Channel::Bidi(BidiChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
-                channel_id,
+                channel_id: channel_id.into(),
+                local_channel_id,
                 label_id: label_id.into_id().into(),
             })),
         }
@@ -282,12 +304,16 @@ pub enum UniChannel {
 pub struct BidiChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
-    channel_id: AfcChannelId,
+    channel_id: ChannelId,
+    local_channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl BidiChannel {
-    // TODO: return BidiChannelId
+    /// The channel's unique ID.
+    pub fn channel_id(&self) -> ChannelId {
+        self.channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
@@ -300,12 +326,12 @@ impl BidiChannel {
     /// be at least `plaintext.len() + Channels::OVERHEAD` bytes
     /// long.
     pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
-        debug!(?self.channel_id, ?self.label_id, "seal");
+        debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
             .await
             .0
-            .seal(self.channel_id, dst, plaintext)
+            .seal(self.local_channel_id, dst, plaintext)
             .map_err(Error::Seal)?;
         Ok(())
     }
@@ -320,13 +346,13 @@ impl BidiChannel {
     /// It returns the cryptographically verified label and
     /// sequence number associated with the ciphertext.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
-        debug!(?self.channel_id, ?self.label_id, "open");
+        debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
             .await
             .0
-            .open(self.channel_id, dst, ciphertext)
+            .open(self.local_channel_id, dst, ciphertext)
             .map_err(Error::Open)?;
         debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
         Ok(Seq(seq))
@@ -335,7 +361,7 @@ impl BidiChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(context::current(), self.channel_id)
+            .delete_afc_channel(context::current(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -348,12 +374,16 @@ impl BidiChannel {
 pub struct SendChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
-    channel_id: AfcChannelId,
+    channel_id: ChannelId,
+    local_channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl SendChannel {
-    // TODO: return UniChannelId.
+    /// The channel's unique ID.
+    pub fn channel_id(&self) -> ChannelId {
+        self.channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
@@ -366,12 +396,12 @@ impl SendChannel {
     /// be at least `plaintext.len() + Channels::OVERHEAD` bytes
     /// long.
     pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
-        debug!(?self.channel_id, ?self.label_id, "seal");
+        debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
             .await
             .0
-            .seal(self.channel_id, dst, plaintext)
+            .seal(self.local_channel_id, dst, plaintext)
             .map_err(Error::Seal)?;
         Ok(())
     }
@@ -379,7 +409,7 @@ impl SendChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(context::current(), self.channel_id)
+            .delete_afc_channel(context::current(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -392,12 +422,16 @@ impl SendChannel {
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
-    channel_id: AfcChannelId,
+    channel_id: ChannelId,
+    local_channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl ReceiveChannel {
-    // TODO: return UniChannelId.
+    /// The channel's unique ID.
+    pub fn channel_id(&self) -> ChannelId {
+        self.channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
@@ -414,13 +448,13 @@ impl ReceiveChannel {
     /// It returns the cryptographically verified label and
     /// sequence number associated with the ciphertext.
     pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
-        debug!(?self.channel_id, ?self.label_id, "open");
+        debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
             .await
             .0
-            .open(self.channel_id, dst, ciphertext)
+            .open(self.local_channel_id, dst, ciphertext)
             .map_err(Error::Open)?;
         debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
         Ok(Seq(seq))
@@ -429,7 +463,7 @@ impl ReceiveChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(context::current(), self.channel_id)
+            .delete_afc_channel(context::current(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
