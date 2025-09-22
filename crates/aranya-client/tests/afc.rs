@@ -149,6 +149,8 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
         .await
         .context("unable to open afc message")?;
 
+    assert_eq!(afc_msg, plaintext);
+
     Ok(())
 }
 
@@ -337,6 +339,8 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .await
         .context("unable to open afc message")?;
 
+    assert_eq!(afc_msg, plaintext1);
+
     // Seal data.
     let afc_msg = "afc msg".as_bytes();
     let mut ciphertext2 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
@@ -351,6 +355,8 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .open(&mut plaintext2, &ciphertext2)
         .await
         .context("unable to open afc message")?;
+
+    assert_eq!(afc_msg, plaintext2);
 
     // Delete channels.
     chan1.delete().await.context("unable to delete channel")?;
@@ -502,6 +508,8 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .await
         .context("unable to open afc message")?;
 
+    assert_eq!(afc_msg, plaintext);
+
     Ok(())
 }
 
@@ -579,6 +587,8 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
     recv.open(&mut plaintext, &ciphertext)
         .await
         .context("unable to open afc message")?;
+
+    assert_eq!(afc_msg, plaintext);
 
     Ok(())
 }
@@ -767,6 +777,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .open(&mut plaintext1, &ciphertext1)
         .await
         .context("unable to open afc message")?;
+    assert_eq!(afc_msg, plaintext1);
 
     // Seal data.
     let mut ciphertext2 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
@@ -781,6 +792,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .open(&mut plaintext2, &ciphertext2)
         .await
         .context("unable to open afc message")?;
+    assert_eq!(afc_msg, plaintext2);
 
     // Delete channels.
     chan1.delete().await.context("unable to delete channel")?;
