@@ -7,6 +7,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
+use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -22,7 +23,7 @@ use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
+    api::{self, ApiKey, DaemonApiServer, EffectReceiver, QSData},
     aqc::Aqc,
     aranya,
     config::{Config, Toggle},
@@ -33,7 +34,7 @@ use crate::{
         PeerCacheMap, SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
-    vm_policy::{PolicyEngine, TEST_POLICY_1},
+    vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
 // Use short names so that we can more easily add generics.
@@ -199,12 +200,15 @@ impl Daemon {
                 let peers = {
                     let mut peers = BTreeMap::new();
                     for graph_id in &graph_ids {
-                        let graph_peers = BiBTreeMap::from_iter(
-                            client
-                                .actions(graph_id)
-                                .query_aqc_network_names_off_graph()
-                                .await?,
-                        );
+                        let effects = client.actions(graph_id).query_aqc_network_names().await?;
+                        let graph_peers =
+                            BiBTreeMap::from_iter(effects.into_iter().filter_map(|e| {
+                                if let policy::Effect::QueryAqcNetworkNamesResult(e) = e {
+                                    Some((NetIdentifier(e.net_id), e.device_id.into()))
+                                } else {
+                                    None
+                                }
+                            }));
                         peers.insert(*graph_id, graph_peers);
                     }
                     peers
@@ -221,7 +225,7 @@ impl Daemon {
 
             let data = QSData { psk_store };
 
-            let crypto = crate::api::Crypto {
+            let crypto = api::Crypto {
                 engine: eng,
                 local_store,
                 aranya_store,
@@ -340,7 +344,7 @@ impl Daemon {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(POLICY_SOURCE, eng, store, device_id)?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
