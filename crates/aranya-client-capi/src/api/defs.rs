@@ -303,7 +303,7 @@ impl From<aranya_client::client::TeamId> for TeamId {
     fn from(value: aranya_client::client::TeamId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__into_id().into(),
             },
         }
     }
