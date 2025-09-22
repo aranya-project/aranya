@@ -32,6 +32,7 @@ use crate::{
 };
 
 pub mod hello;
+pub mod push;
 pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
@@ -272,6 +273,30 @@ pub trait SyncState: Sized {
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
         head: Address,
+    ) -> impl Future<Output = SyncResult<()>> + Send;
+
+    /// Subscribe to push notifications from a sync peer.
+    fn sync_push_subscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    ) -> impl Future<Output = SyncResult<()>> + Send;
+
+    /// Unsubscribe from push notifications from a sync peer.
+    fn sync_push_unsubscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+    ) -> impl Future<Output = SyncResult<()>> + Send;
+
+    /// Broadcast push notifications to all subscribers of a graph.
+    fn broadcast_push_notifications(
+        syncer: &mut Syncer<Self>,
+        graph_id: GraphId,
+        response: aranya_runtime::SyncResponseMessage,
     ) -> impl Future<Output = SyncResult<()>> + Send;
 }
 

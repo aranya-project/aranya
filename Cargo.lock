@@ -332,6 +332,7 @@ dependencies = [
  "derive-where",
  "divan",
  "futures-util",
+ "heapless 0.8.0",
  "postcard",
  "pretty_assertions",
  "serde",

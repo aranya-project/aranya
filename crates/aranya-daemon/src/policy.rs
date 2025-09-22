@@ -6,9 +6,10 @@
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::vec::Vec;
+
 use aranya_policy_ifgen::{
     macros::{actions, effect, effects, value},
-    ClientError, Id, Value, Text,
+    ClientError, Id, Text, Value,
 };
 /// KeyBundle policy struct.
 #[value]
@@ -312,11 +313,7 @@ pub struct TeamTerminated {
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
-    fn create_team(
-        &mut self,
-        owner_keys: KeyBundle,
-        nonce: Vec<u8>,
-    ) -> Result<(), ClientError>;
+    fn create_team(&mut self, owner_keys: KeyBundle, nonce: Vec<u8>) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
     fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
@@ -328,22 +325,14 @@ pub trait ActorExt {
         net_identifier: Text,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn create_aqc_bidi_channel(
-        &mut self,
-        peer_id: Id,
-        label_id: Id,
-    ) -> Result<(), ClientError>;
+    fn create_aqc_bidi_channel(&mut self, peer_id: Id, label_id: Id) -> Result<(), ClientError>;
     fn create_aqc_uni_channel(
         &mut self,
         sender_id: Id,
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
-    fn create_afc_bidi_channel(
-        &mut self,
-        peer_id: Id,
-        label_id: Id,
-    ) -> Result<(), ClientError>;
+    fn create_afc_bidi_channel(&mut self, peer_id: Id, label_id: Id) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
         &mut self,
         sender_id: Id,
@@ -352,12 +341,7 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn assign_label(
-        &mut self,
-        device_id: Id,
-        label_id: Id,
-        op: ChanOp,
-    ) -> Result<(), ClientError>;
+    fn assign_label(&mut self, device_id: Id, label_id: Id, op: ChanOp) -> Result<(), ClientError>;
     fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
     fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
