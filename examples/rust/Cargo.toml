@@ -59,7 +59,3 @@ tempfile = { version = "3.17.1" }
 tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-
-[patch.crates-io]
-aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "driveby/afc-chan-id-ctr" }
-aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "driveby/afc-chan-id-ctr" }
