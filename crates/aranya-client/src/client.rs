@@ -612,7 +612,7 @@ impl Team<'_> {
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     ///
-    /// See [`KeyBundle::encoding`].
+    /// See [`KeyBundle::encryption`].
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")
