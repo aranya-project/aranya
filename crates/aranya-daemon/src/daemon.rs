@@ -34,6 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
+        push::PushInfo,
         quic::{HelloInfo, PskStore, State as QuicSyncClientState, SyncParams},
         PeerCacheMap, SyncPeers, Syncer,
     },
@@ -359,6 +360,9 @@ impl Daemon {
         // Create shared hello subscriptions for both server and syncer
         let hello_subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
+        // Create shared push subscriptions for both server and syncer
+        let push_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+
         // Initialize the syncer
         let (mut syncer, peers, conns, conn_rx) = Syncer::new(
             client.clone(),
@@ -368,6 +372,7 @@ impl Daemon {
             server_addr,
             Arc::clone(&caches),
             Arc::clone(&hello_subscriptions),
+            Arc::clone(&push_subscriptions),
         )?;
 
         info!(addr = %server_addr, "starting QUIC sync server");
@@ -380,6 +385,10 @@ impl Daemon {
             caches,
             HelloInfo {
                 subscriptions: hello_subscriptions,
+                sync_peers: peers.clone(),
+            },
+            PushInfo {
+                subscriptions: push_subscriptions,
                 sync_peers: peers.clone(),
             },
         )

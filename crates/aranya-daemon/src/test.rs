@@ -48,6 +48,7 @@ use crate::{
     sync::{
         self,
         task::{
+            push::{PushInfo, PushSubscriptions},
             quic::{HelloInfo, PskStore},
             PeerCacheKey, PeerCacheMap, SyncPeer,
         },
@@ -249,6 +250,7 @@ impl TestCtx {
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
             let hello_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+            let push_subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
             let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);
@@ -260,6 +262,7 @@ impl TestCtx {
                     Addr::from((Ipv4Addr::LOCALHOST, 0)),
                     caches.clone(),
                     hello_subscriptions.clone(),
+                    push_subscriptions.clone(),
                 )?;
 
                 (syncer, sync_peers, conn_map, conn_rx, effect_recv)
@@ -274,6 +277,10 @@ impl TestCtx {
                 caches.clone(),
                 HelloInfo {
                     subscriptions: hello_subscriptions.clone(),
+                    sync_peers: sync_peers.clone(),
+                },
+                PushInfo {
+                    subscriptions: push_subscriptions.clone(),
                     sync_peers,
                 },
             )

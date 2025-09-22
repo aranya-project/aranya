@@ -17,7 +17,7 @@ use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Address, Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
-    SyncRequester, SyncResponder, SyncType, PushSyncType, MAX_SYNC_MESSAGE_SIZE,
+    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     error::ReportExt as _,
@@ -68,7 +68,10 @@ pub(crate) use connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMa
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 
-pub(crate) use super::hello::{HelloInfo, HelloSubscriptions};
+pub(crate) use super::{
+    hello::{HelloInfo, HelloSubscriptions},
+    push::{PushInfo, PushSubscriptions},
+};
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -118,6 +121,8 @@ pub struct State {
     store: Arc<PskStore>,
     /// Shared reference to hello subscriptions for broadcasting notifications
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    /// Shared reference to push subscriptions for broadcasting push notifications
+    push_subscriptions: Arc<Mutex<PushSubscriptions>>,
 }
 
 impl SyncState for State {
@@ -198,6 +203,52 @@ impl SyncState for State {
     ) -> SyncResult<()> {
         super::hello::broadcast_hello_notifications(syncer, graph_id, head).await
     }
+
+    /// Subscribe to push notifications from a sync peer.
+    #[instrument(skip_all)]
+    async fn sync_push_subscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    ) -> SyncResult<()> {
+        syncer.state.store().set_team(id.into_id().into());
+        syncer
+            .send_push_subscribe_request(
+                peer,
+                id,
+                remain_open,
+                max_bytes,
+                commands,
+                syncer.server_addr,
+            )
+            .await
+    }
+
+    /// Unsubscribe from push notifications from a sync peer.
+    #[instrument(skip_all)]
+    async fn sync_push_unsubscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+    ) -> SyncResult<()> {
+        syncer.state.store().set_team(id.into_id().into());
+        syncer
+            .send_push_unsubscribe_request(peer, id, syncer.server_addr)
+            .await
+    }
+
+    /// Broadcast push notifications to all subscribers of a graph.
+    #[instrument(skip_all)]
+    async fn broadcast_push_notifications(
+        syncer: &mut Syncer<Self>,
+        graph_id: GraphId,
+        response: aranya_runtime::SyncResponseMessage,
+    ) -> SyncResult<()> {
+        super::push::broadcast_push_notifications(syncer, graph_id, response).await
+    }
 }
 
 impl State {
@@ -211,11 +262,17 @@ impl State {
         &self.hello_subscriptions
     }
 
+    /// Get a reference to the push subscriptions
+    pub fn push_subscriptions(&self) -> &Arc<Mutex<PushSubscriptions>> {
+        &self.push_subscriptions
+    }
+
     /// Creates a new instance
     fn new(
         psk_store: Arc<PskStore>,
         conns: SharedConnectionMap,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        push_subscriptions: Arc<Mutex<PushSubscriptions>>,
     ) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -241,6 +298,7 @@ impl State {
             conns,
             store: psk_store,
             hello_subscriptions,
+            push_subscriptions,
         })
     }
 }
@@ -255,6 +313,7 @@ impl Syncer<State> {
         server_addr: Addr,
         caches: PeerCacheMap,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        push_subscriptions: Arc<Mutex<PushSubscriptions>>,
     ) -> SyncResult<(
         Self,
         SyncPeers,
@@ -265,7 +324,12 @@ impl Syncer<State> {
         let peers = SyncPeers::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
-        let state = State::new(psk_store, conns.clone(), hello_subscriptions)?;
+        let state = State::new(
+            psk_store,
+            conns.clone(),
+            hello_subscriptions,
+            push_subscriptions,
+        )?;
 
         Ok((
             Self {
@@ -489,6 +553,8 @@ pub struct Server<EN, SP> {
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Storage for sync hello subscriptions
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    /// Storage for sync push subscriptions
+    push_subscriptions: Arc<Mutex<PushSubscriptions>>,
     /// Interface to trigger sync operations
     sync_peers: SyncPeers,
 }
@@ -508,6 +574,11 @@ where
         Arc::clone(&self.hello_subscriptions)
     }
 
+    /// Returns a reference to the push subscriptions for push notification broadcasting.
+    pub fn push_subscriptions(&self) -> Arc<Mutex<PushSubscriptions>> {
+        Arc::clone(&self.push_subscriptions)
+    }
+
     /// Creates a new `Server`.
     ///
     /// # Panics
@@ -525,6 +596,7 @@ where
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
         caches: PeerCacheMap,
         hello_info: HelloInfo,
+        push_info: PushInfo,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -558,6 +630,7 @@ where
             conn_rx,
             caches,
             hello_subscriptions: hello_info.subscriptions,
+            push_subscriptions: push_info.subscriptions,
             sync_peers: hello_info.sync_peers,
         })
     }
@@ -630,6 +703,7 @@ where
         let client = self.aranya.clone();
         let caches = self.caches.clone();
         let hello_subscriptions = self.hello_subscriptions.clone();
+        let push_subscriptions = self.push_subscriptions.clone();
         let sync_peers = self.sync_peers.clone();
         async move {
             // Accept incoming streams.
@@ -646,6 +720,7 @@ where
                     stream,
                     &active_team,
                     hello_subscriptions.clone(),
+                    push_subscriptions.clone(),
                     sync_peers.clone(),
                 )
                 .await
@@ -668,6 +743,7 @@ where
         stream: BidirectionalStream,
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        push_subscriptions: Arc<Mutex<PushSubscriptions>>,
         sync_peers: SyncPeers,
     ) -> SyncResult<()> {
         let mut recv_buf = Vec::new();
@@ -684,6 +760,7 @@ where
             &recv_buf,
             active_team,
             hello_subscriptions,
+            push_subscriptions,
             sync_peers,
         )
         .await;
@@ -719,6 +796,7 @@ where
         request_data: &[u8],
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        push_subscriptions: Arc<Mutex<PushSubscriptions>>,
         sync_peers: SyncPeers,
     ) -> SyncResult<Box<[u8]>> {
         debug!(
@@ -754,14 +832,20 @@ where
                 )
                 .await
             }
-            SyncType::Push(PushSyncType::Subscribe { .. }) => {
-                bug!("Push subscribe messages are not implemented")
-            }
-            SyncType::Push(PushSyncType::Unsubscribe { .. }) => {
-                bug!("Push unsubscribe messages are not implemented")
-            }
-            SyncType::Push(PushSyncType::Push { .. }) => {
-                bug!("Push messages are not implemented")
+            SyncType::Push(push_msg) => {
+                Self::process_push_message(
+                    push_msg,
+                    client,
+                    caches,
+                    addr,
+                    active_team,
+                    push_subscriptions,
+                    sync_peers,
+                )
+                .await;
+                // Push messages are fire-and-forget, return empty response
+                // Note: returning empty response which will be ignored by client
+                Ok(Box::new([]))
             }
             SyncType::Hello(hello_msg) => {
                 Self::process_hello_message(
