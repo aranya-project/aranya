@@ -140,7 +140,6 @@ name = "aranya-aqc-util"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc8ae2286d8033bf98e4672a84452ee226d4a7f4297898dcef1a95f0ba113dea"
-
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -453,7 +452,8 @@ dependencies = [
 [[package]]
 name = "aranya-libc"
 version = "0.3.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=118-sync-hello#79a6f5faa62d47141220759970e9df934845f410"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c360170b46dd9c1fb6dd195783571d1e04821c522d9f36b0a5dec659d6d9a7b"
 dependencies = [
  "cfg-if",
  "errno",
@@ -616,7 +616,8 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text"
 version = "0.1.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=118-sync-hello#79a6f5faa62d47141220759970e9df934845f410"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b39a413c48e08d25f2b6b7ab9cb43bba27147563984929c4ce9b5d7007e42df"
 dependencies = [
  "aranya-policy-text-macro",
  "proptest",
@@ -627,7 +628,8 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text-macro"
 version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=118-sync-hello#79a6f5faa62d47141220759970e9df934845f410"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9edc5cab895eb10bf04b1c1377dd35b67b029dbc23e8f4d51f7230781b9e5f3f"
 dependencies = [
  "macro-string",
  "proc-macro2",
@@ -4483,8 +4485,3 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[patch.unused]]
-name = "aranya-policy-vm-explorer"
-version = "0.0.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=118-sync-hello#79a6f5faa62d47141220759970e9df934845f410"
