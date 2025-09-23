@@ -47,7 +47,7 @@ impl CtrlMsg {
 }
 
 /// AFC seal error.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub struct AfcSealError(
     #[allow(dead_code, reason = "Don't expose internal error type in public API")]
     aranya_fast_channels::Error,
@@ -60,7 +60,7 @@ impl fmt::Display for AfcSealError {
 }
 
 /// AFC open error.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub struct AfcOpenError(
     #[allow(dead_code, reason = "Don't expose internal error type in public API")]
     aranya_fast_channels::Error,
@@ -313,7 +313,7 @@ impl BidiChannel {
             .await
             .0
             .seal(self.channel_id, dst, plaintext)
-            .map_err(AfcError)
+            .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())
     }
@@ -337,7 +337,7 @@ impl BidiChannel {
             .await
             .0
             .open(self.channel_id, dst, ciphertext)
-            .map_err(AfcError)
+            .map_err(AfcOpenError)
             .map_err(Error::Open)?;
         debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
         Ok(Seq(seq))
@@ -385,7 +385,7 @@ impl SendChannel {
             .await
             .0
             .seal(self.channel_id, dst, plaintext)
-            .map_err(AfcError)
+            .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())
     }
@@ -437,7 +437,7 @@ impl ReceiveChannel {
             .await
             .0
             .open(self.channel_id, dst, ciphertext)
-            .map_err(AfcError)
+            .map_err(AfcOpenError)
             .map_err(Error::Open)?;
         debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
         Ok(Seq(seq))
