@@ -311,7 +311,7 @@ impl From<aranya_client::client::TeamId> for TeamId {
 
 impl From<&TeamId> for aranya_client::client::TeamId {
     fn from(value: &TeamId) -> Self {
-        value.id.bytes.into()
+        Self::__from_array(value.id.bytes)
     }
 }
 
@@ -326,7 +326,7 @@ impl From<aranya_client::client::DeviceId> for DeviceId {
     fn from(value: aranya_client::client::DeviceId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__into_id().into(),
             },
         }
     }
@@ -334,7 +334,7 @@ impl From<aranya_client::client::DeviceId> for DeviceId {
 
 impl From<&DeviceId> for aranya_client::client::DeviceId {
     fn from(value: &DeviceId) -> Self {
-        value.id.bytes.into()
+        Self::__from_array(value.id.bytes)
     }
 }
 
@@ -425,7 +425,7 @@ impl From<aranya_client::client::LabelId> for LabelId {
     fn from(value: aranya_client::client::LabelId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__into_id().into(),
             },
         }
     }
@@ -433,7 +433,7 @@ impl From<aranya_client::client::LabelId> for LabelId {
 
 impl From<&LabelId> for aranya_client::client::LabelId {
     fn from(value: &LabelId) -> Self {
-        value.id.bytes.into()
+        Self::__from_array(value.id.bytes)
     }
 }
 

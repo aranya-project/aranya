@@ -6,7 +6,7 @@ mod common;
 use {
     crate::common::DevicesCtx,
     anyhow::{bail, Context, Result},
-    aranya_client::afc::{Channel, Channels, UniChannel},
+    aranya_client::afc::{Channel, Channels},
     aranya_client::client::ChanOp,
     aranya_daemon_api::text,
 };
@@ -521,7 +521,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
-    let Channel::Uni(UniChannel::Receive(recv)) = memberb_afc
+    let Channel::Recv(recv) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
@@ -601,7 +601,7 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
         .context("unable to create afc uni recv channel")?;
 
     // Receive uni channel.
-    let Channel::Uni(UniChannel::Send(send)) = memberb_afc
+    let Channel::Send(send) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni send channel")?
@@ -681,7 +681,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
-    let Channel::Uni(UniChannel::Receive(recv)) = memberb_afc
+    let Channel::Recv(recv) = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?
@@ -790,7 +790,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .context("unable to create afc uni channel")?;
 
     // Receive first bidi channel.
-    let Channel::Uni(UniChannel::Receive(recv1)) = memberb_afc
+    let Channel::Recv(recv1) = memberb_afc
         .recv_ctrl(team_id, ctrl1)
         .await
         .context("unable to receive afc uni channel")?
@@ -799,7 +799,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     };
 
     // Receive second bidi channel.
-    let Channel::Uni(UniChannel::Receive(recv2)) = membera_afc
+    let Channel::Recv(recv2) = membera_afc
         .recv_ctrl(team_id, ctrl2)
         .await
         .context("unable to receive afc uni channel")?
