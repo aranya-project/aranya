@@ -441,4 +441,24 @@ impl Team<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
+
+    /// Returns the list of labels assigned to a role.
+    #[instrument(skip(self))]
+    pub async fn labels_assigned_to_role(&self, role: RoleId) -> Result<Labels> {
+        let labels = self
+            .client
+            .daemon
+            .labels_assigned_to_role(context::current(), self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Label::from_api)
+            .collect();
+        Ok(Labels { labels })
+    }
 }

@@ -1324,3 +1324,61 @@ async fn test_revoke_label_from_role_missing_entry() -> Result<()> {
 
     Ok(())
 }
+
+/// Verifies label deletion doesn't break role operations that may query assigned labels.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_label_deletion_with_role_assignments() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_label_deletion_with_role_assignments").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Create two labels and assign both to member role
+    let label1 = owner_team
+        .create_label(text!("label-to-delete"), roles.owner().id)
+        .await?;
+    let label2 = owner_team
+        .create_label(text!("label-to-keep"), roles.owner().id)
+        .await?;
+
+    owner_team
+        .assign_label_to_role(roles.member().id, label1, ChanOp::SendRecv)
+        .await?;
+    owner_team
+        .assign_label_to_role(roles.member().id, label2, ChanOp::SendRecv)
+        .await?;
+
+    // Delete the first label
+    owner_team.delete_label(label1).await?;
+
+    // After deletion, operations that may internally query labels should still work:
+
+    // 1. We should be able to assign new labels to the role
+    let label3 = owner_team
+        .create_label(text!("new-label"), roles.owner().id)
+        .await?;
+    owner_team
+        .assign_label_to_role(roles.member().id, label3, ChanOp::SendRecv)
+        .await
+        .context("should be able to assign new labels after deleting an old one")?;
+
+    // 2. We should be able to revoke the remaining label
+    owner_team
+        .revoke_label_from_role(roles.member().id, label2)
+        .await
+        .context("should be able to revoke remaining labels after deletion")?;
+
+    let got = owner_team
+        .labels_assigned_to_role(roles.member().id)
+        .await?
+        .into_iter()
+        .map(|label| label.id)
+        .collect::<Vec<_>>();
+
+    // We deleted label1 and revoked label2.
+    assert_eq!(got, vec![label3]);
+
+    Ok(())
+}

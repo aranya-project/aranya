@@ -4074,12 +4074,18 @@ ephemeral action query_labels_assigned_to_role(role_id id) {
     // it. The key order is optimized for `delete`.
     map LabelAssignedToRole[label_id: ?, role_id: ?] as f {
         if f.role_id == role_id {
-            let label = check_unwrap query Label[label_id: f.label_id]
-            publish QueryLabelsAssignedToRole {
-                role_id: f.role_id,
-                label_id: f.label_id,
-                label_name: label.name,
-                label_author_id: label.author_id,
+            // Skip entries where the Label has been deleted.
+            // This is necessary because LabelAssignedToRole
+            // facts are not yet deleted because we do not have
+            // prefix deletion.
+            if exists Label[label_id: f.label_id] {
+                let label = check_unwrap query Label[label_id: f.label_id]
+                publish QueryLabelsAssignedToRole {
+                    role_id: f.role_id,
+                    label_id: f.label_id,
+                    label_name: label.name,
+                    label_author_id: label.author_id,
+                }
             }
         }
     }
