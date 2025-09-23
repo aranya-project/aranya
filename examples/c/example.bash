@@ -55,6 +55,11 @@ config_dir = "${out}/${device}/config"
 
 aqc.enable = true
 
+[afc]
+enable = true
+shm_path = "/shm_${device}"
+max_chans = 100
+
 [sync.quic]
 enable = true
 addr = "127.0.0.1:${port}"
@@ -63,7 +68,7 @@ EOF
 done
 
 # build the daemon.
-cargo build --bin aranya-daemon --release
+cargo build -p aranya-daemon --bin aranya-daemon --features experimental,aqc --release
 
 # copy the aranya-client.h header file
 mkdir -p "${example}/include"

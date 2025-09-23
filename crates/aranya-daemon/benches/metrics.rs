@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use aranya_daemon::{
-    config::{AqcConfig, Config, QuicSyncConfig, SyncConfig, Toggle},
+    config::{Config, QuicSyncConfig, SyncConfig, Toggle},
     Daemon,
 };
 use aranya_util::Addr;
@@ -26,6 +26,15 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
             let rt = Runtime::new().expect("We need a tokio runtime");
             let work_dir = tmp_dir.path().to_path_buf();
 
+            #[cfg(feature = "afc")]
+            let shm_path = {
+                let path = "/test_daemon_run\0"
+                    .try_into()
+                    .expect("should be able to parse AFC shared memory path");
+                let _ = aranya_fast_channels::shm::unlink(&path);
+                path
+            };
+
             let cfg = Config {
                 name: "test-daemon-run".into(),
                 runtime_dir: work_dir.join("run"),
@@ -38,7 +47,13 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
                     }),
                 },
-                aqc: Toggle::Enabled(AqcConfig {}),
+                #[cfg(feature = "aqc")]
+                aqc: Toggle::Enabled(aranya_daemon::config::AqcConfig {}),
+                #[cfg(feature = "afc")]
+                afc: Toggle::Enabled(aranya_daemon::config::AfcConfig {
+                    shm_path,
+                    max_chans: 100,
+                }),
             };
 
             for dir in [

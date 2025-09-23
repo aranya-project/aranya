@@ -5,12 +5,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
-    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -22,11 +22,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{Metadata, debug, info};
+use tracing::{debug, info, Metadata};
 use tracing_subscriber::{
-    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
+    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -76,6 +76,8 @@ impl ClientCtx {
         let work_dir = TempDir::with_prefix(user_name)?;
 
         let daemon = {
+            let shm = format!("/shm_{}", user_name);
+            let _ = rustix::shm::unlink(&shm);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -94,7 +96,7 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-                name = "daemon"
+                name = {user_name:?}
                 runtime_dir = {runtime_dir:?}
                 state_dir = {state_dir:?}
                 cache_dir = {cache_dir:?}
@@ -102,6 +104,11 @@ impl ClientCtx {
                 config_dir = {config_dir:?}
 
                 aqc.enable = true
+
+                [afc]
+                enable = true
+                shm_path = {shm:?}
+                max_chans = 100
 
                 [sync.quic]
                 enable = true
@@ -131,7 +138,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_server_addr = client.aqc().server_addr();
+        let aqc_server_addr = client.aqc().context("AQC is enabled")?.server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -414,6 +421,7 @@ async fn main() -> Result<()> {
             let chan = membera
                 .client
                 .aqc()
+                .context("AQC is enabled")?
                 .create_bidi_channel(team_id, memberb.aqc_net_id(), label3)
                 .await?;
             Ok(chan)
@@ -421,7 +429,13 @@ async fn main() -> Result<()> {
         async {
             // memberb receives a bidirectional channel.
             info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(chan) = memberb.client.aqc().receive_channel().await? else {
+            let AqcPeerChannel::Bidi(chan) = memberb
+                .client
+                .aqc()
+                .context("AQC is enabled")?
+                .receive_channel()
+                .await?
+            else {
                 bail!("expected a bidirectional channel");
             };
             Ok(chan)
@@ -455,6 +469,7 @@ async fn main() -> Result<()> {
     membera
         .client
         .aqc()
+        .context("AQC is enabled")?
         .delete_bidi_channel(&mut created_aqc_chan)
         .await?;
 

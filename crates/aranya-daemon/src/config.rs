@@ -6,6 +6,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+#[cfg(feature = "afc")]
+use aranya_fast_channels::shm;
 use aranya_util::Addr;
 use serde::{
     de::{self, DeserializeOwned},
@@ -17,7 +19,6 @@ pub use toggle::Toggle;
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     /// The name of the daemon, used for logging and debugging
     /// purposes.
@@ -103,8 +104,16 @@ pub struct Config {
     pub config_dir: PathBuf,
 
     /// AQC configuration.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[serde(default)]
     pub aqc: Toggle<AqcConfig>,
+
+    /// AFC configuration.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    #[serde(default)]
+    pub afc: Toggle<AfcConfig>,
 
     /// QUIC syncer config
     #[serde(default)]
@@ -194,9 +203,23 @@ pub struct SyncConfig {
 }
 
 /// AQC configuration.
+#[cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
+
+/// AFC configuration.
+#[cfg(feature = "afc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AfcConfig {
+    /// Shared memory path.
+    pub shm_path: Box<shm::Path>,
+    /// Maximum number of channels AFC should support.
+    pub max_chans: usize,
+}
 
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -245,7 +268,15 @@ mod tests {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                 }),
             },
+            #[cfg(feature = "aqc")]
             aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "afc")]
+            afc: Toggle::Enabled(AfcConfig {
+                shm_path: "/afc\0"
+                    .try_into()
+                    .context("unable to parse AFC shared memory path")?,
+                max_chans: 100,
+            }),
         };
         assert_eq!(got, want);
 
