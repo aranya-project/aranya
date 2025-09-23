@@ -30,6 +30,11 @@
     unused_qualifications
 )]
 
+#[cfg(all(feature = "aqc", not(feature = "experimental")))]
+compile_error!(
+    "AQC is currently experimental. Enable the 'experimental' feature to opt into experimental APIs."
+);
+
 pub mod actions;
 pub mod aranya;
 pub mod config;
@@ -38,6 +43,8 @@ pub mod policy;
 pub mod sync;
 pub mod vm_policy;
 
+#[cfg(feature = "afc")]
+mod afc;
 mod api;
 mod aqc;
 mod daemon;
@@ -49,3 +56,8 @@ mod test;
 
 pub use daemon::*;
 pub use keystore::AranyaStore;
+
+#[cfg(all(feature = "afc", not(feature = "preview")))]
+compile_error!(
+    "AFC is currently a preview feature. Enable the 'preview' feature to opt into preview APIs."
+);

@@ -72,7 +72,7 @@ async fn test_sync_now() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
     // Set up our team context so we can run the test.
-    let mut devices = DevicesCtx::new("test_query_functions").await?;
+    let mut devices = DevicesCtx::new("test_remove_devices").await?;
 
     // Create the initial team, and get our TeamId.
     let team_id = devices
@@ -302,7 +302,7 @@ async fn test_remove_team() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
-    let devices = DevicesCtx::new("test_multi_team").await?;
+    let devices = DevicesCtx::new("test_multi_team_sync").await?;
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;

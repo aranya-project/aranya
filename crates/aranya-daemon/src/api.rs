@@ -9,7 +9,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
     default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
-    Engine as _, KeyStore as _, KeyStoreExt as _, Rng,
+    Engine, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
@@ -30,9 +30,12 @@ use tarpc::{
 use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
+#[cfg(feature = "afc")]
+use crate::afc::Afc;
+#[cfg(feature = "aqc")]
+use crate::aqc::Aqc;
 use crate::{
     actions::Actions,
-    aqc::Aqc,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -72,29 +75,54 @@ pub(crate) struct DaemonApiServer {
     api: Api,
 }
 
+pub(crate) struct DaemonApiServerArgs {
+    pub(crate) client: Client,
+    pub(crate) local_addr: SocketAddr,
+    pub(crate) uds_path: PathBuf,
+    pub(crate) sk: ApiKey<CS>,
+    pub(crate) pk: PublicKeys<CS>,
+    pub(crate) peers: SyncPeers,
+    pub(crate) recv_effects: EffectReceiver,
+    pub(crate) invalid: InvalidGraphs,
+    #[cfg(feature = "aqc")]
+    pub(crate) aqc: Option<Aqc<CE, KS>>,
+    #[cfg(feature = "afc")]
+    pub(crate) afc: Afc<CE, CS, KS>,
+    pub(crate) crypto: Crypto,
+    pub(crate) seed_id_dir: SeedDir,
+    pub(crate) quic: Option<quic_sync::Data>,
+}
+
 impl DaemonApiServer {
     /// Creates a `DaemonApiServer`.
-    // TODO(eric): Clean up the arguments.
     #[instrument(skip_all)]
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        client: Client,
-        local_addr: SocketAddr,
-        uds_path: PathBuf,
-        sk: ApiKey<CS>,
-        pk: PublicKeys<CS>,
-        peers: SyncPeers,
-        recv_effects: EffectReceiver,
-        invalid: InvalidGraphs,
-        aqc: Aqc<CE, KS>,
-        crypto: Crypto,
-        seed_id_dir: SeedDir,
-        quic: Option<quic_sync::Data>,
+        DaemonApiServerArgs {
+            client,
+            local_addr,
+            uds_path,
+            sk,
+            pk,
+            peers,
+            recv_effects,
+            invalid,
+            #[cfg(feature = "aqc")]
+            aqc,
+            #[cfg(feature = "afc")]
+            afc,
+            crypto,
+            seed_id_dir,
+            quic,
+        }: DaemonApiServerArgs,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
-        let aqc = Arc::new(aqc);
+        #[cfg(feature = "aqc")]
+        let aqc = aqc.map(Arc::new);
+        #[cfg(feature = "afc")]
+        let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
-            aqc: Arc::clone(&aqc),
+            #[cfg(feature = "aqc")]
+            aqc: aqc.clone(),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -103,7 +131,10 @@ impl DaemonApiServer {
             peers,
             effect_handler,
             invalid,
+            #[cfg(feature = "aqc")]
             aqc,
+            #[cfg(feature = "afc")]
+            afc,
             crypto: tokio::sync::Mutex::new(crypto),
             seed_id_dir,
             quic,
@@ -174,7 +205,8 @@ impl DaemonApiServer {
 /// Handles effects from an Aranya action.
 #[derive(Clone, Debug)]
 struct EffectHandler {
-    aqc: Arc<Aqc<CE, KS>>,
+    #[cfg(feature = "aqc")]
+    aqc: Option<Arc<Aqc<CE, KS>>>,
 }
 
 impl EffectHandler {
@@ -184,6 +216,7 @@ impl EffectHandler {
         trace!("handling effects");
 
         use Effect::*;
+        // TODO: support feature flag in interface generator to compile out certain effects.
         for effect in effects {
             trace!(?effect, "handling effect");
             match effect {
@@ -202,26 +235,42 @@ impl EffectHandler {
                 LabelAssigned(_) => {}
                 LabelRevoked(_) => {}
                 AqcNetworkNameSet(e) => {
-                    self.aqc
-                        .add_peer(
+                    #[cfg(feature = "aqc")]
+                    if let Some(aqc) = &self.aqc {
+                        aqc.add_peer(
                             graph,
                             api::NetIdentifier(e.net_identifier.clone()),
                             e.device_id.into(),
                         )
                         .await;
+                        continue;
+                    }
+                    tracing::warn!(effect = ?e, "received AQC effect when not enabled");
                 }
-                AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
+                AqcNetworkNameUnset(e) => {
+                    #[cfg(feature = "aqc")]
+                    if let Some(aqc) = &self.aqc {
+                        aqc.remove_peer(graph, e.device_id.into()).await;
+                        continue;
+                    }
+
+                    tracing::warn!(effect = ?e, "received AQC effect when not enabled")
+                }
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
                 AqcUniChannelCreated(_) => {}
                 AqcUniChannelReceived(_) => {}
+                AfcBidiChannelCreated(_) => {}
+                AfcBidiChannelReceived(_) => {}
+                AfcUniChannelCreated(_) => {}
+                AfcUniChannelReceived(_) => {}
                 QueryDevicesOnTeamResult(_) => {}
                 QueryDeviceRoleResult(_) => {}
                 QueryDeviceKeyBundleResult(_) => {}
-                QueryAqcNetIdentifierResult(_) => {}
                 QueriedLabelAssignment(_) => {}
                 QueryLabelExistsResult(_) => {}
+                QueryAqcNetIdentifierResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
             }
         }
@@ -246,7 +295,10 @@ struct ApiInner {
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
-    aqc: Arc<Aqc<CE, KS>>,
+    #[cfg(feature = "aqc")]
+    aqc: Option<Arc<Aqc<CE, KS>>>,
+    #[cfg(feature = "afc")]
+    afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
     crypto: tokio::sync::Mutex<Crypto>,
     seed_id_dir: SeedDir,
@@ -318,6 +370,12 @@ impl DaemonApi for Api {
     #[instrument(skip(self), err)]
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
         self.device_id().map(|id| id.into_id().into())
+    }
+
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), err)]
+    async fn afc_shm_info(self, context: context::Context) -> api::Result<api::AfcShmInfo> {
+        Ok(self.afc.get_shm_info().await)
     }
 
     #[instrument(skip(self), err)]
@@ -544,6 +602,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn assign_aqc_net_identifier(
         self,
@@ -566,6 +625,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn remove_aqc_net_identifier(
         self,
@@ -584,6 +644,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn create_aqc_bidi_channel(
         self,
@@ -593,13 +654,13 @@ impl DaemonApi for Api {
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
         self.check_team_valid(team).await?;
+        let aqc = self.aqc.as_ref().context("AQC is not enabled")?;
 
-        info!("creating bidi channel");
+        info!("creating aqc bidi channel");
 
         let graph = GraphId::from(team.into_id());
 
-        let peer_id = self
-            .aqc
+        let peer_id = aqc
             .find_device_id(graph, &peer)
             .await
             .context("did not find peer")?;
@@ -619,12 +680,13 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let psks = self.aqc.bidi_channel_created(e).await?;
+        let psks = aqc.bidi_channel_created(e).await?;
         info!(num = psks.len(), "bidi channel created");
 
         Ok((ctrl, psks))
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn create_aqc_uni_channel(
         self,
@@ -634,13 +696,13 @@ impl DaemonApi for Api {
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
         self.check_team_valid(team).await?;
+        let aqc = self.aqc.as_ref().context("AQC is not enabled")?;
 
-        info!("creating uni channel");
+        info!("creating aqc uni channel");
 
         let graph = GraphId::from(team.into_id());
 
-        let peer_id = self
-            .aqc
+        let peer_id = aqc
             .find_device_id(graph, &peer)
             .await
             .context("did not find peer")?;
@@ -660,12 +722,13 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let psks = self.aqc.uni_channel_created(e).await?;
-        info!(num = psks.len(), "uni channel created");
+        let psks = aqc.uni_channel_created(e).await?;
+        info!(num = psks.len(), "aqc uni channel created");
 
         Ok((ctrl, psks))
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn delete_aqc_bidi_channel(
         self,
@@ -676,6 +739,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn delete_aqc_uni_channel(
         self,
@@ -686,6 +750,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn receive_aqc_ctrl(
         self,
@@ -694,6 +759,7 @@ impl DaemonApi for Api {
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::LabelId, api::AqcPsks)> {
         self.check_team_valid(team).await?;
+        let aqc = self.aqc.as_ref().context("AQC is not enabled")?;
 
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
@@ -712,13 +778,13 @@ impl DaemonApi for Api {
             });
             match effect {
                 Some(Effect::AqcBidiChannelReceived(e)) => {
-                    let psks = self.aqc.bidi_channel_received(e).await?;
+                    let psks = aqc.bidi_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
                     return Ok((e.label_id.into(), psks));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
-                    let psks = self.aqc.uni_channel_received(e).await?;
+                    let psks = aqc.uni_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
                     return Ok((e.label_id.into(), psks));
@@ -727,6 +793,190 @@ impl DaemonApi for Api {
             }
         }
         Err(anyhow!("unable to find AQC effect").into())
+    }
+
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), err)]
+    async fn create_afc_bidi_channel(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer_id: api::DeviceId,
+        label: api::LabelId,
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
+        self.check_team_valid(team).await?;
+
+        info!("creating afc bidi channel");
+
+        let graph = GraphId::from(team.into_id());
+
+        let (ctrl, effects) = self
+            .client
+            .actions(&graph)
+            .create_afc_bidi_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
+            .await?;
+        let id = self.device_id()?;
+
+        let Some(Effect::AfcBidiChannelCreated(e)) =
+            find_effect!(&effects, Effect::AfcBidiChannelCreated(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow!("unable to find `AfcBidiChannelCreated` effect").into());
+        };
+
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        let channel_id = self.afc.bidi_channel_created(e).await?;
+        info!("afc bidi channel created");
+
+        let ctrl = ctrl
+            .first()
+            .ok_or(anyhow!("too many ctrl commands"))?
+            .clone();
+
+        Ok((ctrl, channel_id))
+    }
+
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), err)]
+    async fn create_afc_uni_send_channel(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer_id: api::DeviceId,
+        label: api::LabelId,
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
+        self.check_team_valid(team).await?;
+
+        info!("creating afc uni channel");
+
+        let graph = GraphId::from(team.into_id());
+
+        let id = self.device_id()?;
+        let (ctrl, effects) = self
+            .client
+            .actions(&graph)
+            .create_afc_uni_channel_off_graph(id, peer_id.into_id().into(), label.into_id().into())
+            .await?;
+
+        let Some(Effect::AfcUniChannelCreated(e)) =
+            find_effect!(&effects, Effect::AfcUniChannelCreated(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow!("unable to find AfcUniChannelCreated effect").into());
+        };
+
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        let channel_id = self.afc.uni_channel_created(e).await?;
+        info!("afc uni channel created");
+
+        let ctrl = ctrl
+            .first()
+            .ok_or(anyhow!("too many ctrl commands"))?
+            .clone();
+
+        Ok((ctrl, channel_id))
+    }
+
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), err)]
+    async fn create_afc_uni_recv_channel(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer_id: api::DeviceId,
+        label: api::LabelId,
+    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
+        self.check_team_valid(team).await?;
+
+        info!("creating afc uni channel");
+
+        let graph = GraphId::from(team.into_id());
+
+        let id = self.device_id()?;
+        let (ctrl, effects) = self
+            .client
+            .actions(&graph)
+            .create_afc_uni_channel_off_graph(peer_id.into_id().into(), id, label.into_id().into())
+            .await?;
+
+        let Some(Effect::AfcUniChannelCreated(e)) =
+            find_effect!(&effects, Effect::AfcUniChannelCreated(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow!("unable to find AfcUniChannelCreated effect").into());
+        };
+
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        let channel_id = self.afc.uni_channel_created(e).await?;
+        info!("afc uni channel created");
+
+        let ctrl = ctrl
+            .first()
+            .ok_or(anyhow!("too many ctrl commands"))?
+            .clone();
+
+        Ok((ctrl, channel_id))
+    }
+
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), err)]
+    async fn delete_afc_channel(
+        self,
+        _: context::Context,
+        chan: api::AfcChannelId,
+    ) -> api::Result<()> {
+        self.afc.delete_channel(chan).await?;
+        info!("afc channel deleted");
+        Ok(())
+    }
+
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), err)]
+    async fn receive_afc_ctrl(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        ctrl: api::AfcCtrl,
+    ) -> api::Result<(api::LabelId, api::AfcChannelId, api::ChanOp)> {
+        self.check_team_valid(team).await?;
+
+        let graph = GraphId::from(team.into_id());
+        let mut session = self.client.session_new(&graph).await?;
+        let our_device_id = self.device_id()?;
+
+        let effects = self.client.session_receive(&mut session, &ctrl).await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        let effect = effects.iter().find(|e| match e {
+            Effect::AfcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
+            Effect::AfcUniChannelReceived(e) => {
+                (e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into())
+                    || (e.sender_id == our_device_id.into()
+                        && e.receiver_id != our_device_id.into())
+            }
+            _ => false,
+        });
+        match effect {
+            Some(Effect::AfcBidiChannelReceived(e)) => {
+                let channel_id = self.afc.bidi_channel_received(e).await?;
+                // NB: Each action should only produce one
+                // ephemeral command.
+                return Ok((e.label_id.into(), channel_id, api::ChanOp::SendRecv));
+            }
+            Some(Effect::AfcUniChannelReceived(e)) => {
+                let channel_id = self.afc.uni_channel_received(e).await?;
+                // NB: Each action should only produce one
+                // ephemeral command.
+                let op = if e.sender_id == self.device_id()?.into() {
+                    api::ChanOp::SendOnly
+                } else {
+                    api::ChanOp::RecvOnly
+                };
+                return Ok((e.label_id.into(), channel_id, op));
+            }
+            Some(_) | None => {}
+        }
+        Err(anyhow!("unable to find AFC effect").into())
     }
 
     /// Create a label.
@@ -930,6 +1180,7 @@ impl DaemonApi for Api {
     }
 
     /// Query AQC network ID.
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn query_aqc_net_identifier(
         self,

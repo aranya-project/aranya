@@ -9,11 +9,15 @@ use aranya_client::{
     client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
     CreateTeamQuicSyncConfig,
 };
+use aranya_crypto::{
+    dangerous::spideroak_crypto::{hash::Hash, rust::Sha256},
+    id::ToBase58 as _,
+};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
+use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
@@ -167,8 +171,21 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
+
+        // TODO: only compile when 'afc' feature is enabled
+        let afc_shm_path = {
+            use aranya_daemon_api::shm;
+
+            let path = Self::get_shm_path(format!("/{team_name}_{name}\0"));
+            let path: Box<shm::Path> = path
+                .as_str()
+                .try_into()
+                .context("unable to parse AFC shared memory path")?;
+            let _ = shm::unlink(&path);
+            path
+        };
 
         // Setup daemon config.
         let cfg = Config {
@@ -179,6 +196,10 @@ impl DeviceCtx {
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
             aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
+            afc: Toggle::Enabled(daemon_cfg::AfcConfig {
+                shm_path: afc_shm_path,
+                max_chans: 100,
+            }),
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
             },
@@ -207,10 +228,13 @@ impl DeviceCtx {
 
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {
-            Client::builder()
-                .daemon_uds_path(&uds_path)
-                .aqc_server_addr(&addr_any)
-                .connect()
+            let mut builder = Client::builder();
+            builder = builder.daemon_uds_path(&uds_path);
+            #[cfg(feature = "aqc")]
+            {
+                builder = builder.aqc_server_addr(&addr_any);
+            }
+            builder.connect()
         })
         .retry(ExponentialBuilder::default())
         .await
@@ -232,15 +256,13 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
-    #[allow(unused, reason = "module compiled for each test file")]
-    pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier(
-            self.client
-                .aqc()
-                .server_addr()
-                .to_string()
-                .try_into()
-                .expect("socket addr is valid text"),
-        )
+    fn get_shm_path(path: String) -> String {
+        if cfg!(target_os = "macos") && path.len() > 31 {
+            // Shrink the size of the team name down to 22 bytes to work within macOS's limits.
+            let d = Sha256::hash(path.as_bytes());
+            let t: [u8; 16] = d[..16].try_into().expect("expected shm path");
+            return format!("/{}\0", t.to_base58());
+        };
+        path
     }
 }

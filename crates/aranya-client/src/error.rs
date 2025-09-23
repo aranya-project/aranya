@@ -1,6 +1,6 @@
 //! Client API errors.
 
-use std::{convert::Infallible, io};
+use std::io;
 
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
@@ -25,6 +25,8 @@ pub enum Error {
     Config(#[from] ConfigError),
 
     /// An Aranya QUIC Channel error happened.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[error("AQC error")]
     Aqc(#[from] AqcError),
 
@@ -111,6 +113,8 @@ pub(crate) enum IpcRepr {
 }
 
 /// Possible errors that could happen when using Aranya QUIC Channels.
+#[cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AqcError {
@@ -155,12 +159,16 @@ pub enum AqcError {
     Bug(#[from] buggy::Bug),
 }
 
-impl From<Infallible> for AqcError {
-    fn from(value: Infallible) -> Self {
+#[cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+impl From<core::convert::Infallible> for AqcError {
+    fn from(value: core::convert::Infallible) -> Self {
         match value {}
     }
 }
 
+#[cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
 pub(crate) fn no_addr() -> AqcError {
     AqcError::AddrResolution(io::Error::new(io::ErrorKind::NotFound, "no address found"))
 }
