@@ -68,11 +68,6 @@ pub enum Error {
     #[capi(msg = "AQC library error")]
     Aqc,
 
-    /// AFC library error.
-    #[cfg(feature = "afc")]
-    #[capi(msg = "AFC library error")]
-    Afc,
-
     /// Tried to poll an endpoint but nothing received yet.
     #[capi(msg = "no response ready yet")]
     WouldBlock,
@@ -81,7 +76,13 @@ pub enum Error {
     #[capi(msg = "connection got closed")]
     Closed,
 
+    /// AFC library error.
+    #[cfg(feature = "afc")]
+    #[capi(msg = "AFC library error")]
+    Afc,
+
     /// Tried to call a function with the wrong channel (i.e. seal on a ReceiveChannel).
+    #[cfg(feature = "afc")]
     #[capi(msg = "wrong channel type provided")]
     WrongChannelType,
 
@@ -120,6 +121,7 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::WouldBlock => Self::WouldBlock,
             imp::Error::Closed => Self::Closed,
+            #[cfg(feature = "afc")]
             imp::Error::WrongChannelType => Self::WrongChannelType,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
@@ -2187,13 +2189,11 @@ pub enum AfcChannelType {
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
 
-/// An AFC Sequence Number, for reordering incoming messages.
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
+/// An AFC sequence number, for reordering messages.
 #[cfg(feature = "afc")]
-pub struct AfcSeq {
-    seq: afc::Seq,
-}
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type AfcSeq = Safe<imp::AfcSeq>;
 
 /// Create a bidirectional AFC channel between this device and a peer.
 ///
@@ -2222,8 +2222,8 @@ pub fn afc_create_bidi_channel(
         label_id.into(),
     ))?;
 
-    AfcChannel::init(channel, imp::AfcChannel::new_bidi(chan));
-    AfcCtrlMsg::init(control, imp::AfcCtrlMsg::new(ctrl));
+    AfcChannel::init(channel, chan.into());
+    AfcCtrlMsg::init(control, ctrl.into());
     Ok(())
 }
 
@@ -2256,8 +2256,8 @@ pub fn afc_create_uni_send_channel(
             label_id.into(),
         ))?;
 
-    AfcChannel::init(channel, imp::AfcChannel::new_send(chan));
-    AfcCtrlMsg::init(control, imp::AfcCtrlMsg::new(ctrl));
+    AfcChannel::init(channel, chan.into());
+    AfcCtrlMsg::init(control, ctrl.into());
     Ok(())
 }
 
@@ -2290,8 +2290,8 @@ pub fn afc_create_uni_recv_channel(
             label_id.into(),
         ))?;
 
-    AfcChannel::init(channel, imp::AfcChannel::new_recv(chan));
-    AfcCtrlMsg::init(control, imp::AfcCtrlMsg::new(ctrl));
+    AfcChannel::init(channel, chan.into());
+    AfcCtrlMsg::init(control, ctrl.into());
     Ok(())
 }
 
@@ -2314,7 +2314,7 @@ pub fn afc_recv_ctrl(
     channel: &mut MaybeUninit<AfcChannel>,
 ) -> Result<AfcChannelType, imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcCtrl` pointer.
-    let ctrl = unsafe { Opaque::into_inner(control.read()).into_inner().inner };
+    let ctrl = unsafe { Opaque::into_inner(control.read()).into_inner().0 };
     let chan = client
         .rt
         .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl))?;
@@ -2326,7 +2326,7 @@ pub fn afc_recv_ctrl(
             afc::UniChannel::Send(_) => AfcChannelType::Sender,
         },
     };
-    AfcChannel::init(channel, imp::AfcChannel::new(chan));
+    AfcChannel::init(channel, chan.into());
     Ok(channel_type)
 }
 
@@ -2338,10 +2338,10 @@ pub fn afc_recv_ctrl(
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
 pub fn afc_get_channel_type(channel: &AfcChannel) -> AfcChannelType {
-    match channel.deref().deref().inner {
-        imp::ChannelType::Bidi(_) => AfcChannelType::Bidirectional,
-        imp::ChannelType::Send(_) => AfcChannelType::Sender,
-        imp::ChannelType::Receive(_) => AfcChannelType::Receiver,
+    match channel.deref().deref() {
+        imp::AfcChannel::Bidi(_) => AfcChannelType::Bidirectional,
+        imp::AfcChannel::Send(_) => AfcChannelType::Sender,
+        imp::AfcChannel::Receive(_) => AfcChannelType::Receiver,
     }
 }
 
@@ -2353,10 +2353,10 @@ pub fn afc_get_channel_type(channel: &AfcChannel) -> AfcChannelType {
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
 pub fn afc_get_label_id(channel: &AfcChannel) -> LabelId {
-    match &channel.deref().deref().inner {
-        imp::ChannelType::Bidi(c) => c.label_id().into(),
-        imp::ChannelType::Send(c) => c.label_id().into(),
-        imp::ChannelType::Receive(c) => c.label_id().into(),
+    match &channel.deref().deref() {
+        imp::AfcChannel::Bidi(c) => c.label_id().into(),
+        imp::AfcChannel::Send(c) => c.label_id().into(),
+        imp::AfcChannel::Receive(c) => c.label_id().into(),
     }
 }
 
@@ -2381,10 +2381,10 @@ pub fn afc_seal(
     plaintext: &[u8],
     dst: &mut [u8],
 ) -> Result<(), imp::Error> {
-    match &channel.deref().deref().inner {
-        imp::ChannelType::Bidi(c) => client.rt.block_on(c.seal(dst, plaintext))?,
-        imp::ChannelType::Send(c) => client.rt.block_on(c.seal(dst, plaintext))?,
-        imp::ChannelType::Receive(_) => return Err(imp::Error::WrongChannelType),
+    match &channel.deref().deref() {
+        imp::AfcChannel::Bidi(c) => client.rt.block_on(c.seal(dst, plaintext))?,
+        imp::AfcChannel::Send(c) => client.rt.block_on(c.seal(dst, plaintext))?,
+        imp::AfcChannel::Receive(_) => return Err(imp::Error::WrongChannelType),
     }
 
     Ok(())
@@ -2404,14 +2404,16 @@ pub fn afc_open(
     channel: &AfcChannel,
     ciphertext: &[u8],
     dst: &mut [u8],
-) -> Result<AfcSeq, imp::Error> {
-    let seq = match &channel.deref().deref().inner {
-        imp::ChannelType::Bidi(c) => client.rt.block_on(c.open(dst, ciphertext))?,
-        imp::ChannelType::Receive(c) => client.rt.block_on(c.open(dst, ciphertext))?,
-        imp::ChannelType::Send(_) => return Err(imp::Error::WrongChannelType),
+    seq: &mut MaybeUninit<AfcSeq>,
+) -> Result<(), imp::Error> {
+    let seq_raw = match &channel.deref().deref() {
+        imp::AfcChannel::Bidi(c) => client.rt.block_on(c.open(dst, ciphertext))?,
+        imp::AfcChannel::Receive(c) => client.rt.block_on(c.open(dst, ciphertext))?,
+        imp::AfcChannel::Send(_) => return Err(imp::Error::WrongChannelType),
     };
+    AfcSeq::init(seq, seq_raw.into());
 
-    Ok(AfcSeq { seq })
+    Ok(())
 }
 
 /// Removes the current [`AfcChannel`] from use.
@@ -2425,9 +2427,9 @@ pub fn afc_open(
 #[cfg(feature = "afc")]
 pub fn afc_delete(client: &Client, channel: OwnedPtr<AfcChannel>) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcChannel` pointer.
-    match unsafe { channel.read().into_inner().into_inner().inner } {
-        imp::ChannelType::Bidi(c) => Ok(client.rt.block_on(c.delete())?),
-        imp::ChannelType::Receive(c) => Ok(client.rt.block_on(c.delete())?),
-        imp::ChannelType::Send(c) => Ok(client.rt.block_on(c.delete())?),
+    match unsafe { channel.read().into_inner().into_inner() } {
+        imp::AfcChannel::Bidi(c) => Ok(client.rt.block_on(c.delete())?),
+        imp::AfcChannel::Receive(c) => Ok(client.rt.block_on(c.delete())?),
+        imp::AfcChannel::Send(c) => Ok(client.rt.block_on(c.delete())?),
     }
 }

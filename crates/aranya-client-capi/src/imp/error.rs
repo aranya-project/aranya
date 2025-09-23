@@ -31,6 +31,7 @@ pub enum Error {
     #[error("connection was unexpectedly closed")]
     Closed,
 
+    #[cfg(feature = "afc")]
     #[error("wrong channel type provided")]
     WrongChannelType,
 

@@ -1,67 +1,74 @@
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::afc;
 
+/// An AFC channel.
 #[derive(Debug)]
-pub(crate) enum ChannelType {
+pub enum AfcChannel {
     Bidi(afc::BidiChannel),
     Send(afc::SendChannel),
     Receive(afc::ReceiveChannel),
-}
-
-/// An AFC channel.
-#[derive(Debug)]
-pub struct AfcChannel {
-    pub(crate) inner: ChannelType,
 }
 
 impl Typed for AfcChannel {
     const TYPE_ID: TypeId = TypeId::new(0xDC3130B2);
 }
 
-impl AfcChannel {
-    pub fn new(channel: afc::Channel) -> Self {
-        Self {
-            inner: match channel {
-                afc::Channel::Bidi(c) => ChannelType::Bidi(c),
-                afc::Channel::Uni(c) => match c {
-                    afc::UniChannel::Send(c) => ChannelType::Send(c),
-                    afc::UniChannel::Receive(c) => ChannelType::Receive(c),
-                },
+impl From<afc::Channel> for AfcChannel {
+    fn from(channel: afc::Channel) -> Self {
+        match channel {
+            afc::Channel::Bidi(c) => Self::Bidi(c),
+            afc::Channel::Uni(c) => match c {
+                afc::UniChannel::Send(c) => Self::Send(c),
+                afc::UniChannel::Receive(c) => Self::Receive(c),
             },
         }
     }
+}
 
-    pub fn new_bidi(bidi: afc::BidiChannel) -> Self {
-        Self {
-            inner: ChannelType::Bidi(bidi),
-        }
+impl From<afc::BidiChannel> for AfcChannel {
+    fn from(channel: afc::BidiChannel) -> Self {
+        Self::Bidi(channel)
     }
+}
 
-    pub fn new_send(send: afc::SendChannel) -> Self {
-        Self {
-            inner: ChannelType::Send(send),
-        }
+impl From<afc::SendChannel> for AfcChannel {
+    fn from(channel: afc::SendChannel) -> Self {
+        Self::Send(channel)
     }
+}
 
-    pub fn new_recv(recv: afc::ReceiveChannel) -> Self {
-        Self {
-            inner: ChannelType::Receive(recv),
-        }
+impl From<afc::ReceiveChannel> for AfcChannel {
+    fn from(channel: afc::ReceiveChannel) -> Self {
+        Self::Receive(channel)
     }
 }
 
 /// An AFC control message, for ephemeral channels.
+#[repr(transparent)]
 #[derive(Debug)]
-pub struct AfcCtrlMsg {
-    pub(crate) inner: afc::CtrlMsg,
-}
+pub struct AfcCtrlMsg(pub(crate) afc::CtrlMsg);
 
 impl Typed for AfcCtrlMsg {
     const TYPE_ID: TypeId = TypeId::new(0xB421D1CE);
 }
 
-impl AfcCtrlMsg {
-    pub fn new(ctrl: afc::CtrlMsg) -> AfcCtrlMsg {
-        Self { inner: ctrl }
+impl From<afc::CtrlMsg> for AfcCtrlMsg {
+    fn from(msg: afc::CtrlMsg) -> Self {
+        Self(msg)
+    }
+}
+
+/// An AFC sequence number, for reordering messages.
+#[repr(transparent)]
+#[derive(Debug)]
+pub struct AfcSeq(afc::Seq);
+
+impl Typed for AfcSeq {
+    const TYPE_ID: TypeId = TypeId::new(0xC4DCE0C0);
+}
+
+impl From<afc::Seq> for AfcSeq {
+    fn from(seq: afc::Seq) -> Self {
+        Self(seq)
     }
 }
