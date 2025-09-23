@@ -796,7 +796,9 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
 
     let team_id = devices.create_and_add_team().await?;
     // Use setup without delegations so owner owns all roles without conflicts
-    let roles = devices.setup_default_roles_without_delegation(team_id).await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
 
     let owner_team = devices.owner.client.team(team_id);
 
@@ -1150,48 +1152,98 @@ async fn test_role_owners_query() -> Result<()> {
     // Initially, member role should have owner role as its owner (from setup_default_roles)
     let initial_owners = owner_team.role_owners(roles.member().id).await?;
     let initial_owners_vec: Vec<_> = initial_owners.iter().collect();
-    assert_eq!(initial_owners_vec.len(), 1, "member role should initially have one owner from setup");
-    assert_eq!(initial_owners_vec[0].id, roles.owner().id, "owner role should initially own member role");
+    assert_eq!(
+        initial_owners_vec.len(),
+        1,
+        "member role should initially have one owner from setup"
+    );
+    assert_eq!(
+        initial_owners_vec[0].id,
+        roles.owner().id,
+        "owner role should initially own member role"
+    );
 
     // Add admin as owner of member role
-    owner_team.add_role_owner(roles.member().id, roles.admin().id).await?;
+    owner_team
+        .add_role_owner(roles.member().id, roles.admin().id)
+        .await?;
 
     // Query owners again - should now show both owner and admin roles
     let owners_after_add = owner_team.role_owners(roles.member().id).await?;
     let owners_after_add_vec: Vec<_> = owners_after_add.iter().collect();
-    assert_eq!(owners_after_add_vec.len(), 2, "member role should have two owners after adding admin");
+    assert_eq!(
+        owners_after_add_vec.len(),
+        2,
+        "member role should have two owners after adding admin"
+    );
 
     // Check both owners are present (order not guaranteed)
     let owner_ids_after_add: Vec<_> = owners_after_add_vec.iter().map(|r| r.id).collect();
-    assert!(owner_ids_after_add.contains(&roles.owner().id), "owner should still be owner");
-    assert!(owner_ids_after_add.contains(&roles.admin().id), "admin should now be owner");
+    assert!(
+        owner_ids_after_add.contains(&roles.owner().id),
+        "owner should still be owner"
+    );
+    assert!(
+        owner_ids_after_add.contains(&roles.admin().id),
+        "admin should now be owner"
+    );
 
     // Add operator as another owner of member role
-    owner_team.add_role_owner(roles.member().id, roles.operator().id).await?;
+    owner_team
+        .add_role_owner(roles.member().id, roles.operator().id)
+        .await?;
 
     // Query owners again - should now show all three: owner, admin, and operator
     let owners_after_second_add = owner_team.role_owners(roles.member().id).await?;
     let owners_after_second_add_vec: Vec<_> = owners_after_second_add.iter().collect();
-    assert_eq!(owners_after_second_add_vec.len(), 3, "member role should have three owners");
+    assert_eq!(
+        owners_after_second_add_vec.len(),
+        3,
+        "member role should have three owners"
+    );
 
     // Check all owners are present (order not guaranteed)
     let owner_ids: Vec<_> = owners_after_second_add_vec.iter().map(|r| r.id).collect();
-    assert!(owner_ids.contains(&roles.owner().id), "owner should still be owner");
-    assert!(owner_ids.contains(&roles.admin().id), "admin should still be owner");
-    assert!(owner_ids.contains(&roles.operator().id), "operator should now be owner");
+    assert!(
+        owner_ids.contains(&roles.owner().id),
+        "owner should still be owner"
+    );
+    assert!(
+        owner_ids.contains(&roles.admin().id),
+        "admin should still be owner"
+    );
+    assert!(
+        owner_ids.contains(&roles.operator().id),
+        "operator should now be owner"
+    );
 
     // Remove admin as owner
-    owner_team.remove_role_owner(roles.member().id, roles.admin().id).await?;
+    owner_team
+        .remove_role_owner(roles.member().id, roles.admin().id)
+        .await?;
 
     // Query owners again - should now show owner and operator
     let owners_after_remove = owner_team.role_owners(roles.member().id).await?;
     let owners_after_remove_vec: Vec<_> = owners_after_remove.iter().collect();
-    assert_eq!(owners_after_remove_vec.len(), 2, "member role should have two owners after removing admin");
+    assert_eq!(
+        owners_after_remove_vec.len(),
+        2,
+        "member role should have two owners after removing admin"
+    );
 
     let owner_ids_after_remove: Vec<_> = owners_after_remove_vec.iter().map(|r| r.id).collect();
-    assert!(owner_ids_after_remove.contains(&roles.owner().id), "owner should still be owner");
-    assert!(owner_ids_after_remove.contains(&roles.operator().id), "operator should still be owner");
-    assert!(!owner_ids_after_remove.contains(&roles.admin().id), "admin should no longer be owner");
+    assert!(
+        owner_ids_after_remove.contains(&roles.owner().id),
+        "owner should still be owner"
+    );
+    assert!(
+        owner_ids_after_remove.contains(&roles.operator().id),
+        "operator should still be owner"
+    );
+    assert!(
+        !owner_ids_after_remove.contains(&roles.admin().id),
+        "admin should no longer be owner"
+    );
 
     // Verify other clients can also query role owners after sync
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
@@ -1201,11 +1253,21 @@ async fn test_role_owners_query() -> Result<()> {
 
     let admin_view_owners = admin_team.role_owners(roles.member().id).await?;
     let admin_view_owners_vec: Vec<_> = admin_view_owners.iter().collect();
-    assert_eq!(admin_view_owners_vec.len(), 2, "admin client should see two owners");
+    assert_eq!(
+        admin_view_owners_vec.len(),
+        2,
+        "admin client should see two owners"
+    );
 
     let admin_view_owner_ids: Vec<_> = admin_view_owners_vec.iter().map(|r| r.id).collect();
-    assert!(admin_view_owner_ids.contains(&roles.owner().id), "admin client should see owner as owner");
-    assert!(admin_view_owner_ids.contains(&roles.operator().id), "admin client should see operator as owner");
+    assert!(
+        admin_view_owner_ids.contains(&roles.owner().id),
+        "admin client should see owner as owner"
+    );
+    assert!(
+        admin_view_owner_ids.contains(&roles.operator().id),
+        "admin client should see operator as owner"
+    );
 
     Ok(())
 }
