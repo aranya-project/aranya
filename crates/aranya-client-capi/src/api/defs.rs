@@ -7,7 +7,9 @@ use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
 
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
-use aranya_client::{afc, aqc};
+#[cfg(feature = "afc")]
+use aranya_client::afc;
+use aranya_client::aqc;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 use bytes::Bytes;

@@ -4,7 +4,9 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
-use aranya_client::{afc, aqc::TryReceiveError, error::AqcError};
+#[cfg(feature = "afc")]
+use aranya_client::afc;
+use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
 
