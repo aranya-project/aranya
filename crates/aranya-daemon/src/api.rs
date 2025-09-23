@@ -94,6 +94,7 @@ impl DaemonApiServer {
         seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
     ) -> anyhow::Result<Self> {
+        let uds_path = uds_path.canonicalize()?;
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
         #[cfg(feature = "afc")]
