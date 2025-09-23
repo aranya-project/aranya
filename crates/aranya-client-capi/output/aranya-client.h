@@ -176,6 +176,10 @@ enum AranyaError
      */
     ARANYA_ERROR_INVALID_ARGUMENT,
     /**
+     * Component is not enabled.
+     */
+    ARANYA_ERROR_NOT_ENABLED,
+    /**
      * Buffer is too small.
      */
     ARANYA_ERROR_BUFFER_TOO_SMALL,
