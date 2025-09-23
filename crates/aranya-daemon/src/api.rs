@@ -238,6 +238,10 @@ impl EffectHandler {
                 QueryTeamRolesResult(_) => {}
                 QueryRoleOwnersResult(_) => {}
                 RoleCreated(_) => {}
+                AfcBidiChannelCreated(_) => {}
+                AfcBidiChannelReceived(_) => {}
+                AfcUniChannelCreated(_) => {}
+                AfcUniChannelReceived(_) => {}
             }
         }
         Ok(())
@@ -620,6 +624,10 @@ impl DaemonApi for Api {
         return Ok(labels.into_boxed_slice());
     }
 
+    //
+    // AQC
+    //
+
     #[instrument(skip(self), err)]
     async fn aqc_net_id(
         self,
@@ -893,6 +901,10 @@ impl DaemonApi for Api {
         }
         Err(anyhow!("unable to find AQC effect").into())
     }
+
+    //
+    // Labels
+    //
 
     #[instrument(skip(self), err)]
     async fn create_label(

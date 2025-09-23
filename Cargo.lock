@@ -136,6 +136,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
+name = "aranya-afc-util"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e22316f9f397c26704b1db4b3d6e757285975b49bf33cf7b3ee1c69bdb14205"
+dependencies = [
+ "aranya-crypto",
+ "aranya-fast-channels",
+ "aranya-policy-vm",
+ "buggy",
+ "postcard",
+ "serde",
+ "spin 0.10.0",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "aranya-aqc-util"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -288,6 +305,7 @@ name = "aranya-daemon"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "aranya-afc-util",
  "aranya-aqc-util",
  "aranya-crypto",
  "aranya-crypto-ffi",
@@ -373,6 +391,23 @@ dependencies = [
  "aranya-policy-vm",
  "thiserror 2.0.12",
  "tracing",
+]
+
+[[package]]
+name = "aranya-fast-channels"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4224a3070e7603ea40623fb836ed549958a012c99d194c162cf7f71d5361d86c"
+dependencies = [
+ "aranya-crypto",
+ "buggy",
+ "cfg-if",
+ "const_format",
+ "derive-where",
+ "errno",
+ "heapless 0.8.0",
+ "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]

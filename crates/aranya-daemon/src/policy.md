@@ -58,6 +58,7 @@ TODO: talk about how queries are `QueryXResult`, etc.
 ## Imports
 
 ```policy
+use afc
 use aqc
 use crypto
 use device
@@ -66,6 +67,8 @@ use idam
 use perspective
 ```
 
+- [`afc`][afc-ffi]: [AFC][afc] functionality, such as creating
+  channels.
 - [`aqc`][aqc-ffi]: [AQC][aqc] functionality, such as creating
   channels.
 - [`crypto`][crypto-ffi]: core cryptographic functionality, like
@@ -252,7 +255,7 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 
 The Device Encryption Key is a KEM key used to securely send
 encapsulated secret keys to other devices. It is primarily used
-by AQC.
+by AFC and AQC.
 
 ```policy
 // Records the public half of the device's Encryption Key.
@@ -348,6 +351,27 @@ function derive_device_key_ids(device_keys struct KeyBundle) struct DevKeyIds {
         sign_key_id: sign_key_id,
         enc_key_id: enc_key_id,
     }
+}
+
+// Returns the device's encoded public Encryption Key.
+//
+// # Caveats
+//
+// This function does not directly check whether the device
+// exists. However, it would be a very significant invariant
+// violation if a device's key existed without the device also
+// existing. See `valid_device_invariants`.
+function get_enc_pk(device_id id) bytes {
+    // This function is a little too expensive to call every
+    // time we need to get a device, so only uncomment this when
+    // debugging/developing.
+    //
+    // See the comment in `try_find_device`.
+    //
+    // check valid_device_invariants(device_id)
+
+    let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
+    return device_enc_pk.key
 }
 ```
 
@@ -607,7 +631,7 @@ Management][role-management].
 The _scope_ of a role is the aggregate set of resources that the
 role authorizes devices to access. Resources themselves define
 the role(s) that are required to access the resource. For
-instance, each AQC label is associated with a "manager" role that
+instance, each label is associated with a "manager" role that
 (among other things) authorizes devices to assign the label to
 other devices. Devices with sufficient permissions can change
 a role's scope; how this works depends on the resource.
@@ -651,6 +675,11 @@ enum SimplePerm {
     UnsetAqcNetworkName,
     CreateAqcUniChannel,
     CreateAqcBidiChannel,
+
+    // AFC
+    CanUseAfc,
+    CreateAfcUniChannel,
+    CreateAfcBidiChannel,
 }
 
 // Converts `perm` to a string.
@@ -676,6 +705,10 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::UnsetAqcNetworkName => { return "UnsetAqcNetworkName" }
         SimplePerm::CreateAqcUniChannel => { return "CreateAqcUniChannel" }
         SimplePerm::CreateAqcBidiChannel => { return "CreateAqcBidiChannel" }
+
+        SimplePerm::CanUseAfc => { return "CanUseAfc" }
+        SimplePerm::CreateAfcUniChannel => { return "CreateAfcUniChannel" }
+        SimplePerm::CreateAfcBidiChannel => { return "CreateAfcBidiChannel" }
     }
 }
 
@@ -714,6 +747,13 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         "UnsetAqcNetworkName" => { return Some(SimplePerm::UnsetAqcNetworkName) }
         "CreateAqcUniChannel" => { return Some(SimplePerm::CreateAqcUniChannel) }
         "CreateAqcBidiChannel" => { return Some(SimplePerm::CreateAqcBidiChannel) }
+
+        //
+        // AFC
+        //
+        "CanUseAfc" => { return Some(SimplePerm::CanUseAfc) }
+        "CreateAfcUniChannel" => { return Some(SimplePerm::CreateAfcUniChannel) }
+        "CreateAfcBidiChannel" => { return Some(SimplePerm::CreateAfcBidiChannel) }
 
         _ => { return None }
     }
@@ -1652,17 +1692,17 @@ The `setup_default_roles` action creates exactly three default
 roles with fixed names.
 
 - `admin`
-    - Can create and delete AQC labels
+    - Can create and delete labels
     - Can change label managing roles
     - Can unset AQC network names
     - Typically manages the `operator` role
 - `operator`
-    - Can assign and revoke AQC labels
+    - Can assign and revoke labels
     - Can set and unset AQC network names
     - Typically manages the `member` role
 - `member`
-    - Can create and delete AQC channels (for labels they have
-      been granted permission to use)
+    - Can create and delete AFC and AQC channels (for labels they
+      have been granted permission to use)
 
 **Important**: The owner role (created during team creation) should
 be used sparingly. After setting up default roles, the owner
@@ -1815,6 +1855,10 @@ command SetupDefaultRole {
                 let create_aqc_uni_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcUniChannel)
                 let create_aqc_bidi_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcBidiChannel)
 
+                let can_use_afc_perm = simple_perm_to_str(SimplePerm::CanUseAfc)
+                let create_afc_uni_channel_perm = simple_perm_to_str(SimplePerm::CreateAfcUniChannel)
+                let create_afc_bidi_channel_perm = simple_perm_to_str(SimplePerm::CreateAfcBidiChannel)
+
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
@@ -1826,6 +1870,10 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, can_use_aqc_perm)
                     assign_perm_to_role(role_id, create_aqc_uni_channel_perm)
                     assign_perm_to_role(role_id, create_aqc_bidi_channel_perm)
+
+                    assign_perm_to_role(role_id, can_use_afc_perm)
+                    assign_perm_to_role(role_id, create_afc_uni_channel_perm)
+                    assign_perm_to_role(role_id, create_afc_bidi_channel_perm)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -2943,82 +2991,14 @@ function can_remove_self(device_id id) bool {
 }
 ```
 
-## AQC
-<!-- Section contains: Channel types, labels, network IDs, channel creation -->
-
-### Overview
-
-[Aranya QUIC Channels][aqc] provide end-to-end encrypted,
-topic-segmented communication between two devices in a team.
-
-Channels are secured with TLS 1.3 using pre-shared keys (PSK)
-derived from the participants' Device Encryption Keys using HPKE.
-
-```policy
-// Reports whether `size` is a valid PSK length (in bytes).
-//
-// Per the AQC specification, PSKs must be in the range [32, 2^16).
-function is_valid_psk_length(size int) bool {
-    return size >= 32 && size < 65536
-}
-
-// Returns the device's encoded public Encryption Key.
-//
-// # Caveats
-//
-// This function does not directly check whether the device
-// exists. However, it would be a very significant invariant
-// violation if a device's key existed without the device also
-// existing. See `valid_device_invariants`.
-function get_enc_pk(device_id id) bytes {
-    // This function is a little too expensive to call every
-    // time we need to get a device, so only uncomment this when
-    // debugging/developing.
-    //
-    // See the comment in `try_find_device`.
-    //
-    // check valid_device_invariants(device_id)
-
-    let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
-    return device_enc_pk.key
-}
-```
-
-Channels are either bidirectional or unidirectional. In
-a unidirectional channel one peer is permitted to send data and
-the other to receive data.
-
-```policy
-// Valid channel operations for a label assignment.
-enum ChanOp {
-    // The device can only receive data in channels with this
-    // label.
-    RecvOnly,
-    // The device can only send data in channels with this
-    // label.
-    SendOnly,
-    // The device can send and receive data in channels with this
-    // label.
-    SendRecv,
-}
-
-// Returns a numeric rank for `ChanOp` so permissions can be
-// compared. Higher ranks are more permissive.
-function chan_op_rank(op enum ChanOp) int {
-    match op {
-        ChanOp::RecvOnly => { return 0 }
-        ChanOp::SendOnly => { return 1 }
-        ChanOp::SendRecv => { return 2 }
-    }
-}
-```
+## AFC and AQC
 
 ### Labels
 
-Labels provide AQC's topic segmentation. Devices can only
-participate in a channel if they have been granted permission to
-use the channel's label, either directly or through their
-assigned role. Devices can be granted permission to use an
+Labels provide topic segmentation for AFC and AQC. Devices can
+only participate in a channel if they have been granted
+permission to use the channel's label, either directly or through
+their assigned role. Devices can be granted permission to use an
 arbitrary number of labels.
 
 ```policy
@@ -3804,9 +3784,7 @@ command RevokeLabelFromRole {
         }
     }
 }
-```
 
-```policy
 // Revokes permission to use a label from a device.
 //
 // - It is an error if the device does not exist.
@@ -3884,6 +3862,87 @@ command RevokeLabelFromDevice {
             }
         }
     }
+}
+```
+
+#### Label Lookup
+
+```policy
+// Returns the channel operation for a particular label, or `None`
+// if the device does not have permission to use the label.
+//
+// # Caveats
+//
+// - It does NOT check whether the device exists.
+function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum ChanOp {
+    // First test to see if the device's role has been granted
+    // permission to use the label.
+    let role_id = get_assigned_role_id(device_id)
+    let assigned_to_role = query LabelAssignedToRole[
+        label_id: label_id,
+        role_id: role_id,
+    ]
+
+    // Now see if the device was directly granted permission
+    // to use the label.
+    let assigned_to_dev = query LabelAssignedToDevice[
+        label_id: label_id,
+        device_id: device_id,
+    ]
+
+    let role_op = if assigned_to_role is Some {
+        : Some((unwrap assigned_to_role).op)
+    } else {
+        : None
+    }
+    let device_op = device_assignment_op(device_id, assigned_to_dev)
+
+    if role_op is None {
+        return device_op
+    }
+    if device_op is None {
+        return role_op
+    }
+
+    let role_op_val = unwrap role_op
+    let device_op_val = unwrap device_op
+
+    if chan_op_rank(role_op_val) >= chan_op_rank(device_op_val) {
+        return Some(role_op_val)
+    }
+    return Some(device_op_val)
+}
+
+// Returns the channel operation for a device-specific label
+// assignment if it matches the device's current generation.
+function device_assignment_op(
+    device_id id,
+    assignment optional struct LabelAssignedToDevice,
+) optional enum ChanOp {
+    if assignment is None {
+        return None
+    }
+    let assigned = unwrap assignment
+    if label_assignment_matches_gen(
+        device_id,
+        assigned.device_gen,
+    ) {
+        return Some(assigned.op)
+    }
+    return None
+}
+
+// Reports whether a device's direct label assignment generation
+// matches the device's current generation counter.
+function label_assignment_matches_gen(
+    device_id id,
+    assignment_gen int,
+) bool {
+    let maybe_gen = query DeviceGeneration[device_id: device_id]
+    if maybe_gen is None {
+        return false
+    }
+    return (unwrap maybe_gen).generation == assignment_gen
 }
 ```
 
@@ -4070,7 +4129,7 @@ ephemeral command QueryLabelsAssignedToRole {
 }
 ```
 
-###### `query_labels_assigned_to_device`
+##### `query_labels_assigned_to_device`
 
 ```policy
 // Emits `QueryLabelsAssignedToDeviceResult` for all labels the
@@ -4137,7 +4196,446 @@ ephemeral command QueryLabelsAssignedToDevice {
 }
 ```
 
-### Network IDs
+#### Label Directionality
+
+AFC and AQC channels are either bidirectional or unidirectional.
+In a unidirectional channel one peer is permitted to send data
+and the other to receive data.
+
+```policy
+// Valid channel operations for a label assignment.
+enum ChanOp {
+    // The device can only receive data in channels with this
+    // label.
+    RecvOnly,
+    // The device can only send data in channels with this
+    // label.
+    SendOnly,
+    // The device can send and receive data in channels with this
+    // label.
+    SendRecv,
+}
+
+// Returns a numeric rank for `ChanOp` so permissions can be
+// compared. Higher ranks are more permissive.
+function chan_op_rank(op enum ChanOp) int {
+    match op {
+        ChanOp::RecvOnly => { return 0 }
+        ChanOp::SendOnly => { return 1 }
+        ChanOp::SendRecv => { return 2 }
+    }
+}
+```
+
+### AFC
+
+#### AFC Bidirectional Channel Creation
+
+```policy
+ephemeral action create_afc_bidi_channel(peer_id id, label_id id) {
+    let parent_cmd_id = perspective::head_id()
+    let author_id = device::current_device_id()
+    let author = get_device(author_id)
+    let peer_enc_pk = get_enc_pk(peer_id)
+
+    let ch = afc::create_bidi_channel(
+        parent_cmd_id,
+        author.enc_key_id,
+        author_id,
+        peer_enc_pk,
+        peer_id,
+        label_id,
+    )
+
+    /* TODO: need to update afc-util
+    publish AfcCreateBidiChannel {
+        channel_id: ch.channel_id,
+        peer_id: peer_id,
+        label_id: label_id,
+        peer_encap: ch.peer_encap,
+        author_secrets_id: ch.author_secrets_id,
+    }
+    */
+}
+
+// Reports whether the devices have permission to create
+// a bidirectional AFC channel with each other.
+//
+// # Caveats
+//
+// - It does NOT check whether the devices exist.
+function can_create_afc_bidi_channel(device1 id, device2 id, label_id id) bool {
+    // Devices cannot create channels with themselves.
+    //
+    // This should have been caught by the AFC FFI, so check
+    // instead of just returning false.
+    check device1 != device2
+
+    // Both devices must have permissions to read (recv) and
+    // write (send) data.
+    let device1_op = get_allowed_chan_op_for_label(device1, label_id)
+    if device1_op is None {
+        return false
+    }
+    if (unwrap device1_op) != ChanOp::SendRecv {
+        return false
+    }
+
+    let device2_op = get_allowed_chan_op_for_label(device2, label_id)
+    if device2_op is None {
+        return false
+    }
+    if (unwrap device2_op) != ChanOp::SendRecv {
+        return false
+    }
+
+    return true
+}
+
+// Emitted when the author of a bidirectional AFC channel
+// successfully processes the `AfcCreateBidiChannel` command.
+effect AfcBidiChannelCreated {
+    // Uniquely identifies the channel.
+    channel_id id,
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The channel author's encryption key ID.
+    author_enc_key_id id,
+    // The channel peer's device Id.
+    peer_id id,
+    // The channel peer's encoded public encryption key.
+    peer_enc_pk bytes,
+    // The channel label.
+    label_id id,
+    // A unique ID that the author can use to look up the
+    // channel's secrets.
+    author_secret_id id,
+}
+
+// Emitted when the peer of a bidirectional AFC channel
+// successfully processes the `AfcCreateBidiChannel` command.
+effect AfcBidiChannelReceived {
+    // Uniquely identifies the channel.
+    channel_id id,
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The channel author's encoded public encryption key.
+    author_enc_pk bytes,
+    // The channel peer's device Id.
+    peer_id id,
+    // The channel peer's encryption key ID.
+    peer_enc_key_id id,
+    // The channel label.
+    label_id id,
+    // The channel peer's encapsulated KEM shared secret.
+    encap bytes,
+}
+
+ephemeral command AfcCreateBidiChannel {
+    fields {
+        // Uniquely identifies the channel.
+        channel_id id,
+        // The channel peer's device ID.
+        peer_id id,
+        // The label applied to the channel.
+        label_id id,
+        // The channel peer's encapsulated KEM shared secret.
+        peer_encap bytes,
+        // A unique ID that the author can use to look up the
+        // channel's secrets.
+        author_secret_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::CreateAfcBidiChannel)
+        let peer = get_device(this.peer_id)
+
+        // The label must exist.
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Check that both devices have been granted permission
+        // to use the label for for send and recv.
+        check can_create_afc_bidi_channel(author.device_id, peer.device_id, label.label_id)
+
+        let parent_cmd_id = envelope::parent_id(envelope)
+        let current_device_id = device::current_device_id()
+
+        if current_device_id == author.device_id {
+            // We're the channel author.
+            let peer_enc_pk = get_enc_pk(peer.device_id)
+
+            finish {
+                emit AfcBidiChannelCreated {
+                    channel_id: this.channel_id,
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    author_enc_key_id: author.enc_key_id,
+                    peer_id: peer.device_id,
+                    peer_enc_pk: peer_enc_pk,
+                    label_id: label.label_id,
+                    author_secret_id: this.author_secret_id,
+                }
+            }
+        } else if current_device_id == peer.device_id {
+            // We're the channel peer.
+            let author_enc_pk = get_enc_pk(author.device_id)
+
+            finish {
+                emit AfcBidiChannelReceived {
+                    channel_id: this.channel_id,
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    author_enc_pk: author_enc_pk,
+                    peer_id: peer.device_id,
+                    peer_enc_key_id: peer.enc_key_id,
+                    label_id: label.label_id,
+                    encap: this.peer_encap,
+                }
+            }
+        } else {
+            // This is an off-graph session command, so only the
+            // communicating peers should process this command.
+            check false
+        }
+    }
+}
+```
+
+#### AFC Unidirectional Channel Creation
+
+Creates a unidirectional AFC channel for off-graph messaging.
+
+```policy
+ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
+    let parent_cmd_id = perspective::head_id()
+    let author = get_device(device::current_device_id())
+    let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
+    let peer_enc_pk = get_enc_pk(peer_id)
+
+    let ch = afc::create_uni_channel(
+        parent_cmd_id,
+        author.enc_key_id,
+        peer_enc_pk,
+        sender_id,
+        receiver_id,
+        label_id,
+    )
+
+    /* TODO: need to update afc-util
+    publish AfcCreateUniChannel {
+        channel_id: channel_id,
+        sender_id: sender_id,
+        receiver_id: receiver_id,
+        label_id: label_id,
+        peer_encap: ch.peer_encap,
+        author_secrets_id: ch.author_secrets_id,
+    }
+    */
+}
+
+// Emitted when the author of a unidirectional AFC channel
+// successfully processes the `AfcCreateUniChannel` command.
+effect AfcUniChannelCreated {
+    // Uniquely identifies the channel.
+    channel_id id,
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The device ID of the participant that can send data.
+    sender_id id,
+    // The device ID of the participant that can receive data.
+    receiver_id id,
+    // The channel author's encryption key ID.
+    author_enc_key_id id,
+    // The channel peer's encoded public encryption key.
+    peer_enc_pk bytes,
+    // The channel label.
+    label_id id,
+    // A unique ID that the author can use to look up the
+    // channel's secrets.
+    author_secrets_id id,
+}
+
+// Emitted when the peer of a unidirectional AFC channel
+// successfully processes the `AfcCreateUniChannel` command.
+effect AfcUniChannelReceived {
+    // Uniquely identifies the channel.
+    channel_id id,
+    // The unique ID of the previous command.
+    parent_cmd_id id,
+    // The channel author's device ID.
+    author_id id,
+    // The device ID of the participant that can send data.
+    sender_id id,
+    // The device ID of the participant that can receive data.
+    receiver_id id,
+    // The channel author's encryption key ID.
+    author_enc_pk bytes,
+    // The channel peer's encryption key ID.
+    peer_enc_key_id id,
+    // The channel label.
+    label_id id,
+    // The channel peer's encapsulated KEM shared secret.
+    encap bytes,
+}
+
+ephemeral command AfcCreateUniChannel {
+    fields {
+        // Uniquely identifies the channel.
+        channel_id id,
+        // The device ID of the participant that can send data.
+        sender_id id,
+        // The device ID of the participant that can receive
+        // data.
+        receiver_id id,
+        // The label applied to the channel.
+        label_id id,
+        // A unique ID that the author can use to look up the
+        // channel's secrets.
+        author_secrets_id id,
+        // The channel peer's encapsulated KEM shared secret.
+        peer_encap bytes,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::CreateAfcUniChannel)
+
+        // Ensure that the author is one of the channel
+        // participants.
+        check author.device_id == this.sender_id ||
+              author.device_id == this.receiver_id
+
+        let peer_id = if author.device_id == this.sender_id {
+            :this.receiver_id
+        } else {
+            :this.sender_id
+        }
+        let peer = check_unwrap try_find_device(peer_id)
+
+        // The label must exist.
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Check that both devices have been granted permission
+        // to use the label for their respective direcitons.
+        check can_create_afc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
+
+        let parent_cmd_id = envelope::parent_id(envelope)
+        let current_device_id = device::current_device_id()
+
+        if current_device_id == author.device_id {
+            // We authored this command.
+            let peer_enc_pk = get_enc_pk(peer_id)
+
+            finish {
+                emit AfcUniChannelCreated {
+                    channel_id: this.channel_id,
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    sender_id: this.sender_id,
+                    receiver_id: this.receiver_id,
+                    author_enc_key_id: author.enc_key_id,
+                    peer_enc_pk: peer_enc_pk,
+                    label_id: label.label_id,
+                    author_secrets_id: this.author_secrets_id,
+                }
+            }
+        } else if current_device_id == peer.device_id {
+            // We're the intended recipient of this command.
+            let author_enc_pk = get_enc_pk(author.device_id)
+
+            finish {
+                emit AfcUniChannelReceived {
+                    channel_id: this.channel_id,
+                    parent_cmd_id: parent_cmd_id,
+                    author_id: author.device_id,
+                    sender_id: this.sender_id,
+                    receiver_id: this.receiver_id,
+                    author_enc_pk: author_enc_pk,
+                    peer_enc_key_id: peer.enc_key_id,
+                    label_id: label.label_id,
+                    encap: this.peer_encap,
+                }
+            }
+        } else {
+            // This is an off-graph session command, so only the
+            // communicating peers should process this command.
+            check false
+        }
+    }
+}
+
+// Reports whether the devices have permission to create
+// a unidirectional AFC channel with each other.
+function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) bool {
+    // Devices cannot create channels with themselves.
+    //
+    // This should have been caught by the AFC FFI, so check
+    // instead of just returning false.
+    check sender_id != receiver_id
+
+    // The writer must have permissions to write (send) data.
+    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
+    if writer_op is None {
+        return false
+    }
+    match unwrap writer_op {
+        ChanOp::RecvOnly => { return false }
+        ChanOp::SendOnly => {}
+        ChanOp::SendRecv => {}
+    }
+
+    // The reader must have permission to read (receive) data.
+    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id)
+    if reader_op is None {
+        return false
+    }
+    match unwrap reader_op {
+        ChanOp::RecvOnly => {}
+        ChanOp::SendOnly => { return false }
+        ChanOp::SendRecv => {}
+    }
+
+    return true
+}
+```
+
+### AQC
+
+#### Overview
+
+[Aranya QUIC Channels][aqc] provide end-to-end encrypted,
+topic-segmented communication between two devices in a team.
+
+Channels are secured with TLS 1.3 using pre-shared keys (PSK)
+derived from the participants' Device Encryption Keys using HPKE.
+
+```policy
+// Reports whether `size` is a valid PSK length (in bytes).
+//
+// Per the AQC specification, PSKs must be in the range [32, 2^16).
+function is_valid_psk_length(size int) bool {
+    return size >= 32 && size < 65536
+}
+```
+
+#### Network IDs
 
 Each device that wants to participate in an AQC channel must be
 assigned a _network identifier_. A network identifier is an
@@ -4236,7 +4734,7 @@ command SetAqcNetworkName {
 }
 ```
 
-## UnsetAqcNetworkName
+### UnsetAqcNetworkName
 
 Dissociates an AQC network name and address from a device.
 
@@ -4365,7 +4863,7 @@ ephemeral command QueryAqcNetworkNames {
 }
 ```
 
-### Bidirectional Channel Creation
+### AQC Bidirectional Channel Creation
 
 Creates a bidirectional AQC channel for off-graph messaging.
 
@@ -4393,83 +4891,6 @@ ephemeral action create_aqc_bidi_channel(peer_id id, label_id id) {
         author_secrets_id: ch.author_secrets_id,
         psk_length_in_bytes: ch.psk_length_in_bytes,
     }
-}
-
-// Returns the channel operation for a particular label, or `None`
-// if the device does not have permission to use the label.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum ChanOp {
-    // First test to see if the device's role has been granted
-    // permission to use the label.
-    let role_id = get_assigned_role_id(device_id)
-    let assigned_to_role = query LabelAssignedToRole[
-        label_id: label_id,
-        role_id: role_id,
-    ]
-
-    // Now see if the device was directly granted permission
-    // to use the label.
-    let assigned_to_dev = query LabelAssignedToDevice[
-        label_id: label_id,
-        device_id: device_id,
-    ]
-
-    let role_op = if assigned_to_role is Some {
-        : Some((unwrap assigned_to_role).op)
-    } else {
-        : None
-    }
-    let device_op = device_assignment_op(device_id, assigned_to_dev)
-
-    if role_op is None {
-        return device_op
-    }
-    if device_op is None {
-        return role_op
-    }
-
-    let role_op_val = unwrap role_op
-    let device_op_val = unwrap device_op
-
-    if chan_op_rank(role_op_val) >= chan_op_rank(device_op_val) {
-        return Some(role_op_val)
-    }
-    return Some(device_op_val)
-}
-
-// Returns the channel operation for a device-specific label
-// assignment if it matches the device's current generation.
-function device_assignment_op(
-    device_id id,
-    assignment optional struct LabelAssignedToDevice,
-) optional enum ChanOp {
-    if assignment is None {
-        return None
-    }
-    let assigned = unwrap assignment
-    if label_assignment_matches_gen(
-        device_id,
-        assigned.device_gen,
-    ) {
-        return Some(assigned.op)
-    }
-    return None
-}
-
-// Reports whether a device's direct label assignment generation
-// matches the device's current generation counter.
-function label_assignment_matches_gen(
-    device_id id,
-    assignment_gen int,
-) bool {
-    let maybe_gen = query DeviceGeneration[device_id: device_id]
-    if maybe_gen is None {
-        return false
-    }
-    return (unwrap maybe_gen).generation == assignment_gen
 }
 
 // Reports whether the devices have permission to create
@@ -4647,7 +5068,7 @@ ephemeral command AqcCreateBidiChannel {
 }
 ```
 
-### Unidirectional Channel Creation
+### AQC Unidirectional Channel Creation
 
 Creates a unidirectional AQC channel for off-graph messaging.
 
