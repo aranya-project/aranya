@@ -1,4 +1,5 @@
 //! AFC support.
+use core::fmt;
 use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Context;
@@ -52,6 +53,12 @@ pub struct AfcError(
     aranya_fast_channels::Error,
 );
 
+impl fmt::Display for AfcError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -66,7 +73,7 @@ pub enum Error {
 
     /// Unable to connect to channel keys IPC.
     #[error("unable to connect to channel keys IPC")]
-    AfcIpc(anyhow::Error),
+    AfcIpc(#[from] anyhow::Error),
 
     /// No channel info found.
     #[error("no channel info found")]
@@ -91,6 +98,17 @@ impl Debug for Channels {
             .field("daemon", &self.daemon)
             .finish_non_exhaustive()
     }
+}
+
+/// A channel.
+#[derive(Clone, Debug)]
+pub enum Channel {
+    /// A bidirectional channel.
+    Bidi(BidiChannel),
+    /// A unidirectional send channel.
+    Send(SendChannel),
+    /// A unidirectional receive channel.
+    Recv(ReceiveChannel),
 }
 
 impl Channels {
@@ -125,12 +143,7 @@ impl Channels {
     ) -> Result<(BidiChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_bidi_channel(
-                context::current(),
-                team_id.into(),
-                peer_id.into(),
-                label_id.into(),
-            )
+            .create_afc_bidi_channel(context::current(), team_id._id, peer_id._id, label_id._id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -138,7 +151,7 @@ impl Channels {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
             channel_id,
-            label_id: label_id.__into_id().into(),
+            label_id,
         };
         Ok((chan, CtrlMsg(ctrl)))
     }
@@ -166,12 +179,7 @@ impl Channels {
     ) -> Result<(SendChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_uni_send_channel(
-                context::current(),
-                team_id.__into_id().into(),
-                peer_id.__into_id().into(),
-                label_id.__into_id().into(),
-            )
+            .create_afc_uni_send_channel(context::current(), team_id._id, peer_id._id, label_id._id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -179,7 +187,7 @@ impl Channels {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
             channel_id,
-            label_id: label_id.__into_id().into(),
+            label_id,
         };
         Ok((chan, CtrlMsg(ctrl)))
     }
@@ -207,12 +215,7 @@ impl Channels {
     ) -> Result<(ReceiveChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_uni_recv_channel(
-                context::current(),
-                team_id.__into_id().into(),
-                peer_id.__into_id().into(),
-                label_id.__into_id().into(),
-            )
+            .create_afc_uni_recv_channel(context::current(), team_id._id, peer_id._id, label_id._id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -220,7 +223,7 @@ impl Channels {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
             channel_id,
-            label_id: label_id.__into_id().into(),
+            label_id,
         };
         Ok((chan, CtrlMsg(ctrl)))
     }
@@ -239,49 +242,31 @@ impl Channels {
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<Channel> {
         let (label_id, channel_id, op) = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id.__into_id().into(), ctrl.0)
+            .receive_afc_ctrl(context::current(), team_id._id, ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         match op {
-            ChanOp::RecvOnly => Ok(Channel::Uni(UniChannel::Receive(ReceiveChannel {
+            ChanOp::RecvOnly => Ok(Channel::Recv(ReceiveChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: label_id.into_id().into(),
-            }))),
-            ChanOp::SendOnly => Ok(Channel::Uni(UniChannel::Send(SendChannel {
+                label_id: LabelId { _id: label_id },
+            })),
+            ChanOp::SendOnly => Ok(Channel::Send(SendChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: label_id.into_id().into(),
-            }))),
+                label_id: LabelId { _id: label_id },
+            })),
             ChanOp::SendRecv => Ok(Channel::Bidi(BidiChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: label_id.into_id().into(),
+                label_id: LabelId { _id: label_id },
             })),
         }
     }
-}
-
-/// A channel.
-#[derive(Clone, Debug)]
-pub enum Channel {
-    /// A bidirectional channel.
-    Bidi(BidiChannel),
-    /// A unidirectional channel.
-    Uni(UniChannel),
-}
-
-/// An unidirectional channel.
-#[derive(Clone, Debug)]
-pub enum UniChannel {
-    /// A send channel.
-    Send(SendChannel),
-    /// A receive channel.
-    Receive(ReceiveChannel),
 }
 
 /// A bidirectional channel.
@@ -462,7 +447,7 @@ pub(crate) struct ChannelKeys(AfcClient<ReadState<CS>>);
 impl ChannelKeys {
     /// Open shared-memory client to daemon's channel key list.
     pub fn new(afc_shm_info: &AfcShmInfo) -> Result<Self, Error> {
-        // TODO: issue stellar-tapestry#34
+        // TODO: issue#496
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
         debug!(
             "setting up afc shm read side: {:?}",
