@@ -76,7 +76,6 @@ category = "build"
 description = "Build C API shared library"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-dependencies = ["install-nightly"]
 args = ["build", "--release", "--features=preview,afc"]
 
 [tasks.tgz-capi]
@@ -203,7 +202,7 @@ workspace = true
 script = '''
 cargo clippy
 cargo clippy --all-targets
-# cargo clippy --no-default-features (TODO: uncomment in #448) 
+# cargo clippy --no-default-features (TODO: uncomment in #448)
 cargo clippy --all-targets --all-features
 '''
 install_crate = { rustup_component_name = "clippy" }
