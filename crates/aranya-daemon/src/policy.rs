@@ -54,6 +54,7 @@ pub enum Effect {
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsAssignedToRoleResult(QueryLabelsAssignedToRoleResult),
     QueryLabelsResult(QueryLabelsResult),
+    QueryRoleOwnersResult(QueryRoleOwnersResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
     RoleAssigned(RoleAssigned),
     RoleChanged(RoleChanged),
@@ -275,6 +276,14 @@ pub struct QueryLabelsResult {
     pub label_name: Text,
     pub label_author_id: Id,
 }
+/// QueryRoleOwnersResult policy effect.
+#[effect]
+pub struct QueryRoleOwnersResult {
+    pub role_id: Id,
+    pub name: Text,
+    pub author_id: Id,
+    pub default: bool,
+}
 /// QueryTeamRolesResult policy effect.
 #[effect]
 pub struct QueryTeamRolesResult {
@@ -400,6 +409,7 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn query_team_roles(&mut self) -> Result<(), ClientError>;
+    fn query_role_owners(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn create_team(
         &mut self,
         owner_keys: KeyBundle,

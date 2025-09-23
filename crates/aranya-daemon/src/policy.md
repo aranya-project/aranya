@@ -2350,6 +2350,64 @@ ephemeral command QueryTeamRoles {
 }
 ```
 
+#### `query_role_owners`
+
+```policy
+// Emits `QueryRoleOwnersResult` for each role that owns the specified role.
+ephemeral action query_role_owners(role_id id) {
+    map OwnsRole[target_role_id: role_id, owning_role_id: ?] as f {
+        let maybe_role = query Role[role_id: f.owning_role_id]
+        if maybe_role is Some {
+            let role = unwrap maybe_role
+            publish QueryRoleOwners {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: role.author_id,
+                default: role.default,
+            }
+        }
+    }
+}
+
+// Emitted when a role is queried by `query_role_owners`.
+effect QueryRoleOwnersResult {
+    // The ID of the owning role.
+    role_id id,
+    // The name of the owning role.
+    name string,
+    // The ID of the device that created the owning role.
+    author_id id,
+    // Is this a default role?
+    default bool,
+}
+
+// A trampoline command to forward data to `QueryRoleOwnersResult`.
+ephemeral command QueryRoleOwners {
+    fields {
+        role_id id,
+        name string,
+        author_id id,
+        default bool,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueryRoleOwnersResult {
+                role_id: this.role_id,
+                name: this.name,
+                author_id: this.author_id,
+                default: this.default,
+            }
+        }
+    }
+}
+```
+
 ## Teams
 <!-- Section contains: Team creation/termination, device management -->
 
@@ -3069,6 +3127,7 @@ function can_manage_label(device_id id, label_id id) bool {
 //
 // # Required Permissions
 //
+// - `SimplePerm::ChangeLabelManagingRole`
 // - `CanManageLabel(label_id)`
 action add_label_managing_role(label_id id, managing_role_id id) {
     publish AddLabelManagingRole {
@@ -3101,6 +3160,7 @@ command AddLabelManagingRole {
         check team_exists()
 
         let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeLabelManagingRole)
         check can_manage_label(author.device_id, this.label_id)
 
         // Make sure we uphold `CanManageLabel`'s foreign keys.
@@ -3137,6 +3197,7 @@ command AddLabelManagingRole {
 //
 // # Required Permissions
 //
+// - `SimplePerm::ChangeLabelManagingRole`
 // - `CanManageLabel(label_id)`
 action revoke_label_managing_role(label_id id, managing_role_id id) {
     publish RevokeLabelManagingRole {
@@ -3170,6 +3231,7 @@ command RevokeLabelManagingRole {
         check team_exists()
 
         let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeLabelManagingRole)
         check can_manage_label(author.device_id, this.label_id)
 
         check exists CanManageLabel[

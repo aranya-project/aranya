@@ -496,6 +496,17 @@ where
         .in_current_span()
     }
 
+    /// Invokes `query_role_owners`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_owners(&self, role_id: Id) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_role_owners"),
+            args: Cow::Owned(vec![Value::Id(role_id)]),
+        })
+        .map_ok(|(_, effects)| effects)
+        .in_current_span()
+    }
+
     /// Invokes `remove_device`.
     #[instrument(skip(self), fields(%device_id))]
     fn remove_device(

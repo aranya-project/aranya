@@ -789,6 +789,77 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
     Ok(())
 }
 
+/// Test that role management permissions can be assigned and revoked correctly.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_and_revoke_role_management_permission").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    // Use setup without delegations so owner owns all roles without conflicts
+    let roles = devices.setup_default_roles_without_delegation(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // First, assign the permission
+    owner_team
+        .assign_role_management_permission(
+            roles.operator().id,
+            roles.admin().id,
+            text!("CanAssignRole"),
+        )
+        .await
+        .context("Failed to assign role management permission")?;
+
+    // Add admin and operator devices
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+    owner_team
+        .add_device(devices.operator.pk.clone(), None)
+        .await?;
+    owner_team
+        .add_device(devices.membera.pk.clone(), None)
+        .await?;
+
+    // Sync admin with owner
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Try to assign operator role as admin - should succeed with the permission
+    admin_team
+        .assign_role(devices.operator.id, roles.operator().id)
+        .await
+        .context("Admin should be able to assign operator role with CanAssignRole permission")?;
+
+    // Now revoke the permission
+    owner_team
+        .revoke_role_management_permission(
+            roles.operator().id,
+            roles.admin().id,
+            text!("CanAssignRole"),
+        )
+        .await
+        .context("Failed to revoke role management permission")?;
+
+    // Sync admin with owner again to get the revocation
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Try to assign operator role again as admin - should fail now
+    match admin_team
+        .assign_role(devices.membera.id, roles.operator().id)
+        .await
+    {
+        Ok(_) => bail!("Admin should NOT be able to assign operator role after revocation"),
+        Err(aranya_client::Error::Aranya(_)) => {} // Expected failure
+        Err(err) => bail!("Unexpected error when trying to assign after revocation: {err:?}"),
+    }
+
+    Ok(())
+}
+
 /// Deleting a label requires `DeleteLabel` and label management rights.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_delete_label_requires_permission() -> Result<()> {
@@ -1060,6 +1131,81 @@ async fn test_remove_role_owner_missing_entry() -> Result<()> {
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected remove_role_owner error: {err:?}"),
     }
+
+    Ok(())
+}
+
+/// Tests that role_owners returns the correct owning roles.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_role_owners_query() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_role_owners_query").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    devices.add_all_sync_peers(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Initially, member role should have owner role as its owner (from setup_default_roles)
+    let initial_owners = owner_team.role_owners(roles.member().id).await?;
+    let initial_owners_vec: Vec<_> = initial_owners.iter().collect();
+    assert_eq!(initial_owners_vec.len(), 1, "member role should initially have one owner from setup");
+    assert_eq!(initial_owners_vec[0].id, roles.owner().id, "owner role should initially own member role");
+
+    // Add admin as owner of member role
+    owner_team.add_role_owner(roles.member().id, roles.admin().id).await?;
+
+    // Query owners again - should now show both owner and admin roles
+    let owners_after_add = owner_team.role_owners(roles.member().id).await?;
+    let owners_after_add_vec: Vec<_> = owners_after_add.iter().collect();
+    assert_eq!(owners_after_add_vec.len(), 2, "member role should have two owners after adding admin");
+
+    // Check both owners are present (order not guaranteed)
+    let owner_ids_after_add: Vec<_> = owners_after_add_vec.iter().map(|r| r.id).collect();
+    assert!(owner_ids_after_add.contains(&roles.owner().id), "owner should still be owner");
+    assert!(owner_ids_after_add.contains(&roles.admin().id), "admin should now be owner");
+
+    // Add operator as another owner of member role
+    owner_team.add_role_owner(roles.member().id, roles.operator().id).await?;
+
+    // Query owners again - should now show all three: owner, admin, and operator
+    let owners_after_second_add = owner_team.role_owners(roles.member().id).await?;
+    let owners_after_second_add_vec: Vec<_> = owners_after_second_add.iter().collect();
+    assert_eq!(owners_after_second_add_vec.len(), 3, "member role should have three owners");
+
+    // Check all owners are present (order not guaranteed)
+    let owner_ids: Vec<_> = owners_after_second_add_vec.iter().map(|r| r.id).collect();
+    assert!(owner_ids.contains(&roles.owner().id), "owner should still be owner");
+    assert!(owner_ids.contains(&roles.admin().id), "admin should still be owner");
+    assert!(owner_ids.contains(&roles.operator().id), "operator should now be owner");
+
+    // Remove admin as owner
+    owner_team.remove_role_owner(roles.member().id, roles.admin().id).await?;
+
+    // Query owners again - should now show owner and operator
+    let owners_after_remove = owner_team.role_owners(roles.member().id).await?;
+    let owners_after_remove_vec: Vec<_> = owners_after_remove.iter().collect();
+    assert_eq!(owners_after_remove_vec.len(), 2, "member role should have two owners after removing admin");
+
+    let owner_ids_after_remove: Vec<_> = owners_after_remove_vec.iter().map(|r| r.id).collect();
+    assert!(owner_ids_after_remove.contains(&roles.owner().id), "owner should still be owner");
+    assert!(owner_ids_after_remove.contains(&roles.operator().id), "operator should still be owner");
+    assert!(!owner_ids_after_remove.contains(&roles.admin().id), "admin should no longer be owner");
+
+    // Verify other clients can also query role owners after sync
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    let admin_view_owners = admin_team.role_owners(roles.member().id).await?;
+    let admin_view_owners_vec: Vec<_> = admin_view_owners.iter().collect();
+    assert_eq!(admin_view_owners_vec.len(), 2, "admin client should see two owners");
+
+    let admin_view_owner_ids: Vec<_> = admin_view_owners_vec.iter().map(|r| r.id).collect();
+    assert!(admin_view_owner_ids.contains(&roles.owner().id), "admin client should see owner as owner");
+    assert!(admin_view_owner_ids.contains(&roles.operator().id), "admin client should see operator as owner");
 
     Ok(())
 }

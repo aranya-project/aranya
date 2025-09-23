@@ -274,7 +274,7 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_role_management_perm(
+            .revoke_role_management_perm(
                 context::current(),
                 self.id,
                 role.into_api(),

@@ -2147,3 +2147,159 @@ async fn test_remove_role_owner_requires_remaining_owner() -> Result<()> {
 
     Ok(())
 }
+
+/// Operators with label management rights cannot change label managing roles.
+/// Only owners and admins with ChangeLabelManagingRole permission can.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_add_label_managing_role_requires_change_perm() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+    let owner = team.owner;
+    let admin = team.admin;
+    let operator = team.operator;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+    let operator_role = role_id_by_name(&roles, "operator");
+    let member_role = role_id_by_name(&roles, "member");
+
+    // Create a label with owner as the managing role initially
+    let effects = owner
+        .actions()
+        .create_label(text!("PRIVILEGE_TEST"), owner_role)
+        .await
+        .context("label creation should succeed")?;
+    let label_id: LabelId = effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            _ => None,
+        })
+        .expect("expected label created effect");
+
+    // Give operator the ability to manage the label
+    owner
+        .actions()
+        .add_label_managing_role(label_id, operator_role)
+        .await
+        .context("owner should be able to add operator as managing role")?;
+
+    // Sync operator to get the latest state
+    operator
+        .sync_expect(owner, None)
+        .await
+        .context("operator unable to sync owner state")?;
+
+    // Operator should be able to manage the label (assign/revoke)
+    // but should NOT be able to add managing roles
+    let err = operator
+        .actions()
+        .add_label_managing_role(label_id, member_role)
+        .await
+        .expect_err("operator should not be able to add label managing roles");
+    expect_not_authorized(err);
+
+    // Admin should be able to add managing roles (has ChangeLabelManagingRole)
+    // But first needs to be given management permission for this label
+    owner
+        .actions()
+        .add_label_managing_role(label_id, role_id_by_name(&roles, "admin"))
+        .await
+        .context("owner should be able to add admin as managing role")?;
+
+    admin
+        .sync_expect(owner, None)
+        .await
+        .context("admin unable to sync owner state")?;
+    admin
+        .actions()
+        .add_label_managing_role(label_id, member_role)
+        .await
+        .context("admin should be able to add label managing roles")?;
+
+    // Owner should also be able to add managing roles (already tested implicitly above)
+
+    Ok(())
+}
+
+/// Operators with label management rights cannot revoke label managing roles.
+/// Only owners and admins with ChangeLabelManagingRole permission can.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_revoke_label_managing_role_requires_change_perm() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+    let owner = team.owner;
+    let admin = team.admin;
+    let operator = team.operator;
+
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+    let operator_role = role_id_by_name(&roles, "operator");
+    let admin_role = role_id_by_name(&roles, "admin");
+
+    // Create a label with owner as the managing role initially
+    let effects = owner
+        .actions()
+        .create_label(text!("REVOKE_PRIVILEGE_TEST"), owner_role)
+        .await
+        .context("label creation should succeed")?;
+    let label_id: LabelId = effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            _ => None,
+        })
+        .expect("expected label created effect");
+
+    // Add admin and operator as managing roles
+    owner
+        .actions()
+        .add_label_managing_role(label_id, admin_role)
+        .await
+        .context("owner should be able to add admin as managing role")?;
+
+    owner
+        .actions()
+        .add_label_managing_role(label_id, operator_role)
+        .await
+        .context("owner should be able to add operator as managing role")?;
+
+    // Sync operator to get the latest state
+    operator
+        .sync_expect(owner, None)
+        .await
+        .context("operator unable to sync owner state")?;
+
+    // Operator should NOT be able to revoke the admin managing role
+    // even though operator can manage the label
+    let err = operator
+        .actions()
+        .revoke_label_managing_role(label_id, admin_role)
+        .await
+        .expect_err("operator should not be able to revoke label managing roles");
+    expect_not_authorized(err);
+
+    // Admin should be able to revoke managing roles (has ChangeLabelManagingRole)
+    admin
+        .sync_expect(owner, None)
+        .await
+        .context("admin unable to sync owner state")?;
+    admin
+        .actions()
+        .revoke_label_managing_role(label_id, operator_role)
+        .await
+        .context("admin should be able to revoke label managing roles")?;
+
+    // Owner should be able to revoke remaining managing role
+    owner
+        .actions()
+        .revoke_label_managing_role(label_id, admin_role)
+        .await
+        .context("owner should be able to revoke label managing roles")?;
+
+    Ok(())
+}

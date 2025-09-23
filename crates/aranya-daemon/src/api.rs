@@ -236,6 +236,7 @@ impl EffectHandler {
                 QueryLabelsResult(_) => {}
                 QueryLabelsAssignedToRoleResult(_) => {}
                 QueryTeamRolesResult(_) => {}
+                QueryRoleOwnersResult(_) => {}
                 RoleCreated(_) => {}
             }
         }
@@ -1159,7 +1160,27 @@ impl DaemonApi for Api {
     ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
-        todo!()
+        let roles = self
+            .client
+            .actions(&team.into_id().into())
+            .query_role_owners(role.into_id().into())
+            .await
+            .context("unable to query role owners")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryRoleOwnersResult(e) = e {
+                    Some(api::Role {
+                        id: e.role_id.into(),
+                        name: e.name.into(),
+                        author_id: e.author_id.into(),
+                        default: e.default,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(roles)
     }
 
     #[instrument(skip(self), err)]
