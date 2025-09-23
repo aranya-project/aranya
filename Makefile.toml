@@ -22,7 +22,7 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 category = "build"
 description = "Build Code with default features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}"]
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "${@}"]
 
 [tasks.build-default]
 category = "build"
@@ -33,13 +33,13 @@ dependencies = ["build"]
 category = "build"
 description = "Build Code with preview features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}", "--features", "preview, afc, experimental, aqc"]
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features", "preview, afc, experimental, aqc", "${@}"]
 
 [tasks.build-experimental]
 category = "build"
 description = "Build Code with experimental features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}", "--features", "experimental, aqc"]
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features", "experimental, aqc", "${@}"]
 
 [tasks.tgz-daemon]
 category = "build"
