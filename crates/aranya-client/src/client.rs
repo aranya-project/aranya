@@ -11,7 +11,7 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, Role, TeamId, Text, Version, CS,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, Role, TeamId, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
@@ -472,7 +472,11 @@ impl Team<'_> {
     }
 
     /// Create a label.
-    pub async fn create_label(&self, label_name: Text) -> Result<LabelId> {
+    pub async fn create_label(&self, label_name: &str) -> Result<LabelId> {
+        let label_name = label_name
+            .parse()
+            .context("`label_name` contains null bytes")
+            .map_err(error::other)?;
         self.client
             .daemon
             .create_label(context::current(), self.team_id, label_name)

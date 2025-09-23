@@ -13,7 +13,7 @@ use aranya_client::{
     aqc::AqcPeerChannel, AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig,
     CreateTeamQuicSyncConfig, Error,
 };
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use buggy::BugExt as _;
@@ -389,7 +389,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     info!("demo aqc functionality");
     info!("creating aqc label");
-    let label3 = operator.create_label(text!("label3")).await?;
+    let label3 = operator.create_label("label3").await?;
     let op = ChanOp::SendRecv;
 
     info!("assigning label to membera");
