@@ -24,12 +24,6 @@ async fn test_afc_bidi_chan_create() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -87,12 +81,6 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -167,12 +155,6 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -260,12 +242,6 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     // First label.
     let label_id1 = operator_team.create_label(text!("label1")).await?;
@@ -415,12 +391,6 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -480,12 +450,6 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -560,12 +524,6 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -640,12 +598,6 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     let label_id = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
@@ -732,12 +684,6 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     devices.add_all_device_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
-        .await?;
 
     // First label.
     let label_id1 = operator_team.create_label(text!("label1")).await?;

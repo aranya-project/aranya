@@ -27,7 +27,7 @@ args = [
     "--verbose",
     "--release",
     "--package=aranya-daemon",
-    "--features=preview,afc",
+    "--features=preview,afc,experimental,aqc",
     "${@}",
 ]
 
@@ -47,14 +47,18 @@ run_task = { name = [
 ] }
 
 # Build the `aranya-client-capi` C API `aranya-client.h` header file.
+# NOTE: From 1.87 onward, cargo-expand doesn't include cfg's, so cbindgen won't
+# see them to include in the header. Until this is fixed, we cannot increase
+# our MSRV beyond 1.86. See https://github.com/rust-lang/rust/issues/139715.
 [tasks.build-capi-header]
 category = "build"
 description = "Build C API header"
-toolchain = "${NIGHTLY}"
 cwd = "crates/aranya-client-capi"
+# Fake nightly support to enable macro expansion, so we don't have to pin to nightly 1.86 (see above).
+env.RUSTC_BOOTSTRAP = "1"
 command = "cbindgen"
 args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
-dependencies = ["install-cbindgen", "install-nightly"]
+dependencies = ["install-cbindgen"]
 
 [tasks.build-capi-docs]
 category = "build"
@@ -68,13 +72,14 @@ description = "Archive capi docs"
 script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/docs ."
 
 [tasks.build-capi-lib]
+
+dependencies = ["install-nightly"]
+
 category = "build"
 description = "Build C API shared library"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-dependencies = ["install-nightly"]
-args = ["build", "--release", "--features=preview,afc"]
-
+args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
 [tasks.tgz-capi]
 category = "build"
 description = "Archive C API artifacts"
@@ -199,7 +204,7 @@ workspace = true
 script = '''
 cargo clippy
 cargo clippy --all-targets
-# cargo clippy --no-default-features (TODO: uncomment in #448) 
+# cargo clippy --no-default-features (TODO: uncomment in #448)
 cargo clippy --all-targets --all-features
 '''
 install_crate = { rustup_component_name = "clippy" }
@@ -274,7 +279,7 @@ description = "Run Metrics Crate"
 script = '''
 #!/usr/bin/env bash
 set -e
-cargo build --bin aranya-daemon --release
+cargo build --bin aranya-daemon --release --features experimental,aqc
 cargo build --bin aranya-metrics --release
 CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
 '''
