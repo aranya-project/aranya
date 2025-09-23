@@ -8,18 +8,24 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+
+[lints]
+workspace = true
+
+
 [features]
 default = []
+
 # Preview features
 preview = []
 # Aranya Fast Channels
 afc = ["dep:aranya-fast-channels"]
 
+# Experimental features
 experimental = []
+# Aranya QUIC channels
 aqc = ["aranya-crypto/aqc"]
 
-[lints]
-workspace = true
 
 [dependencies]
 aranya-crypto = { workspace = true }
@@ -38,6 +44,7 @@ serde = { workspace = true }
 tarpc = { workspace = true }
 tokio = { workspace = true }
 tokio-serde = { version = "0.9", features = ["messagepack"] }
+
 
 [dev-dependencies]
 backon = { workspace = true }

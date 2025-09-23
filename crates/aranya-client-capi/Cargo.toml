@@ -20,16 +20,17 @@ doctest = false
 
 [features]
 default = []
+
 # Preview features
 preview = ["aranya-client/preview"]
 # Aranya Fast Channels
 afc = ["aranya-client/afc"]
 
-experimental = [
-    "aranya-client/experimental",
-]
-
+# Experimental features
+experimental = ["aranya-client/experimental"]
+# Aranya QUIC channels
 aqc = ["aranya-client/aqc"]
+
 
 [dependencies]
 aranya-client = { workspace = true }
