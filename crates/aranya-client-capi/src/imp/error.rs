@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
-use aranya_client::{aqc::TryReceiveError, error::AqcError};
+use aranya_client::{afc, aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
 
@@ -29,6 +29,9 @@ pub enum Error {
     #[error("connection was unexpectedly closed")]
     Closed,
 
+    #[error("wrong channel type provided")]
+    WrongChannelType,
+
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
 
@@ -51,6 +54,13 @@ pub enum Error {
 impl From<AqcError> for Error {
     fn from(value: AqcError) -> Self {
         Self::Client(aranya_client::Error::Aqc(value))
+    }
+}
+
+#[cfg(feature = "afc")]
+impl From<afc::Error> for Error {
+    fn from(value: afc::Error) -> Self {
+        Self::Client(aranya_client::Error::Afc(value))
     }
 }
 

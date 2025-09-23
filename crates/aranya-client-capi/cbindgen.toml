@@ -30,6 +30,10 @@ after_includes = """
     #define __has_attribute(x) 0
 #endif /* __has_attribute */
 
+#if defined(ENABLE_AFC) && !defined(ENABLE_ARANYA_PREVIEW)
+    #error "AFC is currently in preview. Set `ENABLE_ARANYA_PREVIEW` to opt into preview APIs."
+#endif
+
 #if !defined(ARANYA_ALIGNED)
     #if __has_attribute(aligned)
         #define ARANYA_ALIGNED(n) __attribute__((aligned(n)))
@@ -96,6 +100,7 @@ style = "both"
 "target_os = linux" = "__linux__"
 "target_os = vxworks" = "__VXWORKS__"
 "target_arch = x86_64" = "__x86_64__"
+"feature = afc" = "ENABLE_AFC"
 
 [export]
 renaming_overrides_prefixing = true
@@ -124,7 +129,7 @@ clean = true
 
 [parse.expand]
 default_features = false
-features = []
+features = ["afc", "preview"]
 crates = ["aranya-client-capi"]
 
 [ptr]

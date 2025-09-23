@@ -63,6 +63,7 @@ pub enum Error {
     Config,
 
     /// AQC library error.
+    #[cfg(feature = "afc")]
     #[capi(msg = "AQC library error")]
     Aqc,
 
@@ -77,6 +78,10 @@ pub enum Error {
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
     Closed,
+
+    /// Tried to call a function with the wrong channel (i.e. seal on a ReceiveChannel).
+    #[capi(msg = "wrong channel type provided")]
+    WrongChannelType,
 
     /// Serialization error.
     #[capi(msg = "serialization")]
@@ -102,6 +107,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Aranya(_) => Self::Aranya,
                 aranya_client::Error::Config(_) => Self::Config,
                 aranya_client::Error::Aqc(_) => Self::Aqc,
+                #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Other(_) => Self::Other,
@@ -112,6 +118,7 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::WouldBlock => Self::WouldBlock,
             imp::Error::Closed => Self::Closed,
+            imp::Error::WrongChannelType => Self::WrongChannelType,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::Other(_) => Self::Other,
@@ -2152,6 +2159,7 @@ pub unsafe fn aqc_recv_stream_try_recv(
 }
 
 /// An AFC Channel Object.
+#[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 96, align = 8)]
 pub type AfcChannel = Safe<imp::AfcChannel>;
@@ -2159,6 +2167,7 @@ pub type AfcChannel = Safe<imp::AfcChannel>;
 /// An enum containing all [`AfcChannel`] variants.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
+#[cfg(feature = "afc")]
 pub enum AfcChannelType {
     Bidirectional,
     Sender,
@@ -2166,9 +2175,18 @@ pub enum AfcChannelType {
 }
 
 /// An AFC Control Message.
+#[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AfcCtrl = Safe<imp::AfcCtrl>;
+
+/// An AFC Sequence Number, for reordering incoming messages.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[cfg(feature = "afc")]
+pub struct AfcSeq {
+    seq: afc::Seq,
+}
 
 /// Create a bidirectional AFC channel between this device and a peer.
 ///
@@ -2182,6 +2200,7 @@ pub type AfcCtrl = Safe<imp::AfcCtrl>;
 /// @param[out] control the AFC control message [`AfcCtrl`]
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn afc_create_bidi_channel(
     client: &Client,
     team_id: &TeamId,
@@ -2213,6 +2232,7 @@ pub fn afc_create_bidi_channel(
 /// @param[out] control the AFC control message [`AfcCtrl`]
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn afc_create_uni_send_channel(
     client: &Client,
     team_id: &TeamId,
@@ -2246,6 +2266,7 @@ pub fn afc_create_uni_send_channel(
 /// @param[out] control the AFC control message [`AfcCtrl`]
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn create_uni_recv_channel(
     client: &Client,
     team_id: &TeamId,
@@ -2269,28 +2290,6 @@ pub fn create_uni_recv_channel(
 
 /// Use an ephemeral command to create an AFC channel between this device and a peer.
 ///
-/// Note that the [`AfcChannel`] must be converted before it can be used:
-/// ```C
-/// AranyaAfcChannel channel;
-/// AranyaAfcChannelType channel_type;
-/// AranyaAfcBidiChannel bidi;
-/// AranyaAfcSendChannel sender;
-/// AranyaAfcReceiveChannel receiver;
-///
-/// aranya_afc_recv_ctrl(&client, &team_id, &ctrl, &channel, &channel_type);
-/// switch (channel_type) {
-///     case ARANYA_AFC_CHANNEL_TYPE_BIDIRECTIONAL:
-///         aranya_afc_get_bidi_channel(&channel, &bidi);
-///         break;
-///     case ARANYA_AFC_CHANNEL_TYPE_SENDER:
-///         aranya_afc_get_send_channel(&channel, &sender);
-///         break;
-///     case ARANYA_AFC_CHANNEL_TYPE_RECEIVER:
-///         aranya_afc_get_receive_channel(&channel, &receiver);
-///         break;
-/// }
-/// ```
-///
 /// Note that this function takes ownership of the [`AfcCtrl`] and invalidates any further use.
 ///
 /// @param[in]  client the Aranya Client [`Client`].
@@ -2300,6 +2299,7 @@ pub fn create_uni_recv_channel(
 /// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn afc_recv_ctrl(
     client: &Client,
     team_id: &TeamId,
@@ -2329,12 +2329,95 @@ pub fn afc_recv_ctrl(
 /// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn afc_get_channel_type(channel: &AfcChannel) -> AfcChannelType {
     match channel.deref().deref().inner {
-        afc::Channel::Bidi(_) => AfcChannelType::Bidirectional,
-        afc::Channel::Uni(ref uni) => match uni {
-            afc::UniChannel::Receive(_) => AfcChannelType::Receiver,
-            afc::UniChannel::Send(_) => AfcChannelType::Sender,
-        },
+        imp::ChannelType::Bidi(_) => AfcChannelType::Bidirectional,
+        imp::ChannelType::Send(_) => AfcChannelType::Sender,
+        imp::ChannelType::Receive(_) => AfcChannelType::Receiver,
+    }
+}
+
+/// Returns the [`LabelId`] for the associated [`AfcChannel`].
+///
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[out] __output the corresponding label ID [`LabelId`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_get_label_id(channel: &AfcChannel) -> LabelId {
+    match &channel.deref().deref().inner {
+        imp::ChannelType::Bidi(c) => c.label_id().into(),
+        imp::ChannelType::Send(c) => c.label_id().into(),
+        imp::ChannelType::Receive(c) => c.label_id().into(),
+    }
+}
+
+/// Returns the size of the overhead needed for a channel message.
+#[cfg(feature = "afc")]
+pub fn afc_channel_overhead() -> usize {
+    afc::Channels::OVERHEAD
+}
+
+/// Encrypts and authenticates `plaintext`, and writes it to `dst`.
+///
+/// Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  plaintext the message being encrypted.
+/// @param[out] dst the output buffer the ciphertext is written to.
+#[cfg(feature = "afc")]
+pub fn afc_seal(
+    client: &Client,
+    channel: &AfcChannel,
+    plaintext: &[u8],
+    dst: &mut [u8],
+) -> Result<(), imp::Error> {
+    match &channel.deref().deref().inner {
+        imp::ChannelType::Bidi(c) => client.rt.block_on(c.seal(dst, plaintext))?,
+        imp::ChannelType::Send(c) => client.rt.block_on(c.seal(dst, plaintext))?,
+        imp::ChannelType::Receive(_) => return Err(imp::Error::WrongChannelType),
+    }
+
+    Ok(())
+}
+
+/// Decrypts and authenticates `ciphertext`, and writes it to `dst`.
+///
+/// Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  ciphertext the message being decrypted.
+/// @param[out] dst the output buffer the message is written to.
+#[cfg(feature = "afc")]
+pub fn afc_open(
+    client: &Client,
+    channel: &AfcChannel,
+    ciphertext: &[u8],
+    dst: &mut [u8],
+) -> Result<AfcSeq, imp::Error> {
+    let seq = match &channel.deref().deref().inner {
+        imp::ChannelType::Bidi(c) => client.rt.block_on(c.open(dst, ciphertext))?,
+        imp::ChannelType::Receive(c) => client.rt.block_on(c.open(dst, ciphertext))?,
+        imp::ChannelType::Send(_) => return Err(imp::Error::WrongChannelType),
+    };
+
+    Ok(AfcSeq { seq })
+}
+
+/// Removes the current [`AfcChannel`] from use.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_delete(client: &Client, channel: &AfcChannel) -> Result<(), imp::Error> {
+    match &channel.deref().deref().inner {
+        imp::ChannelType::Bidi(c) => Ok(client.rt.block_on(c.delete())?),
+        imp::ChannelType::Receive(c) => Ok(client.rt.block_on(c.delete())?),
+        imp::ChannelType::Send(c) => Ok(client.rt.block_on(c.delete())?),
     }
 }
