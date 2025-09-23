@@ -23,6 +23,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(feature = "afc")]
+use crate::afc::Afc;
 #[cfg(feature = "aqc")]
 use crate::{actions::Actions, aqc::Aqc};
 use crate::{
@@ -218,6 +220,23 @@ impl Daemon {
                 None
             };
 
+            #[cfg(feature = "afc")]
+            let afc = {
+                let Toggle::Enabled(afc_cfg) = &cfg.afc else {
+                    anyhow::bail!(
+                        "AFC is currently required, set `afc.enable = true` in daemon config."
+                    )
+                };
+                Afc::new(
+                    eng.clone(),
+                    pks.ident_pk.id()?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    afc_cfg.clone(),
+                )?
+            };
+
             let data = QSData { psk_store };
 
             let crypto = crate::api::Crypto {
@@ -237,6 +256,8 @@ impl Daemon {
                 invalid: invalid_graphs,
                 #[cfg(feature = "aqc")]
                 aqc,
+                #[cfg(feature = "afc")]
+                afc,
                 crypto,
                 seed_id_dir,
                 quic: Some(data),
@@ -501,6 +522,15 @@ mod tests {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
 
+        #[cfg(feature = "afc")]
+        let shm_path = {
+            let path = "/test_daemon_run\0"
+                .try_into()
+                .expect("should be able to parse AFC shared memory path");
+            let _ = aranya_fast_channels::shm::unlink(&path);
+            path
+        };
+
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "test-daemon-run".into(),
@@ -514,6 +544,11 @@ mod tests {
             },
             #[cfg(feature = "aqc")]
             aqc: Toggle::Enabled(crate::config::AqcConfig {}),
+            #[cfg(feature = "afc")]
+            afc: Toggle::Enabled(crate::config::AfcConfig {
+                shm_path,
+                max_chans: 100,
+            }),
         };
         for dir in [
             &cfg.runtime_dir,

@@ -1,5 +1,6 @@
 #![cfg(feature = "aqc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+#![cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+//! Implementation of daemon's AQC handler.
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;

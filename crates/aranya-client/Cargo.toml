@@ -13,6 +13,10 @@ workspace = true
 
 [features]
 default = []
+# Preview features
+preview = ["aranya-daemon-api/preview"]
+# Aranya Fast Channels
+afc = ["aranya-daemon-api/afc"]
 
 experimental = [
     "aranya-daemon-api/experimental",
@@ -42,7 +46,7 @@ tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
-aranya-daemon = { path = "../aranya-daemon", features = ["aqc", "experimental"] }
+aranya-daemon = { path = "../aranya-daemon", features = ["aqc", "afc", "experimental", "preview"] }
 
 backon = { workspace = true }
 serial_test = { workspace = true }
@@ -57,4 +61,5 @@ path = "tests/tests.rs"
 always_include_features = [
     "default", # TODO: remove in #448
     "experimental",
+    "preview",
 ]

@@ -31,6 +31,11 @@ compile_error!(
     "AQC is currently experimental. Enable the 'experimental' feature to opt into experimental APIs."
 );
 
+#[cfg(all(feature = "afc", not(feature = "preview")))]
+compile_error!(
+    "AFC is currently a preview feature. Enable the 'preview' feature to opt into preview APIs."
+);
+
 pub mod aqc;
 pub mod client;
 pub mod config;
