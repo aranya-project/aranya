@@ -8,7 +8,7 @@ use aranya_afc_util::{
     UniChannelReceived,
 };
 use aranya_crypto::{
-    afc::{BidiChannelId, BidiPeerEncap, RawOpenKey, RawSealKey, UniChannelId, UniPeerEncap},
+    afc::{RawOpenKey, RawSealKey},
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
 use aranya_daemon_api::{self as api};
@@ -133,10 +133,7 @@ where
     /// Handles the [`AfcBidiChannelCreated`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn bidi_channel_created(
-        &self,
-        e: &AfcBidiChannelCreated,
-    ) -> Result<(ChannelId, BidiChannelId)>
+    pub(crate) async fn bidi_channel_created(&self, e: &AfcBidiChannelCreated) -> Result<ChannelId>
     where
         E: Engine<CS = C>,
     {
@@ -170,7 +167,7 @@ where
             )
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating bidi channel");
-        Ok((channel_id, e.channel_key_id.into()))
+        Ok(channel_id)
     }
 
     /// Handles the [`AfcBidiChannelReceived`] effect, returning
@@ -179,7 +176,7 @@ where
     pub(crate) async fn bidi_channel_received(
         &self,
         e: &AfcBidiChannelReceived,
-    ) -> Result<(ChannelId, api::AfcGlobalChannelId)>
+    ) -> Result<ChannelId>
     where
         E: Engine<CS = C>,
     {
@@ -207,19 +204,14 @@ where
             .add(Directed::Bidirectional { seal, open }, info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving bidi channel");
-        let encap =
-            BidiPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
 
-        Ok((channel_id, encap.id().into()))
+        Ok(channel_id)
     }
 
     /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn uni_channel_created(
-        &self,
-        e: &AfcUniChannelCreated,
-    ) -> Result<(ChannelId, UniChannelId)>
+    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId>
     where
         E: Engine<CS = C>,
     {
@@ -251,16 +243,13 @@ where
             .add(key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
-        Ok((channel_id, e.channel_key_id.into()))
+        Ok(channel_id)
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.label_id))]
-    pub(crate) async fn uni_channel_received(
-        &self,
-        e: &AfcUniChannelReceived,
-    ) -> Result<(ChannelId, api::AfcGlobalChannelId)>
+    pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<ChannelId>
     where
         E: Engine<CS = C>,
     {
@@ -292,9 +281,8 @@ where
             .add(key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving uni channel");
-        let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
 
-        Ok((channel_id, encap.id().into()))
+        Ok(channel_id)
     }
 
     pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>

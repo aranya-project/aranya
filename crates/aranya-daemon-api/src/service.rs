@@ -11,8 +11,6 @@ use core::{
 use std::collections::hash_map::{self, HashMap};
 
 use anyhow::bail;
-#[cfg(feature = "afc")]
-use aranya_crypto::afc::{BidiChannelId, UniChannelId};
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
@@ -114,30 +112,6 @@ custom_id! {
 custom_id! {
     /// An AQC uni channel ID.
     pub struct AqcUniChannelId;
-}
-
-/// An AFC channel ID.
-#[cfg(feature = "afc")]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum AfcGlobalChannelId {
-    /// A bidirectional PSK.
-    Bidi(BidiChannelId),
-    /// A unidirectional PSK.
-    Uni(UniChannelId),
-}
-
-#[cfg(feature = "afc")]
-impl From<BidiChannelId> for AfcGlobalChannelId {
-    fn from(value: BidiChannelId) -> Self {
-        Self::Bidi(value)
-    }
-}
-
-#[cfg(feature = "afc")]
-impl From<UniChannelId> for AfcGlobalChannelId {
-    fn from(value: UniChannelId) -> Self {
-        Self::Uni(value)
-    }
 }
 
 /// A device's public key bundle.
@@ -663,7 +637,7 @@ pub struct Label {
 
 // TODO: tarpc does not cfg return types properly.
 #[cfg(not(feature = "afc"))]
-use afc_stub::{AfcChannelId, AfcCtrl, AfcGlobalChannelId, AfcShmInfo};
+use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
 #[cfg(not(feature = "afc"))]
 mod afc_stub {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -671,7 +645,6 @@ mod afc_stub {
     pub type AfcCtrl = Never;
     pub type AfcShmInfo = Never;
     pub type AfcChannelId = Never;
-    pub type AfcGlobalChannelId = Never;
 }
 
 #[tarpc::service]
@@ -779,7 +752,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcChannelId, AfcGlobalChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC send-only channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -787,7 +760,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcChannelId, AfcGlobalChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC receive-only channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -795,7 +768,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcChannelId, AfcGlobalChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Delete a AFC channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -806,7 +779,7 @@ pub trait DaemonApi {
     async fn receive_afc_ctrl(
         team: TeamId,
         ctrl: AfcCtrl,
-    ) -> Result<(LabelId, AfcChannelId, AfcGlobalChannelId, ChanOp)>;
+    ) -> Result<(LabelId, AfcChannelId, ChanOp)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
