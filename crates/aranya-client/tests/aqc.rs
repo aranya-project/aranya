@@ -21,6 +21,7 @@ impl DeviceCtx {
         NetIdentifier(
             self.client
                 .aqc()
+                .expect("AQC is enabled")
                 .server_addr()
                 .to_string()
                 .try_into()
@@ -87,12 +88,18 @@ async fn test_aqc_chans() -> Result<()> {
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            devices.membera.client.aqc().create_bidi_channel(
-                team_id,
-                devices.memberb.aqc_net_id(),
-                label1,
-            ),
-            devices.memberb.client.aqc().receive_channel(),
+            devices
+                .membera
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label1),
+            devices
+                .memberb
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .receive_channel(),
         )
         .await
         .expect("can create and receive channel");
@@ -161,12 +168,14 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
@@ -174,12 +183,18 @@ async fn test_aqc_chans() -> Result<()> {
     {
         // membera creates aqc uni channel with memberb concurrently
         let (mut uni_chan1, peer_channel) = try_join(
-            devices.membera.client.aqc().create_uni_channel(
-                team_id,
-                devices.memberb.aqc_net_id(),
-                label1,
-            ),
-            devices.memberb.client.aqc().receive_channel(),
+            devices
+                .membera
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .create_uni_channel(team_id, devices.memberb.aqc_net_id(), label1),
+            devices
+                .memberb
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .receive_channel(),
         )
         .await
         .expect("can create uni channel");
@@ -206,6 +221,7 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_send_uni_channel(&mut uni_chan1)
             .await?;
 
@@ -213,6 +229,7 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_receive_uni_channel(&mut uni_chan2)
             .await?;
     }
@@ -223,6 +240,7 @@ async fn test_aqc_chans() -> Result<()> {
                 .membera
                 .client
                 .aqc()
+                .expect("AQC enabled")
                 .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label2)
                 .map(|r| r.context("member-a creating channel")),
             (|| {
@@ -231,6 +249,7 @@ async fn test_aqc_chans() -> Result<()> {
                         .memberb
                         .client
                         .aqc()
+                        .expect("AQC enabled")
                         .try_receive_channel()
                         .context("member-b receiving channel"),
                 )
@@ -275,12 +294,14 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
@@ -348,12 +369,18 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .await?;
 
     let err = try_join(
-        devices.membera.client.aqc().create_bidi_channel(
-            team_id,
-            devices.memberb.aqc_net_id(),
-            label3,
-        ),
-        devices.memberb.client.aqc().receive_channel(),
+        devices
+            .membera
+            .client
+            .aqc()
+            .expect("AQC enabled")
+            .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label3),
+        devices
+            .memberb
+            .client
+            .aqc()
+            .expect("AQC enabled")
+            .receive_channel(),
     )
     .await
     .err()
@@ -424,12 +451,18 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .await?;
 
     let err = try_join(
-        devices.membera.client.aqc().create_bidi_channel(
-            team_id,
-            devices.memberb.aqc_net_id(),
-            label3,
-        ),
-        devices.memberb.client.aqc().receive_channel(),
+        devices
+            .membera
+            .client
+            .aqc()
+            .expect("AQC enabled")
+            .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label3),
+        devices
+            .memberb
+            .client
+            .aqc()
+            .expect("AQC enabled")
+            .receive_channel(),
     )
     .await
     .err()
@@ -493,12 +526,18 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            devices.membera.client.aqc().create_bidi_channel(
-                team_id,
-                devices.memberb.aqc_net_id(),
-                label1,
-            ),
-            devices.memberb.client.aqc().receive_channel(),
+            devices
+                .membera
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label1),
+            devices
+                .memberb
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .receive_channel(),
         )
         .await
         .expect("can create and receive channel");
@@ -557,12 +596,14 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
             .membera
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
@@ -624,12 +665,18 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            devices.membera.client.aqc().create_bidi_channel(
-                team_id,
-                devices.memberb.aqc_net_id(),
-                label1,
-            ),
-            devices.memberb.client.aqc().receive_channel(),
+            devices
+                .membera
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label1),
+            devices
+                .memberb
+                .client
+                .aqc()
+                .expect("AQC enabled")
+                .receive_channel(),
         )
         .await
         .expect("can create and receive channel");
@@ -680,12 +727,14 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
             .membera
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
+            .expect("AQC enabled")
             .delete_bidi_channel(&mut bidi_chan2)
             .await?;
 

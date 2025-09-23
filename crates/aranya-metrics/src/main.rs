@@ -193,7 +193,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_addr = client.aqc().server_addr();
+        let aqc_addr = client.aqc().context("AQC not enabled").server_addr();
         let pk = client
             .get_key_bundle()
             .await

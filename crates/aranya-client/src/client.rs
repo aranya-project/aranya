@@ -104,16 +104,6 @@ impl ClientBuilder<'_> {
             .into());
         };
 
-        #[cfg(feature = "aqc")]
-        let Some(aqc_addr) = &self.aqc_server_addr
-        else {
-            return Err(IpcError::new(InvalidArg::new(
-                "aqc_server_addr",
-                "must specify the AQC server address",
-            ))
-            .into());
-        };
-
         async {
             info!(path = ?uds_path, "connecting to daemon");
 
@@ -163,7 +153,7 @@ impl ClientBuilder<'_> {
             debug!(client = ?want, daemon = ?got, "versions");
 
             #[cfg(feature = "aqc")]
-            let aqc = {
+            let aqc = if let Some(aqc_addr) = self.aqc_server_addr {
                 let aqc_server_addr = aqc_addr
                     .lookup()
                     .await
@@ -171,7 +161,9 @@ impl ClientBuilder<'_> {
                     .map_err(error::other)?
                     .next()
                     .expect("expected AQC server address");
-                AqcClient::new(aqc_server_addr, daemon.clone()).await?
+                Some(AqcClient::new(aqc_server_addr, daemon.clone()).await?)
+            } else {
+                None
             };
 
             let client = Client {
@@ -220,7 +212,7 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     #[cfg(feature = "aqc")]
-    pub(crate) aqc: AqcClient,
+    pub(crate) aqc: Option<AqcClient>,
 }
 
 impl Client {
@@ -236,13 +228,6 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-    }
-
-    /// Returns the address that the AQC client is bound to.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.client_addr()) // TODO: Remove error?
     }
 
     /// Gets the public key bundle for this device.
@@ -319,7 +304,7 @@ impl Client {
     /// Get access to Aranya QUIC Channels.
     #[cfg(feature = "aqc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub fn aqc(&self) -> AqcChannels<'_> {
+    pub fn aqc(&self) -> Option<AqcChannels<'_>> {
         AqcChannels::new(self)
     }
 }

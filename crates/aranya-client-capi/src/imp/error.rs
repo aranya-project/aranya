@@ -21,6 +21,9 @@ pub enum Error {
     #[error(transparent)]
     InvalidArg(#[from] InvalidArg<'static>),
 
+    #[error("component is not enabled")]
+    NotEnabled,
+
     #[error("buffer too small")]
     BufferTooSmall,
 

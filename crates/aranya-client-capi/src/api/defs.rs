@@ -44,6 +44,10 @@ pub enum Error {
     #[capi(msg = "invalid argument")]
     InvalidArgument,
 
+    /// Component is not enabled.
+    #[capi(msg = "component not enabled")]
+    NotEnabled,
+
     /// Buffer is too small.
     #[capi(msg = "buffer too small")]
     BufferTooSmall,
@@ -97,6 +101,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
             imp::Error::InvalidArg(_) => Self::InvalidArgument,
+            imp::Error::NotEnabled => Self::NotEnabled,
             imp::Error::Utf8(_) => Self::InvalidUtf8,
             imp::Error::Addr(_) => Self::InvalidAddr,
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
@@ -1753,11 +1758,13 @@ pub unsafe fn aqc_create_bidi_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.imp();
-    let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
+    let chan = client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .ok_or(imp::Error::NotEnabled)?
+            .create_bidi_channel(team.into(), peer, label_id.into()),
+    )?;
 
     AqcBidiChannel::init(channel, imp::AqcBidiChannel::new(chan));
     Ok(())
@@ -1786,11 +1793,13 @@ pub unsafe fn aqc_create_uni_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.imp();
-    let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
+    let chan = client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .ok_or(imp::Error::NotEnabled)?
+            .create_uni_channel(team.into(), peer, label_id.into()),
+    )?;
 
     AqcSendChannel::init(channel, imp::AqcSendChannel::new(chan));
     Ok(())
@@ -1810,9 +1819,13 @@ pub fn aqc_delete_bidi_channel(
     channel: &mut AqcBidiChannel,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(&mut channel.inner))?;
+    client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .ok_or(imp::Error::NotEnabled)?
+            .delete_bidi_channel(&mut channel.inner),
+    )?;
     Ok(())
 }
 
@@ -1834,6 +1847,7 @@ pub fn aqc_delete_send_uni_channel(
         client
             .inner
             .aqc()
+            .ok_or(imp::Error::NotEnabled)?
             .delete_send_uni_channel(&mut channel.inner),
     )?;
     Ok(())
@@ -1857,6 +1871,7 @@ pub fn aqc_delete_receive_uni_channel(
         client
             .inner
             .aqc()
+            .ok_or(imp::Error::NotEnabled)?
             .delete_receive_uni_channel(&mut channel.inner),
     )?;
     Ok(())
@@ -1895,7 +1910,11 @@ pub fn aqc_try_receive_channel(
     client: &Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
-    let chan = client.inner.aqc().try_receive_channel()?;
+    let chan = client
+        .inner
+        .aqc()
+        .ok_or(imp::Error::NotEnabled)?
+        .try_receive_channel()?;
 
     let chan_type = match chan {
         aqc::AqcPeerChannel::Bidi { .. } => AqcChannelType::Bidirectional,
