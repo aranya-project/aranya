@@ -4,13 +4,14 @@ use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
+#[cfg(feature = "aqc")]
+use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, Role, TeamId, Text, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
@@ -18,8 +19,9 @@ use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
 
+#[cfg(feature = "aqc")]
+use crate::aqc::{AqcChannels, AqcClient};
 use crate::{
-    aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
@@ -67,6 +69,7 @@ pub struct ClientBuilder<'a> {
     #[cfg(unix)]
     daemon_uds_path: Option<&'a Path>,
     // AQC address.
+    #[cfg(feature = "aqc")]
     aqc_server_addr: Option<&'a Addr>,
 }
 
@@ -76,9 +79,24 @@ impl ClientBuilder<'_> {
         Self::default()
     }
 
-    /// Connects to the daemon.
+    /// Creates a client connection to the daemon.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use std::net::Ipv4Addr;
+    /// # use aranya_client::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()> {
+    /// let client = Client::builder()
+    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
+    ///     // .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
+    ///     .connect()
+    ///     .await?;
+    /// #    Ok(())
+    /// # }
+    #[instrument(skip_all)]
     pub async fn connect(self) -> Result<Client> {
-        let Some(sock) = self.daemon_uds_path else {
+        let Some(uds_path) = self.daemon_uds_path else {
             return Err(IpcError::new(InvalidArg::new(
                 "daemon_uds_path",
                 "must specify the daemon's UDS path",
@@ -86,16 +104,84 @@ impl ClientBuilder<'_> {
             .into());
         };
 
-        let Some(aqc_addr) = &self.aqc_server_addr else {
-            return Err(IpcError::new(InvalidArg::new(
-                "aqc_server_addr",
-                "must specify the AQC server address",
-            ))
-            .into());
-        };
-        Client::connect(sock, aqc_addr)
-            .await
-            .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
+        async {
+            info!(path = ?uds_path, "connecting to daemon");
+
+            let daemon = {
+                let pk = {
+                    // The public key is located next to the socket.
+                    let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
+                    let bytes = fs::read(&api_pk_path)
+                        .await
+                        .with_context(|| "unable to read daemon API public key")
+                        .map_err(IpcError::new)?;
+                    PublicApiKey::<CS>::decode(&bytes)
+                        .context("unable to decode public API key")
+                        .map_err(IpcError::new)?
+                };
+
+                let uds_path = uds_path
+                    .canonicalize()
+                    .context("could not canonicalize uds_path")
+                    .map_err(error::other)?;
+                let sock = UnixStream::connect(&uds_path)
+                    .await
+                    .context("unable to connect to UDS path")
+                    .map_err(IpcError::new)?;
+                let info = uds_path.as_os_str().as_encoded_bytes();
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let transport = txp::client(sock, codec, Rng, pk, info);
+
+                DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn()
+            };
+            debug!("connected to daemon");
+
+            let got = daemon
+                .version(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .context("unable to retrieve daemon version")
+                .map_err(error::other)?;
+            let want = Version::parse(env!("CARGO_PKG_VERSION"))
+                .context("unable to parse `CARGO_PKG_VERSION`")
+                .map_err(error::other)?;
+            if got.major != want.major || got.minor != want.minor {
+                return Err(IpcError::new(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    format!("version mismatch: `{got}` != `{want}`"),
+                ))
+                .into());
+            }
+            debug!(client = ?want, daemon = ?got, "versions");
+
+            #[cfg(feature = "aqc")]
+            let aqc = if let Some(aqc_addr) = self.aqc_server_addr {
+                let aqc_server_addr = aqc_addr
+                    .lookup()
+                    .await
+                    .context("unable to resolve AQC server address")
+                    .map_err(error::other)?
+                    .next()
+                    .expect("expected AQC server address");
+                Some(AqcClient::new(aqc_server_addr, daemon.clone()).await?)
+            } else {
+                None
+            };
+
+            let client = Client {
+                daemon,
+                #[cfg(feature = "aqc")]
+                aqc,
+            };
+
+            Ok(client)
+        }
+        .await
+        .inspect_err(
+            |err: &crate::Error| error!(error = %err.report(), "unable to connect to daemon"),
+        )
     }
 }
 
@@ -109,6 +195,8 @@ impl<'a> ClientBuilder<'a> {
     }
 
     /// Specifies the AQC server address.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub fn aqc_server_addr(mut self, addr: &'a Addr) -> Self {
         self.aqc_server_addr = Some(addr);
         self
@@ -127,94 +215,14 @@ pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
-    pub(crate) aqc: AqcClient,
+    #[cfg(feature = "aqc")]
+    pub(crate) aqc: Option<AqcClient>,
 }
 
 impl Client {
     /// Returns a builder for `Client`.
     pub fn builder<'a>() -> ClientBuilder<'a> {
         ClientBuilder::new()
-    }
-
-    /// Creates a client connection to the daemon.
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// use std::net::Ipv4Addr;
-    /// # use aranya_client::Client;
-    /// # #[tokio::main]
-    /// # async fn main() -> anyhow::Result<()> {
-    /// let client = Client::builder()
-    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
-    ///     .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
-    ///     .connect()
-    ///     .await?;
-    /// #    Ok(())
-    /// # }
-    #[instrument(skip_all)]
-    async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
-        info!(path = ?uds_path, "connecting to daemon");
-
-        let daemon = {
-            let pk = {
-                // The public key is located next to the socket.
-                let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
-                let bytes = fs::read(&api_pk_path)
-                    .await
-                    .with_context(|| "unable to read daemon API public key")
-                    .map_err(IpcError::new)?;
-                PublicApiKey::<CS>::decode(&bytes)
-                    .context("unable to decode public API key")
-                    .map_err(IpcError::new)?
-            };
-
-            let uds_path = uds_path
-                .canonicalize()
-                .context("could not canonicalize uds_path")
-                .map_err(error::other)?;
-            let sock = UnixStream::connect(&uds_path)
-                .await
-                .context("unable to connect to UDS path")
-                .map_err(IpcError::new)?;
-            let info = uds_path.as_os_str().as_encoded_bytes();
-            let codec = LengthDelimitedCodec::builder()
-                .max_frame_length(usize::MAX)
-                .new_codec();
-            let transport = txp::client(sock, codec, Rng, pk, info);
-
-            DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn()
-        };
-        debug!("connected to daemon");
-
-        let got = daemon
-            .version(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .context("unable to retrieve daemon version")
-            .map_err(error::other)?;
-        let want = Version::parse(env!("CARGO_PKG_VERSION"))
-            .context("unable to parse `CARGO_PKG_VERSION`")
-            .map_err(error::other)?;
-        if got.major != want.major || got.minor != want.minor {
-            return Err(IpcError::new(io::Error::new(
-                io::ErrorKind::Unsupported,
-                format!("version mismatch: `{got}` != `{want}`"),
-            ))
-            .into());
-        }
-        debug!(client = ?want, daemon = ?got, "versions");
-
-        let aqc_server_addr = aqc_addr
-            .lookup()
-            .await
-            .context("unable to resolve AQC server address")
-            .map_err(error::other)?
-            .next()
-            .expect("expected AQC server address");
-        let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
-        let client = Self { daemon, aqc };
-
-        Ok(client)
     }
 
     /// Returns the address that the Aranya sync server is bound to.
@@ -224,11 +232,6 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-    }
-
-    /// Returns the address that the AQC client is bound to.
-    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.client_addr()) // TODO: Remove error?
     }
 
     /// Gets the public key bundle for this device.
@@ -303,7 +306,9 @@ impl Client {
     }
 
     /// Get access to Aranya QUIC Channels.
-    pub fn aqc(&self) -> AqcChannels<'_> {
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+    pub fn aqc(&self) -> Option<AqcChannels<'_>> {
         AqcChannels::new(self)
     }
 }
@@ -439,6 +444,8 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub async fn assign_aqc_net_identifier(
         &self,
         device: DeviceId,
@@ -453,6 +460,8 @@ impl Team<'_> {
     }
 
     /// Disassociate an AQC network identifier from a device.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub async fn remove_aqc_net_identifier(
         &self,
         device: DeviceId,
@@ -575,6 +584,8 @@ impl Queries<'_> {
     }
 
     /// Returns the AQC network identifier assigned to the current device.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub async fn aqc_net_identifier(&self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         self.client
             .daemon

@@ -1,3 +1,5 @@
+#![cfg(feature = "aqc")]
+
 use core::{
     mem::{self, MaybeUninit},
     ptr,

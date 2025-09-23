@@ -32,9 +32,10 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
+#[cfg(feature = "aqc")]
+use crate::aqc::Aqc;
 use crate::{
     actions::Actions,
-    aqc::Aqc,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -74,35 +75,57 @@ pub(crate) struct DaemonApiServer {
     api: Api,
 }
 
+pub(crate) struct DaemonApiServerArgs {
+    pub(crate) client: Client,
+    pub(crate) local_addr: SocketAddr,
+    pub(crate) uds_path: PathBuf,
+    pub(crate) sk: ApiKey<CS>,
+    pub(crate) pk: PublicKeys<CS>,
+    pub(crate) peers: SyncPeers,
+    pub(crate) recv_effects: EffectReceiver,
+    pub(crate) invalid: InvalidGraphs,
+    #[cfg(feature = "aqc")]
+    pub(crate) aqc: Option<Aqc<CE, KS>>,
+    #[cfg(feature = "afc")]
+    pub(crate) afc: Afc<CE, CS, KS>,
+    pub(crate) crypto: Crypto,
+    pub(crate) seed_id_dir: SeedDir,
+    pub(crate) quic: Option<quic_sync::Data>,
+}
+
 impl DaemonApiServer {
     /// Creates a `DaemonApiServer`.
-    // TODO(eric): Clean up the arguments.
     #[instrument(skip_all)]
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        client: Client,
-        local_addr: SocketAddr,
-        uds_path: PathBuf,
-        sk: ApiKey<CS>,
-        pk: PublicKeys<CS>,
-        peers: SyncPeers,
-        recv_effects: EffectReceiver,
-        invalid: InvalidGraphs,
-        aqc: Aqc<CE, KS>,
-        #[cfg(feature = "afc")] afc: Afc<CE, CS, KS>,
-        crypto: Crypto,
-        seed_id_dir: SeedDir,
-        quic: Option<quic_sync::Data>,
+        DaemonApiServerArgs {
+            client,
+            local_addr,
+            uds_path,
+            sk,
+            pk,
+            peers,
+            recv_effects,
+            invalid,
+            #[cfg(feature = "aqc")]
+            aqc,
+            #[cfg(feature = "afc")]
+            afc,
+            crypto,
+            seed_id_dir,
+            quic,
+        }: DaemonApiServerArgs,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let uds_path = uds_path
             .canonicalize()
             .context("could not canonicalize uds_path")?;
-        let aqc = Arc::new(aqc);
+        #[cfg(feature = "aqc")]
+        let aqc = aqc.map(Arc::new);
         #[cfg(feature = "afc")]
         let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
-            aqc: Arc::clone(&aqc),
+            #[cfg(feature = "aqc")]
+            aqc: aqc.clone(),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -111,6 +134,7 @@ impl DaemonApiServer {
             peers,
             effect_handler,
             invalid,
+            #[cfg(feature = "aqc")]
             aqc,
             #[cfg(feature = "afc")]
             afc,
@@ -184,7 +208,8 @@ impl DaemonApiServer {
 /// Handles effects from an Aranya action.
 #[derive(Clone, Debug)]
 struct EffectHandler {
-    aqc: Arc<Aqc<CE, KS>>,
+    #[cfg(feature = "aqc")]
+    aqc: Option<Arc<Aqc<CE, KS>>>,
 }
 
 impl EffectHandler {
@@ -213,15 +238,27 @@ impl EffectHandler {
                 LabelAssigned(_) => {}
                 LabelRevoked(_) => {}
                 AqcNetworkNameSet(e) => {
-                    self.aqc
-                        .add_peer(
+                    #[cfg(feature = "aqc")]
+                    if let Some(aqc) = &self.aqc {
+                        aqc.add_peer(
                             graph,
                             api::NetIdentifier(e.net_identifier.clone()),
                             e.device_id.into(),
                         )
                         .await;
+                        continue;
+                    }
+                    tracing::warn!(effect = ?e, "received AQC effect when not enabled");
                 }
-                AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
+                AqcNetworkNameUnset(e) => {
+                    #[cfg(feature = "aqc")]
+                    if let Some(aqc) = &self.aqc {
+                        aqc.remove_peer(graph, e.device_id.into()).await;
+                        continue;
+                    }
+
+                    tracing::warn!(effect = ?e, "received AQC effect when not enabled")
+                }
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
@@ -261,7 +298,8 @@ struct ApiInner {
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
-    aqc: Arc<Aqc<CE, KS>>,
+    #[cfg(feature = "aqc")]
+    aqc: Option<Arc<Aqc<CE, KS>>>,
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
@@ -567,6 +605,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn assign_aqc_net_identifier(
         self,
@@ -589,6 +628,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn remove_aqc_net_identifier(
         self,
@@ -607,6 +647,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn create_aqc_bidi_channel(
         self,
@@ -616,13 +657,13 @@ impl DaemonApi for Api {
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
         self.check_team_valid(team).await?;
+        let aqc = self.aqc.as_ref().context("AQC is not enabled")?;
 
         info!("creating aqc bidi channel");
 
         let graph = GraphId::from(team.into_id());
 
-        let peer_id = self
-            .aqc
+        let peer_id = aqc
             .find_device_id(graph, &peer)
             .await
             .context("did not find peer")?;
@@ -642,12 +683,13 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let psks = self.aqc.bidi_channel_created(e).await?;
+        let psks = aqc.bidi_channel_created(e).await?;
         info!(num = psks.len(), "bidi channel created");
 
         Ok((ctrl, psks))
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn create_aqc_uni_channel(
         self,
@@ -657,13 +699,13 @@ impl DaemonApi for Api {
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
         self.check_team_valid(team).await?;
+        let aqc = self.aqc.as_ref().context("AQC is not enabled")?;
 
         info!("creating aqc uni channel");
 
         let graph = GraphId::from(team.into_id());
 
-        let peer_id = self
-            .aqc
+        let peer_id = aqc
             .find_device_id(graph, &peer)
             .await
             .context("did not find peer")?;
@@ -683,12 +725,13 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let psks = self.aqc.uni_channel_created(e).await?;
+        let psks = aqc.uni_channel_created(e).await?;
         info!(num = psks.len(), "aqc uni channel created");
 
         Ok((ctrl, psks))
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn delete_aqc_bidi_channel(
         self,
@@ -699,6 +742,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn delete_aqc_uni_channel(
         self,
@@ -709,6 +753,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn receive_aqc_ctrl(
         self,
@@ -717,6 +762,7 @@ impl DaemonApi for Api {
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::LabelId, api::AqcPsks)> {
         self.check_team_valid(team).await?;
+        let aqc = self.aqc.as_ref().context("AQC is not enabled")?;
 
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
@@ -735,13 +781,13 @@ impl DaemonApi for Api {
             });
             match effect {
                 Some(Effect::AqcBidiChannelReceived(e)) => {
-                    let psks = self.aqc.bidi_channel_received(e).await?;
+                    let psks = aqc.bidi_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
                     return Ok((e.label_id.into(), psks));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
-                    let psks = self.aqc.uni_channel_received(e).await?;
+                    let psks = aqc.uni_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
                     return Ok((e.label_id.into(), psks));
@@ -1137,6 +1183,7 @@ impl DaemonApi for Api {
     }
 
     /// Query AQC network ID.
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn query_aqc_net_identifier(
         self,
