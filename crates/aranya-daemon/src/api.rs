@@ -95,7 +95,6 @@ pub(crate) struct DaemonApiServerArgs {
 
 impl DaemonApiServer {
     /// Creates a `DaemonApiServer`.
-    // TODO(eric): Clean up the arguments.
     #[instrument(skip_all)]
     pub(crate) fn new(
         DaemonApiServerArgs {
