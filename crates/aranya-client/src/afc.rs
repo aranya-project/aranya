@@ -294,7 +294,7 @@ pub struct BidiChannel {
 }
 
 impl BidiChannel {
-    /// TODO: return channel's unique ID.
+    // TODO: return channel's unique ID.
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
@@ -366,7 +366,7 @@ pub struct SendChannel {
 }
 
 impl SendChannel {
-    /// TODO: return channel's unique ID.
+    // TODO: return channel's unique ID.
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
@@ -413,7 +413,7 @@ pub struct ReceiveChannel {
 }
 
 impl ReceiveChannel {
-    /// TODO: return channel's unique ID.
+    // TODO: return channel's unique ID.
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
