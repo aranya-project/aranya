@@ -148,7 +148,7 @@ dependencies = [
  "postcard",
  "serde",
  "spin 0.10.0",
- "thiserror 2.0.12",
+ "thiserror 2.0.16",
  "tracing",
 ]
 
@@ -408,7 +408,7 @@ dependencies = [
  "heapless 0.8.0",
  "libc",
  "serde",
- "thiserror 2.0.12",
+ "thiserror 2.0.16",
 ]
 
 [[package]]

@@ -117,7 +117,7 @@ impl DaemonApiServer {
             aqc,
             #[cfg(feature = "afc")]
             afc,
-            crypto: tokio::sync::Mutex::new(crypto),
+            crypto: Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
