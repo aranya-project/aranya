@@ -25,6 +25,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(feature = "afc")]
+use crate::afc::Afc;
 use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
@@ -224,6 +226,23 @@ impl Daemon {
                 )
             };
 
+            #[cfg(feature = "afc")]
+            let afc = {
+                let Toggle::Enabled(afc_cfg) = &cfg.afc else {
+                    anyhow::bail!(
+                        "AFC is currently required, set `afc.enable = true` in daemon config."
+                    )
+                };
+                Afc::new(
+                    eng.clone(),
+                    pks.ident_pk.id()?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    afc_cfg.clone(),
+                )?
+            };
+
             let data = QSData { psk_store };
 
             let crypto = crate::api::Crypto {
@@ -242,6 +261,8 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
+                #[cfg(feature = "afc")]
+                afc,
                 crypto,
                 seed_id_dir,
                 Some(data),
@@ -512,6 +533,8 @@ mod tests {
     use tokio::time;
 
     use super::*;
+    #[cfg(feature = "afc")]
+    use crate::config::AfcConfig;
     use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
@@ -519,6 +542,15 @@ mod tests {
     async fn test_daemon_run() {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
+
+        #[cfg(feature = "afc")]
+        let shm_path = {
+            let path = "/test_daemon_run\0"
+                .try_into()
+                .expect("should be able to parse AFC shared memory path");
+            let _ = aranya_fast_channels::shm::unlink(&path);
+            path
+        };
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
@@ -532,6 +564,11 @@ mod tests {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
             aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "afc")]
+            afc: Toggle::Enabled(AfcConfig {
+                shm_path,
+                max_chans: 100,
+            }),
         };
         for dir in [
             &cfg.runtime_dir,

@@ -55,6 +55,11 @@ config_dir = "${out}/${device}/config"
 
 aqc.enable = true
 
+[afc]
+enable = true
+shm_path = "/shm_${device}"
+max_chans = 100
+
 [sync.quic]
 enable = true
 addr = "127.0.0.1:${port}"
