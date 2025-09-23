@@ -2183,7 +2183,7 @@ pub enum AfcChannelType {
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type AfcCtrl = Safe<imp::AfcCtrl>;
+pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
 
 /// An AFC Sequence Number, for reordering incoming messages.
 #[repr(C)]
@@ -2212,7 +2212,7 @@ pub fn afc_create_bidi_channel(
     peer_id: &DeviceId,
     label_id: &LabelId,
     channel: &mut MaybeUninit<AfcChannel>,
-    control: &mut MaybeUninit<AfcCtrl>,
+    control: &mut MaybeUninit<AfcCtrlMsg>,
 ) -> Result<(), imp::Error> {
     let (chan, ctrl) = client.rt.block_on(client.inner.afc().create_bidi_channel(
         team_id.into(),
@@ -2221,7 +2221,7 @@ pub fn afc_create_bidi_channel(
     ))?;
 
     AfcChannel::init(channel, imp::AfcChannel::new_bidi(chan));
-    AfcCtrl::init(control, imp::AfcCtrl::new(ctrl));
+    AfcCtrlMsg::init(control, imp::AfcCtrlMsg::new(ctrl));
     Ok(())
 }
 
@@ -2244,7 +2244,7 @@ pub fn afc_create_uni_send_channel(
     peer_id: &DeviceId,
     label_id: &LabelId,
     channel: &mut MaybeUninit<AfcChannel>,
-    control: &mut MaybeUninit<AfcCtrl>,
+    control: &mut MaybeUninit<AfcCtrlMsg>,
 ) -> Result<(), imp::Error> {
     let (chan, ctrl) = client
         .rt
@@ -2255,7 +2255,7 @@ pub fn afc_create_uni_send_channel(
         ))?;
 
     AfcChannel::init(channel, imp::AfcChannel::new_send(chan));
-    AfcCtrl::init(control, imp::AfcCtrl::new(ctrl));
+    AfcCtrlMsg::init(control, imp::AfcCtrlMsg::new(ctrl));
     Ok(())
 }
 
@@ -2278,7 +2278,7 @@ pub fn afc_create_uni_recv_channel(
     peer_id: &DeviceId,
     label_id: &LabelId,
     channel: &mut MaybeUninit<AfcChannel>,
-    control: &mut MaybeUninit<AfcCtrl>,
+    control: &mut MaybeUninit<AfcCtrlMsg>,
 ) -> Result<(), imp::Error> {
     let (chan, ctrl) = client
         .rt
@@ -2289,7 +2289,7 @@ pub fn afc_create_uni_recv_channel(
         ))?;
 
     AfcChannel::init(channel, imp::AfcChannel::new_recv(chan));
-    AfcCtrl::init(control, imp::AfcCtrl::new(ctrl));
+    AfcCtrlMsg::init(control, imp::AfcCtrlMsg::new(ctrl));
     Ok(())
 }
 
@@ -2308,7 +2308,7 @@ pub fn afc_create_uni_recv_channel(
 pub fn afc_recv_ctrl(
     client: &Client,
     team_id: &TeamId,
-    control: OwnedPtr<AfcCtrl>,
+    control: OwnedPtr<AfcCtrlMsg>,
     channel: &mut MaybeUninit<AfcChannel>,
 ) -> Result<AfcChannelType, imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcCtrl` pointer.

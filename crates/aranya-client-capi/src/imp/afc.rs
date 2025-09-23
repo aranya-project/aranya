@@ -52,16 +52,16 @@ impl AfcChannel {
 
 /// An AFC control message, for ephemeral channels.
 #[derive(Debug)]
-pub struct AfcCtrl {
-    pub(crate) inner: afc::Ctrl,
+pub struct AfcCtrlMsg {
+    pub(crate) inner: afc::CtrlMsg,
 }
 
-impl Typed for AfcCtrl {
+impl Typed for AfcCtrlMsg {
     const TYPE_ID: TypeId = TypeId::new(0xB421D1CE);
 }
 
-impl AfcCtrl {
-    pub fn new(ctrl: afc::Ctrl) -> AfcCtrl {
+impl AfcCtrlMsg {
+    pub fn new(ctrl: afc::CtrlMsg) -> AfcCtrlMsg {
         Self { inner: ctrl }
     }
 }
