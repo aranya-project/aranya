@@ -2321,10 +2321,8 @@ pub fn afc_recv_ctrl(
 
     let channel_type = match chan {
         afc::Channel::Bidi(_) => AfcChannelType::Bidirectional,
-        afc::Channel::Uni(ref uni) => match uni {
-            afc::UniChannel::Receive(_) => AfcChannelType::Receiver,
-            afc::UniChannel::Send(_) => AfcChannelType::Sender,
-        },
+        afc::Channel::Send(_) => AfcChannelType::Sender,
+        afc::Channel::Recv(_) => AfcChannelType::Receiver,
     };
     AfcChannel::init(channel, chan.into());
     Ok(channel_type)

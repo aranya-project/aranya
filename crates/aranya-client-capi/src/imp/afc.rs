@@ -17,10 +17,8 @@ impl From<afc::Channel> for AfcChannel {
     fn from(channel: afc::Channel) -> Self {
         match channel {
             afc::Channel::Bidi(c) => Self::Bidi(c),
-            afc::Channel::Uni(c) => match c {
-                afc::UniChannel::Send(c) => Self::Send(c),
-                afc::UniChannel::Receive(c) => Self::Receive(c),
-            },
+            afc::Channel::Send(c) => Self::Send(c),
+            afc::Channel::Recv(c) => Self::Receive(c),
         }
     }
 }
