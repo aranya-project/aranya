@@ -46,14 +46,27 @@ impl CtrlMsg {
     }
 }
 
-/// AFC error.
+/// AFC seal error.
 #[derive(Debug)]
-pub struct AfcError(
+pub struct AfcSealError(
     #[allow(dead_code, reason = "Don't expose internal error type in public API")]
     aranya_fast_channels::Error,
 );
 
-impl fmt::Display for AfcError {
+impl fmt::Display for AfcSealError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+/// AFC open error.
+#[derive(Debug)]
+pub struct AfcOpenError(
+    #[allow(dead_code, reason = "Don't expose internal error type in public API")]
+    aranya_fast_channels::Error,
+);
+
+impl fmt::Display for AfcOpenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         std::fmt::Display::fmt(&self.0, f)
     }
@@ -65,11 +78,11 @@ impl fmt::Display for AfcError {
 pub enum Error {
     /// Unable to seal datagram.
     #[error("unable to seal datagram")]
-    Seal(AfcError),
+    Seal(#[from] AfcSealError),
 
     /// Unable to open datagram.
     #[error("unable to open datagram")]
-    Open(AfcError),
+    Open(#[from] AfcOpenError),
 
     /// Unable to connect to channel keys IPC.
     #[error("unable to connect to channel keys IPC")]
