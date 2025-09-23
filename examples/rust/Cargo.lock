@@ -97,8 +97,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.9.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea871d7a5fbcb9a7afdf2a282f8003035bb4125310e5404dcfeef5725e0a7425"
 dependencies = [
  "buggy",
  "byteorder",
@@ -107,7 +108,7 @@ dependencies = [
  "ciborium-io",
  "derive-where",
  "proptest",
- "rustix",
+ "rustix 0.38.44",
  "serde",
  "sha3-utils",
  "siphasher",
@@ -145,12 +146,12 @@ dependencies = [
  "anyhow",
  "aranya-client",
  "aranya-daemon-api",
- "aranya-fast-channels",
  "aranya-util",
  "backon",
  "buggy",
  "bytes",
  "futures-util",
+ "rustix 1.1.2",
  "tempfile",
  "tokio",
  "tracing",
@@ -159,12 +160,12 @@ dependencies = [
 
 [[package]]
 name = "aranya-fast-channels"
-version = "0.11.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4224a3070e7603ea40623fb836ed549958a012c99d194c162cf7f71d5361d86c"
 dependencies = [
  "aranya-crypto",
  "buggy",
- "byteorder",
  "cfg-if",
  "const_format",
  "derive-where",
@@ -231,7 +232,8 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text"
 version = "0.1.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b39a413c48e08d25f2b6b7ab9cb43bba27147563984929c4ce9b5d7007e42df"
 dependencies = [
  "aranya-policy-text-macro",
  "serde",
@@ -241,7 +243,8 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text-macro"
 version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9edc5cab895eb10bf04b1c1377dd35b67b029dbc23e8f4d51f7230781b9e5f3f"
 dependencies = [
  "macro-string",
  "proc-macro2",
@@ -254,7 +257,6 @@ name = "aranya-util"
 version = "2.0.0"
 dependencies = [
  "anyhow",
- "aranya-fast-channels",
  "aranya-internal-s2n-quic",
  "buggy",
  "bytes",
@@ -1254,6 +1256,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df1d3c3b53da64cf5760482273a98e575c651a67eec7f77df96b5b642de8f039"
+
+[[package]]
 name = "lock_api"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1861,7 +1869,20 @@ dependencies = [
  "bitflags",
  "errno",
  "libc",
- "linux-raw-sys",
+ "linux-raw-sys 0.4.15",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "rustix"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd15f8a2c5551a84d56efdc1cd049089e409ac19a3072d5037a17fd70719ff3e"
+dependencies = [
+ "bitflags",
+ "errno",
+ "libc",
+ "linux-raw-sys 0.11.0",
  "windows-sys 0.59.0",
 ]
 
@@ -2297,7 +2318,7 @@ dependencies = [
  "fastrand",
  "getrandom 0.3.3",
  "once_cell",
- "rustix",
+ "rustix 0.38.44",
  "windows-sys 0.59.0",
 ]
 
@@ -2645,7 +2666,7 @@ dependencies = [
  "either",
  "home",
  "once_cell",
- "rustix",
+ "rustix 0.38.44",
 ]
 
 [[package]]
@@ -2864,83 +2885,3 @@ dependencies = [
  "quote",
  "syn 2.0.101",
 ]
-
-[[patch.unused]]
-name = "aranya-afc-util"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-aqc-util"
-version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-capi-codegen"
-version = "0.3.3"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-capi-core"
-version = "0.4.4"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-crypto-ffi"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-device-ffi"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-envelope-ffi"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-idam-ffi"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-perspective-ffi"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-policy-compiler"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-policy-ifgen"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-policy-ifgen-build"
-version = "0.6.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-policy-lang"
-version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-policy-module"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-policy-vm"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"
-
-[[patch.unused]]
-name = "aranya-runtime"
-version = "0.12.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#eb0af261f7a897c1fa9d07f6caf57a4f0fba810a"

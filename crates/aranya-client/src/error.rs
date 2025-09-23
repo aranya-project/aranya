@@ -33,7 +33,7 @@ pub enum Error {
 
     /// An Aranya Fast Channel error happened.
     #[cfg(feature = "afc")]
-    #[error("AFC error: {0}")]
+    #[error("AFC error")]
     Afc(#[from] AfcError),
 
     /// An unexpected internal error happened.

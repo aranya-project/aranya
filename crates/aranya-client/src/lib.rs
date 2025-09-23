@@ -26,6 +26,11 @@
 #[cfg(not(feature = "default"))]
 compile_error!("'default' feature must be enabled!");
 
+#[cfg(all(feature = "afc", not(feature = "preview")))]
+compile_error!(
+    "AFC is currently a preview feature. Enable the 'preview' feature to opt into preview APIs."
+);
+
 #[cfg(feature = "afc")]
 pub mod afc;
 pub mod aqc;

@@ -315,7 +315,7 @@ impl From<aranya_client::client::TeamId> for TeamId {
     fn from(value: aranya_client::client::TeamId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__into_id().into(),
             },
         }
     }
@@ -490,9 +490,9 @@ impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_client::client::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(aranya_client::client::NetIdentifier(
-            aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?),
-        ))
+        Ok(aranya_client::client::NetIdentifier::from_str(
+            cstr.to_str()?,
+        )?)
     }
 }
 
@@ -1227,7 +1227,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(&keybundle.encoding()),
+            .encrypt_psk_seed_for_peer(&keybundle.encryption()),
     )?;
 
     if *seed_len < wrapped_seed.len() {

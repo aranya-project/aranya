@@ -59,16 +59,16 @@ impl<'a> AqcChannels<'a> {
             .daemon
             .create_aqc_bidi_channel(
                 context::current(),
-                team_id.into_id().into(),
+                team_id.into(),
                 peer.0.clone(),
-                label_id.into_id().into(),
+                label_id.into(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0 .0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -76,12 +76,12 @@ impl<'a> AqcChannels<'a> {
 
         self.client
             .aqc
-            .send_ctrl(peer_addr, aqc_ctrl, team_id.into_id().into())
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.into())
             .await?;
         let channel = self
             .client
             .aqc
-            .create_bidi_channel(peer_addr, label_id.into_id().into(), psks)
+            .create_bidi_channel(peer_addr, label_id.into(), psks)
             .await?;
         Ok(channel)
     }
@@ -108,16 +108,16 @@ impl<'a> AqcChannels<'a> {
             .daemon
             .create_aqc_uni_channel(
                 context::current(),
-                team_id.into_id().into(),
+                team_id.into(),
                 peer.0.clone(),
-                label_id.into_id().into(),
+                label_id.into(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0 .0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -125,13 +125,13 @@ impl<'a> AqcChannels<'a> {
 
         self.client
             .aqc
-            .send_ctrl(peer_addr, aqc_ctrl, team_id.into_id().into())
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.into())
             .await?;
 
         let channel = self
             .client
             .aqc
-            .create_uni_channel(peer_addr, label_id.into_id().into(), psks)
+            .create_uni_channel(peer_addr, label_id.into(), psks)
             .await?;
         Ok(channel)
     }

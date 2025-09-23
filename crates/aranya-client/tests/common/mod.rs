@@ -1,6 +1,7 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
+    str::FromStr,
     time::Duration,
 };
 
@@ -18,7 +19,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{self as api, SEED_IKM_SIZE};
+use aranya_daemon_api::SEED_IKM_SIZE;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
@@ -175,7 +176,18 @@ impl DeviceCtx {
     async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let afc_shm_path = Self::get_shm_path(format!("/{team_name}_{name}\0"));
+        // TODO: only compile when 'afc' feature is enabled
+        let afc_shm_path = {
+            use aranya_daemon_api::shm;
+
+            let path = Self::get_shm_path(format!("/{team_name}_{name}\0"));
+            let path: Box<shm::Path> = path
+                .as_str()
+                .try_into()
+                .context("unable to parse AFC shared memory path")?;
+            let _ = shm::unlink(&path);
+            path
+        };
 
         // Setup daemon config.
         let cfg = Config {
@@ -187,10 +199,7 @@ impl DeviceCtx {
             config_dir: work_dir.join("config"),
             aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
             afc: Toggle::Enabled(daemon_cfg::AfcConfig {
-                shm_path: afc_shm_path
-                    .as_str()
-                    .try_into()
-                    .context("unable to parse AFC shared memory path")?,
+                shm_path: afc_shm_path,
                 max_chans: 100,
             }),
             sync: daemon_cfg::SyncConfig {
@@ -248,14 +257,8 @@ impl DeviceCtx {
 
     #[allow(unused, reason = "module compiled for each test file")]
     pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier(api::NetIdentifier(
-            self.client
-                .aqc()
-                .server_addr()
-                .to_string()
-                .try_into()
-                .expect("socket addr is valid text"),
-        ))
+        NetIdentifier::from_str(self.client.aqc().server_addr().to_string().as_str())
+            .expect("expected net identifier")
     }
 
     fn get_shm_path(path: String) -> String {

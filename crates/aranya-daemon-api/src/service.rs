@@ -21,16 +21,19 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
-use aranya_fast_channels::shm;
-pub use aranya_fast_channels::ChannelId as AfcChannelId;
 pub use aranya_policy_text::{text, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
+pub mod afc;
 pub mod quic_sync;
+
 pub use quic_sync::*;
+
+#[cfg(feature = "afc")]
+pub use self::afc::*;
 
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
@@ -116,7 +119,7 @@ custom_id! {
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
-    pub encoding: Vec<u8>,
+    pub encryption: Vec<u8>,
 }
 
 /// A device's role on the team.
@@ -182,9 +185,6 @@ impl fmt::Display for NetIdentifier {
 
 /// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
-
-/// A serialized command for AFC.
-pub type AfcCtrl = Box<[u8]>;
 
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
@@ -635,12 +635,16 @@ pub struct Label {
     pub name: Text,
 }
 
-/// AFC shared-memory info.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-
-pub struct AfcShmInfo {
-    pub path: Box<shm::Path>,
-    pub max_chans: usize,
+// TODO: tarpc does not cfg return types properly.
+#[cfg(not(feature = "afc"))]
+use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
+#[cfg(not(feature = "afc"))]
+mod afc_stub {
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    pub enum Never {}
+    pub type AfcCtrl = Never;
+    pub type AfcShmInfo = Never;
+    pub type AfcChannelId = Never;
 }
 
 #[tarpc::service]
@@ -730,32 +734,48 @@ pub trait DaemonApi {
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcUniPsks)>;
+    /// Delete a QUIC bidi channel.
+    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
+    /// Delete a QUIC uni channel.
+    async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
 
     /// Gets AFC shared-memory configuration info.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn afc_shm_info() -> Result<AfcShmInfo>;
     /// Create a bidirectional AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC send-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn create_afc_uni_send_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Create a unidirectional AFC receive-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn create_afc_uni_recv_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(AfcCtrl, AfcChannelId)>;
     /// Delete a AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
     /// Receive AFC ctrl message.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn receive_afc_ctrl(
         team: TeamId,
         ctrl: AfcCtrl,
