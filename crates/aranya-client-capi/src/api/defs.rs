@@ -63,11 +63,11 @@ pub enum Error {
     Config,
 
     /// AQC library error.
-    #[cfg(feature = "afc")]
     #[capi(msg = "AQC library error")]
     Aqc,
 
     /// AFC library error.
+    #[cfg(feature = "afc")]
     #[capi(msg = "AFC library error")]
     Afc,
 
@@ -2159,6 +2159,11 @@ pub unsafe fn aqc_recv_stream_try_recv(
 }
 
 /// An AFC Channel Object.
+///
+/// This can contain a bidirectional, receiver, or sender channel.
+///
+/// Note that only bidi and sender channels can call `aranya_afc_seal()`, and
+/// only bidi and receiver channels can call `aranya_afc_open()`.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 96, align = 8)]
@@ -2267,7 +2272,7 @@ pub fn afc_create_uni_send_channel(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn create_uni_recv_channel(
+pub fn afc_create_uni_recv_channel(
     client: &Client,
     team_id: &TeamId,
     peer_id: &DeviceId,
@@ -2409,13 +2414,16 @@ pub fn afc_open(
 
 /// Removes the current [`AfcChannel`] from use.
 ///
+/// Note that this function takes ownership of the [`AfcChannel`] and invalidates any further use.
+///
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  channel the AFC channel object [`AfcChannel`].
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn afc_delete(client: &Client, channel: &AfcChannel) -> Result<(), imp::Error> {
-    match &channel.deref().deref().inner {
+pub fn afc_delete(client: &Client, channel: OwnedPtr<AfcChannel>) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid `AfcChannel` pointer.
+    match unsafe { channel.read().into_inner().into_inner().inner } {
         imp::ChannelType::Bidi(c) => Ok(client.rt.block_on(c.delete())?),
         imp::ChannelType::Receive(c) => Ok(client.rt.block_on(c.delete())?),
         imp::ChannelType::Send(c) => Ok(client.rt.block_on(c.delete())?),
