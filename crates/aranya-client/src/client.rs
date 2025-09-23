@@ -168,7 +168,10 @@ impl Client {
                     .map_err(IpcError::new)?
             };
 
-            let uds_path = uds_path.canonicalize().map_err(error::other)?;
+            let uds_path = uds_path
+                .canonicalize()
+                .context("could not canonicalize uds_path")
+                .map_err(error::other)?;
             let sock = UnixStream::connect(&uds_path)
                 .await
                 .context("unable to connect to UDS path")
