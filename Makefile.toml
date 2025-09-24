@@ -88,10 +88,6 @@ description = "Archive capi docs"
 script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/docs ."
 
 [tasks.build-capi-lib]
-
-dependencies = ["install-nightly"]
-
-
 category = "build"
 description = "Build C API shared library with default features"
 cwd = "crates/aranya-client-capi"
@@ -109,7 +105,6 @@ description = "Build C API shared library with experimental features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
-dependencies = ["install-nightly"]
 
 [tasks.build-capi-lib-preview]
 category = "build"
@@ -117,7 +112,7 @@ description = "Build C API shared library with preview features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview,afc"]
-dependencies = ["install-nightly"]
+
 [tasks.tgz-capi]
 category = "build"
 description = "Archive C API artifacts"
