@@ -49,10 +49,7 @@ where
             cfg.max_chans,
             Rng,
         )
-        .context(format!(
-            "unable to create new `WriteState`: {:?}",
-            cfg.shm_path
-        ));
+        .with_context(|| format!("unable to create new `WriteState`: {:?}", cfg.shm_path));
         match open_res {
             Ok(w) => Ok(Self { cfg, write: w }),
             Err(e) => {
@@ -64,10 +61,9 @@ where
                     cfg.max_chans,
                     Rng,
                 )
-                .context(format!(
-                    "unable to open existing `WriteState`: {:?}",
-                    cfg.shm_path
-                ))?;
+                .with_context(|| {
+                    format!("unable to open existing `WriteState`: {:?}", cfg.shm_path)
+                })?;
 
                 Ok(Self { cfg, write: w })
             }

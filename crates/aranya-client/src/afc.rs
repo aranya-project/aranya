@@ -504,10 +504,7 @@ impl ChannelKeys {
             Mode::ReadWrite,
             afc_shm_info.max_chans,
         )
-        .context(format!(
-            "unable to open `ReadState`: {:?}",
-            afc_shm_info.path
-        ))
+        .with_context(|| format!("unable to open `ReadState`: {:?}", afc_shm_info.path))
         .map_err(Error::AfcIpc)?;
 
         Ok(Self(AfcClient::new(read)))
