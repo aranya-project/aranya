@@ -60,7 +60,7 @@ jobs:
         target:
           - aarch64-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
-    name: publish daemon ${{ matrix.target }}
+    name: publish daemon ${{ matrix.target }} (${{ matrix.features }})
     runs-on: ubuntu-latest
     steps:
       - name: Download Rust doc artifacts
@@ -92,7 +92,7 @@ jobs:
         target:
           - aarch64-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
-    name: publish capi ${{ matrix.target }}
+    name: publish capi ${{ matrix.target }} (${{ matrix.features }})
     runs-on: ubuntu-latest
     steps:
       - name: Download Rust doc artifacts
