@@ -1,13 +1,12 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
-    str::FromStr,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, NetIdentifier, Role, TeamId},
+    client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
@@ -230,10 +229,13 @@ impl DeviceCtx {
 
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {
-            Client::builder()
-                .daemon_uds_path(&uds_path)
-                .aqc_server_addr(&addr_any)
-                .connect()
+            let mut builder = Client::builder();
+            builder = builder.daemon_uds_path(&uds_path);
+            #[cfg(feature = "aqc")]
+            {
+                builder = builder.aqc_server_addr(&addr_any);
+            }
+            builder.connect()
         })
         .retry(ExponentialBuilder::default())
         .await
@@ -253,12 +255,6 @@ impl DeviceCtx {
 
     pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
-    }
-
-    #[allow(unused, reason = "module compiled for each test file")]
-    pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier::from_str(self.client.aqc().server_addr().to_string().as_str())
-            .expect("expected net identifier")
     }
 
     fn get_shm_path(path: String) -> String {

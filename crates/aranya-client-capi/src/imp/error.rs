@@ -6,6 +6,7 @@ use aranya_capi_core::{
 };
 #[cfg(feature = "afc")]
 use aranya_client::afc;
+#[cfg(feature = "aqc")]
 use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
@@ -21,6 +22,9 @@ pub enum Error {
     /// An invalid argument was provided.
     #[error(transparent)]
     InvalidArg(#[from] InvalidArg<'static>),
+
+    #[error("component is not enabled")]
+    NotEnabled,
 
     #[error("buffer too small")]
     BufferTooSmall,
@@ -54,6 +58,7 @@ pub enum Error {
     Other(#[from] anyhow::Error),
 }
 
+#[cfg(feature = "aqc")]
 impl From<AqcError> for Error {
     fn from(value: AqcError) -> Self {
         Self::Client(aranya_client::Error::Aqc(value))
@@ -67,6 +72,7 @@ impl From<afc::Error> for Error {
     }
 }
 
+#[cfg(feature = "aqc")]
 impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
@@ -77,6 +83,7 @@ impl From<TryReceiveError<AqcError>> for Error {
     }
 }
 
+#[cfg(feature = "aqc")]
 impl From<TryReceiveError<aranya_client::Error>> for Error {
     fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
         match value {

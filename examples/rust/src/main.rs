@@ -7,13 +7,14 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::afc::{Channel as AfcChannel, Channels as AfcChannels};
 use aranya_client::{
-    client::{DeviceId, KeyBundle, ChanOp, NetIdentifier, Role},
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+    afc::{Channel as AfcChannel, Channels as AfcChannels},
+    aqc::AqcPeerChannel,
+    client::{ChanOp, Client, DeviceId, KeyBundle, NetIdentifier, Role},
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
+    SyncPeerConfig,
 };
-use aranya_daemon_api::{text};
+use aranya_daemon_api::text;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -140,7 +141,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_server_addr = client.aqc().server_addr();
+        let aqc_server_addr = client.aqc().context("AQC is enabled")?.server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -419,6 +420,7 @@ async fn main() -> Result<()> {
             let chan = membera
                 .client
                 .aqc()
+                .context("AQC is enabled")?
                 .create_bidi_channel(team_id, memberb.aqc_net_id(), label3)
                 .await?;
             Ok(chan)
@@ -426,7 +428,13 @@ async fn main() -> Result<()> {
         async {
             // memberb receives a bidirectional channel.
             info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(chan) = memberb.client.aqc().receive_channel().await? else {
+            let AqcPeerChannel::Bidi(chan) = memberb
+                .client
+                .aqc()
+                .context("AQC is enabled")?
+                .receive_channel()
+                .await?
+            else {
                 bail!("expected a bidirectional channel");
             };
             Ok(chan)
@@ -460,6 +468,7 @@ async fn main() -> Result<()> {
     membera
         .client
         .aqc()
+        .context("AQC is enabled")?
         .delete_bidi_channel(&mut created_aqc_chan)
         .await?;
 
@@ -489,7 +498,6 @@ async fn main() -> Result<()> {
     info!(?afc_msg, "membera sealing data for memberb");
     let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     send.seal(&mut ciphertext, &afc_msg)
-        .await
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
 
@@ -503,7 +511,6 @@ async fn main() -> Result<()> {
     };
     info!("memberb opening data from membera");
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .expect("expected to open afc data");
     info!(?plaintext, "memberb opened data from membera");
     assert_eq!(afc_msg, plaintext);

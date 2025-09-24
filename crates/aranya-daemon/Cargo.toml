@@ -14,13 +14,18 @@ workspace = true
 
 
 [features]
-# TODO: don't enable preview features or afc in daemon by default.
-# Enabled them because unit tests in aranya-client aren't passing without this.
-default = ["afc", "preview"]
+default = []
+
 # Preview features
 preview = ["aranya-daemon-api/preview"]
 # Aranya Fast Channels
 afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
+
+# Experimental features
+experimental = ["aranya-daemon-api/experimental"]
+# Aranya QUIC channels
+aqc = ["aranya-daemon-api/aqc"]
+
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
@@ -70,12 +75,14 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+
 [dev-dependencies]
 divan = { workspace = true }
 pretty_assertions = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
+
 
 [build-dependencies]
 aranya-policy-ifgen-build = { workspace = true }
@@ -86,9 +93,11 @@ name = "aranya-daemon"
 path = "src/main.rs"
 test = false
 
+
 [[bench]]
 name = "metrics"
 harness = false
 
+
 [package.metadata.cargo-all-features]
-always_include_features = ["preview"]
+always_include_features = ["experimental", "preview"]

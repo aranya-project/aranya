@@ -7,6 +7,7 @@ pub mod error;
 
 #[cfg(feature = "afc")]
 pub use afc::*;
+#[cfg(feature = "aqc")]
 pub use aqc::*;
 pub use client::*;
 pub use config::*;

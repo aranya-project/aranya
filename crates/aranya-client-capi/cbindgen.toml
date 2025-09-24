@@ -26,6 +26,10 @@ no_includes = true
 cpp_compat = true
 after_includes = """
 
+#if defined(ENABLE_AQC) && !defined(ENABLE_ARANYA_EXPERIMENTAL)
+    #error "AQC is currently experimental. Set 'ENABLE_ARANYA_EXPERIMENTAL' to opt into experimental APIs."
+#endif
+
 #ifndef __has_attribute
     #define __has_attribute(x) 0
 #endif /* __has_attribute */
@@ -96,10 +100,12 @@ usize_is_size_t = true
 style = "both"
 
 [defines]
+
 "target_os = macos" = "__APPLE__"
 "target_os = linux" = "__linux__"
 "target_os = vxworks" = "__VXWORKS__"
 "target_arch = x86_64" = "__x86_64__"
+"feature = aqc" = "ENABLE_AQC"
 "feature = afc" = "ENABLE_AFC"
 
 [export]
@@ -129,7 +135,7 @@ clean = true
 
 [parse.expand]
 default_features = false
-features = ["afc", "preview"]
+features = ["afc", "preview", "aqc", "experimental"]
 crates = ["aranya-client-capi"]
 
 [ptr]

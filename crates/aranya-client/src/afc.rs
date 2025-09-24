@@ -1,6 +1,9 @@
 //! AFC support.
 use core::fmt;
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::Context;
 use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DaemonApiClient, CS};
@@ -11,7 +14,6 @@ use aranya_fast_channels::{
 };
 use serde::{Deserialize, Serialize};
 use tarpc::context;
-use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
@@ -46,14 +48,27 @@ impl CtrlMsg {
     }
 }
 
-/// AFC error.
-#[derive(Debug)]
-pub struct AfcError(
+/// AFC seal error.
+#[derive(Debug, thiserror::Error)]
+pub struct AfcSealError(
     #[allow(dead_code, reason = "Don't expose internal error type in public API")]
     aranya_fast_channels::Error,
 );
 
-impl fmt::Display for AfcError {
+impl fmt::Display for AfcSealError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+/// AFC open error.
+#[derive(Debug, thiserror::Error)]
+pub struct AfcOpenError(
+    #[allow(dead_code, reason = "Don't expose internal error type in public API")]
+    aranya_fast_channels::Error,
+);
+
+impl fmt::Display for AfcOpenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         std::fmt::Display::fmt(&self.0, f)
     }
@@ -65,11 +80,11 @@ impl fmt::Display for AfcError {
 pub enum Error {
     /// Unable to seal datagram.
     #[error("unable to seal datagram")]
-    Seal(AfcError),
+    Seal(#[from] AfcSealError),
 
     /// Unable to open datagram.
     #[error("unable to open datagram")]
-    Open(AfcError),
+    Open(#[from] AfcOpenError),
 
     /// Unable to connect to channel keys IPC.
     #[error("unable to connect to channel keys IPC")]
@@ -143,7 +158,12 @@ impl Channels {
     ) -> Result<(BidiChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_bidi_channel(context::current(), team_id._id, peer_id._id, label_id._id)
+            .create_afc_bidi_channel(
+                context::current(),
+                team_id.__id,
+                peer_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -179,7 +199,12 @@ impl Channels {
     ) -> Result<(SendChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_uni_send_channel(context::current(), team_id._id, peer_id._id, label_id._id)
+            .create_afc_uni_send_channel(
+                context::current(),
+                team_id.__id,
+                peer_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -215,7 +240,12 @@ impl Channels {
     ) -> Result<(ReceiveChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_uni_recv_channel(context::current(), team_id._id, peer_id._id, label_id._id)
+            .create_afc_uni_recv_channel(
+                context::current(),
+                team_id.__id,
+                peer_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -242,7 +272,7 @@ impl Channels {
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<Channel> {
         let (label_id, channel_id, op) = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id._id, ctrl.0)
+            .receive_afc_ctrl(context::current(), team_id.__id, ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -251,19 +281,19 @@ impl Channels {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: LabelId { _id: label_id },
+                label_id: LabelId { __id: label_id },
             })),
             ChanOp::SendOnly => Ok(Channel::Send(SendChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: LabelId { _id: label_id },
+                label_id: LabelId { __id: label_id },
             })),
             ChanOp::SendRecv => Ok(Channel::Bidi(BidiChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: LabelId { _id: label_id },
+                label_id: LabelId { __id: label_id },
             })),
         }
     }
@@ -293,14 +323,18 @@ impl BidiChannel {
     /// long.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .seal(self.channel_id, dst, plaintext)
-            .map_err(AfcError)
+            .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())
     }
@@ -316,17 +350,21 @@ impl BidiChannel {
     /// sequence number associated with the ciphertext.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .open(self.channel_id, dst, ciphertext)
-            .map_err(AfcError)
+            .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
+        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
         Ok(Seq(seq))
     }
 
@@ -365,14 +403,18 @@ impl SendChannel {
     /// long.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .seal(self.channel_id, dst, plaintext)
-            .map_err(AfcError)
+            .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())
     }
@@ -416,17 +458,21 @@ impl ReceiveChannel {
     /// sequence number associated with the ciphertext.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .open(self.channel_id, dst, ciphertext)
-            .map_err(AfcError)
+            .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
+        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
         Ok(Seq(seq))
     }
 
@@ -447,8 +493,7 @@ pub(crate) struct ChannelKeys(AfcClient<ReadState<CS>>);
 impl ChannelKeys {
     /// Open shared-memory client to daemon's channel key list.
     pub fn new(afc_shm_info: &AfcShmInfo) -> Result<Self, Error> {
-        // TODO: issue#496
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
+        // TODO(#496): fix shm issue on some environments
         debug!(
             "setting up afc shm read side: {:?}",
             afc_shm_info.path.clone()
@@ -459,10 +504,7 @@ impl ChannelKeys {
             Mode::ReadWrite,
             afc_shm_info.max_chans,
         )
-        .context(format!(
-            "unable to open `ReadState`: {:?}",
-            afc_shm_info.path
-        ))
+        .with_context(|| format!("unable to open `ReadState`: {:?}", afc_shm_info.path))
         .map_err(Error::AfcIpc)?;
 
         Ok(Self(AfcClient::new(read)))

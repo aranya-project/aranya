@@ -8,11 +8,13 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[features]
-default = []
 
 [lints]
 workspace = true
+
+
+[features]
+default = []
 
 
 [dependencies]
@@ -32,6 +34,7 @@ tokio = { workspace = true, features = [
 ] }
 tokio-util = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
+
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["time"] }
