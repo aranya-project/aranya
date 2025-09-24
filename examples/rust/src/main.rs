@@ -1,19 +1,20 @@
 use std::{
-    str::FromStr,
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    str::FromStr,
     time::Duration,
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::afc::{Channel as AfcChannel, Channels as AfcChannels};
 use aranya_client::{
-    client::{DeviceId, KeyBundle, ChanOp, NetIdentifier, Role},
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+    afc::{Channel as AfcChannel, Channels as AfcChannels},
+    aqc::AqcPeerChannel,
+    client::{ChanOp, Client, DeviceId, KeyBundle, NetIdentifier, Role},
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
+    SyncPeerConfig,
 };
-use aranya_daemon_api::{text};
+use aranya_daemon_api::text;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
