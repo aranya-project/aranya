@@ -471,6 +471,8 @@ pub struct NetIdentifier(*const c_char);
 #[cfg(feature = "aqc")]
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
+        use aranya_daemon_api::Text;
+
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?))
