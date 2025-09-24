@@ -10,9 +10,10 @@ use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::{ident, Text, Value};
+#[cfg(any(feature = "afc", feature = "aqc"))]
+use aranya_runtime::Session;
 use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
-    VmPolicy,
+    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Sink, StorageProvider, VmPolicy,
 };
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
