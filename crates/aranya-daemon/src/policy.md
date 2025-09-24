@@ -4,7 +4,7 @@ policy-version: 2
 
 # Overview
 
-This Aranya's default policy. It provides the rules that underly
+This Aranya's default policy. It provides the rules that underlie
 Aranya's core functionality. TODO: expand
 
 As a reminder, Aranya policy files use the [literate
@@ -618,7 +618,7 @@ function derive_role_id(evp struct Envelope) id {
 }
 ```
 
-Each role is managed one or more roles, called the _managing
+Each role is managed by one or more roles, called the _managing
 roles_. For more information, see [Role
 Management][role-management].
 
@@ -988,7 +988,7 @@ function device_owns_role(device_id id, target_role_id id) bool {
     // At this point we believe the following to be true:
     //
     // - `device_role_id` refers to a role that exists
-    // - `device_role_id` refers to the role revoked to
+    // - `device_role_id` refers to the role assigned to
     //   `device_id`
     //
     // We do NOT know whether `device_id` refers to a device
@@ -1155,7 +1155,7 @@ The owning roles for a role are allowed to delegate the following
 permissions to other roles, including to themselves:
 
 - `CanAssignRole(role_id)`: grants devices the ability to assign
-  the role *any* device, except themselves.
+  the role to *any* device, except themselves.
 - `CanRevokeRole(role_id)`: grants devices the ability to
   revoke the role from *any* device.
 - `CanChangeRolePerms(role_id)`: grants devices the ability
@@ -1222,7 +1222,7 @@ fact CanRevokeRole[target_role_id id, managing_role_id id]=>{}
 // # Errors
 //
 // This function raises a check error if the device has not been
-// revoked a role.
+// assigned a role.
 //
 // # Caveats
 //
@@ -1267,7 +1267,7 @@ fact CanChangeRolePerms[target_role_id id, managing_role_id id]=>{}
 // # Errors
 //
 // This function raises a check error if the device has not been
-// revoked a role.
+// assigned a role.
 //
 // # Caveats
 //
@@ -3413,7 +3413,7 @@ fact LabelAssignedToRole[label_id id, role_id id]=>{op enum ChanOp}
 
 // Grants the role permission to use the label.
 //
-// - It is an error if the author does not permission to assign
+// - It is an error if the author does not have permission to assign
 //   this label.
 // - It is an error if `role_id` refers to the author's current
 //   role.

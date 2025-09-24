@@ -1028,7 +1028,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// @param team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn setup_default_riles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
 
     // First get the owner role ID by looking at existing roles
