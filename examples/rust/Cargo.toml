@@ -8,13 +8,6 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
 rust-version = "1.85"
 
-[features]
-default = ["afc", "preview"]
-# Preview features
-preview = ["afc"]
-# Aranya Fast Channels
-afc = []
-
 [profile.dev]
 opt-level = 1
 
