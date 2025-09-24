@@ -223,6 +223,7 @@ dependencies = [
  "aranya-crypto",
  "aranya-daemon",
  "aranya-daemon-api",
+ "aranya-fast-channels",
  "aranya-internal-s2n-quic",
  "aranya-util",
  "backon",
