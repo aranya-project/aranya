@@ -27,8 +27,7 @@ use tracing::{debug, error, info, instrument};
 #[cfg(feature = "afc")]
 use {
     crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
-    std::sync::Arc,
-    tokio::sync::Mutex,
+    std::sync::{Arc, Mutex},
 };
 
 #[cfg(feature = "aqc")]

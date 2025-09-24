@@ -128,13 +128,11 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
     let afc_msg = "afc msg".as_bytes();
     let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")?;
 
     assert_eq!(afc_msg, plaintext);
@@ -202,13 +200,11 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
     let afc_msg = "afc msg".as_bytes();
     let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")?;
     assert_eq!(afc_msg, plaintext);
 
@@ -218,11 +214,9 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     // Try open/seal after delete.
     chan.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")
         .expect_err("expected seal to fail");
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")
         .expect_err("expected open to fail");
 
@@ -316,14 +310,12 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     let mut ciphertext1 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan1
         .seal(&mut ciphertext1, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext1 = vec![0u8; ciphertext1.len() - Channels::OVERHEAD];
     recv1
         .open(&mut plaintext1, &ciphertext1)
-        .await
         .context("unable to open afc message")?;
 
     assert_eq!(afc_msg, plaintext1);
@@ -333,14 +325,12 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     let mut ciphertext2 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan2
         .seal(&mut ciphertext2, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext2 = vec![0u8; ciphertext2.len() - Channels::OVERHEAD];
     recv2
         .open(&mut plaintext2, &ciphertext2)
-        .await
         .context("unable to open afc message")?;
 
     assert_eq!(afc_msg, plaintext2);
@@ -355,23 +345,19 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     // Try open/seal after delete.
     chan1
         .seal(&mut ciphertext1, afc_msg)
-        .await
         .context("unable to seal afc message")
         .expect_err("expected seal to fail");
     recv1
         .open(&mut plaintext1, &ciphertext1)
-        .await
         .context("unable to open afc message")
         .expect_err("expected open to fail");
 
     chan2
         .seal(&mut ciphertext2, afc_msg)
-        .await
         .context("unable to seal afc message")
         .expect_err("expected seal to fail");
     recv2
         .open(&mut plaintext2, &ciphertext2)
-        .await
         .context("unable to open afc message")
         .expect_err("expected open to fail");
 
@@ -497,13 +483,11 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     let afc_msg = "afc msg".as_bytes();
     let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")?;
 
     assert_eq!(afc_msg, plaintext);
@@ -571,13 +555,11 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
     let afc_msg = "afc msg".as_bytes();
     let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     send.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")?;
 
     assert_eq!(afc_msg, plaintext);
@@ -645,13 +627,11 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     let afc_msg = "afc msg".as_bytes();
     let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")?;
 
     // Delete channel.
@@ -660,11 +640,9 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     // Try open/seal after delete.
     chan.seal(&mut ciphertext, afc_msg)
-        .await
         .context("unable to seal afc message")
         .expect_err("expected seal to fail");
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .context("unable to open afc message")
         .expect_err("expected open to fail");
 
@@ -758,14 +736,12 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let mut ciphertext1 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan1
         .seal(&mut ciphertext1, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext1 = vec![0u8; ciphertext1.len() - Channels::OVERHEAD];
     recv1
         .open(&mut plaintext1, &ciphertext1)
-        .await
         .context("unable to open afc message")?;
     assert_eq!(afc_msg, plaintext1);
 
@@ -773,14 +749,12 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let mut ciphertext2 = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
     chan2
         .seal(&mut ciphertext2, afc_msg)
-        .await
         .context("unable to seal afc message")?;
 
     // Open data.
     let mut plaintext2 = vec![0u8; ciphertext2.len() - Channels::OVERHEAD];
     recv2
         .open(&mut plaintext2, &ciphertext2)
-        .await
         .context("unable to open afc message")?;
     assert_eq!(afc_msg, plaintext2);
 
@@ -794,23 +768,19 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     // Try open/seal after delete.
     chan1
         .seal(&mut ciphertext1, afc_msg)
-        .await
         .context("unable to seal afc message")
         .expect_err("expected seal to fail");
     recv1
         .open(&mut plaintext1, &ciphertext1)
-        .await
         .context("unable to open afc message")
         .expect_err("expected open to fail");
 
     chan2
         .seal(&mut ciphertext2, afc_msg)
-        .await
         .context("unable to seal afc message")
         .expect_err("expected seal to fail");
     recv2
         .open(&mut plaintext2, &ciphertext2)
-        .await
         .context("unable to open afc message")
         .expect_err("expected open to fail");
 

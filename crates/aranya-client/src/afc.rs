@@ -1,6 +1,9 @@
 //! AFC support.
 use core::fmt;
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::Context;
 use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DaemonApiClient, CS};
@@ -11,7 +14,6 @@ use aranya_fast_channels::{
 };
 use serde::{Deserialize, Serialize};
 use tarpc::context;
-use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
@@ -321,11 +323,15 @@ impl BidiChannel {
     /// long.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .seal(self.channel_id, dst, plaintext)
             .map_err(AfcSealError)
@@ -344,12 +350,16 @@ impl BidiChannel {
     /// sequence number associated with the ciphertext.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .open(self.channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
@@ -393,11 +403,15 @@ impl SendChannel {
     /// long.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .seal(self.channel_id, dst, plaintext)
             .map_err(AfcSealError)
@@ -444,12 +458,16 @@ impl ReceiveChannel {
     /// sequence number associated with the ciphertext.
     ///
     /// Note: it is an error to invoke this method after the channel has been deleted.
-    pub async fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
         debug!(?self.channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
-            .await
+            .expect("poisoned")
             .0
             .open(self.channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
