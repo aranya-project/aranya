@@ -35,17 +35,17 @@ category = "build"
 description = "Build Code with default features"
 dependencies = ["build"]
 
-[tasks.build-preview]
-category = "build"
-description = "Build Code with preview features"
-command = "cargo"
-args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental,aqc", "${@}"]
-
 [tasks.build-experimental]
 category = "build"
 description = "Build Code with experimental features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=experimental,aqc", "${@}"]
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental,aqc", "${@}"]
+
+[tasks.build-preview]
+category = "build"
+description = "Build Code with preview features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc", "${@}"]
 
 [tasks.tgz-daemon]
 category = "build"
@@ -103,22 +103,20 @@ category = "build"
 description = "Build C API shared library with default features"
 dependencies = ["build-capi-lib"]
 
-[tasks.build-capi-lib-preview]
+[tasks.build-capi-lib-experimental]
 category = "build"
-description = "Build C API shared library with preview features"
+description = "Build C API shared library with experimental features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
 dependencies = ["install-nightly"]
 
-[tasks.build-capi-lib-experimental]
-
-
+[tasks.build-capi-lib-preview]
 category = "build"
-description = "Build C API shared library with experimental features"
+description = "Build C API shared library with preview features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release", "--features=experimental,aqc"]
+args = ["build", "--release", "--features=preview,afc"]
 dependencies = ["install-nightly"]
 [tasks.tgz-capi]
 category = "build"
