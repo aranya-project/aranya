@@ -2,7 +2,6 @@
 
 use std::net::SocketAddr;
 
-use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
@@ -10,6 +9,7 @@ use super::{
     net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcReceiveChannel, AqcSendChannel,
 };
 use crate::{
+    client::{LabelId, NetIdentifier, TeamId},
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -62,22 +62,29 @@ impl<'a> AqcChannels<'a> {
         let (aqc_ctrl, psks) = self
             .client
             .daemon
-            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_bidi_channel(
+                context::current(),
+                team_id.__id,
+                peer.0.clone(),
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
             .ok_or_else(no_addr)?;
 
-        self.aqc.send_ctrl(peer_addr, aqc_ctrl, team_id).await?;
+        self.aqc
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.__id)
+            .await?;
         let channel = self
             .aqc
-            .create_bidi_channel(peer_addr, label_id, psks)
+            .create_bidi_channel(peer_addr, label_id.__id, psks)
             .await?;
         Ok(channel)
     }
@@ -102,23 +109,30 @@ impl<'a> AqcChannels<'a> {
         let (aqc_ctrl, psks) = self
             .client
             .daemon
-            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_uni_channel(
+                context::current(),
+                team_id.__id,
+                peer.0.clone(),
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
             .ok_or_else(no_addr)?;
 
-        self.aqc.send_ctrl(peer_addr, aqc_ctrl, team_id).await?;
+        self.aqc
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.__id)
+            .await?;
 
         let channel = self
             .aqc
-            .create_uni_channel(peer_addr, label_id, psks)
+            .create_uni_channel(peer_addr, label_id.__id, psks)
             .await?;
         Ok(channel)
     }

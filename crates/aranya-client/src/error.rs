@@ -5,6 +5,9 @@ use std::io;
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
+#[cfg(feature = "afc")]
+use crate::afc::Error as AfcError;
+
 /// The type returned by fallible Aranya operations.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
@@ -29,6 +32,11 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[error("AQC error")]
     Aqc(#[from] AqcError),
+
+    /// An Aranya Fast Channel error happened.
+    #[cfg(feature = "afc")]
+    #[error("AFC error")]
+    Afc(#[from] AfcError),
 
     /// An unexpected internal error happened.
     #[error(transparent)]
