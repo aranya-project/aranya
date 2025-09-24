@@ -156,7 +156,12 @@ impl Channels {
     ) -> Result<(BidiChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_bidi_channel(context::current(), team_id._id, peer_id._id, label_id._id)
+            .create_afc_bidi_channel(
+                context::current(),
+                team_id.__id,
+                peer_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -192,7 +197,12 @@ impl Channels {
     ) -> Result<(SendChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_uni_send_channel(context::current(), team_id._id, peer_id._id, label_id._id)
+            .create_afc_uni_send_channel(
+                context::current(),
+                team_id.__id,
+                peer_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -228,7 +238,12 @@ impl Channels {
     ) -> Result<(ReceiveChannel, CtrlMsg)> {
         let (ctrl, channel_id) = self
             .daemon
-            .create_afc_uni_recv_channel(context::current(), team_id._id, peer_id._id, label_id._id)
+            .create_afc_uni_recv_channel(
+                context::current(),
+                team_id.__id,
+                peer_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -255,7 +270,7 @@ impl Channels {
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<Channel> {
         let (label_id, channel_id, op) = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id._id, ctrl.0)
+            .receive_afc_ctrl(context::current(), team_id.__id, ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -264,19 +279,19 @@ impl Channels {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: LabelId { _id: label_id },
+                label_id: LabelId { __id: label_id },
             })),
             ChanOp::SendOnly => Ok(Channel::Send(SendChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: LabelId { _id: label_id },
+                label_id: LabelId { __id: label_id },
             })),
             ChanOp::SendRecv => Ok(Channel::Bidi(BidiChannel {
                 daemon: self.daemon.clone(),
                 keys: self.keys.clone(),
                 channel_id,
-                label_id: LabelId { _id: label_id },
+                label_id: LabelId { __id: label_id },
             })),
         }
     }
@@ -339,7 +354,7 @@ impl BidiChannel {
             .open(self.channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
+        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
         Ok(Seq(seq))
     }
 
@@ -439,7 +454,7 @@ impl ReceiveChannel {
             .open(self.channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__into_id());
+        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
         Ok(Seq(seq))
     }
 

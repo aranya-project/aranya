@@ -1,7 +1,12 @@
 //! Client-daemon connection.
 
-use core::fmt;
-use std::{fmt::Debug, io, net::SocketAddr, path::Path, str::FromStr};
+use std::{
+    fmt::{self, Debug, Display},
+    io,
+    net::SocketAddr,
+    path::Path,
+    str::FromStr,
+};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -37,24 +42,12 @@ use crate::{
 #[derive(Copy, Clone, Debug)]
 pub struct DeviceId {
     #[doc(hidden)]
-    pub(crate) _id: aranya_daemon_api::DeviceId,
+    pub __id: aranya_daemon_api::DeviceId,
 }
 
-impl DeviceId {
-    #[doc(hidden)]
-    pub fn __into_id(&self) -> aranya_crypto::Id {
-        self._id.into_id()
-    }
-
-    #[doc(hidden)]
-    pub fn __from_array(value: [u8; 32]) -> Self {
-        Self { _id: value.into() }
-    }
-}
-
-impl fmt::Display for DeviceId {
+impl Display for DeviceId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self._id, f)
+        Display::fmt(&self.__id, f)
     }
 }
 
@@ -62,24 +55,12 @@ impl fmt::Display for DeviceId {
 #[derive(Copy, Clone, Debug)]
 pub struct TeamId {
     #[doc(hidden)]
-    pub(crate) _id: aranya_daemon_api::TeamId,
+    pub __id: aranya_daemon_api::TeamId,
 }
 
-impl TeamId {
-    #[doc(hidden)]
-    pub fn __into_id(&self) -> aranya_crypto::Id {
-        self._id.into_id()
-    }
-
-    #[doc(hidden)]
-    pub fn __from_array(value: [u8; 32]) -> Self {
-        Self { _id: value.into() }
-    }
-}
-
-impl fmt::Display for TeamId {
+impl Display for TeamId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self._id, f)
+        Display::fmt(&self.__id, f)
     }
 }
 
@@ -89,24 +70,12 @@ impl fmt::Display for TeamId {
 #[derive(Copy, Clone, Debug)]
 pub struct LabelId {
     #[doc(hidden)]
-    pub(crate) _id: aranya_daemon_api::LabelId,
+    pub __id: aranya_daemon_api::LabelId,
 }
 
-impl LabelId {
-    #[doc(hidden)]
-    pub fn __into_id(&self) -> aranya_crypto::Id {
-        self._id.into_id()
-    }
-
-    #[doc(hidden)]
-    pub fn __from_array(value: [u8; 32]) -> Self {
-        Self { _id: value.into() }
-    }
-}
-
-impl fmt::Display for LabelId {
+impl Display for LabelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self._id, f)
+        Display::fmt(&self.__id, f)
     }
 }
 
@@ -124,19 +93,9 @@ pub enum ChanOp {
     SendRecv,
 }
 
-impl From<api::ChanOp> for ChanOp {
-    fn from(value: api::ChanOp) -> Self {
-        match value {
-            api::ChanOp::SendRecv => ChanOp::SendRecv,
-            api::ChanOp::RecvOnly => ChanOp::RecvOnly,
-            api::ChanOp::SendOnly => ChanOp::SendOnly,
-        }
-    }
-}
-
-impl From<ChanOp> for api::ChanOp {
-    fn from(value: ChanOp) -> Self {
-        match value {
+impl ChanOp {
+    fn to_api(self) -> api::ChanOp {
+        match self {
             ChanOp::SendRecv => api::ChanOp::SendRecv,
             ChanOp::RecvOnly => api::ChanOp::RecvOnly,
             ChanOp::SendOnly => api::ChanOp::SendOnly,
@@ -157,20 +116,18 @@ pub enum Role {
     Member,
 }
 
-impl From<api::Role> for Role {
-    fn from(value: api::Role) -> Self {
-        match value {
+impl Role {
+    fn from_api(role: api::Role) -> Self {
+        match role {
             api::Role::Owner => Role::Owner,
             api::Role::Admin => Role::Admin,
             api::Role::Operator => Role::Operator,
             api::Role::Member => Role::Member,
         }
     }
-}
 
-impl From<Role> for api::Role {
-    fn from(value: Role) -> Self {
-        match value {
+    fn to_api(self) -> api::Role {
+        match self {
             Role::Owner => api::Role::Owner,
             Role::Admin => api::Role::Admin,
             Role::Operator => api::Role::Operator,
@@ -202,9 +159,9 @@ impl FromStr for NetIdentifier {
     type Err = anyhow::Error;
 }
 
-impl fmt::Display for NetIdentifier {
+impl Display for NetIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -442,7 +399,7 @@ impl Client {
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&self) -> Result<DeviceId> {
         Ok(DeviceId {
-            _id: self
+            __id: self
                 .daemon
                 .get_device_id(context::current())
                 .await
@@ -454,7 +411,7 @@ impl Client {
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = TeamId {
-            _id: self
+            __id: self
                 .daemon
                 .create_team(context::current(), cfg.into())
                 .await
@@ -484,7 +441,7 @@ impl Client {
     /// Add a team to local device storage.
     pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
         let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
-        let team_id = TeamId { _id: cfg.team_id };
+        let team_id = TeamId { __id: cfg.team_id };
 
         self.daemon
             .add_team(context::current(), cfg)
@@ -500,7 +457,7 @@ impl Client {
     /// Remove a team from local device storage.
     pub async fn remove_team(&self, team_id: TeamId) -> Result<()> {
         self.daemon
-            .remove_team(context::current(), team_id._id)
+            .remove_team(context::current(), team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -555,7 +512,7 @@ impl Team<'_> {
         let wrapped = self
             .client
             .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.team_id._id, peer_enc_pk)
+            .encrypt_psk_seed_for_peer(context::current(), self.team_id.__id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -567,7 +524,7 @@ impl Team<'_> {
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.team_id._id, config.into())
+            .add_sync_peer(context::current(), addr, self.team_id.__id, config.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -583,7 +540,7 @@ impl Team<'_> {
             .sync_now(
                 context::current(),
                 addr,
-                self.team_id._id,
+                self.team_id.__id,
                 cfg.map(Into::into),
             )
             .await
@@ -595,7 +552,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.team_id._id)
+            .remove_sync_peer(context::current(), addr, self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -605,7 +562,7 @@ impl Team<'_> {
     pub async fn close_team(&self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.team_id._id)
+            .close_team(context::current(), self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -615,7 +572,7 @@ impl Team<'_> {
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.team_id._id, keys.0)
+            .add_device_to_team(context::current(), self.team_id.__id, keys.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -625,7 +582,7 @@ impl Team<'_> {
     pub async fn remove_device_from_team(&self, device_id: DeviceId) -> Result<()> {
         self.client
             .daemon
-            .remove_device_from_team(context::current(), self.team_id._id, device_id._id)
+            .remove_device_from_team(context::current(), self.team_id.__id, device_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -637,9 +594,9 @@ impl Team<'_> {
             .daemon
             .assign_role(
                 context::current(),
-                self.team_id._id,
-                device_id._id,
-                role.into(),
+                self.team_id.__id,
+                device_id.__id,
+                role.to_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -652,9 +609,9 @@ impl Team<'_> {
             .daemon
             .revoke_role(
                 context::current(),
-                self.team_id._id,
-                device_id._id,
-                role.into(),
+                self.team_id.__id,
+                device_id.__id,
+                role.to_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -677,8 +634,8 @@ impl Team<'_> {
             .daemon
             .assign_aqc_net_identifier(
                 context::current(),
-                self.team_id._id,
-                device_id._id,
+                self.team_id.__id,
+                device_id.__id,
                 net_identifier.0,
             )
             .await
@@ -698,8 +655,8 @@ impl Team<'_> {
             .daemon
             .remove_aqc_net_identifier(
                 context::current(),
-                self.team_id._id,
-                device_id._id,
+                self.team_id.__id,
+                device_id.__id,
                 net_identifier.0,
             )
             .await
@@ -710,10 +667,10 @@ impl Team<'_> {
     /// Create a label.
     pub async fn create_label(&self, label_name: Text) -> Result<LabelId> {
         Ok(LabelId {
-            _id: self
+            __id: self
                 .client
                 .daemon
-                .create_label(context::current(), self.team_id._id, label_name)
+                .create_label(context::current(), self.team_id.__id, label_name)
                 .await
                 .map_err(IpcError::new)?
                 .map_err(aranya_error)?,
@@ -724,7 +681,7 @@ impl Team<'_> {
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.team_id._id, label_id._id)
+            .delete_label(context::current(), self.team_id.__id, label_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -741,10 +698,10 @@ impl Team<'_> {
             .daemon
             .assign_label(
                 context::current(),
-                self.team_id._id,
-                device_id._id,
-                label_id._id,
-                op.into(),
+                self.team_id.__id,
+                device_id.__id,
+                label_id.__id,
+                op.to_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -757,9 +714,9 @@ impl Team<'_> {
             .daemon
             .revoke_label(
                 context::current(),
-                self.team_id._id,
-                device_id._id,
-                label_id._id,
+                self.team_id.__id,
+                device_id.__id,
+                label_id.__id,
             )
             .await
             .map_err(IpcError::new)?
@@ -790,26 +747,26 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_devices_on_team(context::current(), self.team_id._id)
+            .query_devices_on_team(context::current(), self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
             .iter()
-            .map(|d| DeviceId { _id: (*d) })
+            .map(|d| DeviceId { __id: (*d) })
             .collect();
         Ok(Devices { data })
     }
 
     /// Returns the role of the current device.
     pub async fn device_role(&self, device_id: DeviceId) -> Result<Role> {
-        Ok(self
-            .client
-            .daemon
-            .query_device_role(context::current(), self.team_id._id, device_id._id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            .into())
+        Ok(Role::from_api(
+            self.client
+                .daemon
+                .query_device_role(context::current(), self.team_id.__id, device_id.__id)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Returns the keybundle of the current device.
@@ -817,7 +774,7 @@ impl Queries<'_> {
         Ok(KeyBundle(
             self.client
                 .daemon
-                .query_device_keybundle(context::current(), self.team_id._id, device_id._id)
+                .query_device_keybundle(context::current(), self.team_id.__id, device_id.__id)
                 .await
                 .map_err(IpcError::new)?
                 .map_err(aranya_error)?,
@@ -829,7 +786,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_device_label_assignments(context::current(), self.team_id._id, device_id._id)
+            .query_device_label_assignments(context::current(), self.team_id.__id, device_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -843,7 +800,7 @@ impl Queries<'_> {
         Ok(self
             .client
             .daemon
-            .query_aqc_net_identifier(context::current(), self.team_id._id, device_id._id)
+            .query_aqc_net_identifier(context::current(), self.team_id.__id, device_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -854,7 +811,7 @@ impl Queries<'_> {
     pub async fn label_exists(&self, label_id: LabelId) -> Result<bool> {
         self.client
             .daemon
-            .query_label_exists(context::current(), self.team_id._id, label_id._id)
+            .query_label_exists(context::current(), self.team_id.__id, label_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -865,7 +822,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_labels(context::current(), self.team_id._id)
+            .query_labels(context::current(), self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

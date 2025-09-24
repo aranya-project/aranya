@@ -64,9 +64,9 @@ impl<'a> AqcChannels<'a> {
             .daemon
             .create_aqc_bidi_channel(
                 context::current(),
-                team_id._id,
+                team_id.__id,
                 peer.0.clone(),
-                label_id._id,
+                label_id.__id,
             )
             .await
             .map_err(IpcError::new)?
@@ -79,10 +79,12 @@ impl<'a> AqcChannels<'a> {
             .next()
             .ok_or_else(no_addr)?;
 
-        self.aqc.send_ctrl(peer_addr, aqc_ctrl, team_id._id).await?;
+        self.aqc
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.__id)
+            .await?;
         let channel = self
             .aqc
-            .create_bidi_channel(peer_addr, label_id._id, psks)
+            .create_bidi_channel(peer_addr, label_id.__id, psks)
             .await?;
         Ok(channel)
     }
@@ -109,9 +111,9 @@ impl<'a> AqcChannels<'a> {
             .daemon
             .create_aqc_uni_channel(
                 context::current(),
-                team_id._id,
+                team_id.__id,
                 peer.0.clone(),
-                label_id._id,
+                label_id.__id,
             )
             .await
             .map_err(IpcError::new)?
@@ -124,11 +126,13 @@ impl<'a> AqcChannels<'a> {
             .next()
             .ok_or_else(no_addr)?;
 
-        self.aqc.send_ctrl(peer_addr, aqc_ctrl, team_id._id).await?;
+        self.aqc
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.__id)
+            .await?;
 
         let channel = self
             .aqc
-            .create_uni_channel(peer_addr, label_id._id, psks)
+            .create_uni_channel(peer_addr, label_id.__id, psks)
             .await?;
         Ok(channel)
     }
