@@ -498,7 +498,6 @@ async fn main() -> Result<()> {
     info!(?afc_msg, "membera sealing data for memberb");
     let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
     send.seal(&mut ciphertext, &afc_msg)
-        .await
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
 
@@ -512,7 +511,6 @@ async fn main() -> Result<()> {
     };
     info!("memberb opening data from membera");
     recv.open(&mut plaintext, &ciphertext)
-        .await
         .expect("expected to open afc data");
     info!(?plaintext, "memberb opened data from membera");
     assert_eq!(afc_msg, plaintext);
