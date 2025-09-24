@@ -425,11 +425,15 @@ pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn add_perm_to_role(&mut self, role_id: Id, perm: Text) -> Result<(), ClientError>;
+    fn add_perm_to_role(
+        &mut self,
+        role_id: Id,
+        perm_str: Text,
+    ) -> Result<(), ClientError>;
     fn remove_perm_from_role(
         &mut self,
         role_id: Id,
-        perm: Text,
+        perm_str: Text,
     ) -> Result<(), ClientError>;
     fn add_role_owner(
         &mut self,

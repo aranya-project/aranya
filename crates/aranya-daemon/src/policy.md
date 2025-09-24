@@ -774,17 +774,10 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
 // 2. fact RoleHasPerm[role_id id]=>{perm string}
 // 3. fact RoleHasPerm[role_id id]=>{perm enum SimplePerm}
 // 4. fact RoleHasPerm[role_id id, perm enum SimplePerm]
-// We cannot do (4) yet.
-fact RoleHasPerm[role_id id, perm string]=>{}
+fact RoleHasPerm[role_id id, perm enum SimplePerm]=>{}
 
-// A wrapper for `create RoleHasPerm` that converts `perm` to
-// a string.
-//
-// TODO(eric): This should be
-//    finish function assign_perm_to_role(role_id id, perm enum SimplePerm)
-// but we cannot call `simple_perm_to_str` in a finish function,
-// nor can we even use `match`.
-finish function assign_perm_to_role(role_id id, perm string) {
+// A wrapper for `create RoleHasPerm`.
+finish function assign_perm_to_role(role_id id, perm enum SimplePerm) {
     create RoleHasPerm[
         role_id: role_id,
         perm: perm,
@@ -801,7 +794,7 @@ function role_has_simple_perm(role_id id, perm enum SimplePerm) bool {
 
     return exists RoleHasPerm[
         role_id: role_id,
-        perm: simple_perm_to_str(perm),
+        perm: perm,
     ]
 }
 
@@ -816,7 +809,8 @@ function device_has_simple_perm(device_id id, perm enum SimplePerm) bool {
 }
 
 // Adds a permission to the role.
-action add_perm_to_role(role_id id, perm string) {
+action add_perm_to_role(role_id id, perm_str string) {
+    let perm = check_unwrap try_parse_simple_perm(perm_str)
     publish AddPermToRole {
         role_id: role_id,
         perm: perm,
@@ -841,7 +835,7 @@ command AddPermToRole {
         // added.
         role_id id,
         // The permission being added.
-        perm string,
+        perm enum SimplePerm,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -857,20 +851,19 @@ command AddPermToRole {
         let author = get_author(envelope)
         check can_change_role_perms(author.device_id, this.role_id)
 
-        // The permission must be valid.
-        let perm = check_unwrap try_parse_simple_perm(this.perm)
-
         // The role must not already have the permission.
         //
         // TODO(eric): Should this case be a no-op or an error?
-        check !role_has_simple_perm(this.role_id, perm)
+        check !role_has_simple_perm(this.role_id, this.perm)
+
+        let perm_str = simple_perm_to_str(this.perm)
 
         finish {
             create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
 
             emit PermAddedToRole {
                 role_id: this.role_id,
-                perm: this.perm,
+                perm: perm_str,
                 author_id: author.device_id,
             }
         }
@@ -878,7 +871,8 @@ command AddPermToRole {
 }
 
 // Removes the permission from the role.
-action remove_perm_from_role(role_id id, perm string) {
+action remove_perm_from_role(role_id id, perm_str string) {
+    let perm = check_unwrap try_parse_simple_perm(perm_str)
     publish RemovePermFromRole {
         role_id: role_id,
         perm: perm,
@@ -903,7 +897,7 @@ command RemovePermFromRole {
         // removed.
         role_id id,
         // The permission being removed.
-        perm string,
+        perm enum SimplePerm,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -919,11 +913,11 @@ command RemovePermFromRole {
         // the author is allowed to change the role's permissions.
         check can_change_role_perms(author.device_id, this.role_id)
 
-        // The permission must be valid.
-        let perm = check_unwrap try_parse_simple_perm(this.perm)
 
         // TODO(eric): Should this case be a no-op or an error?
-        check role_has_simple_perm(this.role_id, perm)
+        check role_has_simple_perm(this.role_id, this.perm)
+
+        let perm_str = simple_perm_to_str(this.perm)
 
         // At this point we believe the following to be true:
         //
@@ -938,7 +932,7 @@ command RemovePermFromRole {
 
             emit PermRemovedFromRole {
                 role_id: this.role_id,
-                perm: this.perm,
+                perm: perm_str,
                 author_id: author.device_id,
             }
         }
@@ -1776,17 +1770,8 @@ command SetupDefaultRole {
         let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope)
 
-        let assign_role_perm = simple_perm_to_str(SimplePerm::AssignRole)
-        let revoke_role_perm = simple_perm_to_str(SimplePerm::RevokeRole)
-
         match this.name {
             DefaultRoleName::Admin => {
-                let add_device_perm = simple_perm_to_str(SimplePerm::AddDevice)
-                let remove_device_perm = simple_perm_to_str(SimplePerm::RemoveDevice)
-                let create_label_perm = simple_perm_to_str(SimplePerm::CreateLabel)
-                let delete_label_perm = simple_perm_to_str(SimplePerm::DeleteLabel)
-                let change_label_managing_role_perm = simple_perm_to_str(SimplePerm::ChangeLabelManagingRole)
-
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
@@ -1795,13 +1780,13 @@ command SetupDefaultRole {
                         owning_role_id: this.owning_role_id,
                     })
 
-                    assign_perm_to_role(role_id, add_device_perm)
-                    assign_perm_to_role(role_id, remove_device_perm)
-                    assign_perm_to_role(role_id, create_label_perm)
-                    assign_perm_to_role(role_id, delete_label_perm)
-                    assign_perm_to_role(role_id, change_label_managing_role_perm)
-                    assign_perm_to_role(role_id, assign_role_perm)
-                    assign_perm_to_role(role_id, revoke_role_perm)
+                    assign_perm_to_role(role_id, SimplePerm::AddDevice)
+                    assign_perm_to_role(role_id, SimplePerm::RemoveDevice)
+                    assign_perm_to_role(role_id, SimplePerm::CreateLabel)
+                    assign_perm_to_role(role_id, SimplePerm::DeleteLabel)
+                    assign_perm_to_role(role_id, SimplePerm::ChangeLabelManagingRole)
+                    assign_perm_to_role(role_id, SimplePerm::AssignRole)
+                    assign_perm_to_role(role_id, SimplePerm::RevokeRole)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1817,11 +1802,6 @@ command SetupDefaultRole {
                 }
             }
             DefaultRoleName::Operator => {
-                let assign_label_perm = simple_perm_to_str(SimplePerm::AssignLabel)
-                let revoke_label_perm = simple_perm_to_str(SimplePerm::RevokeLabel)
-                let set_aqc_network_name_perm = simple_perm_to_str(SimplePerm::SetAqcNetworkName)
-                let unset_aqc_network_name_perm = simple_perm_to_str(SimplePerm::UnsetAqcNetworkName)
-
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
@@ -1830,12 +1810,12 @@ command SetupDefaultRole {
                         owning_role_id: this.owning_role_id,
                     })
 
-                    assign_perm_to_role(role_id, assign_label_perm)
-                    assign_perm_to_role(role_id, revoke_label_perm)
-                    assign_perm_to_role(role_id, set_aqc_network_name_perm)
-                    assign_perm_to_role(role_id, unset_aqc_network_name_perm)
-                    assign_perm_to_role(role_id, assign_role_perm)
-                    assign_perm_to_role(role_id, revoke_role_perm)
+                    assign_perm_to_role(role_id, SimplePerm::AssignLabel)
+                    assign_perm_to_role(role_id, SimplePerm::RevokeLabel)
+                    assign_perm_to_role(role_id, SimplePerm::SetAqcNetworkName)
+                    assign_perm_to_role(role_id, SimplePerm::UnsetAqcNetworkName)
+                    assign_perm_to_role(role_id, SimplePerm::AssignRole)
+                    assign_perm_to_role(role_id, SimplePerm::RevokeRole)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1851,14 +1831,6 @@ command SetupDefaultRole {
                 }
             }
             DefaultRoleName::Member => {
-                let can_use_aqc_perm = simple_perm_to_str(SimplePerm::CanUseAqc)
-                let create_aqc_uni_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcUniChannel)
-                let create_aqc_bidi_channel_perm = simple_perm_to_str(SimplePerm::CreateAqcBidiChannel)
-
-                let can_use_afc_perm = simple_perm_to_str(SimplePerm::CanUseAfc)
-                let create_afc_uni_channel_perm = simple_perm_to_str(SimplePerm::CreateAfcUniChannel)
-                let create_afc_bidi_channel_perm = simple_perm_to_str(SimplePerm::CreateAfcBidiChannel)
-
                 finish {
                     create_default_role(DefaultRole {
                         role_id: role_id,
@@ -1867,13 +1839,13 @@ command SetupDefaultRole {
                         owning_role_id: this.owning_role_id,
                     })
 
-                    assign_perm_to_role(role_id, can_use_aqc_perm)
-                    assign_perm_to_role(role_id, create_aqc_uni_channel_perm)
-                    assign_perm_to_role(role_id, create_aqc_bidi_channel_perm)
+                    assign_perm_to_role(role_id, SimplePerm::CanUseAqc)
+                    assign_perm_to_role(role_id, SimplePerm::CreateAqcUniChannel)
+                    assign_perm_to_role(role_id, SimplePerm::CreateAqcBidiChannel)
 
-                    assign_perm_to_role(role_id, can_use_afc_perm)
-                    assign_perm_to_role(role_id, create_afc_uni_channel_perm)
-                    assign_perm_to_role(role_id, create_afc_bidi_channel_perm)
+                    assign_perm_to_role(role_id, SimplePerm::CanUseAfc)
+                    assign_perm_to_role(role_id, SimplePerm::CreateAfcUniChannel)
+                    assign_perm_to_role(role_id, SimplePerm::CreateAfcBidiChannel)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -2601,25 +2573,25 @@ command CreateTeam {
 
             // Assign all of the administrative permissions to
             // the owner role.
-            create RoleHasPerm[role_id: owner_role_id, perm: "AddDevice"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "RemoveDevice"]=>{}
+            assign_perm_to_role(owner_role_id, SimplePerm::AddDevice)
+            assign_perm_to_role(owner_role_id, SimplePerm::RemoveDevice)
 
-            create RoleHasPerm[role_id: owner_role_id, perm: "CreateLabel"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "DeleteLabel"]=>{}
+            assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)
 
-            create RoleHasPerm[role_id: owner_role_id, perm: "AssignLabel"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "RevokeLabel"]=>{}
+            assign_perm_to_role(owner_role_id, SimplePerm::AssignLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
 
-            create RoleHasPerm[role_id: owner_role_id, perm: "AssignRole"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "RevokeRole"]=>{}
+            assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
 
-            create RoleHasPerm[role_id: owner_role_id, perm: "SetAqcNetworkName"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "UnsetAqcNetworkName"]=>{}
+            assign_perm_to_role(owner_role_id, SimplePerm::SetAqcNetworkName)
+            assign_perm_to_role(owner_role_id, SimplePerm::UnsetAqcNetworkName)
 
-            create RoleHasPerm[role_id: owner_role_id, perm: "SetupDefaultRole"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "ChangeRoleManagingRole"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "ChangeLabelManagingRole"]=>{}
-            create RoleHasPerm[role_id: owner_role_id, perm: "TerminateTeam"]=>{}
+            assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagingRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::ChangeLabelManagingRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
 
             // And now make sure that the owner has the owner
             // role, of course.
