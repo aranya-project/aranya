@@ -11,6 +11,8 @@ use anyhow::Context as _;
 #[cfg(feature = "aqc")]
 use aranya_capi_core::opaque::Opaque;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+#[cfg(feature = "afc")]
+use aranya_client::afc;
 #[cfg(feature = "aqc")]
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_daemon_api::Text;
@@ -68,6 +70,10 @@ pub enum Error {
     #[capi(msg = "Aranya error")]
     Aranya,
 
+    #[cfg(feature = "afc")]
+    #[capi(msg = "wrong channel type provided")]
+    WrongChannelType,
+
     /// AQC library error.
     #[cfg(feature = "aqc")]
     #[capi(msg = "AQC library error")]
@@ -118,6 +124,8 @@ impl From<&imp::Error> for Error {
                     Self::Bug
                 }
             },
+            #[cfg(feature = "afc")]
+            imp::Error::WrongChannelType => Self::WrongChannelType,
             imp::Error::WouldBlock => Self::WouldBlock,
             imp::Error::Closed => Self::Closed,
             imp::Error::Config(_) => Self::Config,
@@ -2258,4 +2266,289 @@ pub unsafe fn aqc_recv_stream_try_recv(
     }
     *buffer_len = written;
     Ok(())
+}
+
+/// An AFC Channel Object.
+///
+/// This can contain a bidirectional, receiver, or sender channel.
+///
+/// Note that only bidi and sender channels can call `aranya_afc_seal()`, and
+/// only bidi and receiver channels can call `aranya_afc_open()`.
+#[cfg(feature = "afc")]
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type AfcChannel = Safe<imp::AfcChannel>;
+
+/// An enum containing all [`AfcChannel`] variants.
+#[cfg(feature = "afc")]
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+pub enum AfcChannelType {
+    Bidirectional,
+    Sender,
+    Receiver,
+}
+
+/// An AFC Control Message, used to create the other end of a channel.
+#[cfg(feature = "afc")]
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
+
+/// An AFC Sequence Number, for reordering messages.
+#[cfg(feature = "afc")]
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type AfcSeq = Safe<imp::AfcSeq>;
+
+/// Create a bidirectional AFC channel between this device and a peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  team_id the team's identifier [`TeamId`].
+/// @param[in]  peer_id the peer's identifier [`DeviceId`].
+/// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
+/// @param[out] channel the AFC channel object [`AfcChannel`].
+/// @param[out] control the AFC control message [`AfcCtrlMsg`]
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_create_bidi_channel(
+    client: &Client,
+    team_id: &TeamId,
+    peer_id: &DeviceId,
+    label_id: &LabelId,
+    channel: &mut MaybeUninit<AfcChannel>,
+    control: &mut MaybeUninit<AfcCtrlMsg>,
+) -> Result<(), imp::Error> {
+    let (chan, ctrl) = client.rt.block_on(client.inner.afc().create_bidi_channel(
+        team_id.into(),
+        peer_id.into(),
+        label_id.into(),
+    ))?;
+
+    AfcChannel::init(channel, chan.into());
+    AfcCtrlMsg::init(control, ctrl.into());
+    Ok(())
+}
+
+/// Create a send-only AFC channel between this device and a peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  team_id the team's identifier [`TeamId`].
+/// @param[in]  peer_id the peer's identifier [`DeviceId`].
+/// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
+/// @param[out] channel the AFC channel object [`AfcChannel`].
+/// @param[out] control the AFC control message [`AfcCtrlMsg`]
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_create_uni_send_channel(
+    client: &Client,
+    team_id: &TeamId,
+    peer_id: &DeviceId,
+    label_id: &LabelId,
+    channel: &mut MaybeUninit<AfcChannel>,
+    control: &mut MaybeUninit<AfcCtrlMsg>,
+) -> Result<(), imp::Error> {
+    let (chan, ctrl) = client
+        .rt
+        .block_on(client.inner.afc().create_uni_send_channel(
+            team_id.into(),
+            peer_id.into(),
+            label_id.into(),
+        ))?;
+
+    AfcChannel::init(channel, chan.into());
+    AfcCtrlMsg::init(control, ctrl.into());
+    Ok(())
+}
+
+/// Create a receive-only AFC channel between this device and a peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  team_id the team's identifier [`TeamId`].
+/// @param[in]  peer_id the peer's identifier [`DeviceId`].
+/// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
+/// @param[out] channel the AFC channel object [`AfcChannel`].
+/// @param[out] control the AFC control message [`AfcCtrlMsg`]
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_create_uni_recv_channel(
+    client: &Client,
+    team_id: &TeamId,
+    peer_id: &DeviceId,
+    label_id: &LabelId,
+    channel: &mut MaybeUninit<AfcChannel>,
+    control: &mut MaybeUninit<AfcCtrlMsg>,
+) -> Result<(), imp::Error> {
+    let (chan, ctrl) = client
+        .rt
+        .block_on(client.inner.afc().create_uni_recv_channel(
+            team_id.into(),
+            peer_id.into(),
+            label_id.into(),
+        ))?;
+
+    AfcChannel::init(channel, chan.into());
+    AfcCtrlMsg::init(control, ctrl.into());
+    Ok(())
+}
+
+/// Use an ephemeral command to create an AFC channel between this device and a peer.
+///
+/// Note that this function takes ownership of the [`AfcCtrlMsg`] and invalidates any further use.
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  team_id the team's identifier [`TeamId`].
+/// @param[in]  control the AFC control message [`AfcCtrlMsg`].
+/// @param[out] channel the AFC channel object [`AfcChannel`].
+/// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_recv_ctrl(
+    client: &Client,
+    team_id: &TeamId,
+    control: OwnedPtr<AfcCtrlMsg>,
+    channel: &mut MaybeUninit<AfcChannel>,
+) -> Result<AfcChannelType, imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid `AfcCtrlMsg` pointer.
+    let ctrl = unsafe { Opaque::into_inner(control.read()).into_inner().0 };
+    let chan = client
+        .rt
+        .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl))?;
+
+    let channel_type = match chan {
+        afc::Channel::Bidi(_) => AfcChannelType::Bidirectional,
+        afc::Channel::Send(_) => AfcChannelType::Sender,
+        afc::Channel::Recv(_) => AfcChannelType::Receiver,
+    };
+    AfcChannel::init(channel, chan.into());
+    Ok(channel_type)
+}
+
+/// Returns the [`AfcChannelType`] for a given [`AfcChannel`] container.
+///
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
+#[cfg(feature = "afc")]
+pub fn afc_get_channel_type(channel: &AfcChannel) -> AfcChannelType {
+    match channel.deref().deref() {
+        imp::AfcChannel::Bidi(_) => AfcChannelType::Bidirectional,
+        imp::AfcChannel::Send(_) => AfcChannelType::Sender,
+        imp::AfcChannel::Receive(_) => AfcChannelType::Receiver,
+    }
+}
+
+/// Returns the [`LabelId`] for the associated [`AfcChannel`].
+///
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[out] __output the corresponding label ID [`LabelId`].
+#[cfg(feature = "afc")]
+pub fn afc_get_label_id(channel: &AfcChannel) -> LabelId {
+    match &channel.deref().deref() {
+        imp::AfcChannel::Bidi(c) => c.label_id().into(),
+        imp::AfcChannel::Send(c) => c.label_id().into(),
+        imp::AfcChannel::Receive(c) => c.label_id().into(),
+    }
+}
+
+/// Returns the raw data for a given [`AfcCtrlMsg`].
+///
+/// Note that the lifetime of the pointer is tied to the [`AfcCtrlMsg`].
+///
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[out] ptr the raw pointer of the stored buffer.
+/// @param[out] len the raw length of the stored buffer.
+#[cfg(feature = "afc")]
+pub fn afc_get_msg_data(
+    control: &AfcCtrlMsg,
+    ptr: &mut MaybeUninit<*const u8>,
+    len: &mut MaybeUninit<usize>,
+) {
+    let slice = control.0.as_bytes();
+    ptr.write(slice.as_ptr());
+    len.write(slice.len());
+}
+
+/// Returns the size of the overhead needed for a channel message.
+#[cfg(feature = "afc")]
+pub fn afc_channel_overhead() -> usize {
+    afc::Channels::OVERHEAD
+}
+
+/// Encrypts and authenticates `plaintext`, and writes it to `dst`.
+///
+/// Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+///
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  plaintext the message being encrypted.
+/// @param[out] dst the output buffer the ciphertext is written to.
+#[cfg(feature = "afc")]
+pub fn afc_channel_seal(
+    channel: &AfcChannel,
+    plaintext: &[u8],
+    dst: &mut [u8],
+) -> Result<(), imp::Error> {
+    match &channel.deref().deref() {
+        imp::AfcChannel::Bidi(c) => c.seal(dst, plaintext)?,
+        imp::AfcChannel::Send(c) => c.seal(dst, plaintext)?,
+        imp::AfcChannel::Receive(_) => return Err(imp::Error::WrongChannelType),
+    }
+
+    Ok(())
+}
+
+/// Decrypts and authenticates `ciphertext`, and writes it to `dst`.
+///
+/// Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+///
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  ciphertext the message being decrypted.
+/// @param[out] dst the output buffer the message is written to.
+/// @param[out] seq the sequence number for the opened message, for reordering.
+#[cfg(feature = "afc")]
+pub fn afc_channel_open(
+    channel: &AfcChannel,
+    ciphertext: &[u8],
+    dst: &mut [u8],
+    seq: &mut MaybeUninit<AfcSeq>,
+) -> Result<(), imp::Error> {
+    let seq_raw = match &channel.deref().deref() {
+        imp::AfcChannel::Bidi(c) => c.open(dst, ciphertext)?,
+        imp::AfcChannel::Receive(c) => c.open(dst, ciphertext)?,
+        imp::AfcChannel::Send(_) => return Err(imp::Error::WrongChannelType),
+    };
+    AfcSeq::init(seq, seq_raw.into());
+
+    Ok(())
+}
+
+/// Removes an [`AfcChannel`] from use.
+///
+/// Note that this function takes ownership of the [`AfcChannel`] and invalidates
+/// any further use (i.e. calling open/seal).
+///
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AFC channel object [`AfcChannel`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "afc")]
+pub fn afc_channel_delete(
+    client: &Client,
+    channel: OwnedPtr<AfcChannel>,
+) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid `AfcChannel` pointer.
+    match unsafe { channel.read().into_inner().into_inner() } {
+        imp::AfcChannel::Bidi(c) => Ok(client.rt.block_on(c.delete())?),
+        imp::AfcChannel::Receive(c) => Ok(client.rt.block_on(c.delete())?),
+        imp::AfcChannel::Send(c) => Ok(client.rt.block_on(c.delete())?),
+    }
 }
