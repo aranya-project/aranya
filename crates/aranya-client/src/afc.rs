@@ -493,8 +493,7 @@ pub(crate) struct ChannelKeys(AfcClient<ReadState<CS>>);
 impl ChannelKeys {
     /// Open shared-memory client to daemon's channel key list.
     pub fn new(afc_shm_info: &AfcShmInfo) -> Result<Self, Error> {
-        // TODO: issue#496
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
+        // TODO(#496): fix shm issue on some environments
         debug!(
             "setting up afc shm read side: {:?}",
             afc_shm_info.path.clone()
