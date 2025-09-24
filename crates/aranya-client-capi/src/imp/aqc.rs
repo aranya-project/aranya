@@ -1,3 +1,4 @@
+//! AQC-specific utilities for the Aranya Client C API.
 #![cfg(feature = "aqc")]
 
 use core::{
@@ -61,6 +62,8 @@ impl AqcReceiveChannel {
 ///
 /// This needs to be destructured before it can be used, since C doesn't have
 /// dataful enums.
+///
+/// TODO(nikki): refactor this to be less terrible like we did with AFC
 #[derive(Debug)]
 pub struct AqcPeerChannel {
     pub(crate) inner: aqc::AqcPeerChannel,

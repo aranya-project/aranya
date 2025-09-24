@@ -1,7 +1,10 @@
+//! AFC-specific utilities for the Aranya Client C API.
+#![cfg(feature = "afc")]
+
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::afc;
 
-/// An AFC channel.
+/// All channel variants.
 #[derive(Debug)]
 pub enum AfcChannel {
     Bidi(afc::BidiChannel),
@@ -41,7 +44,7 @@ impl From<afc::ReceiveChannel> for AfcChannel {
     }
 }
 
-/// An AFC control message, for ephemeral channels.
+/// A control message, for creating the other end of a channel.
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct AfcCtrlMsg(pub(crate) afc::CtrlMsg);
@@ -56,7 +59,7 @@ impl From<afc::CtrlMsg> for AfcCtrlMsg {
     }
 }
 
-/// An AFC sequence number, for reordering messages.
+/// A sequence number, for reordering messages.
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct AfcSeq(afc::Seq);

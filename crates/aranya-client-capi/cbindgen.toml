@@ -100,7 +100,6 @@ usize_is_size_t = true
 style = "both"
 
 [defines]
-
 "target_os = macos" = "__APPLE__"
 "target_os = linux" = "__linux__"
 "target_os = vxworks" = "__VXWORKS__"

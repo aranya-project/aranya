@@ -29,15 +29,17 @@ pub enum Error {
     #[error("buffer too small")]
     BufferTooSmall,
 
-    #[error("haven't received any data yet")]
-    WouldBlock,
-
-    #[error("connection was unexpectedly closed")]
-    Closed,
-
     #[cfg(feature = "afc")]
     #[error("wrong channel type provided")]
     WrongChannelType,
+
+    #[cfg(feature = "aqc")]
+    #[error("connection was unexpectedly closed")]
+    Closed,
+
+    #[cfg(feature = "aqc")]
+    #[error("haven't received any data yet")]
+    WouldBlock,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
@@ -58,17 +60,17 @@ pub enum Error {
     Other(#[from] anyhow::Error),
 }
 
-#[cfg(feature = "aqc")]
-impl From<AqcError> for Error {
-    fn from(value: AqcError) -> Self {
-        Self::Client(aranya_client::Error::Aqc(value))
-    }
-}
-
 #[cfg(feature = "afc")]
 impl From<afc::Error> for Error {
     fn from(value: afc::Error) -> Self {
         Self::Client(aranya_client::Error::Afc(value))
+    }
+}
+
+#[cfg(feature = "aqc")]
+impl From<AqcError> for Error {
+    fn from(value: AqcError) -> Self {
+        Self::Client(aranya_client::Error::Aqc(value))
     }
 }
 
