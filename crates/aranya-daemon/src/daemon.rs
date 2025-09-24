@@ -13,11 +13,14 @@ use aranya_crypto::{
     Engine, Rng,
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
+#[cfg(feature = "aqc")]
+use aranya_runtime::StorageProvider;
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, StorageProvider,
+    ClientState,
 };
 use aranya_util::ready;
+#[cfg(feature = "aqc")]
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
@@ -27,10 +30,10 @@ use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
+#[cfg(feature = "aqc")]
+use crate::{actions::Actions, aqc::Aqc};
 use crate::{
-    actions::Actions,
-    api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
-    aqc::Aqc,
+    api::{ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
     aranya,
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
@@ -143,13 +146,6 @@ impl Daemon {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
-            // TODO: Make aqc optional.
-            let Toggle::Enabled(_) = &cfg.aqc else {
-                anyhow::bail!(
-                    "AQC is currently required, set `aqc.enable = true` in daemon config."
-                )
-            };
-
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
@@ -193,16 +189,17 @@ impl Daemon {
             .await?;
             let local_addr = sync_server.local_addr()?;
 
-            let graph_ids = client
-                .aranya
-                .lock()
-                .await
-                .provider()
-                .list_graph_ids()?
-                .flatten()
-                .collect::<Vec<_>>();
+            #[cfg(feature = "aqc")]
+            let aqc = if let Toggle::Enabled(_) = &cfg.aqc {
+                let graph_ids = client
+                    .aranya
+                    .lock()
+                    .await
+                    .provider()
+                    .list_graph_ids()?
+                    .flatten()
+                    .collect::<Vec<_>>();
 
-            let aqc = {
                 let peers = {
                     let mut peers = BTreeMap::new();
                     for graph_id in &graph_ids {
@@ -216,14 +213,16 @@ impl Daemon {
                     }
                     peers
                 };
-                Aqc::new(
+                Some(Aqc::new(
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
                     peers,
-                )
+                ))
+            } else {
+                None
             };
 
             #[cfg(feature = "afc")]
@@ -251,22 +250,23 @@ impl Daemon {
                 aranya_store,
             };
 
-            let api = DaemonApiServer::new(
+            let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
                 local_addr,
-                cfg.uds_api_sock(),
-                api_sk,
-                pks,
+                uds_path: cfg.uds_api_sock(),
+                sk: api_sk,
+                pk: pks,
                 peers,
                 recv_effects,
-                invalid_graphs,
+                invalid: invalid_graphs,
+                #[cfg(feature = "aqc")]
                 aqc,
                 #[cfg(feature = "afc")]
                 afc,
                 crypto,
                 seed_id_dir,
-                Some(data),
-            )?;
+                quic: Some(data),
+            })?;
             Ok(Self {
                 sync_server,
                 syncer,
@@ -533,9 +533,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    #[cfg(feature = "afc")]
-    use crate::config::AfcConfig;
-    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
+    use crate::config::{QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -563,9 +561,10 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
-            aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "aqc")]
+            aqc: Toggle::Enabled(crate::config::AqcConfig {}),
             #[cfg(feature = "afc")]
-            afc: Toggle::Enabled(AfcConfig {
+            afc: Toggle::Enabled(crate::config::AfcConfig {
                 shm_path,
                 max_chans: 100,
             }),

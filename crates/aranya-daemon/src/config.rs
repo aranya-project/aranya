@@ -104,6 +104,8 @@ pub struct Config {
     pub config_dir: PathBuf,
 
     /// AQC configuration.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[serde(default)]
     pub aqc: Toggle<AqcConfig>,
 
@@ -201,6 +203,8 @@ pub struct SyncConfig {
 }
 
 /// AQC configuration.
+#[cfg(feature = "aqc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
@@ -264,6 +268,7 @@ mod tests {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                 }),
             },
+            #[cfg(feature = "aqc")]
             aqc: Toggle::Enabled(AqcConfig {}),
             #[cfg(feature = "afc")]
             afc: Toggle::Enabled(AfcConfig {
