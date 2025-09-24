@@ -81,6 +81,11 @@ impl ClientBuilder<'_> {
 
     /// Creates a client connection to the daemon.
     ///
+    /// # Panics
+    ///
+    /// Panics if DNS resolution of the AQC server address returns no addresses
+    /// (when the `aqc` feature is enabled).
+    ///
     /// # Example
     /// ```rust,no_run
     /// use std::net::Ipv4Addr;
