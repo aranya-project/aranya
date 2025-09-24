@@ -141,8 +141,8 @@ pub struct KeyBundle(api::KeyBundle);
 
 impl KeyBundle {
     /// Return public encryption key bytes.
-    pub fn encryption(&self) -> Vec<u8> {
-        self.0.encryption.clone()
+    pub fn encryption(&self) -> &[u8] {
+        &self.0.encryption
     }
 }
 
