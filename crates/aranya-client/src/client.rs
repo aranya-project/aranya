@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path, time::Duration};
+use std::{io, path::Path, time::Duration};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -227,7 +227,7 @@ impl Client {
     }
 
     /// Returns the address that the Aranya sync server is bound to.
-    pub async fn local_addr(&self) -> Result<SocketAddr> {
+    pub async fn local_addr(&self) -> Result<Addr> {
         self.daemon
             .aranya_local_addr(context::current())
             .await

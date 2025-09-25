@@ -1,8 +1,4 @@
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    path::PathBuf,
-    time::Duration,
-};
+use std::{net::Ipv4Addr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_client::{
@@ -84,7 +80,7 @@ impl DevicesCtx {
 
         // Make sure it sees the configuration change.
         admin_team
-            .sync_now(self.owner.aranya_local_addr().await?.into(), None)
+            .sync_now(self.owner.aranya_local_addr().await?, None)
             .await?;
 
         // Assign the operator its role.
@@ -94,7 +90,7 @@ impl DevicesCtx {
 
         // Make sure it sees the configuration change.
         operator_team
-            .sync_now(self.admin.aranya_local_addr().await?.into(), None)
+            .sync_now(self.admin.aranya_local_addr().await?, None)
             .await?;
 
         // Add member A as a new device.
@@ -110,7 +106,7 @@ impl DevicesCtx {
             .await?;
 
         // Make sure all see the configuration change.
-        let operator_addr = self.operator.aranya_local_addr().await?.into();
+        let operator_addr = self.operator.aranya_local_addr().await?;
         for team in [owner_team, admin_team, membera_team, memberb_team] {
             team.sync_now(operator_addr, None).await?;
         }
@@ -252,7 +248,7 @@ impl DeviceCtx {
         })
     }
 
-    pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    pub async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 

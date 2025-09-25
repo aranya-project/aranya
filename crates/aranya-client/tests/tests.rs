@@ -61,7 +61,7 @@ async fn test_sync_now() -> Result<()> {
     }
 
     // Let's sync immediately, which will propagate the role change.
-    admin.sync_now(owner_addr.into(), None).await?;
+    admin.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin
@@ -198,7 +198,7 @@ async fn test_add_team() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id);
-        match admin.sync_now(owner_addr.into(), None).await {
+        match admin.sync_now(owner_addr, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -233,7 +233,7 @@ async fn test_add_team() -> Result<()> {
         .await?;
     {
         let admin = devices.admin.client.team(team_id);
-        admin.sync_now(owner_addr.into(), None).await?;
+        admin.sync_now(owner_addr, None).await?;
 
         // Now we should be able to successfully assign a role.
         admin
@@ -367,7 +367,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id1);
-        match admin.sync_now(owner_addr.into(), None).await {
+        match admin.sync_now(owner_addr, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -402,7 +402,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await?;
 
     let admin1 = devices.admin.client.team(team_id1);
-    admin1.sync_now(owner_addr.into(), None).await?;
+    admin1.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin1
@@ -413,7 +413,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id2);
-        match admin.sync_now(owner_addr.into(), None).await {
+        match admin.sync_now(owner_addr, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -448,7 +448,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await?;
 
     let admin2 = devices.admin.client.team(team_id2);
-    admin2.sync_now(owner_addr.into(), None).await?;
+    admin2.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin2
@@ -480,9 +480,10 @@ async fn test_hello_subscription() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
 
     let sync_config = SyncPeerConfig::builder()
-        .interval(Duration::from_secs(24 * 60 * 60)) // Long interval to ensure sync on hello is triggered
-        .sync_now(false) // Don't sync immediately when adding peer
-        .sync_on_hello(true) // Enable sync on hello messages
+        .interval(Duration::from_secs(24 * 60 * 60))? // Long interval to ensure sync on hello is triggered)
+        // .expect("error setting interval")
+        .sync_now(false)
+        .sync_on_hello(true)
         .build()?;
 
     membera_team
@@ -578,7 +579,7 @@ async fn test_hello_subscription() -> Result<()> {
     // Admin subscribes to hello notifications from Owner
     admin_team
         .sync_hello_subscribe(
-            owner_addr.into(),
+            owner_addr,
             Duration::from_millis(1000),
             Duration::from_millis(1000),
         )
@@ -588,7 +589,7 @@ async fn test_hello_subscription() -> Result<()> {
     // Test multiple subscriptions
     operator_team
         .sync_hello_subscribe(
-            owner_addr.into(),
+            owner_addr,
             Duration::from_millis(2000),
             Duration::from_millis(1000),
         )
@@ -603,10 +604,8 @@ async fn test_hello_subscription() -> Result<()> {
     info!("operator subscribed to both owner and admin");
 
     // Test unsubscribing
-    admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
-    operator_team
-        .sync_hello_unsubscribe(owner_addr.into())
-        .await?;
+    admin_team.sync_hello_unsubscribe(owner_addr).await?;
+    operator_team.sync_hello_unsubscribe(owner_addr).await?;
     operator_team
         .sync_hello_unsubscribe(admin_addr.into())
         .await?;
@@ -618,12 +617,12 @@ async fn test_hello_subscription() -> Result<()> {
     // Test edge cases
     admin_team
         .sync_hello_subscribe(
-            owner_addr.into(),
+            owner_addr,
             Duration::from_millis(100),
             Duration::from_millis(1000),
         )
         .await?;
-    admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
+    admin_team.sync_hello_unsubscribe(owner_addr).await?;
     info!("tested immediate subscribe/unsubscribe");
 
     // Test unsubscribing from non-subscribed peer

@@ -463,8 +463,8 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn aranya_local_addr(self, context: context::Context) -> api::Result<SocketAddr> {
-        Ok(self.local_addr)
+    async fn aranya_local_addr(self, context: context::Context) -> api::Result<Addr> {
+        Ok(self.local_addr.into())
     }
 
     #[instrument(skip(self), err)]

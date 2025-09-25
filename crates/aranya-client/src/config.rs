@@ -37,7 +37,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 /// Builder for a [`SyncPeerConfig`]
 #[derive(Debug)]
 pub struct SyncPeerConfigBuilder {
-    interval: Option<Duration>,
+    interval: Duration,
     sync_now: bool,
     sync_on_hello: bool,
 }
@@ -50,27 +50,8 @@ impl SyncPeerConfigBuilder {
 
     /// Attempts to build a [`SyncPeerConfig`] using the provided parameters.
     pub fn build(self) -> Result<SyncPeerConfig> {
-        let Some(interval) = self.interval else {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "interval",
-                "must call `SyncPeerConfigBuilder::interval`",
-            ))
-            .into());
-        };
-
-        // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
-        // in DelayQueue::insert() (which calculates deadline as current_time + interval)
-        let one_year = Duration::from_secs(365 * 24 * 60 * 60); // 365 days
-        if interval > one_year {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "interval",
-                "must not exceed 1 year to prevent overflow",
-            ))
-            .into());
-        }
-
         Ok(SyncPeerConfig {
-            interval,
+            interval: self.interval,
             sync_now: self.sync_now,
             sync_on_hello: self.sync_on_hello,
         })
@@ -80,11 +61,21 @@ impl SyncPeerConfigBuilder {
     ///
     /// The interval must be less than 1 year to prevent overflow when calculating deadlines.
     ///
-    /// By default, the interval is not set. It is an error to call [`build`][Self::build] before
-    /// setting the interval with this method
-    pub fn interval(mut self, duration: Duration) -> Self {
-        self.interval = Some(duration);
-        self
+    /// By default, the interval is 1 year.
+    pub fn interval(mut self, duration: Duration) -> Result<Self> {
+        // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
+        // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+        let one_year = Duration::from_secs(365 * 24 * 60 * 60); // 365 days
+        if duration > one_year {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "interval",
+                "must not exceed 1 year to prevent overflow",
+            ))
+            .into());
+        }
+
+        self.interval = duration;
+        Ok(self)
     }
 
     /// Configures whether the peer will be immediately synced with after being added.
@@ -108,7 +99,7 @@ impl SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: None,
+            interval: Duration::from_secs(365 * 24 * 60 * 60), // 365 days = 1 year
             sync_now: true,
             sync_on_hello: false,
         }

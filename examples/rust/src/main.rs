@@ -1,6 +1,6 @@
 use std::{
     env,
-    net::{Ipv4Addr, SocketAddr},
+    net::Ipv4Addr,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -155,7 +155,7 @@ impl ClientCtx {
         })
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 
@@ -211,7 +211,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval)?.build()?;
 
     let team_name = "rust_example";
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;

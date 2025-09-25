@@ -186,6 +186,7 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
             .interval(value.interval.into())
+            .expect("interval is valid")
             .sync_now(value.sync_now)
             .build()
             .expect("All values are set")
@@ -201,14 +202,14 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 /// Builder for a [`SyncPeerConfig`]
 #[derive(Clone, Debug)]
 pub struct SyncPeerConfigBuilder {
-    interval: Option<Duration>,
+    interval: Duration,
     sync_now: bool,
 }
 
 impl SyncPeerConfigBuilder {
     /// Set the interval at which syncing occurs
     pub fn interval(&mut self, duration: Duration) {
-        self.interval = Some(duration);
+        self.interval = duration;
     }
 
     /// Configures whether the peer will be immediately synced with after being added.
@@ -227,12 +228,8 @@ impl Builder for SyncPeerConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(interval) = self.interval else {
-            return Err(InvalidArg::new("interval", "field not set").into());
-        };
-
         let cfg = SyncPeerConfig {
-            interval,
+            interval: self.interval,
             sync_now: self.sync_now,
         };
         Self::Output::init(out, cfg);
@@ -247,7 +244,9 @@ impl Typed for SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: None,
+            interval: Duration {
+                nanos: 365 * 24 * 60 * 60 * 1_000_000_000, // 365 days = 1 year in nanoseconds
+            },
             sync_now: true,
         }
     }

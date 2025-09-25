@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{borrow::Borrow, error, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
+use core::{borrow::Borrow, error, fmt, hash::Hash, ops::Deref, time::Duration};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
@@ -304,7 +304,7 @@ pub trait DaemonApi {
     async fn version() -> Result<Version>;
 
     /// Gets local address the Aranya sync server is bound to.
-    async fn aranya_local_addr() -> Result<SocketAddr>;
+    async fn aranya_local_addr() -> Result<Addr>;
 
     /// Gets the public key bundle for this device
     async fn get_key_bundle() -> Result<KeyBundle>;

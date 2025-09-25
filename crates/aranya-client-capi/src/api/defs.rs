@@ -986,8 +986,19 @@ pub fn sync_peer_config_build(
 /// @param[in] interval Set the interval at which syncing occurs
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) -> Result<(), imp::Error> {
+    // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
+    // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+    let one_year = std::time::Duration::from_secs(365 * 24 * 60 * 60); // 365 days
+    if std::time::Duration::from(interval) > one_year {
+        return Err(InvalidArg::new(
+            "interval",
+            "must not exceed 1 year to prevent overflow",
+        ).into());
+    }
+
     cfg.interval(interval);
+    Ok(())
 }
 
 /// Updates the config to enable immediate syncing with the peer.
