@@ -6,12 +6,11 @@ use core::{
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Deref,
-    str::FromStr,
     time::Duration,
 };
 use std::collections::hash_map::{self, HashMap};
 
-use anyhow::{bail, Context as _};
+use anyhow::bail;
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
@@ -655,92 +654,6 @@ pub enum ChanOp {
     /// The device can send and receive data in channels with this
     /// label.
     SendRecv,
-}
-
-/// Operation that can be assigned to roles.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Op {
-    AddDevice,
-    AqcCreateBidiChannel,
-    AqcCreateUniChannel,
-    AssignLabel,
-    AssignRole,
-    ChangeLabelManagingRole,
-    CreateLabel,
-    DeleteLabel,
-    RemoveDevice,
-    RevokeLabel,
-    RevokeRole,
-    SetAqcNetworkName,
-    SetupDefaultRole,
-    TerminateTeam,
-    UnsetAqcNetworkName,
-    UpdateOperation,
-    Other(Text),
-}
-
-impl Op {
-    /// Converts the op to a string.
-    pub const fn to_str(&self) -> &str {
-        match self {
-            Self::AddDevice => "AddMember",
-            Self::AqcCreateBidiChannel => "AqcCreateBidiChannel",
-            Self::AqcCreateUniChannel => "AqcCreateUniChannel",
-            Self::AssignLabel => "AssignLabel",
-            Self::AssignRole => "AssignRole",
-            Self::ChangeLabelManagingRole => "ChangeLabelManagingRole",
-            Self::CreateLabel => "CreateLabel",
-            Self::DeleteLabel => "DeleteLabel",
-            Self::RemoveDevice => "RemoveMember",
-            Self::RevokeLabel => "RevokeLabel",
-            Self::RevokeRole => "RevokeRole",
-            Self::SetAqcNetworkName => "SetAqcNetworkName",
-            Self::SetupDefaultRole => "SetupDefaultRole",
-            Self::TerminateTeam => "TerminateTeam",
-            Self::UnsetAqcNetworkName => "UnsetAqcNetworkName",
-            Self::UpdateOperation => "UpdateOperation",
-            Self::Other(op) => op.as_str(),
-        }
-    }
-
-    /// Converts the string to an op.
-    pub fn try_from_str(s: &str) -> Option<Self> {
-        let op = match s {
-            "AddMember" => Self::AddDevice,
-            "AqcCreateBidiChannel" => Self::AqcCreateBidiChannel,
-            "AqcCreateUniChannel" => Self::AqcCreateUniChannel,
-            "AssignLabel" => Self::AssignLabel,
-            "AssignRole" => Self::AssignRole,
-            "ChangeLabelManagingRole" => Self::ChangeLabelManagingRole,
-            "CreateLabel" => Self::CreateLabel,
-            "DeleteLabel" => Self::DeleteLabel,
-            "RemoveMember" => Self::RemoveDevice,
-            "RevokeLabel" => Self::RevokeLabel,
-            "RevokeRole" => Self::RevokeRole,
-            "SetAqcNetworkName" => Self::SetAqcNetworkName,
-            "SetupDefaultRole" => Self::SetupDefaultRole,
-            "TerminateTeam" => Self::TerminateTeam,
-            "UnsetAqcNetworkName" => Self::UnsetAqcNetworkName,
-            "UpdateOperation" => Self::UpdateOperation,
-            s => return Text::from_str(s).ok().map(Self::Other),
-        };
-        Some(op)
-    }
-}
-
-impl FromStr for Op {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_from_str(s).context("invalid operation")
-    }
-}
-
-/// Display implementation for [`Op`]
-impl fmt::Display for Op {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.to_str().fmt(f)
-    }
 }
 
 #[tarpc::service]
