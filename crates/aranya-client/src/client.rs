@@ -2,7 +2,7 @@
 
 use std::{io, path::Path, time::Duration};
 
-use anyhow::Context as _;
+use anyhow::{self, Context as _};
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 #[cfg(feature = "aqc")]
 use aranya_daemon_api::NetIdentifier;
@@ -80,11 +80,6 @@ impl ClientBuilder<'_> {
     }
 
     /// Creates a client connection to the daemon.
-    ///
-    /// # Panics
-    ///
-    /// Panics if DNS resolution of the AQC server address returns no addresses
-    /// (when the `aqc` feature is enabled).
     ///
     /// # Example
     /// ```rust,no_run
@@ -165,7 +160,11 @@ impl ClientBuilder<'_> {
                     .context("unable to resolve AQC server address")
                     .map_err(error::other)?
                     .next()
-                    .expect("expected AQC server address");
+                    .ok_or_else(|| {
+                        error::other(anyhow::anyhow!(
+                            "AQC server address resolution returned no addresses"
+                        ))
+                    })?;
                 Some(AqcClient::new(aqc_server_addr, daemon.clone()).await?)
             } else {
                 None
