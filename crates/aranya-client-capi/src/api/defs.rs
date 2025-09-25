@@ -2259,12 +2259,17 @@ pub enum AfcChannelType {
 }
 
 /// An AFC Control Message, used to create the other end of a channel.
+///
+/// In order to access the underlying buffer to send to a peer, you'll need to
+/// call `aranya_afc_get_msg_data()`.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
 
 /// An AFC Sequence Number, for reordering messages.
+///
+/// You can compare two sequence numbers using `aranya_afc_seq_cmp()`.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
@@ -2372,11 +2377,9 @@ pub fn afc_create_uni_recv_channel(
 
 /// Use an ephemeral command to create an AFC channel between this device and a peer.
 ///
-/// Note that this function takes ownership of the [`AfcCtrlMsg`] and invalidates any further use.
-///
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  team_id the team's identifier [`TeamId`].
-/// @param[in]  control the AFC control message [`AfcCtrlMsg`].
+/// @param[in]  control the AFC control message.
 /// @param[out] channel the AFC channel object [`AfcChannel`].
 /// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
 ///
@@ -2385,14 +2388,13 @@ pub fn afc_create_uni_recv_channel(
 pub fn afc_recv_ctrl(
     client: &Client,
     team_id: &TeamId,
-    control: OwnedPtr<AfcCtrlMsg>,
+    control: &[u8],
     channel: &mut MaybeUninit<AfcChannel>,
 ) -> Result<AfcChannelType, imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid `AfcCtrlMsg` pointer.
-    let ctrl = unsafe { Opaque::into_inner(control.read()).into_inner().0 };
+    let ctrl = Vec::from(control).into_boxed_slice();
     let chan = client
         .rt
-        .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl))?;
+        .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl.into()))?;
 
     let channel_type = match chan {
         afc::Channel::Bidi(_) => AfcChannelType::Bidirectional,
@@ -2448,6 +2450,9 @@ pub fn afc_get_msg_data(
 }
 
 /// Returns the size of the overhead needed for a channel message.
+///
+/// Note that the ciphertext buffer must be at least `plaintext_len` +
+/// `aranya_afc_channel_overhead()` long.
 #[cfg(feature = "afc")]
 pub fn afc_channel_overhead() -> usize {
     afc::Channels::OVERHEAD
