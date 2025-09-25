@@ -1108,6 +1108,8 @@ pub fn revoke_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
+/// Returns an error if `name` contains an interior null byte.
+///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] name label name string [`LabelName`].

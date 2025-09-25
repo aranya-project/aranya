@@ -664,6 +664,10 @@ impl Team<'_> {
     }
 
     /// Create a label.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `label_name` contains a null byte.
     pub async fn create_label(&self, label_name: &str) -> Result<LabelId> {
         let label_name = label_name
             .parse()
