@@ -116,6 +116,9 @@ impl DaemonApiServer {
         }: DaemonApiServerArgs,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
+        let uds_path = uds_path
+            .canonicalize()
+            .context("could not canonicalize uds_path")?;
         #[cfg(feature = "aqc")]
         let aqc = aqc.map(Arc::new);
         #[cfg(feature = "afc")]
