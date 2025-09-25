@@ -176,6 +176,7 @@ mod aqc {
 pub struct SyncPeerConfig {
     interval: Duration,
     sync_now: bool,
+    sync_on_hello: bool,
 }
 
 impl Typed for SyncPeerConfig {
@@ -188,6 +189,7 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
             .interval(value.interval.into())
             .expect("interval is valid")
             .sync_now(value.sync_now)
+            .sync_on_hello(value.sync_on_hello)
             .build()
             .expect("All values are set")
     }
@@ -204,6 +206,7 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 pub struct SyncPeerConfigBuilder {
     interval: Duration,
     sync_now: bool,
+    sync_on_hello: bool,
 }
 
 impl SyncPeerConfigBuilder {
@@ -218,6 +221,14 @@ impl SyncPeerConfigBuilder {
     pub fn sync_now(&mut self, sync_now: bool) {
         self.sync_now = sync_now;
     }
+
+    /// Configures whether to automatically sync when a hello message is received from this peer
+    /// indicating they have a head that we don't have.
+    ///
+    /// By default, sync on hello is disabled.
+    pub fn sync_on_hello(&mut self, sync_on_hello: bool) {
+        self.sync_on_hello = sync_on_hello;
+    }
 }
 
 impl Builder for SyncPeerConfigBuilder {
@@ -231,6 +242,7 @@ impl Builder for SyncPeerConfigBuilder {
         let cfg = SyncPeerConfig {
             interval: self.interval,
             sync_now: self.sync_now,
+            sync_on_hello: self.sync_on_hello,
         };
         Self::Output::init(out, cfg);
         Ok(())
@@ -248,6 +260,7 @@ impl Default for SyncPeerConfigBuilder {
                 nanos: 365 * 24 * 60 * 60 * 1_000_000_000, // 365 days = 1 year in nanoseconds
             },
             sync_now: true,
+            sync_on_hello: false,
         }
     }
 }

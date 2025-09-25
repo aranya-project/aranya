@@ -68,7 +68,7 @@ impl SyncPeerConfigBuilder {
         let one_year = Duration::from_secs(365 * 24 * 60 * 60); // 365 days
         if duration > one_year {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "interval",
+                "duration",
                 "must not exceed 1 year to prevent overflow",
             ))
             .into());

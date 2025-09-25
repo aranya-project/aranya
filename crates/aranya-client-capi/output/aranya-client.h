@@ -1745,6 +1745,29 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
                                                                struct AranyaExtError *__ext_err);
 
 /**
+ * Enables automatic syncing when a hello message is received from this peer
+ * indicating they have a head that we don't have.
+ *
+ * By default, sync on hello is disabled.
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncPeerConfigBuilder *cfg);
+
+/**
+ * Enables automatic syncing when a hello message is received from this peer
+ * indicating they have a head that we don't have.
+ *
+ * By default, sync on hello is disabled.
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                                  struct AranyaExtError *__ext_err);
+
+/**
  * Assign a role to a device.
  *
  * This will change the device's current role to the new role assigned.

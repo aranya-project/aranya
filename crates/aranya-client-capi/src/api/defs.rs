@@ -986,15 +986,17 @@ pub fn sync_peer_config_build(
 /// @param[in] interval Set the interval at which syncing occurs
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) -> Result<(), imp::Error> {
+pub fn sync_peer_config_builder_set_interval(
+    cfg: &mut SyncPeerConfigBuilder,
+    interval: Duration,
+) -> Result<(), imp::Error> {
     // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
     // in DelayQueue::insert() (which calculates deadline as current_time + interval)
     let one_year = std::time::Duration::from_secs(365 * 24 * 60 * 60); // 365 days
     if std::time::Duration::from(interval) > one_year {
-        return Err(InvalidArg::new(
-            "interval",
-            "must not exceed 1 year to prevent overflow",
-        ).into());
+        return Err(
+            InvalidArg::new("interval", "must not exceed 1 year to prevent overflow").into(),
+        );
     }
 
     cfg.interval(interval);
@@ -1026,6 +1028,17 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
     cfg.sync_now(false);
+}
+
+/// Enables automatic syncing when a hello message is received from this peer
+/// indicating they have a head that we don't have.
+///
+/// By default, sync on hello is disabled.
+/// @param[in,out] cfg a pointer to the builder for a sync config
+///
+/// @relates AranyaSyncPeerConfigBuilder.
+pub fn sync_peer_config_builder_set_sync_on_hello(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.sync_on_hello(true);
 }
 
 /// Assign a role to a device.
