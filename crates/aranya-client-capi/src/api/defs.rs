@@ -1107,6 +1107,8 @@ pub fn revoke_role(
 /// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
+/// 
+/// Returns an error if `name` contains an interior null byte.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
