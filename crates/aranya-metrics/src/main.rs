@@ -16,7 +16,6 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig, CreateTeamQuicSyncConfig,
     DeviceId, Error,
 };
-use aranya_daemon_api::text;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use buggy::BugExt as _;
@@ -387,7 +386,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     info!("demo aqc functionality");
     info!("creating aqc label");
-    let label3 = operator.create_label(text!("label3")).await?;
+    let label3 = operator.create_label("label3").await?;
     let op = ChanOp::SendRecv;
 
     info!("assigning label to membera");

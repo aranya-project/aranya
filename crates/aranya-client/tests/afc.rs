@@ -8,7 +8,6 @@ use {
     anyhow::{bail, Context, Result},
     aranya_client::afc::{Channel, Channels},
     aranya_client::client::ChanOp,
-    aranya_daemon_api::text,
 };
 
 /// Demonstrate creating a bidirectional AFC channel.
@@ -25,7 +24,7 @@ async fn test_afc_bidi_chan_create() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -82,7 +81,7 @@ async fn test_afc_bidi_chan_seal_open() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -154,7 +153,7 @@ async fn test_afc_bidi_chan_delete() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -238,7 +237,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
     let operator_team = devices.operator.client.team(team_id);
 
     // First label.
-    let label_id1 = operator_team.create_label(text!("label1")).await?;
+    let label_id1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id1, op)
@@ -248,7 +247,7 @@ async fn test_afc_bidi_multi_chans() -> Result<()> {
         .await?;
 
     // Second label.
-    let label_id2 = operator_team.create_label(text!("label2")).await?;
+    let label_id2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id2, op)
@@ -378,7 +377,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -437,7 +436,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -509,7 +508,7 @@ async fn test_afc_uni_recv_chan_seal_open() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -581,7 +580,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id, op)
@@ -664,7 +663,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let operator_team = devices.operator.client.team(team_id);
 
     // First label.
-    let label_id1 = operator_team.create_label(text!("label1")).await?;
+    let label_id1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id1, op)
@@ -674,7 +673,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .await?;
 
     // Second label.
-    let label_id2 = operator_team.create_label(text!("label2")).await?;
+    let label_id2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label_id2, op)

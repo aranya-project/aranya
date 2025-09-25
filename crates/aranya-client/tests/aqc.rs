@@ -13,7 +13,6 @@ use aranya_client::{
     client::{ChanOp, NetIdentifier},
 };
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
-use aranya_daemon_api::text;
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
@@ -58,7 +57,7 @@ async fn test_aqc_chans() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label1, op)
@@ -67,7 +66,7 @@ async fn test_aqc_chans() -> Result<()> {
         .assign_label(devices.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label2, op)
@@ -332,7 +331,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label1, op)
@@ -341,7 +340,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_label(devices.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label2, op)
@@ -350,7 +349,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_label(devices.memberb.id, label2, op)
         .await?;
 
-    let label3 = operator_team.create_label(text!("label3")).await?;
+    let label3 = operator_team.create_label("label3").await?;
     let op = ChanOp::SendRecv;
     // assign label 3 to only the receiver, we are testing if the sender can create
     // a channel without the label assignment
@@ -414,7 +413,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label1, op)
@@ -423,7 +422,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_label(devices.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label2, op)
@@ -432,7 +431,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_label(devices.memberb.id, label2, op)
         .await?;
 
-    let label3 = operator_team.create_label(text!("label3")).await?;
+    let label3 = operator_team.create_label("label3").await?;
     let op = ChanOp::SendRecv;
     // assign label 3 to only the sender, we are testing if the receiver can receive
     // a channel without the label assignment
@@ -496,7 +495,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label1, op)
@@ -505,7 +504,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .assign_label(devices.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label2, op)
@@ -635,7 +634,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team.create_label("label1").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label1, op)
@@ -644,7 +643,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .assign_label(devices.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team.create_label("label2").await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(devices.membera.id, label2, op)

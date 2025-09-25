@@ -13,7 +13,6 @@ use aranya_capi_core::opaque::Opaque;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 #[cfg(feature = "aqc")]
 use aranya_client::aqc::{self, AqcPeerStream};
-use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 #[cfg(feature = "aqc")]
 use bytes::Bytes;
@@ -471,10 +470,10 @@ impl From<&LabelId> for aranya_client::client::LabelId {
 pub struct LabelName(*const c_char);
 
 impl LabelName {
-    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+    unsafe fn as_underlying(&self) -> Result<&str, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(Text::try_from(cstr)?)
+        Ok(cstr.to_str()?)
     }
 }
 
@@ -1108,6 +1107,8 @@ pub fn revoke_role(
 /// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
+/// 
+/// Returns an error if `name` contains an interior null byte.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
