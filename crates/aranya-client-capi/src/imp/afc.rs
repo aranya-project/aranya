@@ -62,7 +62,7 @@ impl From<afc::CtrlMsg> for AfcCtrlMsg {
 /// A sequence number, for reordering messages.
 #[repr(transparent)]
 #[derive(Debug)]
-pub struct AfcSeq(afc::Seq);
+pub struct AfcSeq(pub(crate) afc::Seq);
 
 impl Typed for AfcSeq {
     const TYPE_ID: TypeId = TypeId::new(0xC4DCE0C0);
