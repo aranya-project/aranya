@@ -5,10 +5,14 @@ use std::time::Duration;
 
 mod common;
 
+use std::str::FromStr;
+
 use anyhow::{Context as _, Result};
-use aranya_client::aqc::AqcPeerChannel;
+use aranya_client::{
+    aqc::AqcPeerChannel,
+    client::{ChanOp, NetIdentifier},
+};
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
-use aranya_daemon_api::{ChanOp, NetIdentifier};
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
@@ -18,15 +22,15 @@ use crate::common::{sleep, DeviceCtx, DevicesCtx};
 
 impl DeviceCtx {
     pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier(
+        NetIdentifier::from_str(
             self.client
                 .aqc()
                 .expect("AQC is enabled")
                 .server_addr()
                 .to_string()
-                .try_into()
-                .expect("socket addr is valid text"),
+                .as_str(),
         )
+        .expect("expected net identifier")
     }
 }
 

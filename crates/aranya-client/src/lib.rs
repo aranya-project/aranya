@@ -36,6 +36,8 @@ compile_error!(
     "AFC is currently a preview feature. Enable the 'preview' feature to opt into preview APIs."
 );
 
+#[cfg(feature = "afc")]
+pub mod afc;
 pub mod aqc;
 pub mod client;
 pub mod config;
@@ -43,7 +45,7 @@ pub mod error;
 
 #[doc(inline)]
 pub use crate::{
-    client::{Client, Team},
+    client::{Client, DeviceId, LabelId, Team, TeamId},
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
         CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
