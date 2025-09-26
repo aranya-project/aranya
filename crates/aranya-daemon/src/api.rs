@@ -1175,7 +1175,7 @@ impl DaemonApi for Api {
         let roles = self
             .client
             .actions(&team.into_id().into())
-            .query_role_owners(role.into_id().into())
+            .query_role_owners(role.into_id())
             .await
             .context("unable to query role owners")?
             .into_iter()
@@ -1183,7 +1183,7 @@ impl DaemonApi for Api {
                 if let Effect::QueryRoleOwnersResult(e) = e {
                     Some(api::Role {
                         id: e.role_id.into(),
-                        name: e.name.into(),
+                        name: e.name,
                         author_id: e.author_id.into(),
                         default: e.default,
                     })
