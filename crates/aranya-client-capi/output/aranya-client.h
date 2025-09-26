@@ -296,7 +296,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaExtError {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[88];
+    uint8_t __for_size_only[96];
 } AranyaExtError;
 
 /**
@@ -2012,6 +2012,8 @@ AranyaError aranya_create_team_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_rand(const struct AranyaClient *client,
                         uint8_t *buf,
@@ -2025,6 +2027,8 @@ AranyaError aranya_rand(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_rand_ext(const struct AranyaClient *client,
                             uint8_t *buf,
@@ -3140,7 +3144,7 @@ AranyaError aranya_aqc_try_receive_channel_ext(const struct AranyaClient *client
  * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
  * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_bidi_channel(struct AranyaAqcPeerChannel *channel,
                                         struct AranyaAqcBidiChannel *bidi);
@@ -3157,7 +3161,7 @@ AranyaError aranya_aqc_get_bidi_channel(struct AranyaAqcPeerChannel *channel,
  * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
  * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_bidi_channel_ext(struct AranyaAqcPeerChannel *channel,
                                             struct AranyaAqcBidiChannel *bidi,
@@ -3175,7 +3179,7 @@ AranyaError aranya_aqc_get_bidi_channel_ext(struct AranyaAqcPeerChannel *channel
  * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] receiver the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_receive_channel(struct AranyaAqcPeerChannel *channel,
                                            struct AranyaAqcReceiveChannel *receiver);
@@ -3192,7 +3196,7 @@ AranyaError aranya_aqc_get_receive_channel(struct AranyaAqcPeerChannel *channel,
  * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] receiver the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_receive_channel_ext(struct AranyaAqcPeerChannel *channel,
                                                struct AranyaAqcReceiveChannel *receiver,
@@ -3282,7 +3286,7 @@ AranyaError aranya_aqc_bidi_stream_send_ext(const struct AranyaClient *client,
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiStream.
  */
 AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
                                             uint8_t *buffer,
@@ -3300,7 +3304,7 @@ AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiStream.
  */
 AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stream,
                                                 uint8_t *buffer,
@@ -3362,7 +3366,7 @@ AranyaError aranya_aqc_bidi_create_uni_stream_ext(const struct AranyaClient *cli
  * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
  * @param[out] send_init whether or not we received a `send_stream`.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiChannel.
  */
 AranyaError aranya_aqc_bidi_try_receive_stream(struct AranyaAqcBidiChannel *channel,
                                                struct AranyaAqcReceiveStream *recv_stream,
@@ -3387,7 +3391,7 @@ AranyaError aranya_aqc_bidi_try_receive_stream(struct AranyaAqcBidiChannel *chan
  * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
  * @param[out] send_init whether or not we received a `send_stream`.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiChannel.
  */
 AranyaError aranya_aqc_bidi_try_receive_stream_ext(struct AranyaAqcBidiChannel *channel,
                                                    struct AranyaAqcReceiveStream *recv_stream,
@@ -3446,7 +3450,7 @@ AranyaError aranya_aqc_send_create_uni_stream_ext(const struct AranyaClient *cli
  * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  * @param[out] stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveChannel.
  */
 AranyaError aranya_aqc_recv_try_receive_uni_stream(struct AranyaAqcReceiveChannel *channel,
                                                    struct AranyaAqcReceiveStream *stream);
@@ -3465,7 +3469,7 @@ AranyaError aranya_aqc_recv_try_receive_uni_stream(struct AranyaAqcReceiveChanne
  * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  * @param[out] stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveChannel.
  */
 AranyaError aranya_aqc_recv_try_receive_uni_stream_ext(struct AranyaAqcReceiveChannel *channel,
                                                        struct AranyaAqcReceiveStream *stream,
@@ -3518,7 +3522,7 @@ AranyaError aranya_aqc_send_stream_send_ext(const struct AranyaClient *client,
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveStream.
  */
 AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *stream,
                                             uint8_t *buffer,
@@ -3536,7 +3540,7 @@ AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *strea
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveStream.
  */
 AranyaError aranya_aqc_recv_stream_try_recv_ext(struct AranyaAqcReceiveStream *stream,
                                                 uint8_t *buffer,

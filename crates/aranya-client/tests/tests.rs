@@ -15,10 +15,9 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    config::{CreateTeamConfig, SyncPeerConfig},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    client::Role, config::{CreateTeamConfig, SyncPeerConfig}, AddTeamConfig, 
+    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
-use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
 
@@ -215,7 +214,7 @@ async fn test_add_team() -> Result<()> {
     }
 
     let admin_seed = owner
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -384,7 +383,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed1 = team1
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -430,7 +429,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed2 = team2
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin

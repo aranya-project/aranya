@@ -2,8 +2,9 @@ use std::{net::Ipv4Addr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_client::{
-    client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfig,
+    client::{Client, DeviceId, KeyBundle, Role, TeamId},
+    config::CreateTeamConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_crypto::{
     dangerous::spideroak_crypto::{hash::Hash, rust::Sha256},
@@ -13,7 +14,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId, SEED_IKM_SIZE};
+use aranya_daemon_api::SEED_IKM_SIZE;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
@@ -220,7 +221,7 @@ impl DeviceCtx {
             .context("unable to load daemon")?
             .spawn()
             .await
-            .context("unanble to start daemon")?;
+            .context("unable to start daemon")?;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {
