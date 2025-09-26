@@ -26,6 +26,10 @@ no_includes = true
 cpp_compat = true
 after_includes = """
 
+#if defined(ENABLE_AFC) && !defined(ENABLE_ARANYA_PREVIEW)
+    #error "AFC is currently in preview. Set `ENABLE_ARANYA_PREVIEW` to opt into preview APIs."
+#endif
+
 #if defined(ENABLE_AQC) && !defined(ENABLE_ARANYA_EXPERIMENTAL)
     #error "AQC is currently experimental. Set 'ENABLE_ARANYA_EXPERIMENTAL' to opt into experimental APIs."
 #endif
@@ -100,6 +104,7 @@ style = "both"
 "target_os = linux" = "__linux__"
 "target_os = vxworks" = "__VXWORKS__"
 "target_arch = x86_64" = "__x86_64__"
+"feature = afc" = "ENABLE_AFC"
 "feature = aqc" = "ENABLE_AQC"
 
 [export]
@@ -129,7 +134,7 @@ clean = true
 
 [parse.expand]
 default_features = false
-features = ["aqc", "experimental"]
+features = ["afc", "preview", "aqc", "experimental"]
 crates = ["aranya-client-capi"]
 
 [ptr]

@@ -20,6 +20,10 @@
 #include <stddef.h>
 #include <sys/socket.h>
 
+#if defined(ENABLE_AFC) && !defined(ENABLE_ARANYA_PREVIEW)
+    #error "AFC is currently in preview. Set `ENABLE_ARANYA_PREVIEW` to opt into preview APIs."
+#endif
+
 #if defined(ENABLE_AQC) && !defined(ENABLE_ARANYA_EXPERIMENTAL)
     #error "AQC is currently experimental. Set 'ENABLE_ARANYA_EXPERIMENTAL' to opt into experimental APIs."
 #endif
@@ -103,6 +107,24 @@
  * The size in bytes of an ID converted to a human-readable base58 string.
  */
 #define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
+
+#if defined(ENABLE_AFC)
+/**
+ * An enum containing all [`AranyaAfcChannel`](@ref AranyaAfcChannel) variants.
+ */
+enum AranyaAfcChannelType
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    ARANYA_AFC_CHANNEL_TYPE_BIDIRECTIONAL,
+    ARANYA_AFC_CHANNEL_TYPE_SENDER,
+    ARANYA_AFC_CHANNEL_TYPE_RECEIVER,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaAfcChannelType;
+#endif // __cplusplus
+#endif
 
 #if defined(ENABLE_AQC)
 /**
@@ -199,6 +221,9 @@ enum AranyaError
      * An Aranya error.
      */
     ARANYA_ERROR_ARANYA,
+#if defined(ENABLE_AFC)
+    ARANYA_ERROR_WRONG_CHANNEL_TYPE,
+#endif
 #if defined(ENABLE_AQC)
     /**
      * AQC library error.
@@ -664,6 +689,58 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
      */
     uint8_t __for_size_only[208];
 } AranyaAqcReceiveStream;
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * An AFC Channel Object.
+ *
+ * This can contain a bidirectional, receiver, or sender channel.
+ *
+ * Note that only bidi and sender channels can call `aranya_afc_seal()`, and
+ * only bidi and receiver channels can call `aranya_afc_open()`.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAfcChannel {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[96];
+} AranyaAfcChannel;
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * An AFC Control Message, used to create the other end of a channel.
+ *
+ * In order to access the underlying buffer to send to a peer, you'll need to
+ * call `aranya_afc_get_msg_data()`.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAfcCtrlMsg {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[32];
+} AranyaAfcCtrlMsg;
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * An AFC Sequence Number, for reordering messages.
+ *
+ * You can compare two sequence numbers using `aranya_afc_seq_cmp()`.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAfcSeq {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[24];
+} AranyaAfcSeq;
 #endif
 
 #ifdef __cplusplus
@@ -3453,6 +3530,478 @@ AranyaError aranya_aqc_recv_stream_try_recv_ext(struct AranyaAqcReceiveStream *s
                                                 uint8_t *buffer,
                                                 size_t *buffer_len,
                                                 struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_afc_channel_init`.
+ *
+ * @relates AranyaAfcChannel
+ */
+AranyaError aranya_afc_channel_cleanup(struct AranyaAfcChannel *ptr);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_afc_channel_init`.
+ *
+ * @relates AranyaAfcChannel
+ */
+AranyaError aranya_afc_channel_cleanup_ext(struct AranyaAfcChannel *ptr,
+                                           struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_afc_ctrl_msg_init`.
+ *
+ * @relates AranyaAfcCtrlMsg
+ */
+AranyaError aranya_afc_ctrl_msg_cleanup(struct AranyaAfcCtrlMsg *ptr);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_afc_ctrl_msg_init`.
+ *
+ * @relates AranyaAfcCtrlMsg
+ */
+AranyaError aranya_afc_ctrl_msg_cleanup_ext(struct AranyaAfcCtrlMsg *ptr,
+                                            struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_afc_seq_init`.
+ *
+ * @relates AranyaAfcSeq
+ */
+AranyaError aranya_afc_seq_cleanup(struct AranyaAfcSeq *ptr);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_afc_seq_init`.
+ *
+ * @relates AranyaAfcSeq
+ */
+AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
+                                       struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Create a bidirectional AFC channel between this device and a peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_bidi_channel(const struct AranyaClient *client,
+                                           const struct AranyaTeamId *team_id,
+                                           const struct AranyaDeviceId *peer_id,
+                                           const struct AranyaLabelId *label_id,
+                                           struct AranyaAfcChannel *channel,
+                                           struct AranyaAfcCtrlMsg *control);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Create a bidirectional AFC channel between this device and a peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_bidi_channel_ext(const struct AranyaClient *client,
+                                               const struct AranyaTeamId *team_id,
+                                               const struct AranyaDeviceId *peer_id,
+                                               const struct AranyaLabelId *label_id,
+                                               struct AranyaAfcChannel *channel,
+                                               struct AranyaAfcCtrlMsg *control,
+                                               struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Create a send-only AFC channel between this device and a peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client,
+                                               const struct AranyaTeamId *team_id,
+                                               const struct AranyaDeviceId *peer_id,
+                                               const struct AranyaLabelId *label_id,
+                                               struct AranyaAfcChannel *channel,
+                                               struct AranyaAfcCtrlMsg *control);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Create a send-only AFC channel between this device and a peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *client,
+                                                   const struct AranyaTeamId *team_id,
+                                                   const struct AranyaDeviceId *peer_id,
+                                                   const struct AranyaLabelId *label_id,
+                                                   struct AranyaAfcChannel *channel,
+                                                   struct AranyaAfcCtrlMsg *control,
+                                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Create a receive-only AFC channel between this device and a peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_uni_recv_channel(const struct AranyaClient *client,
+                                               const struct AranyaTeamId *team_id,
+                                               const struct AranyaDeviceId *peer_id,
+                                               const struct AranyaLabelId *label_id,
+                                               struct AranyaAfcChannel *channel,
+                                               struct AranyaAfcCtrlMsg *control);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Create a receive-only AFC channel between this device and a peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_uni_recv_channel_ext(const struct AranyaClient *client,
+                                                   const struct AranyaTeamId *team_id,
+                                                   const struct AranyaDeviceId *peer_id,
+                                                   const struct AranyaLabelId *label_id,
+                                                   struct AranyaAfcChannel *channel,
+                                                   struct AranyaAfcCtrlMsg *control,
+                                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Use an ephemeral command to create an AFC channel between this device and a peer.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  control the AFC control message.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_recv_ctrl(const struct AranyaClient *client,
+                                 const struct AranyaTeamId *team_id,
+                                 const uint8_t *control,
+                                 size_t control_len,
+                                 struct AranyaAfcChannel *channel,
+                                 AranyaAfcChannelType *__output);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Use an ephemeral command to create an AFC channel between this device and a peer.
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in]  control the AFC control message.
+ * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_recv_ctrl_ext(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team_id,
+                                     const uint8_t *control,
+                                     size_t control_len,
+                                     struct AranyaAfcChannel *channel,
+                                     AranyaAfcChannelType *__output,
+                                     struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the [`AranyaAfcChannelType`](@ref AranyaAfcChannelType) for a given [`AranyaAfcChannel`](@ref AranyaAfcChannel) container.
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
+ */
+AranyaError aranya_afc_get_channel_type(const struct AranyaAfcChannel *channel,
+                                        AranyaAfcChannelType *__output);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the [`AranyaAfcChannelType`](@ref AranyaAfcChannelType) for a given [`AranyaAfcChannel`](@ref AranyaAfcChannel) container.
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
+ */
+AranyaError aranya_afc_get_channel_type_ext(const struct AranyaAfcChannel *channel,
+                                            AranyaAfcChannelType *__output,
+                                            struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] __output the corresponding label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ */
+AranyaError aranya_afc_get_label_id(const struct AranyaAfcChannel *channel,
+                                    struct AranyaLabelId *__output);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] __output the corresponding label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ */
+AranyaError aranya_afc_get_label_id_ext(const struct AranyaAfcChannel *channel,
+                                        struct AranyaLabelId *__output,
+                                        struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the raw data for a given [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
+ *
+ * Note that the lifetime of the pointer is tied to the [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] ptr the raw pointer of the stored buffer.
+ * @param[out] len the raw length of the stored buffer.
+ */
+AranyaError aranya_afc_get_msg_data(const struct AranyaAfcCtrlMsg *control,
+                                    const uint8_t **ptr,
+                                    size_t *len);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the raw data for a given [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
+ *
+ * Note that the lifetime of the pointer is tied to the [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[out] ptr the raw pointer of the stored buffer.
+ * @param[out] len the raw length of the stored buffer.
+ */
+AranyaError aranya_afc_get_msg_data_ext(const struct AranyaAfcCtrlMsg *control,
+                                        const uint8_t **ptr,
+                                        size_t *len,
+                                        struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the size of the overhead needed for a channel message.
+ *
+ * Note that the ciphertext buffer must be at least `plaintext_len` +
+ * `aranya_afc_channel_overhead()` long.
+ */
+size_t aranya_afc_channel_overhead(void);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the three-way comparison between `seq1` and `seq2`.
+ *
+ * @param[in]  seq1 the first sequence number to compare.
+ * @param[in]  seq1 the second sequence number to compare.
+ * @param[out] __output the comparison result (-1 is <, 0 is =, 1 is >).
+ */
+AranyaError aranya_afc_seq_cmp(const struct AranyaAfcSeq *seq1,
+                               const struct AranyaAfcSeq *seq2,
+                               ptrdiff_t *__output);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Returns the three-way comparison between `seq1` and `seq2`.
+ *
+ * @param[in]  seq1 the first sequence number to compare.
+ * @param[in]  seq1 the second sequence number to compare.
+ * @param[out] __output the comparison result (-1 is <, 0 is =, 1 is >).
+ */
+AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
+                                   const struct AranyaAfcSeq *seq2,
+                                   ptrdiff_t *__output,
+                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Encrypts and authenticates `plaintext`, and writes it to `dst`.
+ *
+ * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  plaintext the message being encrypted.
+ * @param[out] dst the output buffer the ciphertext is written to.
+ */
+AranyaError aranya_afc_channel_seal(const struct AranyaAfcChannel *channel,
+                                    const uint8_t *plaintext,
+                                    size_t plaintext_len,
+                                    uint8_t *dst,
+                                    size_t dst_len);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Encrypts and authenticates `plaintext`, and writes it to `dst`.
+ *
+ * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  plaintext the message being encrypted.
+ * @param[out] dst the output buffer the ciphertext is written to.
+ */
+AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcChannel *channel,
+                                        const uint8_t *plaintext,
+                                        size_t plaintext_len,
+                                        uint8_t *dst,
+                                        size_t dst_len,
+                                        struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Decrypts and authenticates `ciphertext`, and writes it to `dst`.
+ *
+ * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  ciphertext the message being decrypted.
+ * @param[out] dst the output buffer the message is written to.
+ * @param[out] seq the sequence number for the opened message, for reordering.
+ */
+AranyaError aranya_afc_channel_open(const struct AranyaAfcChannel *channel,
+                                    const uint8_t *ciphertext,
+                                    size_t ciphertext_len,
+                                    uint8_t *dst,
+                                    size_t dst_len,
+                                    struct AranyaAfcSeq *seq);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Decrypts and authenticates `ciphertext`, and writes it to `dst`.
+ *
+ * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  ciphertext the message being decrypted.
+ * @param[out] dst the output buffer the message is written to.
+ * @param[out] seq the sequence number for the opened message, for reordering.
+ */
+AranyaError aranya_afc_channel_open_ext(const struct AranyaAfcChannel *channel,
+                                        const uint8_t *ciphertext,
+                                        size_t ciphertext_len,
+                                        uint8_t *dst,
+                                        size_t dst_len,
+                                        struct AranyaAfcSeq *seq,
+                                        struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Removes an [`AranyaAfcChannel`](@ref AranyaAfcChannel) from use.
+ *
+ * Note that this function takes ownership of the [`AranyaAfcChannel`](@ref AranyaAfcChannel) and invalidates
+ * any further use (i.e. calling open/seal).
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_channel_delete(const struct AranyaClient *client,
+                                      struct AranyaAfcChannel *channel);
+#endif
+
+#if defined(ENABLE_AFC)
+/**
+ * Removes an [`AranyaAfcChannel`](@ref AranyaAfcChannel) from use.
+ *
+ * Note that this function takes ownership of the [`AranyaAfcChannel`](@ref AranyaAfcChannel) and invalidates
+ * any further use (i.e. calling open/seal).
+ *
+ * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_channel_delete_ext(const struct AranyaClient *client,
+                                          struct AranyaAfcChannel *channel,
+                                          struct AranyaExtError *__ext_err);
 #endif
 
 #ifdef __cplusplus

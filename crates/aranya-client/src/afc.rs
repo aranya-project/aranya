@@ -48,6 +48,12 @@ impl CtrlMsg {
     }
 }
 
+impl From<Box<[u8]>> for CtrlMsg {
+    fn from(value: Box<[u8]>) -> Self {
+        Self(value)
+    }
+}
+
 /// AFC seal error.
 #[derive(Debug, thiserror::Error)]
 pub struct AfcSealError(
