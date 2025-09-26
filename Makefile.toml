@@ -20,22 +20,27 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 [tasks.dev]
 description = "Development flow with all features"
 category = "Development"
-run_task = { name = ["format", "build", "test"] }
+run_task = { name = ["build", "test", "correctness"] }
 
 [tasks.dev-default]
 description = "Development flow with default features"
 category = "Development"
-run_task = { name = ["format", "build-default", "test"] }
+run_task = { name = ["build-default", "test", "correctness"] }
 
 [tasks.dev-preview]
 description = "Development flow with preview features"
 category = "Development"
-run_task = { name = ["format", "build-preview", "test"] }
+run_task = { name = ["build-preview", "test", "correctness"] }
 
 [tasks.dev-experimental]
 description = "Development flow with experimental features"
 category = "Development"
-run_task = { name = ["format", "build-experimental", "test"] }
+run_task = { name = ["build-experimental", "test", "correctness"] }
+
+[tasks.correctness]
+description = "Run correctness checks"
+category = "Development"
+run_task = { name = ["format", "check-features", "clippy", "unused-deps"] }
 
 # =================================================================================================
 # Build Tasks - Daemon builds with different feature levels
@@ -63,6 +68,11 @@ description = "Build daemon with experimental features"
 category = "Build"
 command = "cargo"
 args = ["build", "--release", "--package=aranya-daemon", "--verbose", "--features=preview,afc,experimental,aqc", "${@}"]
+
+[tasks.build-full]
+description = "Build daemon with all features"
+category = "Build"
+alias = "build"
 
 # =================================================================================================
 # C API Build Tasks
@@ -134,37 +144,87 @@ cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
 
+[tasks.capi-lib-full]
+description = "Build C API library with all features"
+category = "C API"
+alias = "capi-lib"
+
 # =================================================================================================
 # CI Flows - Comprehensive testing for continuous integration
 # =================================================================================================
-[tasks.ci-flow]
-description = "CI flow with all features (default)"
+[tasks.ci-correctness]
+description = "CI correctness checks (mirrors correctness.yml)"
 category = "CI"
-env = { RUSTDOCFLAGS = "-Dwarnings" }
-run_task = { name = ["check-format", "build", "capi", "test", "clippy", "doc"] }
+run_task = { name = ["check-format", "clippy", "unused-deps", "check-features"] }
 
-[tasks.ci-default]
-description = "CI flow with default features only"
+[tasks.ci-tests]
+description = "CI test checks (mirrors tests.yml)"
 category = "CI"
-env = { RUSTDOCFLAGS = "-Dwarnings" }
-run_task = { name = ["check-format", "build-default", "capi-default", "test", "clippy", "doc"] }
+run_task = { name = ["test", "example-c", "example-rust"] }
 
-[tasks.ci-preview]
-description = "CI flow with preview features only"
+[tasks.ci-build]
+description = "CI build checks (mirrors build.yml)"
 category = "CI"
-env = { RUSTDOCFLAGS = "-Dwarnings" }
-run_task = { name = ["check-format", "build-preview", "capi-preview", "test", "clippy", "doc"] }
+run_task = { name = ["build", "package-daemon", "capi-header", "capi-lib", "package-capi", "git-unchanged"] }
 
-[tasks.ci-experimental]
-description = "CI flow with experimental features only"
+[tasks.ci-build-default]
+description = "CI build checks with default features"
+category = "CI"
+run_task = { name = ["build-default", "package-daemon", "capi-header", "capi-lib-default", "package-capi", "git-unchanged"] }
+
+[tasks.ci-build-preview]
+description = "CI build checks with preview features"
+category = "CI"
+run_task = { name = ["build-preview", "package-daemon", "capi-header", "capi-lib-preview", "package-capi", "git-unchanged"] }
+
+[tasks.ci-build-experimental]
+description = "CI build checks with experimental features"
+category = "CI"
+run_task = { name = ["build-experimental", "package-daemon", "capi-header", "capi-lib-experimental", "package-capi", "git-unchanged"] }
+
+[tasks.ci-docs]
+description = "CI documentation checks (mirrors doc.yml)"
 category = "CI"
 env = { RUSTDOCFLAGS = "-Dwarnings" }
-run_task = { name = ["check-format", "build-experimental", "capi-experimental", "test", "clippy", "doc"] }
+run_task = { name = ["capi-docs", "package-capi-docs", "doc"] }
+
+[tasks.ci-security]
+description = "CI security checks (mirrors security.yml)"
+category = "CI"
+run_task = { name = ["security-flow"] }
 
 [tasks.ci-complete]
-description = "Complete CI - all checks, security, quality, and examples"
+description = "Complete CI - all checks that run in GitHub Actions"
 category = "CI"
-run_task = { name = ["qa-flow", "ci-flow", "examples-flow"] }
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build", "ci-docs", "ci-security"] }
+
+[tasks.ci-complete-default]
+description = "Complete CI with default features"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build-default", "ci-docs", "ci-security"] }
+
+[tasks.ci-complete-preview]
+description = "Complete CI with preview features"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build-preview", "ci-docs", "ci-security"] }
+
+[tasks.ci-complete-experimental]
+description = "Complete CI with experimental features"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build-experimental", "ci-docs", "ci-security"] }
+
+# =================================================================================================
+# Quality Assurance Flows
+# =================================================================================================
+[tasks.qa-flow]
+description = "Quality assurance checks"
+category = "Quality"
+run_task = { name = ["check-format", "clippy", "check-features", "security-flow"] }
+
+[tasks.qa-complete]
+description = "Quality assurance checks"
+category = "Quality"
+run_task = { name = ["qa-flow", "test", "example-c", "example-rust"] }
 
 # =================================================================================================
 # Release Flow - For creating releases with packaged artifacts
@@ -172,22 +232,22 @@ run_task = { name = ["qa-flow", "ci-flow", "examples-flow"] }
 [tasks.release-flow]
 description = "Release flow - CI checks + artifact packaging"
 category = "Release"
-run_task = { name = ["ci-flow", "package-daemon", "package-capi", "package-docs"] }
+run_task = { name = ["ci-complete", "package-daemon", "package-capi", "package-docs"] }
 
 [tasks.release-flow-default]
 description = "Release flow with default features"
 category = "Release"
-run_task = { name = ["ci-default", "package-daemon", "package-capi", "package-docs"] }
+run_task = { name = ["ci-complete-default", "package-daemon", "package-capi", "package-docs"] }
 
 [tasks.release-flow-preview]
 description = "Release flow with preview features"
 category = "Release"
-run_task = { name = ["ci-preview", "package-daemon", "package-capi", "package-docs"] }
+run_task = { name = ["ci-complete-preview", "package-daemon", "package-capi", "package-docs"] }
 
 [tasks.release-flow-experimental]
 description = "Release flow with experimental features"
 category = "Release"
-run_task = { name = ["ci-experimental", "package-daemon", "package-capi", "package-docs"] }
+run_task = { name = ["ci-complete-experimental", "package-daemon", "package-capi", "package-docs"] }
 
 # =================================================================================================
 # Format Tasks - Code formatting
@@ -231,18 +291,8 @@ script = "git ls-files -z '*.toml' | xargs -0 -- taplo fmt --check --diff"
 dependencies = ["install-taplo"]
 
 # =================================================================================================
-# Quality Assurance
+# Quality Assurance Tasks
 # =================================================================================================
-[tasks.qa-flow]
-description = "Complete quality assurance checks"
-category = "Quality"
-run_task = { name = ["check-format", "clippy", "check-features", "security-flow"] }
-
-[tasks.correctness]
-description = "Run correctness checks"
-category = "Quality"
-run_task = { name = ["format", "check-features", "clippy", "unused-deps"] }
-
 [tasks.clippy]
 description = "Check code quality using clippy lints"
 category = "Quality"
@@ -309,7 +359,7 @@ env = { RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}" }
 dependencies = ["install-nightly"]
 
 # =================================================================================================
-# Documentation
+# Testing
 # =================================================================================================
 [tasks.test]
 description = "Run unit tests with all feature flag combinations"
@@ -375,7 +425,7 @@ description = "Package daemon binary"
 category = "Packaging"
 script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
 
-[tasks.tgz-capi]
+[tasks.package-capi]
 description = "Package C API artifacts"
 category = "Packaging"
 script = '''
@@ -416,7 +466,7 @@ script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/
 dependencies = ["capi-docs"]
 
 # =================================================================================================
-# Packaging Tasks
+# Metrics Collection
 # =================================================================================================
 [tasks.metrics]
 description = "Run metrics collection"
