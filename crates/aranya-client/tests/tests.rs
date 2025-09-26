@@ -275,7 +275,7 @@ async fn test_remove_team() -> Result<()> {
         owner.assign_role(devices.admin.id, Role::Admin).await?;
 
         admin
-            .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
+            .sync_now(devices.owner.aranya_local_addr().await?, None)
             .await?;
 
         // We should be able to successfully assign a role.
@@ -481,20 +481,17 @@ async fn test_hello_subscription() -> Result<()> {
 
     let sync_config = SyncPeerConfig::builder()
         .interval(Duration::from_secs(24 * 60 * 60))? // Long interval to ensure sync on hello is triggered)
-        // .expect("error setting interval")
         .sync_now(false)
         .sync_on_hello(true)
         .build()?;
 
-    membera_team
-        .add_sync_peer(admin_addr.into(), sync_config)
-        .await?;
+    membera_team.add_sync_peer(admin_addr, sync_config).await?;
     info!("membera added admin as sync peer with sync_on_hello=true");
 
     // MemberA subscribes to hello notifications from Admin
     membera_team
         .sync_hello_subscribe(
-            admin_addr.into(),
+            admin_addr,
             Duration::from_millis(100),
             Duration::from_millis(1000),
         ) // Short delay for faster testing
@@ -596,7 +593,7 @@ async fn test_hello_subscription() -> Result<()> {
         .await?;
     operator_team
         .sync_hello_subscribe(
-            admin_addr.into(),
+            admin_addr,
             Duration::from_millis(1500),
             Duration::from_millis(1000),
         )
@@ -606,12 +603,8 @@ async fn test_hello_subscription() -> Result<()> {
     // Test unsubscribing
     admin_team.sync_hello_unsubscribe(owner_addr).await?;
     operator_team.sync_hello_unsubscribe(owner_addr).await?;
-    operator_team
-        .sync_hello_unsubscribe(admin_addr.into())
-        .await?;
-    membera_team
-        .sync_hello_unsubscribe(admin_addr.into())
-        .await?;
+    operator_team.sync_hello_unsubscribe(admin_addr).await?;
+    membera_team.sync_hello_unsubscribe(admin_addr).await?;
     info!("all devices unsubscribed");
 
     // Test edge cases
@@ -627,9 +620,7 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Test unsubscribing from non-subscribed peer
     let memberb_addr = devices.memberb.aranya_local_addr().await?;
-    admin_team
-        .sync_hello_unsubscribe(memberb_addr.into())
-        .await?;
+    admin_team.sync_hello_unsubscribe(memberb_addr).await?;
     info!("tested unsubscribing from non-subscribed peer");
 
     Ok(())
