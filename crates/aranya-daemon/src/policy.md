@@ -1948,13 +1948,7 @@ function try_get_assigned_role(device_id id) optional struct Role {
     if assigned_role is None {
         return None
     }
-    let role = query Role[role_id: (unwrap assigned_role).role_id]
-    if role is None {
-        // The role doesn't exist. See the comment in
-        // `get_assigned_role` for more information.
-        return None
-    }
-    return Some(unwrap role)
+    return query Role[role_id: (unwrap assigned_role).role_id]
 }
 
 // Returns the role assigned to the device.
