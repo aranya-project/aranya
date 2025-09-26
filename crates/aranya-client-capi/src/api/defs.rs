@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
-#[cfg(any(feature = "afc", feature = "aqc"))]
+#[cfg(feature = "aqc")]
 use aranya_capi_core::opaque::Opaque;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 #[cfg(feature = "afc")]
