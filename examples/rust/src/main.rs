@@ -1,6 +1,6 @@
 use std::{
     env,
-    net::{Ipv4Addr, SocketAddr},
+    net::Ipv4Addr,
     path::{Path, PathBuf},
     str::FromStr,
     time::Duration,
@@ -158,7 +158,7 @@ impl ClientCtx {
         })
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 
@@ -210,7 +210,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval)?.build()?;
 
     let team_name = "rust_example";
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
@@ -294,6 +294,32 @@ async fn main() -> Result<()> {
 
     info!("assigning role");
     admin_team.assign_role(operator.id, Role::Operator).await?;
+
+    // Demo hello subscription functionality
+    info!("demonstrating hello subscription");
+
+    // Admin subscribes to hello notifications from Owner with 2-second delay
+    info!("admin subscribing to hello notifications from owner");
+    admin_team
+        .sync_hello_subscribe(owner_addr.into(), Duration::from_millis(2000), Duration::from_secs(30))
+        .await?;
+
+    // Operator subscribes to hello notifications from Admin with 1-second delay
+    info!("operator subscribing to hello notifications from admin");
+    operator_team
+        .sync_hello_subscribe(admin_addr.into(), Duration::from_millis(1000), Duration::from_secs(30))
+        .await?;
+
+    sleep(sleep_interval).await;
+
+    // Later, unsubscribe from hello notifications
+    info!("admin unsubscribing from hello notifications from owner");
+    admin_team.sync_hello_unsubscribe(owner_addr.into()).await?;
+
+    info!("operator unsubscribing from hello notifications from admin");
+    operator_team.sync_hello_unsubscribe(admin_addr.into()).await?;
+
+    sleep(sleep_interval).await;
 
     info!("adding sync peers");
     owner_team

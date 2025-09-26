@@ -657,6 +657,23 @@ AranyaError run(Team *t) {
 
     sleep(1);
 
+    // Demo hello subscription functionality
+    printf("demonstrating hello subscription\n");
+
+    // Admin subscribes to hello notifications from Owner with 2-second delay
+    printf("admin subscribing to hello notifications from owner\n");
+    err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
+                                      2000, 30000);
+    EXPECT("error subscribing admin to owner hello notifications", err);
+
+    // Operator subscribes to hello notifications from Admin with 1-second delay
+    printf("operator subscribing to hello notifications from admin\n");
+    err = aranya_sync_hello_subscribe(&operator->client, &t->id,
+                                      sync_addrs[ADMIN], 1000, 30000);
+    EXPECT("error subscribing operator to admin hello notifications", err);
+
+    sleep(1);
+
     // assign AQC network addresses.
     err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
                                            &membera->id, aqc_addrs[MEMBERA]);
@@ -754,6 +771,19 @@ AranyaError run(Team *t) {
     err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
                                            &memberb->id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
+
+    // Later, unsubscribe from hello notifications
+    printf("admin unsubscribing from hello notifications from owner\n");
+    err = aranya_sync_hello_unsubscribe(&admin->client, &t->id,
+                                        sync_addrs[OWNER]);
+    EXPECT("error unsubscribing admin from owner hello notifications", err);
+
+    printf("operator unsubscribing from hello notifications from admin\n");
+    err = aranya_sync_hello_unsubscribe(&operator->client, &t->id,
+                                        sync_addrs[ADMIN]);
+    EXPECT("error unsubscribing operator from admin hello notifications", err);
+
+    sleep(1);
 
     err = run_aqc_example(t);
     EXPECT("error running aqc example", err);
@@ -1152,6 +1182,22 @@ AranyaError run_aqc_example(Team *t) {
     EXPECT("error assigning label2 to memberb", err);
     sleep(1);
 
+    // Demo hello subscription with members
+    printf("demonstrating hello subscription with members\n");
+
+    // Members subscribe to each other with different delays
+    printf("membera subscribing to hello notifications from memberb\n");
+    err = aranya_sync_hello_subscribe(&membera->client, &t->id,
+                                      sync_addrs[MEMBERB], 500, 30000);
+    EXPECT("error subscribing membera to memberb hello notifications", err);
+
+    printf("memberb subscribing to hello notifications from membera\n");
+    err = aranya_sync_hello_subscribe(&memberb->client, &t->id,
+                                      sync_addrs[MEMBERA], 1500, 30000);
+    EXPECT("error subscribing memberb to membera hello notifications", err);
+
+    sleep(1);
+
     // Queries
     printf("query if label exists on team \n");
     bool exists = false;
@@ -1228,6 +1274,17 @@ AranyaError run_aqc_example(Team *t) {
 
     ctx_thread1.client = &membera->client;
     ctx_thread2.client = &memberb->client;
+
+    // Unsubscribe before AQC demo
+    printf("members unsubscribing from hello notifications\n");
+    err = aranya_sync_hello_unsubscribe(&membera->client, &t->id,
+                                        sync_addrs[MEMBERB]);
+    EXPECT("error unsubscribing membera from memberb hello notifications", err);
+    err = aranya_sync_hello_unsubscribe(&memberb->client, &t->id,
+                                        sync_addrs[MEMBERA]);
+    EXPECT("error unsubscribing memberb from membera hello notifications", err);
+
+    sleep(1);
 
     pthread_create(&thread1, NULL, membera_aqc_thread, &ctx_thread1);
     pthread_create(&thread2, NULL, memberb_aqc_thread, &ctx_thread2);

@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
@@ -18,7 +18,7 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::GraphId;
+use aranya_runtime::{Address, GraphId, Storage, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
@@ -27,7 +27,10 @@ use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::{net::UnixListener, sync::mpsc};
+use tokio::{
+    net::UnixListener,
+    sync::{mpsc, Mutex},
+};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
@@ -123,6 +126,9 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             #[cfg(feature = "aqc")]
             aqc: aqc.clone(),
+            client: Some(client.clone()),
+            peers: Some(peers.clone()),
+            prev_head_addresses: Arc::new(Mutex::new(HashMap::new())),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -135,7 +141,7 @@ impl DaemonApiServer {
             aqc,
             #[cfg(feature = "afc")]
             afc,
-            crypto: tokio::sync::Mutex::new(crypto),
+            crypto: Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
@@ -207,6 +213,10 @@ impl DaemonApiServer {
 struct EffectHandler {
     #[cfg(feature = "aqc")]
     aqc: Option<Arc<Aqc<CE, KS>>>,
+    client: Option<Client>,
+    peers: Option<SyncPeers>,
+    /// Stores the previous head address for each graph to detect changes
+    prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
 }
 
 impl EffectHandler {
@@ -274,6 +284,104 @@ impl EffectHandler {
                 QueryAqcNetworkNamesOutput(_) => {}
             }
         }
+
+        // Check if the graph head address has changed
+        if let Some(current_head) = self.get_graph_head_address(graph).await {
+            let mut prev_addresses = self.prev_head_addresses.lock().await;
+            let has_graph_changes = match prev_addresses.get(&graph) {
+                Some(prev_head) => prev_head != &current_head,
+                None => true, // First time seeing this graph
+            };
+
+            debug!(
+                ?graph,
+                ?current_head,
+                ?has_graph_changes,
+                effects_count = effects.len(),
+                "checking for graph head address changes"
+            );
+
+            if has_graph_changes {
+                debug!(
+                    ?graph,
+                    ?current_head,
+                    "graph head address changed, triggering hello notification broadcast"
+                );
+                // Update stored head address
+                prev_addresses.insert(graph, current_head);
+                drop(prev_addresses); // Release the lock before async call
+
+                self.broadcast_hello_notifications(graph, current_head)
+                    .await?;
+            } else {
+                debug!(
+                    ?graph,
+                    "graph head address unchanged, no hello broadcast needed"
+                );
+            }
+        } else {
+            warn!(?graph, "unable to get current graph head address");
+        }
+
+        Ok(())
+    }
+
+    /// Gets the current graph head address using the proper Location->Segment->Command->Address flow.
+    async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
+        let client = self.client.as_ref()?;
+
+        let mut aranya = client.aranya.lock().await;
+        let storage = aranya.provider().get_storage(graph_id).ok()?;
+
+        storage.get_head_address().ok()
+    }
+
+    /// Broadcasts hello notifications to subscribers when the graph changes.
+    #[instrument(skip(self), err)]
+    async fn broadcast_hello_notifications(
+        &self,
+        graph_id: GraphId,
+        head: Address,
+    ) -> anyhow::Result<()> {
+        // Use the SyncPeers interface to trigger hello broadcasting
+        // This will be handled by the QUIC syncer which has access to the subscription data
+        if let Err(e) = self.trigger_hello_broadcast(graph_id, head).await {
+            debug!(
+                error = %e,
+                ?graph_id,
+                ?head,
+                "Failed to trigger hello broadcast"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Triggers hello notification broadcasting via the SyncPeers interface.
+    #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
+    async fn trigger_hello_broadcast(
+        &self,
+        graph_id: GraphId,
+        head: Address,
+    ) -> anyhow::Result<()> {
+        if let Some(peers) = &self.peers {
+            info!(?graph_id, ?head, "Calling peers.broadcast_hello");
+            if let Err(e) = peers.broadcast_hello(graph_id, head).await {
+                trace!(
+                    error = %e,
+                    ?graph_id,
+                    ?head,
+                    "peers.broadcast_hello failed"
+                );
+                return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
+            }
+        } else {
+            trace!(
+                ?graph_id,
+                ?head,
+                "No peers interface available for hello broadcasting"
+            );
+        }
         Ok(())
     }
 }
@@ -300,7 +408,7 @@ struct ApiInner {
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
-    crypto: tokio::sync::Mutex<Crypto>,
+    crypto: Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
 }
@@ -355,8 +463,8 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn aranya_local_addr(self, context: context::Context) -> api::Result<SocketAddr> {
-        Ok(self.local_addr)
+    async fn aranya_local_addr(self, context: context::Context) -> api::Result<Addr> {
+        Ok(self.local_addr.into())
     }
 
     #[instrument(skip(self), err)]
@@ -406,6 +514,38 @@ impl DaemonApi for Api {
 
         self.peers
             .sync_now(peer, team.into_id().into(), cfg)
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn sync_hello_subscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+        delay: Duration,
+        duration: Duration,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.peers
+            .sync_hello_subscribe(peer, team.into_id().into(), delay, duration)
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn sync_hello_unsubscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.peers
+            .sync_hello_unsubscribe(peer, team.into_id().into())
             .await?;
         Ok(())
     }
@@ -989,17 +1129,27 @@ impl DaemonApi for Api {
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 
+        let graph = GraphId::from(team.into_id());
+
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_label(label_name)
             .await
             .context("unable to create AQC label")?;
-        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label_id.into())
+        let label_id = if let Some(Effect::LabelCreated(e)) =
+            find_effect!(&effects, Effect::LabelCreated(_e))
+        {
+            e.label_id.into()
         } else {
-            Err(anyhow!("unable to create AQC label").into())
-        }
+            warn!("No LabelCreated effect found!");
+            return Err(anyhow!("unable to create AQC label").into());
+        };
+
+        // Send effects to the effect handler for processing (including hello notifications)
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        Ok(label_id)
     }
 
     /// Delete a label.

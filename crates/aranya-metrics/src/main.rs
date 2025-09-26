@@ -213,7 +213,7 @@ impl ClientCtx {
         })
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 
