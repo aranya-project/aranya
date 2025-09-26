@@ -29,6 +29,8 @@ add_compile_options(
     -Wno-gnu-zero-variadic-macro-arguments
 )
 
+add_compile_options(-DENABLE_AFC)
+add_compile_options(-DENABLE_ARANYA_PREVIEW)
 add_compile_options(-DENABLE_AQC)
 add_compile_options(-DENABLE_ARANYA_EXPERIMENTAL)
 
