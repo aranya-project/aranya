@@ -57,7 +57,7 @@ aqc.enable = true
 
 [afc]
 enable = true
-shm_path = "/shm_test_${device}"
+shm_path = "/shm_${device}"
 max_chans = 100
 
 [sync.quic]
