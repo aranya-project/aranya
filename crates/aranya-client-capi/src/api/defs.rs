@@ -1428,7 +1428,6 @@ pub unsafe fn sync_hello_subscribe(
     delay: Duration,
     duration: Duration,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
     client
@@ -1455,7 +1454,6 @@ pub unsafe fn sync_hello_unsubscribe(
     team: &TeamId,
     peer: Addr,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
     client

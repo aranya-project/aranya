@@ -384,6 +384,9 @@ impl Team<'_> {
     /// This will request the peer to send hello notifications when their graph head changes.
     /// The `delay` parameter specifies the minimum delay between notifications.
     /// The `duration` parameter specifies how long the subscription should last.
+    ///
+    /// To automatically sync when receiving a hello message, call [`add_sync_peer`] with
+    /// [`SyncPeerConfig::sync_on_hello`] set to `true`.
     pub async fn sync_hello_subscribe(
         &self,
         peer: Addr,
