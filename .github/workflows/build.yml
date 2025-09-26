@@ -23,7 +23,7 @@ jobs:
   build-release:
     strategy:
       matrix:
-        features: ["default", "preview", "experimental"]
+        features: ["default", "preview", "experimental", "full"]
         runner: ["ubuntu2404-arm64-4core", "ubuntu-latest"]
         include:
           - runner: "ubuntu2404-arm64-4core"
@@ -40,7 +40,7 @@ jobs:
       - name: Build code
         run: |
           cargo make build-${{ matrix.features }}
-          cargo make tgz-daemon
+          cargo make package-daemon
 
       - name: Verify build didn't change any checked-in files
         run: cargo make git-unchanged
@@ -55,7 +55,7 @@ jobs:
   build-aranya-lib:
     strategy:
       matrix:
-        features: ["default", "preview", "experimental"]
+        features: ["default", "preview", "experimental", "full"]
         runner: ["ubuntu2404-arm64-4core", "ubuntu-latest"]
         include:
           - runner: "ubuntu2404-arm64-4core"
@@ -72,9 +72,9 @@ jobs:
 
       - name: Build Aranya Shared Library
         run: |
-          cargo make build-capi-header
-          cargo make build-capi-lib-${{ matrix.features }}
-          cargo make tgz-capi
+          cargo make capi-header
+          cargo make capi-lib-${{ matrix.features }}
+          cargo make package-capi
           cargo make git-unchanged
 
       - name: Publish aranya lib

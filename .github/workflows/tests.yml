@@ -36,7 +36,6 @@ jobs:
       - name: Unit Tests
         run: cargo make test
 
-
   c-example-application:
     strategy:
       matrix:
@@ -53,7 +52,7 @@ jobs:
       - name: C Example Application
         run: |
           export CC=clang
-          cargo make run-capi-example
+          cargo make example-c
 
   rust-example-application:
     strategy:
@@ -70,4 +69,4 @@ jobs:
 
       - name: Rust Example Application
         run: |
-          cargo make run-rust-example
+          cargo make example-rust
