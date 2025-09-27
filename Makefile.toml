@@ -12,7 +12,7 @@ skip_rust_env_info = true
 
 [tasks.default]
 description = "List available tasks"
-private = true
+category = "Default"
 script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 
 # =================================================================================================
@@ -370,34 +370,37 @@ description = "Run C example with all features"
 category = "Examples"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["capi"]
 
 [tasks.example-c-default]
 description = "Run C example with default features"
 category = "Examples"
 cwd = "examples/c"
 script = "./run.bash default"
-dependencies = ["capi-default"]
 
 [tasks.example-c-preview]
 description = "Run C example with preview features"
 category = "Examples"
 cwd = "examples/c"
 script = "./run.bash preview"
-dependencies = ["capi-preview"]
 
 [tasks.example-c-experimental]
 description = "Run C example with experimental features"
 category = "Examples"
 cwd = "examples/c"
 script = "./run.bash experimental"
-dependencies = ["capi-experimental"]
 
 [tasks.example-rust]
 description = "Run Rust example application"
 category = "Examples"
 cwd = "examples/rust"
 script = "./run.bash"
+
+[tasks.build-example-rust]
+description = "Build Rust example application"
+category = "Examples"
+command = "cargo"
+workspace = false
+args = ["build", "--release", "--manifest-path", "examples/rust/Cargo.toml", "--locked"]
 
 [tasks.examples-flow]
 description = "Run all examples"
