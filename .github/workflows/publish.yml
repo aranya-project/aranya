@@ -56,7 +56,7 @@ jobs:
       - build
     strategy:
       matrix:
-        features: ["default", "preview", "experimental"]
+        features: ["default", "preview", "experimental", "full"]
         target:
           - aarch64-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
@@ -73,7 +73,7 @@ jobs:
       - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
-            GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-daemon-${{ matrix.target }}-${{ matrix.features }}/aranya-daemon.tar.gz
@@ -88,7 +88,7 @@ jobs:
       - build
     strategy:
       matrix:
-        features: ["default", "preview", "experimental"]
+        features: ["default", "preview", "experimental", "full"]
         target:
           - aarch64-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
@@ -105,7 +105,7 @@ jobs:
       - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
-            GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-${{ matrix.target }}-${{ matrix.features }}/aranya-client-lib.tar.gz
@@ -129,7 +129,7 @@ jobs:
           path: aranya-client-capi-docs
 
       - name: Extract
-        run:  |
+        run: |
           cd aranya-client-capi-docs
           tar -xzf aranya-client-capi-docs.tar.gz
 
@@ -147,7 +147,7 @@ jobs:
       - name: Upload capi docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
-            GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-docs/aranya-client-capi-docs.tar.gz
