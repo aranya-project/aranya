@@ -15,8 +15,9 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::Role, config::{CreateTeamConfig, SyncPeerConfig}, AddTeamConfig, 
-    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    client::Role,
+    config::{CreateTeamConfig, SyncPeerConfig},
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use test_log::test;
 use tracing::{debug, info};
