@@ -2439,7 +2439,7 @@ pub fn afc_get_label_id(channel: &AfcChannel) -> LabelId {
 /// @param[out] ptr the raw pointer of the stored buffer.
 /// @param[out] len the raw length of the stored buffer.
 #[cfg(feature = "afc")]
-pub fn afc_get_msg_data(
+pub fn afc_ctrl_msg_get_bytes(
     control: &AfcCtrlMsg,
     ptr: &mut MaybeUninit<*const u8>,
     len: &mut MaybeUninit<usize>,

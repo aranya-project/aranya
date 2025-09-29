@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,13 +76,13 @@ typedef enum {
 } Members;
 
 // List of Unix domain socket paths for the Aranya clients.
-const char *daemon_socks[] = {
+const char* daemon_socks[] = {
     "out/owner/run/uds.sock", "out/admin/run/uds.sock",
     "out/operator/run/uds.sock", "out/membera/run/uds.sock",
     "out/memberb/run/uds.sock"};
 
 // List of names for the Aranya clients.
-const char *client_names[] = {"owner", "admin", "operator", "membera",
+const char* client_names[] = {"owner", "admin", "operator", "membera",
                               "memberb"};
 
 // List of sync addresses.
@@ -90,18 +91,18 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
                                  "127.0.0.1:10005"};
 
 // List of AQC addresses.
-const char *aqc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
+const char* aqc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
                            "127.0.0.1:11003", "127.0.0.1:11004",
                            "127.0.0.1:11005"};
 
 // Aranya client.
 typedef struct {
     // Name of Aranya client.
-    const char *name;
+    const char* name;
     // Pointer to Aranya client.
     AranyaClient client;
     // Aranya client's serialized public key bundle.
-    uint8_t *pk;
+    uint8_t* pk;
     // Aranya client's serialized public key bundle length.
     size_t pk_len;
     // Aranya client's public id.
@@ -139,17 +140,22 @@ typedef struct {
 } Team;
 
 // Forward Declarations
-AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
-                        const char *aqc_addr);
-AranyaError init_team(Team *t);
-AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
-AranyaError run(Team *t);
-AranyaError run_aqc_example(Team *t);
-AranyaError cleanup_team(Team *t);
+AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
+                        const char* aqc_addr);
+AranyaError init_team(Team* t);
+AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
+AranyaError run(Team* t);
+AranyaError run_afc_example(Team* t);
+AranyaError run_aqc_example(Team* t);
+AranyaError cleanup_team(Team* t);
+
+AranyaError aranya_allocate_label(AranyaClient* client, AranyaTeamId* id,
+                                  const char* label_name,
+                                  AranyaLabelId* label_id, int num_peers, ...);
 
 // Initialize an Aranya `Client` with the given parameters.
-AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
-                        const char *aqc_addr) {
+AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
+                        const char* aqc_addr) {
     AranyaError err;
     c->name = name;
 
@@ -232,7 +238,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         // Too small, so the actual size was written to
         // `c->pk_len`.
-        uint8_t *new_pk = realloc(c->pk, c->pk_len);
+        uint8_t* new_pk = realloc(c->pk, c->pk_len);
         if (new_pk == NULL) {
             abort();
         }
@@ -251,27 +257,27 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
 // Initialize the Aranya `Team` by first initializing the team's clients and
 // then creates the team.
-AranyaError init_team(Team *t) {
+AranyaError init_team(Team* t) {
     AranyaError err;
 
-    Client *owner = &t->clients.owner;
-    Client *admin = &t->clients.admin;
-    Client *operator= & t->clients.operator;
-    Client *membera = &t->clients.membera;
-    Client *memberb = &t->clients.memberb;
+    Client* owner = &t->clients.owner;
+    Client* admin = &t->clients.admin;
+    Client* operator= & t->clients.operator;
+    Client* membera = &t->clients.membera;
+    Client* memberb = &t->clients.memberb;
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
 
-        char *sock_path = realpath(daemon_socks[i], NULL);
+        char* sock_path = realpath(daemon_socks[i], NULL);
         if (sock_path == NULL) {
             fprintf(stderr, "`realpath(%s,...)` failed: %s\n", daemon_socks[i],
                     strerror(errno));
             return ARANYA_ERROR_OTHER;
         }
 
-        Client *client = &t->clients_arr[i];
+        Client* client = &t->clients_arr[i];
         err = init_client(client, client_names[i], sock_path, aqc_addrs[i]);
         free(sock_path);
         if (err != ARANYA_ERROR_SUCCESS) {
@@ -448,7 +454,7 @@ AranyaError init_team(Team *t) {
         } else {
             printf("encrypting PSK seed for peer\n");
             size_t wrapped_seed_len = 100;
-            uint8_t *wrapped_seed   = calloc(wrapped_seed_len, 1);
+            uint8_t* wrapped_seed   = calloc(wrapped_seed_len, 1);
             err                     = aranya_encrypt_psk_seed_for_peer(
                 &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
                 t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
@@ -519,7 +525,7 @@ AranyaError init_team(Team *t) {
             return err;
         }
 
-        Client *client = &t->clients_arr[i];
+        Client* client = &t->clients_arr[i];
         err            = aranya_add_team(&client->client, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
@@ -532,7 +538,7 @@ AranyaError init_team(Team *t) {
 }
 
 // Cleanup Aranya `Team`.
-AranyaError cleanup_team(Team *t) {
+AranyaError cleanup_team(Team* t) {
     AranyaError err;
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
 
@@ -560,7 +566,7 @@ AranyaError cleanup_team(Team *t) {
 // Add sync peers.
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
-AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
+AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg) {
     AranyaError err;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -585,15 +591,15 @@ AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
 }
 
 // Run the example.
-AranyaError run(Team *t) {
+AranyaError run(Team* t) {
     AranyaError err;
-    AranyaDeviceId *devices = NULL;
+    AranyaDeviceId* devices = NULL;
 
-    Client *owner = &t->clients.owner;
-    Client *admin = &t->clients.admin;
-    Client *operator= & t->clients.operator;
-    Client *membera = &t->clients.membera;
-    Client *memberb = &t->clients.memberb;
+    Client* owner = &t->clients.owner;
+    Client* admin = &t->clients.admin;
+    Client* operator= & t->clients.operator;
+    Client* membera = &t->clients.membera;
+    Client* memberb = &t->clients.memberb;
 
     // initialize logging.
     printf("initializing logging\n");
@@ -763,17 +769,118 @@ exit:
     return err;
 }
 
+AranyaError aranya_allocate_label(AranyaClient* client, AranyaTeamId* id,
+                                  const char* label_name,
+                                  AranyaLabelId* label_id, int num_peers, ...) {
+    AranyaError err = ARANYA_ERROR_OTHER;
+
+    err = aranya_create_label(client, id, label_name, label_id);
+    EXPECT("error creating label", err);
+
+    va_list args;
+    va_start(args, num_peers);
+
+    for (int i = 0; i < num_peers; i++) {
+        // va_arg promotes smaller primitives to int, so we downcast back
+        AranyaChanOp op          = va_arg(args, int);
+        AranyaDeviceId device_id = va_arg(args, AranyaDeviceId);
+
+        err = aranya_assign_label(client, id, &device_id, label_id, op);
+        EXPECT("error assigning label", err);
+    }
+
+exit:
+    va_end(args);
+    return err;
+}
+
+// Run the AFC example.
+AranyaError run_afc_example(Team* t) {
+    AranyaError err = ARANYA_ERROR_OTHER;
+
+    unsigned char* ciphertext = NULL;
+    unsigned char* plaintext  = NULL;
+
+    Client* operator= & t->clients.operator;
+    Client* membera = &t->clients.membera;
+    Client* memberb = &t->clients.memberb;
+
+    AranyaLabelId label1_id;
+    AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
+    err = aranya_allocate_label(&operator->client, &t->id, "label1", &label1_id,
+                                2, &membera->id, op, &memberb->id, op);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        goto exit;
+    }
+
+    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OPERATOR], NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
+    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OPERATOR], NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
+    AranyaAfcChannel channel_a;
+    AranyaAfcCtrlMsg message;
+    err = aranya_afc_create_bidi_channel(&membera->client, &t->id, &memberb->id,
+                                         &label1_id, &channel_a, &message);
+    EXPECT("error creating a bidi channel from membera", err);
+
+    const uint8_t* ptr;
+    size_t len;
+    err = aranya_afc_ctrl_msg_get_bytes(&message, &ptr, &len);
+    EXPECT("error getting ptr+len from `AranyaAfcCtrlMsg`", err);
+
+    AranyaAfcChannel channel_b;
+    err = aranya_afc_recv_ctrl(&memberb->client, &t->id, ptr, len, &channel_b,
+                               NULL);
+    EXPECT("error creating a bidi channel from memberb", err);
+
+    const char* afc_msg   = "afc msg";
+    size_t afc_msg_len    = strlen(afc_msg);
+    size_t ciphertext_len = afc_msg_len + aranya_afc_channel_overhead();
+    ciphertext            = calloc(ciphertext_len, 1);
+    if (ciphertext == NULL) {
+        err = ARANYA_ERROR_BUG;
+        goto exit;
+    }
+
+    err = aranya_afc_channel_seal(&channel_a, (const uint8_t*)afc_msg,
+                                  afc_msg_len, ciphertext, ciphertext_len);
+    EXPECT("error sealing afc message", err);
+
+    size_t plaintext_len = ciphertext_len - aranya_afc_channel_overhead();
+    plaintext            = calloc(plaintext_len, 1);
+    if (plaintext == NULL) {
+        err = ARANYA_ERROR_BUG;
+        goto exit;
+    }
+
+    AranyaAfcSeq seq;
+    err = aranya_afc_channel_open(&channel_b, ciphertext, ciphertext_len,
+                                  plaintext, plaintext_len, &seq);
+    EXPECT("error opening afc message", err);
+
+    if (strcmp(afc_msg, (const char*)plaintext)) {
+        EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
+    }
+
+exit:
+    free(ciphertext);
+    free(plaintext);
+    return err;
+}
+
 // Thread-unique data.
 typedef struct {
-    AranyaClient *client;
+    AranyaClient* client;
     AranyaTeamId id;
     AranyaLabelId label1;
     AranyaLabelId label2;
     AranyaError result;
 } channel_context_t;
 
-static void *membera_aqc_thread(void *arg) {
-    channel_context_t *ctx = (channel_context_t *)arg;
+static void* membera_aqc_thread(void* arg) {
+    channel_context_t* ctx = (channel_context_t*)arg;
     AranyaError err;
 
     AranyaAqcBidiChannel bidi_chan;
@@ -818,9 +925,9 @@ static void *membera_aqc_thread(void *arg) {
 
     // Send some data to make sure it works.
     printf("membera: Sending bidi stream data\n");
-    const char *bidi_string = "hello from aqc membera!";
+    const char* bidi_string = "hello from aqc membera!";
     err = aranya_aqc_bidi_stream_send(ctx->client, &bidi_stream,
-                                      (const uint8_t *)bidi_string,
+                                      (const uint8_t*)bidi_string,
                                       strnlen(bidi_string, BUFFER_LEN - 1) + 1);
     EXPECT("membera: Unable to send bidi data from Member A", err);
 
@@ -834,9 +941,9 @@ static void *membera_aqc_thread(void *arg) {
     sleep(1);
 
     printf("membera: Sending uni stream data\n");
-    const char *uni_string = "hello from aqc uni membera!";
+    const char* uni_string = "hello from aqc uni membera!";
     err = aranya_aqc_send_stream_send(ctx->client, &send_stream,
-                                      (const uint8_t *)uni_string,
+                                      (const uint8_t*)uni_string,
                                       strnlen(uni_string, BUFFER_LEN - 1) + 1);
     EXPECT("membera: Unable to send uni data from Member A", err);
 
@@ -846,7 +953,7 @@ static void *membera_aqc_thread(void *arg) {
     size_t bidi_recv_length = BUFFER_LEN;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("membera: Trying to receive member b's stream data\n");
-    POLL(aranya_aqc_bidi_stream_try_recv(&bidi_stream, (uint8_t *)bidi_buffer,
+    POLL(aranya_aqc_bidi_stream_try_recv(&bidi_stream, (uint8_t*)bidi_buffer,
                                          &bidi_recv_length),
          "membera: error receiving aqc stream data");
 
@@ -868,7 +975,7 @@ static void *membera_aqc_thread(void *arg) {
     size_t uni_recv_length = BUFFER_LEN;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("membera: Trying to receive member b's stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(&recv_stream, (uint8_t *)uni_buffer,
+    POLL(aranya_aqc_recv_stream_try_recv(&recv_stream, (uint8_t*)uni_buffer,
                                          &uni_recv_length),
          "membera: error receving aqc stream data");
 
@@ -926,8 +1033,8 @@ exit:
     return NULL;
 }
 
-static void *memberb_aqc_thread(void *arg) {
-    channel_context_t *ctx = (channel_context_t *)arg;
+static void* memberb_aqc_thread(void* arg) {
+    channel_context_t* ctx = (channel_context_t*)arg;
     AranyaError err;
 
     AranyaAqcPeerChannel bidi_channel;
@@ -987,7 +1094,7 @@ static void *memberb_aqc_thread(void *arg) {
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("memberb: Trying to receive the bidi stream data\n");
     POLL(aranya_aqc_recv_stream_try_recv(
-             &bidi_recv_stream, (uint8_t *)bidi_buffer, &bidi_recv_length),
+             &bidi_recv_stream, (uint8_t*)bidi_buffer, &bidi_recv_length),
          "memberb: error receving aqc stream data");
 
     if (strncmp("hello from aqc membera!", bidi_buffer, BUFFER_LEN)) {
@@ -1016,8 +1123,8 @@ static void *memberb_aqc_thread(void *arg) {
     size_t uni_recv_length = BUFFER_LEN;
     memset(uni_buffer, 0, BUFFER_LEN);
     printf("memberb: Trying to receive the uni stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(
-             &uni_recv_stream, (uint8_t *)uni_buffer, &uni_recv_length),
+    POLL(aranya_aqc_recv_stream_try_recv(&uni_recv_stream, (uint8_t*)uni_buffer,
+                                         &uni_recv_length),
          "memberb: error receving aqc stream data");
 
     if (strncmp("hello from aqc uni membera!", uni_buffer, BUFFER_LEN)) {
@@ -1029,9 +1136,9 @@ static void *memberb_aqc_thread(void *arg) {
 
     // Send some data to make sure it works.
     printf("memberb: Sending some data back from member b\n");
-    const char *bidi_string = "hello from aqc memberb!";
+    const char* bidi_string = "hello from aqc memberb!";
     err = aranya_aqc_send_stream_send(ctx->client, &bidi_send_stream,
-                                      (const uint8_t *)bidi_string,
+                                      (const uint8_t*)bidi_string,
                                       strnlen(bidi_string, BUFFER_LEN - 1) + 1);
     EXPECT("memberb: Unable to send bidi data from Member B", err);
 
@@ -1043,9 +1150,9 @@ static void *memberb_aqc_thread(void *arg) {
     EXPECT("memberb: Unable to open a uni stream from Member B", err);
 
     // Need to send data to make sure Member A actually receives our stream.
-    const char *uni_string = "hello from aqc uni memberb!";
+    const char* uni_string = "hello from aqc uni memberb!";
     err = aranya_aqc_send_stream_send(ctx->client, &uni_send_stream,
-                                      (const uint8_t *)uni_string,
+                                      (const uint8_t*)uni_string,
                                       strnlen(uni_string, BUFFER_LEN - 1) + 1);
     EXPECT("memberb: Unable to send uni data from Member B", err);
 
@@ -1103,14 +1210,14 @@ exit:
 }
 
 // Run the AQC example.
-AranyaError run_aqc_example(Team *t) {
+AranyaError run_aqc_example(Team* t) {
     AranyaError err       = ARANYA_ERROR_OTHER;
-    AranyaLabelId *labels = NULL;
+    AranyaLabelId* labels = NULL;
 
-    Client *admin = &t->clients.admin;
-    Client *operator= & t->clients.operator;
-    Client *membera = &t->clients.membera;
-    Client *memberb = &t->clients.memberb;
+    Client* admin = &t->clients.admin;
+    Client* operator= & t->clients.operator;
+    Client* membera = &t->clients.membera;
+    Client* memberb = &t->clients.memberb;
 
     pthread_t thread1, thread2;
     channel_context_t ctx_thread1 = {0};
@@ -1121,35 +1228,21 @@ AranyaError run_aqc_example(Team *t) {
     // Create label and assign it to members
     printf("creating labels\n");
 
-    const char *label1_name = "label1";
     AranyaLabelId label1_id;
-    err =
-        aranya_create_label(&operator->client, &t->id, label1_name, &label1_id);
-    EXPECT("error creating label1", err);
-
-    const char *label2_name = "label2";
     AranyaLabelId label2_id;
-    err =
-        aranya_create_label(&operator->client, &t->id, label2_name, &label2_id);
-    EXPECT("error creating label2", err);
-
-    printf("assigning label to members\n");
     AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
-    err = aranya_assign_label(&operator->client, &t->id, &membera->id,
-                              &label1_id, op);
-    EXPECT("error assigning label1 to membera", err);
+    err = aranya_allocate_label(&operator->client, &t->id, "label1", &label1_id,
+                                2, &membera->id, op, &memberb->id, op);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        goto exit;
+    }
 
-    err = aranya_assign_label(&operator->client, &t->id, &memberb->id,
-                              &label1_id, op);
-    EXPECT("error assigning label2 to memberb", err);
+    err = aranya_allocate_label(&operator->client, &t->id, "label2", &label2_id,
+                                2, &membera->id, op, &memberb->id, op);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        goto exit;
+    }
 
-    err = aranya_assign_label(&operator->client, &t->id, &membera->id,
-                              &label2_id, op);
-    EXPECT("error assigning label2 to membera", err);
-
-    err = aranya_assign_label(&operator->client, &t->id, &memberb->id,
-                              &label2_id, op);
-    EXPECT("error assigning label2 to memberb", err);
     sleep(1);
 
     // Queries
@@ -1251,7 +1344,7 @@ exit:
     return err;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     Team team       = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
     int retErr      = EXIT_SUCCESS;
@@ -1259,7 +1352,7 @@ int main(int argc, char *argv[]) {
     // parse arguments.
     team.seed_mode = GENERATE;
     if (argc >= 2) {
-        char *seed_mode_arg = argv[1];
+        char* seed_mode_arg = argv[1];
         if (!strncmp(seed_mode_arg, "raw_seed_ikm", 10)) {
             team.seed_mode = RAW_IKM;
         }

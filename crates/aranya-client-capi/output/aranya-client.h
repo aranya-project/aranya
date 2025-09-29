@@ -3839,9 +3839,9 @@ AranyaError aranya_afc_get_label_id_ext(const struct AranyaAfcChannel *channel,
  * @param[out] ptr the raw pointer of the stored buffer.
  * @param[out] len the raw length of the stored buffer.
  */
-AranyaError aranya_afc_get_msg_data(const struct AranyaAfcCtrlMsg *control,
-                                    const uint8_t **ptr,
-                                    size_t *len);
+AranyaError aranya_afc_ctrl_msg_get_bytes(const struct AranyaAfcCtrlMsg *control,
+                                          const uint8_t **ptr,
+                                          size_t *len);
 #endif
 
 #if defined(ENABLE_AFC)
@@ -3854,10 +3854,10 @@ AranyaError aranya_afc_get_msg_data(const struct AranyaAfcCtrlMsg *control,
  * @param[out] ptr the raw pointer of the stored buffer.
  * @param[out] len the raw length of the stored buffer.
  */
-AranyaError aranya_afc_get_msg_data_ext(const struct AranyaAfcCtrlMsg *control,
-                                        const uint8_t **ptr,
-                                        size_t *len,
-                                        struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_ctrl_msg_get_bytes_ext(const struct AranyaAfcCtrlMsg *control,
+                                              const uint8_t **ptr,
+                                              size_t *len,
+                                              struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_AFC)
