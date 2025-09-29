@@ -3,7 +3,6 @@
 use std::{
     fmt::{self, Debug, Display},
     io,
-    net::SocketAddr,
     path::Path,
     str::FromStr,
     time::Duration,
@@ -568,7 +567,7 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_subscribe(context::current(), peer, self.team_id, delay, duration)
+            .sync_hello_subscribe(context::current(), peer, self.team_id.__id, delay, duration)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -580,7 +579,7 @@ impl Team<'_> {
     pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_unsubscribe(context::current(), peer, self.team_id)
+            .sync_hello_unsubscribe(context::current(), peer, self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
