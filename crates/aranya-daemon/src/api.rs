@@ -293,16 +293,8 @@ impl EffectHandler {
                 None => true, // First time seeing this graph
             };
 
-            debug!(
-                ?graph,
-                ?current_head,
-                ?has_graph_changes,
-                effects_count = effects.len(),
-                "checking for graph head address changes"
-            );
-
             if has_graph_changes {
-                debug!(
+                trace!(
                     ?graph,
                     ?current_head,
                     "graph head address changed, triggering hello notification broadcast"
@@ -314,7 +306,7 @@ impl EffectHandler {
                 self.broadcast_hello_notifications(graph, current_head)
                     .await?;
             } else {
-                debug!(
+                trace!(
                     ?graph,
                     "graph head address unchanged, no hello broadcast needed"
                 );

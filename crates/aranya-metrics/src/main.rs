@@ -338,22 +338,22 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Admin syncs with the Owner peer and retries the role assignment command
     info!("syncing the graph for proper permissions");
-    admin.sync_now(owner_addr.into(), None).await?;
+    admin.sync_now(owner_addr, None).await?;
 
     info!("properly assigning the operator's role");
     admin.assign_role(ctx.operator.id, Role::Operator).await?;
 
-    operator.sync_now(admin_addr.into(), None).await?;
+    operator.sync_now(admin_addr, None).await?;
 
     // add membera to team.
     info!("adding membera to team");
     operator.add_device_to_team(ctx.membera.pk.clone()).await?;
-    membera.sync_now(operator_addr.into(), None).await?;
+    membera.sync_now(operator_addr, None).await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     operator.add_device_to_team(ctx.memberb.pk.clone()).await?;
-    memberb.sync_now(operator_addr.into(), None).await?;
+    memberb.sync_now(operator_addr, None).await?;
 
     info!("assigning aqc net identifiers");
     operator
@@ -363,8 +363,8 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .assign_aqc_net_identifier(ctx.memberb.id, ctx.memberb.aqc_net_id())
         .await?;
 
-    membera.sync_now(operator_addr.into(), None).await?;
-    memberb.sync_now(operator_addr.into(), None).await?;
+    membera.sync_now(operator_addr, None).await?;
+    memberb.sync_now(operator_addr, None).await?;
 
     // fact database queries
     let queries = membera.queries();
@@ -396,8 +396,8 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("assigning label to memberb");
     operator.assign_label(ctx.memberb.id, label3, op).await?;
 
-    membera.sync_now(operator_addr.into(), None).await?;
-    memberb.sync_now(operator_addr.into(), None).await?;
+    membera.sync_now(operator_addr, None).await?;
+    memberb.sync_now(operator_addr, None).await?;
 
     // Creating and receiving a channel "blocks" until both sides have
     // joined the channel, so we do them concurrently with `try_join`.
@@ -458,7 +458,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("revoking label from memberb");
     operator.revoke_label(ctx.memberb.id, label3).await?;
 
-    admin.sync_now(operator_addr.into(), None).await?;
+    admin.sync_now(operator_addr, None).await?;
 
     info!("deleting label");
     admin.delete_label(label3).await?;
