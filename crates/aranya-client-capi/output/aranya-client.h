@@ -3880,7 +3880,7 @@ size_t aranya_afc_channel_overhead(void);
  */
 AranyaError aranya_afc_seq_cmp(const struct AranyaAfcSeq *seq1,
                                const struct AranyaAfcSeq *seq2,
-                               ptrdiff_t *__output);
+                               int *__output);
 #endif
 
 #if defined(ENABLE_AFC)
@@ -3893,7 +3893,7 @@ AranyaError aranya_afc_seq_cmp(const struct AranyaAfcSeq *seq1,
  */
 AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
                                    const struct AranyaAfcSeq *seq2,
-                                   ptrdiff_t *__output,
+                                   int *__output,
                                    struct AranyaExtError *__ext_err);
 #endif
 
