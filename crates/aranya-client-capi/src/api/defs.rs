@@ -95,6 +95,10 @@ pub enum Error {
     #[capi(msg = "serialization")]
     Serialization,
 
+    /// Memory allocation failed.
+    #[capi(msg = "memory allocation error")]
+    Memory,
+
     /// Some other error occurred.
     #[capi(msg = "other")]
     Other,

@@ -267,6 +267,10 @@ enum AranyaError
      */
     ARANYA_ERROR_SERIALIZATION,
     /**
+     * Memory allocation failed.
+     */
+    ARANYA_ERROR_MEMORY,
+    /**
      * Some other error occurred.
      */
     ARANYA_ERROR_OTHER,
