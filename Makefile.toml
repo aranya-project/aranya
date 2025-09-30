@@ -21,22 +21,22 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 [tasks.dev]
 description = "Development flow with all features"
 category = "Development"
-run_task = { name = ["format", "build", "test", "clippy"] }
+run_task = { name = ["format", "build", "clippy"] }
 
 [tasks.dev-default]
 description = "Development flow with default features"
 category = "Development"
-run_task = { name = ["format", "build-default", "test", "clippy"] }
+run_task = { name = ["format", "build-default", "clippy"] }
 
 [tasks.dev-preview]
 description = "Development flow with preview features"
 category = "Development"
-run_task = { name = ["format", "build-preview", "test", "clippy"] }
+run_task = { name = ["format", "build-preview", "clippy"] }
 
 [tasks.dev-experimental]
 description = "Development flow with experimental features"
 category = "Development"
-run_task = { name = ["format", "build-experimental", "test", "clippy"] }
+run_task = { name = ["format", "build-experimental", "clippy"] }
 
 # =================================================================================================
 # Quality Assurance - Full checks before committing
@@ -140,25 +140,25 @@ run_task = { name = ["ci-experimental", "package-daemon", "package-capi", "packa
 description = "Build daemon with all features"
 category = "Build"
 command = "cargo"
-args = ["build", "--release", "--package=aranya-daemon", "--verbose", "--all-features", "${@}"]
+args = ["build", "--release", "--package=aranya-daemon", "--all-features", "${@}"]
 
 [tasks.build-default]
 description = "Build daemon with default features"
 category = "Build"
 command = "cargo"
-args = ["build", "--release", "--package=aranya-daemon", "--verbose", "${@}"]
+args = ["build", "--release", "--package=aranya-daemon", "${@}"]
 
 [tasks.build-preview]
 description = "Build daemon with preview features"
 category = "Build"
 command = "cargo"
-args = ["build", "--release", "--package=aranya-daemon", "--verbose", "--features=preview,afc", "${@}"]
+args = ["build", "--release", "--package=aranya-daemon", "--features=preview,afc", "${@}"]
 
 [tasks.build-experimental]
 description = "Build daemon with experimental features"
 category = "Build"
 command = "cargo"
-args = ["build", "--release", "--package=aranya-daemon", "--verbose", "--features=preview,afc,experimental,aqc", "${@}"]
+args = ["build", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental,aqc", "${@}"]
 
 [tasks.build-full]
 description = "Build daemon with all features"
@@ -303,7 +303,7 @@ description = "Check all feature combinations"
 category = "Quality"
 workspace = true
 command = "cargo"
-args = ["check-all-features", "--verbose"]
+args = ["check-all-features"]
 dependencies = ["install-cargo-all-features"]
 
 [tasks.unused-deps]
@@ -359,7 +359,7 @@ description = "Run unit tests with all feature flag combinations"
 category = "Testing"
 workspace = true
 command = "cargo"
-args = ["--verbose", "test-all-features", "${@}"]
+args = ["test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
 
 # =================================================================================================

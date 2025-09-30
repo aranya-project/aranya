@@ -124,7 +124,7 @@ EOF
 }
 
 setup_device_configs() {
-    log_info "Setting up edvice configurations..."
+    log_info "Setting up device configurations..."
 
     local port="${BASE_PORT}"
     for device in "${DEVICES[@]}"; do
@@ -139,13 +139,13 @@ build_components() {
     local task_suffix="$(get_make_task_suffix)"
 
     log_info "Building daemon..."
-    cargo make "build${task_suffix}"
+    cargo make build${task_suffix}
 
     log_info "Building C API header..."
-    cargo make "capi-header"
+    cargo make capi-header
 
     log_info "Building C API library..."
-    cargo make "capi-lib${task_suffix}"
+    cargo make capi-lib${task_suffix}
 }
 
 setup_example_environment() {
@@ -243,6 +243,7 @@ run_example() {
 main() {
     log_info "Starting C API example (features: ${FEATURES}, mode: ${MODE})"
 
+    cd "${WORKSPACE_ROOT}"
     check_dependencies
     setup_device_configs
     build_components
