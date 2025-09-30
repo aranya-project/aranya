@@ -811,6 +811,10 @@ AranyaError run_afc_bidi_example(Team* t) {
     Client* operator= & t->clients.operator;
     Client* membera = &t->clients.membera;
     Client* memberb = &t->clients.memberb;
+
+    unsigned char* ciphertext = NULL;
+    unsigned char* plaintext  = NULL;
+
     AranyaError err;
 
     // Create a new label and assign it to Member A/Member B.
@@ -863,10 +867,10 @@ AranyaError run_afc_bidi_example(Team* t) {
     // Now we need to define some data we want to send, in this case a simple
     // string. We need both the original data, as well as a buffer to store the
     // resulting ciphertext, which includes some additional overhead.
-    const char* afc_msg       = "afc msg";
-    size_t afc_msg_len        = strlen(afc_msg);
-    size_t ciphertext_len     = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
-    unsigned char* ciphertext = calloc(ciphertext_len, 1);
+    const char* afc_msg   = "afc msg";
+    size_t afc_msg_len    = strlen(afc_msg);
+    size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
+    ciphertext            = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
         err = ARANYA_ERROR_MEMORY;
         goto exit;
@@ -884,8 +888,8 @@ AranyaError run_afc_bidi_example(Team* t) {
 
     // The peer needs to allocate a buffer to decrypt the data back into, minus
     // channel overhead. This allows it to calculate the original data's length.
-    size_t plaintext_len     = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
-    unsigned char* plaintext = calloc(plaintext_len, 1);
+    size_t plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
+    plaintext            = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
         err = ARANYA_ERROR_MEMORY;
         goto exit;
@@ -924,6 +928,10 @@ AranyaError run_afc_uni_example(Team* t) {
     Client* operator= & t->clients.operator;
     Client* membera = &t->clients.membera;
     Client* memberb = &t->clients.memberb;
+
+    unsigned char* ciphertext = NULL;
+    unsigned char* plaintext  = NULL;
+
     AranyaError err;
 
     // Create a new label and assign it to Member A/Member B. Note that Member A
@@ -977,10 +985,10 @@ AranyaError run_afc_uni_example(Team* t) {
     // Now we need to define some data we want to send, in this case a simple
     // string. We need both the original data, as well as a buffer to store the
     // resulting ciphertext, which includes some additional overhead.
-    const char* afc_msg       = "one way msg";
-    size_t afc_msg_len        = strlen(afc_msg);
-    size_t ciphertext_len     = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
-    unsigned char* ciphertext = calloc(ciphertext_len, 1);
+    const char* afc_msg   = "one way msg";
+    size_t afc_msg_len    = strlen(afc_msg);
+    size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
+    ciphertext            = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
         err = ARANYA_ERROR_MEMORY;
         goto exit;
@@ -998,8 +1006,8 @@ AranyaError run_afc_uni_example(Team* t) {
 
     // The peer needs to allocate a buffer to decrypt the data back into, minus
     // channel overhead. This allows it to calculate the original data's length.
-    size_t plaintext_len     = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
-    unsigned char* plaintext = calloc(plaintext_len, 1);
+    size_t plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
+    plaintext            = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
         err = ARANYA_ERROR_MEMORY;
         goto exit;
