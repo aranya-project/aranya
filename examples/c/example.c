@@ -1069,48 +1069,36 @@ static void* membera_aqc_thread(void* arg) {
 
     sleep(2);
 
-exit:
     printf("membera: cleanup bidi stream\n");
-    aranya_aqc_bidi_stream_cleanup(&bidi_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    err = aranya_aqc_bidi_stream_cleanup(&bidi_stream);
+    EXPECT("membera: cleanup bidi stream", err);
 
     printf("membera: cleanup recv stream\n");
     err = aranya_aqc_receive_stream_cleanup(&recv_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("membera: cleanup recv stream", err);
 
     printf("membera: cleanup send stream\n");
     err = aranya_aqc_send_stream_cleanup(&send_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("membera: cleanup send stream", err);
 
     printf("membera: deleting AQC bidi channel\n");
     err = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("membera: deleting AQC bidi channel", err);
 
     printf("membera: cleaning up AQC bidi channel\n");
     err = aranya_aqc_bidi_channel_cleanup(&bidi_chan);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("membera: cleaning up AQC bidi channel", err);
 
     printf("membera: deleting AQC uni channel\n");
     err = aranya_aqc_delete_receive_uni_channel(ctx->client, &uni_recv);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("membera: deleting AQC uni channel", err);
 
     printf("membera: cleaning up AQC uni channel\n");
     err = aranya_aqc_receive_channel_cleanup(&uni_recv);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("membera: cleaning up AQC uni channel", err);
+
+exit:
+    ctx->result = err;
     return NULL;
 }
 
@@ -1239,54 +1227,39 @@ static void* memberb_aqc_thread(void* arg) {
 
     sleep(2);
 
-exit:
     printf("memberb: cleanup bidi send stream\n");
     aranya_aqc_send_stream_cleanup(&bidi_send_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: cleanup bidi send stream", err);
 
     printf("memberb: cleanup bidi recv stream\n");
     aranya_aqc_receive_stream_cleanup(&bidi_recv_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: cleanup bidi recv stream", err);
 
     printf("memberb: cleanup uni send stream\n");
     aranya_aqc_send_stream_cleanup(&uni_send_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: cleanup uni send stream", err);
 
     printf("memberb: cleanup uni recv stream\n");
     aranya_aqc_receive_stream_cleanup(&uni_recv_stream);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: cleanup uni recv stream", err);
 
     printf("memberb: deleting AQC bidi channel\n");
     err = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_recv);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: deleting AQC bidi channel", err);
 
     printf("memberb: cleaning up AQC bidi channel\n");
     err = aranya_aqc_bidi_channel_cleanup(&bidi_recv);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: cleaning up AQC bidi channel", err);
 
     printf("memberb: deleting AQC uni channel\n");
     err = aranya_aqc_delete_send_uni_channel(ctx->client, &uni_send);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: deleting AQC uni channel", err);
 
     printf("memberb: cleaning up AQC uni channel\n");
     err = aranya_aqc_send_channel_cleanup(&uni_send);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        ctx->result = err;
-    }
+    EXPECT("memberb: cleaning up AQC uni channel", err);
+
+exit:
     return NULL;
 }
 
@@ -1428,7 +1401,6 @@ exit:
 int main(int argc, char* argv[]) {
     Team team       = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
-    int retErr      = EXIT_SUCCESS;
 
     // parse arguments.
     team.seed_mode = GENERATE;
@@ -1453,15 +1425,15 @@ int main(int argc, char* argv[]) {
     err = run(&team);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "application failed: %s\n", aranya_error_to_str(err));
-        retErr = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
     // cleanup team.
     printf("cleaning up the Aranya team \n");
     err = cleanup_team(&team);
     if (err != ARANYA_ERROR_SUCCESS) {
-        retErr = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
-    return retErr;
+    return EXIT_SUCCESS;
 }
