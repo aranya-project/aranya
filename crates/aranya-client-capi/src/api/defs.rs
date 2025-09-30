@@ -2283,6 +2283,7 @@ pub type AfcSeq = Safe<imp::AfcSeq>;
 pub const ARANYA_AFC_CHANNEL_OVERHEAD: usize = 24;
 
 #[allow(unused_qualifications)]
+#[cfg(feature = "afc")]
 const _: () = {
     assert!(ARANYA_AFC_CHANNEL_OVERHEAD == aranya_client::afc::Channels::OVERHEAD);
 };
