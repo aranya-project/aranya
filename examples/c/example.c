@@ -761,8 +761,11 @@ AranyaError run(Team* t) {
                                            &memberb->id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
 
-    err = run_aqc_example(t);
-    EXPECT("error running aqc example", err);
+    err = run_afc_example(t);
+    EXPECT("error running afc example", err);
+
+    // err = run_aqc_example(t);
+    // EXPECT("error running aqc example", err);
 
 exit:
     free(devices);
@@ -781,9 +784,9 @@ AranyaError aranya_allocate_label(AranyaClient* client, AranyaTeamId* id,
     va_start(args, num_peers);
 
     for (int i = 0; i < num_peers; i++) {
-        // va_arg promotes smaller primitives to int, so we downcast back
-        AranyaChanOp op          = va_arg(args, int);
         AranyaDeviceId device_id = va_arg(args, AranyaDeviceId);
+        // va_arg promotes smaller primitives to int, so we downcast back
+        AranyaChanOp op = va_arg(args, int);
 
         err = aranya_assign_label(client, id, &device_id, label_id, op);
         EXPECT("error assigning label", err);
@@ -800,6 +803,13 @@ AranyaError run_afc_example(Team* t) {
 
     unsigned char* ciphertext = NULL;
     unsigned char* plaintext  = NULL;
+    size_t ciphertext_len;
+    size_t plaintext_len;
+
+    AranyaAfcChannelType chan_type;
+    AranyaAfcSeq seq;
+    const uint8_t* ptr;
+    size_t len;
 
     Client* operator= & t->clients.operator;
     Client* membera = &t->clients.membera;
@@ -825,20 +835,18 @@ AranyaError run_afc_example(Team* t) {
                                          &label1_id, &channel_a, &message);
     EXPECT("error creating a bidi channel from membera", err);
 
-    const uint8_t* ptr;
-    size_t len;
     err = aranya_afc_ctrl_msg_get_bytes(&message, &ptr, &len);
     EXPECT("error getting ptr+len from `AranyaAfcCtrlMsg`", err);
 
     AranyaAfcChannel channel_b;
     err = aranya_afc_recv_ctrl(&memberb->client, &t->id, ptr, len, &channel_b,
-                               NULL);
+                               &chan_type);
     EXPECT("error creating a bidi channel from memberb", err);
 
-    const char* afc_msg   = "afc msg";
-    size_t afc_msg_len    = strlen(afc_msg);
-    size_t ciphertext_len = afc_msg_len + aranya_afc_channel_overhead();
-    ciphertext            = calloc(ciphertext_len, 1);
+    const char* afc_msg = "afc msg";
+    size_t afc_msg_len  = strlen(afc_msg);
+    ciphertext_len      = afc_msg_len + aranya_afc_channel_overhead();
+    ciphertext          = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
         err = ARANYA_ERROR_BUG;
         goto exit;
@@ -848,21 +856,94 @@ AranyaError run_afc_example(Team* t) {
                                   afc_msg_len, ciphertext, ciphertext_len);
     EXPECT("error sealing afc message", err);
 
-    size_t plaintext_len = ciphertext_len - aranya_afc_channel_overhead();
-    plaintext            = calloc(plaintext_len, 1);
+    plaintext_len = ciphertext_len - aranya_afc_channel_overhead();
+    plaintext     = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
         err = ARANYA_ERROR_BUG;
         goto exit;
     }
 
-    AranyaAfcSeq seq;
     err = aranya_afc_channel_open(&channel_b, ciphertext, ciphertext_len,
                                   plaintext, plaintext_len, &seq);
     EXPECT("error opening afc message", err);
 
-    if (strcmp(afc_msg, (const char*)plaintext)) {
+    if (memcmp(afc_msg, plaintext, afc_msg_len)) {
         EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
     }
+
+    err = aranya_afc_channel_delete(&membera->client, &channel_a);
+    EXPECT("error deleting membera's channel", err);
+
+    err = aranya_afc_channel_delete(&memberb->client, &channel_b);
+    EXPECT("error deleting memberb's channel", err);
+
+    free(ciphertext);
+    free(plaintext);
+
+    // =====================
+
+    AranyaLabelId label2_id;
+    err = aranya_allocate_label(&operator->client, &t->id, "label2", &label2_id,
+                                2, &membera->id, ARANYA_CHAN_OP_SEND_ONLY,
+                                &memberb->id, ARANYA_CHAN_OP_RECV_ONLY);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        goto exit;
+    }
+
+    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OPERATOR], NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
+    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OPERATOR], NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
+    AranyaAfcChannel send_channel;
+    AranyaAfcCtrlMsg recv_message;
+    err = aranya_afc_create_uni_send_channel(&membera->client, &t->id,
+                                             &memberb->id, &label2_id,
+                                             &send_channel, &recv_message);
+    EXPECT("error creating a uni send channel from membera", err);
+
+    err = aranya_afc_ctrl_msg_get_bytes(&recv_message, &ptr, &len);
+    EXPECT("error getting ptr+len from `AranyaAfcCtrlMsg`", err);
+
+    AranyaAfcChannel recv_channel;
+    err = aranya_afc_recv_ctrl(&memberb->client, &t->id, ptr, len,
+                               &recv_channel, &chan_type);
+    EXPECT("error creating a uni recv channel from memberb", err);
+
+    const char* one_way_msg = "one way msg";
+    size_t one_way_msg_len  = strlen(one_way_msg);
+    ciphertext_len          = one_way_msg_len + aranya_afc_channel_overhead();
+    ciphertext              = calloc(ciphertext_len, 1);
+    if (ciphertext == NULL) {
+        err = ARANYA_ERROR_BUG;
+        goto exit;
+    }
+
+    err = aranya_afc_channel_seal(&send_channel, (const uint8_t*)one_way_msg,
+                                  one_way_msg_len, ciphertext, ciphertext_len);
+    EXPECT("error sealing one way message", err);
+
+    plaintext_len = ciphertext_len - aranya_afc_channel_overhead();
+    plaintext     = calloc(plaintext_len, 1);
+    if (plaintext == NULL) {
+        err = ARANYA_ERROR_BUG;
+        goto exit;
+    }
+
+    err = aranya_afc_channel_open(&recv_channel, ciphertext, ciphertext_len,
+                                  plaintext, plaintext_len, &seq);
+    EXPECT("error opening afc message", err);
+
+    if (memcmp(one_way_msg, plaintext, one_way_msg_len)) {
+        EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
+    }
+
+    err = aranya_afc_channel_delete(&membera->client, &send_channel);
+    EXPECT("error deleting membera's channel", err);
+
+    err = aranya_afc_channel_delete(&memberb->client, &recv_channel);
+    EXPECT("error deleting memberb's channel", err);
 
 exit:
     free(ciphertext);
