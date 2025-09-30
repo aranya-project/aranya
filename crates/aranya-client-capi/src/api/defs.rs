@@ -2275,6 +2275,18 @@ pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type AfcSeq = Safe<imp::AfcSeq>;
 
+/// The overhead needed for a channel message.
+///
+/// Note that the ciphertext buffer must be at least `plaintext_len` +
+/// `aranya_afc_channel_overhead()` long.
+#[cfg(feature = "afc")]
+pub const ARANYA_AFC_CHANNEL_OVERHEAD: usize = 24;
+
+#[allow(unused_qualifications)]
+const _: () = {
+    assert!(ARANYA_AFC_CHANNEL_OVERHEAD == aranya_client::afc::Channels::OVERHEAD);
+};
+
 /// Create a bidirectional AFC channel between this device and a peer.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
@@ -2447,15 +2459,6 @@ pub fn afc_ctrl_msg_get_bytes(
     let slice = control.0.as_bytes();
     ptr.write(slice.as_ptr());
     len.write(slice.len());
-}
-
-/// Returns the size of the overhead needed for a channel message.
-///
-/// Note that the ciphertext buffer must be at least `plaintext_len` +
-/// `aranya_afc_channel_overhead()` long.
-#[cfg(feature = "afc")]
-pub fn afc_channel_overhead() -> usize {
-    afc::Channels::OVERHEAD
 }
 
 /// Returns the three-way comparison between `seq1` and `seq2`.

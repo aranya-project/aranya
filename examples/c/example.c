@@ -784,11 +784,11 @@ AranyaError aranya_allocate_label(AranyaClient* client, AranyaTeamId* id,
     va_start(args, num_peers);
 
     for (int i = 0; i < num_peers; i++) {
-        AranyaDeviceId device_id = va_arg(args, AranyaDeviceId);
+        AranyaDeviceId* device_id = va_arg(args, AranyaDeviceId*);
         // va_arg promotes smaller primitives to int, so we downcast back
         AranyaChanOp op = va_arg(args, int);
 
-        err = aranya_assign_label(client, id, &device_id, label_id, op);
+        err = aranya_assign_label(client, id, device_id, label_id, op);
         EXPECT("error assigning label", err);
     }
 
@@ -845,7 +845,7 @@ AranyaError run_afc_example(Team* t) {
 
     const char* afc_msg = "afc msg";
     size_t afc_msg_len  = strlen(afc_msg);
-    ciphertext_len      = afc_msg_len + aranya_afc_channel_overhead();
+    ciphertext_len      = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
     ciphertext          = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
         err = ARANYA_ERROR_BUG;
@@ -856,7 +856,7 @@ AranyaError run_afc_example(Team* t) {
                                   afc_msg_len, ciphertext, ciphertext_len);
     EXPECT("error sealing afc message", err);
 
-    plaintext_len = ciphertext_len - aranya_afc_channel_overhead();
+    plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
     plaintext     = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
         err = ARANYA_ERROR_BUG;
@@ -913,7 +913,7 @@ AranyaError run_afc_example(Team* t) {
 
     const char* one_way_msg = "one way msg";
     size_t one_way_msg_len  = strlen(one_way_msg);
-    ciphertext_len          = one_way_msg_len + aranya_afc_channel_overhead();
+    ciphertext_len          = one_way_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
     ciphertext              = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
         err = ARANYA_ERROR_BUG;
@@ -924,7 +924,7 @@ AranyaError run_afc_example(Team* t) {
                                   one_way_msg_len, ciphertext, ciphertext_len);
     EXPECT("error sealing one way message", err);
 
-    plaintext_len = ciphertext_len - aranya_afc_channel_overhead();
+    plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
     plaintext     = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
         err = ARANYA_ERROR_BUG;

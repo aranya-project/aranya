@@ -29,9 +29,9 @@ add_compile_options(
     -Wno-gnu-zero-variadic-macro-arguments
 )
 
-add_compile_options(-DENABLE_AFC)
+add_compile_options(-DENABLE_ARANYA_AFC)
 add_compile_options(-DENABLE_ARANYA_PREVIEW)
-add_compile_options(-DENABLE_AQC)
+add_compile_options(-DENABLE_ARANYA_AQC)
 add_compile_options(-DENABLE_ARANYA_EXPERIMENTAL)
 
 # Apple and Windows system linkers do not recognize these options.
