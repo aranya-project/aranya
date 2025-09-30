@@ -1348,6 +1348,7 @@ impl From<ChanOp> for api::ChanOp {
 }
 
 /// Extract a single command from the session commands to get the AFC control message.
+#[cfg(feature = "afc")]
 fn get_afc_ctrl(cmds: Vec<Box<[u8]>>) -> anyhow::Result<Box<[u8]>> {
     let mut cmds = cmds.into_iter();
     let msg = cmds.next().context("missing AFC control message")?;
