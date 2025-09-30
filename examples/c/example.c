@@ -764,8 +764,8 @@ AranyaError run(Team* t) {
     err = run_afc_example(t);
     EXPECT("error running afc example", err);
 
-    // err = run_aqc_example(t);
-    // EXPECT("error running aqc example", err);
+    err = run_aqc_example(t);
+    EXPECT("error running aqc example", err);
 
 exit:
     free(devices);
