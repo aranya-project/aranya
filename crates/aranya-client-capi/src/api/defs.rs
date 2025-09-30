@@ -3,6 +3,8 @@ use core::{
     ffi::{c_char, CStr},
     ptr, slice,
 };
+#[cfg(feature = "afc")]
+use std::ffi::c_int;
 #[cfg(feature = "aqc")]
 use std::str::FromStr;
 use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt};
@@ -2464,10 +2466,8 @@ pub fn afc_channel_overhead() -> usize {
 /// @param[in]  seq1 the second sequence number to compare.
 /// @param[out] __output the comparison result (-1 is <, 0 is =, 1 is >).
 #[cfg(feature = "afc")]
-pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> isize {
-    let seq1 = &seq1.deref().deref().0;
-    let seq2 = &seq2.deref().deref().0;
-    Ord::cmp(seq1, seq2) as isize
+pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> c_int {
+    afc::Seq::cmp(&seq1.0, &seq2.0) as c_int
 }
 
 /// Encrypts and authenticates `plaintext`, and writes it to `dst`.
