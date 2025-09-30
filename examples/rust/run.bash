@@ -7,11 +7,11 @@
 # Usage:
 #   ./run.bash
 
-set -xeuo pipefail
+set -euo pipefail
 
 # Configuration
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly WORKSPACE_ROOT="$(cargo locate-project --workspace --message-format plain | xargs dirname)"
+readonly EXAMPLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly WORKSPACE_ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 readonly RELEASE_DIR="${WORKSPACE_ROOT}/target/release"
 
 log_info() {
@@ -41,12 +41,14 @@ check_dependencies() {
 
 build_components() {
     cd "${WORKSPACE_ROOT}"
+
     log_info "Building daemon with full features..."
     cargo make build
 
     log_info "Building Rust example..."
     cargo make build-example-rust
-    cd "${SCRIPT_DIR}"
+
+    cd "${EXAMPLE_ROOT}"
 }
 
 run_example() {
