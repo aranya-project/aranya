@@ -46,7 +46,7 @@ jobs:
           which ld || echo "ld not in PATH"
 
       - name: Unit Tests
-        run: cargo make test
+        run: cargo make test --verbose --verbose
 
   c-example-application:
     strategy:
