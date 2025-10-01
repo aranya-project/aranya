@@ -33,20 +33,8 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
 
-      - name: Show build configuration
-        run: |
-          echo "=== Build Configuration ==="
-          echo "Runner: ${{ matrix.runner }}"
-          echo "RUSTFLAGS: ${RUSTFLAGS:-<not set>}"
-          echo "CARGO_INCREMENETAL: ${CARGO_INCREMENTAL:-<not set>}"
-          echo ""
-          echo "=== Linker Check ==="
-          which mold || echo "mold not in PATH"
-          which lld || echo "lld not in PATH"
-          which ld || echo "ld not in PATH"
-
       - name: Unit Tests
-        run: cargo make test --verbose --verbose
+        run: cargo make test
 
   c-example-application:
     strategy:
