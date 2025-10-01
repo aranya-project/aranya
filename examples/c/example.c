@@ -872,8 +872,7 @@ AranyaError run_afc_bidi_example(Team* t) {
     size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
     ciphertext            = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
-        err = ARANYA_ERROR_MEMORY;
-        goto exit;
+        abort();
     }
 
     // Use the channel to encrypt and authenticate our data, and store the
@@ -891,8 +890,7 @@ AranyaError run_afc_bidi_example(Team* t) {
     size_t plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
     plaintext            = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
-        err = ARANYA_ERROR_MEMORY;
-        goto exit;
+        abort();
     }
 
     // Here, we open the message and get back the original data, as well as a
@@ -990,8 +988,7 @@ AranyaError run_afc_uni_example(Team* t) {
     size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
     ciphertext            = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
-        err = ARANYA_ERROR_MEMORY;
-        goto exit;
+        abort();
     }
 
     // Use the channel to encrypt and authenticate our data, and store the
@@ -1009,8 +1006,7 @@ AranyaError run_afc_uni_example(Team* t) {
     size_t plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
     plaintext            = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
-        err = ARANYA_ERROR_MEMORY;
-        goto exit;
+        abort();
     }
 
     // Here, we open the message and get back the original data, as well as a

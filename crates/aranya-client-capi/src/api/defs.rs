@@ -95,10 +95,6 @@ pub enum Error {
     #[capi(msg = "serialization")]
     Serialization,
 
-    /// Memory allocation failed.
-    #[capi(msg = "memory allocation error")]
-    Memory,
-
     /// Some other error occurred.
     #[capi(msg = "other")]
     Other,
@@ -2265,7 +2261,7 @@ pub enum AfcChannelType {
 /// An AFC Control Message, used to create the other end of a channel.
 ///
 /// In order to access the underlying buffer to send to a peer, you'll need to
-/// call `aranya_afc_get_msg_data()`.
+/// call `aranya_afc_ctrl_msg_get_bytes()`.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 32, align = 8)]
@@ -2293,6 +2289,9 @@ const _: () = {
 };
 
 /// Create a bidirectional AFC channel between this device and a peer.
+///
+/// Note that the control message needs to be sent to the other peer using the
+/// transport of your choice to create the other side of the channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -2325,6 +2324,9 @@ pub fn afc_create_bidi_channel(
 }
 
 /// Create a send-only AFC channel between this device and a peer.
+///
+/// Note that the control message needs to be sent to the other peer using the
+/// transport of your choice to create the other side of the channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -2359,6 +2361,9 @@ pub fn afc_create_uni_send_channel(
 }
 
 /// Create a receive-only AFC channel between this device and a peer.
+///
+/// Note that the control message needs to be sent to the other peer using the
+/// transport of your choice to create the other side of the channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -2478,47 +2483,79 @@ pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
 
 /// Encrypts and authenticates `plaintext`, and writes it to `dst`.
 ///
-/// Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+/// Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
+/// or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
 ///
 /// @param[in]  channel the AFC channel object [`AfcChannel`].
 /// @param[in]  plaintext the message being encrypted.
 /// @param[out] dst the output buffer the ciphertext is written to.
 #[cfg(feature = "afc")]
-pub fn afc_channel_seal(
+pub unsafe fn afc_channel_seal(
     channel: &AfcChannel,
     plaintext: &[u8],
-    dst: &mut [u8],
+    dst: *mut u8,
+    dst_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    if dst.is_null() || *dst_len == 0 {
+        return Err(
+            InvalidArg::new("dst", "Tried to call afc_channel_seal with an empty buffer").into(),
+        );
+    }
+
+    if *dst_len < (plaintext.len() + ARANYA_AFC_CHANNEL_OVERHEAD) {
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    // SAFETY: the user is responsible for giving us a valid pointer.
+    let dst = aranya_capi_core::try_as_mut_slice!(dst, *dst_len);
     match &channel.deref().deref() {
         imp::AfcChannel::Bidi(c) => c.seal(dst, plaintext)?,
         imp::AfcChannel::Send(c) => c.seal(dst, plaintext)?,
         imp::AfcChannel::Receive(_) => return Err(imp::Error::WrongChannelType),
     }
+    *dst_len = plaintext.len() + ARANYA_AFC_CHANNEL_OVERHEAD;
 
     Ok(())
 }
 
 /// Decrypts and authenticates `ciphertext`, and writes it to `dst`.
 ///
-/// Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+/// Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
+/// or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
 ///
 /// @param[in]  channel the AFC channel object [`AfcChannel`].
 /// @param[in]  ciphertext the message being decrypted.
 /// @param[out] dst the output buffer the message is written to.
 /// @param[out] seq the sequence number for the opened message, for reordering.
 #[cfg(feature = "afc")]
-pub fn afc_channel_open(
+pub unsafe fn afc_channel_open(
     channel: &AfcChannel,
     ciphertext: &[u8],
-    dst: &mut [u8],
+    dst: *mut u8,
+    dst_len: &mut usize,
     seq: &mut MaybeUninit<AfcSeq>,
 ) -> Result<(), imp::Error> {
+    if dst.is_null() || *dst_len == 0 {
+        return Err(
+            InvalidArg::new("dst", "Tried to call afc_channel_open with an empty buffer").into(),
+        );
+    }
+
+    if *dst_len < (ciphertext.len() - ARANYA_AFC_CHANNEL_OVERHEAD) {
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    // SAFETY: the user is responsible for giving us a valid pointer.
+    let dst = aranya_capi_core::try_as_mut_slice!(dst, *dst_len);
     let seq_raw = match &channel.deref().deref() {
         imp::AfcChannel::Bidi(c) => c.open(dst, ciphertext)?,
         imp::AfcChannel::Receive(c) => c.open(dst, ciphertext)?,
         imp::AfcChannel::Send(_) => return Err(imp::Error::WrongChannelType),
     };
+
     AfcSeq::init(seq, seq_raw.into());
+    // Do our best to set a max bound, even if we can't know if they pass in a larger ciphertext than needed.
+    *dst_len = ciphertext.len() - ARANYA_AFC_CHANNEL_OVERHEAD;
 
     Ok(())
 }

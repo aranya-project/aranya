@@ -267,10 +267,6 @@ enum AranyaError
      */
     ARANYA_ERROR_SERIALIZATION,
     /**
-     * Memory allocation failed.
-     */
-    ARANYA_ERROR_MEMORY,
-    /**
      * Some other error occurred.
      */
     ARANYA_ERROR_OTHER,
@@ -739,7 +735,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcChannel {
  * An AFC Control Message, used to create the other end of a channel.
  *
  * In order to access the underlying buffer to send to a peer, you'll need to
- * call `aranya_afc_get_msg_data()`.
+ * call `aranya_afc_ctrl_msg_get_bytes()`.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAfcCtrlMsg {
     /**
@@ -3629,6 +3625,9 @@ AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
 /**
  * Create a bidirectional AFC channel between this device and a peer.
  *
+ * Note that the control message needs to be sent to the other peer using the
+ * transport of your choice to create the other side of the channel.
+ *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -3651,6 +3650,9 @@ AranyaError aranya_afc_create_bidi_channel(const struct AranyaClient *client,
 #if defined(ENABLE_ARANYA_AFC)
 /**
  * Create a bidirectional AFC channel between this device and a peer.
+ *
+ * Note that the control message needs to be sent to the other peer using the
+ * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -3676,6 +3678,9 @@ AranyaError aranya_afc_create_bidi_channel_ext(const struct AranyaClient *client
 /**
  * Create a send-only AFC channel between this device and a peer.
  *
+ * Note that the control message needs to be sent to the other peer using the
+ * transport of your choice to create the other side of the channel.
+ *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -3698,6 +3703,9 @@ AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client
 #if defined(ENABLE_ARANYA_AFC)
 /**
  * Create a send-only AFC channel between this device and a peer.
+ *
+ * Note that the control message needs to be sent to the other peer using the
+ * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -3723,6 +3731,9 @@ AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *cl
 /**
  * Create a receive-only AFC channel between this device and a peer.
  *
+ * Note that the control message needs to be sent to the other peer using the
+ * transport of your choice to create the other side of the channel.
+ *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -3745,6 +3756,9 @@ AranyaError aranya_afc_create_uni_recv_channel(const struct AranyaClient *client
 #if defined(ENABLE_ARANYA_AFC)
 /**
  * Create a receive-only AFC channel between this device and a peer.
+ *
+ * Note that the control message needs to be sent to the other peer using the
+ * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -3915,7 +3929,8 @@ AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
 /**
  * Encrypts and authenticates `plaintext`, and writes it to `dst`.
  *
- * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+ * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
+ * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
  * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
  * @param[in]  plaintext the message being encrypted.
@@ -3925,14 +3940,15 @@ AranyaError aranya_afc_channel_seal(const struct AranyaAfcChannel *channel,
                                     const uint8_t *plaintext,
                                     size_t plaintext_len,
                                     uint8_t *dst,
-                                    size_t dst_len);
+                                    size_t *dst_len);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
  * Encrypts and authenticates `plaintext`, and writes it to `dst`.
  *
- * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`.
+ * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
+ * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
  * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
  * @param[in]  plaintext the message being encrypted.
@@ -3942,7 +3958,7 @@ AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcChannel *channel,
                                         const uint8_t *plaintext,
                                         size_t plaintext_len,
                                         uint8_t *dst,
-                                        size_t dst_len,
+                                        size_t *dst_len,
                                         struct AranyaExtError *__ext_err);
 #endif
 
@@ -3950,7 +3966,8 @@ AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcChannel *channel,
 /**
  * Decrypts and authenticates `ciphertext`, and writes it to `dst`.
  *
- * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+ * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
+ * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
  * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
  * @param[in]  ciphertext the message being decrypted.
@@ -3961,7 +3978,7 @@ AranyaError aranya_afc_channel_open(const struct AranyaAfcChannel *channel,
                                     const uint8_t *ciphertext,
                                     size_t ciphertext_len,
                                     uint8_t *dst,
-                                    size_t dst_len,
+                                    size_t *dst_len,
                                     struct AranyaAfcSeq *seq);
 #endif
 
@@ -3969,7 +3986,8 @@ AranyaError aranya_afc_channel_open(const struct AranyaAfcChannel *channel,
 /**
  * Decrypts and authenticates `ciphertext`, and writes it to `dst`.
  *
- * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`.
+ * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
+ * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
  * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
  * @param[in]  ciphertext the message being decrypted.
@@ -3980,7 +3998,7 @@ AranyaError aranya_afc_channel_open_ext(const struct AranyaAfcChannel *channel,
                                         const uint8_t *ciphertext,
                                         size_t ciphertext_len,
                                         uint8_t *dst,
-                                        size_t dst_len,
+                                        size_t *dst_len,
                                         struct AranyaAfcSeq *seq,
                                         struct AranyaExtError *__ext_err);
 #endif
