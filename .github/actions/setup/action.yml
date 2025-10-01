@@ -21,7 +21,6 @@ runs:
       shell: bash
       run: |
         sudo apt-get install -y lld --no-install-recommends
-        lld --version
 
     - name: Configure faster linker
       shell: bash
