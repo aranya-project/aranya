@@ -56,3 +56,6 @@ target_compile_definitions(aranya_client_capi
 )
 
 add_library(Aranya::Client ALIAS aranya_client_capi)
+
+
+add_subdirectory(ctest)
