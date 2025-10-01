@@ -92,7 +92,7 @@ category = "build"
 description = "Build C API shared library with default features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release", "--features=experimental,aqc"]
+args = ["build", "--release"]
 
 [tasks.build-capi-lib-default]
 category = "build"
@@ -294,7 +294,7 @@ category = "examples"
 description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["build-capi-header", "build-capi-lib"]
+dependencies = ["build-capi-header", "build-capi-lib-experimental"]
 
 # Rust Example
 [tasks.run-rust-example]
