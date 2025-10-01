@@ -8,6 +8,15 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
 rust-version = "1.85"
 
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+panic = "abort"
+
 [workspace]
 
 [lints.rust]
@@ -29,7 +38,7 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [dependencies]
-aranya-client = { path = "../../crates/aranya-client" }
+aranya-client = { path = "../../crates/aranya-client", features = ["preview", "afc", "aqc", "experimental"] }
 aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
 aranya-util = { path = "../../crates/aranya-util" }
 
@@ -37,6 +46,8 @@ anyhow = { version = "1.0.97" }
 backon = { version = "1.4.0" }
 buggy = { version = "0.1.0" }
 bytes = { version = "1.10.0" }
+futures-util = { version = "0.3" }
+rustix = { version = "1.1.2", features = ["shm"] }
 tempfile = { version = "3.17.1" }
 tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { version = "0.1.41" }

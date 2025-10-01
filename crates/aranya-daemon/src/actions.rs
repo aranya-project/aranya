@@ -6,6 +6,7 @@ use std::{borrow::Cow, sync::Arc};
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
+#[cfg(feature = "aqc")]
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -14,6 +15,7 @@ use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
 };
+#[cfg(feature = "aqc")]
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
 use tracing::{debug, info, instrument, warn, Instrument};
@@ -279,6 +281,7 @@ where
     }
 
     /// Sets an AQC network name.
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
     fn set_aqc_network_name(
         &self,
@@ -294,6 +297,7 @@ where
     }
 
     /// Unsets an AQC network name.
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), fields(device_id = %device_id))]
     fn unset_aqc_network_name(
         &self,
@@ -308,6 +312,7 @@ where
     }
 
     /// Queries all AQC network names off-graph.
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self))]
     fn query_aqc_network_names_off_graph(
         &self,
@@ -336,8 +341,9 @@ where
     }
 
     /// Creates a bidirectional AQC channel off graph.
+    #[cfg(feature = "aqc")]
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label_id))]
+    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
     fn create_aqc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -351,50 +357,59 @@ where
     }
 
     /// Creates a unidirectional AQC channel.
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
-    fn create_aqc_uni_channel(
-        &self,
-        seal_id: DeviceId,
-        open_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_aqc_uni_channel(seal_id.into(), open_id.into(), label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Creates a unidirectional AQC channel.
+    #[cfg(feature = "aqc")]
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
     fn create_aqc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,
         open_id: DeviceId,
-        label: LabelId,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_aqc_uni_channel"),
             args: Cow::Owned(vec![
                 Value::from(seal_id),
                 Value::from(open_id),
-                Value::from(label),
+                Value::from(label_id),
             ]),
         })
         .in_current_span()
     }
 
-    /// Creates a bidirectional AQC channel.
+    /// Creates a bidirectional AFC channel off graph.
+    #[cfg(feature = "afc")]
+    #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
-    fn create_aqc_bidi_channel(
+    fn create_afc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_aqc_bidi_channel(peer_id.into(), label_id.into())?;
-            Ok(())
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("create_afc_bidi_channel"),
+            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a unidirectional AFC channel.
+    #[cfg(feature = "afc")]
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
+    fn create_afc_uni_channel_off_graph(
+        &self,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("create_afc_uni_channel"),
+            args: Cow::Owned(vec![
+                Value::from(seal_id),
+                Value::from(open_id),
+                Value::from(label_id),
+            ]),
         })
         .in_current_span()
     }
@@ -468,6 +483,21 @@ where
         .in_current_span()
     }
 
+    /// Query AFC net identifier off-graph.
+    #[cfg(feature = "afc")]
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_afc_net_identifier_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_aqc_net_identifier"),
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
     /// Query label exists off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
@@ -497,8 +527,10 @@ where
 }
 
 /// An implementation of [`Actor`].
+///
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
+#[derive(Debug)]
 pub struct ActorImpl<'a, EN, SP, CE, S> {
     client: &'a mut ClientState<EN, SP>,
     sink: &'a mut S,

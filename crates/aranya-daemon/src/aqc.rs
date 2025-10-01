@@ -1,4 +1,6 @@
-use core::fmt;
+#![cfg(feature = "aqc")]
+#![cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+//! Implementation of daemon's AQC handler.
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
@@ -12,6 +14,7 @@ use aranya_daemon_api::{
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
 use buggy::{bug, BugExt};
+use derive_where::derive_where;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
@@ -25,12 +28,15 @@ use crate::{
 type PeerMap = BTreeMap<GraphId, Peers>;
 type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
+#[derive_where(Debug)]
 pub(crate) struct Aqc<E, KS> {
     /// Our device ID.
     device_id: DeviceId,
     /// All the peers that we have channels with.
     peers: Arc<Mutex<PeerMap>>,
+    #[derive_where(skip(Debug))]
     handler: Mutex<Handler<AranyaStore<KS>>>,
+    #[derive_where(skip(Debug))]
     eng: Mutex<E>,
 }
 
@@ -111,7 +117,7 @@ where
         }
 
         let info = BidiChannelCreated {
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             peer_id: e.peer_id.into(),
@@ -148,7 +154,7 @@ where
 
         let info = BidiChannelReceived {
             channel_id: e.channel_id.into(),
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_pk: &e.author_enc_pk,
             peer_id: e.peer_id.into(),
@@ -184,7 +190,7 @@ where
         }
 
         let info = UniChannelCreated {
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             send_id: e.sender_id.into(),
@@ -232,7 +238,7 @@ where
 
         let info = UniChannelReceived {
             channel_id: e.channel_id.into(),
-            parent_cmd_id: e.parent_cmd_id,
+            parent_cmd_id: e.parent_cmd_id.into(),
             send_id: e.sender_id.into(),
             recv_id: e.receiver_id.into(),
             author_id: e.author_id.into(),
@@ -264,14 +270,5 @@ where
             }
         })?;
         Ok(AqcPsks::Uni(psks))
-    }
-}
-
-impl<E, KS> fmt::Debug for Aqc<E, KS> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Aqc")
-            .field("device_id", &self.device_id)
-            .field("peers", &self.peers)
-            .finish_non_exhaustive()
     }
 }

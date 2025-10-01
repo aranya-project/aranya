@@ -3,16 +3,10 @@ use std::mem::MaybeUninit;
 use aranya_capi_core::safe::{TypeId, Typed};
 
 /// An instance of an Aranya Client, along with an async runtime.
+#[derive(Debug)]
 pub struct Client {
     pub(crate) inner: aranya_client::Client,
     pub(crate) rt: tokio::runtime::Runtime,
-}
-
-impl Client {
-    /// Useful for deref coercion.
-    pub(crate) fn imp(&mut self) -> &mut Self {
-        self
-    }
 }
 
 impl Typed for Client {
@@ -21,7 +15,7 @@ impl Typed for Client {
 
 /// Serializes a [`KeyBundle`] into the output buffer.
 pub unsafe fn key_bundle_serialize(
-    keybundle: &aranya_daemon_api::KeyBundle,
+    keybundle: &aranya_client::client::KeyBundle,
     buf: *mut MaybeUninit<u8>,
     buf_len: &mut usize,
 ) -> Result<(), crate::imp::Error> {
@@ -44,6 +38,6 @@ pub unsafe fn key_bundle_serialize(
 /// Deserializes key bundle buffer into a [`KeyBundle`].
 pub fn key_bundle_deserialize(
     buf: &[u8],
-) -> Result<aranya_daemon_api::KeyBundle, crate::imp::Error> {
+) -> Result<aranya_client::client::KeyBundle, crate::imp::Error> {
     Ok(postcard::from_bytes(buf)?)
 }
