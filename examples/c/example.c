@@ -878,7 +878,7 @@ AranyaError run_afc_bidi_example(Team* t) {
     // Use the channel to encrypt and authenticate our data, and store the
     // encrypted result in our ciphertext buffer.
     err = aranya_afc_channel_seal(&afc_bidi_chan_a, (const uint8_t*)afc_msg,
-                                  afc_msg_len, ciphertext, ciphertext_len);
+                                  afc_msg_len, ciphertext, &ciphertext_len);
     EXPECT("error sealing afc message", err);
 
     // Here, you would send the ciphertext to the other peer using the transport
@@ -898,7 +898,7 @@ AranyaError run_afc_bidi_example(Team* t) {
     // received out-of-order using `aranya_afc_seq_cmp()` to compare two seq.
     AranyaAfcSeq seq;
     err = aranya_afc_channel_open(&afc_bidi_chan_b, ciphertext, ciphertext_len,
-                                  plaintext, plaintext_len, &seq);
+                                  plaintext, &plaintext_len, &seq);
     EXPECT("error opening afc message", err);
 
     // Make sure that the received message matches the originally sent data.
@@ -994,7 +994,7 @@ AranyaError run_afc_uni_example(Team* t) {
     // Use the channel to encrypt and authenticate our data, and store the
     // encrypted result in our ciphertext buffer.
     err = aranya_afc_channel_seal(&afc_send_channel, (const uint8_t*)afc_msg,
-                                  afc_msg_len, ciphertext, ciphertext_len);
+                                  afc_msg_len, ciphertext, &ciphertext_len);
     EXPECT("error sealing afc message", err);
 
     // Here, you would send the ciphertext to the other peer using the transport
@@ -1014,7 +1014,7 @@ AranyaError run_afc_uni_example(Team* t) {
     // received out-of-order using `aranya_afc_seq_cmp()` to compare two seq.
     AranyaAfcSeq seq;
     err = aranya_afc_channel_open(&afc_recv_channel, ciphertext, ciphertext_len,
-                                  plaintext, plaintext_len, &seq);
+                                  plaintext, &plaintext_len, &seq);
     EXPECT("error opening afc message", err);
 
     // Make sure that the received message matches the originally sent data.
