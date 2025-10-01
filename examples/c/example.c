@@ -264,16 +264,9 @@ AranyaError init_team(Team *t) {
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
 
-        char *sock_path = realpath(daemon_socks[i], NULL);
-        if (sock_path == NULL) {
-            fprintf(stderr, "`realpath(%s,...)` failed: %s\n", daemon_socks[i],
-                    strerror(errno));
-            return ARANYA_ERROR_OTHER;
-        }
-
         Client *client = &t->clients_arr[i];
-        err = init_client(client, client_names[i], sock_path, aqc_addrs[i]);
-        free(sock_path);
+        err =
+            init_client(client, client_names[i], daemon_socks[i], aqc_addrs[i]);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to initialize client %s: %s\n",
                     client->name, aranya_error_to_str(err));
