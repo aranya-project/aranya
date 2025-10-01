@@ -18,11 +18,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ENABLE_ARANYA_AFC 1
-#define ENABLE_ARANYA_PREVIEW 1
-#define ENABLE_ARANYA_AQC 1
-#define ENABLE_ARANYA_EXPERIMENTAL 1
-#include "../../crates/aranya-client-capi/output/aranya-client.h"
+#include "aranya-client.h"
 
 // Macro for printing AranyaError to stderr and returning the error.
 // Does nothing if error value is ARANYA_SUCCESS.
