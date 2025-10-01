@@ -3629,6 +3629,8 @@ AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
  * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ * Both the current node and its peer should have permission to use the label
+ * and have appropriate channel permissions.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
@@ -3655,6 +3657,8 @@ AranyaError aranya_afc_create_bidi_channel(const struct AranyaClient *client,
  * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ * Both the current node and its peer should have permission to use the label
+ * and have appropriate channel permissions.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
@@ -3682,6 +3686,8 @@ AranyaError aranya_afc_create_bidi_channel_ext(const struct AranyaClient *client
  * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ * Both the current node and its peer should have permission to use the label
+ * and have appropriate channel permissions.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
@@ -3708,6 +3714,8 @@ AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client
  * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ * Both the current node and its peer should have permission to use the label
+ * and have appropriate channel permissions.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
@@ -3735,6 +3743,8 @@ AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *cl
  * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ * Both the current node and its peer should have permission to use the label
+ * and have appropriate channel permissions.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
@@ -3761,6 +3771,8 @@ AranyaError aranya_afc_create_uni_recv_channel(const struct AranyaClient *client
  * transport of your choice to create the other side of the channel.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ * Both the current node and its peer should have permission to use the label
+ * and have appropriate channel permissions.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
