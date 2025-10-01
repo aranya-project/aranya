@@ -2294,6 +2294,8 @@ const _: () = {
 /// transport of your choice to create the other side of the channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
+/// Both the current node and its peer should have permission to use the label
+/// and have appropriate channel permissions.
 ///
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  team_id the team's identifier [`TeamId`].
@@ -2329,6 +2331,8 @@ pub fn afc_create_bidi_channel(
 /// transport of your choice to create the other side of the channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
+/// Both the current node and its peer should have permission to use the label
+/// and have appropriate channel permissions.
 ///
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  team_id the team's identifier [`TeamId`].
@@ -2366,6 +2370,8 @@ pub fn afc_create_uni_send_channel(
 /// transport of your choice to create the other side of the channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
+/// Both the current node and its peer should have permission to use the label
+/// and have appropriate channel permissions.
 ///
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  team_id the team's identifier [`TeamId`].
