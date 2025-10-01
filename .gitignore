@@ -5,3 +5,6 @@
 *.tar.gz
 
 .vscode
+
+# CMake
+build/
