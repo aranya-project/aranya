@@ -4,6 +4,7 @@ project(aranya-client LANGUAGES C)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+include(CTest)
 include(FetchContent)
 
 FetchContent_Declare(
