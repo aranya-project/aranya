@@ -17,6 +17,29 @@ runs:
       shell: bash
       run: sudo apt-get update
 
+    - name: Install mold linker
+      shell: bash
+      run: |
+        sudo apt-get install -y mold --no-install-recommends
+        mold --version
+
+    - name: Configure faster linker
+      shell: bash
+      run: |
+        # Check the Rust version
+        RUST_VERSION=$(rustc --version | cut -d' ' -f2)
+        RUST_MINOR=$(echo "$RUST_VERSION" | cut -d'.' -f2)
+
+        if command -v mold &> /dev/null; then
+          echo "Using mold linker"
+          echo "RUSTFLAGS=-C linker=clang -C link-arg=-fuse-ld=mold" >> $GITHUB_ENV
+        elif [ "$RUST_MINOR" -ge 90 ]; then
+          echo "Rust 1.90 has lld as default"
+        else:
+          echo "Using lld linker"
+          echo "RUSTFLAGS=-C linker=clang -C link-arg=-fuse-ld=lld" >> $GITHUB_ENV
+        fi
+
     - name: patchelf
       shell: bash
       run: |
