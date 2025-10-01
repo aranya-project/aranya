@@ -28,7 +28,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Check formatting
-        run: cargo make check-fmt
+        run: cargo make check-format
 
   clippy:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
       - name: Run clippy
         run: cargo make clippy
 
-  machete:
+  unused-deps:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,9 +48,9 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Check dependency usage
-        run: cargo make machete
+        run: cargo make unused-deps
 
-  check:
+  check-features:
     strategy:
       matrix:
         runner:
