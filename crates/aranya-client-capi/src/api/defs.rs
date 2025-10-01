@@ -1018,8 +1018,21 @@ pub fn sync_peer_config_build(
 /// @param[in] interval Set the interval at which syncing occurs
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+pub fn sync_peer_config_builder_set_interval(
+    cfg: &mut SyncPeerConfigBuilder,
+    interval: Duration,
+) -> Result<(), imp::Error> {
+    // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
+    // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+    let one_year = std::time::Duration::from_secs(365 * 24 * 60 * 60); // 365 days
+    if std::time::Duration::from(interval) > one_year {
+        return Err(
+            InvalidArg::new("interval", "must not exceed 1 year to prevent overflow").into(),
+        );
+    }
+
     cfg.interval(interval);
+    Ok(())
 }
 
 /// Updates the config to enable immediate syncing with the peer.
@@ -1047,6 +1060,17 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
     cfg.sync_now(false);
+}
+
+/// Enables automatic syncing when a hello message is received from this peer
+/// indicating they have a head that we don't have.
+///
+/// By default, sync on hello is disabled.
+/// @param[in,out] cfg a pointer to the builder for a sync config
+///
+/// @relates AranyaSyncPeerConfigBuilder.
+pub fn sync_peer_config_builder_set_sync_on_hello(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.sync_on_hello(true);
 }
 
 /// Assign a role to a device.
@@ -1400,6 +1424,58 @@ pub unsafe fn remove_sync_peer(
     client
         .rt
         .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
+    Ok(())
+}
+
+/// Subscribe to hello notifications from a sync peer.
+///
+/// This will request the peer to send hello notifications when their graph head changes.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] peer the peer's Aranya network address [`Addr`].
+/// @param[in] delay minimum delay between notifications.
+/// @param[in] duration how long the subscription should remain active.
+///
+/// @relates AranyaClient.
+pub unsafe fn sync_hello_subscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+    delay: Duration,
+    duration: Duration,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_subscribe(
+            addr,
+            delay.into(),
+            duration.into(),
+        ))?;
+    Ok(())
+}
+
+/// Unsubscribe from hello notifications from a sync peer.
+///
+/// This will stop receiving hello notifications from the specified peer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
+///
+/// @relates AranyaClient.
+pub unsafe fn sync_hello_unsubscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
     Ok(())
 }
 
