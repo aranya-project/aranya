@@ -806,16 +806,17 @@ where
             "Server received sync request"
         );
 
-        let sync_type: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| {
-            error!(
-                error = %e,
-                request_data_len = request_data.len(),
-                ?addr,
-                ?active_team,
-                "Failed to deserialize sync request"
-            );
-            anyhow::anyhow!(e)
-        })?;
+        let (sync_type, remaining): (SyncType<Addr>, &[u8]) =
+            postcard::take_from_bytes(request_data).map_err(|e| {
+                error!(
+                    error = %e,
+                    request_data_len = request_data.len(),
+                    ?addr,
+                    ?active_team,
+                    "Failed to deserialize sync request"
+                );
+                anyhow::anyhow!(e)
+            })?;
 
         match sync_type {
             SyncType::Poll {
@@ -832,13 +833,18 @@ where
                 )
                 .await
             }
-            SyncType::Push(push_msg) => {
+            SyncType::Push {
+                message,
+                storage_id,
+                address,
+            } => {
                 Self::process_push_message(
-                    push_msg,
+                    message,
+                    storage_id,
+                    address,
+                    remaining,
                     client,
                     caches,
-                    addr,
-                    active_team,
                     push_subscriptions,
                     sync_peers,
                 )
@@ -860,6 +866,10 @@ where
                 .await;
                 // Hello messages are fire-and-forget, return empty response
                 // Note: returning empty response which will be ignored by client
+                Ok(Box::new([]))
+            }
+            SyncType::Subscribe { .. } | SyncType::Unsubscribe { .. } => {
+                // These are handled by the push.rs module, not here
                 Ok(Box::new([]))
             }
         }

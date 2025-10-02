@@ -71,6 +71,7 @@ derive-where = { version = "1" }
 divan = { version = "0.1", default-features = false }
 futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
+heapless = { version = "0.8", default-features = false, features = ["serde"] }
 http = { version = "1" }
 libc = { version = "0.2" }
 metrics = { version = "0.24" }
