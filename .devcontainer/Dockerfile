@@ -8,8 +8,6 @@ RUN apt-get update && apt-get install -y \
     sudo \
     zsh
 
-RUN cargo install cargo-make
-
 WORKDIR /usr/src/myapp
 COPY . .
 

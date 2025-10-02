@@ -21,7 +21,11 @@ Confirm this by checking the repository `Settings->Codespaces` tab and your acco
 To run the Aranya Rust example inside a codespace:
 - Launch the Codespace
 - Once the Codespace has initialized, select the terminal so you can start entering commands. If you are unable to run commands in the terminal, open a new terminal in the IDE.
-- Execute `cargo make run-rust-example` to run the Rust example
+- Execute the following to run the Rust example:
+```
+cd examples/rust
+./run.bash
+```
 
 # Cost Saving Recommendations
 
