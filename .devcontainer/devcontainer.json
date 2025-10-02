@@ -6,7 +6,7 @@
         "rust-lang.rust-analyzer"
       ],
       "settings": {
-        "terminal.integrated.shell.linux": "/usr/bin/zsh"
+        "terminal.integrated.defaultProfile.linux": "zsh"
       }
     }
   },
