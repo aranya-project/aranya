@@ -13,13 +13,13 @@ Confirm this by checking the repository `Settings->Codespaces` tab and your acco
 
 - Navigate to the branch of the repo you would like to create a Codespace for.
 - Click the `Code` dropdown, then click on the `Codespaces` tab.
-- Click `Create new Codespace with options`
+- Click `...`->`New with options`
 - Recommend creating a codespace with at least 8 cores on the desired branch of the repo.
 
 # Running The Aranya Rust Example
 
 To run the Aranya Rust example inside a codespace:
-- Launch the Codespace
+- Start the Codespace
 - Once the Codespace has initialized, select the terminal so you can start entering commands. If you are unable to run commands in the terminal, open a new terminal in the IDE.
 - Execute the following to run the Rust example:
 ```
