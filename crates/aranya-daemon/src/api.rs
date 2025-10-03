@@ -264,8 +264,6 @@ impl EffectHandler {
                 AqcBidiChannelReceived(_) => {}
                 AqcUniChannelCreated(_) => {}
                 AqcUniChannelReceived(_) => {}
-                AfcBidiChannelCreated(_) => {}
-                AfcBidiChannelReceived(_) => {}
                 AfcUniChannelCreated(_) => {}
                 AfcUniChannelReceived(_) => {}
                 QueryDevicesOnTeamResult(_) => {}
@@ -800,44 +798,6 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn create_afc_bidi_channel(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer_id: api::DeviceId,
-        label: api::LabelId,
-    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
-        self.check_team_valid(team).await?;
-
-        info!("creating afc bidi channel");
-
-        let graph = GraphId::from(team.into_id());
-
-        let (ctrl, effects) = self
-            .client
-            .actions(&graph)
-            .create_afc_bidi_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
-            .await?;
-        let id = self.device_id()?;
-
-        let Some(Effect::AfcBidiChannelCreated(e)) =
-            find_effect!(&effects, Effect::AfcBidiChannelCreated(e) if e.author_id == id.into())
-        else {
-            return Err(anyhow!("unable to find `AfcBidiChannelCreated` effect").into());
-        };
-
-        self.effect_handler.handle_effects(graph, &effects).await?;
-
-        let channel_id = self.afc.bidi_channel_created(e).await?;
-        info!("afc bidi channel created");
-
-        let ctrl = get_afc_ctrl(ctrl)?;
-
-        Ok((ctrl, channel_id))
-    }
-
-    #[cfg(feature = "afc")]
-    #[instrument(skip(self), err)]
     async fn create_afc_uni_send_channel(
         self,
         _: context::Context,
@@ -931,7 +891,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcChannelId, api::ChanOp)> {
+    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
         let graph = GraphId::from(team.into_id());
@@ -941,36 +901,18 @@ impl DaemonApi for Api {
         let effects = self.client.session_receive(&mut session, &ctrl).await?;
         self.effect_handler.handle_effects(graph, &effects).await?;
 
+        // NB: Each action should only produce one ephemeral command.
         let effect = effects.iter().find(|e| match e {
-            Effect::AfcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
             Effect::AfcUniChannelReceived(e) => {
-                (e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into())
-                    || (e.sender_id == our_device_id.into()
-                        && e.receiver_id != our_device_id.into())
+                e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into()
             }
             _ => false,
         });
-        match effect {
-            Some(Effect::AfcBidiChannelReceived(e)) => {
-                let channel_id = self.afc.bidi_channel_received(e).await?;
-                // NB: Each action should only produce one
-                // ephemeral command.
-                return Ok((e.label_id.into(), channel_id, api::ChanOp::SendRecv));
-            }
-            Some(Effect::AfcUniChannelReceived(e)) => {
-                let channel_id = self.afc.uni_channel_received(e).await?;
-                // NB: Each action should only produce one
-                // ephemeral command.
-                let op = if e.sender_id == self.device_id()?.into() {
-                    api::ChanOp::SendOnly
-                } else {
-                    api::ChanOp::RecvOnly
-                };
-                return Ok((e.label_id.into(), channel_id, op));
-            }
-            Some(_) | None => {}
-        }
-        Err(anyhow!("unable to find AFC effect").into())
+        let Some(Effect::AfcUniChannelReceived(e)) = effect else {
+            return Err(anyhow!("unable to find AFC effect").into());
+        };
+        let channel_id = self.afc.uni_channel_received(e).await?;
+        return Ok((e.label_id.into(), channel_id));
     }
 
     /// Create a label.
