@@ -4,44 +4,20 @@
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::afc;
 
-/// All channel variants.
+/// Send channel.
 #[derive(Debug)]
-pub enum AfcChannel {
-    Bidi(afc::BidiChannel),
-    Send(afc::SendChannel),
-    Receive(afc::ReceiveChannel),
-}
+pub struct AfcSendChannel(pub afc::SendChannel);
 
-impl Typed for AfcChannel {
+impl Typed for AfcSendChannel {
     const TYPE_ID: TypeId = TypeId::new(0xDC3130B2);
 }
 
-impl From<afc::Channel> for AfcChannel {
-    fn from(channel: afc::Channel) -> Self {
-        match channel {
-            afc::Channel::Bidi(c) => Self::Bidi(c),
-            afc::Channel::Send(c) => Self::Send(c),
-            afc::Channel::Recv(c) => Self::Receive(c),
-        }
-    }
-}
+/// Receive channel.
+#[derive(Debug)]
+pub struct AfcReceiveChannel(pub afc::ReceiveChannel);
 
-impl From<afc::BidiChannel> for AfcChannel {
-    fn from(channel: afc::BidiChannel) -> Self {
-        Self::Bidi(channel)
-    }
-}
-
-impl From<afc::SendChannel> for AfcChannel {
-    fn from(channel: afc::SendChannel) -> Self {
-        Self::Send(channel)
-    }
-}
-
-impl From<afc::ReceiveChannel> for AfcChannel {
-    fn from(channel: afc::ReceiveChannel) -> Self {
-        Self::Receive(channel)
-    }
+impl Typed for AfcReceiveChannel {
+    const TYPE_ID: TypeId = TypeId::new(0xDC3130B2);
 }
 
 /// A control message, for creating the other end of a channel.
