@@ -253,28 +253,30 @@ pub unsafe fn client_init(
     // TODO: Clean this up.
     let daemon_socket = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
+        unsafe { CStr::from_ptr(config.daemon_addr) }.to_bytes(),
     )
     .as_ref();
 
     let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
     #[cfg(feature = "aqc")]
-    let aqc_addr = {
+    let aqc_addr = if let Some(aqc) = &config.aqc {
         // SAFETY: Caller must ensure pointer is a valid C String.
-        let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
+        let aqc_str = unsafe { CStr::from_ptr(aqc.addr) }
             .to_str()
             .context("unable to convert to string")?;
 
-        aranya_util::Addr::from_str(aqc_str)?
+        Some(aranya_util::Addr::from_str(aqc_str)?)
+    } else {
+        None
     };
 
     let inner = rt.block_on({
         let mut builder = aranya_client::Client::builder();
         builder = builder.daemon_uds_path(daemon_socket);
         #[cfg(feature = "aqc")]
-        {
-            builder = builder.aqc_server_addr(&aqc_addr);
+        if let Some(aqc_addr) = &aqc_addr {
+            builder = builder.aqc_server_addr(aqc_addr);
         }
         builder.connect()
     })?;
