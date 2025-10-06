@@ -171,17 +171,7 @@ impl Channels {
         Ok((chan, CtrlMsg(ctrl)))
     }
 
-    /// Receive a [`CtrlMsg`] message from a peer to create a corresponding channel.
-    ///
-    /// The type of channel returned by this method depends on which type of channel the peer created:
-    /// - If the peer created a [`BidiChannel`], this will return a [`BidiChannel`]
-    /// - If the peer created a [`SendChannel`], this will return a [`ReceiveChannel`]
-    /// - If the peer created a [`ReceiveChannel`], this will return a [`SendChannel`]
-    ///
-    /// Returns a [`Channel`] enum that can be matched into any of the following channel types:
-    /// - [`BidiChannel`]
-    /// - [`SendChannel`]
-    /// - [`ReceiveChannel`]
+    /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let (label_id, channel_id) = self
             .daemon
