@@ -3959,7 +3959,7 @@ AranyaError aranya_afc_send_channel_delete_ext(const struct AranyaClient *client
  * @relates AranyaClient.
  */
 AranyaError aranya_afc_receive_channel_delete(const struct AranyaClient *client,
-                                              struct AranyaAfcSendChannel *channel);
+                                              struct AranyaAfcReceiveChannel *channel);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
@@ -3975,7 +3975,7 @@ AranyaError aranya_afc_receive_channel_delete(const struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_afc_receive_channel_delete_ext(const struct AranyaClient *client,
-                                                  struct AranyaAfcSendChannel *channel,
+                                                  struct AranyaAfcReceiveChannel *channel,
                                                   struct AranyaExtError *__ext_err);
 #endif
 

@@ -2491,7 +2491,7 @@ pub fn afc_send_channel_delete(
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_delete(
     client: &Client,
-    channel: OwnedPtr<AfcSendChannel>,
+    channel: OwnedPtr<AfcReceiveChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcReceiveChannel` pointer.
     let channel = unsafe { channel.read().into_inner().into_inner() };

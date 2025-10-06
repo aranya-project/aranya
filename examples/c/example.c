@@ -18,6 +18,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#define ENABLE_ARANYA_AFC 1
+#define ENABLE_ARANYA_PREVIEW 1
+#define ENABLE_ARANYA_AQC 1
+#define ENABLE_ARANYA_EXPERIMENTAL 1
 #include "aranya-client.h"
 
 // Macro for printing AranyaError to stderr and returning the error.
@@ -841,14 +845,9 @@ AranyaError run_afc_uni_example(Team* t) {
     // Note that since we created a uni send channel on Member A's side above,
     // Member B here will get a uni receive channel.
     AranyaAfcReceiveChannel afc_recv_channel;
-    AranyaAfcChannelType chan_type;
     err = aranya_afc_recv_ctrl(&memberb->client, &t->id, bytes_ptr, bytes_len,
-                               &afc_recv_channel, &chan_type);
+                               &afc_recv_channel);
     EXPECT("error creating a channel from control message", err);
-    if (chan_type != ARANYA_AFC_CHANNEL_TYPE_RECEIVER) {
-        EXPECT("didn't receive a uni recv channel from membera",
-               ARANYA_ERROR_BUG);
-    }
 
     // Now we need to define some data we want to send, in this case a simple
     // string. We need both the original data, as well as a buffer to store the
@@ -892,10 +891,11 @@ AranyaError run_afc_uni_example(Team* t) {
         EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
     }
 
-    err = aranya_afc_channel_delete(&membera->client, &afc_send_channel);
+    err = aranya_afc_send_channel_delete(&membera->client, &afc_send_channel);
     EXPECT("error deleting membera's channel", err);
 
-    err = aranya_afc_channel_delete(&memberb->client, &afc_recv_channel);
+    err =
+        aranya_afc_receive_channel_delete(&memberb->client, &afc_recv_channel);
     EXPECT("error deleting memberb's channel", err);
 
     err = aranya_afc_ctrl_msg_cleanup(&recv_message);
