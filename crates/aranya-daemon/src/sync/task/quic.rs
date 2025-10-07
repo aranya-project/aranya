@@ -8,8 +8,12 @@
 
 use core::net::SocketAddr;
 use std::{
-    collections::HashMap, convert::Infallible, future::Future, net::Ipv4Addr, sync::Arc,
-    time::Duration,
+    collections::HashMap,
+    convert::Infallible,
+    future::Future,
+    net::Ipv4Addr,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
 use anyhow::Context;
@@ -17,7 +21,7 @@ use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Address, Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
-    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    SyncRequester, SyncResponder, SyncResponseMessage, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     error::ReportExt as _,
@@ -245,9 +249,8 @@ impl SyncState for State {
     async fn broadcast_push_notifications(
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
-        response: aranya_runtime::SyncResponseMessage,
     ) -> SyncResult<()> {
-        super::push::broadcast_push_notifications(syncer, graph_id, response).await
+        super::push::broadcast_push_notifications(syncer, graph_id).await
     }
 }
 
@@ -868,8 +871,31 @@ where
                 // Note: returning empty response which will be ignored by client
                 Ok(Box::new([]))
             }
-            SyncType::Subscribe { .. } | SyncType::Unsubscribe { .. } => {
-                // These are handled by the push.rs module, not here
+            SyncType::Subscribe {
+                remain_open,
+                max_bytes,
+                commands,
+                address,
+                storage_id,
+            } => {
+                Self::process_subscribe_message(
+                    remain_open,
+                    max_bytes,
+                    commands,
+                    address,
+                    storage_id,
+                    client,
+                    caches,
+                    push_subscriptions,
+                    active_team,
+                )
+                .await;
+                // Subscribe messages are fire-and-forget, return empty response
+                Ok(Box::new([]))
+            }
+            SyncType::Unsubscribe { address } => {
+                Self::process_unsubscribe_message(address, push_subscriptions, active_team).await;
+                // Unsubscribe messages are fire-and-forget, return empty response
                 Ok(Box::new([]))
             }
         }
@@ -917,6 +943,195 @@ where
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
         Ok(buf.into())
+    }
+
+    /// Processes a push notification message.
+    ///
+    /// Handles incoming push notifications by triggering a sync with the sender.
+    /// Similar to hello notifications, this triggers a sync operation rather than
+    /// directly processing commands, since the server context doesn't have access
+    /// to the effect sink.
+    #[instrument(skip_all)]
+    async fn process_push_message(
+        message: SyncResponseMessage,
+        storage_id: GraphId,
+        sender_addr: Addr,
+        _remaining: &[u8],
+        _client: AranyaClient<EN, SP>,
+        _caches: PeerCacheMap,
+        _push_subscriptions: Arc<Mutex<PushSubscriptions>>,
+        sync_peers: SyncPeers,
+    ) {
+        debug!(
+            ?storage_id,
+            ?sender_addr,
+            "Received Push notification message"
+        );
+
+        // Extract any heads from the push message to update cache
+        if let SyncResponseMessage::SyncResponse { commands, .. } = &message {
+            if !commands.is_empty() {
+                debug!(
+                    cmd_count = commands.len(),
+                    ?storage_id,
+                    ?sender_addr,
+                    "Push notification indicates new commands available"
+                );
+
+                // Trigger a sync to fetch the new commands
+                // This is similar to sync_on_hello - we trigger a sync operation
+                // which will properly handle command processing with the effect sink
+                match sync_peers.sync_on_hello(sender_addr, storage_id).await {
+                    Ok(()) => {
+                        debug!(
+                            ?sender_addr,
+                            ?storage_id,
+                            "Successfully triggered sync from push notification"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            error = %e,
+                            ?sender_addr,
+                            ?storage_id,
+                            "Failed to trigger sync from push notification"
+                        );
+                    }
+                }
+            } else {
+                debug!(
+                    ?storage_id,
+                    ?sender_addr,
+                    "Push notification contained no commands"
+                );
+            }
+        }
+    }
+
+    /// Processes a subscribe request for push notifications.
+    ///
+    /// Handles subscription management for push notifications.
+    #[instrument(skip_all)]
+    async fn process_subscribe_message(
+        remain_open: u64,
+        max_bytes: u64,
+        commands: heapless::Vec<Address, 100>,
+        subscriber_addr: Addr,
+        storage_id: GraphId,
+        client: AranyaClient<EN, SP>,
+        caches: PeerCacheMap,
+        push_subscriptions: Arc<Mutex<PushSubscriptions>>,
+        _active_team: &TeamId,
+    ) {
+        debug!(
+            ?subscriber_addr,
+            ?storage_id,
+            remain_open,
+            max_bytes,
+            "Received Subscribe push message"
+        );
+
+        // Convert Addr to SocketAddr for the subscription storage
+        let subscriber_socket_addr = match subscriber_addr.host().parse() {
+            Ok(ip) => SocketAddr::new(ip, subscriber_addr.port()),
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    ?subscriber_addr,
+                    "Failed to parse subscriber address, ignoring subscription"
+                );
+                return;
+            }
+        };
+
+        // Calculate close time
+        let close_time = Instant::now() + Duration::from_secs(remain_open);
+
+        let subscription = super::push::PushSubscription {
+            close_time,
+            remaining_bytes: max_bytes,
+        };
+
+        // Update the remote heads cache with the subscriber's commands
+        let key = PeerCacheKey::new(subscriber_addr, storage_id);
+        {
+            let mut aranya = match client.aranya.try_lock() {
+                Ok(lock) => lock,
+                Err(_) => client.aranya.lock().await,
+            };
+            let mut caches = caches.lock().await;
+            let cache = caches.entry(key).or_default();
+
+            // Update heads with the commands from the subscriber
+            // This helps us know what the subscriber already has
+            if let Err(e) = aranya.update_heads(storage_id, commands.iter().copied(), cache) {
+                warn!(
+                    error = %e,
+                    ?subscriber_addr,
+                    ?storage_id,
+                    "Failed to update heads for push subscription"
+                );
+                return;
+            }
+        }
+
+        // Store subscription (replaces any existing subscription for this peer+team)
+        let sub_key = (storage_id, subscriber_socket_addr);
+        let mut subscriptions = push_subscriptions.lock().await;
+        subscriptions.insert(sub_key, subscription);
+
+        debug!(
+            ?subscriber_addr,
+            ?storage_id,
+            "Successfully added push subscription"
+        );
+    }
+
+    /// Processes an unsubscribe request for push notifications.
+    ///
+    /// Removes a push notification subscription.
+    #[instrument(skip_all)]
+    async fn process_unsubscribe_message(
+        subscriber_addr: Addr,
+        push_subscriptions: Arc<Mutex<PushSubscriptions>>,
+        active_team: &TeamId,
+    ) {
+        debug!(
+            ?subscriber_addr,
+            ?active_team,
+            "Received Unsubscribe push message"
+        );
+
+        // Convert Addr to SocketAddr for the subscription lookup
+        let subscriber_socket_addr = match subscriber_addr.host().parse() {
+            Ok(ip) => SocketAddr::new(ip, subscriber_addr.port()),
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    ?subscriber_addr,
+                    "Failed to parse subscriber address, ignoring unsubscribe"
+                );
+                return;
+            }
+        };
+
+        // Remove subscription for this peer and team
+        let storage_id: GraphId = active_team.into_id().into();
+        let key = (storage_id, subscriber_socket_addr);
+        let mut subscriptions = push_subscriptions.lock().await;
+        if subscriptions.remove(&key).is_some() {
+            debug!(
+                ?subscriber_addr,
+                ?storage_id,
+                "Removed push subscription successfully"
+            );
+        } else {
+            debug!(
+                ?subscriber_addr,
+                ?storage_id,
+                "No push subscription found to remove"
+            );
+        }
     }
 }
 

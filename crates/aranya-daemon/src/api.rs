@@ -305,6 +305,8 @@ impl EffectHandler {
 
                 self.broadcast_hello_notifications(graph, current_head)
                     .await?;
+
+                self.broadcast_push_notifications(graph).await?;
             } else {
                 trace!(
                     ?graph,
@@ -372,6 +374,24 @@ impl EffectHandler {
                 ?graph_id,
                 ?head,
                 "No peers interface available for hello broadcasting"
+            );
+        }
+        Ok(())
+    }
+
+    /// Broadcasts push notifications to subscribers when the graph changes.
+    #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
+    async fn broadcast_push_notifications(&self, graph_id: GraphId) -> anyhow::Result<()> {
+        if let Some(peers) = &self.peers {
+            info!(?graph_id, "Calling peers.broadcast_push");
+            peers
+                .broadcast_push(graph_id)
+                .await
+                .context("failed to broadcast push notifications")?;
+        } else {
+            trace!(
+                ?graph_id,
+                "No peers interface available for push broadcasting"
             );
         }
         Ok(())
@@ -538,6 +558,46 @@ impl DaemonApi for Api {
 
         self.peers
             .sync_hello_unsubscribe(peer, team.into_id().into())
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn sync_push_subscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let commands = commands.into_iter().map(|addr| addr).collect();
+        self.peers
+            .sync_push_subscribe(
+                peer,
+                team.into_id().into(),
+                remain_open,
+                max_bytes,
+                commands,
+            )
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn sync_push_unsubscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.peers
+            .sync_push_unsubscribe(peer, team.into_id().into())
             .await?;
         Ok(())
     }

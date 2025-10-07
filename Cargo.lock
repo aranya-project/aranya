@@ -356,6 +356,7 @@ dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
  "aranya-policy-text",
+ "aranya-runtime",
  "aranya-util",
  "backon",
  "buggy",

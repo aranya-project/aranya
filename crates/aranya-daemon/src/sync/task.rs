@@ -57,12 +57,24 @@ enum Msg {
     HelloUnsubscribe {
         peer: SyncPeer,
     },
+    PushSubscribe {
+        peer: SyncPeer,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    },
+    PushUnsubscribe {
+        peer: SyncPeer,
+    },
     SyncOnHello {
         peer: SyncPeer,
     },
     BroadcastHello {
         graph_id: GraphId,
         head: Address,
+    },
+    BroadcastPush {
+        graph_id: GraphId,
     },
 }
 type Request = (Msg, oneshot::Sender<Reply>);
@@ -175,6 +187,37 @@ impl SyncPeers {
         self.send(Msg::HelloUnsubscribe { peer }).await
     }
 
+    /// Subscribe to push notifications from a sync peer.
+    pub(crate) async fn sync_push_subscribe(
+        &self,
+        peer_addr: Addr,
+        graph_id: GraphId,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    ) -> Reply {
+        let peer = SyncPeer {
+            addr: peer_addr,
+            graph_id,
+        };
+        self.send(Msg::PushSubscribe {
+            peer,
+            remain_open,
+            max_bytes,
+            commands,
+        })
+        .await
+    }
+
+    /// Unsubscribe from push notifications from a sync peer.
+    pub(crate) async fn sync_push_unsubscribe(&self, peer_addr: Addr, graph_id: GraphId) -> Reply {
+        let peer = SyncPeer {
+            addr: peer_addr,
+            graph_id,
+        };
+        self.send(Msg::PushUnsubscribe { peer }).await
+    }
+
     /// Trigger sync with a peer based on hello message.
     pub(crate) async fn sync_on_hello(&self, addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer { addr, graph_id };
@@ -184,6 +227,11 @@ impl SyncPeers {
     /// Broadcast hello notifications to all subscribers of a graph.
     pub(crate) async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Reply {
         self.send(Msg::BroadcastHello { graph_id, head }).await
+    }
+
+    /// Broadcast push notifications to all subscribers of a graph.
+    pub(crate) async fn broadcast_push(&self, graph_id: GraphId) -> Reply {
+        self.send(Msg::BroadcastPush { graph_id }).await
     }
 }
 
@@ -296,7 +344,6 @@ pub trait SyncState: Sized {
     fn broadcast_push_notifications(
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
-        response: aranya_runtime::SyncResponseMessage,
     ) -> impl Future<Output = SyncResult<()>> + Send;
 }
 
@@ -363,6 +410,18 @@ impl<ST: SyncState> Syncer<ST> {
                     Msg::HelloUnsubscribe { peer } => {
                         self.sync_hello_unsubscribe(&peer).await
                     }
+                    Msg::PushSubscribe {
+                        peer,
+                        remain_open,
+                        max_bytes,
+                        commands,
+                    } => {
+                        self.sync_push_subscribe(&peer, remain_open, max_bytes, commands)
+                            .await
+                    }
+                    Msg::PushUnsubscribe { peer } => {
+                        self.sync_push_unsubscribe(&peer).await
+                    }
                     Msg::SyncOnHello { peer } => {
                         // Check if sync_on_hello is enabled for this peer
                         if let Some((cfg, _)) = self.peers.get(&peer) {
@@ -393,6 +452,9 @@ impl<ST: SyncState> Syncer<ST> {
                     }
                     Msg::BroadcastHello { graph_id, head } => {
                         ST::broadcast_hello_notifications(self, graph_id, head).await
+                    }
+                    Msg::BroadcastPush { graph_id } => {
+                        ST::broadcast_push_notifications(self, graph_id).await
                     }
                 };
                 if let Err(reply) = tx.send(reply) {
@@ -479,6 +541,34 @@ impl<ST: SyncState> Syncer<ST> {
     async fn sync_hello_unsubscribe(&mut self, peer: &SyncPeer) -> SyncResult<()> {
         trace!("unsubscribing from hello notifications from peer");
         ST::sync_hello_unsubscribe_impl(self, peer.graph_id, &peer.addr).await
+    }
+
+    /// Subscribe to push notifications from a sync peer.
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
+    async fn sync_push_subscribe(
+        &mut self,
+        peer: &SyncPeer,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    ) -> SyncResult<()> {
+        trace!("subscribing to push notifications from peer");
+        ST::sync_push_subscribe_impl(
+            self,
+            peer.graph_id,
+            &peer.addr,
+            remain_open,
+            max_bytes,
+            commands,
+        )
+        .await
+    }
+
+    /// Unsubscribe from push notifications from a sync peer.
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
+    async fn sync_push_unsubscribe(&mut self, peer: &SyncPeer) -> SyncResult<()> {
+        trace!("unsubscribing from push notifications from peer");
+        ST::sync_push_unsubscribe_impl(self, peer.graph_id, &peer.addr).await
     }
 
     /// Get peer caches.

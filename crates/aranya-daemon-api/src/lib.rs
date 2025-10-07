@@ -20,4 +20,5 @@ compile_error!(
 pub mod crypto;
 mod service;
 
+pub use aranya_runtime::Address;
 pub use service::*;

@@ -31,6 +31,7 @@ aqc = ["aranya-crypto/aqc"]
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"], optional = true }
 aranya-policy-text = { workspace = true }
+aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
 

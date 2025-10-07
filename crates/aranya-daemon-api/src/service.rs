@@ -12,6 +12,7 @@ use aranya_crypto::{
     EncryptionPublicKey, Engine,
 };
 pub use aranya_policy_text::{text, Text};
+use aranya_runtime::Address;
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
@@ -328,6 +329,18 @@ pub trait DaemonApi {
 
     /// Unsubscribe from hello notifications from a sync peer.
     async fn sync_hello_unsubscribe(peer: Addr, team: TeamId) -> Result<()>;
+
+    /// Subscribe to push notifications from a sync peer.
+    async fn sync_push_subscribe(
+        peer: Addr,
+        team: TeamId,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<Address>,
+    ) -> Result<()>;
+
+    /// Unsubscribe from push notifications from a sync peer.
+    async fn sync_push_unsubscribe(peer: Addr, team: TeamId) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;

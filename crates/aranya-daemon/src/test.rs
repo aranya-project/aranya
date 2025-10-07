@@ -48,7 +48,7 @@ use crate::{
     sync::{
         self,
         task::{
-            push::{PushInfo, PushSubscriptions},
+            push::PushInfo,
             quic::{HelloInfo, PskStore},
             PeerCacheKey, PeerCacheMap, SyncPeer,
         },

@@ -585,6 +585,51 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Subscribe to push notifications from a sync peer.
+    ///
+    /// This will subscribe to receive push notifications when new commands are available
+    /// from the specified peer. The subscription will remain open for `remain_open` seconds
+    /// and can send up to `max_bytes` bytes of data.
+    ///
+    /// # Arguments
+    /// * `peer` - The address of the peer to subscribe to
+    /// * `remain_open` - Number of seconds the subscription should remain open
+    /// * `max_bytes` - Maximum number of bytes that can be sent
+    /// * `commands` - Sample of the peer's graph heads
+    pub async fn sync_push_subscribe(
+        &self,
+        peer: Addr,
+        remain_open: u64,
+        max_bytes: u64,
+        commands: Vec<aranya_daemon_api::Address>,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .sync_push_subscribe(
+                context::current(),
+                peer,
+                self.team_id.__id,
+                remain_open,
+                max_bytes,
+                commands,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Unsubscribe from push notifications from a sync peer.
+    ///
+    /// This will stop receiving push notifications from the specified peer.
+    pub async fn sync_push_unsubscribe(&self, peer: Addr) -> Result<()> {
+        self.client
+            .daemon
+            .sync_push_unsubscribe(context::current(), peer, self.team_id.__id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Removes a peer from automatic Aranya state syncing.
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
