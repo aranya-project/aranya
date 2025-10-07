@@ -40,7 +40,7 @@ jobs:
       - name: Run clippy
         run: cargo make clippy
 
-  unused-deps:
+  machete:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
       - name: Check dependency usage
         run: cargo make unused-deps
 
-  check-features:
+  check:
     strategy:
       matrix:
         runner:
