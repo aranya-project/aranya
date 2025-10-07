@@ -16,7 +16,7 @@ env:
   REV: ${{ github.run_id }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow || 'direct' }}-${{ github.ref != 'refs/heads/main' || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ github.ref != 'refs/heads/main' || github.run_id }}
   cancel-in-progress: true
 
 jobs:

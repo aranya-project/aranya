@@ -18,7 +18,7 @@
 #   dual         - Run example twice (random + raw seed) (default)
 #   raw_seed_ikm - Run example with raw QUIC PSK seed
 
-set -xeuo pipefail
+set -euo pipefail
 
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
