@@ -74,8 +74,6 @@ check_dependencies() {
 
     local missing_deps=()
 
-    command -v shellcheck >/dev/null && shellcheck "${0}"
-
     command -v patchelf >/dev/null || missing_deps+=("patchelf")
     command -v cargo >/dev/null || missing_deps+=("cargo")
     command -v cmake >/dev/null | missing_deps+=("cmake")
