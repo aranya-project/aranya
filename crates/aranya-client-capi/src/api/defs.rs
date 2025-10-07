@@ -2292,7 +2292,7 @@ const _: () = {
 /// @param[in]  team_id the team's identifier [`TeamId`].
 /// @param[in]  peer_id the peer's identifier [`DeviceId`].
 /// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
-/// @param[out] channel the AFC channel object [`AfcChannel`].
+/// @param[out] channel the AFC channel object [`AfcSendChannel`].
 /// @param[out] control the AFC control message [`AfcCtrlMsg`]
 ///
 /// @relates AranyaClient.
@@ -2323,7 +2323,7 @@ pub fn afc_create_uni_send_channel(
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  team_id the team's identifier [`TeamId`].
 /// @param[in]  control the AFC control message.
-/// @param[out] channel the AFC channel object [`AfcChannel`].
+/// @param[out] channel the AFC channel object [`AfcReceiveChannel`].
 /// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
 ///
 /// @relates AranyaClient.
@@ -2364,7 +2364,7 @@ pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId 
 ///
 /// Note that the lifetime of the pointer is tied to the [`AfcCtrlMsg`].
 ///
-/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  control the control message produced by creating a channel.
 /// @param[out] ptr the raw pointer of the stored buffer.
 /// @param[out] len the raw length of the stored buffer.
 #[cfg(feature = "afc")]
@@ -2393,7 +2393,7 @@ pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
 /// Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
 /// or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
 ///
-/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
 /// @param[in]  plaintext the message being encrypted.
 /// @param[out] dst the output buffer the ciphertext is written to.
 #[cfg(feature = "afc")]
@@ -2426,7 +2426,7 @@ pub unsafe fn afc_channel_seal(
 /// Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
 /// or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
 ///
-/// @param[in]  channel the AFC channel object [`AfcChannel`].
+/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
 /// @param[in]  ciphertext the message being decrypted.
 /// @param[out] dst the output buffer the message is written to.
 /// @param[out] seq the sequence number for the opened message, for reordering.

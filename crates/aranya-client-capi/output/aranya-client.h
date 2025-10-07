@@ -3650,7 +3650,7 @@ AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AfcChannel`].
+ * @param[out] channel the AFC channel object [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
  * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
  *
  * @relates AranyaClient.
@@ -3678,7 +3678,7 @@ AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AfcChannel`].
+ * @param[out] channel the AFC channel object [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
  * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
  *
  * @relates AranyaClient.
@@ -3699,7 +3699,7 @@ AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *cl
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in]  control the AFC control message.
- * @param[out] channel the AFC channel object [`AfcChannel`].
+ * @param[out] channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  * @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
  *
  * @relates AranyaClient.
@@ -3718,7 +3718,7 @@ AranyaError aranya_afc_recv_ctrl(const struct AranyaClient *client,
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in]  control the AFC control message.
- * @param[out] channel the AFC channel object [`AfcChannel`].
+ * @param[out] channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  * @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
  *
  * @relates AranyaClient.
@@ -3783,7 +3783,7 @@ AranyaError aranya_afc_receive_channel_get_label_id_ext(const struct AranyaAfcRe
  *
  * Note that the lifetime of the pointer is tied to the [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
  *
- * @param[in]  channel the AFC channel object [`AfcChannel`].
+ * @param[in]  control the control message produced by creating a channel.
  * @param[out] ptr the raw pointer of the stored buffer.
  * @param[out] len the raw length of the stored buffer.
  */
@@ -3798,7 +3798,7 @@ AranyaError aranya_afc_ctrl_msg_get_bytes(const struct AranyaAfcCtrlMsg *control
  *
  * Note that the lifetime of the pointer is tied to the [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
  *
- * @param[in]  channel the AFC channel object [`AfcChannel`].
+ * @param[in]  control the control message produced by creating a channel.
  * @param[out] ptr the raw pointer of the stored buffer.
  * @param[out] len the raw length of the stored buffer.
  */
@@ -3842,7 +3842,7 @@ AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
  * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AfcChannel`].
+ * @param[in]  channel the AFC channel object [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
@@ -3860,7 +3860,7 @@ AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
  * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AfcChannel`].
+ * @param[in]  channel the AFC channel object [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
@@ -3879,7 +3879,7 @@ AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcSendChannel *chann
  * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AfcChannel`].
+ * @param[in]  channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  * @param[in]  ciphertext the message being decrypted.
  * @param[out] dst the output buffer the message is written to.
  * @param[out] seq the sequence number for the opened message, for reordering.
@@ -3899,7 +3899,7 @@ AranyaError aranya_afc_channel_open(const struct AranyaAfcReceiveChannel *channe
  * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AfcChannel`].
+ * @param[in]  channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  * @param[in]  ciphertext the message being decrypted.
  * @param[out] dst the output buffer the message is written to.
  * @param[out] seq the sequence number for the opened message, for reordering.
