@@ -27,7 +27,7 @@ backon = { workspace = true }
 buggy = { workspace = true }
 bytes = { workspace = true }
 futures-util = { workspace = true }
-rustix = { version = "1.1.2", features = ["shm"] }
+rustix = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { workspace = true }
