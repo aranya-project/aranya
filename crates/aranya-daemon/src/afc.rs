@@ -10,7 +10,6 @@ use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId,
 };
-use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument, warn};
@@ -125,19 +124,12 @@ where
     where
         E: Engine<CS = C>,
     {
-        if e.author_id != self.device_id.into() {
-            bug!("not the author of the uni channel");
-        }
-        if e.sender_id != self.device_id.into() && e.receiver_id != self.device_id.into() {
-            bug!("not a member of this uni channel");
-        }
-
         let info = UniChannelCreated {
             key_id: e.channel_key_id.into(),
             parent_cmd_id: e.parent_cmd_id.into(),
-            author_id: e.author_id.into(),
+            author_id: self.device_id,
             author_enc_key_id: e.author_enc_key_id.into(),
-            seal_id: e.sender_id.into(),
+            seal_id: self.device_id,
             open_id: e.receiver_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
@@ -163,18 +155,11 @@ where
     where
         E: Engine<CS = C>,
     {
-        if e.author_id == self.device_id.into() {
-            bug!("not the peer of the uni channel");
-        }
-        if e.sender_id != self.device_id.into() && e.receiver_id != self.device_id.into() {
-            bug!("not a member of this uni channel");
-        }
-
         let info = UniChannelReceived {
             parent_cmd_id: e.parent_cmd_id.into(),
             seal_id: e.sender_id.into(),
-            open_id: e.receiver_id.into(),
-            author_id: e.author_id.into(),
+            open_id: self.device_id,
+            author_id: e.sender_id.into(),
             author_enc_pk: &e.author_enc_pk,
             peer_enc_key_id: e.peer_enc_key_id.into(),
             label_id: e.label_id.into(),

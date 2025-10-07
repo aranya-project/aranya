@@ -1521,23 +1521,23 @@ the encapsulation through the `AfcCreateUniChannel` command. When processing the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
+ephemeral action create_afc_uni_channel(receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
-    let author = get_valid_device(device::current_device_id())
-    let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
-    let peer_enc_pk = get_enc_pk(peer_id)
+    let author_id = device::current_device_id()
+    check receiver_id != author_id
+    let author = get_valid_device(author_id)
+    let peer_enc_pk = get_enc_pk(receiver_id)
 
     let ch = afc::create_uni_channel(
         parent_cmd_id,
         author.enc_key_id,
         peer_enc_pk,
-        sender_id,
+        author_id,
         receiver_id,
         label_id,
     )
 
     publish AfcCreateUniChannel {
-        sender_id: sender_id,
         receiver_id: receiver_id,
         label_id: label_id,
         peer_encap: ch.peer_encap,
@@ -1551,10 +1551,6 @@ ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id i
 effect AfcUniChannelCreated {
     // The unique ID of the previous command.
     parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The device ID of the participant that can send data.
-    sender_id id,
     // The device ID of the participant that can receive data.
     receiver_id id,
     // The channel author's encryption key ID.
@@ -1573,12 +1569,8 @@ effect AfcUniChannelCreated {
 effect AfcUniChannelReceived {
     // The unique ID of the previous command.
     parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
     // The device ID of the participant that can send data.
     sender_id id,
-    // The device ID of the participant that can receive data.
-    receiver_id id,
     // The channel author's encryption key ID.
     author_enc_pk bytes,
     // The channel peer's encryption key ID.
@@ -1590,8 +1582,6 @@ effect AfcUniChannelReceived {
 }
 ephemeral command AfcCreateUniChannel {
     fields {
-        // The device ID of the participant that can send data.
-        sender_id id,
         // The device ID of the participant that can receive
         // data.
         receiver_id id,
@@ -1609,18 +1599,12 @@ ephemeral command AfcCreateUniChannel {
     policy {
         check team_exists()
 
-        let author = get_valid_device(envelope::author_id(envelope))
+        let author_id = envelope::author_id(envelope)
+        let sender_id = author_id
+        check sender_id != this.receiver_id
+        let author = get_valid_device(author_id)
 
-        // Ensure that the author is one of the channel
-        // participants.
-        check author.device_id == this.sender_id ||
-              author.device_id == this.receiver_id
-
-        let peer_id = if author.device_id == this.sender_id {
-            :this.receiver_id
-        } else {
-            :this.sender_id
-        }
+        let peer_id = this.receiver_id
         let peer = check_unwrap find_existing_device(peer_id)
 
         // The label must exist.
@@ -1631,7 +1615,7 @@ ephemeral command AfcCreateUniChannel {
         check is_member(peer.role)
 
         // Check that both devices have been assigned to the label and have correct send/recv permissions.
-        check can_create_afc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
+        check can_create_afc_uni_channel(sender_id, this.receiver_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1643,8 +1627,6 @@ ephemeral command AfcCreateUniChannel {
             finish {
                 emit AfcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    sender_id: this.sender_id,
                     receiver_id: this.receiver_id,
                     author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
@@ -1660,9 +1642,7 @@ ephemeral command AfcCreateUniChannel {
             finish {
                 emit AfcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    sender_id: this.sender_id,
-                    receiver_id: this.receiver_id,
+                    sender_id: author_id,
                     author_enc_pk: author_enc_pk,
                     peer_enc_key_id: peer.enc_key_id,
                     label_id: this.label_id,

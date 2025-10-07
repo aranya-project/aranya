@@ -80,8 +80,6 @@ pub struct AdminRevoked {
 #[effect]
 pub struct AfcUniChannelCreated {
     pub parent_cmd_id: Id,
-    pub author_id: Id,
-    pub sender_id: Id,
     pub receiver_id: Id,
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
@@ -92,9 +90,7 @@ pub struct AfcUniChannelCreated {
 #[effect]
 pub struct AfcUniChannelReceived {
     pub parent_cmd_id: Id,
-    pub author_id: Id,
     pub sender_id: Id,
-    pub receiver_id: Id,
     pub author_enc_pk: Vec<u8>,
     pub peer_enc_key_id: Id,
     pub label_id: Id,
@@ -317,7 +313,6 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
         &mut self,
-        sender_id: Id,
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;

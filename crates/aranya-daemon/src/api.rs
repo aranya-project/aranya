@@ -20,6 +20,7 @@ use aranya_daemon_api::{
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
+use buggy::bug;
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
@@ -811,55 +812,14 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
 
-        let id = self.device_id()?;
         let (ctrl, effects) = self
             .client
             .actions(&graph)
-            .create_afc_uni_channel_off_graph(id, peer_id.into_id().into(), label.into_id().into())
+            .create_afc_uni_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
             .await?;
 
-        let Some(Effect::AfcUniChannelCreated(e)) =
-            find_effect!(&effects, Effect::AfcUniChannelCreated(e) if e.author_id == id.into())
-        else {
-            return Err(anyhow!("unable to find AfcUniChannelCreated effect").into());
-        };
-
-        self.effect_handler.handle_effects(graph, &effects).await?;
-
-        let channel_id = self.afc.uni_channel_created(e).await?;
-        info!("afc uni channel created");
-
-        let ctrl = get_afc_ctrl(ctrl)?;
-
-        Ok((ctrl, channel_id))
-    }
-
-    #[cfg(feature = "afc")]
-    #[instrument(skip(self), err)]
-    async fn create_afc_uni_recv_channel(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer_id: api::DeviceId,
-        label: api::LabelId,
-    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
-        self.check_team_valid(team).await?;
-
-        info!("creating afc uni channel");
-
-        let graph = GraphId::from(team.into_id());
-
-        let id = self.device_id()?;
-        let (ctrl, effects) = self
-            .client
-            .actions(&graph)
-            .create_afc_uni_channel_off_graph(peer_id.into_id().into(), id, label.into_id().into())
-            .await?;
-
-        let Some(Effect::AfcUniChannelCreated(e)) =
-            find_effect!(&effects, Effect::AfcUniChannelCreated(e) if e.author_id == id.into())
-        else {
-            return Err(anyhow!("unable to find AfcUniChannelCreated effect").into());
+        let [Effect::AfcUniChannelCreated(e)] = effects.as_slice() else {
+            bug!("expected afc uni channel created effect")
         };
 
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -896,22 +856,17 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
-        let our_device_id = self.device_id()?;
 
         let effects = self.client.session_receive(&mut session, &ctrl).await?;
+
+        let [Effect::AfcUniChannelReceived(e)] = effects.as_slice() else {
+            bug!("expected afc uni channel received effect")
+        };
+
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        // NB: Each action should only produce one ephemeral command.
-        let effect = effects.iter().find(|e| match e {
-            Effect::AfcUniChannelReceived(e) => {
-                e.receiver_id == our_device_id.into() && e.sender_id != our_device_id.into()
-            }
-            _ => false,
-        });
-        let Some(Effect::AfcUniChannelReceived(e)) = effect else {
-            return Err(anyhow!("unable to find AFC effect").into());
-        };
         let channel_id = self.afc.uni_channel_received(e).await?;
+
         return Ok((e.label_id.into(), channel_id));
     }
 
