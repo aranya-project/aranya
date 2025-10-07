@@ -497,7 +497,7 @@ async fn main() -> Result<()> {
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
     let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
-    send.seal(&mut ciphertext, &afc_msg)
+    send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
 
@@ -517,7 +517,7 @@ async fn main() -> Result<()> {
     assert_eq!(afc_msg, plaintext);
 
     // seal/open again to get a new sequence number.
-    send.seal(&mut ciphertext, &afc_msg)
+    send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
     let seq2 = recv

@@ -1,7 +1,8 @@
 //! Member B device.
 
-use anyhow::Context;
-use anyhow::{bail, Result};
+use std::path::PathBuf;
+
+use anyhow::{bail, Context, Result};
 use aranya_client::{
     aqc::{AqcPeerChannel, AqcPeerStream},
     AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig,
@@ -13,7 +14,6 @@ use aranya_example_multi_node::{
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
-use std::path::PathBuf;
 use tokio::time::sleep;
 use tracing::info;
 

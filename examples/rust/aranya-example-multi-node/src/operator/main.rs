@@ -1,8 +1,12 @@
 //! Operator device.
 
+use std::{path::PathBuf, str::FromStr};
+
 use anyhow::Result;
-use aranya_client::client::{ChanOp, NetIdentifier, Role};
-use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, LabelId, SyncPeerConfig};
+use aranya_client::{
+    client::{ChanOp, NetIdentifier, Role},
+    AddTeamConfig, AddTeamQuicSyncConfig, Client, LabelId, SyncPeerConfig,
+};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -10,8 +14,6 @@ use aranya_example_multi_node::{
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
-use std::path::PathBuf;
-use std::str::FromStr;
 use tokio::time::sleep;
 use tracing::info;
 

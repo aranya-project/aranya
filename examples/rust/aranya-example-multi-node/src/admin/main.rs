@@ -3,8 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::client::Role;
-use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{client::Role, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::text;
 use aranya_example_multi_node::{
     env::EnvVars,
