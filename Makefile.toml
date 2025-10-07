@@ -20,9 +20,32 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 # Build
 [tasks.build]
 category = "build"
-description = "Build Code"
+description = "Build Code with default features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}"]
+args = [
+    "build",
+    "--verbose",
+    "--release",
+    "--package=aranya-daemon",
+    "${@}",
+]
+
+[tasks.build-default]
+category = "build"
+description = "Build Code with default features"
+dependencies = ["build"]
+
+[tasks.build-experimental]
+category = "build"
+description = "Build Code with experimental features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental,aqc", "${@}"]
+
+[tasks.build-preview]
+category = "build"
+description = "Build Code with preview features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc", "${@}"]
 
 [tasks.tgz-daemon]
 category = "build"
@@ -40,14 +63,18 @@ run_task = { name = [
 ] }
 
 # Build the `aranya-client-capi` C API `aranya-client.h` header file.
+# NOTE: From 1.87 onward, cargo-expand doesn't include cfg's, so cbindgen won't
+# see them to include in the header. Until this is fixed, we cannot increase
+# our MSRV beyond 1.86. See https://github.com/rust-lang/rust/issues/139715.
 [tasks.build-capi-header]
 category = "build"
 description = "Build C API header"
-toolchain = "${NIGHTLY}"
 cwd = "crates/aranya-client-capi"
+# Fake nightly support to enable macro expansion, so we don't have to pin to nightly 1.86 (see above).
+env.RUSTC_BOOTSTRAP = "1"
 command = "cbindgen"
 args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
-dependencies = ["install-cbindgen", "install-nightly"]
+dependencies = ["install-cbindgen"]
 
 [tasks.build-capi-docs]
 category = "build"
@@ -62,11 +89,29 @@ script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/
 
 [tasks.build-capi-lib]
 category = "build"
-description = "Build C API shared library"
+description = "Build C API shared library with default features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release"]
-dependencies = ["install-nightly"]
+
+[tasks.build-capi-lib-default]
+category = "build"
+description = "Build C API shared library with default features"
+dependencies = ["build-capi-lib"]
+
+[tasks.build-capi-lib-experimental]
+category = "build"
+description = "Build C API shared library with experimental features"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
+
+[tasks.build-capi-lib-preview]
+category = "build"
+description = "Build C API shared library with preview features"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features=preview,afc"]
 
 [tasks.tgz-capi]
 category = "build"
@@ -192,7 +237,7 @@ workspace = true
 script = '''
 cargo clippy
 cargo clippy --all-targets
-# cargo clippy --no-default-features (TODO: uncomment in #448) 
+# cargo clippy --no-default-features (TODO: uncomment in #448)
 cargo clippy --all-targets --all-features
 '''
 install_crate = { rustup_component_name = "clippy" }
@@ -249,7 +294,7 @@ category = "examples"
 description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["build-capi-header", "build-capi-lib"]
+dependencies = ["build-capi-header", "build-capi-lib-experimental"]
 
 # Rust Example
 [tasks.run-rust-example]
@@ -273,7 +318,7 @@ description = "Run Metrics Crate"
 script = '''
 #!/usr/bin/env bash
 set -e
-cargo build --bin aranya-daemon --release
+cargo build --bin aranya-daemon --release --features=experimental,aqc
 cargo build --bin aranya-metrics --release
 CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
 '''

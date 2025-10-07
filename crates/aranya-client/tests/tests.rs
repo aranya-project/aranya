@@ -13,9 +13,9 @@ mod common;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    client::Role, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfig,
 };
-use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
 
@@ -72,7 +72,7 @@ async fn test_sync_now() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
     // Set up our team context so we can run the test.
-    let mut devices = DevicesCtx::new("test_query_functions").await?;
+    let mut devices = DevicesCtx::new("test_remove_devices").await?;
 
     // Create the initial team, and get our TeamId.
     let team_id = devices
@@ -212,7 +212,7 @@ async fn test_add_team() -> Result<()> {
     }
 
     let admin_seed = owner
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -302,7 +302,7 @@ async fn test_remove_team() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
-    let devices = DevicesCtx::new("test_multi_team").await?;
+    let devices = DevicesCtx::new("test_multi_team_sync").await?;
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -381,7 +381,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed1 = team1
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -427,7 +427,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed2 = team2
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin

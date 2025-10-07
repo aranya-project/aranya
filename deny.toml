@@ -113,6 +113,7 @@ confidence-threshold = 0.8
 exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
+    { allow = ["AGPL-3.0"], crate = "aranya-afc-util" },
     { allow = ["AGPL-3.0"], crate = "aranya-aqc-util" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-codegen" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-core" },
@@ -121,6 +122,7 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-crypto-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-device-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-envelope-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-fast-channels" },
     { allow = ["AGPL-3.0"], crate = "aranya-idam-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-libc" },
     { allow = ["AGPL-3.0"], crate = "aranya-perspective-ffi" },

@@ -15,6 +15,8 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
 
     let cfg = work_dir.join("config.toml");
 
+    let shm = format!("/shm_{}", device);
+    let _ = rustix::shm::unlink(&shm);
     let runtime_dir = work_dir.join("run");
     let state_dir = work_dir.join("state");
     let cache_dir = work_dir.join("cache");
@@ -37,6 +39,11 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
                 config_dir = {config_dir:?}
 
                 aqc.enable = true
+
+                [afc]
+                enable = true
+                shm_path = {shm:?}
+                max_chans = 100
 
                 [sync.quic]
                 enable = true

@@ -18,7 +18,7 @@ default = []
 debug = []
 
 [dependencies]
-aranya-client = { workspace = true }
+aranya-client = { workspace = true, features = ["preview", "afc", "aqc", "experimental"] }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
@@ -28,6 +28,7 @@ backon = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }
 postcard = { workspace = true }
+rustix = { version = "1.1.2", features = ["shm"] }
 serde = { workspace = true, features = ["derive"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync", "process"] }

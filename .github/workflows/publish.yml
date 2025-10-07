@@ -59,17 +59,18 @@ jobs:
       - build
     strategy:
       matrix:
+        features: ["default", "preview", "experimental"]
         target:
           - aarch64-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
-    name: publish daemon ${{ matrix.target }}
+    name: publish daemon ${{ matrix.target }} (${{ matrix.features }})
     runs-on: ubuntu-latest
     steps:
       - name: Download Rust doc artifacts
         uses: actions/download-artifact@v4
         with:
-          name: aranya-daemon-${{ matrix.target }}
-          path: aranya-daemon-${{ matrix.target }}
+          name: aranya-daemon-${{ matrix.target }}-${{ matrix.features }}
+          path: aranya-daemon-${{ matrix.target }}-${{ matrix.features }}
       - name: List files
         run: ls -R -al
       - name: Upload Rust docs to tagged release
@@ -78,8 +79,8 @@ jobs:
             GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
-          asset_path: aranya-daemon-${{ matrix.target }}/aranya-daemon.tar.gz
-          asset_name: aranya-daemon-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
+          asset_path: aranya-daemon-${{ matrix.target }}-${{ matrix.features }}/aranya-daemon.tar.gz
+          asset_name: aranya-daemon-${{ inputs.tag }}-${{ matrix.target }}-${{ matrix.features }}.tar.gz
           asset_content_type: application/gzip
 
   publish-capi-lib:
@@ -90,17 +91,18 @@ jobs:
       - build
     strategy:
       matrix:
+        features: ["default", "preview", "experimental"]
         target:
           - aarch64-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
-    name: publish capi ${{ matrix.target }}
+    name: publish capi ${{ matrix.target }} (${{ matrix.features }})
     runs-on: ubuntu-latest
     steps:
       - name: Download Rust doc artifacts
         uses: actions/download-artifact@v4
         with:
-          name: aranya-client-capi-${{ matrix.target }}
-          path: aranya-client-capi-${{ matrix.target }}
+          name: aranya-client-capi-${{ matrix.target }}-${{ matrix.features }}
+          path: aranya-client-capi-${{ matrix.target }}-${{ matrix.features }}
       - name: List files
         run: ls -R -al
       - name: Upload Rust docs to tagged release
@@ -109,8 +111,8 @@ jobs:
             GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
-          asset_path: aranya-client-capi-${{ matrix.target }}/aranya-client-lib.tar.gz
-          asset_name: aranya-client-capi-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
+          asset_path: aranya-client-capi-${{ matrix.target }}-${{ matrix.features }}/aranya-client-lib.tar.gz
+          asset_name: aranya-client-capi-${{ inputs.tag }}-${{ matrix.target }}-${{ matrix.features }}.tar.gz
           asset_content_type: application/gzip
 
   publish-capi-docs:

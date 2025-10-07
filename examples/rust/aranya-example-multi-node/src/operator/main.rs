@@ -1,10 +1,10 @@
 //! Operator device.
 
 use std::path::PathBuf;
-
+use std::str::FromStr;
 use anyhow::Result;
-use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::{ChanOp, NetIdentifier, Role};
+use aranya_client::{LabelId, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::client::{ChanOp, NetIdentifier, Role};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -97,8 +97,8 @@ async fn main() -> Result<()> {
     let queries = team.queries();
     let label1 = loop {
         if let Ok(labels) = queries.labels().await {
-            if let Some(label1) = labels.iter().next() {
-                break label1.id;
+            if let Some(label) = labels.iter().next() {
+                break label.clone();
             }
         }
         sleep(SLEEP_INTERVAL).await;
@@ -146,13 +146,10 @@ async fn main() -> Result<()> {
     info!("operator: assigning network identifier to membera");
     team.assign_aqc_net_identifier(
         membera,
-        NetIdentifier(
-            env.membera
+         NetIdentifier::from_str(env.membera
                 .aqc_addr
-                .to_string()
-                .try_into()
-                .expect("addr is valid text"),
-        ),
+                .to_string().as_str())
+            .expect("expected net identifier"),
     )
     .await
     .expect("expected to assign net identifier");
@@ -161,13 +158,10 @@ async fn main() -> Result<()> {
     info!("operator: assigning network identifier to memberb");
     team.assign_aqc_net_identifier(
         memberb,
-        NetIdentifier(
-            env.memberb
+         NetIdentifier::from_str(env.memberb
                 .aqc_addr
-                .to_string()
-                .try_into()
-                .expect("addr is valid text"),
-        ),
+                .to_string().as_str())
+            .expect("expected net identifier"),
     )
     .await
     .expect("expected to assign net identifier");
@@ -176,10 +170,10 @@ async fn main() -> Result<()> {
     // Assign label to members.
     let op = ChanOp::SendRecv;
     info!("operator: assigning label to membera");
-    team.assign_label(membera, label1, op).await?;
+    team.assign_label(membera, LabelId{ __id: label1.id }, op).await?;
     info!("operator: assigned label to membera");
     info!("operator: assigning label to memberb");
-    team.assign_label(memberb, label1, op).await?;
+    team.assign_label(memberb, LabelId{ __id: label1.id }, op).await?;
     info!("operator: assigned label to memberb");
 
     info!("operator: complete");

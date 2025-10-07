@@ -1,28 +1,168 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path};
+use std::{
+    fmt::{self, Debug, Display},
+    io,
+    net::SocketAddr,
+    path::Path,
+    str::FromStr,
+};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
+    self as api,
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS,
+    DaemonApiClient, Label, Text, Version, CS,
 };
 use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
+use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
+#[cfg(feature = "afc")]
+use {
+    crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
+    std::sync::{Arc, Mutex},
+};
 
+#[cfg(feature = "aqc")]
+use crate::aqc::{AqcChannels, AqcClient};
 use crate::{
-    aqc::{AqcChannels, AqcClient},
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
+
+/// The Device ID.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceId {
+    #[doc(hidden)]
+    pub __id: aranya_daemon_api::DeviceId,
+}
+
+impl Display for DeviceId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.__id, f)
+    }
+}
+
+/// The Team ID (a.k.a Graph ID).
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct TeamId {
+    #[doc(hidden)]
+    pub __id: aranya_daemon_api::TeamId,
+}
+
+impl Display for TeamId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.__id, f)
+    }
+}
+
+/// An Aranya label ID.
+///
+/// Both peers must have the same label ID assigned to them before creating a channel between themselves with that label ID.
+#[derive(Copy, Clone, Debug)]
+pub struct LabelId {
+    #[doc(hidden)]
+    pub __id: aranya_daemon_api::LabelId,
+}
+
+impl Display for LabelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.__id, f)
+    }
+}
+
+/// Valid channel operations for a label assignment.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    RecvOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    SendOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    SendRecv,
+}
+
+impl ChanOp {
+    fn to_api(self) -> api::ChanOp {
+        match self {
+            ChanOp::SendRecv => api::ChanOp::SendRecv,
+            ChanOp::RecvOnly => api::ChanOp::RecvOnly,
+            ChanOp::SendOnly => api::ChanOp::SendOnly,
+        }
+    }
+}
+
+/// A device's role on the team.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum Role {
+    /// Owner role.
+    Owner,
+    /// Admin role.
+    Admin,
+    /// Operator role.
+    Operator,
+    /// Member role.
+    Member,
+}
+
+impl Role {
+    fn from_api(role: api::Role) -> Self {
+        match role {
+            api::Role::Owner => Role::Owner,
+            api::Role::Admin => Role::Admin,
+            api::Role::Operator => Role::Operator,
+            api::Role::Member => Role::Member,
+        }
+    }
+
+    fn to_api(self) -> api::Role {
+        match self {
+            Role::Owner => api::Role::Owner,
+            Role::Admin => api::Role::Admin,
+            Role::Operator => api::Role::Operator,
+            Role::Member => api::Role::Member,
+        }
+    }
+}
+
+/// A device's public key bundle.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct KeyBundle(api::KeyBundle);
+
+impl KeyBundle {
+    /// Return public encryption key bytes.
+    pub fn encryption(&self) -> &[u8] {
+        &self.0.encryption
+    }
+}
+
+/// A device's network identifier.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+pub struct NetIdentifier(pub(crate) api::NetIdentifier);
+
+impl FromStr for NetIdentifier {
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        Ok(Self(api::NetIdentifier(s.to_string().try_into()?)))
+    }
+
+    type Err = anyhow::Error;
+}
+
+impl Display for NetIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
 
 /// List of device IDs.
 #[derive(Debug)]
@@ -67,6 +207,7 @@ pub struct ClientBuilder<'a> {
     #[cfg(unix)]
     daemon_uds_path: Option<&'a Path>,
     // AQC address.
+    #[cfg(feature = "aqc")]
     aqc_server_addr: Option<&'a Addr>,
 }
 
@@ -76,9 +217,24 @@ impl ClientBuilder<'_> {
         Self::default()
     }
 
-    /// Connects to the daemon.
+    /// Creates a client connection to the daemon.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use std::net::Ipv4Addr;
+    /// # use aranya_client::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()> {
+    /// let client = Client::builder()
+    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
+    ///     // .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
+    ///     .connect()
+    ///     .await?;
+    /// #    Ok(())
+    /// # }
+    #[instrument(skip_all)]
     pub async fn connect(self) -> Result<Client> {
-        let Some(sock) = self.daemon_uds_path else {
+        let Some(uds_path) = self.daemon_uds_path else {
             return Err(IpcError::new(InvalidArg::new(
                 "daemon_uds_path",
                 "must specify the daemon's UDS path",
@@ -86,16 +242,97 @@ impl ClientBuilder<'_> {
             .into());
         };
 
-        let Some(aqc_addr) = &self.aqc_server_addr else {
-            return Err(IpcError::new(InvalidArg::new(
-                "aqc_server_addr",
-                "must specify the AQC server address",
-            ))
-            .into());
-        };
-        Client::connect(sock, aqc_addr)
-            .await
-            .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
+        async {
+            info!(path = ?uds_path, "connecting to daemon");
+
+            let daemon = {
+                let pk = {
+                    // The public key is located next to the socket.
+                    let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
+                    let bytes = fs::read(&api_pk_path)
+                        .await
+                        .with_context(|| "unable to read daemon API public key")
+                        .map_err(IpcError::new)?;
+                    PublicApiKey::<CS>::decode(&bytes)
+                        .context("unable to decode public API key")
+                        .map_err(IpcError::new)?
+                };
+
+                let uds_path = uds_path
+                    .canonicalize()
+                    .context("could not canonicalize uds_path")
+                    .map_err(error::other)?;
+                let sock = UnixStream::connect(&uds_path)
+                    .await
+                    .context("unable to connect to UDS path")
+                    .map_err(IpcError::new)?;
+                let info = uds_path.as_os_str().as_encoded_bytes();
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let transport = txp::client(sock, codec, Rng, pk, info);
+
+                DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn()
+            };
+            debug!("connected to daemon");
+
+            let got = daemon
+                .version(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .context("unable to retrieve daemon version")
+                .map_err(error::other)?;
+            let want = Version::parse(env!("CARGO_PKG_VERSION"))
+                .context("unable to parse `CARGO_PKG_VERSION`")
+                .map_err(error::other)?;
+            if got.major != want.major || got.minor != want.minor {
+                return Err(IpcError::new(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    format!("version mismatch: `{got}` != `{want}`"),
+                ))
+                .into());
+            }
+            debug!(client = ?want, daemon = ?got, "versions");
+
+            #[cfg(feature = "aqc")]
+            let aqc = if let Some(aqc_addr) = self.aqc_server_addr {
+                let aqc_server_addr = aqc_addr
+                    .lookup()
+                    .await
+                    .context("unable to resolve AQC server address")
+                    .map_err(error::other)?
+                    .next()
+                    .expect("expected AQC server address");
+                Some(AqcClient::new(aqc_server_addr, daemon.clone()).await?)
+            } else {
+                None
+            };
+
+            #[cfg(feature = "afc")]
+            let afc_keys = {
+                let afc_shm_info = daemon
+                    .afc_shm_info(context::current())
+                    .await
+                    .map_err(IpcError::new)?
+                    .context("unable to retrieve afc shm info")
+                    .map_err(error::other)?;
+                Arc::new(Mutex::new(AfcChannelKeys::new(&afc_shm_info)?))
+            };
+
+            let client = Client {
+                daemon,
+                #[cfg(feature = "aqc")]
+                aqc,
+                #[cfg(feature = "afc")]
+                afc_keys,
+            };
+
+            Ok(client)
+        }
+        .await
+        .inspect_err(
+            |err: &crate::Error| error!(error = %err.report(), "unable to connect to daemon"),
+        )
     }
 }
 
@@ -109,6 +346,8 @@ impl<'a> ClientBuilder<'a> {
     }
 
     /// Specifies the AQC server address.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub fn aqc_server_addr(mut self, addr: &'a Addr) -> Self {
         self.aqc_server_addr = Some(addr);
         self
@@ -127,90 +366,17 @@ pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
-    pub(crate) aqc: AqcClient,
+    #[cfg(feature = "aqc")]
+    pub(crate) aqc: Option<AqcClient>,
+    /// AFC channel keys.
+    #[cfg(feature = "afc")]
+    afc_keys: Arc<Mutex<AfcChannelKeys>>,
 }
 
 impl Client {
     /// Returns a builder for `Client`.
     pub fn builder<'a>() -> ClientBuilder<'a> {
         ClientBuilder::new()
-    }
-
-    /// Creates a client connection to the daemon.
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// use std::net::Ipv4Addr;
-    /// # use aranya_client::Client;
-    /// # #[tokio::main]
-    /// # async fn main() -> anyhow::Result<()> {
-    /// let client = Client::builder()
-    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
-    ///     .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
-    ///     .connect()
-    ///     .await?;
-    /// #    Ok(())
-    /// # }
-    #[instrument(skip_all)]
-    async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
-        info!(path = ?uds_path, "connecting to daemon");
-
-        let daemon = {
-            let pk = {
-                // The public key is located next to the socket.
-                let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
-                let bytes = fs::read(&api_pk_path)
-                    .await
-                    .with_context(|| "unable to read daemon API public key")
-                    .map_err(IpcError::new)?;
-                PublicApiKey::<CS>::decode(&bytes)
-                    .context("unable to decode public API key")
-                    .map_err(IpcError::new)?
-            };
-
-            let sock = UnixStream::connect(uds_path)
-                .await
-                .context("unable to connect to UDS path")
-                .map_err(IpcError::new)?;
-            let info = uds_path.as_os_str().as_encoded_bytes();
-            let codec = LengthDelimitedCodec::builder()
-                .max_frame_length(usize::MAX)
-                .new_codec();
-            let transport = txp::client(sock, codec, Rng, pk, info);
-
-            DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn()
-        };
-        debug!("connected to daemon");
-
-        let got = daemon
-            .version(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .context("unable to retrieve daemon version")
-            .map_err(error::other)?;
-        let want = Version::parse(env!("CARGO_PKG_VERSION"))
-            .context("unable to parse `CARGO_PKG_VERSION`")
-            .map_err(error::other)?;
-        if got.major != want.major || got.minor != want.minor {
-            return Err(IpcError::new(io::Error::new(
-                io::ErrorKind::Unsupported,
-                format!("version mismatch: `{got}` != `{want}`"),
-            ))
-            .into());
-        }
-        debug!(client = ?want, daemon = ?got, "versions");
-
-        let aqc_server_addr = aqc_addr
-            .lookup()
-            .await
-            .context("unable to resolve AQC server address")
-            .map_err(error::other)?
-            .next()
-            .expect("expected AQC server address");
-        let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
-        let client = Self { daemon, aqc };
-
-        Ok(client)
     }
 
     /// Returns the address that the Aranya sync server is bound to.
@@ -222,37 +388,39 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Returns the address that the AQC client is bound to.
-    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.client_addr()) // TODO: Remove error?
-    }
-
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&self) -> Result<KeyBundle> {
-        self.daemon
-            .get_key_bundle(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+        Ok(KeyBundle(
+            self.daemon
+                .get_key_bundle(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&self) -> Result<DeviceId> {
-        self.daemon
-            .get_device_id(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+        Ok(DeviceId {
+            __id: self
+                .daemon
+                .get_device_id(context::current())
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        })
     }
 
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
-        let team_id = self
-            .daemon
-            .create_team(context::current(), cfg.into())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+        let team_id = TeamId {
+            __id: self
+                .daemon
+                .create_team(context::current(), cfg.into())
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        };
         Ok(Team {
             client: self,
             team_id,
@@ -276,7 +444,7 @@ impl Client {
     /// Add a team to local device storage.
     pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
         let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
-        let team_id = cfg.team_id;
+        let team_id = TeamId { __id: cfg.team_id };
 
         self.daemon
             .add_team(context::current(), cfg)
@@ -292,15 +460,23 @@ impl Client {
     /// Remove a team from local device storage.
     pub async fn remove_team(&self, team_id: TeamId) -> Result<()> {
         self.daemon
-            .remove_team(context::current(), team_id)
+            .remove_team(context::current(), team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Get access to Aranya QUIC Channels.
-    pub fn aqc(&self) -> AqcChannels<'_> {
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+    pub fn aqc(&self) -> Option<AqcChannels<'_>> {
         AqcChannels::new(self)
+    }
+
+    /// Get access to Aranya Fast Channels.
+    #[cfg(feature = "afc")]
+    pub fn afc(&self) -> AfcChannels {
+        AfcChannels::new(self.daemon.clone(), self.afc_keys.clone())
     }
 }
 
@@ -331,7 +507,7 @@ impl Team<'_> {
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     ///
-    /// See [`KeyBundle::encoding`].
+    /// See [`KeyBundle::encryption`].
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")
@@ -339,7 +515,7 @@ impl Team<'_> {
         let wrapped = self
             .client
             .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.team_id, peer_enc_pk)
+            .encrypt_psk_seed_for_peer(context::current(), self.team_id.__id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -351,7 +527,7 @@ impl Team<'_> {
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.team_id, config.into())
+            .add_sync_peer(context::current(), addr, self.team_id.__id, config.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -364,7 +540,12 @@ impl Team<'_> {
     pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.team_id, cfg.map(Into::into))
+            .sync_now(
+                context::current(),
+                addr,
+                self.team_id.__id,
+                cfg.map(Into::into),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -374,7 +555,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.team_id)
+            .remove_sync_peer(context::current(), addr, self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -384,7 +565,7 @@ impl Team<'_> {
     pub async fn close_team(&self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.team_id)
+            .close_team(context::current(), self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -394,37 +575,47 @@ impl Team<'_> {
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.team_id, keys)
+            .add_device_to_team(context::current(), self.team_id.__id, keys.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Remove a device from the team.
-    pub async fn remove_device_from_team(&self, device: DeviceId) -> Result<()> {
+    pub async fn remove_device_from_team(&self, device_id: DeviceId) -> Result<()> {
         self.client
             .daemon
-            .remove_device_from_team(context::current(), self.team_id, device)
+            .remove_device_from_team(context::current(), self.team_id.__id, device_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Assign a role to a device.
-    pub async fn assign_role(&self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn assign_role(&self, device_id: DeviceId, role: Role) -> Result<()> {
         self.client
             .daemon
-            .assign_role(context::current(), self.team_id, device, role)
+            .assign_role(
+                context::current(),
+                self.team_id.__id,
+                device_id.__id,
+                role.to_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
-    pub async fn revoke_role(&self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn revoke_role(&self, device_id: DeviceId, role: Role) -> Result<()> {
         self.client
             .daemon
-            .revoke_role(context::current(), self.team_id, device, role)
+            .revoke_role(
+                context::current(),
+                self.team_id.__id,
+                device_id.__id,
+                role.to_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -435,28 +626,42 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub async fn assign_aqc_net_identifier(
         &self,
-        device: DeviceId,
+        device_id: DeviceId,
         net_identifier: NetIdentifier,
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_aqc_net_identifier(context::current(), self.team_id, device, net_identifier)
+            .assign_aqc_net_identifier(
+                context::current(),
+                self.team_id.__id,
+                device_id.__id,
+                net_identifier.0,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Disassociate an AQC network identifier from a device.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     pub async fn remove_aqc_net_identifier(
         &self,
-        device: DeviceId,
+        device_id: DeviceId,
         net_identifier: NetIdentifier,
     ) -> Result<()> {
         self.client
             .daemon
-            .remove_aqc_net_identifier(context::current(), self.team_id, device, net_identifier)
+            .remove_aqc_net_identifier(
+                context::current(),
+                self.team_id.__id,
+                device_id.__id,
+                net_identifier.0,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -464,19 +669,22 @@ impl Team<'_> {
 
     /// Create a label.
     pub async fn create_label(&self, label_name: Text) -> Result<LabelId> {
-        self.client
-            .daemon
-            .create_label(context::current(), self.team_id, label_name)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+        Ok(LabelId {
+            __id: self
+                .client
+                .daemon
+                .create_label(context::current(), self.team_id.__id, label_name)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        })
     }
 
     /// Delete a label.
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.team_id, label_id)
+            .delete_label(context::current(), self.team_id.__id, label_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -485,23 +693,34 @@ impl Team<'_> {
     /// Assign a label to a device.
     pub async fn assign_label(
         &self,
-        device: DeviceId,
+        device_id: DeviceId,
         label_id: LabelId,
         op: ChanOp,
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_label(context::current(), self.team_id, device, label_id, op)
+            .assign_label(
+                context::current(),
+                self.team_id.__id,
+                device_id.__id,
+                label_id.__id,
+                op.to_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Revoke a label from a device.
-    pub async fn revoke_label(&self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    pub async fn revoke_label(&self, device_id: DeviceId, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .revoke_label(context::current(), self.team_id, device, label_id)
+            .revoke_label(
+                context::current(),
+                self.team_id.__id,
+                device_id.__id,
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -531,39 +750,46 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_devices_on_team(context::current(), self.team_id)
+            .query_devices_on_team(context::current(), self.team_id.__id)
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+            .map_err(aranya_error)?
+            .iter()
+            .map(|d| DeviceId { __id: (*d) })
+            .collect();
         Ok(Devices { data })
     }
 
     /// Returns the role of the current device.
-    pub async fn device_role(&self, device: DeviceId) -> Result<Role> {
-        self.client
-            .daemon
-            .query_device_role(context::current(), self.team_id, device)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+    pub async fn device_role(&self, device_id: DeviceId) -> Result<Role> {
+        Ok(Role::from_api(
+            self.client
+                .daemon
+                .query_device_role(context::current(), self.team_id.__id, device_id.__id)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Returns the keybundle of the current device.
-    pub async fn device_keybundle(&self, device: DeviceId) -> Result<KeyBundle> {
-        self.client
-            .daemon
-            .query_device_keybundle(context::current(), self.team_id, device)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+    pub async fn device_keybundle(&self, device_id: DeviceId) -> Result<KeyBundle> {
+        Ok(KeyBundle(
+            self.client
+                .daemon
+                .query_device_keybundle(context::current(), self.team_id.__id, device_id.__id)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        ))
     }
 
     /// Returns a list of labels assiged to the current device.
-    pub async fn device_label_assignments(&self, device: DeviceId) -> Result<Labels> {
+    pub async fn device_label_assignments(&self, device_id: DeviceId) -> Result<Labels> {
         let data = self
             .client
             .daemon
-            .query_device_label_assignments(context::current(), self.team_id, device)
+            .query_device_label_assignments(context::current(), self.team_id.__id, device_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -571,20 +797,24 @@ impl Queries<'_> {
     }
 
     /// Returns the AQC network identifier assigned to the current device.
-    pub async fn aqc_net_identifier(&self, device: DeviceId) -> Result<Option<NetIdentifier>> {
-        self.client
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+    pub async fn aqc_net_identifier(&self, device_id: DeviceId) -> Result<Option<NetIdentifier>> {
+        Ok(self
+            .client
             .daemon
-            .query_aqc_net_identifier(context::current(), self.team_id, device)
+            .query_aqc_net_identifier(context::current(), self.team_id.__id, device_id.__id)
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            .map(NetIdentifier))
     }
 
     /// Returns whether a label exists.
     pub async fn label_exists(&self, label_id: LabelId) -> Result<bool> {
         self.client
             .daemon
-            .query_label_exists(context::current(), self.team_id, label_id)
+            .query_label_exists(context::current(), self.team_id.__id, label_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -595,7 +825,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_labels(context::current(), self.team_id)
+            .query_labels(context::current(), self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

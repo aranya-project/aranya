@@ -5,15 +5,18 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    str::FromStr,
     time::{Duration, Instant},
 };
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error,
+    aqc::AqcPeerChannel,
+    client::{ChanOp, KeyBundle, NetIdentifier, Role},
+    AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    DeviceId, Error,
 };
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::text;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use buggy::BugExt as _;
@@ -193,7 +196,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_addr = client.aqc().server_addr();
+        let aqc_addr = client.aqc().context("AQC not enabled")?.server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -215,12 +218,7 @@ impl ClientCtx {
     }
 
     fn aqc_net_id(&self) -> NetIdentifier {
-        NetIdentifier(
-            self.aqc_addr
-                .to_string()
-                .try_into()
-                .expect("addr is valid text"),
-        )
+        NetIdentifier::from_str(self.aqc_addr.to_string().as_str()).expect("addr is valid text")
     }
 }
 
@@ -411,6 +409,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
                 .membera
                 .client
                 .aqc()
+                .context("AQC not enabled")?
                 .create_bidi_channel(team_id, ctx.memberb.aqc_net_id(), label3)
                 .await?;
             Ok(chan)
@@ -418,7 +417,13 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         async {
             // memberb receives a bidirectional channel.
             info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(chan) = ctx.memberb.client.aqc().receive_channel().await?
+            let AqcPeerChannel::Bidi(chan) = ctx
+                .memberb
+                .client
+                .aqc()
+                .context("AQC not enabled")?
+                .receive_channel()
+                .await?
             else {
                 bail!("expected a bidirectional channel");
             };

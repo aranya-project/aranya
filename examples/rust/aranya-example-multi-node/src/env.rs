@@ -4,7 +4,7 @@ use std::{env, path::Path, str::FromStr};
 
 use age::secrecy::{ExposeSecret, SecretString};
 use anyhow::{Context, Result};
-use aranya_daemon_api::Role;
+use aranya_client::client::Role;
 use aranya_util::Addr;
 use tokio::fs;
 

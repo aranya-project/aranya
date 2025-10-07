@@ -8,8 +8,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+
 [lints]
 workspace = true
+
 
 [features]
 default = []
@@ -17,8 +19,20 @@ default = []
 # Enable debugging.
 debug = []
 
+# Preview features
+preview = ["aranya-daemon-api/preview"]
+# Aranya Fast Channels
+afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
+
+# Experimental features
+experimental = ["aranya-daemon-api/experimental"]
+# Aranya QUIC channels
+aqc = ["aranya-daemon-api/aqc"]
+
+
 [dependencies]
 aranya-daemon-api = { workspace = true }
+aranya-fast-channels = { workspace = true, optional = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
@@ -35,18 +49,24 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
 
+
 [dev-dependencies]
-aranya-daemon = { path = "../aranya-daemon" }
+aranya-daemon = { path = "../aranya-daemon", features = ["aqc", "afc", "experimental", "preview"] }
 
 backon = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 
+
 [[test]]
 name = "tests"
 path = "tests/tests.rs"
 
+
 [package.metadata.cargo-all-features]
-# TODO: remove in #448
-always_include_features = ["default"]
+always_include_features = [
+    "default", # TODO: remove in #448
+    "experimental",
+    "preview",
+]

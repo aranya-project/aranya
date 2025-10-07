@@ -2,13 +2,14 @@
 
 use std::net::SocketAddr;
 
-use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
-use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
+use super::{
+    net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcReceiveChannel, AqcSendChannel,
+};
 use crate::{
-    aqc::AqcReceiveChannel,
+    client::{LabelId, NetIdentifier, TeamId},
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -18,23 +19,27 @@ use crate::{
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
     client: &'a Client,
+    aqc: &'a super::AqcClient,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a Client) -> Self {
-        Self { client }
+    pub(crate) fn new(client: &'a Client) -> Option<Self> {
+        Some(Self {
+            client,
+            aqc: client.aqc.as_ref()?,
+        })
     }
 
     /// Returns the address that the AQC client is bound to. This address is used to
     /// make connections to other peers.
     pub fn client_addr(&self) -> SocketAddr {
-        self.client.aqc.client_addr()
+        self.aqc.client_addr()
     }
 
     /// Returns the address that the AQC server is bound to. This address is used by
     /// peers to connect to this instance.
     pub fn server_addr(&self) -> SocketAddr {
-        self.client.aqc.server_addr()
+        self.aqc.server_addr()
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -57,26 +62,29 @@ impl<'a> AqcChannels<'a> {
         let (aqc_ctrl, psks) = self
             .client
             .daemon
-            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_bidi_channel(
+                context::current(),
+                team_id.__id,
+                peer.0.clone(),
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
             .ok_or_else(no_addr)?;
 
-        self.client
-            .aqc
-            .send_ctrl(peer_addr, aqc_ctrl, team_id)
+        self.aqc
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.__id)
             .await?;
         let channel = self
-            .client
             .aqc
-            .create_bidi_channel(peer_addr, label_id, psks)
+            .create_bidi_channel(peer_addr, label_id.__id, psks)
             .await?;
         Ok(channel)
     }
@@ -101,27 +109,30 @@ impl<'a> AqcChannels<'a> {
         let (aqc_ctrl, psks) = self
             .client
             .daemon
-            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_uni_channel(
+                context::current(),
+                team_id.__id,
+                peer.0.clone(),
+                label_id.__id,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
+        let peer_addr = tokio::net::lookup_host((peer.0).0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
             .ok_or_else(no_addr)?;
 
-        self.client
-            .aqc
-            .send_ctrl(peer_addr, aqc_ctrl, team_id)
+        self.aqc
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.__id)
             .await?;
 
         let channel = self
-            .client
             .aqc
-            .create_uni_channel(peer_addr, label_id, psks)
+            .create_uni_channel(peer_addr, label_id.__id, psks)
             .await?;
         Ok(channel)
     }
@@ -165,7 +176,7 @@ impl<'a> AqcChannels<'a> {
     /// Waits for a peer to create an AQC channel with this client.
     #[instrument(skip_all)]
     pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
-        self.client.aqc.receive_channel().await
+        self.aqc.receive_channel().await
     }
 
     /// Receive the next available channel.
@@ -174,6 +185,6 @@ impl<'a> AqcChannels<'a> {
     /// If the channel is closed, return Closed.
     #[instrument(skip_all)]
     pub fn try_receive_channel(&self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
-        self.client.aqc.try_receive_channel()
+        self.aqc.try_receive_channel()
     }
 }

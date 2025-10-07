@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use age::secrecy::SecretString;
 use anyhow::Result;
-use aranya_daemon_api::{DeviceId, KeyBundle, TeamId};
+use aranya_client::client::{DeviceId, KeyBundle, TeamId};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 

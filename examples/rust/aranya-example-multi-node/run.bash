@@ -35,7 +35,8 @@ echo "Building aranya-daemon..."
 cargo build \
     --release \
     --manifest-path Cargo.toml \
-    --bin aranya-daemon
+    --bin aranya-daemon \
+    --features experimental,aqc,preview,afc
 
 echo "Building aranya-example-multi-node..."
 ARANYA_EXAMPLE=info cargo run \
