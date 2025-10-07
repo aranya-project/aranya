@@ -1,6 +1,5 @@
 //! Member B device.
 
-use std::path::PathBuf;
 use anyhow::Context;
 use anyhow::{bail, Result};
 use aranya_client::{
@@ -14,6 +13,7 @@ use aranya_example_multi_node::{
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use std::path::PathBuf;
 use tokio::time::sleep;
 use tracing::info;
 
@@ -160,7 +160,8 @@ async fn main() -> Result<()> {
     // Receive bidi channel.
     info!("memberb: receiving AQC bidi channel");
     let AqcPeerChannel::Bidi(mut chan) = client
-        .aqc().context("AQC is enabled")?
+        .aqc()
+        .context("AQC is enabled")?
         .receive_channel()
         .await
         .expect("expected to receive channel")

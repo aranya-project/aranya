@@ -1,10 +1,8 @@
 //! Operator device.
 
-use std::path::PathBuf;
-use std::str::FromStr;
 use anyhow::Result;
-use aranya_client::{LabelId, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_client::client::{ChanOp, NetIdentifier, Role};
+use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, LabelId, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -12,6 +10,8 @@ use aranya_example_multi_node::{
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use std::path::PathBuf;
+use std::str::FromStr;
 use tokio::time::sleep;
 use tracing::info;
 
@@ -146,9 +146,7 @@ async fn main() -> Result<()> {
     info!("operator: assigning network identifier to membera");
     team.assign_aqc_net_identifier(
         membera,
-         NetIdentifier::from_str(env.membera
-                .aqc_addr
-                .to_string().as_str())
+        NetIdentifier::from_str(env.membera.aqc_addr.to_string().as_str())
             .expect("expected net identifier"),
     )
     .await
@@ -158,9 +156,7 @@ async fn main() -> Result<()> {
     info!("operator: assigning network identifier to memberb");
     team.assign_aqc_net_identifier(
         memberb,
-         NetIdentifier::from_str(env.memberb
-                .aqc_addr
-                .to_string().as_str())
+        NetIdentifier::from_str(env.memberb.aqc_addr.to_string().as_str())
             .expect("expected net identifier"),
     )
     .await
@@ -170,10 +166,12 @@ async fn main() -> Result<()> {
     // Assign label to members.
     let op = ChanOp::SendRecv;
     info!("operator: assigning label to membera");
-    team.assign_label(membera, LabelId{ __id: label1.id }, op).await?;
+    team.assign_label(membera, LabelId { __id: label1.id }, op)
+        .await?;
     info!("operator: assigned label to membera");
     info!("operator: assigning label to memberb");
-    team.assign_label(memberb, LabelId{ __id: label1.id }, op).await?;
+    team.assign_label(memberb, LabelId { __id: label1.id }, op)
+        .await?;
     info!("operator: assigned label to memberb");
 
     info!("operator: complete");

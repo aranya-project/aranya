@@ -1,11 +1,9 @@
 //! Member A device.
 
-use std::path::PathBuf;
-use std::str::FromStr;
 use anyhow::Context;
 use anyhow::Result;
-use aranya_client::{LabelId, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_client::client::{NetIdentifier};
+use aranya_client::client::NetIdentifier;
+use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, LabelId, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -14,6 +12,8 @@ use aranya_example_multi_node::{
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
 use clap::Parser;
+use std::path::PathBuf;
+use std::str::FromStr;
 use tokio::time::sleep;
 use tracing::info;
 
@@ -159,14 +159,13 @@ async fn main() -> Result<()> {
     // Create a bidi AQC channel.
     info!("membera: creating bidi channel");
     let mut chan = client
-        .aqc().context("AQC is enabled")?
+        .aqc()
+        .context("AQC is enabled")?
         .create_bidi_channel(
             team_info.team_id,
-           NetIdentifier::from_str(env.memberb
-                .aqc_addr
-                .to_string().as_str())
-            .expect("expected net identifier"),
-            LabelId{ __id: label1.id },
+            NetIdentifier::from_str(env.memberb.aqc_addr.to_string().as_str())
+                .expect("expected net identifier"),
+            LabelId { __id: label1.id },
         )
         .await
         .expect("expected to create bidi channel");

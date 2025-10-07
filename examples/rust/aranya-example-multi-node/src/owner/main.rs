@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_client::client::Role;
+use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo},
