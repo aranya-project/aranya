@@ -18,7 +18,7 @@
 #   dual         - Run example twice (random + raw seed) (default)
 #   raw_seed_ikm - Run example with raw QUIC PSK seed
 
-set -euo pipefail
+set -xeuo pipefail
 
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -175,13 +175,13 @@ get_compile_flags() {
             cmake_flags=""
             ;;
         "preview")
-            cmake_flags="-DENABLE_ARANYA_PREVIEW -DENABLE_AFC"
+            cmake_flags="-DENABLE_ARANYA_PREVIEW -DENABLE_ARANYA_AFC"
             ;;
         "experimental")
-            cmake_flags="-DENABLE_ARANYA_PREVIEW -DENABLE_AFC -DENABLE_ARANYA_EXPERIMENTAL -DENABLE_AQC"
+            cmake_flags="-DENABLE_ARANYA_PREVIEW -DENABLE_ARANYA_AFC -DENABLE_ARANYA_EXPERIMENTAL -DENABLE_ARANYA_AQC"
             ;;
         "full")
-            cmake_flags="-DENABLE_ARANYA_PREVIEW -DENABLE_AFC -DENABLE_ARANYA_EXPERIMENTAL -DENABLE_AQC"
+            cmake_flags="-DENABLE_ARANYA_PREVIEW -DENABLE_ARANYA_AFC -DENABLE_ARANYA_EXPERIMENTAL -DENABLE_ARANYA_AQC"
             ;;
         *)
             die "Unknown features: ${FEATURES}"
