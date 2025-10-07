@@ -39,6 +39,19 @@ For more information on Aranya's internal components, see the Aranya Core
 
 - [Aranya Examples](examples/): examples of how to integrate Aranya into an application. We currently support direct integration into Rust and C applications.
 
+## Feature Flags
+
+There are currently three classifications of feature sets we can build:
+- Production - the default set of production ready features included in every build. Future changes are guaranteed to be backward compatible. Release artifacts are appended with *-default.
+- Preview - production ready features with plans for long-term support. May introduce breaking changes but are designed with API stability in mind. Release artifacts are appended with *-preview.
+- Experimental - experimental features with no backward compatibility or long-term support guarantees. These features may be unstable or introduce breaking changes in the future. Release artifacts are appended with *-experimental.
+
+AFC is a preview feature that can be enabled with the `afc` and `preview` feature flags.
+
+AQC is an experimental feature that can be enabled with the `aqc` and `experimental` feature flags.
+
+Rather than requiring feature flags to be manually specified with `cargo build --features ...`, `cargo make` commands are provided in [Makefile.toml](Makefile.toml) for each feature set.
+
 ## Cargo Make
 
 We rely heavely on `cargo make` targets to build software, run integration tests, perform unit tests, and run CICD checks. Here's how to install `cargo make`:
@@ -70,6 +83,13 @@ Performance metrics:
 
 Auto-formatting code:
 - `cargo make fmt`
+
+We allow certain targets to be run for specific sets of feature flags by appending `*-preview` or `*-experimental`:
+- `cargo make build-preview`
+- `cargo make build-experimental`
+- `cargo make build-capi-lib-preview`
+- `cargo make build-capi-lib-experimental`
+
 
 A complete list of `cargo make` targets can be found in the [Makefile.toml](Makefile.toml)
 
@@ -200,15 +220,18 @@ Step 2. The `Owner` initializes the team
 Step 3. The `Owner` adds the `Admin` and `Operator` to the team. `Member A` and
 `Member B` can either be added by the `Owner` or `Operator`.
 
-Step 4. The `Admin` creates an Aranya QUIC Channel label
+Step 4. The `Admin` creates an Aranya Fast Channel label
 
-Step 5. The `Operator` assigns the created QUIC Channel label to `Member A`
+Step 5. The `Operator` assigns the created Fast Channel label to `Member A`
 and `Member B`
 
-Step 6. `Member A` creates an Aranya QUIC Channel
+Step 6. `Member A` creates a unidirectional send Aranya Fast Channel with `Member B`.
 
-Step 7. `Member A` uses this channel to send a message to `Member B`.
-Optionally, `Member B` may also send a message back to `Member A`.
+Step 7. `Member B` receives the channel by receiving a control message from `Member A`.
+
+Step 8. `Member A` uses this channel to encrypt plaintext with `seal()` and send the ciphertext to `Member B`.
+
+Step 9. `Member B` receives the ciphertext from `Member A` and decrypts it with `open()`.
 
 For more details on how Aranya starts and the steps performed in the examples,
 see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
