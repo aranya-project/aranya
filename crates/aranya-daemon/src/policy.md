@@ -1524,7 +1524,6 @@ corresponding recipient will decapsulate their key and store it in the shared me
 ephemeral action create_afc_uni_channel(receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
-    check receiver_id != author_id
     let author = get_valid_device(author_id)
     let peer_enc_pk = get_enc_pk(receiver_id)
 
@@ -1580,6 +1579,7 @@ effect AfcUniChannelReceived {
     // The channel peer's encapsulated KEM shared secret.
     encap bytes,
 }
+
 ephemeral command AfcCreateUniChannel {
     fields {
         // The device ID of the participant that can receive
@@ -1599,52 +1599,50 @@ ephemeral command AfcCreateUniChannel {
     policy {
         check team_exists()
 
-        let author_id = envelope::author_id(envelope)
-        let sender_id = author_id
-        check sender_id != this.receiver_id
-        let author = get_valid_device(author_id)
+        let sender_id = envelope::author_id(envelope)
+        let sender = get_valid_device(sender_id)
 
-        let peer_id = this.receiver_id
-        let peer = check_unwrap find_existing_device(peer_id)
+        let receiver_id = this.receiver_id
+        let receiver = check_unwrap find_existing_device(receiver_id)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
         // Only Members can create AFC channels with other peer Members
-        check is_member(author.role)
-        check is_member(peer.role)
+        check is_member(sender.role)
+        check is_member(receiver.role)
 
         // Check that both devices have been assigned to the label and have correct send/recv permissions.
-        check can_create_afc_uni_channel(sender_id, this.receiver_id, label.label_id)
+        check can_create_afc_uni_channel(sender_id, receiver_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
 
-        if current_device_id == author.device_id {
+        if current_device_id == sender_id {
             // We authored this command.
-            let peer_enc_pk = get_enc_pk(peer_id)
+            let peer_enc_pk = get_enc_pk(receiver_id)
 
             finish {
                 emit AfcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
-                    receiver_id: this.receiver_id,
-                    author_enc_key_id: author.enc_key_id,
+                    receiver_id: receiver_id,
+                    author_enc_key_id: sender.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                 }
             }
         }
-        else if current_device_id == peer.device_id {
+        else if current_device_id == receiver_id {
             // We're the intended recipient of this command.
-            let author_enc_pk = get_enc_pk(author.device_id)
+            let author_enc_pk = get_enc_pk(sender_id)
 
             finish {
                 emit AfcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
-                    sender_id: author_id,
+                    sender_id: sender_id,
                     author_enc_pk: author_enc_pk,
-                    peer_enc_key_id: peer.enc_key_id,
+                    peer_enc_key_id: receiver.enc_key_id,
                     label_id: this.label_id,
                     encap: this.peer_encap,
                 }

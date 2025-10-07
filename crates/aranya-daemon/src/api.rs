@@ -20,6 +20,7 @@ use aranya_daemon_api::{
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
+#[cfg(feature = "afc")]
 use buggy::bug;
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
