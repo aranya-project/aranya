@@ -126,6 +126,8 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             #[cfg(feature = "aqc")]
             aqc: aqc.clone(),
+            #[cfg(feature = "afc")]
+            afc: afc.clone(),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -210,6 +212,8 @@ impl DaemonApiServer {
 struct EffectHandler {
     #[cfg(feature = "aqc")]
     aqc: Option<Arc<Aqc<CE, KS>>>,
+    #[cfg(feature = "afc")]
+    afc: Arc<Afc<CE, CS, KS>>,
 }
 
 impl EffectHandler {
@@ -236,7 +240,13 @@ impl EffectHandler {
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
-                LabelRevoked(_) => {}
+                LabelRevoked(label_revoked) => {
+                    #[cfg(feature = "afc")]
+                    self.afc
+                        .label_revoked(label_revoked.label_id.into())
+                        .await?;
+                    tracing::warn!(effect = ?label_revoked, "received label revoked effect");
+                }
                 AqcNetworkNameSet(e) => {
                     #[cfg(feature = "aqc")]
                     if let Some(aqc) = &self.aqc {

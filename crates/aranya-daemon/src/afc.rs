@@ -11,7 +11,7 @@ use aranya_crypto::{
     afc::{RawOpenKey, RawSealKey},
     CipherSuite, DeviceId, Engine, KeyStore, Rng,
 };
-use aranya_daemon_api::{self as api};
+use aranya_daemon_api::{self as api, LabelId};
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId, Directed,
@@ -291,6 +291,15 @@ where
             .write
             .remove(channel_id)
             .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
+    }
+
+    pub(crate) async fn label_revoked(&self, label_id: LabelId) -> Result<()> {
+        let shm = self.shm.lock().await;
+
+        // TODO: aranya-core/issues/429
+        shm.write
+            .remove_if(|channel_id, chan_label| chan_label == label_id)
+            .map_err(|err| anyhow!("unable to remove AFC channels with label ID: {err}"))
     }
 
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
