@@ -321,10 +321,7 @@ where
                         let Effect::QueryAqcNetworkNamesResult(eff) = eff else {
                             anyhow::bail!("bad effect in query_network_names");
                         };
-                        Ok((
-                            NetIdentifier(eff.net_id),
-                            DeviceId::from(eff.device_id),
-                        ))
+                        Ok((NetIdentifier(eff.net_id), DeviceId::from(eff.device_id)))
                     })
                     .collect(),
             )
