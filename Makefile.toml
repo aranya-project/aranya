@@ -313,7 +313,7 @@ script = '''
 #!/usr/bin/env bash
 set -e
 cargo build --bin aranya-daemon --release --features=experimental,aqc
-cargo build --bin aranya-metrics --release
+cargo build --bin aranya-metrics --release --features=aqc
 CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
 '''
 
