@@ -185,14 +185,14 @@ impl ClientCtx {
         let client = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_sock)
-                .with_daemon_aqc_addr(&any_addr)
+                .with_aqc_server_addr(&any_addr)
                 .connect()
         })
         .retry(ExponentialBuilder::new())
         .await
         .context("unable to initialize client")?;
 
-        let aqc_addr = client.aqc().server_addr();
+        let aqc_addr = client.aqc().context("AQC not enabled")?.server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -419,6 +419,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
                 .membera
                 .client
                 .aqc()
+                .context("AQC not enabled")?
                 .create_bidi_channel(team_id, ctx.memberb.aqc_net_id(), label3)
                 .await?;
             Ok(chan)
@@ -426,7 +427,13 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         async {
             // memberb receives a bidirectional channel.
             info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(chan) = ctx.memberb.client.aqc().receive_channel().await?
+            let AqcPeerChannel::Bidi(chan) = ctx
+                .memberb
+                .client
+                .aqc()
+                .context("AQC not enabled")?
+                .receive_channel()
+                .await?
             else {
                 bail!("expected a bidirectional channel");
             };

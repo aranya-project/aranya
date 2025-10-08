@@ -20,6 +20,10 @@
 #include <stddef.h>
 #include <sys/socket.h>
 
+#if defined(ENABLE_AQC) && !defined(ENABLE_ARANYA_EXPERIMENTAL)
+    #error "AQC is currently experimental. Set 'ENABLE_ARANYA_EXPERIMENTAL' to opt into experimental APIs."
+#endif
+
 #ifndef __has_attribute
     #define __has_attribute(x) 0
 #endif /* __has_attribute */
@@ -100,6 +104,7 @@
  */
 #define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
 
+#if defined(ENABLE_AQC)
 /**
  * An enum containing all [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) variants.
  */
@@ -114,6 +119,7 @@ enum AranyaAqcChannelType
 #ifndef __cplusplus
 typedef uint8_t AranyaAqcChannelType;
 #endif // __cplusplus
+#endif
 
 /**
  * Valid channel operations for a label assignment.
@@ -170,6 +176,10 @@ enum AranyaError
      */
     ARANYA_ERROR_INVALID_ARGUMENT,
     /**
+     * Component is not enabled.
+     */
+    ARANYA_ERROR_NOT_ENABLED,
+    /**
      * Buffer is too small.
      */
     ARANYA_ERROR_BUFFER_TOO_SMALL,
@@ -189,10 +199,12 @@ enum AranyaError
      * An Aranya error.
      */
     ARANYA_ERROR_ARANYA,
+#if defined(ENABLE_AQC)
     /**
      * AQC library error.
      */
     ARANYA_ERROR_AQC,
+#endif
     /**
      * Tried to poll an endpoint but nothing received yet.
      */
@@ -255,7 +267,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaExtError {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[88];
+    uint8_t __for_size_only[96];
 } AranyaExtError;
 
 /**
@@ -329,6 +341,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
     uint8_t __for_size_only[72];
 } AranyaClientConfigBuilder;
 
+#if defined(ENABLE_AQC)
 /**
  * Configuration info builder for Aranya QUIC Channels config [`AranyaAqcConfig`](@ref AranyaAqcConfig).
  */
@@ -340,7 +353,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
      */
     uint8_t __for_size_only[24];
 } AranyaAqcConfigBuilder;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Configuration info for Aranya QUIC Channels.
  *
@@ -354,6 +369,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
      */
     uint8_t __for_size_only[40];
 } AranyaAqcConfig;
+#endif
 
 /**
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
@@ -529,13 +545,16 @@ typedef struct AranyaLabelId {
  */
 typedef const char *AranyaAddr;
 
+#if defined(ENABLE_AQC)
 /**
  * A network identifier for an Aranya client.
  *
  * E.g. "localhost:8080", "127.0.0.1:8080"
  */
 typedef const char *AranyaNetIdentifier;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * A type containing the AQC channel variant.
  *
@@ -551,7 +570,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
      */
     uint8_t __for_size_only[168];
 } AranyaAqcPeerChannel;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * An AQC Bidirectional Channel Object.
  */
@@ -563,7 +584,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      */
     uint8_t __for_size_only[160];
 } AranyaAqcBidiChannel;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * An AQC Sender Channel Object.
  */
@@ -575,7 +598,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendChannel {
      */
     uint8_t __for_size_only[160];
 } AranyaAqcSendChannel;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * An AQC Receiver Channel Object.
  */
@@ -587,7 +612,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveChannel {
      */
     uint8_t __for_size_only[160];
 } AranyaAqcReceiveChannel;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * An AQC Bidirectional Stream Object.
  */
@@ -599,7 +626,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiStream {
      */
     uint8_t __for_size_only[208];
 } AranyaAqcBidiStream;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * An AQC Sender Stream Object.
  */
@@ -611,7 +640,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendStream {
      */
     uint8_t __for_size_only[176];
 } AranyaAqcSendStream;
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * An AQC Receiver Stream Object.
  */
@@ -623,6 +654,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
      */
     uint8_t __for_size_only[208];
 } AranyaAqcReceiveStream;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -1013,6 +1045,7 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaCl
                                                                  const char *address,
                                                                  struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_AQC)
 /**
  * Initializes `AranyaAqcConfigBuilder`.
  *
@@ -1022,7 +1055,9 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaCl
  * @relates AranyaAqcConfigBuilder
  */
 AranyaError aranya_aqc_config_builder_init(struct AranyaAqcConfigBuilder *out);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Initializes `AranyaAqcConfigBuilder`.
  *
@@ -1033,7 +1068,9 @@ AranyaError aranya_aqc_config_builder_init(struct AranyaAqcConfigBuilder *out);
  */
 AranyaError aranya_aqc_config_builder_init_ext(struct AranyaAqcConfigBuilder *out,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -1042,7 +1079,9 @@ AranyaError aranya_aqc_config_builder_init_ext(struct AranyaAqcConfigBuilder *ou
  * @relates AranyaAqcConfigBuilder
  */
 AranyaError aranya_aqc_config_builder_cleanup(struct AranyaAqcConfigBuilder *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -1052,7 +1091,9 @@ AranyaError aranya_aqc_config_builder_cleanup(struct AranyaAqcConfigBuilder *ptr
  */
 AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder *ptr,
                                                   struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
  *
@@ -1066,7 +1107,9 @@ AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder 
  */
 AranyaError aranya_aqc_config_build(struct AranyaAqcConfigBuilder *cfg,
                                     struct AranyaAqcConfig *out);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
  *
@@ -1081,7 +1124,9 @@ AranyaError aranya_aqc_config_build(struct AranyaAqcConfigBuilder *cfg,
 AranyaError aranya_aqc_config_build_ext(struct AranyaAqcConfigBuilder *cfg,
                                         struct AranyaAqcConfig *out,
                                         struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Sets the network address that the AQC server should listen
  * on.
@@ -1093,7 +1138,9 @@ AranyaError aranya_aqc_config_build_ext(struct AranyaAqcConfigBuilder *cfg,
  */
 AranyaError aranya_aqc_config_builder_set_address(struct AranyaAqcConfigBuilder *cfg,
                                                   const char *address);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Sets the network address that the AQC server should listen
  * on.
@@ -1106,7 +1153,9 @@ AranyaError aranya_aqc_config_builder_set_address(struct AranyaAqcConfigBuilder 
 AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuilder *cfg,
                                                       const char *address,
                                                       struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Sets the configuration for Aranya QUIC Channels.
  *
@@ -1117,7 +1166,9 @@ AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuil
  */
 AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfigBuilder *cfg,
                                                         const struct AranyaAqcConfig *aqc_config);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Sets the configuration for Aranya QUIC Channels.
  *
@@ -1129,6 +1180,7 @@ AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfi
 AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientConfigBuilder *cfg,
                                                             const struct AranyaAqcConfig *aqc_config,
                                                             struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Initializes `AranyaAddTeamQuicSyncConfigBuilder`.
@@ -2031,6 +2083,8 @@ AranyaError aranya_create_team_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_rand(const struct AranyaClient *client,
                         uint8_t *buf,
@@ -2044,6 +2098,8 @@ AranyaError aranya_rand(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_rand_ext(const struct AranyaClient *client,
                             uint8_t *buf,
@@ -2542,6 +2598,7 @@ AranyaError aranya_query_label_exists_ext(const struct AranyaClient *client,
                                           bool *__output,
                                           struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_AQC)
 /**
  * Query device's AQC network identifier.
  *
@@ -2559,7 +2616,9 @@ AranyaError aranya_query_aqc_net_identifier(const struct AranyaClient *client,
                                             char *ident,
                                             size_t *ident_len,
                                             bool *__output);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Query device's AQC network identifier.
  *
@@ -2578,7 +2637,9 @@ AranyaError aranya_query_aqc_net_identifier_ext(const struct AranyaClient *clien
                                                 size_t *ident_len,
                                                 bool *__output,
                                                 struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Associate a network identifier to a device for use with AQC.
  *
@@ -2599,7 +2660,9 @@ AranyaError aranya_aqc_assign_net_identifier(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
                                              AranyaNetIdentifier net_identifier);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Associate a network identifier to a device for use with AQC.
  *
@@ -2621,7 +2684,9 @@ AranyaError aranya_aqc_assign_net_identifier_ext(const struct AranyaClient *clie
                                                  const struct AranyaDeviceId *device,
                                                  AranyaNetIdentifier net_identifier,
                                                  struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Disassociate an AQC network identifier from a device.
  *
@@ -2638,7 +2703,9 @@ AranyaError aranya_aqc_remove_net_identifier(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
                                              AranyaNetIdentifier net_identifier);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Disassociate an AQC network identifier from a device.
  *
@@ -2656,7 +2723,9 @@ AranyaError aranya_aqc_remove_net_identifier_ext(const struct AranyaClient *clie
                                                  const struct AranyaDeviceId *device,
                                                  AranyaNetIdentifier net_identifier,
                                                  struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2665,7 +2734,9 @@ AranyaError aranya_aqc_remove_net_identifier_ext(const struct AranyaClient *clie
  * @relates AranyaAqcPeerChannel
  */
 AranyaError aranya_aqc_peer_channel_cleanup(struct AranyaAqcPeerChannel *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2675,7 +2746,9 @@ AranyaError aranya_aqc_peer_channel_cleanup(struct AranyaAqcPeerChannel *ptr);
  */
 AranyaError aranya_aqc_peer_channel_cleanup_ext(struct AranyaAqcPeerChannel *ptr,
                                                 struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2684,7 +2757,9 @@ AranyaError aranya_aqc_peer_channel_cleanup_ext(struct AranyaAqcPeerChannel *ptr
  * @relates AranyaAqcBidiChannel
  */
 AranyaError aranya_aqc_bidi_channel_cleanup(struct AranyaAqcBidiChannel *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2694,7 +2769,9 @@ AranyaError aranya_aqc_bidi_channel_cleanup(struct AranyaAqcBidiChannel *ptr);
  */
 AranyaError aranya_aqc_bidi_channel_cleanup_ext(struct AranyaAqcBidiChannel *ptr,
                                                 struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2703,7 +2780,9 @@ AranyaError aranya_aqc_bidi_channel_cleanup_ext(struct AranyaAqcBidiChannel *ptr
  * @relates AranyaAqcSendChannel
  */
 AranyaError aranya_aqc_send_channel_cleanup(struct AranyaAqcSendChannel *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2713,7 +2792,9 @@ AranyaError aranya_aqc_send_channel_cleanup(struct AranyaAqcSendChannel *ptr);
  */
 AranyaError aranya_aqc_send_channel_cleanup_ext(struct AranyaAqcSendChannel *ptr,
                                                 struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2722,7 +2803,9 @@ AranyaError aranya_aqc_send_channel_cleanup_ext(struct AranyaAqcSendChannel *ptr
  * @relates AranyaAqcReceiveChannel
  */
 AranyaError aranya_aqc_receive_channel_cleanup(struct AranyaAqcReceiveChannel *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2732,7 +2815,9 @@ AranyaError aranya_aqc_receive_channel_cleanup(struct AranyaAqcReceiveChannel *p
  */
 AranyaError aranya_aqc_receive_channel_cleanup_ext(struct AranyaAqcReceiveChannel *ptr,
                                                    struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2741,7 +2826,9 @@ AranyaError aranya_aqc_receive_channel_cleanup_ext(struct AranyaAqcReceiveChanne
  * @relates AranyaAqcBidiStream
  */
 AranyaError aranya_aqc_bidi_stream_cleanup(struct AranyaAqcBidiStream *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2751,7 +2838,9 @@ AranyaError aranya_aqc_bidi_stream_cleanup(struct AranyaAqcBidiStream *ptr);
  */
 AranyaError aranya_aqc_bidi_stream_cleanup_ext(struct AranyaAqcBidiStream *ptr,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2760,7 +2849,9 @@ AranyaError aranya_aqc_bidi_stream_cleanup_ext(struct AranyaAqcBidiStream *ptr,
  * @relates AranyaAqcSendStream
  */
 AranyaError aranya_aqc_send_stream_cleanup(struct AranyaAqcSendStream *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2770,7 +2861,9 @@ AranyaError aranya_aqc_send_stream_cleanup(struct AranyaAqcSendStream *ptr);
  */
 AranyaError aranya_aqc_send_stream_cleanup_ext(struct AranyaAqcSendStream *ptr,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2779,7 +2872,9 @@ AranyaError aranya_aqc_send_stream_cleanup_ext(struct AranyaAqcSendStream *ptr,
  * @relates AranyaAqcReceiveStream
  */
 AranyaError aranya_aqc_receive_stream_cleanup(struct AranyaAqcReceiveStream *ptr);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Releases any resources associated with `ptr`.
  *
@@ -2789,7 +2884,9 @@ AranyaError aranya_aqc_receive_stream_cleanup(struct AranyaAqcReceiveStream *ptr
  */
 AranyaError aranya_aqc_receive_stream_cleanup_ext(struct AranyaAqcReceiveStream *ptr,
                                                   struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a bidirectional AQC channel between this device and a peer.
  *
@@ -2808,7 +2905,9 @@ AranyaError aranya_aqc_create_bidi_channel(const struct AranyaClient *client,
                                            AranyaNetIdentifier peer,
                                            const struct AranyaLabelId *label_id,
                                            struct AranyaAqcBidiChannel *channel);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a bidirectional AQC channel between this device and a peer.
  *
@@ -2828,7 +2927,9 @@ AranyaError aranya_aqc_create_bidi_channel_ext(const struct AranyaClient *client
                                                const struct AranyaLabelId *label_id,
                                                struct AranyaAqcBidiChannel *channel,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a unidirectional AQC channel between this device and a peer.
  *
@@ -2847,7 +2948,9 @@ AranyaError aranya_aqc_create_uni_channel(const struct AranyaClient *client,
                                           AranyaNetIdentifier peer,
                                           const struct AranyaLabelId *label_id,
                                           struct AranyaAqcSendChannel *channel);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a unidirectional AQC channel between this device and a peer.
  *
@@ -2867,7 +2970,9 @@ AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
                                               const struct AranyaLabelId *label_id,
                                               struct AranyaAqcSendChannel *channel,
                                               struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Delete a bidirectional AQC channel.
  * Zeroizes PSKs associated with the channel.
@@ -2880,7 +2985,9 @@ AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
  */
 AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
                                            struct AranyaAqcBidiChannel *channel);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Delete a bidirectional AQC channel.
  * Zeroizes PSKs associated with the channel.
@@ -2894,7 +3001,9 @@ AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
 AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client,
                                                struct AranyaAqcBidiChannel *channel,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Delete a send unidirectional AQC channel.
  * Zeroizes PSKs associated with the channel.
@@ -2907,7 +3016,9 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client
  */
 AranyaError aranya_aqc_delete_send_uni_channel(const struct AranyaClient *client,
                                                struct AranyaAqcSendChannel *channel);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Delete a send unidirectional AQC channel.
  * Zeroizes PSKs associated with the channel.
@@ -2921,7 +3032,9 @@ AranyaError aranya_aqc_delete_send_uni_channel(const struct AranyaClient *client
 AranyaError aranya_aqc_delete_send_uni_channel_ext(const struct AranyaClient *client,
                                                    struct AranyaAqcSendChannel *channel,
                                                    struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Delete a receive unidirectional AQC channel.
  * Zeroizes PSKs associated with the channel.
@@ -2934,7 +3047,9 @@ AranyaError aranya_aqc_delete_send_uni_channel_ext(const struct AranyaClient *cl
  */
 AranyaError aranya_aqc_delete_receive_uni_channel(const struct AranyaClient *client,
                                                   struct AranyaAqcReceiveChannel *channel);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Delete a receive unidirectional AQC channel.
  * Zeroizes PSKs associated with the channel.
@@ -2948,7 +3063,9 @@ AranyaError aranya_aqc_delete_receive_uni_channel(const struct AranyaClient *cli
 AranyaError aranya_aqc_delete_receive_uni_channel_ext(const struct AranyaClient *client,
                                                       struct AranyaAqcReceiveChannel *channel,
                                                       struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Tries to poll AQC to see if any channels have been received.
  *
@@ -2982,7 +3099,9 @@ AranyaError aranya_aqc_delete_receive_uni_channel_ext(const struct AranyaClient 
 AranyaError aranya_aqc_try_receive_channel(const struct AranyaClient *client,
                                            struct AranyaAqcPeerChannel *channel,
                                            AranyaAqcChannelType *__output);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Tries to poll AQC to see if any channels have been received.
  *
@@ -3017,7 +3136,9 @@ AranyaError aranya_aqc_try_receive_channel_ext(const struct AranyaClient *client
                                                struct AranyaAqcPeerChannel *channel,
                                                AranyaAqcChannelType *__output,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
  *
@@ -3028,11 +3149,13 @@ AranyaError aranya_aqc_try_receive_channel_ext(const struct AranyaClient *client
  * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
  * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_bidi_channel(struct AranyaAqcPeerChannel *channel,
                                         struct AranyaAqcBidiChannel *bidi);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
  *
@@ -3043,12 +3166,14 @@ AranyaError aranya_aqc_get_bidi_channel(struct AranyaAqcPeerChannel *channel,
  * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
  * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_bidi_channel_ext(struct AranyaAqcPeerChannel *channel,
                                             struct AranyaAqcBidiChannel *bidi,
                                             struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) for receiving data.
  *
@@ -3059,11 +3184,13 @@ AranyaError aranya_aqc_get_bidi_channel_ext(struct AranyaAqcPeerChannel *channel
  * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] receiver the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_receive_channel(struct AranyaAqcPeerChannel *channel,
                                            struct AranyaAqcReceiveChannel *receiver);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) for receiving data.
  *
@@ -3074,12 +3201,14 @@ AranyaError aranya_aqc_get_receive_channel(struct AranyaAqcPeerChannel *channel,
  * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] receiver the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcPeerChannel.
  */
 AranyaError aranya_aqc_get_receive_channel_ext(struct AranyaAqcPeerChannel *channel,
                                                struct AranyaAqcReceiveChannel *receiver,
                                                struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a bidirectional stream from a [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
  *
@@ -3095,7 +3224,9 @@ AranyaError aranya_aqc_get_receive_channel_ext(struct AranyaAqcPeerChannel *chan
 AranyaError aranya_aqc_bidi_create_bidi_stream(const struct AranyaClient *client,
                                                struct AranyaAqcBidiChannel *channel,
                                                struct AranyaAqcBidiStream *stream);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a bidirectional stream from a [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
  *
@@ -3112,7 +3243,9 @@ AranyaError aranya_aqc_bidi_create_bidi_stream_ext(const struct AranyaClient *cl
                                                    struct AranyaAqcBidiChannel *channel,
                                                    struct AranyaAqcBidiStream *stream,
                                                    struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Send some data to a peer using an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
@@ -3127,7 +3260,9 @@ AranyaError aranya_aqc_bidi_stream_send(const struct AranyaClient *client,
                                         struct AranyaAqcBidiStream *stream,
                                         const uint8_t *data,
                                         size_t data_len);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Send some data to a peer using an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
@@ -3143,7 +3278,9 @@ AranyaError aranya_aqc_bidi_stream_send_ext(const struct AranyaClient *client,
                                             const uint8_t *data,
                                             size_t data_len,
                                             struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
@@ -3154,12 +3291,14 @@ AranyaError aranya_aqc_bidi_stream_send_ext(const struct AranyaClient *client,
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiStream.
  */
 AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
                                             uint8_t *buffer,
                                             size_t *buffer_len);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
@@ -3170,13 +3309,15 @@ AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiStream.
  */
 AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stream,
                                                 uint8_t *buffer,
                                                 size_t *buffer_len,
                                                 struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a unidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
  *
@@ -3192,7 +3333,9 @@ AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stre
 AranyaError aranya_aqc_bidi_create_uni_stream(const struct AranyaClient *client,
                                               struct AranyaAqcBidiChannel *channel,
                                               struct AranyaAqcSendStream *stream);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a unidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
  *
@@ -3209,7 +3352,9 @@ AranyaError aranya_aqc_bidi_create_uni_stream_ext(const struct AranyaClient *cli
                                                   struct AranyaAqcBidiChannel *channel,
                                                   struct AranyaAqcSendStream *stream,
                                                   struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Tries to receive the receive (and potentially send) ends of a stream.
  *
@@ -3226,13 +3371,15 @@ AranyaError aranya_aqc_bidi_create_uni_stream_ext(const struct AranyaClient *cli
  * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
  * @param[out] send_init whether or not we received a `send_stream`.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiChannel.
  */
 AranyaError aranya_aqc_bidi_try_receive_stream(struct AranyaAqcBidiChannel *channel,
                                                struct AranyaAqcReceiveStream *recv_stream,
                                                struct AranyaAqcSendStream *send_stream,
                                                bool *send_init);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Tries to receive the receive (and potentially send) ends of a stream.
  *
@@ -3249,14 +3396,16 @@ AranyaError aranya_aqc_bidi_try_receive_stream(struct AranyaAqcBidiChannel *chan
  * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
  * @param[out] send_init whether or not we received a `send_stream`.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcBidiChannel.
  */
 AranyaError aranya_aqc_bidi_try_receive_stream_ext(struct AranyaAqcBidiChannel *channel,
                                                    struct AranyaAqcReceiveStream *recv_stream,
                                                    struct AranyaAqcSendStream *send_stream,
                                                    bool *send_init,
                                                    struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a unidirectional stream from an [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
  *
@@ -3272,7 +3421,9 @@ AranyaError aranya_aqc_bidi_try_receive_stream_ext(struct AranyaAqcBidiChannel *
 AranyaError aranya_aqc_send_create_uni_stream(const struct AranyaClient *client,
                                               struct AranyaAqcSendChannel *channel,
                                               struct AranyaAqcSendStream *stream);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Create a unidirectional stream from an [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
  *
@@ -3289,7 +3440,9 @@ AranyaError aranya_aqc_send_create_uni_stream_ext(const struct AranyaClient *cli
                                                   struct AranyaAqcSendChannel *channel,
                                                   struct AranyaAqcSendStream *stream,
                                                   struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Receives the stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  *
@@ -3302,11 +3455,13 @@ AranyaError aranya_aqc_send_create_uni_stream_ext(const struct AranyaClient *cli
  * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  * @param[out] stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveChannel.
  */
 AranyaError aranya_aqc_recv_try_receive_uni_stream(struct AranyaAqcReceiveChannel *channel,
                                                    struct AranyaAqcReceiveStream *stream);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Receives the stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  *
@@ -3319,12 +3474,14 @@ AranyaError aranya_aqc_recv_try_receive_uni_stream(struct AranyaAqcReceiveChanne
  * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
  * @param[out] stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveChannel.
  */
 AranyaError aranya_aqc_recv_try_receive_uni_stream_ext(struct AranyaAqcReceiveChannel *channel,
                                                        struct AranyaAqcReceiveStream *stream,
                                                        struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Send some data over an [`AranyaAqcSendStream`](@ref AranyaAqcSendStream)m.
  *
@@ -3339,7 +3496,9 @@ AranyaError aranya_aqc_send_stream_send(const struct AranyaClient *client,
                                         struct AranyaAqcSendStream *stream,
                                         const uint8_t *data,
                                         size_t data_len);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Send some data over an [`AranyaAqcSendStream`](@ref AranyaAqcSendStream)m.
  *
@@ -3355,7 +3514,9 @@ AranyaError aranya_aqc_send_stream_send_ext(const struct AranyaClient *client,
                                             const uint8_t *data,
                                             size_t data_len,
                                             struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
@@ -3366,12 +3527,14 @@ AranyaError aranya_aqc_send_stream_send_ext(const struct AranyaClient *client,
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveStream.
  */
 AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *stream,
                                             uint8_t *buffer,
                                             size_t *buffer_len);
+#endif
 
+#if defined(ENABLE_AQC)
 /**
  * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
@@ -3382,12 +3545,13 @@ AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *strea
  * @param[out] buffer pointer to the target buffer.
  * @param[in,out] buffer_len length of the target buffer.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcReceiveStream.
  */
 AranyaError aranya_aqc_recv_stream_try_recv_ext(struct AranyaAqcReceiveStream *stream,
                                                 uint8_t *buffer,
                                                 size_t *buffer_len,
                                                 struct AranyaExtError *__ext_err);
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

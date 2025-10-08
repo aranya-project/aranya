@@ -25,6 +25,11 @@ impl NetIdentifier {
     pub fn from_api(id: api::NetIdentifier) -> Self {
         Self(id.0)
     }
+
+    #[doc(hidden)]
+    pub fn try_from_cstr(cstr: &CStr) -> Result<Self, Utf8Error> {
+        Ok(Self(Text::try_from(cstr)?))
+    }
 }
 
 impl AsRef<str> for NetIdentifier {

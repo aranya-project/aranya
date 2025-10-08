@@ -2,15 +2,19 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    str::FromStr,
     time::Duration,
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{
+    afc::{Channel as AfcChannel, Channels as AfcChannels},
+    aqc::AqcPeerChannel,
+    client::{ChanOp, Client, DeviceId, KeyBundle, NetIdentifier, Role},
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
-    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
+    SyncPeerConfig,
 };
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
+use aranya_daemon_api::text;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -22,11 +26,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{Metadata, debug, info};
+use tracing::{debug, info, Metadata};
 use tracing_subscriber::{
-    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
+    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -76,6 +80,8 @@ impl ClientCtx {
         let work_dir = TempDir::with_prefix(user_name)?;
 
         let daemon = {
+            let shm = format!("/shm_{}", user_name);
+            let _ = rustix::shm::unlink(&shm);
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
@@ -94,7 +100,7 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-                name = "daemon"
+                name = {user_name:?}
                 runtime_dir = {runtime_dir:?}
                 state_dir = {state_dir:?}
                 cache_dir = {cache_dir:?}
@@ -102,6 +108,11 @@ impl ClientCtx {
                 config_dir = {config_dir:?}
 
                 aqc.enable = true
+
+                [afc]
+                enable = true
+                shm_path = {shm:?}
+                max_chans = 100
 
                 [sync.quic]
                 enable = true
@@ -120,7 +131,6 @@ impl ClientCtx {
         sleep(Duration::from_millis(100)).await;
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-
         let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
@@ -131,7 +141,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_server_addr = client.aqc().server_addr();
+        let aqc_server_addr = client.aqc().context("AQC is enabled")?.server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -153,12 +163,8 @@ impl ClientCtx {
     }
 
     fn aqc_net_id(&self) -> NetIdentifier {
-        NetIdentifier(
-            self.aqc_addr
-                .to_string()
-                .try_into()
-                .expect("addr is valid text"),
-        )
+        NetIdentifier::from_str(self.aqc_addr.to_string().as_str())
+            .expect("expected net identifier")
     }
 }
 
@@ -414,6 +420,7 @@ async fn main() -> Result<()> {
             let chan = membera
                 .client
                 .aqc()
+                .context("AQC is enabled")?
                 .create_bidi_channel(team_id, memberb.aqc_net_id(), label3)
                 .await?;
             Ok(chan)
@@ -421,7 +428,13 @@ async fn main() -> Result<()> {
         async {
             // memberb receives a bidirectional channel.
             info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(chan) = memberb.client.aqc().receive_channel().await? else {
+            let AqcPeerChannel::Bidi(chan) = memberb
+                .client
+                .aqc()
+                .context("AQC is enabled")?
+                .receive_channel()
+                .await?
+            else {
                 bail!("expected a bidirectional channel");
             };
             Ok(chan)
@@ -455,8 +468,54 @@ async fn main() -> Result<()> {
     membera
         .client
         .aqc()
+        .context("AQC is enabled")?
         .delete_bidi_channel(&mut created_aqc_chan)
         .await?;
+
+    info!("completed aqc demo");
+
+    // Demo AFC.
+    info!("demo afc functionality");
+
+    // membera creates AFC channel.
+    info!("creating afc bidi channel");
+    let membera_afc = membera.client.afc();
+    let (send, ctrl) = membera_afc
+        .create_bidi_channel(team_id, memberb.id, label3)
+        .await
+        .expect("expected to create afc bidi channel");
+
+    // memberb receives AFC channel.
+    info!("receiving afc bidi channel");
+    let memberb_afc = memberb.client.afc();
+    let chan = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .expect("expected to receive afc channel");
+
+    // membera seals data for memberb.
+    let afc_msg = "afc msg".as_bytes();
+    info!(?afc_msg, "membera sealing data for memberb");
+    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
+    send.seal(&mut ciphertext, &afc_msg)
+        .expect("expected to seal afc data");
+    info!(?afc_msg, "membera sealed data for memberb");
+
+    // This is where membera would send the ciphertext to memberb via the network.
+
+    // memberb opens data from membera.
+    info!("memberb receiving bidi channel from membera");
+    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
+    let AfcChannel::Bidi(recv) = chan else {
+        bail!("expected a bidirectional receive channel");
+    };
+    info!("memberb opening data from membera");
+    recv.open(&mut plaintext, &ciphertext)
+        .expect("expected to open afc data");
+    info!(?plaintext, "memberb opened data from membera");
+    assert_eq!(afc_msg, plaintext);
+
+    info!("completed afc demo");
 
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;
@@ -464,8 +523,6 @@ async fn main() -> Result<()> {
     operator_team.revoke_label(memberb.id, label3).await?;
     info!("deleting label");
     admin_team.delete_label(label3).await?;
-
-    info!("completed aqc demo");
 
     info!("completed example Aranya application");
 

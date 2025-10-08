@@ -139,6 +139,8 @@ impl Device<'_> {
     }
 
     /// Assigns an AQC network identifier to the device.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[instrument(skip(self, net_identifier))]
     pub async fn assign_aqc_net_identifier<I>(&self, net_identifier: I) -> Result<()>
     where
@@ -161,6 +163,8 @@ impl Device<'_> {
     }
 
     /// Removes the device's AQC network identifier.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[instrument(skip(self, net_identifier))]
     pub async fn remove_aqc_net_identifier<I>(&self, net_identifier: I) -> Result<()>
     where
@@ -187,6 +191,8 @@ impl Device<'_> {
     // TODO(eric): documented whether this returns `None` if the
     // device does not exist or if the device exists but does not
     // have a net ID.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     #[instrument(skip(self))]
     pub async fn aqc_net_id(&self) -> Result<Option<NetIdentifier>> {
         let id = self

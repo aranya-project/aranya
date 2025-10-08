@@ -84,6 +84,11 @@ config_dir = "/etc/aranya"
 [aqc]
 enable = true
 
+[afc]
+enable = true
+shm_path = "/afc"
+max_chans = 100
+
 [sync.quic]
 enable = true
 # Aranya sync server address.

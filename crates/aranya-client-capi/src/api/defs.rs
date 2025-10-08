@@ -1,21 +1,28 @@
 #![allow(rustdoc::broken_intra_doc_links)]
+#[cfg(feature = "aqc")]
+use core::str::FromStr;
 use core::{
     ffi::{c_char, CStr},
     ops::Deref,
     ptr, slice,
-    str::FromStr,
 };
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
-use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
-use aranya_client::aqc::{self, AqcPeerStream};
+#[cfg(feature = "aqc")]
+use aranya_capi_core::opaque::Opaque;
+use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+#[cfg(feature = "aqc")]
+use aranya_client::aqc;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
+#[cfg(feature = "aqc")]
+use buggy::BugExt;
+#[cfg(feature = "aqc")]
 use bytes::Bytes;
 use tracing::{debug, error};
 
-use crate::imp::{self, aqc::consume_bytes};
+use crate::imp;
 
 /// An error code.
 ///
@@ -40,6 +47,10 @@ pub enum Error {
     #[capi(msg = "invalid argument")]
     InvalidArgument,
 
+    /// Component is not enabled.
+    #[capi(msg = "component not enabled")]
+    NotEnabled,
+
     /// Buffer is too small.
     #[capi(msg = "buffer too small")]
     BufferTooSmall,
@@ -61,6 +72,7 @@ pub enum Error {
     Aranya,
 
     /// AQC library error.
+    #[cfg(feature = "aqc")]
     #[capi(msg = "AQC library error")]
     Aqc,
 
@@ -92,12 +104,14 @@ impl From<&imp::Error> for Error {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
             imp::Error::InvalidArg(_) => Self::InvalidArgument,
+            imp::Error::NotEnabled => Self::NotEnabled,
             imp::Error::Utf8(_) => Self::InvalidUtf8,
             imp::Error::Addr(_) => Self::InvalidAddr,
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Aranya(_) => Self::Aranya,
+                #[cfg(feature = "aqc")]
                 aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
@@ -174,7 +188,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 /// Extended error information.
 #[allow(rustdoc::invalid_rust_codeblocks)]
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
+#[aranya_capi_core::opaque(size = 96, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
@@ -240,17 +254,21 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
-    // SAFETY: Caller must ensure pointer is a valid C String.
-    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
-        .to_str()
-        .context("unable to convert to string")?;
+    #[cfg(feature = "aqc")]
+    let aqc_addr = {
+        // SAFETY: Caller must ensure pointer is a valid C String.
+        let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
+            .to_str()
+            .context("unable to convert to string")?;
 
-    let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
+        aranya_util::Addr::from_str(aqc_str)?
+    };
+
     let inner = rt.block_on({
-        aranya_client::Client::builder()
-            .with_daemon_uds_path(daemon_socket)
-            .with_daemon_aqc_addr(&aqc_addr)
-            .connect()
+        let builder = aranya_client::Client::builder().with_daemon_uds_path(daemon_socket);
+        #[cfg(feature = "aqc")]
+        let builder = builder.with_aqc_server_addr(&aqc_addr);
+        builder.connect()
     })?;
 
     Client::init(client, imp::Client { rt, inner });
@@ -477,6 +495,15 @@ impl Addr {
 #[derive(Copy, Clone, Debug)]
 pub struct NetIdentifier(*const c_char);
 
+#[cfg(feature = "aqc")]
+impl NetIdentifier {
+    unsafe fn as_underlying(self) -> Result<aranya_client::NetIdentifier, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(aranya_client::NetIdentifier::try_from_cstr(cstr)?)
+    }
+}
+
 impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier {
     type Error = aranya_client::InvalidNetIdentifier;
 
@@ -489,12 +516,14 @@ impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier {
 }
 
 /// Channel ID for AQC bidi channel.
+#[cfg(feature = "aqc")]
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct AqcBidiChannelId {
     id: Id,
 }
 
+#[cfg(feature = "aqc")]
 impl From<aqc::AqcBidiChannelId> for AqcBidiChannelId {
     fn from(value: aqc::AqcBidiChannelId) -> Self {
         Self {
@@ -505,6 +534,7 @@ impl From<aqc::AqcBidiChannelId> for AqcBidiChannelId {
     }
 }
 
+#[cfg(feature = "aqc")]
 impl From<&AqcBidiChannelId> for aqc::AqcBidiChannelId {
     fn from(value: &AqcBidiChannelId) -> Self {
         value.id.bytes.into()
@@ -512,12 +542,14 @@ impl From<&AqcBidiChannelId> for aqc::AqcBidiChannelId {
 }
 
 /// Channel ID for AQC uni channel.
+#[cfg(feature = "aqc")]
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct AqcUniChannelId {
     id: Id,
 }
 
+#[cfg(feature = "aqc")]
 impl From<aqc::AqcUniChannelId> for AqcUniChannelId {
     fn from(value: aqc::AqcUniChannelId) -> Self {
         Self {
@@ -528,6 +560,7 @@ impl From<aqc::AqcUniChannelId> for AqcUniChannelId {
     }
 }
 
+#[cfg(feature = "aqc")]
 impl From<&AqcUniChannelId> for aqc::AqcUniChannelId {
     fn from(value: &AqcUniChannelId) -> Self {
         value.id.bytes.into()
@@ -561,7 +594,6 @@ pub unsafe fn get_key_bundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let keys = client.rt.block_on(client.inner.get_key_bundle())?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
@@ -614,7 +646,6 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 ///
 /// @relates AranyaClient.
 pub fn get_device_id(client: &Client) -> Result<DeviceId, imp::Error> {
-    let client = client.imp();
     let id = client.rt.block_on(client.inner.get_device_id())?;
     Ok(id.into())
 }
@@ -664,10 +695,12 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// Configuration info for Aranya QUIC Channels.
 ///
 /// Use a [`AqcConfigBuilder`] to construct this object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AqcConfig = Safe<imp::AqcConfig>;
 
 /// Configuration info builder for Aranya QUIC Channels config [`AqcConfig`].
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
@@ -681,6 +714,7 @@ pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 /// @param[out] out a pointer to write the aqc config to
 ///
 /// @relates AranyaAqcConfigBuilder.
+#[cfg(feature = "aqc")]
 pub fn aqc_config_build(
     cfg: OwnedPtr<AqcConfigBuilder>,
     out: &mut MaybeUninit<AqcConfig>,
@@ -697,6 +731,7 @@ pub fn aqc_config_build(
 /// @param[in] address a string with the address to bind to
 ///
 /// @relates AranyaAqcConfigBuilder.
+#[cfg(feature = "aqc")]
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
     cfg.addr(address);
 }
@@ -707,6 +742,7 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
 /// @param[in] aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 ///
 /// @relates AranyaAqcConfigBuilder.
+#[cfg(feature = "aqc")]
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
     cfg.aqc((**aqc_config).clone());
 }
@@ -1029,8 +1065,6 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// @relates AranyaClient.
 pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.imp();
-
     // First get the owner role ID by looking at existing roles
     let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
 
@@ -1071,7 +1105,6 @@ pub fn assign_role(
     device: &DeviceId,
     role_id: &RoleId,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1097,7 +1130,6 @@ pub fn revoke_role(
     device: &DeviceId,
     role_id: &RoleId,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1124,7 +1156,6 @@ pub fn create_label(
     name: LabelName,
     managing_role_id: &RoleId,
 ) -> Result<LabelId, imp::Error> {
-    let client = client.imp();
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
     let label_id = client.rt.block_on(
@@ -1146,7 +1177,6 @@ pub fn create_label(
 ///
 /// @relates AranyaClient.
 pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Result<(), imp::Error> {
-    let client = client.imp();
     client
         .rt
         .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
@@ -1170,7 +1200,6 @@ pub fn assign_label(
     label_id: &LabelId,
     op: ChanOp,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1197,7 +1226,6 @@ pub fn revoke_label(
     device: &DeviceId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1216,7 +1244,6 @@ pub fn revoke_label(
 ///
 /// @relates AranyaClient.
 pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
-    let client = client.imp();
     let cfg: &imp::CreateTeamConfig = cfg.deref();
     let team_id = client
         .rt
@@ -1233,9 +1260,9 @@ pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, im
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
+///
+/// @relates AranyaClient.
 pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
-    let client = client.imp();
-
     buf.fill(MaybeUninit::new(0));
     // SAFETY: We just initialized the buf and are removing MaybeUninit.
     let buf = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), buf.len()) };
@@ -1268,14 +1295,13 @@ pub unsafe fn encrypt_psk_seed_for_peer(
     seed: *mut MaybeUninit<u8>,
     seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
     let wrapped_seed = client.rt.block_on(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(&keybundle.encoding),
+            .encrypt_psk_seed_for_peer(&keybundle.encryption),
     )?;
 
     if *seed_len < wrapped_seed.len() {
@@ -1298,7 +1324,6 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 ///
 /// @relates AranyaClient.
 pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
-    let client = client.imp();
     let cfg: &imp::AddTeamConfig = cfg.deref();
     client.rt.block_on(client.inner.add_team(cfg.into()))?;
     Ok(())
@@ -1311,7 +1336,6 @@ pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> 
 ///
 /// @relates AranyaClient.
 pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
 }
@@ -1323,7 +1347,6 @@ pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// @relates AranyaClient.
 pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.imp();
     client
         .rt
         .block_on(client.inner.team(team.into()).close_team())?;
@@ -1347,7 +1370,6 @@ pub unsafe fn add_device_to_team(
     keybundle: &[u8],
     role_id: Option<&RoleId>,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
     client.rt.block_on(
@@ -1373,7 +1395,6 @@ pub fn remove_device_from_team(
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client
         .rt
         .block_on(client.inner.team(team.into()).remove_device(device.into()))?;
@@ -1398,7 +1419,6 @@ pub unsafe fn add_sync_peer(
     addr: Addr,
     config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client.rt.block_on(
@@ -1422,7 +1442,6 @@ pub unsafe fn remove_sync_peer(
     team: &TeamId,
     addr: Addr,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client
@@ -1455,7 +1474,6 @@ pub unsafe fn sync_now(
     addr: Addr,
     config: Option<&SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client.rt.block_on(
@@ -1481,7 +1499,6 @@ pub unsafe fn query_devices_on_team(
     devices: *mut MaybeUninit<DeviceId>,
     devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let data = client
         .rt
         .block_on(client.inner.team(team.into()).devices())?;
@@ -1516,7 +1533,6 @@ pub unsafe fn query_device_keybundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let keys = client.rt.block_on(
         client
             .inner
@@ -1549,7 +1565,6 @@ pub unsafe fn query_device_label_assignments(
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let data = client.rt.block_on(
         client
             .inner
@@ -1588,7 +1603,6 @@ pub unsafe fn query_labels(
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     let data = client
         .rt
         .block_on(client.inner.team(team.into()).labels())?;
@@ -1619,7 +1633,6 @@ pub unsafe fn query_label_exists(
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
-    let client = client.imp();
     let label_result = client
         .rt
         .block_on(client.inner.team(team.into()).label(label.into()))?;
@@ -1636,6 +1649,7 @@ pub unsafe fn query_label_exists(
 /// @param[in,out] length of ident
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub unsafe fn query_aqc_net_identifier(
     client: &Client,
     team: &TeamId,
@@ -1643,7 +1657,6 @@ pub unsafe fn query_aqc_net_identifier(
     ident: *mut MaybeUninit<c_char>,
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
-    let client = client.imp();
     let Some(net_identifier) = client.rt.block_on(
         client
             .inner
@@ -1673,13 +1686,13 @@ pub unsafe fn query_aqc_net_identifier(
 /// @param[in] net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub unsafe fn aqc_assign_net_identifier(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1700,13 +1713,13 @@ pub unsafe fn aqc_assign_net_identifier(
 /// @param[in] net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub unsafe fn aqc_remove_net_identifier(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1722,11 +1735,13 @@ pub unsafe fn aqc_remove_net_identifier(
 /// Note that this data is only valid after a successful call to
 /// `try_receive_channel`, and is invalidated after calling
 /// `get_bidi_channel`/`get_receive_channel`.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 168, align = 8)]
 pub type AqcPeerChannel = Safe<imp::AqcPeerChannel>;
 
 /// An enum containing all [`AqcPeerChannel`] variants.
+#[cfg(feature = "aqc")]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum AqcChannelType {
@@ -1735,31 +1750,37 @@ pub enum AqcChannelType {
 }
 
 /// An AQC Bidirectional Channel Object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
 /// An AQC Sender Channel Object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcSendChannel = Safe<imp::AqcSendChannel>;
 
 /// An AQC Receiver Channel Object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcBidiStream = Safe<imp::AqcBidiStream>;
 
 /// An AQC Sender Stream Object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
 /// An AQC Receiver Stream Object.
+#[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
@@ -1775,6 +1796,7 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 /// @param[out] channel the AQC channel object [`AqcBidiChannel`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub unsafe fn aqc_create_bidi_channel(
     client: &Client,
     team: &TeamId,
@@ -1782,12 +1804,17 @@ pub unsafe fn aqc_create_bidi_channel(
     label_id: &LabelId,
     channel: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
-    let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
+    // SAFETY: Caller must ensure `peer` is a valid C String.
+
+    let peer = unsafe { peer.as_underlying() }?;
+
+    let mut aqc = client
+        .inner
+        .aqc()
+        .assume("AQC feature enabled but no AQC available in client")?;
+    let chan = client
+        .rt
+        .block_on(aqc.create_bidi_channel(team.into(), peer, label_id.into()))?;
 
     AqcBidiChannel::init(channel, imp::AqcBidiChannel::new(chan));
     Ok(())
@@ -1804,6 +1831,7 @@ pub unsafe fn aqc_create_bidi_channel(
 /// @param[out] channel the AQC channel object [`AqcSendChannel`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub unsafe fn aqc_create_uni_channel(
     client: &Client,
     team: &TeamId,
@@ -1811,12 +1839,16 @@ pub unsafe fn aqc_create_uni_channel(
     label_id: &LabelId,
     channel: &mut MaybeUninit<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
-    let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
+    // SAFETY: Caller must ensure `peer` is a valid C String.
+    let peer = unsafe { peer.as_underlying() }?;
+
+    let mut aqc = client
+        .inner
+        .aqc()
+        .assume("AQC feature enabled but no AQC available in client")?;
+    let chan = client
+        .rt
+        .block_on(aqc.create_uni_channel(team.into(), peer, label_id.into()))?;
 
     AqcSendChannel::init(channel, imp::AqcSendChannel::new(chan));
     Ok(())
@@ -1830,14 +1862,18 @@ pub unsafe fn aqc_create_uni_channel(
 /// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_delete_bidi_channel(
     client: &Client,
     channel: &mut AqcBidiChannel,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(&mut channel.inner))?;
+    client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .ok_or(imp::Error::NotEnabled)?
+            .delete_bidi_channel(&mut channel.inner),
+    )?;
     Ok(())
 }
 
@@ -1849,15 +1885,16 @@ pub fn aqc_delete_bidi_channel(
 /// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_delete_send_uni_channel(
     client: &Client,
     channel: &mut AqcSendChannel,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
             .aqc()
+            .ok_or(imp::Error::NotEnabled)?
             .delete_send_uni_channel(&mut channel.inner),
     )?;
     Ok(())
@@ -1871,15 +1908,16 @@ pub fn aqc_delete_send_uni_channel(
 /// @param[in] channel the AQC Channel [`AqcReceiveChannel`] to delete.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_delete_receive_uni_channel(
     client: &Client,
     channel: &mut AqcReceiveChannel,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
     client.rt.block_on(
         client
             .inner
             .aqc()
+            .ok_or(imp::Error::NotEnabled)?
             .delete_receive_uni_channel(&mut channel.inner),
     )?;
     Ok(())
@@ -1913,11 +1951,16 @@ pub fn aqc_delete_receive_uni_channel(
 /// @param[out] __output the corresponding AQC channel type [`AqcChannelType`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_try_receive_channel(
     client: &Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
-    let chan = client.inner.aqc().try_receive_channel()?;
+    let chan = client
+        .inner
+        .aqc()
+        .ok_or(imp::Error::NotEnabled)?
+        .try_receive_channel()?;
 
     let chan_type = match chan {
         aqc::AqcPeerChannel::Bidi { .. } => AqcChannelType::Bidirectional,
@@ -1938,7 +1981,8 @@ pub fn aqc_try_receive_channel(
 /// @param[in]  channel the AQC channel holder [`AqcPeerChannel`] that holds a channel object.
 /// @param[out] bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
 ///
-/// @relates AranyaClient.
+/// @relates AranyaAqcPeerChannel.
+#[cfg(feature = "aqc")]
 pub fn aqc_get_bidi_channel(
     channel: OwnedPtr<AqcPeerChannel>,
     bidi: &mut MaybeUninit<AqcBidiChannel>,
@@ -1967,7 +2011,8 @@ pub fn aqc_get_bidi_channel(
 /// @param[in]  channel the AQC channel container [`AqcPeerChannel`].
 /// @param[out] receiver the AQC channel object [`AqcReceiveChannel`].
 ///
-/// @relates AranyaClient.
+/// @relates AranyaAqcPeerChannel.
+#[cfg(feature = "aqc")]
 pub fn aqc_get_receive_channel(
     channel: OwnedPtr<AqcPeerChannel>,
     receiver: &mut MaybeUninit<AqcReceiveChannel>,
@@ -1997,6 +2042,7 @@ pub fn aqc_get_receive_channel(
 /// @param[out] stream the bidirectional AQC stream [`AqcBidiStream`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_bidi_create_bidi_stream(
     client: &Client,
     channel: &mut AqcBidiChannel,
@@ -2016,6 +2062,7 @@ pub fn aqc_bidi_create_bidi_stream(
 /// @param[in] data_len length of the data to send.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_bidi_stream_send(
     client: &Client,
     stream: &mut AqcBidiStream,
@@ -2034,7 +2081,8 @@ pub fn aqc_bidi_stream_send(
 /// @param[out] buffer pointer to the target buffer.
 /// @param[in,out] buffer_len length of the target buffer.
 ///
-/// @relates AranyaClient.
+/// @relates AranyaAqcBidiStream.
+#[cfg(feature = "aqc")]
 pub unsafe fn aqc_bidi_stream_try_recv(
     stream: &mut AqcBidiStream,
     buffer: *mut MaybeUninit<u8>,
@@ -2051,7 +2099,7 @@ pub unsafe fn aqc_bidi_stream_try_recv(
     let mut written = 0;
     let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
     while !buf.is_empty() {
-        written += consume_bytes(&mut buf, &mut stream.data);
+        written += imp::aqc::consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
@@ -2072,6 +2120,7 @@ pub unsafe fn aqc_bidi_stream_try_recv(
 /// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_bidi_create_uni_stream(
     client: &Client,
     channel: &mut AqcBidiChannel,
@@ -2098,7 +2147,8 @@ pub fn aqc_bidi_create_uni_stream(
 /// @param[out] send_stream the sending side of a stream [`AqcSendStream`].
 /// @param[out] send_init whether or not we received a `send_stream`.
 ///
-/// @relates AranyaClient.
+/// @relates AranyaAqcBidiChannel.
+#[cfg(feature = "aqc")]
 pub fn aqc_bidi_try_receive_stream(
     channel: &mut AqcBidiChannel,
     recv_stream: &mut MaybeUninit<AqcReceiveStream>,
@@ -2107,13 +2157,13 @@ pub fn aqc_bidi_try_receive_stream(
 ) -> Result<(), imp::Error> {
     let stream = channel.inner.try_receive_stream()?;
     match stream {
-        AqcPeerStream::Bidi(bidi) => {
+        aqc::AqcPeerStream::Bidi(bidi) => {
             let (send, recv) = bidi.split();
             AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
             AqcSendStream::init(send_stream, imp::AqcSendStream::new(send));
             send_init.write(true);
         }
-        AqcPeerStream::Receive(recv) => {
+        aqc::AqcPeerStream::Receive(recv) => {
             AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
             send_init.write(false);
         }
@@ -2131,6 +2181,7 @@ pub fn aqc_bidi_try_receive_stream(
 /// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_send_create_uni_stream(
     client: &Client,
     channel: &mut AqcSendChannel,
@@ -2153,7 +2204,8 @@ pub fn aqc_send_create_uni_stream(
 /// @param[in]  channel the AQC channel object [`AqcReceiveChannel`].
 /// @param[out] stream the receiving side of a stream [`AqcReceiveStream`].
 ///
-/// @relates AranyaClient.
+/// @relates AranyaAqcReceiveChannel.
+#[cfg(feature = "aqc")]
 pub fn aqc_recv_try_receive_uni_stream(
     channel: &mut AqcReceiveChannel,
     stream: &mut MaybeUninit<AqcReceiveStream>,
@@ -2172,6 +2224,7 @@ pub fn aqc_recv_try_receive_uni_stream(
 /// @param[in] data_len length of the data to send.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "aqc")]
 pub fn aqc_send_stream_send(
     client: &Client,
     stream: &mut AqcSendStream,
@@ -2190,7 +2243,8 @@ pub fn aqc_send_stream_send(
 /// @param[out] buffer pointer to the target buffer.
 /// @param[in,out] buffer_len length of the target buffer.
 ///
-/// @relates AranyaClient.
+/// @relates AranyaAqcReceiveStream.
+#[cfg(feature = "aqc")]
 pub unsafe fn aqc_recv_stream_try_recv(
     stream: &mut AqcReceiveStream,
     buffer: *mut MaybeUninit<u8>,
@@ -2207,7 +2261,7 @@ pub unsafe fn aqc_recv_stream_try_recv(
     let mut written = 0;
     let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
     while !buf.is_empty() {
-        written += consume_bytes(&mut buf, &mut stream.data);
+        written += imp::aqc::consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,

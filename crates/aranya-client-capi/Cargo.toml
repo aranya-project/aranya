@@ -21,6 +21,16 @@ doctest = false
 [features]
 default = []
 
+# Preview features
+preview = ["aranya-client/preview"]
+# Aranya Fast Channels
+afc = ["aranya-client/afc"]
+
+# Experimental features
+experimental = ["aranya-client/experimental"]
+# Aranya QUIC channels
+aqc = ["aranya-client/aqc"]
+
 
 [dependencies]
 aranya-client = { workspace = true }
@@ -46,3 +56,7 @@ aranya-capi-codegen = { workspace = true }
 anyhow = { workspace = true }
 quote = "1"
 syn = "2"
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["experimental", "preview"]

@@ -366,7 +366,7 @@ async fn test_add_team() -> Result<()> {
     }
 
     let admin_seed = owner
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
         .await?;
     devices
         .admin
@@ -466,7 +466,7 @@ async fn test_remove_team() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
-    let devices = DevicesCtx::new("test_multi_team").await?;
+    let devices = DevicesCtx::new("test_multi_team_sync").await?;
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -554,7 +554,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed1 = team1
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
         .await?;
     devices
         .admin
@@ -603,7 +603,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed2 = team2
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encoding)
+        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
         .await?;
     devices
         .admin

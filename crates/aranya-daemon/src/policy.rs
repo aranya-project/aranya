@@ -74,7 +74,6 @@ pub enum Effect {
 /// AfcBidiChannelCreated policy effect.
 #[effect]
 pub struct AfcBidiChannelCreated {
-    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub author_enc_key_id: Id,
@@ -82,11 +81,11 @@ pub struct AfcBidiChannelCreated {
     pub peer_enc_pk: Vec<u8>,
     pub label_id: Id,
     pub author_secret_id: Id,
+    pub channel_key_id: Id,
 }
 /// AfcBidiChannelReceived policy effect.
 #[effect]
 pub struct AfcBidiChannelReceived {
-    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub author_enc_pk: Vec<u8>,
@@ -98,7 +97,6 @@ pub struct AfcBidiChannelReceived {
 /// AfcUniChannelCreated policy effect.
 #[effect]
 pub struct AfcUniChannelCreated {
-    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub sender_id: Id,
@@ -106,12 +104,11 @@ pub struct AfcUniChannelCreated {
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label_id: Id,
-    pub author_secrets_id: Id,
+    pub channel_key_id: Id,
 }
 /// AfcUniChannelReceived policy effect.
 #[effect]
 pub struct AfcUniChannelReceived {
-    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub sender_id: Id,

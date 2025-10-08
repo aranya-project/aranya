@@ -84,10 +84,11 @@ where
             .context("should be able to compile policy")?;
         let machine = Machine::from_module(module).context("should be able to create machine")?;
 
-        // select which FFI moddules to use.
+        // select which FFI modules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(AqcFfi::new(store.try_clone()?)),
+            Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),

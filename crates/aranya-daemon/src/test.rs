@@ -1296,6 +1296,7 @@ async fn test_revoke_label_managing_role_requires_existing_fact() -> Result<()> 
     Ok(())
 }
 
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_assign_label_to_device_is_unique() -> Result<()> {
@@ -1577,6 +1578,7 @@ async fn test_assign_label_to_role_requires_can_use_aqc() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_revoke_label_from_device_requires_existing_fact() -> Result<()> {
@@ -1632,6 +1634,7 @@ async fn test_revoke_label_from_device_requires_existing_fact() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_assign_label_to_device_self_rejected() -> Result<()> {
@@ -1711,6 +1714,7 @@ async fn test_assign_label_to_device_requires_network_id() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_remove_device_invalidates_direct_labels() -> Result<()> {
@@ -1790,6 +1794,7 @@ async fn test_remove_device_invalidates_direct_labels() -> Result<()> {
 }
 
 /// Checks label reassignment after device removal bumps the generation.
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_assign_label_to_device_updates_after_readdition() -> Result<()> {
@@ -1907,6 +1912,7 @@ async fn test_assign_label_to_device_updates_after_readdition() -> Result<()> {
 }
 
 /// Rejects setting an AQC network name for unknown devices.
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_set_aqc_network_name_requires_existing_device() -> Result<()> {
@@ -1938,6 +1944,7 @@ async fn test_set_aqc_network_name_requires_existing_device() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_set_aqc_network_name_requires_permission() -> Result<()> {
@@ -1969,6 +1976,7 @@ async fn test_set_aqc_network_name_requires_permission() -> Result<()> {
 }
 
 /// Verifies removing a device clears its stored network identifier.
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_remove_device_clears_network_id() -> Result<()> {
@@ -2023,6 +2031,7 @@ async fn test_remove_device_clears_network_id() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_query_aqc_network_names_requires_active_team() -> Result<()> {
@@ -2081,6 +2090,7 @@ async fn test_terminate_team_requires_matching_id() -> Result<()> {
 }
 
 /// Requires AQC entries to exist before unsetting a member's network name.
+#[cfg(feature = "aqc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_unset_aqc_network_name_requires_existing_entry() -> Result<()> {

@@ -1,26 +1,16 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{
-    borrow::Borrow,
-    error, fmt,
-    hash::{Hash, Hasher},
-    net::SocketAddr,
-    ops::Deref,
-    time::Duration,
-};
-use std::collections::hash_map::{self, HashMap};
+use core::{borrow::Borrow, error, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
 
-use anyhow::bail;
-pub use aranya_crypto::aqc::CipherSuiteId;
+pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
-    aqc::{BidiPskId, UniPskId},
     custom_id,
     dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    EncryptionPublicKey, Engine, Id,
+    EncryptionPublicKey, Engine,
 };
 pub use aranya_policy_text::{text, InvalidText, Text};
 use aranya_util::{error::ReportExt, Addr};
@@ -28,8 +18,15 @@ use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
+pub mod afc;
+pub mod aqc;
 pub mod quic_sync;
-pub use quic_sync::*;
+
+#[cfg(feature = "afc")]
+pub use self::afc::*;
+#[cfg(feature = "aqc")]
+pub use self::aqc::*;
+pub use self::quic_sync::*;
 
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
@@ -123,7 +120,7 @@ pub struct Role {
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
-    pub encoding: Vec<u8>,
+    pub encryption: Vec<u8>,
 }
 
 impl fmt::Debug for KeyBundle {
@@ -131,7 +128,7 @@ impl fmt::Debug for KeyBundle {
         f.debug_struct("KeyBundle")
             .field("identity", &Hex::new(&*self.identity))
             .field("signing", &Hex::new(&*self.signing))
-            .field("encoding", &Hex::new(&*self.encoding))
+            .field("encryption", &Hex::new(&*self.encryption))
             .finish()
     }
 }
@@ -211,9 +208,6 @@ custom_id! {
     pub struct AqcUniChannelId;
 }
 
-/// A serialized command for AQC.
-pub type AqcCtrl = Vec<Box<[u8]>>;
-
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Ikm([u8; SEED_IKM_SIZE]);
@@ -291,348 +285,6 @@ impl fmt::Debug for Secret {
     }
 }
 
-macro_rules! psk_map {
-    (
-        $(#[$meta:meta])*
-        $vis:vis struct $name:ident(PskMap<$psk:ty>);
-    ) => {
-        $(#[$meta])*
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        #[cfg_attr(test, derive(PartialEq))]
-        $vis struct $name {
-            id: Id,
-            psks: HashMap<CsId, $psk>
-        }
-
-        impl $name {
-            /// Returns the number of PSKs.
-            pub fn len(&self) -> usize {
-                self.psks.len()
-            }
-
-            /// Reports whether `self` is empty.
-            pub fn is_empty(&self) -> bool {
-                self.psks.is_empty()
-            }
-
-            /// Returns the channel ID.
-            pub fn channel_id(&self) -> &Id {
-                &self.id
-            }
-
-            /// Returns the PSK for the cipher suite.
-            pub fn get(&self, suite: CipherSuiteId) -> Option<&$psk> {
-                self.psks.get(&CsId(suite))
-            }
-
-            /// Creates a PSK map from a function that generates
-            /// a PSK for a cipher suite.
-            pub fn try_from_fn<I, E, F>(id: I, mut f: F) -> anyhow::Result<Self>
-            where
-                I: Into<Id>,
-                anyhow::Error: From<E>,
-                F: FnMut(CipherSuiteId) -> Result<$psk, E>,
-            {
-                let id = id.into();
-                let mut psks = HashMap::new();
-                for &suite in CipherSuiteId::all() {
-                    let psk = f(suite)?;
-                    if !bool::from(psk.identity().channel_id().into_id().ct_eq(&id)) {
-                        bail!("PSK identity does not match channel ID");
-                    }
-                    psks.insert(CsId(suite), psk);
-                }
-                Ok(Self { id, psks })
-            }
-        }
-
-        impl IntoIterator for $name {
-            type Item = (CipherSuiteId, $psk);
-            type IntoIter = IntoPsks<$psk>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                IntoPsks {
-                    iter: self.psks.into_iter(),
-                }
-            }
-        }
-
-        #[cfg(test)]
-        impl tests::PskMap for $name {
-            type Psk = $psk;
-
-            fn new() -> Self {
-                Self {
-                    // TODO
-                    id: Id::default(),
-                    psks: HashMap::new(),
-                }
-            }
-
-            fn len(&self) -> usize {
-                self.psks.len()
-            }
-
-            fn insert(&mut self, psk: Self::Psk) {
-                let suite = psk.cipher_suite();
-                let opt = self.psks.insert(CsId(suite), psk);
-                assert!(opt.is_none());
-            }
-        }
-    };
-}
-psk_map! {
-    /// An injective mapping of PSKs to cipher suites for
-    /// a single bidirectional channel.
-    pub struct AqcBidiPsks(PskMap<AqcBidiPsk>);
-}
-
-psk_map! {
-    /// An injective mapping of PSKs to cipher suites for
-    /// a single unidirectional channel.
-    pub struct AqcUniPsks(PskMap<AqcUniPsk>);
-}
-
-/// An injective mapping of PSKs to cipher suites for a single
-/// bidirectional or unidirectional channel.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum AqcPsks {
-    Bidi(AqcBidiPsks),
-    Uni(AqcUniPsks),
-}
-
-impl IntoIterator for AqcPsks {
-    type IntoIter = AqcPsksIntoIter;
-    type Item = <Self::IntoIter as Iterator>::Item;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            AqcPsks::Bidi(psks) => AqcPsksIntoIter::Bidi(psks.into_iter()),
-            AqcPsks::Uni(psks) => AqcPsksIntoIter::Uni(psks.into_iter()),
-        }
-    }
-}
-
-/// An iterator over an AQC channel's PSKs.
-#[derive(Debug)]
-pub enum AqcPsksIntoIter {
-    Bidi(IntoPsks<AqcBidiPsk>),
-    Uni(IntoPsks<AqcUniPsk>),
-}
-
-impl Iterator for AqcPsksIntoIter {
-    type Item = (CipherSuiteId, AqcPsk);
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            AqcPsksIntoIter::Bidi(it) => it.next().map(|(s, k)| (s, AqcPsk::Bidi(k))),
-            AqcPsksIntoIter::Uni(it) => it.next().map(|(s, k)| (s, AqcPsk::Uni(k))),
-        }
-    }
-}
-
-/// An iterator over an AQC channel's PSKs.
-#[derive(Debug)]
-pub struct IntoPsks<V> {
-    iter: hash_map::IntoIter<CsId, V>,
-}
-
-impl<V> Iterator for IntoPsks<V> {
-    type Item = (CipherSuiteId, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|(k, v)| (k.0, v))
-    }
-}
-
-// TODO(eric): Get rid of this once `CipherSuiteId` implements
-// `Hash`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(transparent)]
-struct CsId(CipherSuiteId);
-
-impl Hash for CsId {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.to_bytes().hash(state);
-    }
-}
-
-/// An AQC PSK.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum AqcPsk {
-    /// Bidirectional.
-    Bidi(AqcBidiPsk),
-    /// Unidirectional.
-    Uni(AqcUniPsk),
-}
-
-impl AqcPsk {
-    /// Returns the PSK identity.
-    #[inline]
-    pub fn identity(&self) -> AqcPskId {
-        match self {
-            Self::Bidi(psk) => AqcPskId::Bidi(psk.identity),
-            Self::Uni(psk) => AqcPskId::Uni(psk.identity),
-        }
-    }
-
-    /// Returns the PSK cipher suite.
-    #[inline]
-    pub fn cipher_suite(&self) -> CipherSuiteId {
-        self.identity().cipher_suite()
-    }
-
-    /// Returns the PSK secret.
-    #[inline]
-    pub fn secret(&self) -> &[u8] {
-        match self {
-            Self::Bidi(psk) => psk.secret.raw_secret_bytes(),
-            Self::Uni(psk) => match &psk.secret {
-                Directed::Send(secret) | Directed::Recv(secret) => secret.raw_secret_bytes(),
-            },
-        }
-    }
-}
-
-impl From<AqcBidiPsk> for AqcPsk {
-    fn from(psk: AqcBidiPsk) -> Self {
-        Self::Bidi(psk)
-    }
-}
-
-impl From<AqcUniPsk> for AqcPsk {
-    fn from(psk: AqcUniPsk) -> Self {
-        Self::Uni(psk)
-    }
-}
-
-impl ConstantTimeEq for AqcPsk {
-    fn ct_eq(&self, other: &Self) -> Choice {
-        // It's fine that matching discriminants isn't constant
-        // time since it isn't secret data.
-        match (self, other) {
-            (Self::Bidi(lhs), Self::Bidi(rhs)) => lhs.ct_eq(rhs),
-            (Self::Uni(lhs), Self::Uni(rhs)) => lhs.ct_eq(rhs),
-            _ => Choice::from(0u8),
-        }
-    }
-}
-
-/// An AQC bidirectional channel PSK.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AqcBidiPsk {
-    /// The PSK identity.
-    pub identity: BidiPskId,
-    /// The PSK's secret.
-    pub secret: Secret,
-}
-
-impl AqcBidiPsk {
-    fn identity(&self) -> &BidiPskId {
-        &self.identity
-    }
-
-    #[cfg(test)]
-    fn cipher_suite(&self) -> CipherSuiteId {
-        self.identity.cipher_suite()
-    }
-}
-
-impl ConstantTimeEq for AqcBidiPsk {
-    fn ct_eq(&self, other: &Self) -> Choice {
-        let id = self.identity.ct_eq(&other.identity);
-        let secret = self.secret.ct_eq(&other.secret);
-        id & secret
-    }
-}
-
-impl ZeroizeOnDrop for AqcBidiPsk {}
-
-/// An AQC unidirectional PSK.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AqcUniPsk {
-    /// The PSK identity.
-    pub identity: UniPskId,
-    /// The PSK's secret.
-    pub secret: Directed<Secret>,
-}
-
-impl AqcUniPsk {
-    fn identity(&self) -> &UniPskId {
-        &self.identity
-    }
-
-    #[cfg(test)]
-    fn cipher_suite(&self) -> CipherSuiteId {
-        self.identity.cipher_suite()
-    }
-}
-
-impl ConstantTimeEq for AqcUniPsk {
-    fn ct_eq(&self, other: &Self) -> Choice {
-        let id = self.identity.ct_eq(&other.identity);
-        let secret = self.secret.ct_eq(&other.secret);
-        id & secret
-    }
-}
-
-impl ZeroizeOnDrop for AqcUniPsk {}
-
-/// Either send only or receive only.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Directed<T> {
-    /// Send only.
-    Send(T),
-    /// Receive only.
-    Recv(T),
-}
-
-impl<T: ConstantTimeEq> ConstantTimeEq for Directed<T> {
-    fn ct_eq(&self, other: &Self) -> Choice {
-        // It's fine that matching discriminants isn't constant
-        // time since the direction isn't secret data.
-        match (self, other) {
-            (Self::Send(lhs), Self::Send(rhs)) => lhs.ct_eq(rhs),
-            (Self::Recv(lhs), Self::Recv(rhs)) => lhs.ct_eq(rhs),
-            _ => Choice::from(0u8),
-        }
-    }
-}
-
-/// An AQC PSK identity.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum AqcPskId {
-    /// A bidirectional PSK.
-    Bidi(BidiPskId),
-    /// A unidirectional PSK.
-    Uni(UniPskId),
-}
-
-impl AqcPskId {
-    /// Returns the unique channel ID.
-    pub fn channel_id(&self) -> Id {
-        match self {
-            Self::Bidi(v) => (*v.channel_id()).into(),
-            Self::Uni(v) => (*v.channel_id()).into(),
-        }
-    }
-
-    /// Returns the cipher suite.
-    pub fn cipher_suite(&self) -> CipherSuiteId {
-        match self {
-            Self::Bidi(v) => v.cipher_suite(),
-            Self::Uni(v) => v.cipher_suite(),
-        }
-    }
-
-    /// Converts the ID to its byte encoding.
-    pub fn as_bytes(&self) -> &[u8; 34] {
-        match self {
-            Self::Bidi(v) => v.as_bytes(),
-            Self::Uni(v) => v.as_bytes(),
-        }
-    }
-}
-
 /// Configuration values for syncing with a peer
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SyncPeerConfig {
@@ -654,6 +306,29 @@ pub enum ChanOp {
     /// The device can send and receive data in channels with this
     /// label.
     SendRecv,
+}
+
+// TODO(jdygert): tarpc does not cfg return types properly.
+#[cfg(not(feature = "aqc"))]
+use aqc_stub::{AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks};
+#[cfg(not(feature = "aqc"))]
+mod aqc_stub {
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    pub enum Never {}
+    pub type AqcCtrl = Never;
+    pub type AqcPsks = Never;
+    pub type AqcBidiPsks = Never;
+    pub type AqcUniPsks = Never;
+}
+#[cfg(not(feature = "afc"))]
+use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
+#[cfg(not(feature = "afc"))]
+mod afc_stub {
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    pub enum Never {}
+    pub type AfcCtrl = Never;
+    pub type AfcShmInfo = Never;
+    pub type AfcChannelId = Never;
 }
 
 #[tarpc::service]
@@ -808,10 +483,16 @@ pub trait DaemonApi {
     //
 
     /// Assign a QUIC channels network identifier to a device.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn assign_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
     /// Remove a QUIC channels network identifier from a device.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn remove_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
     /// Returns a device's AQC network identifier.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn aqc_net_id(team: TeamId, device: DeviceId) -> Result<Option<NetIdentifier>>;
 
     //
@@ -819,25 +500,28 @@ pub trait DaemonApi {
     //
 
     /// Creates an AQC bidi channel.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn create_aqc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcBidiPsks)>;
-    /// Deletes an AQC bidi channel.
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
-
-    //
-    // AQC uni channels
-    //
-
-    /// Creates an AQC uni channel.
+    /// Create a unidirectional QUIC channel.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcUniPsks)>;
-    /// Deletes an AQC uni channel.
+    /// Delete a QUIC bidi channel.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
+    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
+    /// Delete a QUIC uni channel.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
 
     //
@@ -845,91 +529,47 @@ pub trait DaemonApi {
     //
 
     /// Receive AQC ctrl message.
+    #[cfg(feature = "aqc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
-}
 
-#[cfg(test)]
-mod tests {
-    use aranya_crypto::Rng;
-    use serde::de::DeserializeOwned;
-
-    use super::*;
-
-    fn secret(secret: &[u8]) -> Secret {
-        Secret(Box::from(secret))
-    }
-
-    pub(super) trait PskMap:
-        fmt::Debug + PartialEq + Serialize + DeserializeOwned + Sized
-    {
-        type Psk;
-        fn new() -> Self;
-        /// Returns the number of PSKs in the map.
-        fn len(&self) -> usize;
-        /// Adds `psk` to the map.
-        ///
-        /// # Panics
-        ///
-        /// Panics if `psk` already exists.
-        fn insert(&mut self, psk: Self::Psk);
-    }
-
-    impl PartialEq for AqcBidiPsk {
-        fn eq(&self, other: &Self) -> bool {
-            bool::from(self.ct_eq(other))
-        }
-    }
-    impl PartialEq for AqcUniPsk {
-        fn eq(&self, other: &Self) -> bool {
-            bool::from(self.ct_eq(other))
-        }
-    }
-    impl PartialEq for AqcPsk {
-        fn eq(&self, other: &Self) -> bool {
-            bool::from(self.ct_eq(other))
-        }
-    }
-
-    #[track_caller]
-    fn psk_map_test<M, F>(name: &'static str, mut f: F)
-    where
-        M: PskMap,
-        F: FnMut(Secret, Id, CipherSuiteId) -> M::Psk,
-    {
-        let mut psks = M::new();
-        for (i, &suite) in CipherSuiteId::all().iter().enumerate() {
-            let id = Id::random(&mut Rng);
-            let secret = secret(&i.to_le_bytes());
-            psks.insert(f(secret, id, suite));
-        }
-        assert_eq!(psks.len(), CipherSuiteId::all().len(), "{name}");
-
-        let bytes = postcard::to_allocvec(&psks).unwrap();
-        let got = postcard::from_bytes::<M>(&bytes).unwrap();
-        assert_eq!(got, psks, "{name}")
-    }
-
-    /// Test that we can correctly serialize and deserialize
-    /// [`AqcBidiPsk`].
-    #[test]
-    fn test_aqc_bidi_psks_serde() {
-        psk_map_test::<AqcBidiPsks, _>("AqcBidiPsk", |secret, id, suite| AqcBidiPsk {
-            identity: BidiPskId::from((id.into(), suite)),
-            secret,
-        });
-    }
-
-    /// Test that we can correctly serialize and deserialize
-    /// [`AqcUniPsk`].
-    #[test]
-    fn test_aqc_uni_psks_serde() {
-        psk_map_test::<AqcUniPsks, _>("AqcUniPsk (send)", |secret, id, suite| AqcUniPsk {
-            identity: UniPskId::from((id.into(), suite)),
-            secret: Directed::Send(secret),
-        });
-        psk_map_test::<AqcUniPsks, _>("AqcUniPsk (recv)", |secret, id, suite| AqcUniPsk {
-            identity: UniPskId::from((id.into(), suite)),
-            secret: Directed::Recv(secret),
-        });
-    }
+    /// Gets AFC shared-memory configuration info.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn afc_shm_info() -> Result<AfcShmInfo>;
+    /// Create a bidirectional AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn create_afc_bidi_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    /// Create a unidirectional AFC send-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn create_afc_uni_send_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    /// Create a unidirectional AFC receive-only channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn create_afc_uni_recv_channel(
+        team: TeamId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    /// Delete a AFC channel.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
+    /// Receive AFC ctrl message.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+    async fn receive_afc_ctrl(
+        team: TeamId,
+        ctrl: AfcCtrl,
+    ) -> Result<(LabelId, AfcChannelId, ChanOp)>;
 }

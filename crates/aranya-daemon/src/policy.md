@@ -4203,6 +4203,17 @@ function chan_op_rank(op enum ChanOp) int {
 
 #### AFC Bidirectional Channel Creation
 
+Creates a bidirectional AFC channel for off-graph messaging. This is an
+ephemeral command, which means that it can only be emitted within an
+ephemeral session so that it is not added to the graph of commands.
+Furthermore, it cannot persist any changes to the factDB.
+
+The `create_afc_bidi_channel` action creates the `ChannelKeys`,
+encapsulates them for the peer and the author, and sends the
+encapsulations through the `AfcCreateBidiChannel` command. When
+processing the command, the device will decapsulate their keys and store
+them in the shared memory DB.
+
 ```policy
 ephemeral action create_afc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
@@ -4219,15 +4230,12 @@ ephemeral action create_afc_bidi_channel(peer_id id, label_id id) {
         label_id,
     )
 
-    /* TODO: need to update afc-util
     publish AfcCreateBidiChannel {
-        channel_id: ch.channel_id,
         peer_id: peer_id,
         label_id: label_id,
         peer_encap: ch.peer_encap,
-        author_secrets_id: ch.author_secrets_id,
+        channel_key_id: ch.key_id,
     }
-    */
 }
 
 // Reports whether the devices have permission to create
@@ -4267,8 +4275,6 @@ function can_create_afc_bidi_channel(device1 id, device2 id, label_id id) bool {
 // Emitted when the author of a bidirectional AFC channel
 // successfully processes the `AfcCreateBidiChannel` command.
 effect AfcBidiChannelCreated {
-    // Uniquely identifies the channel.
-    channel_id id,
     // The unique ID of the previous command.
     parent_cmd_id id,
     // The channel author's device ID.
@@ -4284,13 +4290,13 @@ effect AfcBidiChannelCreated {
     // A unique ID that the author can use to look up the
     // channel's secrets.
     author_secret_id id,
+    // The channel key ID.
+    channel_key_id id,
 }
 
 // Emitted when the peer of a bidirectional AFC channel
 // successfully processes the `AfcCreateBidiChannel` command.
 effect AfcBidiChannelReceived {
-    // Uniquely identifies the channel.
-    channel_id id,
     // The unique ID of the previous command.
     parent_cmd_id id,
     // The channel author's device ID.
@@ -4309,17 +4315,14 @@ effect AfcBidiChannelReceived {
 
 ephemeral command AfcCreateBidiChannel {
     fields {
-        // Uniquely identifies the channel.
-        channel_id id,
         // The channel peer's device ID.
         peer_id id,
         // The label applied to the channel.
         label_id id,
         // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
-        // A unique ID that the author can use to look up the
-        // channel's secrets.
-        author_secret_id id,
+        // The channel key ID.
+        channel_key_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -4348,14 +4351,13 @@ ephemeral command AfcCreateBidiChannel {
 
             finish {
                 emit AfcBidiChannelCreated {
-                    channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.device_id,
                     author_enc_key_id: author.enc_key_id,
                     peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
-                    author_secret_id: this.author_secret_id,
+                    channel_key_id: this.channel_key_id,
                 }
             }
         } else if current_device_id == peer.device_id {
@@ -4364,7 +4366,6 @@ ephemeral command AfcCreateBidiChannel {
 
             finish {
                 emit AfcBidiChannelReceived {
-                    channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.device_id,
                     author_enc_pk: author_enc_pk,
@@ -4385,7 +4386,16 @@ ephemeral command AfcCreateBidiChannel {
 
 #### AFC Unidirectional Channel Creation
 
-Creates a unidirectional AFC channel for off-graph messaging.
+Creates a unidirectional AFC channel. This is an ephemeral command,
+which means that it can only be emitted within an ephemeral session and
+is not added to the graph of commands. Furthermore, it does not persist
+any changes to the factDB.
+
+The `create_afc_uni_channel` action creates the `ChannelKey`,
+encapsulates it for the peer, and sends the encapsulation through the
+`AfcCreateUniChannel` command. When processing the command, the
+corresponding recipient will decapsulate their key and store it in the
+shared memory DB.
 
 ```policy
 ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
@@ -4403,23 +4413,18 @@ ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id i
         label_id,
     )
 
-    /* TODO: need to update afc-util
     publish AfcCreateUniChannel {
-        channel_id: channel_id,
         sender_id: sender_id,
         receiver_id: receiver_id,
         label_id: label_id,
         peer_encap: ch.peer_encap,
-        author_secrets_id: ch.author_secrets_id,
+        channel_key_id: ch.key_id,
     }
-    */
 }
 
 // Emitted when the author of a unidirectional AFC channel
 // successfully processes the `AfcCreateUniChannel` command.
 effect AfcUniChannelCreated {
-    // Uniquely identifies the channel.
-    channel_id id,
     // The unique ID of the previous command.
     parent_cmd_id id,
     // The channel author's device ID.
@@ -4434,16 +4439,13 @@ effect AfcUniChannelCreated {
     peer_enc_pk bytes,
     // The channel label.
     label_id id,
-    // A unique ID that the author can use to look up the
-    // channel's secrets.
-    author_secrets_id id,
+    // The channel key ID.
+    channel_key_id id,
 }
 
 // Emitted when the peer of a unidirectional AFC channel
 // successfully processes the `AfcCreateUniChannel` command.
 effect AfcUniChannelReceived {
-    // Uniquely identifies the channel.
-    channel_id id,
     // The unique ID of the previous command.
     parent_cmd_id id,
     // The channel author's device ID.
@@ -4464,8 +4466,6 @@ effect AfcUniChannelReceived {
 
 ephemeral command AfcCreateUniChannel {
     fields {
-        // Uniquely identifies the channel.
-        channel_id id,
         // The device ID of the participant that can send data.
         sender_id id,
         // The device ID of the participant that can receive
@@ -4473,11 +4473,10 @@ ephemeral command AfcCreateUniChannel {
         receiver_id id,
         // The label applied to the channel.
         label_id id,
-        // A unique ID that the author can use to look up the
-        // channel's secrets.
-        author_secrets_id id,
         // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
+        // The ID of the AFC channel key.
+        channel_key_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -4505,7 +4504,7 @@ ephemeral command AfcCreateUniChannel {
         let label = check_unwrap query Label[label_id: this.label_id]
 
         // Check that both devices have been granted permission
-        // to use the label for their respective direcitons.
+        // to use the label for their respective directions.
         check can_create_afc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
@@ -4517,7 +4516,6 @@ ephemeral command AfcCreateUniChannel {
 
             finish {
                 emit AfcUniChannelCreated {
-                    channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.device_id,
                     sender_id: this.sender_id,
@@ -4525,7 +4523,6 @@ ephemeral command AfcCreateUniChannel {
                     author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
-                    author_secrets_id: this.author_secrets_id,
                 }
             }
         } else if current_device_id == peer.device_id {
@@ -4534,7 +4531,6 @@ ephemeral command AfcCreateUniChannel {
 
             finish {
                 emit AfcUniChannelReceived {
-                    channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.device_id,
                     sender_id: this.sender_id,
@@ -4762,11 +4758,13 @@ ephemeral action query_aqc_net_id(device_id id) {
 }
 
 effect QueryAqcNetIdResult {
+    // Network name assigned to the device.
     net_id optional string,
 }
 
 ephemeral command QueryAqcNetId {
     fields {
+        // ID of device whose network name is being queried.
         device_id id,
     }
 
@@ -4807,13 +4805,17 @@ ephemeral action query_aqc_network_names() {
 }
 
 effect QueryAqcNetworkNamesResult {
+    // AQC network name assigned to device.
     net_id string,
+    // Device ID of the device with assigned network name.
     device_id id,
 }
 
 ephemeral command QueryAqcNetworkNames {
     fields {
+        // AQC network name assigned to device.
         net_id string,
+        // Device ID of device with assigned network name.
         device_id id,
     }
 
@@ -5179,7 +5181,7 @@ ephemeral command AqcCreateUniChannel {
         let label = check_unwrap query Label[label_id: this.label_id]
 
         // Check that both devices have been granted permission
-        // to use the label for their respective direcitons.
+        // to use the label for their respective directions.
         check can_create_aqc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
