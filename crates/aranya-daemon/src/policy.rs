@@ -187,6 +187,7 @@ pub struct LabelDeleted {
 /// LabelRevoked policy effect.
 #[effect]
 pub struct LabelRevoked {
+    pub device_id: Id,
     pub label_id: Id,
     pub label_name: Text,
     pub label_author_id: Id,

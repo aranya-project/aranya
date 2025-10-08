@@ -1953,6 +1953,7 @@ command RevokeLabel {
             delete AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
             emit LabelRevoked {
+                device_id: target.device_id,
                 label_id: label.label_id,
                 label_name: label.name,
                 label_author_id: label.author_id,
@@ -1965,6 +1966,8 @@ command RevokeLabel {
 // The effect emitted when the `RevokeLabel` command is
 // successfully processed.
 effect LabelRevoked {
+    // The target device.
+    device_id id,
     // The ID of the label that was revoked.
     label_id id,
     // The name of the label that was revoked.

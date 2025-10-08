@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
 use aranya_crypto::{CipherSuite, DeviceId, Engine, KeyStore, Rng};
-use aranya_daemon_api::{self as api};
+use aranya_daemon_api::{self as api, LabelId};
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId,
@@ -190,6 +190,14 @@ where
             .write
             .remove(channel_id)
             .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
+    }
+
+    pub(crate) async fn label_deleted(&self, label_id: LabelId) -> Result<()> {
+        let shm = self.shm.lock().await;
+
+        shm.write
+            .remove_if(|_channel_id, chan_label| chan_label == label_id.into_id().into())
+            .map_err(|err| anyhow!("unable to remove AFC channels with label ID: {err}"))
     }
 
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
