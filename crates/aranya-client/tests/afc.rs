@@ -218,7 +218,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     Ok(())
 }
 
-/// Demonstrate revoking a label from a unidirectional AFC channel.
+/// Demonstrate revoking a label from devices deletes the channel.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_revoke_label() -> Result<()> {
