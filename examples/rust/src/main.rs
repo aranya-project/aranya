@@ -510,10 +510,30 @@ async fn main() -> Result<()> {
         bail!("expected a bidirectional receive channel");
     };
     info!("memberb opening data from membera");
-    recv.open(&mut plaintext, &ciphertext)
+    let seq1 = recv
+        .open(&mut plaintext, &ciphertext)
         .expect("expected to open afc data");
     info!(?plaintext, "memberb opened data from membera");
     assert_eq!(afc_msg, plaintext);
+
+    // seal/open again to get a new sequence number.
+    send.seal(&mut ciphertext, &afc_msg)
+        .expect("expected to seal afc data");
+    info!(?afc_msg, "membera sealed data for memberb");
+    let seq2 = recv
+        .open(&mut plaintext, &ciphertext)
+        .expect("expected to open afc data");
+    info!(?plaintext, "memberb opened data from membera");
+    assert_eq!(afc_msg, plaintext);
+
+    // AFC sequence numbers should be ascending.
+    assert!(seq2 > seq1);
+
+    // delete the channels
+    info!("deleting afc channels");
+    send.delete().await?;
+    recv.delete().await?;
+    info!("deleted afc channels");
 
     info!("completed afc demo");
 
