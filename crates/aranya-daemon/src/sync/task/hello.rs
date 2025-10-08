@@ -3,7 +3,6 @@
 //! This module handles subscription management and broadcasting of hello notifications
 //! when graph heads change, allowing peers to stay synchronized.
 
-use core::net::SocketAddr;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -41,7 +40,7 @@ pub struct HelloSubscription {
 
 /// Type alias for hello subscription storage
 /// Maps from (team_id, subscriber_address) to subscription details
-pub type HelloSubscriptions = HashMap<(GraphId, SocketAddr), HelloSubscription>;
+pub type HelloSubscriptions = HashMap<(GraphId, Addr), HelloSubscription>;
 
 /// Hello-related information combining subscriptions and sync peers.
 #[derive(Debug, Clone)]
@@ -93,10 +92,8 @@ pub async fn broadcast_hello_notifications(
         }
 
         // Send the notification
-        // Convert SocketAddr to Addr for the syncer method
-        let peer_addr = Addr::from(*subscriber_addr);
         match syncer
-            .send_hello_notification_to_subscriber(&peer_addr, graph_id, head)
+            .send_hello_notification_to_subscriber(subscriber_addr, graph_id, head)
             .await
         {
             Ok(()) => {
@@ -355,20 +352,6 @@ where
                 duration_milliseconds,
                 address,
             } => {
-                // Use the subscriber server address directly from the message
-                // Convert Addr to SocketAddr for the subscription storage
-                let subscriber_address = match address.host().parse() {
-                    Ok(ip) => SocketAddr::new(ip, address.port()),
-                    Err(e) => {
-                        warn!(
-                            error = %e,
-                            ?address,
-                            "Failed to parse subscriber address, ignoring subscription"
-                        );
-                        return;
-                    }
-                };
-
                 // Calculate expiration time
                 let expires_at = Instant::now() + Duration::from_millis(duration_milliseconds);
 
@@ -379,7 +362,7 @@ where
                 };
 
                 // Store subscription (replaces any existing subscription for this peer+team)
-                let key = (graph_id, subscriber_address);
+                let key = (graph_id, address);
 
                 let mut subscriptions = hello_subscriptions.lock().await;
                 subscriptions.insert(key, subscription);
@@ -392,33 +375,19 @@ where
                     "Received Unsubscribe hello message"
                 );
 
-                // Use the address from the message
-                // Convert Addr to SocketAddr for the subscription lookup
-                let subscriber_address = match address.host().parse() {
-                    Ok(ip) => SocketAddr::new(ip, address.port()),
-                    Err(e) => {
-                        warn!(
-                            error = %e,
-                            ?address,
-                            "Failed to parse subscriber address, ignoring unsubscribe"
-                        );
-                        return;
-                    }
-                };
-
                 // Remove subscription for this peer and team
-                let key = (graph_id, subscriber_address);
+                let key = (graph_id, address);
                 let mut subscriptions = hello_subscriptions.lock().await;
                 if subscriptions.remove(&key).is_some() {
                     debug!(
                         team_id = ?active_team,
-                        ?subscriber_address,
+                        ?address,
                         "Removed hello subscription successfully"
                     );
                 } else {
                     debug!(
                         team_id = ?active_team,
-                        ?subscriber_address,
+                        ?address,
                         "No subscription found to remove"
                     );
                 }
@@ -434,24 +403,15 @@ where
 
                 // Check if we have this command in our graph
                 let command_exists = {
-                    let mut aranya = match client.aranya.try_lock() {
-                        Ok(lock) => lock,
-                        Err(_) => client.aranya.lock().await,
-                    };
+                    let mut aranya = client.aranya.lock().await;
                     aranya.command_exists(graph_id, head)
                 };
 
                 if !command_exists {
-                    // Use the address from the Hello message for sync_on_hello
-                    let server_addr_for_sync = address;
-
-                    match sync_peers
-                        .sync_on_hello(server_addr_for_sync, graph_id)
-                        .await
-                    {
+                    match sync_peers.sync_on_hello(address, graph_id).await {
                         Ok(()) => {
                             debug!(
-                                ?server_addr_for_sync,
+                                ?address,
                                 ?peer_addr,
                                 ?graph_id,
                                 ?head,
@@ -462,7 +422,7 @@ where
                             warn!(
                                 error = %e,
                                 ?head,
-                                ?server_addr_for_sync,
+                                ?address,
                                 ?peer_addr,
                                 ?graph_id,
                                 "Failed to send sync_on_hello message"

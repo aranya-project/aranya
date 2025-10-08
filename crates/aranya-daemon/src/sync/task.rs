@@ -356,6 +356,10 @@ impl<ST: SyncState> Syncer<ST> {
                                     }
                                 }
                             } else {
+                                trace!(
+                                    ?peer,
+                                    "SyncOnHello is not enabled for this peer, ignoring"
+                                );
                                 Ok(())
                             }
                         } else {
