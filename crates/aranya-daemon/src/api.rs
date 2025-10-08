@@ -119,6 +119,9 @@ impl DaemonApiServer {
         }: DaemonApiServerArgs,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
+        let uds_path = uds_path
+            .canonicalize()
+            .context("could not canonicalize uds_path")?;
         #[cfg(feature = "aqc")]
         let aqc = aqc.map(Arc::new);
         #[cfg(feature = "afc")]
@@ -960,10 +963,7 @@ impl DaemonApi for Api {
         let channel_id = self.afc.bidi_channel_created(e).await?;
         info!("afc bidi channel created");
 
-        let ctrl = ctrl
-            .first()
-            .ok_or(anyhow!("too many ctrl commands"))?
-            .clone();
+        let ctrl = get_afc_ctrl(ctrl)?;
 
         Ok((ctrl, channel_id))
     }
@@ -1001,10 +1001,7 @@ impl DaemonApi for Api {
         let channel_id = self.afc.uni_channel_created(e).await?;
         info!("afc uni channel created");
 
-        let ctrl = ctrl
-            .first()
-            .ok_or(anyhow!("too many ctrl commands"))?
-            .clone();
+        let ctrl = get_afc_ctrl(ctrl)?;
 
         Ok((ctrl, channel_id))
     }
@@ -1042,10 +1039,7 @@ impl DaemonApi for Api {
         let channel_id = self.afc.uni_channel_created(e).await?;
         info!("afc uni channel created");
 
-        let ctrl = ctrl
-            .first()
-            .ok_or(anyhow!("too many ctrl commands"))?
-            .clone();
+        let ctrl = get_afc_ctrl(ctrl)?;
 
         Ok((ctrl, channel_id))
     }
@@ -1496,4 +1490,15 @@ impl From<ChanOp> for api::ChanOp {
             ChanOp::SendOnly => api::ChanOp::SendOnly,
         }
     }
+}
+
+/// Extract a single command from the session commands to get the AFC control message.
+#[cfg(feature = "afc")]
+fn get_afc_ctrl(cmds: Vec<Box<[u8]>>) -> anyhow::Result<Box<[u8]>> {
+    let mut cmds = cmds.into_iter();
+    let msg = cmds.next().context("missing AFC control message")?;
+    if cmds.next().is_some() {
+        anyhow::bail!("too many commands for AFC control message");
+    }
+    Ok(msg)
 }
