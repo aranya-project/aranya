@@ -16,20 +16,9 @@ pub(crate) use team::*;
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
-    daemon_addr: *const c_char,
+    pub daemon_addr: *const c_char,
     #[cfg(feature = "aqc")]
-    aqc: AqcConfig,
-}
-
-impl ClientConfig {
-    pub(crate) fn daemon_addr(&self) -> *const c_char {
-        self.daemon_addr
-    }
-
-    #[cfg(feature = "aqc")]
-    pub(crate) fn aqc_addr(&self) -> *const c_char {
-        self.aqc.addr
-    }
+    pub aqc: Option<AqcConfig>,
 }
 
 impl Typed for ClientConfig {
@@ -73,16 +62,10 @@ impl Builder for ClientConfigBuilder {
             return Err(InvalidArg::new("daemon_addr", "field not set").into());
         }
 
-        #[cfg(feature = "aqc")]
-        let Some(aqc) = self.aqc
-        else {
-            return Err(InvalidArg::new("aqc", "field not set").into());
-        };
-
         let cfg = ClientConfig {
             daemon_addr: self.daemon_addr,
             #[cfg(feature = "aqc")]
-            aqc,
+            aqc: self.aqc,
         };
         Self::Output::init(out, cfg);
         Ok(())
