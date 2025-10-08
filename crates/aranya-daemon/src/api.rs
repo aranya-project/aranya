@@ -383,15 +383,16 @@ impl EffectHandler {
     #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
     async fn broadcast_push_notifications(&self, graph_id: GraphId) -> anyhow::Result<()> {
         if let Some(peers) = &self.peers {
-            info!(?graph_id, "Calling peers.broadcast_push");
+            info!(?graph_id, "🔔 EffectHandler calling peers.broadcast_push");
             peers
                 .broadcast_push(graph_id)
                 .await
                 .context("failed to broadcast push notifications")?;
+            info!(?graph_id, "🔔 EffectHandler peers.broadcast_push completed");
         } else {
-            trace!(
+            warn!(
                 ?graph_id,
-                "No peers interface available for push broadcasting"
+                "⚠️ No peers interface available for push broadcasting"
             );
         }
         Ok(())
@@ -572,6 +573,15 @@ impl DaemonApi for Api {
         max_bytes: u64,
         commands: Vec<Address>,
     ) -> api::Result<()> {
+        info!(
+            ?peer,
+            ?team,
+            remain_open,
+            max_bytes,
+            commands_len = commands.len(),
+            "📮 API: sync_push_subscribe called"
+        );
+
         self.check_team_valid(team).await?;
 
         let commands = commands.into_iter().map(|addr| addr).collect();
@@ -584,6 +594,8 @@ impl DaemonApi for Api {
                 commands,
             )
             .await?;
+
+        info!(?peer, ?team, "📮 API: sync_push_subscribe completed");
         Ok(())
     }
 

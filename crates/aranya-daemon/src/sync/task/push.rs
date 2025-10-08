@@ -55,6 +55,7 @@ pub async fn broadcast_push_notifications(
     // Get all subscribers for this graph
     let subscribers = {
         let subscriptions = syncer.state.push_subscriptions().lock().await;
+        let total_subs = subscriptions.len();
 
         let filtered: Vec<_> = subscriptions
             .iter()
@@ -62,11 +63,25 @@ pub async fn broadcast_push_notifications(
             .map(|((_, addr), subscription)| (*addr, subscription.clone()))
             .collect();
 
+        tracing::info!(
+            ?graph_id,
+            total_subscriptions = total_subs,
+            filtered_subscribers = filtered.len(),
+            "📡 broadcast_push_notifications: Found subscribers for graph"
+        );
+
         filtered
     };
 
     // Send push notification to each subscriber
     for (subscriber_addr, subscription) in subscribers.iter() {
+        tracing::info!(
+            ?subscriber_addr,
+            ?graph_id,
+            remaining_bytes = subscription.remaining_bytes,
+            "📤 Processing subscriber for push notification"
+        );
+        
         // Check if subscription has expired
         if Instant::now() >= subscription.close_time || subscription.remaining_bytes == 0 {
             // Remove expired subscription
@@ -103,10 +118,12 @@ pub async fn broadcast_push_notifications(
         let mut response_syncer = SyncResponder::new(syncer.server_addr);
 
         // Prepare the sync request with the subscriber's cached heads
+        // Use the subscription's remaining bytes as the max_bytes limit
+        let max_bytes = subscription.remaining_bytes.min(MAX_SYNC_MESSAGE_SIZE as u64);
         let sync_request = SyncRequestMessage::SyncRequest {
             session_id,
             storage_id: graph_id,
-            max_bytes: 0,
+            max_bytes,
             commands,
         };
 
@@ -128,7 +145,16 @@ pub async fn broadcast_push_notifications(
         let len = {
             let mut aranya = syncer.client.aranya.lock().await;
             match response_syncer.push(&mut target, aranya.provider()) {
-                Ok(len) => len,
+                Ok(len) => {
+                    tracing::info!(
+                        ?subscriber_addr,
+                        ?graph_id,
+                        len,
+                        max_bytes,
+                        "📦 response_syncer.push() returned"
+                    );
+                    len
+                }
                 Err(e) => {
                     warn!(
                         error = %e,
@@ -143,13 +169,20 @@ pub async fn broadcast_push_notifications(
 
         // Only send if there's data to send
         if len == 0 {
-            debug!(
+            tracing::info!(
                 ?subscriber_addr,
                 ?graph_id,
-                "No new data to push to subscriber"
+                "⚠️ No new data to push to subscriber"
             );
             continue;
         }
+        
+        tracing::info!(
+            ?subscriber_addr,
+            ?graph_id,
+            message_size = len,
+            "📨 Sending push notification with data"
+        );
 
         // Check if the message size exceeds remaining bytes
         if len as u64 > subscription.remaining_bytes {
@@ -168,23 +201,11 @@ pub async fn broadcast_push_notifications(
         // Truncate the buffer to the actual data size
         target.truncate(len);
 
-        // Deserialize the push message to send it via send_push_notification_to_subscriber
-        let subscriber_response: SyncResponseMessage = match postcard::from_bytes(&target) {
-            Ok(response) => response,
-            Err(e) => {
-                warn!(
-                    error = %e,
-                    ?subscriber_addr,
-                    ?graph_id,
-                    "Failed to deserialize response for subscriber"
-                );
-                continue;
-            }
-        };
-
-        // Send the notification
+        // The push() method already creates a complete SyncType::Push message,
+        // so we can send the bytes directly without deserializing and re-wrapping.
+        // Send the notification directly
         match syncer
-            .send_push_notification_to_subscriber(&peer_addr, graph_id, subscriber_response)
+            .send_push_notification_raw(&peer_addr, graph_id, target)
             .await
         {
             Ok(bytes_sent) => {
@@ -196,26 +217,26 @@ pub async fn broadcast_push_notifications(
                     } else {
                         sub.remaining_bytes = 0;
                     }
-                    debug!(
+                    tracing::info!(
                         ?subscriber_addr,
                         ?graph_id,
                         bytes_sent,
                         remaining = sub.remaining_bytes,
-                        "Successfully sent push notification"
+                        "✅ Successfully sent push notification"
                     );
                 } else {
-                    warn!(
+                    tracing::warn!(
                         ?subscriber_addr,
                         ?graph_id,
-                        "Failed to find subscription to update remaining_bytes"
+                        "⚠️ Failed to find subscription to update remaining_bytes"
                     );
                 }
             }
             Err(e) => {
-                warn!(
+                tracing::warn!(
                     error = %e,
                     ?subscriber_addr,
-                    "Failed to send push notification"
+                    "❌ Failed to send push notification"
                 );
             }
         }
@@ -251,6 +272,15 @@ impl Syncer<State> {
         commands: Vec<Address>,
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
+        tracing::info!(
+            ?peer,
+            ?id,
+            ?subscriber_server_addr,
+            remain_open,
+            max_bytes,
+            "📮 Sending push subscribe request"
+        );
+        
         // Convert commands to the expected type
         let mut commands_heapless: heapless::Vec<Address, 100> = heapless::Vec::new();
         for addr in commands.into_iter().take(100) {
@@ -286,12 +316,13 @@ impl Syncer<State> {
         recv.read_to_end(&mut response_buf)
             .await
             .context("failed to read push subscribe response")?;
-        debug!(
+        tracing::info!(
             response_len = response_buf.len(),
-            "received push subscribe response"
+            ?peer,
+            ?id,
+            "✅ Successfully sent push subscribe request and received response"
         );
 
-        debug!("sent push subscribe request");
         Ok(())
     }
 
@@ -349,6 +380,98 @@ impl Syncer<State> {
         Ok(())
     }
 
+    /// Sends a push notification to a specific subscriber using raw bytes.
+    ///
+    /// This method sends pre-serialized push notification bytes directly to the subscriber.
+    /// The bytes should already be a complete SyncType::Push message.
+    ///
+    /// # Arguments
+    /// * `peer` - The network address of the subscriber to send the notification to
+    /// * `id` - The graph ID for the team/graph
+    /// * `data` - The pre-serialized push notification message
+    ///
+    /// # Returns
+    /// * `Ok(bytes_sent)` if the notification was sent successfully
+    /// * `Err(SyncError)` if there was an error connecting or sending the message
+    #[instrument(skip_all)]
+    pub async fn send_push_notification_raw(
+        &mut self,
+        peer: &Addr,
+        id: GraphId,
+        data: Vec<u8>,
+    ) -> SyncResult<u64> {
+        tracing::info!(
+            ?peer,
+            ?id,
+            data_len = data.len(),
+            "🔌 send_push_notification_raw: Sending raw push notification"
+        );
+        
+        // Set the team for this graph
+        let team_id = id.into_id().into();
+        self.state.store().set_team(team_id);
+
+        let bytes_to_send = data.len() as u64;
+
+        tracing::info!(
+            ?peer,
+            ?id,
+            bytes_to_send,
+            "🔌 Attempting to connect to subscriber"
+        );
+
+        let stream = self.connect(peer, id).await.map_err(|e| {
+            tracing::warn!(
+                error = %e,
+                ?peer,
+                ?id,
+                "❌ Failed to connect to peer"
+            );
+            e
+        })?;
+        
+        tracing::info!(
+            ?peer,
+            ?id,
+            "✅ Connected to subscriber, sending raw data"
+        );
+        let (mut recv, mut send) = stream.split();
+
+        send.send(bytes::Bytes::from(data)).await.map_err(|e| {
+            tracing::warn!(
+                error = %e,
+                ?peer,
+                "❌ Failed to send push message"
+            );
+            Error::from(e)
+        })?;
+        
+        tracing::info!(?peer, ?id, "📤 Data sent, closing send stream");
+
+        send.close().await.map_err(|e| {
+            tracing::warn!(
+                error = %e,
+                ?peer,
+                "❌ Failed to close send stream"
+            );
+            Error::from(e)
+        })?;
+
+        // Read the response to avoid race condition with server
+        let mut response_buf = Vec::new();
+        recv.read_to_end(&mut response_buf)
+            .await
+            .context("failed to read push notification response")?;
+        tracing::info!(
+            response_len = response_buf.len(),
+            ?peer,
+            ?id,
+            "✅ Received push notification response, send complete"
+        );
+
+        Ok(bytes_to_send)
+    }
+
     /// Sends a push notification to a specific subscriber.
     ///
     /// This method sends a `SyncType::Push` message to the specified subscriber,
@@ -369,6 +492,12 @@ impl Syncer<State> {
         id: GraphId,
         response: SyncResponseMessage,
     ) -> SyncResult<u64> {
+        tracing::info!(
+            ?peer,
+            ?id,
+            "🔌 send_push_notification_to_subscriber: Starting to send"
+        );
+        
         // Set the team for this graph
         let team_id = id.into_id().into();
         self.state.store().set_team(team_id);
@@ -383,31 +512,46 @@ impl Syncer<State> {
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
         let bytes_to_send = data.len() as u64;
 
+        tracing::info!(
+            ?peer,
+            ?id,
+            bytes_to_send,
+            "🔌 Attempting to connect to subscriber"
+        );
+
         let stream = self.connect(peer, id).await.map_err(|e| {
-            warn!(
+            tracing::warn!(
                 error = %e,
                 ?peer,
                 ?id,
-                "Failed to connect to peer"
+                "❌ Failed to connect to peer"
             );
             e
         })?;
+        
+        tracing::info!(
+            ?peer,
+            ?id,
+            "✅ Connected to subscriber, sending data"
+        );
         let (mut recv, mut send) = stream.split();
 
         send.send(bytes::Bytes::from(data)).await.map_err(|e| {
-            warn!(
+            tracing::warn!(
                 error = %e,
                 ?peer,
-                "Failed to send push message"
+                "❌ Failed to send push message"
             );
             Error::from(e)
         })?;
+        
+        tracing::info!(?peer, ?id, "📤 Data sent, closing send stream");
 
         send.close().await.map_err(|e| {
-            warn!(
+            tracing::warn!(
                 error = %e,
                 ?peer,
-                "Failed to close send stream"
+                "❌ Failed to close send stream"
             );
             Error::from(e)
         })?;
@@ -417,9 +561,11 @@ impl Syncer<State> {
         recv.read_to_end(&mut response_buf)
             .await
             .context("failed to read push notification response")?;
-        debug!(
+        tracing::info!(
             response_len = response_buf.len(),
-            "received push notification response"
+            ?peer,
+            ?id,
+            "✅ Received push notification response, send complete"
         );
 
         Ok(bytes_to_send)

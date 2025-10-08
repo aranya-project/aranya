@@ -218,8 +218,18 @@ impl SyncState for State {
         max_bytes: u64,
         commands: Vec<Address>,
     ) -> SyncResult<()> {
+        tracing::info!(
+            ?peer,
+            ?id,
+            remain_open,
+            max_bytes,
+            commands_len = commands.len(),
+            server_addr = ?syncer.server_addr,
+            "📮 sync_push_subscribe_impl: calling send_push_subscribe_request"
+        );
+
         syncer.state.store().set_team(id.into_id().into());
-        syncer
+        let result = syncer
             .send_push_subscribe_request(
                 peer,
                 id,
@@ -228,7 +238,10 @@ impl SyncState for State {
                 commands,
                 syncer.server_addr,
             )
-            .await
+            .await;
+
+        tracing::info!(?peer, ?id, result = ?result, "📮 sync_push_subscribe_impl: send_push_subscribe_request completed");
+        result
     }
 
     /// Unsubscribe from push notifications from a sync peer.
@@ -962,49 +975,62 @@ where
         _push_subscriptions: Arc<Mutex<PushSubscriptions>>,
         sync_peers: SyncPeers,
     ) {
-        debug!(
+        tracing::info!(
             ?storage_id,
             ?sender_addr,
-            "Received Push notification message"
+            ?message,
+            "📥 RECEIVED Push notification message"
         );
 
         // Extract any heads from the push message to update cache
         if let SyncResponseMessage::SyncResponse { commands, .. } = &message {
+            tracing::info!(
+                cmd_count = commands.len(),
+                ?storage_id,
+                "📥 Push message is SyncResponse, checking if commands is empty"
+            );
+
             if !commands.is_empty() {
-                debug!(
+                tracing::info!(
                     cmd_count = commands.len(),
                     ?storage_id,
                     ?sender_addr,
-                    "Push notification indicates new commands available"
+                    "📦 Push notification indicates new commands available, triggering sync"
                 );
 
                 // Trigger a sync to fetch the new commands
-                // This is similar to sync_on_hello - we trigger a sync operation
-                // which will properly handle command processing with the effect sink
-                match sync_peers.sync_on_hello(sender_addr, storage_id).await {
+                // Use sync_on_push which always syncs, regardless of sync_on_hello setting
+                match sync_peers.sync_on_push(sender_addr, storage_id).await {
                     Ok(()) => {
-                        debug!(
+                        tracing::info!(
                             ?sender_addr,
                             ?storage_id,
-                            "Successfully triggered sync from push notification"
+                            "✅ Successfully triggered sync from push notification"
                         );
                     }
                     Err(e) => {
-                        warn!(
+                        tracing::warn!(
                             error = %e,
                             ?sender_addr,
                             ?storage_id,
-                            "Failed to trigger sync from push notification"
+                            "❌ Failed to trigger sync from push notification"
                         );
                     }
                 }
             } else {
-                debug!(
+                tracing::info!(
                     ?storage_id,
                     ?sender_addr,
-                    "Push notification contained no commands"
+                    "⚠️ Push notification contained no commands (commands is empty)"
                 );
             }
+        } else {
+            tracing::warn!(
+                ?storage_id,
+                ?sender_addr,
+                ?message,
+                "⚠️ Push message is not a SyncResponse!"
+            );
         }
     }
 
@@ -1079,11 +1105,16 @@ where
         let sub_key = (storage_id, subscriber_socket_addr);
         let mut subscriptions = push_subscriptions.lock().await;
         subscriptions.insert(sub_key, subscription);
+        let total_subs = subscriptions.len();
 
-        debug!(
+        tracing::info!(
             ?subscriber_addr,
+            ?subscriber_socket_addr,
             ?storage_id,
-            "Successfully added push subscription"
+            remain_open,
+            max_bytes,
+            total_subscriptions = total_subs,
+            "✅ Successfully added push subscription"
         );
     }
 

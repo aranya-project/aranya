@@ -69,6 +69,9 @@ enum Msg {
     SyncOnHello {
         peer: SyncPeer,
     },
+    SyncOnPush {
+        peer: SyncPeer,
+    },
     BroadcastHello {
         graph_id: GraphId,
         head: Address,
@@ -196,17 +199,29 @@ impl SyncPeers {
         max_bytes: u64,
         commands: Vec<Address>,
     ) -> Reply {
+        tracing::info!(
+            ?peer_addr,
+            ?graph_id,
+            remain_open,
+            max_bytes,
+            commands_len = commands.len(),
+            "📮 SyncPeers: sync_push_subscribe sending Msg::PushSubscribe"
+        );
+        
         let peer = SyncPeer {
             addr: peer_addr,
             graph_id,
         };
-        self.send(Msg::PushSubscribe {
+        let result = self.send(Msg::PushSubscribe {
             peer,
             remain_open,
             max_bytes,
             commands,
         })
-        .await
+        .await;
+        
+        tracing::info!(?peer_addr, ?graph_id, result = ?result, "📮 SyncPeers: sync_push_subscribe message sent");
+        result
     }
 
     /// Unsubscribe from push notifications from a sync peer.
@@ -222,6 +237,12 @@ impl SyncPeers {
     pub(crate) async fn sync_on_hello(&self, addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::SyncOnHello { peer }).await
+    }
+
+    /// Trigger sync with a peer based on push notification.
+    pub(crate) async fn sync_on_push(&self, addr: Addr, graph_id: GraphId) -> Reply {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::SyncOnPush { peer }).await
     }
 
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -416,8 +437,17 @@ impl<ST: SyncState> Syncer<ST> {
                         max_bytes,
                         commands,
                     } => {
-                        self.sync_push_subscribe(&peer, remain_open, max_bytes, commands)
-                            .await
+                        tracing::info!(
+                            ?peer,
+                            remain_open,
+                            max_bytes,
+                            commands_len = commands.len(),
+                            "📮 Task: Received Msg::PushSubscribe, calling sync_push_subscribe"
+                        );
+                        let result = self.sync_push_subscribe(&peer, remain_open, max_bytes, commands)
+                            .await;
+                        tracing::info!(?peer, result = ?result, "📮 Task: sync_push_subscribe completed");
+                        result
                     }
                     Msg::PushUnsubscribe { peer } => {
                         self.sync_push_unsubscribe(&peer).await
@@ -448,6 +478,24 @@ impl<ST: SyncState> Syncer<ST> {
                                 "Peer not found in our configuration, ignoring SyncOnHello"
                             );
                             Ok(())
+                        }
+                    }
+                    Msg::SyncOnPush { peer } => {
+                        // Push notifications always trigger sync, regardless of sync_on_hello setting
+                        tracing::info!(?peer, "🚀 Received SyncOnPush, triggering sync");
+                        match self.sync(&peer).await {
+                            Ok(_) => {
+                                tracing::info!(?peer, "🚀 SyncOnPush sync completed successfully");
+                                Ok(())
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    ?peer,
+                                    "❌ SyncOnPush sync failed"
+                                );
+                                Err(e)
+                            }
                         }
                     }
                     Msg::BroadcastHello { graph_id, head } => {
@@ -552,8 +600,14 @@ impl<ST: SyncState> Syncer<ST> {
         max_bytes: u64,
         commands: Vec<Address>,
     ) -> SyncResult<()> {
-        trace!("subscribing to push notifications from peer");
-        ST::sync_push_subscribe_impl(
+        tracing::info!(
+            peer = %peer.addr,
+            graph = %peer.graph_id,
+            remain_open,
+            max_bytes,
+            "📮 Task method: subscribing to push notifications from peer, calling impl"
+        );
+        let result = ST::sync_push_subscribe_impl(
             self,
             peer.graph_id,
             &peer.addr,
@@ -561,7 +615,9 @@ impl<ST: SyncState> Syncer<ST> {
             max_bytes,
             commands,
         )
-        .await
+        .await;
+        tracing::info!(peer = %peer.addr, result = ?result, "📮 Task method: sync_push_subscribe_impl completed");
+        result
     }
 
     /// Unsubscribe from push notifications from a sync peer.
