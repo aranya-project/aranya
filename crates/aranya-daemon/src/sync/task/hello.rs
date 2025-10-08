@@ -135,7 +135,7 @@ pub async fn broadcast_hello_notifications(
 impl Syncer<State> {
     /// Sends a subscribe request to a peer for hello notifications.
     ///
-    /// This method sends a `SyncHelloType::Subscribe` message to the specified peer,
+    /// This method sends a [`SyncHelloType::Subscribe`] message to the specified peer,
     /// requesting to be notified when the peer's graph head changes. The peer will
     /// send hello notifications with the specified delay between them.
     ///
