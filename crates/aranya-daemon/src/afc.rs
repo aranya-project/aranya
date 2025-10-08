@@ -3,20 +3,13 @@
 use std::fmt::Debug;
 
 use anyhow::{anyhow, Context, Result};
-use aranya_afc_util::{
-    BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler, UniChannelCreated,
-    UniChannelReceived,
-};
-use aranya_crypto::{
-    afc::{RawOpenKey, RawSealKey},
-    CipherSuite, DeviceId, Engine, KeyStore, Rng,
-};
+use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
+use aranya_crypto::{CipherSuite, DeviceId, Engine, KeyStore, Rng};
 use aranya_daemon_api::{self as api};
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
-    AranyaState, ChannelId, Directed,
+    AranyaState, ChannelId,
 };
-use buggy::bug;
 use derive_where::derive_where;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument, warn};
@@ -24,9 +17,7 @@ use tracing::{debug, instrument, warn};
 use crate::{
     config::AfcConfig,
     keystore::AranyaStore,
-    policy::{
-        AfcBidiChannelCreated, AfcBidiChannelReceived, AfcUniChannelCreated, AfcUniChannelReceived,
-    },
+    policy::{AfcUniChannelCreated, AfcUniChannelReceived},
 };
 
 /// AFC shared memory.
@@ -126,84 +117,6 @@ where
     C: CipherSuite,
     KS: KeyStore,
 {
-    /// Handles the [`AfcBidiChannelCreated`] effect, returning
-    /// the channel ID.
-    #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn bidi_channel_created(&self, e: &AfcBidiChannelCreated) -> Result<ChannelId>
-    where
-        E: Engine<CS = C>,
-    {
-        if e.author_id != self.device_id.into() {
-            bug!("not the author of the bidi channel");
-        }
-
-        let info = BidiChannelCreated {
-            key_id: e.channel_key_id.into(),
-            parent_cmd_id: e.parent_cmd_id.into(),
-            author_id: e.author_id.into(),
-            author_enc_key_id: e.author_enc_key_id.into(),
-            peer_id: e.peer_id.into(),
-            peer_enc_pk: &e.peer_enc_pk,
-            label_id: e.label_id.into(),
-        };
-        let keys: BidiKeys<RawSealKey<<E as Engine>::CS>, RawOpenKey<<E as Engine>::CS>> = self
-            .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
-            .await?;
-        let channel_id = self
-            .shm
-            .lock()
-            .await
-            .write
-            .add(
-                Directed::Bidirectional {
-                    seal: keys.seal,
-                    open: keys.open,
-                },
-                info.label_id,
-            )
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-        debug!(?channel_id, "creating bidi channel");
-        Ok(channel_id)
-    }
-
-    /// Handles the [`AfcBidiChannelReceived`] effect, returning
-    /// the channel ID.
-    #[instrument(skip_all, fields(id = %e.label_id))]
-    pub(crate) async fn bidi_channel_received(
-        &self,
-        e: &AfcBidiChannelReceived,
-    ) -> Result<ChannelId>
-    where
-        E: Engine<CS = C>,
-    {
-        if e.peer_id != self.device_id.into() {
-            bug!("not the peer of the bidi channel");
-        }
-
-        let info = BidiChannelReceived {
-            parent_cmd_id: e.parent_cmd_id.into(),
-            author_id: e.author_id.into(),
-            author_enc_pk: &e.author_enc_pk,
-            peer_id: e.peer_id.into(),
-            peer_enc_key_id: e.peer_enc_key_id.into(),
-            label_id: e.label_id.into(),
-            encap: &e.encap,
-        };
-        let BidiKeys { seal, open } = self
-            .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
-            .await?;
-        let channel_id = self
-            .shm
-            .lock()
-            .await
-            .write
-            .add(Directed::Bidirectional { seal, open }, info.label_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-        debug!(?channel_id, "receiving bidi channel");
-
-        Ok(channel_id)
-    }
-
     /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
@@ -211,19 +124,12 @@ where
     where
         E: Engine<CS = C>,
     {
-        if e.author_id != self.device_id.into() {
-            bug!("not the author of the uni channel");
-        }
-        if e.sender_id != self.device_id.into() && e.receiver_id != self.device_id.into() {
-            bug!("not a member of this uni channel");
-        }
-
         let info = UniChannelCreated {
             key_id: e.channel_key_id.into(),
             parent_cmd_id: e.parent_cmd_id.into(),
-            author_id: e.author_id.into(),
+            author_id: self.device_id,
             author_enc_key_id: e.author_enc_key_id.into(),
-            seal_id: e.sender_id.into(),
+            seal_id: self.device_id,
             open_id: e.receiver_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
@@ -249,18 +155,11 @@ where
     where
         E: Engine<CS = C>,
     {
-        if e.author_id == self.device_id.into() {
-            bug!("not the peer of the uni channel");
-        }
-        if e.sender_id != self.device_id.into() && e.receiver_id != self.device_id.into() {
-            bug!("not a member of this uni channel");
-        }
-
         let info = UniChannelReceived {
             parent_cmd_id: e.parent_cmd_id.into(),
             seal_id: e.sender_id.into(),
-            open_id: e.receiver_id.into(),
-            author_id: e.author_id.into(),
+            open_id: self.device_id,
+            author_id: e.sender_id.into(),
             author_enc_pk: &e.author_enc_pk,
             peer_enc_key_id: e.peer_enc_key_id.into(),
             label_id: e.label_id.into(),
