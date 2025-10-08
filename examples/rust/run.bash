@@ -57,7 +57,7 @@ run_example() {
 
     # Verify binaries exist
     [[ -f "${daemon}" ]] || die "Daemon binary not found: ${daemon}"
-    [[ -f "${example}" ]] || die "Daemon binary not found: ${example}"
+    [[ -f "${example}" ]] || die "Example binary not found: ${example}"
 
     log_info "Running Rust example with daemon: ${daemon}"
 
