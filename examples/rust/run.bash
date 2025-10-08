@@ -1,33 +1,83 @@
 #!/usr/bin/env bash
 
 # Copyright (c) SpiderOak, Inc. All rights reserved.
+#
+# Aranya Rust Example Runner
+#
+# Usage:
+#   ./run.bash
 
-set -xeuo pipefail
+set -euo pipefail
 
-script_dir="$(dirname "$0")"
+# Configuration
+readonly EXAMPLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly WORKSPACE_ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
+readonly RELEASE_DIR="${WORKSPACE_ROOT}/target/release"
 
-# Back to root of the repo.
-pushd "${script_dir}"
-pushd ../../
+log_info() {
+    echo "INFO: $*" >&2
+}
 
-current_dir="$(pwd)"
+log_error() {
+    echo "ERROR: $*" >&2
+}
 
-echo "Building aranya-example..."
-cargo build \
-    --release \
-    --manifest-path "examples/rust/Cargo.toml" \
-    --locked
+die() {
+    log_error "$*"
+    exit 1
+}
 
-echo "Building aranya-daemon..."
-cargo build \
-    --release \
-    --manifest-path Cargo.toml \
-    --package aranya-daemon \
-    --bin aranya-daemon \
-    --features experimental,aqc,preview,afc
+check_dependencies() {
+    log_info "Checking dependencies..."
 
-daemon="${current_dir}/target/release/aranya-daemon"
-example="${current_dir}/examples/rust/target/release/aranya-example"
+    local missing_deps=()
 
-echo "Running aranya-example with daemon: ${daemon}"
-"${example}" "${daemon}"
+    command -v cargo >/dev/null || missing_deps+=("cargo")
+
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        die "Missing required dependencies: ${missing_deps[*]}"
+    fi
+}
+
+build_components() {
+    cd "${WORKSPACE_ROOT}"
+
+    log_info "Building daemon with full features..."
+    cargo make build
+
+    log_info "Building Rust example..."
+    cargo make build-example-rust
+
+    cd "${EXAMPLE_ROOT}"
+}
+
+run_example() {
+    local daemon="${RELEASE_DIR}/aranya-daemon"
+    local example="${WORKSPACE_ROOT}/examples/rust/target/release/aranya-example"
+
+    # Verify binaries exist
+    [[ -f "${daemon}" ]] || die "Daemon binary not found: ${daemon}"
+    [[ -f "${example}" ]] || die "Example binary not found: ${example}"
+
+    log_info "Running Rust example with daemon: ${daemon}"
+
+    "${example}" "${daemon}"
+}
+
+main() {
+    log_info "Starting Rust example"
+
+    check_dependencies
+    build_components
+    run_example
+
+    log_info "Example completed successfully!"
+}
+
+# Show usage if requested
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    head -n 8 "${0}" | grep "^#" | grep -v "^#!/" | sed 's/^# *//'
+    exit 0
+fi
+
+main "$@"

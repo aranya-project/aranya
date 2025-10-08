@@ -2,7 +2,6 @@
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = 1
 RUSTDOCFLAGS = { value = "", condition = { env_not_set = ["RUSTDOCFLAGS"] } }
 NIGHTLY = { script = ["cat rust-nightly.txt"], condition = { env_not_set = ["NIGHTLY"] } }
-
 RUSTFLAGS = { value = "-Dwarnings", condition = { env_true = ["CARGO_MAKE_CI"] } }
 
 [config]
@@ -11,64 +10,191 @@ skip_core_tasks = true
 skip_git_env_info = true
 skip_rust_env_info = true
 
-
 [tasks.default]
-description = "List tasks"
+description = "List available tasks"
+category = "Default"
 script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 
+# =================================================================================================
+# Development Flows - Quick iteration for local development
+# =================================================================================================
+[tasks.dev]
+description = "Development flow with all features"
+category = "Development"
+run_task = { name = ["format", "build", "clippy"] }
 
-# Build
+[tasks.dev-default]
+description = "Development flow with default features"
+category = "Development"
+run_task = { name = ["format", "build-default", "clippy"] }
+
+[tasks.dev-preview]
+description = "Development flow with preview features"
+category = "Development"
+run_task = { name = ["format", "build-preview", "clippy"] }
+
+[tasks.dev-experimental]
+description = "Development flow with experimental features"
+category = "Development"
+run_task = { name = ["format", "build-experimental", "clippy"] }
+
+# =================================================================================================
+# Quality Assurance - Full checks before committing
+# =================================================================================================
+[tasks.qa]
+description = "Quality assurance checks"
+category = "Quality"
+run_task = { name = ["check-format", "clippy", "check-features", "security-flow", "test", "example-flow"] }
+
+# =================================================================================================
+# CI Flows - Comprehensive testing for continuous integration
+# =================================================================================================
+[tasks.ci]
+description = "Complete CI - all checks that run in GitHub Actions"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build", "ci-docs", "ci-security"] }
+
+[tasks.ci-default]
+description = "Complete CI with default features"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build-default", "ci-docs", "ci-security"] }
+
+[tasks.ci-preview]
+description = "Complete CI with preview features"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build-preview", "ci-docs", "ci-security"] }
+
+[tasks.ci-experimental]
+description = "Complete CI with experimental features"
+category = "CI"
+run_task = { name = ["ci-correctness", "ci-tests", "ci-build-experimental", "ci-docs", "ci-security"] }
+
+[tasks.ci-correctness]
+description = "CI correctness checks (mirrors correctness.yml)"
+category = "CI"
+run_task = { name = ["check-format", "clippy", "unused-deps", "check-features"] }
+
+[tasks.ci-tests]
+description = "CI test checks (mirrors tests.yml)"
+category = "CI"
+run_task = { name = ["test", "example-c", "example-rust"] }
+
+[tasks.ci-docs]
+description = "CI documentation checks (mirrors doc.yml)"
+category = "CI"
+env = { RUSTDOCFLAGS = "-Dwarnings" }
+run_task = { name = ["capi-docs", "package-capi-docs", "doc"] }
+
+[tasks.ci-security]
+description = "CI security checks (mirrors security.yml)"
+category = "CI"
+run_task = { name = ["security-flow"] }
+
+[tasks.ci-build]
+description = "CI build checks (mirrors build.yml)"
+category = "CI"
+run_task = { name = ["build", "package-daemon", "capi-header", "capi-lib", "package-capi", "git-unchanged"] }
+
+[tasks.ci-build-default]
+description = "CI build checks with default features"
+category = "CI"
+run_task = { name = ["build-default", "package-daemon", "capi-header", "capi-lib-default", "package-capi", "git-unchanged"] }
+
+[tasks.ci-build-preview]
+description = "CI build checks with preview features"
+category = "CI"
+run_task = { name = ["build-preview", "package-daemon", "capi-header", "capi-lib-preview", "package-capi", "git-unchanged"] }
+
+[tasks.ci-build-experimental]
+description = "CI build checks with experimental features"
+category = "CI"
+run_task = { name = ["build-experimental", "package-daemon", "capi-header", "capi-lib-experimental", "package-capi", "git-unchanged"] }
+
+# =================================================================================================
+# Release Flow - For creating releases with packaged artifacts
+# =================================================================================================
+[tasks.release]
+description = "Release flow - CI checks + artifact packaging"
+category = "Release"
+run_task = { name = ["ci", "package-daemon", "package-capi", "package-docs"] }
+
+[tasks.release-default]
+description = "Release flow with default features"
+category = "Release"
+run_task = { name = ["ci-default", "package-daemon", "package-capi", "package-docs"] }
+
+[tasks.release-preview]
+description = "Release flow with preview features"
+category = "Release"
+run_task = { name = ["ci-preview", "package-daemon", "package-capi", "package-docs"] }
+
+[tasks.release-experimental]
+description = "Release flow with experimental features"
+category = "Release"
+run_task = { name = ["ci-experimental", "package-daemon", "package-capi", "package-docs"] }
+
+# =================================================================================================
+# Build Tasks - Daemon builds with different feature levels
+# =================================================================================================
 [tasks.build]
-category = "build"
-description = "Build Code with default features"
+description = "Build daemon with all features"
+category = "Build"
 command = "cargo"
-args = [
-    "build",
-    "--verbose",
-    "--release",
-    "--package=aranya-daemon",
-    "${@}",
-]
+args = ["build", "--release", "--package=aranya-daemon", "--all-features", "${@}"]
 
 [tasks.build-default]
-category = "build"
-description = "Build Code with default features"
-dependencies = ["build"]
-
-[tasks.build-experimental]
-category = "build"
-description = "Build Code with experimental features"
+description = "Build daemon with default features"
+category = "Build"
 command = "cargo"
-args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental,aqc", "${@}"]
+args = ["build", "--release", "--package=aranya-daemon", "${@}"]
 
 [tasks.build-preview]
-category = "build"
-description = "Build Code with preview features"
+description = "Build daemon with preview features"
+category = "Build"
 command = "cargo"
-args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc", "${@}"]
+args = ["build", "--release", "--package=aranya-daemon", "--features=preview,afc", "${@}"]
 
-[tasks.tgz-daemon]
-category = "build"
-description = "Archive daemon"
-script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
+[tasks.build-experimental]
+description = "Build daemon with experimental features"
+category = "Build"
+command = "cargo"
+args = ["build", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental,aqc", "${@}"]
 
-# Build the `aranya-client-capi` C API.
-[tasks.build-capi]
-category = "build"
-description = "Build C API"
-run_task = { name = [
-    "build-capi-header",
-    "build-capi-docs",
-    "build-capi-lib",
-] }
+[tasks.build-full]
+description = "Build daemon with all features"
+category = "Build"
+alias = "build"
+private = true
 
-# Build the `aranya-client-capi` C API `aranya-client.h` header file.
+# =================================================================================================
+# C API Build Tasks
+# =================================================================================================
+[tasks.capi]
+description = "Build complete C API with all features"
+category = "C API"
+run_task = { name = ["capi-header", "capi-docs", "capi-lib"] }
+
+[tasks.capi-default]
+description = "Build complete C API with default features"
+category = "C API"
+run_task = { name = ["capi-header", "capi-docs", "capi-lib-default"] }
+
+[tasks.capi-preview]
+description = "Build complete C API with preview features"
+category = "C API"
+run_task = { name = ["capi-header", "capi-docs", "capi-lib-preview"] }
+
+[tasks.capi-experimental]
+description = "Build complete C API with experimental features"
+category = "C API"
+run_task = { name = ["capi-header", "capi-docs", "capi-lib-experimental"] }
+
 # NOTE: From 1.87 onward, cargo-expand doesn't include cfg's, so cbindgen won't
 # see them to include in the header. Until this is fixed, we cannot increase
 # our MSRV beyond 1.86. See https://github.com/rust-lang/rust/issues/139715.
-[tasks.build-capi-header]
-category = "build"
-description = "Build C API header"
+[tasks.capi-header]
+description = "Generate C API header"
+category = "C API"
 cwd = "crates/aranya-client-capi"
 # Fake nightly support to enable macro expansion, so we don't have to pin to nightly 1.86 (see above).
 env.RUSTC_BOOTSTRAP = "1"
@@ -76,163 +202,93 @@ command = "cbindgen"
 args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
 dependencies = ["install-cbindgen"]
 
-[tasks.build-capi-docs]
-category = "build"
-description = "Build C API docs"
+[tasks.capi-docs]
+description = "Generate C API documentation"
+category = "C API"
 cwd = "crates/aranya-client-capi"
 command = "doxygen"
 
-[tasks.tgz-capi-docs]
-category = "docs"
-description = "Archive capi docs"
-script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/docs ."
+[tasks.capi-lib]
+description = "Build C API library with all features"
+category = "C API"
+cwd = "crates/aranya-client-capi"
+extend = "build"
+args = ["build", "--release", "--all-features"]
 
-[tasks.build-capi-lib]
-category = "build"
-description = "Build C API shared library with default features"
+[tasks.capi-lib-default]
+description = "Build C API library with default features"
+category = "C API"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release"]
 
-[tasks.build-capi-lib-default]
-category = "build"
-description = "Build C API shared library with default features"
-dependencies = ["build-capi-lib"]
-
-[tasks.build-capi-lib-experimental]
-category = "build"
-description = "Build C API shared library with experimental features"
-cwd = "crates/aranya-client-capi"
-command = "cargo"
-args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
-
-[tasks.build-capi-lib-preview]
-category = "build"
-description = "Build C API shared library with preview features"
+[tasks.capi-lib-preview]
+description = "Build C API library with preview features"
+category = "C API"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview,afc"]
 
-[tasks.tgz-capi]
-category = "build"
-description = "Archive C API artifacts"
-script = '''
-#!/usr/bin/env bash
-capi="$(mktemp -d)"
-mkdir -p "${capi}/"{lib,cmake,include}
-ls target/release/libaranya_client*
-cp target/release/libaranya_client_capi.dylib "${capi}"/lib/ || cp target/release/libaranya_client_capi.so "${capi}"/lib/
-ls "${capi}"/lib
-cp examples/c/cmake/AranyaConfig.cmake "${capi}"/cmake/
-cp crates/aranya-client-capi/output/aranya-client.h "${capi}"/include/
-tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
-'''
+[tasks.capi-lib-experimental]
+description = "Build C API library with experimental features"
+category = "C API"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features=preview,afc,experimental,aqc"]
 
-[tasks.install-cbindgen]
+[tasks.capi-lib-full]
+description = "Build C API library with all features"
+category = "C API"
+alias = "capi-lib"
 private = true
-install_crate = { crate_name = "cbindgen", version = "0.29.0", binary = "cbindgen", test_arg = "-V" }
 
+# =================================================================================================
+# Format Tasks - Code formatting
+# =================================================================================================
+[tasks.format]
+description = "Format all code"
+category = "Quality"
+dependencies = ["format-rust", "format-toml"]
 
-# Test
-[tasks.test]
-category = "test"
-description = "Run Unit Tests"
-workspace = true
-command = "cargo"
-args = ["--verbose", "test-all-features", "${@}"]
-dependencies = ["install-cargo-all-features"]
-
-
-# Security
-[tasks.security]
-category = "security"
-description = "Run security checks"
-run_task = { name = [
-    "cargo-audit",
-    "cargo-deny",
-    "cargo-vet",
-] }
-
-[tasks.cargo-audit]
-category = "security"
-install_crate = { crate_name = "cargo-audit", version = "0.21.2", binary = "cargo-audit", test_arg = "-V" }
-command = "cargo"
-args = ["audit"]
-
-[tasks.cargo-deny]
-category = "security"
-install_crate = { crate_name = "cargo-deny", version = "0.18.2", binary = "cargo-deny", test_arg = "-V" }
-command = "cargo"
-args = ["deny", "check"]
-
-[tasks.cargo-vet]
-category = "security"
-install_crate = { crate_name = "cargo-vet", version = "0.10.0", binary = "cargo-vet", test_arg = "-V" }
-command = "cargo"
-args = ["vet", "check"]
-
-# Correctness
-[tasks.correctness]
-category = "correctness"
-description = "Run correctness checks"
-run_task = { name = [
-    "fmt",
-    "check-features",
-    "clippy",
-    "machete",
-] }
-
-[tasks.check-fmt]
-dependencies = ["check-fmt-rust", "check-fmt-toml"]
-description = "Check file formatting"
-
-[tasks.fmt]
-dependencies = ["fmt-rust", "fmt-toml"]
-description = "Format files"
-
-[tasks.check-fmt-rust]
-category = "correctness"
-description = "Check rust code formatting"
-toolchain = "${NIGHTLY}"
-command = "cargo"
-args = ["fmt", "--all", "--", "--check"]
-dependencies = ["install-nightly"]
-
-[tasks.fmt-rust]
-category = "correctness"
-description = "Format rust code"
+[tasks.format-rust]
+description = "Format Rust code with nightly"
+category = "Quality"
 toolchain = "${NIGHTLY}"
 command = "cargo"
 args = ["fmt", "--all"]
 dependencies = ["install-nightly"]
 
-[tasks.check-fmt-toml]
-category = "correctness"
-description = "Check toml formatting"
-script = "git ls-files -z '*.toml' | xargs -0 -- taplo fmt --check --diff"
-dependencies = ["install-taplo"]
-
-[tasks.fmt-toml]
-category = "correctness"
-description = "Format toml"
+[tasks.format-toml]
+description = "Format TOML files"
+category = "Quality"
 script = "git ls-files -z '*.toml' | xargs -0 taplo fmt"
 dependencies = ["install-taplo"]
 
-[tasks.install-taplo]
-private = true
-install_crate = { crate_name = "taplo-cli", version = "0.9.3", binary = "taplo", test_arg = ["-V"] }
+[tasks.check-format]
+description = "Check code formatting"
+category = "Quality"
+dependencies = ["check-format-rust", "check-format-toml"]
 
-[tasks.check-features]
-category = "correctness"
-description = "Check features"
-workspace = true
+[tasks.check-format-rust]
+description = "Check Rust formatting with nightly"
+category = "Quality"
+toolchain = "${NIGHTLY}"
 command = "cargo"
-args = ["--verbose", "check-all-features"]
-dependencies = ["install-cargo-all-features"]
+args = ["fmt", "--all", "--", "--check"]
+dependencies = ["install-nightly"]
 
+[tasks.check-format-toml]
+description = "Check TOML formatting"
+category = "Quality"
+script = "git ls-files -z '*.toml' | xargs -0 -- taplo fmt --check --diff"
+dependencies = ["install-taplo"]
+
+# =================================================================================================
+# Quality Assurance Tasks
+# =================================================================================================
 [tasks.clippy]
-category = "correctness"
-description = "Run clippy to lint code"
+description = "Check code quality using clippy lints"
+category = "Quality"
 workspace = true
 script = '''
 cargo clippy
@@ -240,38 +296,197 @@ cargo clippy --all-targets
 # cargo clippy --no-default-features (TODO: uncomment in #448)
 cargo clippy --all-targets --all-features
 '''
-install_crate = { rustup_component_name = "clippy" }
+dependencies = ["install-clippy"]
 
-[tasks.machete]
+[tasks.check-features]
+description = "Check all feature combinations"
+category = "Quality"
+workspace = true
+command = "cargo"
+args = ["check-all-features"]
+dependencies = ["install-cargo-all-features"]
+
+[tasks.unused-deps]
+description = "Check for unused dependencies"
+category = "Quality"
 command = "cargo"
 args = ["machete"]
-install_crate = { crate_name = "cargo-machete", version = "0.8.0", binary = "cargo-machete", test_arg = "--version" }
+dependencies = ["install-cargo-machete"]
 
+[tasks.security-flow]
+description = "Run security checks"
+category = "Security"
+run_task = { name = ["audit", "deny", "vet"] }
 
-# Docs
-[tasks.gen-docs-nightly]
-category = "docs"
-description = "Generate docs with rust nightly"
+[tasks.audit]
+description = "Audit dependencies for vulnerabilities"
+category = "Security"
+command = "cargo"
+args = ["audit"]
+dependencies = ["install-cargo-audit"]
+
+[tasks.deny]
+description = "Check dependencies licenses and sources"
+category = "Security"
+command = "cargo"
+args = ["deny", "check"]
+dependencies = ["install-cargo-deny"]
+
+[tasks.vet]
+description = "Verify dependency authenticity"
+category = "Security"
+command = "cargo"
+args = ["vet", "check"]
+dependencies = ["install-cargo-vet"]
+
+# =================================================================================================
+# Documentation
+# =================================================================================================
+[tasks.doc]
+description = "Generate documentation with nightly"
+category = "Documentation"
 toolchain = "${NIGHTLY}"
-env = { RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}" }
 command = "cargo"
 args = ["doc", "--all-features"]
+env = { RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}" }
 dependencies = ["install-nightly"]
 
-[tasks.tgz-docs]
-category = "docs"
-description = "Archive Rust docs"
+# =================================================================================================
+# Testing
+# =================================================================================================
+[tasks.test]
+description = "Run unit tests with all feature flag combinations"
+category = "Testing"
+workspace = true
+command = "cargo"
+args = ["test-all-features", "${@}"]
+dependencies = ["install-cargo-all-features"]
+
+# =================================================================================================
+# Example Tasks
+# =================================================================================================
+[tasks.example-c]
+description = "Run C example with all features"
+category = "Examples"
+cwd = "examples/c"
+script = "./run.bash"
+
+[tasks.example-c-default]
+description = "Run C example with default features"
+category = "Examples"
+cwd = "examples/c"
+script = "./run.bash default"
+
+[tasks.example-c-preview]
+description = "Run C example with preview features"
+category = "Examples"
+cwd = "examples/c"
+script = "./run.bash preview"
+
+[tasks.example-c-experimental]
+description = "Run C example with experimental features"
+category = "Examples"
+cwd = "examples/c"
+script = "./run.bash experimental"
+
+[tasks.example-rust]
+description = "Run Rust example application"
+category = "Examples"
+cwd = "examples/rust"
+script = "./run.bash"
+
+[tasks.build-example-rust]
+description = "Build Rust example application"
+category = "Examples"
+command = "cargo"
+workspace = false
+args = ["build", "--release", "--manifest-path", "examples/rust/Cargo.toml", "--locked"]
+
+[tasks.examples-flow]
+description = "Run all examples"
+category = "Examples"
+run_task = { name = [
+    "example-c-default",
+    "example-c-preview",
+    "example-c-experimental",
+    "example-c",
+    "example-rust",
+] }
+
+# =================================================================================================
+# Packaging Tasks
+# =================================================================================================
+[tasks.package-daemon]
+description = "Package daemon binary"
+category = "Packaging"
+script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
+
+[tasks.package-capi]
+description = "Package C API artifacts"
+category = "Packaging"
+script = '''
+#!/usr/bin/env bash
+set -euo pipefail
+temp_dir="$(mktemp -d)"
+mkdir -p "${temp_dir}/"{lib,cmake,include}
+
+# Copy platform-specific library
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    cp target/release/libaranya_client_capi.dylib "${temp_dir}/lib/"
+else
+    cp target/release/libaranya_client_capi.so "${temp_dir}/lib/"
+fi
+
+cp examples/c/cmake/AranyaConfig.cmake "${temp_dir}/cmake/"
+cp crates/aranya-client-capi/output/aranya-client.h "${temp_dir}/include/"
+tar -cvzf aranya-client-lib.tar.gz -C "${temp_dir}" .
+rm -rf "${temp_dir}"
+'''
+dependencies = ["capi"]
+
+[tasks.package-docs]
+description = "Package documentation"
+category = "Packaging"
+run_task = { name = ["package-rust-docs", "package-capi-docs"] }
+
+[tasks.package-rust-docs]
+description = "Package Rust documentation"
+category = "Packaging"
 script = "tar -czf rust-docs.tar.gz -C target/doc ."
+dependencies = ["doc"]
 
-# Misc
-[tasks.install-nightly]
-description = "Install nightly rust"
-# First check if the toolchain is installed, because that is much faster.
-# Don't do this if you want to keep a rolling channel up-to-date.
-script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY} --profile minimal -c rustfmt"
+[tasks.package-capi-docs]
+description = "Package C API documentation"
+category = "Packaging"
+script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/docs ."
+dependencies = ["capi-docs"]
 
+# =================================================================================================
+# Metrics Collection
+# =================================================================================================
+[tasks.metrics]
+description = "Run metrics collection"
+category = "Metrics"
+script = '''
+#!/usr/bin/env bash
+set -e
+cargo build --bin aranya-daemon --release --features=experimental,aqc
+cargo build --bin aranya-metrics --release
+CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml \
+    $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
+'''
+
+[tasks.metrics-prometheus]
+description = "Run metrics collection with Prometheus"
+category = "Metrics"
+script = "crates/aranya-metrics/prometheus.bash"
+
+# =================================================================================================
+# Utility Tasks
+# =================================================================================================
 [tasks.git-unchanged]
 description = "Verify files are unchanged"
+category = "Utilities"
 script = '''
 git diff
 status=$(git status -s)
@@ -281,44 +496,61 @@ if [ -n "$status" ]; then
 fi
 '''
 
+# =================================================================================================
+# External Tool Instllation - All external dependencies
+# =================================================================================================
+[tasks.install-nightly]
+description = "Install nightly Rust toolchain"
+category = "Install"
+private = true
+# First check if the toolchain is installed, because that is much faster.
+# Don't do this if you want to keep a rolling channel up-to-date.
+script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY} --profile minimal -c rustfmt"
+
+[tasks.install-cbindgen]
+description = "Install cbindgen"
+category = "Install"
+private = true
+install_crate = { crate_name = "cbindgen", version = "0.29.0", binary = "cbindgen", test_arg = ["-V"] }
+
+[tasks.install-clippy]
+description = "Install clippy"
+category = "Install"
+private = true
+install_crate = { rustup_component_name = "clippy" }
+
+[tasks.install-taplo]
+description = "Install taplo-cli for TOML formatting"
+category = "Install"
+private = true
+install_crate = { crate_name = "taplo-cli", version = "0.9.3", binary = "taplo", test_arg = ["-V"] }
+
 [tasks.install-cargo-all-features]
+description = "Install cargo-all-features"
+category = "Install"
 private = true
 install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
 
+[tasks.install-cargo-machete]
+description = "Install cargo-machete"
+category = "Install"
+private = true
+install_crate = { crate_name = "cargo-machete", version = "0.8.0", binary = "cargo-machete", test_arg = "--version" }
 
-# Examples
+[tasks.install-cargo-audit]
+description = "Install cargo-audit"
+category = "Install"
+private = true
+install_crate = { crate_name = "cargo-audit", version = "0.21.2", binary = "cargo-audit", test_arg = "-V" }
 
-# C Example
-[tasks.run-capi-example]
-category = "examples"
-description = "Run C example application"
-cwd = "examples/c"
-script = "./run.bash"
-dependencies = ["build-capi-header", "build-capi-lib-experimental"]
+[tasks.install-cargo-deny]
+description = "Install cargo-deny"
+category = "Install"
+private = true
+install_crate = { crate_name = "cargo-deny", version = "0.18.2", binary = "cargo-deny", test_arg = "-V" }
 
-# Rust Example
-[tasks.run-rust-example]
-category = "examples"
-description = "Run Rust example application"
-cwd = "examples/rust"
-script = "./run.bash"
-
-# Metrics
-
-# Run `aranya-metrics`
-[tasks.metrics]
-category = "metrics"
-description = "Run Metrics Crate"
-script = '''
-#!/usr/bin/env bash
-set -e
-cargo build --bin aranya-daemon --release --features=experimental,aqc
-cargo build --bin aranya-metrics --release
-CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
-'''
-
-# Run `aranya-metrics` using prometheus
-[tasks.metrics-prometheus]
-category = "metrics"
-description = "Run aranya-metrics crate w/ Prometheus exporter and a Push Gateway"
-script = "crates/aranya-metrics/prometheus.bash"
+[tasks.install-cargo-vet]
+description = "Install cargo-vet"
+category = "Install"
+private = true
+install_crate = { crate_name = "cargo-vet", version = "0.10.0", binary = "cargo-vet", test_arg = "-V" }
