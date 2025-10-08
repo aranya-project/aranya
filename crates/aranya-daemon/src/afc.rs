@@ -195,9 +195,8 @@ where
     pub(crate) async fn label_revoked(&self, label_id: LabelId) -> Result<()> {
         let shm = self.shm.lock().await;
 
-        // TODO: aranya-core/issues/429
         shm.write
-            .remove_if(|channel_id, chan_label| chan_label == label_id)
+            .remove_if(|_channel_id, chan_label| chan_label == label_id.into_id().into())
             .map_err(|err| anyhow!("unable to remove AFC channels with label ID: {err}"))
     }
 
