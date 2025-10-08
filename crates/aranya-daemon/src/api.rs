@@ -685,6 +685,7 @@ impl DaemonApi for Api {
     // AQC
     //
 
+    #[cfg(feature = "aqc")]
     #[instrument(skip(self), err)]
     async fn aqc_net_id(
         self,
@@ -1157,11 +1158,11 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .create_label(label_name, managing_role_id.into_id().into())
             .await
-            .context("unable to create AQC label")?;
+            .context("unable to create label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
             Ok(e.label_id.into())
         } else {
-            Err(anyhow!("unable to create AQC label").into())
+            Err(anyhow!("unable to create label").into())
         }
     }
 
@@ -1179,11 +1180,11 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .delete_label(label_id.into_id().into())
             .await
-            .context("unable to delete AQC label")?;
+            .context("unable to delete label")?;
         if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
             Ok(())
         } else {
-            Err(anyhow!("unable to delete AQC label").into())
+            Err(anyhow!("unable to delete label").into())
         }
     }
 
@@ -1207,13 +1208,13 @@ impl DaemonApi for Api {
                 op.into(),
             )
             .await
-            .context("unable to assign AQC label")?;
+            .context("unable to assign label")?;
         if let Some(Effect::AssignedLabelToDevice(_e)) =
             find_effect!(&effects, Effect::AssignedLabelToDevice(_e))
         {
             Ok(())
         } else {
-            Err(anyhow!("unable to assign AQC label").into())
+            Err(anyhow!("unable to assign label").into())
         }
     }
 
@@ -1232,13 +1233,13 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .revoke_label_from_device(device.into_id().into(), label_id.into_id().into())
             .await
-            .context("unable to revoke AQC label")?;
+            .context("unable to revoke label")?;
         if let Some(Effect::LabelRevokedFromDevice(_e)) =
             find_effect!(&effects, Effect::LabelRevokedFromDevice(_e))
         {
             Ok(())
         } else {
-            Err(anyhow!("unable to revoke AQC label").into())
+            Err(anyhow!("unable to revoke label").into())
         }
     }
 
@@ -1493,13 +1494,13 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .assign_label_to_role(role.into_id().into(), label.into_id().into(), op.into())
             .await
-            .context("unable to assign AQC label to role")?;
+            .context("unable to assign label to role")?;
         if let Some(Effect::AssignedLabelToRole(_e)) =
             find_effect!(&effects, Effect::AssignedLabelToRole(_e))
         {
             Ok(())
         } else {
-            Err(anyhow!("unable to assign AQC label to role").into())
+            Err(anyhow!("unable to assign label to role").into())
         }
     }
 
@@ -1518,13 +1519,13 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .revoke_label_from_role(role.into_id().into(), label.into_id().into())
             .await
-            .context("unable to revoke AQC label from role")?;
+            .context("unable to revoke label from role")?;
         if let Some(Effect::LabelRevokedFromRole(_e)) =
             find_effect!(&effects, Effect::LabelRevokedFromRole(_e))
         {
             Ok(())
         } else {
-            Err(anyhow!("unable to revoke AQC label from role").into())
+            Err(anyhow!("unable to revoke label from role").into())
         }
     }
 
