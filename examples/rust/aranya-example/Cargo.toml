@@ -12,13 +12,16 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
+default = ["afc", "aqc"]
+
+afc = ["aranya-client/afc", "aranya-client/preview"]
+aqc = ["aranya-client/aqc", "aranya-client/experimental"]
 
 # Enable debugging.
 debug = []
 
 [dependencies]
-aranya-client = { workspace = true, features = ["preview", "afc", "aqc", "experimental"] }
+aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 

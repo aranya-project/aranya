@@ -28,6 +28,7 @@ for device in "${devices[@]}"; do
         --release \
         --manifest-path Cargo.toml \
         --bin aranya-example-multi-node-"${device}" \
+        --features aqc \
         --locked
 done
 
