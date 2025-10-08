@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    afc::{Channel as AfcChannel, Channels as AfcChannels},
+    afc,
     aqc::AqcPeerChannel,
     client::{ChanOp, Client, DeviceId, KeyBundle, NetIdentifier, Role},
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
@@ -478,17 +478,17 @@ async fn main() -> Result<()> {
     info!("demo afc functionality");
 
     // membera creates AFC channel.
-    info!("creating afc bidi channel");
+    info!("creating afc send channel");
     let membera_afc = membera.client.afc();
     let (send, ctrl) = membera_afc
-        .create_bidi_channel(team_id, memberb.id, label3)
+        .create_uni_send_channel(team_id, memberb.id, label3)
         .await
-        .expect("expected to create afc bidi channel");
+        .expect("expected to create afc send channel");
 
     // memberb receives AFC channel.
-    info!("receiving afc bidi channel");
+    info!("receiving afc recv channel");
     let memberb_afc = memberb.client.afc();
-    let chan = memberb_afc
+    let recv = memberb_afc
         .recv_ctrl(team_id, ctrl)
         .await
         .expect("expected to receive afc channel");
@@ -496,19 +496,16 @@ async fn main() -> Result<()> {
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
-    let mut ciphertext = vec![0u8; afc_msg.len() + AfcChannels::OVERHEAD];
-    send.seal(&mut ciphertext, &afc_msg)
+    let mut ciphertext = vec![0u8; afc_msg.len() + afc::Channels::OVERHEAD];
+    send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
 
     // This is where membera would send the ciphertext to memberb via the network.
 
     // memberb opens data from membera.
-    info!("memberb receiving bidi channel from membera");
-    let mut plaintext = vec![0u8; ciphertext.len() - AfcChannels::OVERHEAD];
-    let AfcChannel::Bidi(recv) = chan else {
-        bail!("expected a bidirectional receive channel");
-    };
+    info!("memberb receiving uni channel from membera");
+    let mut plaintext = vec![0u8; ciphertext.len() - afc::Channels::OVERHEAD];
     info!("memberb opening data from membera");
     let seq1 = recv
         .open(&mut plaintext, &ciphertext)
@@ -517,7 +514,7 @@ async fn main() -> Result<()> {
     assert_eq!(afc_msg, plaintext);
 
     // seal/open again to get a new sequence number.
-    send.seal(&mut ciphertext, &afc_msg)
+    send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
     let seq2 = recv
