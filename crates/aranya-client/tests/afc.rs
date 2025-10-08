@@ -315,6 +315,108 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     Ok(())
 }
 
+/// Demonstrate deleting a label deletes the channel.
+#[cfg(feature = "afc")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_uni_chan_delete_label() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_chan_delete_label").await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id).await?;
+
+    let operator_team = devices.operator.client.team(team_id);
+
+    let label_id = operator_team.create_label(text!("label1")).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(devices.membera.id, label_id, op)
+        .await?;
+    operator_team
+        .assign_label(devices.memberb.id, label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
+
+    // Create uni channel.
+    let (chan, ctrl) = membera_afc
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .await
+        .context("unable to create afc uni channel")?;
+
+    // Receive uni channel.
+    let recv = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .context("unable to receive afc uni channel")?;
+
+    // Seal data.
+    let afc_msg = "afc msg".as_bytes();
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")?;
+
+    // Open data.
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")?;
+
+    // wait for syncing.
+    devices
+        .admin
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    // Delete label.
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.delete_label(label_id).await?;
+
+    // wait for syncing.
+    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(admin_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(admin_addr, None)
+        .await?;
+
+    // Try open/seal after channels are deleted.
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
+    Ok(())
+}
+
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]

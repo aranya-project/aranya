@@ -130,6 +130,8 @@ impl DaemonApiServer {
             aqc: aqc.clone(),
             #[cfg(feature = "afc")]
             afc: afc.clone(),
+            #[cfg(feature = "afc")]
+            device_id: pk.ident_pk.id()?,
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -216,6 +218,8 @@ struct EffectHandler {
     aqc: Option<Arc<Aqc<CE, KS>>>,
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
+    #[cfg(feature = "afc")]
+    device_id: DeviceId,
 }
 
 impl EffectHandler {
@@ -240,14 +244,23 @@ impl EffectHandler {
                 AdminRevoked(_admin_revoked) => {}
                 OperatorRevoked(_operator_revoked) => {}
                 LabelCreated(_) => {}
-                LabelDeleted(_) => {}
-                LabelAssigned(_) => {}
-                LabelRevoked(label_revoked) => {
+                LabelDeleted(label_deleted) => {
                     #[cfg(feature = "afc")]
                     self.afc
-                        .label_revoked(label_revoked.label_id.into())
+                        .label_deleted(label_deleted.label_id.into())
                         .await?;
-                    tracing::warn!(effect = ?label_revoked, "received label revoked effect");
+                    tracing::warn!(effect = ?label_deleted, "received LabelDeleted effect");
+                }
+                LabelAssigned(_) => {}
+                LabelRevoked(label_revoked) => {
+                    // TODO: delete AFC channel if label is revoked from peer.
+                    #[cfg(feature = "afc")]
+                    if self.device_id == label_revoked.device_id.into() {
+                        self.afc
+                            .label_deleted(label_revoked.label_id.into())
+                            .await?;
+                    }
+                    tracing::warn!(effect = ?label_revoked, "received LabelRevoked effect");
                 }
                 AqcNetworkNameSet(e) => {
                     #[cfg(feature = "aqc")]

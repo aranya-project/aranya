@@ -192,7 +192,7 @@ where
             .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
     }
 
-    pub(crate) async fn label_revoked(&self, label_id: LabelId) -> Result<()> {
+    pub(crate) async fn label_deleted(&self, label_id: LabelId) -> Result<()> {
         let shm = self.shm.lock().await;
 
         shm.write
