@@ -1,8 +1,12 @@
 //! Multi-node Aranya example written in Rust.
 
-use std::{env, path::Path, time::Duration};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aranya_example_multi_node::{config::create_config, env::EnvVars, tracing::init_tracing};
 use tempfile::tempdir;
 use tokio::{
@@ -18,22 +22,24 @@ async fn main() -> Result<()> {
 
     info!("starting aranya-example-multi-node example");
 
-    // Generate default environment file.
-    let workspace = env::var("CARGO_WORKSPACE_DIR")
-        .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
-    let workspace = Path::new(&workspace);
-    let release = workspace.join("target").join("release");
+    let mut args = env::args();
+    args.next(); // skip executable name
+    // Get release directory from input args.
+    let release = {
+        let path = args.next().context("missing `release` path")?;
+        PathBuf::from(path)
+    };
+
+    let workspace = {
+        let path = args.next().context("missing `release` path")?;
+        PathBuf::from(path)
+    };
 
     // Generate environment file for deploying on different machines.
     let env = EnvVars::default();
-    env.generate(
-        &workspace
-            .join("examples")
-            .join("rust")
-            .join("aranya-example-multi-node")
-            .join("example.env"),
-    )
-    .await?;
+    let example = workspace.join("example.env");
+    env.generate(&example).await?;
+
     // Set environment variables before spawning child processes.
     env.set();
 

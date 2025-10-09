@@ -20,6 +20,8 @@ script_dir="$(dirname "$0")"
 pushd "${script_dir}"
 pushd ../../../
 
+current_dir="$(pwd)"
+
 devices=("owner" "admin" "operator" "membera" "memberb")
 
 for device in "${devices[@]}"; do
@@ -32,6 +34,10 @@ for device in "${devices[@]}"; do
         --locked
 done
 
+workspace="${current_dir}/examples/rust/aranya-example-multi-node"
+release="${current_dir}/target/release"
+example="${current_dir}/target/release/aranya-example-multi-node"
+
 echo "Building aranya-daemon..."
 cargo build \
     --release \
@@ -40,9 +46,11 @@ cargo build \
     --features experimental,aqc
 
 echo "Building aranya-example-multi-node..."
-ARANYA_EXAMPLE=info cargo run \
+cargo build \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-example-multi-node \
-    --features aqc \
-    --locked
+    --features aqc
+
+echo "Running aranya-example-multi-node..."
+"${example}" "${release}" "${workspace}"
