@@ -37,7 +37,7 @@ cargo build \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-daemon \
-    --features experimental,aqc,preview,afc
+    --features experimental,aqc
 
 echo "Building aranya-example-multi-node..."
 ARANYA_EXAMPLE=info cargo run \
