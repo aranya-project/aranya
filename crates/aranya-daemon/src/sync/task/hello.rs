@@ -155,9 +155,8 @@ impl Syncer<State> {
         duration: Duration,
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
-        let delay_milliseconds = delay.as_millis() as u64;
-
         // Create the subscribe message
+        let delay_milliseconds = delay.as_millis() as u64;
         let duration_milliseconds = duration.as_millis() as u64;
         let hello_msg = SyncHelloType::Subscribe {
             delay_milliseconds,
