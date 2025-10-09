@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
 
     let mut args = env::args();
     args.next(); // skip executable name
-    // Get release directory from input args.
+                 // Get release directory from input args.
     let release = {
         let path = args.next().context("missing `release` path")?;
         PathBuf::from(path)
