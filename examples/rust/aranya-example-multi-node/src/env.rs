@@ -65,7 +65,7 @@ const DEVICE_LIST: [(&str, Role); 5] = [
 ];
 
 /// Environment variables.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EnvVars {
     /// Tracing log level.
     pub level: String,
@@ -150,6 +150,7 @@ impl EnvVars {
 
     /// Set environment variables.
     pub fn set(&self) {
+        // TODO: set_var() is not safe to call in a multi-threaded program.
         env::set_var("ARANYA_EXAMPLE", self.level.clone());
         env::set_var(
             ONBOARDING_PASSPHRASE_ENV_VAR,

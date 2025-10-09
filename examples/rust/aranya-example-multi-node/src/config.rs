@@ -17,6 +17,7 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
 
     let shm = format!("/shm_{}", device);
     let _ = rustix::shm::unlink(&shm);
+    // TODO: reuse code to derive subdirectories for all examples.
     let runtime_dir = work_dir.join("run");
     let state_dir = work_dir.join("state");
     let cache_dir = work_dir.join("cache");

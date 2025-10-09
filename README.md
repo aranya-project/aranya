@@ -58,7 +58,7 @@ We rely heavely on `cargo make` targets to build software, run integration tests
 [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation)
 
 Building Aranya:
-- `cargo make build` - builds release versions of crates at [crates](crates/) and [examples/rust](examples/rust). This includes the Aranya client Rust library, Aranya daemon executable, and Rust example executables.
+- `cargo make build` - builds release version of the daemon executable at [daemon](crates/aranya-daemon/).
 - `cargo make build-capi` - builds the Aranya C API library including the [aranya-client.h](crates/aranya-client-capi/output/aranya-client.h) header file and `libaranya_client_capi.*` shared library artifact. The extension of the shared library artifact depends on what system it is built on. E.g. MacOS will have a `.dylib` extension while linux would have a `.so` extension.
 
 Testing Aranya:
@@ -91,7 +91,7 @@ We allow certain targets to be run for specific sets of feature flags by appendi
 - `cargo make build-capi-lib-experimental`
 
 
-A complete list of `cargo make` targets can be found in the [Makefile.toml](Makefile.toml)
+A complete list of `cargo make` targets can be found in the [Makefile.toml](Makefile.toml) or by running `cargo make` in the workspace root without any arguments.
 
 ## Getting Started
 

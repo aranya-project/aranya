@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
 
     // Start a daemon for each device.
     let tmp = tempdir()?;
-    let mut children = vec![];
+    let mut children = Vec::with_capacity(env.devices().count());
     for device in env.devices() {
         // Generate config file.
         info!("generating daemon config file for {}", device.name);
@@ -74,13 +74,14 @@ async fn main() -> Result<()> {
 
         let mut child =
             client(device.name.clone(), &uds_sock, &release).expect("expected to spawn client");
+        // Wait on the device executable expected to complete last.
         if device.name == "membera" {
             set.spawn(async move {
                 let _ = child.wait().await;
             });
-        } else {
-            children.push(child);
+            continue;
         }
+        children.push(child);
     }
     // Wait for longest running processes to complete (in this case it's membera).
     // Other device processes will automatically be killed when dropped.
