@@ -260,7 +260,7 @@ async fn test_aqc_chans() -> Result<()> {
                 )
             })
             .retry(
-                ConstantBuilder::new()
+                ConstantBuilder::default()
                     .with_delay(Duration::from_millis(10))
                     .with_max_times(10),
             ),
@@ -283,7 +283,7 @@ async fn test_aqc_chans() -> Result<()> {
         // Receive a unidirectional stream from peer 1
         let mut recv2_1 = (|| std::future::ready(bidi_chan2.try_receive_stream()))
             .retry(
-                ConstantBuilder::new()
+                ConstantBuilder::default()
                     .with_delay(Duration::from_millis(10))
                     .with_max_times(10),
             )
