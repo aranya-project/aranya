@@ -44,4 +44,5 @@ ARANYA_EXAMPLE=info cargo run \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-example-multi-node \
+    --features aqc \
     --locked
