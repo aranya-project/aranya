@@ -176,6 +176,7 @@ mod aqc {
 pub struct SyncPeerConfig {
     interval: Duration,
     sync_now: bool,
+    sync_on_hello: bool,
 }
 
 impl Typed for SyncPeerConfig {
@@ -186,7 +187,9 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
             .interval(value.interval.into())
+            .expect("interval is valid")
             .sync_now(value.sync_now)
+            .sync_on_hello(value.sync_on_hello)
             .build()
             .expect("All values are set")
     }
@@ -201,14 +204,15 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 /// Builder for a [`SyncPeerConfig`]
 #[derive(Clone, Debug)]
 pub struct SyncPeerConfigBuilder {
-    interval: Option<Duration>,
+    interval: Duration,
     sync_now: bool,
+    sync_on_hello: bool,
 }
 
 impl SyncPeerConfigBuilder {
     /// Set the interval at which syncing occurs
     pub fn interval(&mut self, duration: Duration) {
-        self.interval = Some(duration);
+        self.interval = duration;
     }
 
     /// Configures whether the peer will be immediately synced with after being added.
@@ -216,6 +220,14 @@ impl SyncPeerConfigBuilder {
     /// By default, the peer is immediately synced with.
     pub fn sync_now(&mut self, sync_now: bool) {
         self.sync_now = sync_now;
+    }
+
+    /// Configures whether to automatically sync when a hello message is received from this peer
+    /// indicating they have a head that we don't have.
+    ///
+    /// By default, sync on hello is disabled.
+    pub fn sync_on_hello(&mut self, sync_on_hello: bool) {
+        self.sync_on_hello = sync_on_hello;
     }
 }
 
@@ -227,13 +239,10 @@ impl Builder for SyncPeerConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(interval) = self.interval else {
-            return Err(InvalidArg::new("interval", "field not set").into());
-        };
-
         let cfg = SyncPeerConfig {
-            interval,
+            interval: self.interval,
             sync_now: self.sync_now,
+            sync_on_hello: self.sync_on_hello,
         };
         Self::Output::init(out, cfg);
         Ok(())
@@ -247,8 +256,11 @@ impl Typed for SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: None,
+            interval: Duration {
+                nanos: 365 * 24 * 60 * 60 * 1_000_000_000, // 365 days = 1 year in nanoseconds
+            },
             sync_now: true,
+            sync_on_hello: false,
         }
     }
 }

@@ -77,7 +77,7 @@ async fn test_aqc_chans() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -359,7 +359,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -441,7 +441,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -515,7 +515,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -654,7 +654,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client

@@ -11,9 +11,10 @@ use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::{ident, Text, Value};
+#[cfg(any(feature = "afc", feature = "aqc"))]
+use aranya_runtime::Session;
 use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
-    VmPolicy,
+    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Sink, StorageProvider, VmPolicy,
 };
 #[cfg(feature = "aqc")]
 use futures_util::TryFutureExt as _;
@@ -72,6 +73,7 @@ where
 
     /// Create new ephemeral Session.
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
+    #[cfg(any(feature = "afc", feature = "aqc"))]
     #[instrument(skip_all, fields(id = %id))]
     pub(crate) async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
         let session = self.aranya.lock().await.session(*id)?;
@@ -81,6 +83,7 @@ where
     /// Receives an ephemeral command from another ephemeral Session.
     /// Assumes an ephemeral Session has already been created before adding an ephemeral command to the Session.
     #[instrument(skip_all)]
+    #[cfg(any(feature = "afc", feature = "aqc"))]
     pub(crate) async fn session_receive(
         &self,
         session: &mut Session<SP, EN>,

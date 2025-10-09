@@ -7,13 +7,16 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::HashMap, convert::Infallible, future::Future, net::Ipv4Addr, sync::Arc};
+use std::{
+    collections::HashMap, convert::Infallible, future::Future, net::Ipv4Addr, sync::Arc,
+    time::Duration,
+};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    Address, Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -41,15 +44,18 @@ use s2n_quic::{
     Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{io::AsyncReadExt, sync::mpsc};
+use tokio::{
+    io::AsyncReadExt,
+    sync::{mpsc, Mutex},
+};
 use tokio_util::time::DelayQueue;
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
-use super::{Request, SyncPeers, SyncResponse};
+use super::{Request, SyncPeers, SyncResponse, SyncState};
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        task::{PeerCacheKey, PeerCacheMap, SyncState, Syncer},
+        task::{PeerCacheKey, PeerCacheMap, Syncer},
         Result as SyncResult, SyncError,
     },
     InvalidGraphs,
@@ -61,6 +67,8 @@ mod psk;
 pub(crate) use connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
+
+pub(crate) use super::hello::{HelloInfo, HelloSubscriptions};
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -108,6 +116,8 @@ pub struct State {
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
+    /// Shared reference to hello subscriptions for broadcasting notifications
+    hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
 }
 
 impl SyncState for State {
@@ -125,7 +135,7 @@ impl SyncState for State {
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
         // Sets the active team before starting a QUIC connection
-        syncer.state.store.set_team(id.into_id().into());
+        syncer.state.store().set_team(id.into_id().into());
 
         let stream = syncer
             .connect(peer, id)
@@ -150,11 +160,63 @@ impl SyncState for State {
 
         Ok(cmd_count)
     }
+
+    /// Subscribe to hello notifications from a sync peer.
+    #[instrument(skip_all)]
+    async fn sync_hello_subscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+        delay: Duration,
+        duration: Duration,
+    ) -> SyncResult<()> {
+        syncer.state.store().set_team(id.into_id().into());
+        syncer
+            .send_sync_hello_subscribe_request(peer, id, delay, duration, syncer.server_addr)
+            .await
+    }
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    #[instrument(skip_all)]
+    async fn sync_hello_unsubscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+    ) -> SyncResult<()> {
+        syncer.state.store().set_team(id.into_id().into());
+        syncer
+            .send_hello_unsubscribe_request(peer, id, syncer.server_addr)
+            .await
+    }
+
+    /// Broadcast hello notifications to all subscribers of a graph.
+    #[instrument(skip_all)]
+    async fn broadcast_hello_notifications(
+        syncer: &mut Syncer<Self>,
+        graph_id: GraphId,
+        head: Address,
+    ) -> SyncResult<()> {
+        super::hello::broadcast_hello_notifications(syncer, graph_id, head).await
+    }
 }
 
 impl State {
+    /// Get a reference to the PSK store
+    pub fn store(&self) -> &Arc<PskStore> {
+        &self.store
+    }
+
+    /// Get a reference to the hello subscriptions
+    pub fn hello_subscriptions(&self) -> &Arc<Mutex<HelloSubscriptions>> {
+        &self.hello_subscriptions
+    }
+
     /// Creates a new instance
-    fn new(psk_store: Arc<PskStore>, conns: SharedConnectionMap) -> SyncResult<Self> {
+    fn new(
+        psk_store: Arc<PskStore>,
+        conns: SharedConnectionMap,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    ) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -178,6 +240,7 @@ impl State {
             client,
             conns,
             store: psk_store,
+            hello_subscriptions,
         })
     }
 }
@@ -191,6 +254,7 @@ impl Syncer<State> {
         psk_store: Arc<PskStore>,
         server_addr: Addr,
         caches: PeerCacheMap,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
         SyncPeers,
@@ -201,7 +265,7 @@ impl Syncer<State> {
         let peers = SyncPeers::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
-        let state = State::new(psk_store, conns.clone())?;
+        let state = State::new(psk_store, conns.clone(), hello_subscriptions)?;
 
         Ok((
             Self {
@@ -221,8 +285,25 @@ impl Syncer<State> {
         ))
     }
 
+    /// Establishes a QUIC connection to a peer and opens a bidirectional stream.
+    ///
+    /// This method first checks if there's an existing connection to the peer.
+    /// If not, it creates a new QUIC connection. Then it opens a bidirectional
+    /// stream for sending sync requests and receiving responses.
+    ///
+    /// # Arguments
+    /// * `peer` - The network address of the peer to connect to
+    /// * `id` - The graph ID for the team/graph to sync with
+    ///
+    /// # Returns
+    /// * `Ok(BidirectionalStream)` if the connection and stream were established successfully
+    /// * `Err(SyncError)` if there was an error connecting or opening the stream
     #[instrument(skip_all)]
-    async fn connect(&mut self, peer: &Addr, id: GraphId) -> SyncResult<BidirectionalStream> {
+    pub(crate) async fn connect(
+        &mut self,
+        peer: &Addr,
+        id: GraphId,
+    ) -> SyncResult<BidirectionalStream> {
         debug!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
@@ -273,8 +354,22 @@ impl Syncer<State> {
         Ok(stream)
     }
 
+    /// Sends a sync request to a peer over an established QUIC stream.
+    ///
+    /// This method uses the SyncRequester to generate the sync request data,
+    /// serializes it, and sends it over the provided QUIC send stream.
+    ///
+    /// # Arguments
+    /// * `send` - The QUIC send stream to use for sending the request
+    /// * `syncer` - The SyncRequester instance that generates the sync request
+    /// * `id` - The graph ID for the team/graph to sync
+    /// * `peer` - The network address of the peer
+    ///
+    /// # Returns
+    /// * `Ok(())` if the sync request was sent successfully
+    /// * `Err(SyncError)` if there was an error generating or sending the request
     #[instrument(skip_all)]
-    async fn send_sync_request<A>(
+    pub(crate) async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
         syncer: &mut SyncRequester<A>,
@@ -314,7 +409,7 @@ impl Syncer<State> {
     /// Receives and processes a sync response from the server.
     ///
     /// Returns the number of commands that were received and successfully processed.
-    async fn receive_sync_response<S, A>(
+    pub async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
         syncer: &mut SyncRequester<A>,
@@ -333,6 +428,12 @@ impl Syncer<State> {
             .await
             .context("failed to read sync response")?;
         debug!(n = recv_buf.len(), "received sync response");
+
+        // Check for empty response (which indicates a hello message response)
+        if recv_buf.is_empty() {
+            debug!("received empty response, likely from hello message - ignoring");
+            return Ok(0);
+        }
 
         // process the sync response.
         let resp = postcard::from_bytes(&recv_buf)
@@ -386,13 +487,10 @@ pub struct Server<EN, SP> {
     conns: SharedConnectionMap,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
-}
-
-impl<EN, SP> Server<EN, SP> {
-    /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> anyhow::Result<SocketAddr> {
-        Ok(self.server.local_addr()?)
-    }
+    /// Storage for sync hello subscriptions
+    hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    /// Interface to trigger sync operations
+    sync_peers: SyncPeers,
 }
 
 impl<EN, SP> Server<EN, SP>
@@ -400,6 +498,16 @@ where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
+    /// Returns the local address the sync server bound to.
+    pub fn local_addr(&self) -> anyhow::Result<SocketAddr> {
+        Ok(self.server.local_addr()?)
+    }
+
+    /// Returns a reference to the hello subscriptions for hello notification broadcasting.
+    pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
+        Arc::clone(&self.hello_subscriptions)
+    }
+
     /// Creates a new `Server`.
     ///
     /// # Panics
@@ -416,6 +524,7 @@ where
         conns: SharedConnectionMap,
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
         caches: PeerCacheMap,
+        hello_info: HelloInfo,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -448,6 +557,8 @@ where
             conns,
             conn_rx,
             caches,
+            hello_subscriptions: hello_info.subscriptions,
+            sync_peers: hello_info.sync_peers,
         })
     }
 
@@ -518,6 +629,8 @@ where
         let peer = key.addr;
         let client = self.aranya.clone();
         let caches = self.caches.clone();
+        let hello_subscriptions = self.hello_subscriptions.clone();
+        let sync_peers = self.sync_peers.clone();
         async move {
             // Accept incoming streams.
             while let Some(stream) = acceptor
@@ -532,6 +645,8 @@ where
                     peer.into(),
                     stream,
                     &active_team,
+                    hello_subscriptions.clone(),
+                    sync_peers.clone(),
                 )
                 .await
                 .context("failed to process sync request")?;
@@ -552,19 +667,26 @@ where
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        sync_peers: SyncPeers,
     ) -> SyncResult<()> {
-        debug!("server received a sync request");
-
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
-        debug!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res =
-            Self::sync_respond(client, caches, peer, &recv_buf, active_team).await;
+        let sync_response_res = Self::sync_respond(
+            client,
+            caches,
+            peer,
+            &recv_buf,
+            active_team,
+            hello_subscriptions,
+            sync_peers,
+        )
+        .await;
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
@@ -582,8 +704,8 @@ where
                 .context("Could not send sync response")?;
             data_len
         };
-        send.close().await.map_err(Error::from)?;
         debug!(n = data_len, "server sent sync response");
+        send.close().await.map_err(Error::from)?;
 
         Ok(())
     }
@@ -596,19 +718,82 @@ where
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        sync_peers: SyncPeers,
     ) -> SyncResult<Box<[u8]>> {
-        debug!("server responding to sync request");
+        debug!(
+            request_data_len = request_data.len(),
+            ?addr,
+            ?active_team,
+            "Server received sync request"
+        );
 
-        let mut resp = SyncResponder::new(addr);
+        let sync_type: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| {
+            error!(
+                error = %e,
+                request_data_len = request_data.len(),
+                ?addr,
+                ?active_team,
+                "Failed to deserialize sync request"
+            );
+            anyhow::anyhow!(e)
+        })?;
 
-        let SyncType::Poll {
-            request: request_msg,
-            address: peer_server_addr,
-        }: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| anyhow::anyhow!(e))?
-        else {
-            bug!("Other sync types are not implemented");
-        };
+        match sync_type {
+            SyncType::Poll {
+                request: request_msg,
+                address: peer_server_addr,
+            } => {
+                Self::process_poll_message(
+                    request_msg,
+                    client,
+                    caches,
+                    addr,
+                    peer_server_addr,
+                    active_team,
+                )
+                .await
+            }
+            SyncType::Subscribe { .. } => {
+                bug!("Push subscribe messages are not implemented")
+            }
+            SyncType::Unsubscribe { .. } => {
+                bug!("Push unsubscribe messages are not implemented")
+            }
+            SyncType::Push { .. } => {
+                bug!("Push messages are not implemented")
+            }
+            SyncType::Hello(hello_msg) => {
+                Self::process_hello_message(
+                    hello_msg,
+                    client,
+                    caches,
+                    addr,
+                    active_team,
+                    hello_subscriptions,
+                    sync_peers,
+                )
+                .await;
+                // Hello messages are fire-and-forget, return empty response
+                // Note: returning empty response which will be ignored by client
+                Ok(Box::new([]))
+            }
+        }
+    }
 
+    /// Processes a poll message.
+    ///
+    /// Handles sync poll requests and generates sync responses.
+    #[instrument(skip_all)]
+    async fn process_poll_message(
+        request_msg: SyncRequestMessage,
+        client: AranyaClient<EN, SP>,
+        caches: PeerCacheMap,
+        peer_addr: Addr,
+        peer_server_addr: Addr,
+        active_team: &TeamId,
+    ) -> SyncResult<Box<[u8]>> {
+        let mut resp = SyncResponder::new(peer_addr);
         let storage_id = check_request(active_team, &request_msg)?;
 
         resp.receive(request_msg).context("sync recv failed")?;
@@ -622,18 +807,18 @@ where
             let cache = caches.entry(key).or_default();
 
             resp.poll(&mut buf, aranya.provider(), cache)
-                .or_else(|err| {
-                    if matches!(
-                        err,
-                        aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
-                    ) {
-                        warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
-                        Ok(0)
-                    } else {
-                        Err(err)
-                    }
-                })
-                .context("sync resp poll failed")?
+                        .or_else(|err| {
+                            if matches!(
+                                err,
+                                aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                            ) {
+                                warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
+                                Ok(0)
+                            } else {
+                                Err(err)
+                            }
+                        })
+                        .context("sync resp poll failed")?
         };
         debug!(len = len, "sync poll finished");
         buf.truncate(len);

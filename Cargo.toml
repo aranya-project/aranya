@@ -54,14 +54,14 @@ aranya-policy-text = { version = "0.1.2" }
 aranya-policy-vm = { version = "0.13.0", features = ["std"] }
 aranya-runtime = { version = "0.14.0", features = ["std", "libc"] }
 
-buggy = { version = "0.1.0" }
-
 aranya-client = { version = "3.0.0", path = "crates/aranya-client" }
 aranya-daemon = { version = "3.0.0", path = "crates/aranya-daemon" }
 aranya-daemon-api = { version = "3.0.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "3.0.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "3.0.0", path = "crates/aranya-util" }
+buggy = { version = "0.1.0" }
 
+# External dependencies
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
 bytes = { version = "1.0" }
@@ -71,7 +71,6 @@ derive-where = { version = "1" }
 divan = { version = "0.1", default-features = false }
 futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
-heapless = { version = "0.8", default-features = false }
 http = { version = "1" }
 libc = { version = "0.2" }
 metrics = { version = "0.24" }
