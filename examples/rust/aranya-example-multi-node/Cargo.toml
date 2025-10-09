@@ -12,7 +12,7 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["aqc"]
+default = []
 
 aqc = ["aranya-client/aqc", "aranya-client/experimental"]
 

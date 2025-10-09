@@ -12,7 +12,7 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["afc", "aqc"]
+default = []
 
 afc = ["aranya-client/afc", "aranya-client/preview"]
 aqc = ["aranya-client/aqc", "aranya-client/experimental"]
@@ -35,3 +35,9 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[[bin]]
+name = "aranya-example"
+path = "src/main.rs"
+required-features = ["afc", "aqc"]
+test = false
