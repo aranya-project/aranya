@@ -59,11 +59,11 @@ aranya-daemon = { version = "3.0.0", path = "crates/aranya-daemon" }
 aranya-daemon-api = { version = "3.0.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "3.0.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "3.0.0", path = "crates/aranya-util" }
+buggy = { version = "0.1.0" }
 
 # External dependencies
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
-buggy = { version = "0.1.0" }
 bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }

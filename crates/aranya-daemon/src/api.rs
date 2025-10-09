@@ -131,7 +131,7 @@ impl DaemonApiServer {
             aqc: aqc.clone(),
             client: Some(client.clone()),
             peers: Some(peers.clone()),
-            prev_head_addresses: Arc::new(Mutex::new(HashMap::new())),
+            prev_head_addresses: Arc::default(),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -289,33 +289,34 @@ impl EffectHandler {
         }
 
         // Check if the graph head address has changed
-        if let Some(current_head) = self.get_graph_head_address(graph).await {
-            let mut prev_addresses = self.prev_head_addresses.lock().await;
-            let has_graph_changes = match prev_addresses.get(&graph) {
-                Some(prev_head) => prev_head != &current_head,
-                None => true, // First time seeing this graph
-            };
-
-            if has_graph_changes {
-                trace!(
-                    ?graph,
-                    ?current_head,
-                    "graph head address changed, triggering hello notification broadcast"
-                );
-                // Update stored head address
-                prev_addresses.insert(graph, current_head);
-                drop(prev_addresses); // Release the lock before async call
-
-                self.broadcast_hello_notifications(graph, current_head)
-                    .await?;
-            } else {
-                trace!(
-                    ?graph,
-                    "graph head address unchanged, no hello broadcast needed"
-                );
-            }
-        } else {
+        let Some(current_head) = self.get_graph_head_address(graph).await else {
             warn!(?graph, "unable to get current graph head address");
+            return Ok(());
+        };
+
+        let mut prev_addresses = self.prev_head_addresses.lock().await;
+        let has_graph_changes = match prev_addresses.get(&graph) {
+            Some(prev_head) => prev_head != &current_head,
+            None => true, // First time seeing this graph
+        };
+
+        if has_graph_changes {
+            trace!(
+                ?graph,
+                ?current_head,
+                "graph head address changed, triggering hello notification broadcast"
+            );
+            // Update stored head address
+            prev_addresses.insert(graph, current_head);
+            drop(prev_addresses); // Release the lock before async call
+
+            self.broadcast_hello_notifications(graph, current_head)
+                .await?;
+        } else {
+            trace!(
+                ?graph,
+                "graph head address unchanged, no hello broadcast needed"
+            );
         }
 
         Ok(())

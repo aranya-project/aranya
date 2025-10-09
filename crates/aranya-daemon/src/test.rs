@@ -8,7 +8,7 @@
 )]
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fs,
     net::Ipv4Addr,
     ops::{Deref, DerefMut},
@@ -48,7 +48,7 @@ use crate::{
     sync::{
         self,
         task::{
-            quic::{HelloInfo, PskStore},
+            quic::{HelloInfo, HelloSubscriptions, PskStore},
             PeerCacheKey, PeerCacheMap, SyncPeer,
         },
     },
@@ -248,7 +248,7 @@ impl TestCtx {
             let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
-            let hello_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+            let hello_subscriptions = Arc::<Mutex<HelloSubscriptions>>::default();
 
             let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);

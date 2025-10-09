@@ -1032,8 +1032,8 @@ pub fn sync_peer_config_builder_set_interval(
 ) -> Result<(), imp::Error> {
     // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
     // in DelayQueue::insert() (which calculates deadline as current_time + interval)
-    let one_year = std::time::Duration::from_secs(365 * 24 * 60 * 60); // 365 days
-    if std::time::Duration::from(interval) > one_year {
+    const ONE_YEAR: std::time::Duration = std::time::Duration::from_secs(365 * 24 * 60 * 60); // 365 days
+    if std::time::Duration::from(interval) > ONE_YEAR {
         return Err(
             InvalidArg::new("interval", "must not exceed 1 year to prevent overflow").into(),
         );

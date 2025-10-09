@@ -1,9 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    io,
-    path::Path,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -378,7 +373,7 @@ impl Daemon {
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
         // Create shared hello subscriptions for both server and syncer
-        let hello_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+        let hello_subscriptions = Arc::default();
 
         // Initialize the syncer
         let (mut syncer, peers, conns, conn_rx) = Syncer::new(

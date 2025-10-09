@@ -71,10 +71,12 @@ pub async fn broadcast_hello_notifications(
         filtered
     };
 
+    let now = Instant::now();
+
     // Send hello notification to each subscriber
     for (subscriber_addr, subscription) in subscribers.iter() {
         // Check if subscription has expired
-        if Instant::now() >= subscription.expires_at {
+        if now >= subscription.expires_at {
             // Remove expired subscription
             let mut subscriptions = syncer.state.hello_subscriptions().lock().await;
             subscriptions.remove(&(graph_id, *subscriber_addr));
@@ -85,8 +87,7 @@ pub async fn broadcast_hello_notifications(
         // Check if enough time has passed since last notification
         if let Some(last_notified) = subscription.last_notified {
             let delay = Duration::from_millis(subscription.delay_milliseconds);
-            let elapsed = last_notified.elapsed();
-            if elapsed < delay {
+            if now - last_notified < delay {
                 continue;
             }
         }
@@ -100,7 +101,7 @@ pub async fn broadcast_hello_notifications(
                 // Update the last notified time
                 let mut subscriptions = syncer.state.hello_subscriptions().lock().await;
                 if let Some(sub) = subscriptions.get_mut(&(graph_id, *subscriber_addr)) {
-                    sub.last_notified = Some(Instant::now());
+                    sub.last_notified = Some(now);
                 } else {
                     warn!(
                         ?subscriber_addr,

@@ -340,35 +340,31 @@ impl<ST: SyncState> Syncer<ST> {
                     }
                     Msg::SyncOnHello { peer } => {
                         // Check if sync_on_hello is enabled for this peer
-                        if let Some((cfg, _)) = self.peers.get(&peer) {
-                            if cfg.sync_on_hello {
-                                match self.sync(&peer).await {
-                                    Ok(_) => {
-                                        Ok(())
-                                    }
-                                    Err(e) => {
-                                        warn!(
-                                            error = %e,
-                                            ?peer,
-                                            "SyncOnHello sync failed"
-                                        );
-                                        Err(e)
-                                    }
-                                }
-                            } else {
-                                trace!(
-                                    ?peer,
-                                    "SyncOnHello is not enabled for this peer, ignoring"
-                                );
-                                Ok(())
-                            }
-                        } else {
+                        let Some((cfg, _)) = self.peers.get(&peer) else {
                             warn!(
                                 ?peer,
                                 "Peer not found in our configuration, ignoring SyncOnHello"
                             );
-                            Ok(())
+                            return Ok(());
+                        };
+
+                        if !cfg.sync_on_hello {
+                            trace!(
+                                ?peer,
+                                "SyncOnHello is not enabled for this peer, ignoring"
+                            );
+                            return Ok(());
                         }
+
+                        self.sync(&peer).await
+                            .inspect_err(|e| {
+                                warn!(
+                                    error = %e,
+                                    ?peer,
+                                    "SyncOnHello sync failed"
+                                );
+                            })
+                            .map(|_| ())
                     }
                     Msg::BroadcastHello { graph_id, head } => {
                         ST::broadcast_hello_notifications(self, graph_id, head).await
