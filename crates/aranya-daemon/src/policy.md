@@ -4201,189 +4201,6 @@ function chan_op_rank(op enum ChanOp) int {
 
 ### AFC
 
-#### AFC Bidirectional Channel Creation
-
-Creates a bidirectional AFC channel for off-graph messaging. This is an
-ephemeral command, which means that it can only be emitted within an
-ephemeral session so that it is not added to the graph of commands.
-Furthermore, it cannot persist any changes to the factDB.
-
-The `create_afc_bidi_channel` action creates the `ChannelKeys`,
-encapsulates them for the peer and the author, and sends the
-encapsulations through the `AfcCreateBidiChannel` command. When
-processing the command, the device will decapsulate their keys and store
-them in the shared memory DB.
-
-```policy
-ephemeral action create_afc_bidi_channel(peer_id id, label_id id) {
-    let parent_cmd_id = perspective::head_id()
-    let author_id = device::current_device_id()
-    let author = get_device(author_id)
-    let peer_enc_pk = get_enc_pk(peer_id)
-
-    let ch = afc::create_bidi_channel(
-        parent_cmd_id,
-        author.enc_key_id,
-        author_id,
-        peer_enc_pk,
-        peer_id,
-        label_id,
-    )
-
-    publish AfcCreateBidiChannel {
-        peer_id: peer_id,
-        label_id: label_id,
-        peer_encap: ch.peer_encap,
-        channel_key_id: ch.key_id,
-    }
-}
-
-// Reports whether the devices have permission to create
-// a bidirectional AFC channel with each other.
-//
-// # Caveats
-//
-// - It does NOT check whether the devices exist.
-function can_create_afc_bidi_channel(device1 id, device2 id, label_id id) bool {
-    // Devices cannot create channels with themselves.
-    //
-    // This should have been caught by the AFC FFI, so check
-    // instead of just returning false.
-    check device1 != device2
-
-    // Both devices must have permissions to read (recv) and
-    // write (send) data.
-    let device1_op = get_allowed_chan_op_for_label(device1, label_id)
-    if device1_op is None {
-        return false
-    }
-    if (unwrap device1_op) != ChanOp::SendRecv {
-        return false
-    }
-
-    let device2_op = get_allowed_chan_op_for_label(device2, label_id)
-    if device2_op is None {
-        return false
-    }
-    if (unwrap device2_op) != ChanOp::SendRecv {
-        return false
-    }
-
-    return true
-}
-
-// Emitted when the author of a bidirectional AFC channel
-// successfully processes the `AfcCreateBidiChannel` command.
-effect AfcBidiChannelCreated {
-    // The unique ID of the previous command.
-    parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The channel author's encryption key ID.
-    author_enc_key_id id,
-    // The channel peer's device Id.
-    peer_id id,
-    // The channel peer's encoded public encryption key.
-    peer_enc_pk bytes,
-    // The channel label.
-    label_id id,
-    // A unique ID that the author can use to look up the
-    // channel's secrets.
-    author_secret_id id,
-    // The channel key ID.
-    channel_key_id id,
-}
-
-// Emitted when the peer of a bidirectional AFC channel
-// successfully processes the `AfcCreateBidiChannel` command.
-effect AfcBidiChannelReceived {
-    // The unique ID of the previous command.
-    parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The channel author's encoded public encryption key.
-    author_enc_pk bytes,
-    // The channel peer's device Id.
-    peer_id id,
-    // The channel peer's encryption key ID.
-    peer_enc_key_id id,
-    // The channel label.
-    label_id id,
-    // The channel peer's encapsulated KEM shared secret.
-    encap bytes,
-}
-
-ephemeral command AfcCreateBidiChannel {
-    fields {
-        // The channel peer's device ID.
-        peer_id id,
-        // The label applied to the channel.
-        label_id id,
-        // The channel peer's encapsulated KEM shared secret.
-        peer_encap bytes,
-        // The channel key ID.
-        channel_key_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateAfcBidiChannel)
-        let peer = get_device(this.peer_id)
-
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
-
-        // Check that both devices have been granted permission
-        // to use the label for for send and recv.
-        check can_create_afc_bidi_channel(author.device_id, peer.device_id, label.label_id)
-
-        let parent_cmd_id = envelope::parent_id(envelope)
-        let current_device_id = device::current_device_id()
-
-        if current_device_id == author.device_id {
-            // We're the channel author.
-            let peer_enc_pk = get_enc_pk(peer.device_id)
-
-            finish {
-                emit AfcBidiChannelCreated {
-                    parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    author_enc_key_id: author.enc_key_id,
-                    peer_id: peer.device_id,
-                    peer_enc_pk: peer_enc_pk,
-                    label_id: label.label_id,
-                    channel_key_id: this.channel_key_id,
-                }
-            }
-        } else if current_device_id == peer.device_id {
-            // We're the channel peer.
-            let author_enc_pk = get_enc_pk(author.device_id)
-
-            finish {
-                emit AfcBidiChannelReceived {
-                    parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    author_enc_pk: author_enc_pk,
-                    peer_id: peer.device_id,
-                    peer_enc_key_id: peer.enc_key_id,
-                    label_id: label.label_id,
-                    encap: this.peer_encap,
-                }
-            }
-        } else {
-            // This is an off-graph session command, so only the
-            // communicating peers should process this command.
-            check false
-        }
-    }
-}
-```
-
 #### AFC Unidirectional Channel Creation
 
 Creates a unidirectional AFC channel. This is an ephemeral command,
@@ -4398,23 +4215,22 @@ corresponding recipient will decapsulate their key and store it in the
 shared memory DB.
 
 ```policy
-ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
+ephemeral action create_afc_uni_channel(receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
-    let author = get_device(device::current_device_id())
-    let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
-    let peer_enc_pk = get_enc_pk(peer_id)
+    let author_id = device::current_device_id()
+    let author = get_device(author_id)
+    let peer_enc_pk = get_enc_pk(receiver_id)
 
     let ch = afc::create_uni_channel(
         parent_cmd_id,
         author.enc_key_id,
         peer_enc_pk,
-        sender_id,
+        author_id,
         receiver_id,
         label_id,
     )
 
     publish AfcCreateUniChannel {
-        sender_id: sender_id,
         receiver_id: receiver_id,
         label_id: label_id,
         peer_encap: ch.peer_encap,
@@ -4427,10 +4243,6 @@ ephemeral action create_afc_uni_channel(sender_id id, receiver_id id, label_id i
 effect AfcUniChannelCreated {
     // The unique ID of the previous command.
     parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The device ID of the participant that can send data.
-    sender_id id,
     // The device ID of the participant that can receive data.
     receiver_id id,
     // The channel author's encryption key ID.
@@ -4448,12 +4260,8 @@ effect AfcUniChannelCreated {
 effect AfcUniChannelReceived {
     // The unique ID of the previous command.
     parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
     // The device ID of the participant that can send data.
     sender_id id,
-    // The device ID of the participant that can receive data.
-    receiver_id id,
     // The channel author's encryption key ID.
     author_enc_pk bytes,
     // The channel peer's encryption key ID.
@@ -4466,8 +4274,6 @@ effect AfcUniChannelReceived {
 
 ephemeral command AfcCreateUniChannel {
     fields {
-        // The device ID of the participant that can send data.
-        sender_id id,
         // The device ID of the participant that can receive
         // data.
         receiver_id id,
@@ -4485,59 +4291,47 @@ ephemeral command AfcCreateUniChannel {
     policy {
         check team_exists()
 
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateAfcUniChannel)
+        let sender = get_author(envelope)
+        let sender_id = sender.device_id
+        check device_has_simple_perm(sender_id, SimplePerm::CreateAfcUniChannel)
 
-        // Ensure that the author is one of the channel
-        // participants.
-        check author.device_id == this.sender_id ||
-              author.device_id == this.receiver_id
-
-        let peer_id = if author.device_id == this.sender_id {
-            :this.receiver_id
-        } else {
-            :this.sender_id
-        }
-        let peer = check_unwrap try_find_device(peer_id)
+        let receiver_id = this.receiver_id
+        let receiver = check_unwrap try_find_device(receiver_id)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
         // Check that both devices have been granted permission
         // to use the label for their respective directions.
-        check can_create_afc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
+        check can_create_afc_uni_channel(sender_id, receiver_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
 
-        if current_device_id == author.device_id {
+        if current_device_id == sender_id {
             // We authored this command.
-            let peer_enc_pk = get_enc_pk(peer_id)
+            let peer_enc_pk = get_enc_pk(receiver_id)
 
             finish {
                 emit AfcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    sender_id: this.sender_id,
-                    receiver_id: this.receiver_id,
-                    author_enc_key_id: author.enc_key_id,
+                    receiver_id: receiver_id,
+                    author_enc_key_id: sender.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
                 }
             }
-        } else if current_device_id == peer.device_id {
+        } else if current_device_id == receiver_id {
             // We're the intended recipient of this command.
-            let author_enc_pk = get_enc_pk(author.device_id)
+            let author_enc_pk = get_enc_pk(sender_id)
 
             finish {
                 emit AfcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    sender_id: this.sender_id,
-                    receiver_id: this.receiver_id,
+                    sender_id: sender_id,
                     author_enc_pk: author_enc_pk,
-                    peer_enc_key_id: peer.enc_key_id,
-                    label_id: label.label_id,
+                    peer_enc_key_id: receiver.enc_key_id,
+                    label_id: this.label_id,
                     encap: this.peer_encap,
                 }
             }

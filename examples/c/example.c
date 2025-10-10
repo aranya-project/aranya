@@ -18,6 +18,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#define ENABLE_ARANYA_AFC 1
+#define ENABLE_ARANYA_PREVIEW 1
+#define ENABLE_ARANYA_AQC 1
+#define ENABLE_ARANYA_EXPERIMENTAL 1
 #include "aranya-client.h"
 
 // Macro for printing AranyaError to stderr and returning the error.
@@ -145,7 +149,6 @@ AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
 AranyaError init_team(Team* t);
 AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
 AranyaError run(Team* t);
-AranyaError run_afc_bidi_example(Team* t);
 AranyaError run_afc_uni_example(Team* t);
 AranyaError run_aqc_example(Team* t);
 AranyaError cleanup_team(Team* t);
@@ -761,9 +764,6 @@ AranyaError run(Team* t) {
                                            &memberb->id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
 
-    err = run_afc_bidi_example(t);
-    EXPECT("error running afc bidi example", err);
-
     err = run_afc_uni_example(t);
     EXPECT("error running afc uni example", err);
 
@@ -792,121 +792,6 @@ AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
     }
 
 exit:
-    return err;
-}
-
-// Run the AFC unidirectional example.
-AranyaError run_afc_bidi_example(Team* t) {
-    Client* operator= & t->clients.operator;
-    Client* membera = &t->clients.membera;
-    Client* memberb = &t->clients.memberb;
-
-    unsigned char* ciphertext = NULL;
-    unsigned char* plaintext  = NULL;
-
-    AranyaError err;
-
-    // Create a new label and assign it to Member A/Member B.
-    AranyaLabelId label_id;
-    AranyaChannelIdent idents[] = {{&membera->id, ARANYA_CHAN_OP_SEND_RECV},
-                                   {&memberb->id, ARANYA_CHAN_OP_SEND_RECV}};
-    err = aranya_create_assign_label(&operator->client, &t->id, "bidi_label",
-                                     &label_id, idents, 2);
-    // We already attached a warning message, just return.
-    if (err != ARANYA_ERROR_SUCCESS) {
-        goto exit;
-    }
-
-    // Tell them both to sync with the operator to see their new label.
-    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OPERATOR], NULL);
-    EXPECT("error calling `sync_now` to sync with peer", err);
-
-    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OPERATOR], NULL);
-    EXPECT("error calling `sync_now` to sync with peer", err);
-
-    // Create a new bidi channel, which will give back an `AranyaAfcChannel`
-    // and a control message to send to the other peer (in this case, it's local
-    // so there's no "transport" layer sending the ctrl_msg to Member B).
-    AranyaAfcChannel afc_bidi_chan_a;
-    AranyaAfcCtrlMsg ctrl_msg;
-    err =
-        aranya_afc_create_bidi_channel(&membera->client, &t->id, &memberb->id,
-                                       &label_id, &afc_bidi_chan_a, &ctrl_msg);
-    EXPECT("error creating a bidi channel for membera", err);
-
-    // In production, you would get the underlying buffer from the control
-    // message, and send it to the other peer via your transport of choice,
-    // which will allow them to create the other side of the channel.
-    const uint8_t* bytes_ptr;
-    size_t bytes_len;
-    err = aranya_afc_ctrl_msg_get_bytes(&ctrl_msg, &bytes_ptr, &bytes_len);
-    EXPECT("error getting ptr+len from `AranyaAfcCtrlMsg`", err);
-
-    // Note that since we created a bidi channel on Member A's side above,
-    // Member B here will also have a bidi channel.
-    AranyaAfcChannel afc_bidi_chan_b;
-    AranyaAfcChannelType chan_type;
-    err = aranya_afc_recv_ctrl(&memberb->client, &t->id, bytes_ptr, bytes_len,
-                               &afc_bidi_chan_b, &chan_type);
-    EXPECT("error creating a channel from control message", err);
-    if (chan_type != ARANYA_AFC_CHANNEL_TYPE_BIDIRECTIONAL) {
-        EXPECT("didn't receive a bidi channel from membera", ARANYA_ERROR_BUG);
-    }
-
-    // Now we need to define some data we want to send, in this case a simple
-    // string. We need both the original data, as well as a buffer to store the
-    // resulting ciphertext, which includes some additional overhead.
-    const char* afc_msg   = "afc msg";
-    size_t afc_msg_len    = strlen(afc_msg);
-    size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
-    ciphertext            = calloc(ciphertext_len, 1);
-    if (ciphertext == NULL) {
-        abort();
-    }
-
-    // Use the channel to encrypt and authenticate our data, and store the
-    // encrypted result in our ciphertext buffer.
-    err = aranya_afc_channel_seal(&afc_bidi_chan_a, (const uint8_t*)afc_msg,
-                                  afc_msg_len, ciphertext, &ciphertext_len);
-    EXPECT("error sealing afc message", err);
-
-    // Here, you would send the ciphertext to the other peer using the transport
-    // of your choice. Aranya Fast Channels (AFC) does not provide a transport,
-    // only the encryption capabilities to make such an operation safe.
-
-    // The peer needs to allocate a buffer to decrypt the data back into, minus
-    // channel overhead. This allows it to calculate the original data's length.
-    size_t plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
-    plaintext            = calloc(plaintext_len, 1);
-    if (plaintext == NULL) {
-        abort();
-    }
-
-    // Here, we open the message and get back the original data, as well as a
-    // sequence number, which allows you to reorder messages that may have been
-    // received out-of-order using `aranya_afc_seq_cmp()` to compare two seq.
-    AranyaAfcSeq seq;
-    err = aranya_afc_channel_open(&afc_bidi_chan_b, ciphertext, ciphertext_len,
-                                  plaintext, &plaintext_len, &seq);
-    EXPECT("error opening afc message", err);
-
-    // Make sure that the received message matches the originally sent data.
-    if (memcmp(afc_msg, plaintext, afc_msg_len)) {
-        EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
-    }
-
-    err = aranya_afc_channel_delete(&membera->client, &afc_bidi_chan_a);
-    EXPECT("error deleting membera's channel", err);
-
-    err = aranya_afc_channel_delete(&memberb->client, &afc_bidi_chan_b);
-    EXPECT("error deleting memberb's channel", err);
-
-    err = aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
-    EXPECT("error cleaning up control message", err);
-
-exit:
-    free(ciphertext);
-    free(plaintext);
     return err;
 }
 
@@ -942,7 +827,7 @@ AranyaError run_afc_uni_example(Team* t) {
     // Create a new uni send channel, which will give back an `AranyaAfcChannel`
     // and a control message to send to the other peer (in this case, it's local
     // so there's no "transport" layer sending the ctrl_msg to Member B).
-    AranyaAfcChannel afc_send_channel;
+    AranyaAfcSendChannel afc_send_channel;
     AranyaAfcCtrlMsg recv_message;
     err = aranya_afc_create_uni_send_channel(&membera->client, &t->id,
                                              &memberb->id, &label_id,
@@ -959,15 +844,10 @@ AranyaError run_afc_uni_example(Team* t) {
 
     // Note that since we created a uni send channel on Member A's side above,
     // Member B here will get a uni receive channel.
-    AranyaAfcChannel afc_recv_channel;
-    AranyaAfcChannelType chan_type;
+    AranyaAfcReceiveChannel afc_recv_channel;
     err = aranya_afc_recv_ctrl(&memberb->client, &t->id, bytes_ptr, bytes_len,
-                               &afc_recv_channel, &chan_type);
+                               &afc_recv_channel);
     EXPECT("error creating a channel from control message", err);
-    if (chan_type != ARANYA_AFC_CHANNEL_TYPE_RECEIVER) {
-        EXPECT("didn't receive a uni recv channel from membera",
-               ARANYA_ERROR_BUG);
-    }
 
     // Now we need to define some data we want to send, in this case a simple
     // string. We need both the original data, as well as a buffer to store the
@@ -1011,10 +891,11 @@ AranyaError run_afc_uni_example(Team* t) {
         EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
     }
 
-    err = aranya_afc_channel_delete(&membera->client, &afc_send_channel);
+    err = aranya_afc_send_channel_delete(&membera->client, &afc_send_channel);
     EXPECT("error deleting membera's channel", err);
 
-    err = aranya_afc_channel_delete(&memberb->client, &afc_recv_channel);
+    err =
+        aranya_afc_receive_channel_delete(&memberb->client, &afc_recv_channel);
     EXPECT("error deleting memberb's channel", err);
 
     err = aranya_afc_ctrl_msg_cleanup(&recv_message);
