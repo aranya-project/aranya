@@ -5,7 +5,10 @@ use std::{fmt, marker::PhantomData, str::FromStr};
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::Ffi as AfcFfi;
 use aranya_aqc_util::Ffi as AqcFfi;
-use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
+use aranya_crypto::{
+    keystore::{fs_keystore::Store, KeyStore},
+    DeviceId,
+};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
 use aranya_envelope_ffi::Ffi as EnvelopeFfi;
@@ -20,13 +23,10 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::{
-    keystore::AranyaStore,
-    policy::{ChanOp, Role},
-};
+use crate::{keystore::AranyaStore, policy::ChanOp, util::TryClone};
 
 /// Policy loaded from policy.md file.
-pub const TEST_POLICY_1: &str = include_str!("./policy.md");
+pub(crate) const POLICY_SOURCE: &str = include_str!("./policy.md");
 
 /// Converts [`ChanOp`] to string.
 impl FromStr for ChanOp {
@@ -56,23 +56,24 @@ pub struct PolicyEngine<E, KS> {
     _ks: PhantomData<KS>,
 }
 
-impl<E> PolicyEngine<E, Store>
+impl<E, KS> PolicyEngine<E, KS>
 where
     E: aranya_crypto::Engine,
+    KS: KeyStore + TryClone + Send + 'static,
 {
     /// Creates a `PolicyEngine` from a policy document.
     pub fn new(
         policy_doc: &str,
         eng: E,
-        store: AranyaStore<Store>,
+        store: AranyaStore<KS>,
         device_id: DeviceId,
     ) -> Result<Self> {
         // compile the policy.
         let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
         let module = Compiler::new(&ast)
             .ffi_modules(&[
-                AqcFfi::<Store>::SCHEMA,
                 AfcFfi::<Store>::SCHEMA,
+                AqcFfi::<Store>::SCHEMA,
                 CryptoFfi::<Store>::SCHEMA,
                 DeviceFfi::SCHEMA,
                 EnvelopeFfi::SCHEMA,
@@ -85,6 +86,7 @@ where
 
         // select which FFI modules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
+            Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(AqcFfi::new(store.try_clone()?)),
             Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
@@ -130,18 +132,6 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PolicyEngine").finish_non_exhaustive()
-    }
-}
-
-/// Converts policy [`Role`] to string.
-impl fmt::Display for Role {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Owner => f.write_str("Owner"),
-            Self::Admin => f.write_str("Admin"),
-            Self::Operator => f.write_str("Operator"),
-            Self::Member => f.write_str("Member"),
-        }
     }
 }
 
@@ -218,4 +208,34 @@ impl Sink<&[u8]> for MsgSink {
 
     #[instrument(skip_all)]
     fn commit(&mut self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use core::convert::Infallible;
+
+    use aranya_crypto::{
+        default::{DefaultCipherSuite, DefaultEngine},
+        keystore::memstore::MemStore,
+        Rng,
+    };
+
+    use super::*;
+
+    impl TryClone for MemStore {
+        type Error = Infallible;
+
+        fn try_clone(&self) -> Result<Self, Self::Error> {
+            Ok(self.clone())
+        }
+    }
+
+    /// Tests that we can compile and build [`POLICY_SOURCE`].
+    #[test]
+    fn test_policy_compile() {
+        let (eng, _) = DefaultEngine::<_, DefaultCipherSuite>::from_entropy(Rng);
+        let store = AranyaStore::new(MemStore::new());
+        let device_id = DeviceId::default();
+        PolicyEngine::<_, _>::new(POLICY_SOURCE, eng, store, device_id).unwrap();
+    }
 }

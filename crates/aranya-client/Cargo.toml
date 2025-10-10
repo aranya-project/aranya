@@ -33,6 +33,7 @@ aqc = ["aranya-daemon-api/aqc"]
 [dependencies]
 aranya-daemon-api = { workspace = true }
 aranya-fast-channels = { workspace = true, optional = true }
+aranya-policy-text = { workspace = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
