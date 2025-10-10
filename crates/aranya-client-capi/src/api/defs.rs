@@ -15,6 +15,7 @@ use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_client::afc;
 #[cfg(feature = "aqc")]
 use aranya_client::aqc;
+use aranya_client::config::MAX_SYNC_INTERVAL;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 #[cfg(feature = "aqc")]
@@ -1032,8 +1033,7 @@ pub fn sync_peer_config_builder_set_interval(
 ) -> Result<(), imp::Error> {
     // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
     // in DelayQueue::insert() (which calculates deadline as current_time + interval)
-    const ONE_YEAR: std::time::Duration = std::time::Duration::from_secs(365 * 24 * 60 * 60); // 365 days
-    if std::time::Duration::from(interval) > ONE_YEAR {
+    if std::time::Duration::from(interval) > MAX_SYNC_INTERVAL {
         return Err(
             InvalidArg::new("interval", "must not exceed 1 year to prevent overflow").into(),
         );

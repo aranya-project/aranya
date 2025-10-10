@@ -9,6 +9,12 @@ use crate::{error::InvalidArg, ConfigError, Result};
 pub mod team;
 pub use team::*;
 
+/// Maximum sync interval of 1 year (365 days).
+///
+/// This limit prevents overflow when calculating deadlines in DelayQueue::insert(),
+/// which adds the interval to Instant::now().
+pub const MAX_SYNC_INTERVAL: Duration = Duration::from_secs(365 * 24 * 60 * 60);
+
 /// Configuration info for syncing with a peer.
 #[derive(Debug, Clone)]
 pub struct SyncPeerConfig {
@@ -65,8 +71,7 @@ impl SyncPeerConfigBuilder {
     pub fn interval(mut self, duration: Duration) -> Result<Self> {
         // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
         // in DelayQueue::insert() (which calculates deadline as current_time + interval)
-        let one_year = Duration::from_secs(365 * 24 * 60 * 60); // 365 days
-        if duration > one_year {
+        if duration > MAX_SYNC_INTERVAL {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
                 "duration",
                 "must not exceed 1 year to prevent overflow",
@@ -99,7 +104,7 @@ impl SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: Duration::from_secs(365 * 24 * 60 * 60), // 365 days = 1 year
+            interval: MAX_SYNC_INTERVAL,
             sync_now: true,
             sync_on_hello: false,
         }

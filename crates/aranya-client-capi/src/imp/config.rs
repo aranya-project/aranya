@@ -6,6 +6,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_client::config::MAX_SYNC_INTERVAL;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -257,7 +258,7 @@ impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
             interval: Duration {
-                nanos: 365 * 24 * 60 * 60 * 1_000_000_000, // 365 days = 1 year in nanoseconds
+                nanos: MAX_SYNC_INTERVAL.as_nanos() as u64,
             },
             sync_now: true,
             sync_on_hello: false,
