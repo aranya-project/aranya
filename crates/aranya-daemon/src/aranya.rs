@@ -3,10 +3,12 @@
 //! The `Client` is specifically designed to be shared across threads safely, using
 //! an `Arc<Mutex<_>>` internally to manage concurrent access.
 
-use std::{fmt, ops::Deref, sync::Arc};
+use std::{collections::BTreeMap, fmt, ops::Deref, sync::Arc};
 
-use aranya_runtime::ClientState;
-use tokio::sync::Mutex;
+use aranya_runtime::{ClientState, PeerCache};
+use tokio::sync::{Mutex, MutexGuard};
+
+use crate::sync::task::PeerCacheKey;
 
 /// Thread-safe wrapper for an Aranya client.
 pub struct Client<EN, SP> {

@@ -196,7 +196,7 @@ impl SyncState for State {
         graph_id: GraphId,
         head: Address,
     ) -> SyncResult<()> {
-        super::hello::broadcast_hello_notifications(syncer, graph_id, head).await
+        syncer.broadcast_hello_notifications(graph_id, head).await
     }
 }
 

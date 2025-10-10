@@ -51,86 +51,86 @@ pub struct HelloInfo {
     pub sync_peers: SyncPeers,
 }
 
-/// Broadcast hello notifications to all subscribers of a graph.
-#[instrument(skip_all)]
-pub async fn broadcast_hello_notifications(
-    syncer: &mut Syncer<State>,
-    graph_id: GraphId,
-    head: Address,
-) -> SyncResult<()> {
-    // Get all subscribers for this graph
-    let subscribers = {
-        let subscriptions = syncer.state.hello_subscriptions().lock().await;
+impl Syncer<State> {
+    /// Broadcast hello notifications to all subscribers of a graph.
+    #[instrument(skip_all)]
+    pub async fn broadcast_hello_notifications(
+        &mut self,
+        graph_id: GraphId,
+        head: Address,
+    ) -> SyncResult<()> {
+        // Get all subscribers for this graph
+        let subscribers = {
+            let subscriptions = self.state.hello_subscriptions().lock().await;
 
-        let filtered: Vec<_> = subscriptions
-            .iter()
-            .filter(|((sub_graph_id, _), _)| *sub_graph_id == graph_id)
-            .map(|((_, addr), subscription)| (*addr, subscription.clone()))
-            .collect();
+            let filtered: Vec<_> = subscriptions
+                .iter()
+                .filter(|((sub_graph_id, _), _)| *sub_graph_id == graph_id)
+                .map(|((_, addr), subscription)| (*addr, subscription.clone()))
+                .collect();
 
-        filtered
-    };
+            filtered
+        };
 
-    let now = Instant::now();
+        let now = Instant::now();
 
-    // Send hello notification to each subscriber
-    for (subscriber_addr, subscription) in subscribers.iter() {
-        // Check if subscription has expired
-        if now >= subscription.expires_at {
-            // Remove expired subscription
-            let mut subscriptions = syncer.state.hello_subscriptions().lock().await;
-            subscriptions.remove(&(graph_id, *subscriber_addr));
-            debug!(?subscriber_addr, ?graph_id, "Removed expired subscription");
-            continue;
-        }
-
-        // Check if enough time has passed since last notification
-        if let Some(last_notified) = subscription.last_notified {
-            let delay = Duration::from_millis(subscription.delay_milliseconds);
-            if now - last_notified < delay {
+        // Send hello notification to each subscriber
+        for (subscriber_addr, subscription) in subscribers.iter() {
+            // Check if subscription has expired
+            if now >= subscription.expires_at {
+                // Remove expired subscription
+                let mut subscriptions = self.state.hello_subscriptions().lock().await;
+                subscriptions.remove(&(graph_id, *subscriber_addr));
+                debug!(?subscriber_addr, ?graph_id, "Removed expired subscription");
                 continue;
             }
-        }
 
-        // Send the notification
-        match syncer
-            .send_hello_notification_to_subscriber(subscriber_addr, graph_id, head)
-            .await
-        {
-            Ok(()) => {
-                // Update the last notified time
-                let mut subscriptions = syncer.state.hello_subscriptions().lock().await;
-                if let Some(sub) = subscriptions.get_mut(&(graph_id, *subscriber_addr)) {
-                    sub.last_notified = Some(now);
-                } else {
+            // Check if enough time has passed since last notification
+            if let Some(last_notified) = subscription.last_notified {
+                let delay = Duration::from_millis(subscription.delay_milliseconds);
+                if now - last_notified < delay {
+                    continue;
+                }
+            }
+
+            // Send the notification
+            match self
+                .send_hello_notification_to_subscriber(subscriber_addr, graph_id, head)
+                .await
+            {
+                Ok(()) => {
+                    // Update the last notified time
+                    let mut subscriptions = self.state.hello_subscriptions().lock().await;
+                    if let Some(sub) = subscriptions.get_mut(&(graph_id, *subscriber_addr)) {
+                        sub.last_notified = Some(now);
+                    } else {
+                        warn!(
+                            ?subscriber_addr,
+                            ?graph_id,
+                            "Failed to find subscription to update last_notified"
+                        );
+                    }
+                }
+                Err(e) => {
                     warn!(
+                        error = %e,
                         ?subscriber_addr,
-                        ?graph_id,
-                        "Failed to find subscription to update last_notified"
+                        ?head,
+                        "Failed to send hello notification"
                     );
                 }
             }
-            Err(e) => {
-                warn!(
-                    error = %e,
-                    ?subscriber_addr,
-                    ?head,
-                    "Failed to send hello notification"
-                );
-            }
         }
+
+        trace!(
+            ?graph_id,
+            ?head,
+            subscriber_count = subscribers.len(),
+            "Completed broadcast_hello_notifications"
+        );
+        Ok(())
     }
 
-    trace!(
-        ?graph_id,
-        ?head,
-        subscriber_count = subscribers.len(),
-        "Completed broadcast_hello_notifications"
-    );
-    Ok(())
-}
-
-impl Syncer<State> {
     /// Sends a subscribe request to a peer for hello notifications.
     ///
     /// This method sends a [`SyncHelloType::Subscribe`] message to the specified peer,
@@ -401,13 +401,7 @@ where
                     "Received Hello notification message"
                 );
 
-                // Check if we have this command in our graph
-                let command_exists = {
-                    let mut aranya = client.aranya.lock().await;
-                    aranya.command_exists(graph_id, head)
-                };
-
-                if !command_exists {
+                if !client.aranya.lock().await.command_exists(graph_id, head) {
                     match sync_peers.sync_on_hello(address, graph_id).await {
                         Ok(()) => {
                             debug!(
