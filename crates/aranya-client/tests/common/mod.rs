@@ -205,7 +205,7 @@ impl DevicesCtx {
     /// by [`Client::setup_default_roles`].
     #[instrument(skip(self))]
     pub async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
-        self.setup_default_roles_inner(team_id, true).await
+        self.owner.setup_default_roles(team_id, true).await
     }
 
     /// Sets up default roles without creating any management delegations.
@@ -214,58 +214,7 @@ impl DevicesCtx {
         &self,
         team_id: TeamId,
     ) -> Result<DefaultRoles> {
-        self.setup_default_roles_inner(team_id, false).await
-    }
-
-    #[instrument(skip(self, grant_delegations))]
-    async fn setup_default_roles_inner(
-        &self,
-        team_id: TeamId,
-        grant_delegations: bool,
-    ) -> Result<DefaultRoles> {
-        let owner_role = self
-            .owner
-            .client
-            .team(team_id)
-            .roles()
-            .await?
-            .try_into_owner_role()?;
-        tracing::debug!(owner_role_id = %owner_role.id);
-
-        let setup_roles = self
-            .owner
-            .client
-            .team(team_id)
-            .setup_default_roles(owner_role.id)
-            .await?;
-
-        let roles = setup_roles
-            .into_iter()
-            .chain(iter::once(owner_role))
-            .try_into_default_roles()
-            .context("unable to parse `DefaultRoles`")?;
-        tracing::debug!(?roles, "default roles set up");
-
-        if grant_delegations {
-            let mappings = [
-                // admin -> operator
-                ("admin -> operator", roles.operator().id, roles.admin().id),
-                // admin -> member
-                ("admin -> member", roles.member().id, roles.admin().id),
-                // operator -> member
-                ("operator -> member", roles.member().id, roles.operator().id),
-            ];
-            for (name, role, manager) in mappings {
-                self.owner
-                    .client
-                    .team(team_id)
-                    .assign_role_management_permission(role, manager, text!("CanAssignRole"))
-                    .await
-                    .with_context(|| format!("{name}: unable to change managing role"))?;
-            }
-        }
-
-        Ok(roles)
+        self.owner.setup_default_roles(team_id, false).await
     }
 }
 
@@ -368,6 +317,54 @@ impl DeviceCtx {
             return format!("/{}\0", t.to_base58());
         };
         path
+    }
+
+    #[instrument(skip(self, grant_delegations))]
+    async fn setup_default_roles(
+        &self,
+        team_id: TeamId,
+        grant_delegations: bool,
+    ) -> Result<DefaultRoles> {
+        let owner_role = self
+            .client
+            .team(team_id)
+            .roles()
+            .await?
+            .try_into_owner_role()?;
+        tracing::debug!(owner_role_id = %owner_role.id);
+
+        let setup_roles = self
+            .client
+            .team(team_id)
+            .setup_default_roles(owner_role.id)
+            .await?;
+
+        let roles = setup_roles
+            .into_iter()
+            .chain(iter::once(owner_role))
+            .try_into_default_roles()
+            .context("unable to parse `DefaultRoles`")?;
+        tracing::debug!(?roles, "default roles set up");
+
+        if grant_delegations {
+            let mappings = [
+                // admin -> operator
+                ("admin -> operator", roles.operator().id, roles.admin().id),
+                // admin -> member
+                ("admin -> member", roles.member().id, roles.admin().id),
+                // operator -> member
+                ("operator -> member", roles.member().id, roles.operator().id),
+            ];
+            for (name, role, manager) in mappings {
+                self.client
+                    .team(team_id)
+                    .assign_role_management_permission(role, manager, text!("CanAssignRole"))
+                    .await
+                    .with_context(|| format!("{name}: unable to change managing role"))?;
+            }
+        }
+
+        Ok(roles)
     }
 
     #[cfg(feature = "aqc")]
