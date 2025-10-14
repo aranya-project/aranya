@@ -17,11 +17,11 @@ use tokio::{io::AsyncReadExt, sync::Mutex};
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
-    aranya::Client as AranyaClient,
+    aranya::ClientWithCaches,
     sync::{
         task::{
             quic::{Error, Server, State},
-            PeerCacheKey, PeerCacheMap, SyncPeers, Syncer,
+            PeerCacheKey, SyncPeers, Syncer,
         },
         Result as SyncResult,
     },
@@ -335,8 +335,7 @@ where
     #[instrument(skip_all)]
     pub async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client: AranyaClient<EN, SP>,
-        caches: PeerCacheMap,
+        client_with_caches: ClientWithCaches<EN, SP>,
         peer_addr: Addr,
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
@@ -401,7 +400,13 @@ where
                     "Received Hello notification message"
                 );
 
-                if !client.aranya.lock().await.command_exists(graph_id, head) {
+                if !client_with_caches
+                    .client()
+                    .aranya
+                    .lock()
+                    .await
+                    .command_exists(graph_id, head)
+                {
                     match sync_peers.sync_on_hello(address, graph_id).await {
                         Ok(()) => {
                             debug!(
@@ -428,9 +433,8 @@ where
                 // Update the peer cache with the received head_id
                 let key = PeerCacheKey::new(peer_addr, graph_id);
 
-                // Must lock aranya then caches to prevent deadlock.
-                let mut aranya = client.aranya.lock().await;
-                let mut caches = caches.lock().await;
+                // Lock both aranya and caches in the correct order.
+                let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;
                 let cache = caches.entry(key).or_default();
 
                 // Update the cache with the received head_id

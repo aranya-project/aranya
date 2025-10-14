@@ -29,13 +29,13 @@ use crate::afc::Afc;
 use crate::{actions::Actions, aqc::Aqc};
 use crate::{
     api::{ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
-    aranya,
+    aranya::{self, ClientWithCaches, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
         quic::{HelloInfo, PskStore, State as QuicSyncClientState, SyncParams},
-        PeerCacheMap, SyncPeers, Syncer,
+        SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -176,9 +176,9 @@ impl Daemon {
                 &pks,
                 SyncParams {
                     psk_store: Arc::clone(&psk_store),
-                    caches: caches.clone(),
                     server_addr: qs_config.addr,
                 },
+                caches,
                 invalid_graphs.clone(),
             )
             .await?;
@@ -347,9 +347,9 @@ impl Daemon {
         pk: &PublicKeys<CS>,
         SyncParams {
             psk_store,
-            caches,
             server_addr,
         }: SyncParams,
+        caches: PeerCacheMap,
         invalid_graphs: InvalidGraphs,
     ) -> Result<(
         Client,
@@ -376,24 +376,25 @@ impl Daemon {
         let hello_subscriptions = Arc::default();
 
         // Initialize the syncer
+        let client_with_caches_for_syncer =
+            ClientWithCaches::new(client.clone(), Arc::clone(&caches));
         let (mut syncer, peers, conns, conn_rx) = Syncer::new(
-            client.clone(),
+            client_with_caches_for_syncer,
             send_effects,
             invalid_graphs,
             Arc::clone(&psk_store),
             server_addr,
-            Arc::clone(&caches),
             Arc::clone(&hello_subscriptions),
         )?;
 
         info!(addr = %server_addr, "starting QUIC sync server");
+        let client_with_caches = ClientWithCaches::new(client.clone(), caches);
         let server = SyncServer::new(
-            client.clone(),
+            client_with_caches,
             &server_addr,
             psk_store,
             conns,
             conn_rx,
-            caches,
             HelloInfo {
                 subscriptions: hello_subscriptions,
                 sync_peers: peers.clone(),

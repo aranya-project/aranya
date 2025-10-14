@@ -44,3 +44,78 @@ impl<EN, SP> Deref for Client<EN, SP> {
         &self.aranya
     }
 }
+
+/// Thread-safe map of peer caches.
+///
+/// For a given peer, there should only be one cache. If separate caches are used
+/// for the server and state it will reduce the efficiency of the syncer.
+pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
+
+/// Wrapper that pairs an Aranya client with peer caches.
+///
+/// Ensures safe lock ordering by providing a method that locks both in the correct order.
+/// The client must always be locked before the caches to prevent deadlocks.
+pub(crate) struct ClientWithCaches<EN, SP> {
+    client: Client<EN, SP>,
+    caches: PeerCacheMap,
+}
+
+impl<EN, SP> ClientWithCaches<EN, SP> {
+    /// Creates a new `ClientWithCaches`.
+    pub fn new(client: Client<EN, SP>, caches: PeerCacheMap) -> Self {
+        Self { client, caches }
+    }
+
+    /// Locks both the client and caches in the correct order.
+    ///
+    /// This method ensures that the client (aranya) is always locked before the caches,
+    /// preventing potential deadlocks. Returns a tuple of guards in the order (aranya, caches).
+    pub async fn lock_aranya_and_caches(
+        &self,
+    ) -> (
+        MutexGuard<'_, ClientState<EN, SP>>,
+        MutexGuard<'_, BTreeMap<PeerCacheKey, PeerCache>>,
+    ) {
+        let aranya = self.client.aranya.lock().await;
+        let caches = self.caches.lock().await;
+        (aranya, caches)
+    }
+
+    /// Returns a reference to the underlying client.
+    ///
+    /// Use this when you need to access the client alone without locking the caches.
+    pub fn client(&self) -> &Client<EN, SP> {
+        &self.client
+    }
+
+    /// Returns a mutable reference to the underlying client.
+    ///
+    /// Use this when you need mutable access to the client alone without locking the caches.
+    #[cfg(test)]
+    pub(crate) fn client_mut(&mut self) -> &mut Client<EN, SP> {
+        &mut self.client
+    }
+
+    /// Returns a clone of the peer caches Arc for test inspection.
+    ///
+    /// This is a test-only method to allow inspection of cache contents.
+    #[cfg(test)]
+    pub(crate) fn caches_for_test(&self) -> PeerCacheMap {
+        Arc::clone(&self.caches)
+    }
+}
+
+impl<EN, SP> fmt::Debug for ClientWithCaches<EN, SP> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ClientWithCaches").finish_non_exhaustive()
+    }
+}
+
+impl<EN, SP> Clone for ClientWithCaches<EN, SP> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            caches: Arc::clone(&self.caches),
+        }
+    }
+}

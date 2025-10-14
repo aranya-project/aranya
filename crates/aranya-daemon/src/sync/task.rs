@@ -6,30 +6,21 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::Future,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, future::Future, time::Duration};
 
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Address, Engine, PeerCache, Sink};
+use aranya_runtime::{storage::GraphId, Address, Engine, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{
-    daemon::{Client, EF},
-    vm_policy::VecSink,
-    InvalidGraphs,
-};
+use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
 
 pub mod hello;
 pub mod quic;
@@ -203,20 +194,14 @@ impl PeerCacheKey {
     }
 }
 
-/// Thread-safe map of peer caches.
-///
-/// For a given peer, there's should only be one cache. If separate caches are used
-/// for the server and state it will reduce the efficiency of the syncer.
-pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
-
 /// Syncs with each peer after the specified interval.
 ///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 #[derive(Debug)]
 pub struct Syncer<ST> {
-    /// Aranya client to allow syncing the Aranya graph with another peer.
-    pub client: Client,
+    /// Aranya client paired with caches, ensuring safe lock ordering.
+    pub(crate) client_with_caches: crate::aranya::ClientWithCaches<crate::EN, crate::SP>,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
     /// Receives added/removed peers.
@@ -231,9 +216,6 @@ pub struct Syncer<ST> {
     state: ST,
     /// Sync server address.
     server_addr: Addr,
-    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
-    /// Lock must be acquired after [`Self::client`]
-    caches: PeerCacheMap,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
@@ -456,21 +438,21 @@ impl<ST: SyncState> Syncer<ST> {
         ST::sync_hello_unsubscribe_impl(self, peer.graph_id, &peer.addr).await
     }
 
-    /// Get peer caches.
+    /// Get peer caches for test inspection.
     #[cfg(test)]
-    pub(crate) fn get_peer_caches(&self) -> PeerCacheMap {
-        self.caches.clone()
+    pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
+        self.client_with_caches.caches_for_test()
     }
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
     pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
-        &self.client
+        self.client_with_caches.client()
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
     pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
-        &mut self.client
+        self.client_with_caches.client_mut()
     }
 }

@@ -43,13 +43,13 @@ use tokio::{
 use crate::{
     actions::Actions,
     api::EffectReceiver,
-    aranya,
+    aranya::{self, ClientWithCaches, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
         task::{
             quic::{HelloInfo, HelloSubscriptions, PskStore},
-            PeerCacheKey, PeerCacheMap, SyncPeer,
+            PeerCacheKey, SyncPeer,
         },
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -252,26 +252,26 @@ impl TestCtx {
 
             let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);
+                let client_with_caches_for_syncer = ClientWithCaches::new(client.clone(), caches.clone());
                 let (syncer, sync_peers, conn_map, conn_rx) = TestSyncer::new(
-                    client.clone(),
+                    client_with_caches_for_syncer,
                     send_effects,
                     InvalidGraphs::default(),
                     psk_store.clone(),
                     Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                    caches.clone(),
                     hello_subscriptions.clone(),
                 )?;
 
                 (syncer, sync_peers, conn_map, conn_rx, effect_recv)
             };
 
+            let client_with_caches = ClientWithCaches::new(client.clone(), caches.clone());
             let server: TestServer = TestServer::new(
-                client.clone(),
+                client_with_caches,
                 &local_addr,
                 psk_store.clone(),
                 conn_map,
                 conn_rx,
-                caches.clone(),
                 HelloInfo {
                     subscriptions: hello_subscriptions.clone(),
                     sync_peers,

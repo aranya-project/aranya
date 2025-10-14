@@ -53,9 +53,9 @@ use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::{Request, SyncPeers, SyncResponse, SyncState};
 use crate::{
-    aranya::Client as AranyaClient,
+    aranya::ClientWithCaches,
     sync::{
-        task::{PeerCacheKey, PeerCacheMap, Syncer},
+        task::{PeerCacheKey, Syncer},
         Result as SyncResult, SyncError,
     },
     InvalidGraphs,
@@ -102,7 +102,6 @@ impl From<Infallible> for Error {
 /// Sync configuration for setting up Aranya.
 pub(crate) struct SyncParams {
     pub(crate) psk_store: Arc<PskStore>,
-    pub(crate) caches: PeerCacheMap,
     pub(crate) server_addr: Addr,
 }
 
@@ -248,12 +247,11 @@ impl State {
 impl Syncer<State> {
     /// Creates a new [`Syncer`].
     pub(crate) fn new(
-        client: super::Client,
+        client_with_caches: ClientWithCaches<crate::EN, crate::SP>,
         send_effects: super::EffectSender,
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         server_addr: Addr,
-        caches: PeerCacheMap,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
@@ -269,7 +267,7 @@ impl Syncer<State> {
 
         Ok((
             Self {
-                client,
+                client_with_caches,
                 peers: HashMap::new(),
                 recv,
                 queue: DelayQueue::new(),
@@ -277,7 +275,6 @@ impl Syncer<State> {
                 invalid,
                 state,
                 server_addr,
-                caches,
             },
             peers,
             conns,
@@ -383,10 +380,9 @@ impl Syncer<State> {
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let len = {
-            // Must lock aranya then caches to prevent deadlock.
-            let mut aranya = self.client.aranya.lock().await;
+            // Lock both aranya and caches in the correct order.
+            let (mut aranya, mut caches) = self.client_with_caches.lock_aranya_and_caches().await;
             let key = PeerCacheKey::new(*peer, id);
-            let mut caches = self.caches.lock().await;
             let cache = caches.entry(key).or_default();
             let (len, _) = syncer
                 .poll(&mut send_buf, aranya.provider(), cache)
@@ -449,7 +445,9 @@ impl Syncer<State> {
         if let Some(cmds) = syncer.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
-                let mut aranya = self.client.aranya.lock().await;
+                // Lock both aranya and caches in the correct order.
+                let (mut aranya, mut caches) =
+                    self.client_with_caches.lock_aranya_and_caches().await;
                 let mut trx = aranya.transaction(*id);
                 aranya
                     .add_commands(&mut trx, sink, &cmds)
@@ -457,7 +455,6 @@ impl Syncer<State> {
                 aranya.commit(&mut trx, sink).context("commit failed")?;
                 debug!("committed");
                 let key = PeerCacheKey::new(*peer, *id);
-                let mut caches = self.caches.lock().await;
                 let cache = caches.entry(key).or_default();
                 aranya
                     .update_heads(*id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
@@ -475,14 +472,11 @@ impl Syncer<State> {
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
 pub struct Server<EN, SP> {
-    /// Thread-safe Aranya client reference.
-    aranya: AranyaClient<EN, SP>,
+    /// Thread-safe Aranya client paired with caches, ensuring safe lock ordering.
+    client_with_caches: ClientWithCaches<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
     server_keys: Arc<PskStore>,
-    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
-    /// Lock must be acquired after [`Self::aranya`]
-    caches: PeerCacheMap,
     /// Connection map shared with [`super::Syncer`]
     conns: SharedConnectionMap,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
@@ -518,12 +512,11 @@ where
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        aranya: AranyaClient<EN, SP>,
+        client_with_caches: ClientWithCaches<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
         conns: SharedConnectionMap,
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
-        caches: PeerCacheMap,
         hello_info: HelloInfo,
     ) -> SyncResult<Self> {
         // Create Server Config
@@ -551,12 +544,11 @@ where
             .map_err(Error::ServerStart)?;
 
         Ok(Self {
-            aranya,
+            client_with_caches,
             server,
             server_keys,
             conns,
             conn_rx,
-            caches,
             hello_subscriptions: hello_info.subscriptions,
             sync_peers: hello_info.sync_peers,
         })
@@ -627,8 +619,7 @@ where
     ) -> impl Future<Output = ()> {
         let active_team = key.id.into_id().into();
         let peer = key.addr;
-        let client = self.aranya.clone();
-        let caches = self.caches.clone();
+        let client_with_caches = self.client_with_caches.clone();
         let hello_subscriptions = self.hello_subscriptions.clone();
         let sync_peers = self.sync_peers.clone();
         async move {
@@ -640,8 +631,7 @@ where
             {
                 debug!("received incoming QUIC stream");
                 Self::sync(
-                    client.clone(),
-                    caches.clone(),
+                    client_with_caches.clone(),
                     peer.into(),
                     stream,
                     &active_team,
@@ -662,8 +652,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     pub async fn sync(
-        client: AranyaClient<EN, SP>,
-        caches: PeerCacheMap,
+        client_with_caches: ClientWithCaches<EN, SP>,
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
@@ -678,8 +667,7 @@ where
 
         // Generate a sync response for a sync request.
         let sync_response_res = Self::sync_respond(
-            client,
-            caches,
+            client_with_caches,
             peer,
             &recv_buf,
             active_team,
@@ -713,8 +701,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: AranyaClient<EN, SP>,
-        caches: PeerCacheMap,
+        client_with_caches: ClientWithCaches<EN, SP>,
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
@@ -746,8 +733,7 @@ where
             } => {
                 Self::process_poll_message(
                     request_msg,
-                    client,
-                    caches,
+                    client_with_caches,
                     addr,
                     peer_server_addr,
                     active_team,
@@ -766,8 +752,7 @@ where
             SyncType::Hello(hello_msg) => {
                 Self::process_hello_message(
                     hello_msg,
-                    client,
-                    caches,
+                    client_with_caches,
                     addr,
                     active_team,
                     hello_subscriptions,
@@ -787,8 +772,7 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: AranyaClient<EN, SP>,
-        caches: PeerCacheMap,
+        client_with_caches: ClientWithCaches<EN, SP>,
         peer_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,
@@ -800,10 +784,9 @@ where
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         let len = {
-            // Must lock aranya then caches to prevent deadlock.
-            let mut aranya = client.aranya.lock().await;
+            // Lock both aranya and caches in the correct order.
+            let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;
             let key = PeerCacheKey::new(peer_server_addr, storage_id);
-            let mut caches = caches.lock().await;
             let cache = caches.entry(key).or_default();
 
             resp.poll(&mut buf, aranya.provider(), cache)
