@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
 
     // Start a daemon for each device.
     let tmp = tempdir()?;
-    let mut children = Vec::with_capacity(env.devices().count());
+    let mut daemons = Vec::with_capacity(env.devices().count());
     for device in env.devices() {
         // Generate config file.
         info!("generating daemon config file for {}", device.name);
@@ -56,13 +56,13 @@ async fn main() -> Result<()> {
         // Start daemon.
         info!("starting {} daemon", device.name);
         let child = daemon(&release, &cfg).expect("expected to spawn daemon");
-        children.push(child);
+        daemons.push(child);
     }
     // Wait for daemons to start.
     sleep(Duration::from_secs(2)).await;
 
     // Start device for each team member.
-    let mut set = JoinSet::new();
+    let mut processes = JoinSet::new();
     for device in env.devices() {
         info!("starting {} client", device.name);
         let uds_sock = tmp
@@ -74,21 +74,17 @@ async fn main() -> Result<()> {
 
         let mut child =
             client(device.name.clone(), &uds_sock, &release).expect("expected to spawn client");
-        // Wait on the device executable expected to complete last.
-        if device.name == "membera" {
-            set.spawn(async move {
-                let _ = child.wait().await;
-            });
-            continue;
-        }
-        children.push(child);
+        // Spawn device process and collect exit status.
+        processes.spawn(async move {
+            let status = child.wait().await.unwrap();
+            assert!(status.success(), "{status:?}");
+        });
     }
-    // Wait for longest running processes to complete (in this case it's membera).
-    // Other device processes will automatically be killed when dropped.
-    set.join_all().await;
-    // Kill remaining child processes.
-    for mut child in children {
-        let _ = child.kill().await;
+    // Wait for all device processes to complete.
+    processes.join_all().await;
+    // Kill daemon processes.
+    for mut d in daemons {
+        let _ = d.kill().await;
     }
 
     info!("completed aranya-example-multi-node example");
