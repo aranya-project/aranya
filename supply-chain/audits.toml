@@ -208,11 +208,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
 
-[[audits.redox_syscall]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.5.10"
-
 [[audits.rfc6979]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -272,26 +267,6 @@ version = "0.4.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
-
-[[audits.rustix]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.37.13 -> 0.37.28"
-
-[[audits.rustix]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.37.13 -> 0.37.28"
-
-[[audits.rustix]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.37.13 -> 0.37.28"
-
-[[audits.rustix]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.37.13 -> 0.37.28"
 
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
