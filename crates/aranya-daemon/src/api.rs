@@ -37,7 +37,7 @@ use crate::afc::Afc;
 #[cfg(feature = "aqc")]
 use crate::aqc::Aqc;
 use crate::{
-    actions::Actions,
+    actions::{Actions, SessionData},
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated},
@@ -838,7 +838,7 @@ impl DaemonApi for Api {
             .await
             .context("did not find peer")?;
 
-        let (ctrl, effects) = self
+        let SessionData { ctrl, effects } = self
             .client
             .actions(&graph)
             .create_aqc_bidi_channel(peer_id, label.into_id().into())
@@ -881,7 +881,7 @@ impl DaemonApi for Api {
             .context("did not find peer")?;
 
         let id = self.device_id()?;
-        let (ctrl, effects) = self
+        let SessionData { ctrl, effects } = self
             .client
             .actions(&graph)
             .create_aqc_uni_channel(id, peer_id, label.into_id().into())
@@ -983,7 +983,7 @@ impl DaemonApi for Api {
 
         let graph = GraphId::from(team.into_id());
 
-        let (ctrl, effects) = self
+        let SessionData { ctrl, effects } = self
             .client
             .actions(&graph)
             .create_afc_uni_channel_off_graph(peer_id.into_id().into(), label.into_id().into())

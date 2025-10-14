@@ -26,8 +26,14 @@ use crate::{
     vm_policy::{MsgSink, VecSink},
 };
 
-/// Type alias for complex AQC channel creation results.
-type ChannelCreationResult = Result<(Vec<Box<[u8]>>, Vec<Effect>)>;
+/// Container for complex AQC channel creation results.
+#[derive(Debug)]
+pub(crate) struct SessionData {
+    /// The serialized messages
+    pub ctrl: Vec<Box<[u8]>>,
+    /// The effects produced
+    pub effects: Vec<Effect>,
+}
 
 /// Functions related to Aranya actions
 impl<EN, SP, CE> Client<EN, SP>
@@ -138,7 +144,7 @@ where
     /// and a vector of [`Effect`]s produced by the action.
     #[instrument(skip_all)]
     #[allow(clippy::type_complexity)] // 2advanced4u
-    async fn session_action<'a, F>(&self, f: F) -> Result<(Vec<Box<[u8]>>, Vec<Effect>)>
+    async fn session_action<'a, F>(&self, f: F) -> Result<SessionData>
     where
         F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a>,
     {
@@ -147,7 +153,10 @@ where
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();
         session.action(&client, &mut sink, &mut msg_sink, f())?;
-        Ok((msg_sink.into_cmds(), sink.collect()?))
+        Ok(SessionData {
+            ctrl: msg_sink.into_cmds(),
+            effects: sink.collect()?,
+        })
     }
 }
 
@@ -165,10 +174,7 @@ where
 
     /// Performs a session action.
     #[allow(clippy::type_complexity)]
-    fn session_action<'a, F>(
-        &self,
-        f: F,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send
+    fn session_action<'a, F>(&self, f: F) -> impl Future<Output = Result<SessionData>> + Send
     where
         F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a> + Send;
 
@@ -313,7 +319,7 @@ where
             name: ident!("query_aqc_network_names"),
             args: Cow::Owned(vec![]),
         })
-        .and_then(|(_, effects)| {
+        .and_then(|SessionData { effects, .. }| {
             std::future::ready(
                 effects
                     .into_iter()
@@ -372,7 +378,7 @@ where
         &self,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = ChannelCreationResult> + Send {
+    ) -> impl Future<Output = Result<SessionData>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_aqc_bidi_channel"),
             args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
@@ -390,7 +396,7 @@ where
         seal_id: DeviceId,
         open_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = ChannelCreationResult> + Send {
+    ) -> impl Future<Output = Result<SessionData>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_aqc_uni_channel"),
             args: Cow::Owned(vec![
@@ -423,7 +429,7 @@ where
         &self,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = Result<SessionData>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_afc_bidi_channel"),
             args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
@@ -439,7 +445,7 @@ where
         &self,
         open_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = Result<SessionData>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_afc_uni_channel"),
             args: Cow::Owned(vec![Value::from(open_id), Value::from(label_id)]),
@@ -468,7 +474,7 @@ where
             name: ident!("query_aqc_net_id"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -479,7 +485,7 @@ where
             name: ident!("query_aqc_network_names"),
             args: Cow::Owned(vec![]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -494,7 +500,7 @@ where
             name: ident!("query_device_keybundle"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -509,7 +515,7 @@ where
             name: ident!("query_device_role"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -521,7 +527,7 @@ where
             name: ident!("query_devices_on_team"),
             args: Cow::Owned(vec![]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -531,7 +537,7 @@ where
     fn query_aqc_net_identifier_off_graph(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = Result<SessionData>> + Send {
         self.session_action(move || VmAction {
             name: ident!("query_aqc_net_identifier"),
             args: Cow::Owned(vec![Value::from(device_id)]),
@@ -547,7 +553,7 @@ where
             name: ident!("query_label"),
             args: Cow::Owned(vec![Value::from(label_id)]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -559,7 +565,7 @@ where
             name: ident!("query_labels"),
             args: Cow::Owned(vec![]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -573,7 +579,7 @@ where
             name: ident!("query_labels_assigned_to_device"),
             args: Cow::Owned(vec![Value::from(device.into_id())]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -587,7 +593,7 @@ where
             name: ident!("query_labels_assigned_to_role"),
             args: Cow::Owned(vec![Value::from(role.into_id())]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -598,7 +604,7 @@ where
             name: ident!("query_team_roles"),
             args: Cow::Owned(vec![]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
@@ -609,7 +615,7 @@ where
             name: ident!("query_role_owners"),
             args: Cow::Owned(vec![Value::Id(role_id)]),
         })
-        .map_ok(|(_, effects)| effects)
+        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
