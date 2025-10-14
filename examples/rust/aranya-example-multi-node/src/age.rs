@@ -22,15 +22,9 @@ impl AgeEncryptor {
 
     /// Encrypt data with a passhrase.
     pub fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
-        /// Constants copied from age-0.11.1/src/primitives/stream.rs
-        const CHUNK_SIZE: usize = 64 * 1024;
-        const TAG_SIZE: usize = 16;
-        const ENCRYPTED_CHUNK_SIZE: usize = CHUNK_SIZE + TAG_SIZE;
-
         let encryptor = Encryptor::with_user_passphrase(self.passphrase.clone());
 
-        let mut ciphertext =
-            Vec::with_capacity(plaintext.len() * ENCRYPTED_CHUNK_SIZE / CHUNK_SIZE);
+        let mut ciphertext = vec![];
         let mut writer = encryptor.wrap_output(&mut ciphertext)?;
         writer.write_all(plaintext)?;
         writer.finish()?;
