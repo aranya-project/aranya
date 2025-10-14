@@ -29,12 +29,15 @@ use tracing::{debug, error, instrument};
 use crate::{
     aranya::ClientWithCaches,
     sync::{
+        manager::{EffectSender, Request, SyncHandle, SyncManager},
         services::hello::HelloSubscriptions,
-        task::{EffectSender, Request, SyncPeers, SyncState, Syncer},
-        transport::quic::{
-            connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
-            psk::PskStore,
-            ALPN_QUIC_SYNC,
+        transport::{
+            quic::{
+                connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
+                psk::PskStore,
+                ALPN_QUIC_SYNC,
+            },
+            Transport,
         },
         types::{SyncPeer, SyncResponse},
         Result as SyncResult, SyncError,
@@ -82,13 +85,13 @@ pub struct State {
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
 }
 
-impl SyncState for State {
+impl Transport for State {
     /// Syncs with the peer.
     ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
     async fn sync_impl<S>(
-        syncer: &mut Syncer<Self>,
+        syncer: &mut SyncManager<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
@@ -126,7 +129,7 @@ impl SyncState for State {
     /// Subscribe to hello notifications from a sync peer.
     #[instrument(skip_all)]
     async fn sync_hello_subscribe_impl(
-        syncer: &mut Syncer<Self>,
+        syncer: &mut SyncManager<Self>,
         id: GraphId,
         peer: &Addr,
         delay: Duration,
@@ -141,7 +144,7 @@ impl SyncState for State {
     /// Unsubscribe from hello notifications from a sync peer.
     #[instrument(skip_all)]
     async fn sync_hello_unsubscribe_impl(
-        syncer: &mut Syncer<Self>,
+        syncer: &mut SyncManager<Self>,
         id: GraphId,
         peer: &Addr,
     ) -> SyncResult<()> {
@@ -154,7 +157,7 @@ impl SyncState for State {
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
     async fn broadcast_hello_notifications(
-        syncer: &mut Syncer<Self>,
+        syncer: &mut SyncManager<Self>,
         graph_id: GraphId,
         head: Address,
     ) -> SyncResult<()> {
@@ -207,7 +210,7 @@ impl State {
     }
 }
 
-impl Syncer<State> {
+impl SyncManager<State> {
     /// Creates a new [`Syncer`].
     pub(crate) fn new(
         client_with_caches: ClientWithCaches<crate::EN, crate::SP>,
@@ -218,12 +221,12 @@ impl Syncer<State> {
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
-        SyncPeers,
+        SyncHandle,
         SharedConnectionMap,
         mpsc::Receiver<ConnectionUpdate>,
     )> {
         let (send, recv) = mpsc::channel::<Request>(128);
-        let peers = SyncPeers::new(send);
+        let peers = SyncHandle::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
         let state = State::new(psk_store, conns.clone(), hello_subscriptions)?;

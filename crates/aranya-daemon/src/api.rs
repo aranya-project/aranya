@@ -44,7 +44,7 @@ use crate::{
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::{task::SyncPeers, transport::quic as qs},
+    sync::{manager::SyncHandle, transport::quic as qs},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
 };
@@ -86,7 +86,7 @@ pub(crate) struct DaemonApiServerArgs {
     pub(crate) uds_path: PathBuf,
     pub(crate) sk: ApiKey<CS>,
     pub(crate) pk: PublicKeys<CS>,
-    pub(crate) peers: SyncPeers,
+    pub(crate) peers: SyncHandle,
     pub(crate) recv_effects: EffectReceiver,
     pub(crate) invalid: InvalidGraphs,
     #[cfg(feature = "aqc")]
@@ -219,7 +219,7 @@ struct EffectHandler {
     #[cfg(feature = "aqc")]
     aqc: Option<Arc<Aqc<CE, KS>>>,
     client: Option<Client>,
-    peers: Option<SyncPeers>,
+    peers: Option<SyncHandle>,
     /// Stores the previous head address for each graph to detect changes
     prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
 }
@@ -394,7 +394,7 @@ struct ApiInner {
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Aranya sync peers,
-    peers: SyncPeers,
+    peers: SyncHandle,
     /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.

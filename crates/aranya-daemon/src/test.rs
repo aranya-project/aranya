@@ -61,7 +61,7 @@ type TestClient =
 
 type TestState = sync::transport::quic::State;
 // Aranya sync client for testing.
-type TestSyncer = sync::task::Syncer<TestState>;
+type TestSyncer = sync::manager::SyncManager<TestState>;
 
 // Aranya sync server for testing.
 type TestServer = sync::transport::quic::Server<

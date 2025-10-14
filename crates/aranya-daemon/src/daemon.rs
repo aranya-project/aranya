@@ -34,8 +34,8 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
+        manager::{SyncHandle, SyncManager},
         services::hello::HelloInfo,
-        task::{SyncPeers, Syncer},
         transport::quic::{PskStore, State as QuicSyncClientState, SyncParams},
         types::PeerCacheMap,
     },
@@ -125,7 +125,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncClientState>,
+    syncer: SyncManager<QuicSyncClientState>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -356,8 +356,8 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        Syncer<QuicSyncClientState>,
-        SyncPeers,
+        SyncManager<QuicSyncClientState>,
+        SyncHandle,
         EffectReceiver,
     )> {
         let device_id = pk.ident_pk.id()?;
@@ -380,7 +380,7 @@ impl Daemon {
         // Initialize the syncer
         let client_with_caches_for_syncer =
             ClientWithCaches::new(client.clone(), Arc::clone(&caches));
-        let (mut syncer, peers, conns, conn_rx) = Syncer::new(
+        let (mut syncer, peers, conns, conn_rx) = SyncManager::new(
             client_with_caches_for_syncer,
             send_effects,
             invalid_graphs,

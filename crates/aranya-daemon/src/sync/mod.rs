@@ -1,6 +1,6 @@
 //! Aranya syncer for syncing Aranya graph commands.
+pub mod manager;
 pub mod services;
-pub mod task;
 pub mod transport;
 pub mod types;
 

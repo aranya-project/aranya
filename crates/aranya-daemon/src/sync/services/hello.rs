@@ -16,23 +16,22 @@ use tokio::{io::AsyncReadExt, sync::Mutex};
 use tracing::{debug, instrument, trace, warn};
 
 use crate::sync::{
-    task::{SyncPeers, Syncer},
+    manager::{SyncManager, SyncHandle},
     transport::quic::{Error, State},
     Result as SyncResult,
 };
 
-/// Storage for sync hello subscriptions
+/// A hello subscription from a peer.
 #[derive(Debug, Clone)]
 pub struct HelloSubscription {
-    /// Delay in milliseconds between notifications to this subscriber
+    /// Delay between notifications to this subscriber (milliseconds)
     pub(crate) delay_milliseconds: u64,
-    /// Last notification time for delay management
+    /// Last time we sent a notification
     pub(crate) last_notified: Option<Instant>,
-    /// Expiration time of the subscription
+    /// When this subscription expires
     pub(crate) expires_at: Instant,
 }
 
-/// Type alias for hello subscription storage
 /// Maps from (team_id, subscriber_address) to subscription details
 pub type HelloSubscriptions = HashMap<(GraphId, Addr), HelloSubscription>;
 
@@ -42,10 +41,10 @@ pub struct HelloInfo {
     /// Storage for sync hello subscriptions
     pub subscriptions: Arc<Mutex<HelloSubscriptions>>,
     /// Interface to trigger sync operations
-    pub sync_peers: SyncPeers,
+    pub sync_peers: SyncHandle,
 }
 
-impl Syncer<State> {
+impl SyncManager<State> {
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
     pub async fn broadcast_hello_notifications(

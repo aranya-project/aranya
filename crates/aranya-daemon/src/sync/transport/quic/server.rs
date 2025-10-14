@@ -41,8 +41,8 @@ use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 use crate::{
     aranya::ClientWithCaches,
     sync::{
+        manager::SyncHandle,
         services::hello::{HelloInfo, HelloSubscription, HelloSubscriptions},
-        task::SyncPeers,
         transport::quic::{
             connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
             psk::PskStore,
@@ -70,7 +70,7 @@ pub struct Server<EN, SP> {
     /// Storage for sync hello subscriptions
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     /// Interface to trigger sync operations
-    sync_peers: SyncPeers,
+    sync_peers: SyncHandle,
 }
 
 impl<EN, SP> Server<EN, SP>
@@ -238,7 +238,7 @@ where
         stream: BidirectionalStream,
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
-        sync_peers: SyncPeers,
+        sync_peers: SyncHandle,
     ) -> SyncResult<()> {
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
@@ -287,7 +287,7 @@ where
         request_data: &[u8],
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
-        sync_peers: SyncPeers,
+        sync_peers: SyncHandle,
     ) -> SyncResult<Box<[u8]>> {
         debug!(
             request_data_len = request_data.len(),
@@ -399,7 +399,7 @@ where
         peer_addr: Addr,
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
-        sync_peers: SyncPeers,
+        sync_peers: SyncHandle,
     ) {
         let graph_id = active_team.into_id().into();
 
