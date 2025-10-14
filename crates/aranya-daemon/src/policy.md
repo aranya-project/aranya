@@ -4509,6 +4509,7 @@ action unset_aqc_network_name(device_id id) {
 
 effect AqcNetworkNameUnset {
     device_id id,
+    net_id string,
 }
 
 command UnsetAqcNetworkName {
@@ -4529,11 +4530,14 @@ command UnsetAqcNetworkName {
 
         check exists AqcNetId[device_id: this.device_id]
 
+        let old_mapping = unwrap query AqcNetId[device_id: this.device_id]
+
         finish {
             delete AqcNetId[device_id: this.device_id]
 
             emit AqcNetworkNameUnset {
                 device_id: device.device_id,
+                net_id: old_mapping.net_id,
             }
         }
     }

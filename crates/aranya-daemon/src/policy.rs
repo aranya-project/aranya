@@ -125,6 +125,7 @@ pub struct AqcNetworkNameSet {
 #[effect]
 pub struct AqcNetworkNameUnset {
     pub device_id: Id,
+    pub net_id: Text,
 }
 /// AqcUniChannelCreated policy effect.
 #[effect]
