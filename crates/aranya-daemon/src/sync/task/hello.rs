@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::Context;
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, GraphId, StorageProvider, SyncHelloType};
+use aranya_runtime::{Address, Engine, GraphId, StorageProvider, SyncHelloType, SyncType};
 use aranya_util::Addr;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 use tracing::{debug, instrument, trace, warn};
@@ -131,6 +131,50 @@ impl Syncer<State> {
         Ok(())
     }
 
+    /// Sends a hello message to a peer and waits for a response.
+    ///
+    /// This is a helper method that handles the common logic for sending hello messages,
+    /// including serialization, connection management, and response handling.
+    ///
+    /// # Arguments
+    /// * `peer` - The network address of the peer to send the message to
+    /// * `id` - The graph ID for the team/graph
+    /// * `sync_type` - The hello message to send
+    /// * `operation_name` - Name of the operation for logging
+    ///
+    /// # Returns
+    /// * `Ok(())` if the message was sent successfully
+    /// * `Err(SyncError)` if there was an error
+    #[instrument(skip_all)]
+    async fn send_hello_request(
+        &mut self,
+        peer: &Addr,
+        id: GraphId,
+        sync_type: SyncType<Addr>,
+        operation_name: &str,
+    ) -> SyncResult<()> {
+        // Serialize the message
+        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
+
+        // Connect to the peer
+        let stream = self.connect(peer, id).await?;
+        let (mut recv, mut send) = stream.split();
+
+        // Send the message
+        send.send(bytes::Bytes::from(data))
+            .await
+            .map_err(Error::from)?;
+        send.close().await.map_err(Error::from)?;
+
+        // Read the response to avoid race condition with server
+        let mut response_buf = Vec::new();
+        recv.read_to_end(&mut response_buf)
+            .await
+            .with_context(|| format!("failed to read hello {} response", operation_name))?;
+        assert!(!response_buf.is_empty());
+        Ok(())
+    }
+
     /// Sends a subscribe request to a peer for hello notifications.
     ///
     /// This method sends a [`SyncHelloType::Subscribe`] message to the specified peer,
@@ -163,33 +207,10 @@ impl Syncer<State> {
             duration_milliseconds,
             address: subscriber_server_addr,
         };
-        let sync_type: aranya_runtime::SyncType<Addr> = aranya_runtime::SyncType::Hello(hello_msg);
+        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
 
-        // Serialize the message
-        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
-
-        // Connect to the peer
-        let stream = self.connect(peer, id).await?;
-        let (mut recv, mut send) = stream.split();
-
-        // Send the message
-        send.send(bytes::Bytes::from(data))
+        self.send_hello_request(peer, id, sync_type, "subscribe")
             .await
-            .map_err(Error::from)?;
-        send.close().await.map_err(Error::from)?;
-
-        // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
-            .await
-            .context("failed to read hello subscribe response")?;
-        debug!(
-            response_len = response_buf.len(),
-            "received hello subscribe response"
-        );
-
-        debug!("sent subscribe request");
-        Ok(())
     }
 
     /// Sends an unsubscribe request to a peer to stop hello notifications.
@@ -215,36 +236,12 @@ impl Syncer<State> {
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
-        let sync_type: aranya_runtime::SyncType<Addr> =
-            aranya_runtime::SyncType::Hello(SyncHelloType::Unsubscribe {
-                address: subscriber_server_addr,
-            });
+        let sync_type: SyncType<Addr> = SyncType::Hello(SyncHelloType::Unsubscribe {
+            address: subscriber_server_addr,
+        });
 
-        // Serialize the message
-        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
-
-        // Connect to the peer
-        let stream = self.connect(peer, id).await?;
-        let (mut recv, mut send) = stream.split();
-
-        // Send the message
-        send.send(bytes::Bytes::from(data))
+        self.send_hello_request(peer, id, sync_type, "unsubscribe")
             .await
-            .map_err(Error::from)?;
-        send.close().await.map_err(Error::from)?;
-
-        // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
-            .await
-            .context("failed to read hello unsubscribe response")?;
-        debug!(
-            response_len = response_buf.len(),
-            "received hello unsubscribe response"
-        );
-
-        debug!("sent unsubscribe request");
-        Ok(())
     }
 
     /// Sends a hello notification to a specific subscriber.
@@ -277,7 +274,7 @@ impl Syncer<State> {
             head,
             address: self.server_addr,
         };
-        let sync_type: aranya_runtime::SyncType<Addr> = aranya_runtime::SyncType::Hello(hello_msg);
+        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -341,8 +338,6 @@ where
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncPeers,
     ) {
-        use aranya_runtime::SyncHelloType;
-
         let graph_id = active_team.into_id().into();
 
         match hello_msg {
