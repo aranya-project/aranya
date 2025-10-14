@@ -42,12 +42,13 @@ use crate::{
     aranya::ClientWithCaches,
     sync::{
         services::hello::{HelloInfo, HelloSubscription, HelloSubscriptions},
-        task::{PeerCacheKey, SyncPeers, SyncResponse},
+        task::SyncPeers,
         transport::quic::{
             connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
             psk::PskStore,
             Error, ALPN_QUIC_SYNC,
         },
+        types::{SyncPeer, SyncResponse},
         Result as SyncResult, SyncError,
     },
 };
@@ -366,7 +367,7 @@ where
         let len = {
             // Lock both aranya and caches in the correct order.
             let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;
-            let key = PeerCacheKey::new(peer_server_addr, storage_id);
+            let key = SyncPeer::new(peer_server_addr, storage_id);
             let cache = caches.entry(key).or_default();
 
             resp.poll(&mut buf, aranya.provider(), cache)
@@ -488,7 +489,7 @@ where
                 }
 
                 // Update the peer cache with the received head_id
-                let key = PeerCacheKey::new(peer_addr, graph_id);
+                let key = SyncPeer::new(peer_addr, graph_id);
 
                 // Lock both aranya and caches in the correct order.
                 let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;

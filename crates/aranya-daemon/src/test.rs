@@ -43,13 +43,13 @@ use tokio::{
 use crate::{
     actions::Actions,
     api::EffectReceiver,
-    aranya::{self, ClientWithCaches, PeerCacheMap},
+    aranya::{self, ClientWithCaches},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
         services::hello::{HelloInfo, HelloSubscriptions},
-        task::{PeerCacheKey, SyncPeer},
         transport::quic::PskStore,
+        types::{PeerCacheMap, SyncPeer},
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,
@@ -357,9 +357,9 @@ impl TestCtx {
         admin.sync_expect(owner, Some(3)).await?;
 
         let admin_caches = admin.syncer.get_peer_caches();
-        let owner_key = PeerCacheKey {
+        let owner_key = SyncPeer {
             addr: owner.sync_local_addr,
-            id: admin.graph_id,
+            graph_id: admin.graph_id,
         };
         let admin_cache_size = admin_caches
             .lock()

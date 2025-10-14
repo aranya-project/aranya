@@ -2,6 +2,7 @@
 pub mod services;
 pub mod task;
 pub mod transport;
+pub mod types;
 
 use error::SyncError;
 

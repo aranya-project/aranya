@@ -14,13 +14,14 @@ use aranya_runtime::{storage::GraphId, Address, Engine, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
+#[cfg(test)]
+use crate::sync::types::PeerCacheMap;
+use crate::{daemon::EF, sync::types::SyncPeer, vm_policy::VecSink, InvalidGraphs};
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
@@ -55,39 +56,11 @@ pub(crate) enum Msg {
 pub(crate) type Request = (Msg, oneshot::Sender<Reply>);
 type Reply = SyncResult<()>;
 
-/// A sync peer.
-///
-/// Contains the information needed to sync with a single peer:
-/// - network address
-/// - Aranya graph id
-#[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
-pub(crate) struct SyncPeer {
-    addr: Addr,
-    graph_id: GraphId,
-}
-
-impl SyncPeer {
-    /// Creates a new `SyncPeer`.
-    #[cfg(test)]
-    pub fn new(addr: Addr, graph_id: GraphId) -> Self {
-        Self { addr, graph_id }
-    }
-}
-
 /// Handles adding and removing sync peers.
 #[derive(Clone, Debug)]
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
     sender: mpsc::Sender<Request>,
-}
-
-/// A response to a sync request.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) enum SyncResponse {
-    /// Success.
-    Ok(Box<[u8]>),
-    /// Failure.
-    Err(String),
 }
 
 impl SyncPeers {
@@ -175,21 +148,6 @@ impl SyncPeers {
 }
 
 pub(crate) type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
-
-/// Key for looking up syncer peer cache in map.
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
-pub struct PeerCacheKey {
-    /// The peer address.
-    pub addr: Addr,
-    /// The Aranya graph ID.
-    pub id: GraphId,
-}
-
-impl PeerCacheKey {
-    pub(super) fn new(addr: Addr, id: GraphId) -> Self {
-        Self { addr, id }
-    }
-}
 
 /// Syncs with each peer after the specified interval.
 ///
@@ -437,7 +395,7 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Get peer caches for test inspection.
     #[cfg(test)]
-    pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
+    pub(crate) fn get_peer_caches(&self) -> PeerCacheMap {
         self.client_with_caches.caches_for_test()
     }
 

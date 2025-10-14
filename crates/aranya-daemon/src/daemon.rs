@@ -29,7 +29,7 @@ use crate::afc::Afc;
 use crate::{actions::Actions, aqc::Aqc};
 use crate::{
     api::{ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
-    aranya::{self, ClientWithCaches, PeerCacheMap},
+    aranya::{self, ClientWithCaches},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
@@ -37,6 +37,7 @@ use crate::{
         services::hello::HelloInfo,
         task::{SyncPeers, Syncer},
         transport::quic::{PskStore, State as QuicSyncClientState, SyncParams},
+        types::PeerCacheMap,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},

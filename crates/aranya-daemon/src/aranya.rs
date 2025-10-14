@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, fmt, ops::Deref, sync::Arc};
 use aranya_runtime::{ClientState, PeerCache};
 use tokio::sync::{Mutex, MutexGuard};
 
-use crate::sync::task::PeerCacheKey;
+use crate::sync::types::{PeerCacheMap, SyncPeer};
 
 /// Thread-safe wrapper for an Aranya client.
 pub struct Client<EN, SP> {
@@ -45,12 +45,6 @@ impl<EN, SP> Deref for Client<EN, SP> {
     }
 }
 
-/// Thread-safe map of peer caches.
-///
-/// For a given peer, there should only be one cache. If separate caches are used
-/// for the server and state it will reduce the efficiency of the syncer.
-pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
-
 /// Wrapper that pairs an Aranya client with peer caches.
 ///
 /// Ensures safe lock ordering by providing a method that locks both in the correct order.
@@ -74,7 +68,7 @@ impl<EN, SP> ClientWithCaches<EN, SP> {
         &self,
     ) -> (
         MutexGuard<'_, ClientState<EN, SP>>,
-        MutexGuard<'_, BTreeMap<PeerCacheKey, PeerCache>>,
+        MutexGuard<'_, BTreeMap<SyncPeer, PeerCache>>,
     ) {
         let aranya = self.client.aranya.lock().await;
         let caches = self.caches.lock().await;

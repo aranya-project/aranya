@@ -30,12 +30,13 @@ use crate::{
     aranya::ClientWithCaches,
     sync::{
         services::hello::HelloSubscriptions,
-        task::{EffectSender, PeerCacheKey, Request, SyncPeers, SyncResponse, SyncState, Syncer},
+        task::{EffectSender, Request, SyncPeers, SyncState, Syncer},
         transport::quic::{
             connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
             psk::PskStore,
             ALPN_QUIC_SYNC,
         },
+        types::{SyncPeer, SyncResponse},
         Result as SyncResult, SyncError,
     },
     InvalidGraphs,
@@ -344,7 +345,7 @@ impl Syncer<State> {
         let len = {
             // Lock both aranya and caches in the correct order.
             let (mut aranya, mut caches) = self.client_with_caches.lock_aranya_and_caches().await;
-            let key = PeerCacheKey::new(*peer, id);
+            let key = SyncPeer::new(*peer, id);
             let cache = caches.entry(key).or_default();
             let (len, _) = syncer
                 .poll(&mut send_buf, aranya.provider(), cache)
@@ -416,7 +417,7 @@ impl Syncer<State> {
                     .context("unable to add received commands")?;
                 aranya.commit(&mut trx, sink).context("commit failed")?;
                 debug!("committed");
-                let key = PeerCacheKey::new(*peer, *id);
+                let key = SyncPeer::new(*peer, *id);
                 let cache = caches.entry(key).or_default();
                 aranya
                     .update_heads(*id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
