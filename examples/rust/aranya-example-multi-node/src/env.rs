@@ -15,47 +15,6 @@ const AQC_ADDR_ENV_VAR: &str = "ARANYA_AQC_ADDR";
 const TCP_ADDR_ENV_VAR: &str = "ARANYA_TCP_ADDR";
 const SYNC_ADDR_ENV_VAR: &str = "ARANYA_SYNC_ADDR";
 
-/// Default environment variables.
-const DEFAULT_ENV_VARS: ConstEnvVars<'_> = ConstEnvVars {
-    level: "info",
-    passphrase: "passphrase",
-    owner: ConstDevice {
-        name: "owner",
-        aqc_addr: "127.0.0.1:10000",
-        tcp_addr: "127.0.0.1:10001",
-        sync_addr: "127.0.0.1:10002",
-        role: Role::Owner,
-    },
-    admin: ConstDevice {
-        name: "admin",
-        aqc_addr: "127.0.0.1:10003",
-        tcp_addr: "127.0.0.1:10004",
-        sync_addr: "127.0.0.1:10005",
-        role: Role::Admin,
-    },
-    operator: ConstDevice {
-        name: "operator",
-        aqc_addr: "127.0.0.1:10006",
-        tcp_addr: "127.0.0.1:10007",
-        sync_addr: "127.0.0.1:10008",
-        role: Role::Operator,
-    },
-    membera: ConstDevice {
-        name: "membera",
-        aqc_addr: "127.0.0.1:10009",
-        tcp_addr: "127.0.0.1:10010",
-        sync_addr: "127.0.0.1:10011",
-        role: Role::Member,
-    },
-    memberb: ConstDevice {
-        name: "memberb",
-        aqc_addr: "127.0.0.1:10012",
-        tcp_addr: "127.0.0.1:10013",
-        sync_addr: "127.0.0.1:10014",
-        role: Role::Member,
-    },
-};
-
 const DEVICE_LIST: [(&str, Role); 5] = [
     ("owner", Role::Owner),
     ("admin", Role::Admin),
@@ -185,53 +144,49 @@ impl EnvVars {
     }
 }
 
+/// Default environment variables.
 impl Default for EnvVars {
     fn default() -> Self {
-        DEFAULT_ENV_VARS.into()
-    }
-}
-
-/// Constant representation of environment variables.
-#[derive(Debug)]
-struct ConstEnvVars<'a> {
-    /// Tracing log level.
-    level: &'a str,
-    /// Onboarding passphrase for encrypting team info with `age`.
-    passphrase: &'a str,
-    /// Owner device
-    owner: ConstDevice<'a>,
-    /// Admin device
-    admin: ConstDevice<'a>,
-    /// Operator device
-    operator: ConstDevice<'a>,
-    /// Member A device
-    membera: ConstDevice<'a>,
-    /// Member B device
-    memberb: ConstDevice<'a>,
-}
-
-impl From<ConstEnvVars<'_>> for EnvVars {
-    fn from(value: ConstEnvVars<'_>) -> Self {
-        EnvVars {
-            level: value.level.into(),
-            passphrase: value.passphrase.into(),
-            owner: value.owner.into(),
-            admin: value.admin.into(),
-            operator: value.operator.into(),
-            membera: value.membera.into(),
-            memberb: value.memberb.into(),
+        Self {
+            level: "info".into(),
+            passphrase: "passphrase".into(),
+            owner: Device {
+                name: "owner".into(),
+                aqc_addr: Addr::from_str("127.0.0.1:10000").expect("expected addr"),
+                tcp_addr: Addr::from_str("127.0.0.1:10001").expect("expected addr"),
+                sync_addr: Addr::from_str("127.0.0.1:10002").expect("expected addr"),
+                role: Role::Owner,
+            },
+            admin: Device {
+                name: "admin".into(),
+                aqc_addr: Addr::from_str("127.0.0.1:10003").expect("expected addr"),
+                tcp_addr: Addr::from_str("127.0.0.1:10004").expect("expected addr"),
+                sync_addr: Addr::from_str("127.0.0.1:10005").expect("expected addr"),
+                role: Role::Admin,
+            },
+            operator: Device {
+                name: "operator".into(),
+                aqc_addr: Addr::from_str("127.0.0.1:10006").expect("expected addr"),
+                tcp_addr: Addr::from_str("127.0.0.1:10007").expect("expected addr"),
+                sync_addr: Addr::from_str("127.0.0.1:10008").expect("expected addr"),
+                role: Role::Operator,
+            },
+            membera: Device {
+                name: "membera".into(),
+                aqc_addr: Addr::from_str("127.0.0.1:10009").expect("expected addr"),
+                tcp_addr: Addr::from_str("127.0.0.1:10010").expect("expected addr"),
+                sync_addr: Addr::from_str("127.0.0.1:10011").expect("expected addr"),
+                role: Role::Member,
+            },
+            memberb: Device {
+                name: "memberb".into(),
+                aqc_addr: Addr::from_str("127.0.0.1:10012").expect("expected addr"),
+                tcp_addr: Addr::from_str("127.0.0.1:10013").expect("expected addr"),
+                sync_addr: Addr::from_str("127.0.0.1:10014").expect("expected addr"),
+                role: Role::Member,
+            },
         }
     }
-}
-
-/// Constant representation of an Aranya device.
-#[derive(Debug)]
-struct ConstDevice<'a> {
-    name: &'a str,
-    aqc_addr: &'a str,
-    tcp_addr: &'a str,
-    sync_addr: &'a str,
-    role: Role,
 }
 
 /// Aranya device info.
@@ -247,18 +202,6 @@ pub struct Device {
     pub sync_addr: Addr,
     /// Device's role.
     pub role: Role,
-}
-
-impl From<ConstDevice<'_>> for Device {
-    fn from(value: ConstDevice<'_>) -> Self {
-        Device {
-            name: value.name.to_string(),
-            aqc_addr: Addr::from_str(value.aqc_addr).expect("expected addr"),
-            tcp_addr: Addr::from_str(value.tcp_addr).expect("expected addr"),
-            sync_addr: Addr::from_str(value.sync_addr).expect("expected addr"),
-            role: value.role,
-        }
-    }
 }
 
 /// Parses an environment variable, including the name in the error.
