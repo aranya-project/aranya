@@ -85,24 +85,27 @@ impl EnvVars {
             self.passphrase.expose_secret()
         )?;
         for device in self.devices() {
-            buf += &format!(
+            writeln!(
+                buf,
                 "export {}_{}={}\r\n",
                 SYNC_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
                 device.sync_addr
-            );
-            buf += &format!(
+            )?;
+            writeln!(
+                buf,
                 "export {}_{}={}\r\n",
                 AQC_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
                 device.aqc_addr
-            );
-            buf += &format!(
+            )?;
+            writeln!(
+                buf,
                 "export {}_{}={}\r\n",
                 TCP_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
                 device.tcp_addr
-            );
+            )?;
         }
         fs::write(path, buf).await?;
         Ok(())
