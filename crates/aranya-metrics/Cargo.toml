@@ -23,8 +23,7 @@ tcp = ["dep:metrics-exporter-tcp"]
 
 
 [dependencies]
-aranya-client = { workspace = true }
-aranya-daemon-api = { workspace = true }
+aranya-client = { workspace = true, features = ["aqc", "experimental"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
 
