@@ -18,7 +18,7 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing();
+    init_tracing(module_path!());
 
     info!("starting aranya-example-multi-node example");
 
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
             client(device.name.clone(), &uds_sock, &release).expect("expected to spawn client");
         // Spawn device process and collect exit status.
         processes.spawn(async move {
-            let status = child.wait().await.unwrap();
+            let status = child.wait().await.expect("expected exit status");
             assert!(status.success(), "{status:?}");
         });
     }

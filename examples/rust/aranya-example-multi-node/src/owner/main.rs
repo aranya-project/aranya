@@ -27,7 +27,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing();
+    init_tracing(module_path!());
     info!("starting aranya-example-multi-node-owner");
 
     // Parse input args.

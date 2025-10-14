@@ -77,31 +77,31 @@ impl EnvVars {
     /// Generate environment file.
     pub async fn generate(&self, path: &Path) -> Result<()> {
         let mut buf = "".to_string();
-        writeln!(buf, "export {}={}\r\n", LOG_LEVEL_ENV_VAR, self.level)?;
+        writeln!(buf, "export {}={}", LOG_LEVEL_ENV_VAR, self.level)?;
         writeln!(
             buf,
-            "export {}={}\r\n",
+            "export {}={}",
             ONBOARDING_PASSPHRASE_ENV_VAR,
             self.passphrase.expose_secret()
         )?;
         for device in self.devices() {
             writeln!(
                 buf,
-                "export {}_{}={}\r\n",
+                "export {}_{}={}",
                 SYNC_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
                 device.sync_addr
             )?;
             writeln!(
                 buf,
-                "export {}_{}={}\r\n",
+                "export {}_{}={}",
                 AQC_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
                 device.aqc_addr
             )?;
             writeln!(
                 buf,
-                "export {}_{}={}\r\n",
+                "export {}_{}={}",
                 TCP_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
                 device.tcp_addr
