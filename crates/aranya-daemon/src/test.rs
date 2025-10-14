@@ -252,7 +252,8 @@ impl TestCtx {
 
             let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);
-                let client_with_caches_for_syncer = ClientWithCaches::new(client.clone(), caches.clone());
+                let client_with_caches_for_syncer =
+                    ClientWithCaches::new(client.clone(), caches.clone());
                 let (syncer, sync_peers, conn_map, conn_rx) = TestSyncer::new(
                     client_with_caches_for_syncer,
                     send_effects,
