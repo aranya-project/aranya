@@ -72,12 +72,20 @@ criteria = "safe-to-deploy"
 version = "0.11.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.age-core]]
+version = "0.11.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.ahash]]
 version = "0.8.12"
 criteria = "safe-to-deploy"
 
 [[exemptions.aho-corasick]]
 version = "1.1.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.arc-swap]]
+version = "1.7.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.async-trait]]
@@ -96,6 +104,10 @@ criteria = "safe-to-deploy"
 version = "0.28.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.backon]]
+version = "1.2.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.backtrace]]
 version = "0.3.74"
 criteria = "safe-to-deploy"
@@ -108,12 +120,24 @@ criteria = "safe-to-deploy"
 version = "1.6.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.bech32]]
+version = "0.8.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.bimap]]
 version = "0.6.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.bytes]]
 version = "1.9.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.chacha20]]
+version = "0.9.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.chacha20poly1305]]
+version = "0.9.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.ciborium]]
@@ -158,6 +182,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.const_format_proc_macros]]
 version = "0.2.34"
+criteria = "safe-to-deploy"
+
+[[exemptions.cookie-factory]]
+version = "0.3.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.core-foundation]]
@@ -260,8 +288,24 @@ criteria = "safe-to-deploy"
 version = "0.13.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.find-crate]]
+version = "0.6.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.fixedbitset]]
 version = "0.5.7"
+criteria = "safe-to-deploy"
+
+[[exemptions.fluent]]
+version = "0.16.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.fluent-bundle]]
+version = "0.15.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.fluent-syntax]]
+version = "0.11.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.fs_extra]]
@@ -364,6 +408,26 @@ criteria = "safe-to-deploy"
 version = "0.1.16"
 criteria = "safe-to-deploy"
 
+[[exemptions.i18n-config]]
+version = "0.4.8"
+criteria = "safe-to-deploy"
+
+[[exemptions.i18n-embed]]
+version = "0.15.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.i18n-embed-fl]]
+version = "0.9.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.i18n-embed-impl]]
+version = "0.8.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.io_tee]]
+version = "0.1.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.ipnet]]
 version = "2.5.0"
 criteria = "safe-to-deploy"
@@ -394,6 +458,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.linux-raw-sys]]
 version = "0.4.14"
+criteria = "safe-to-deploy"
+
+[[exemptions.linux-raw-sys]]
+version = "0.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.lock_api]]
@@ -500,8 +568,20 @@ criteria = "safe-to-deploy"
 version = "2.2.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.parking_lot]]
+version = "0.12.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.parking_lot_core]]
+version = "0.9.10"
+criteria = "safe-to-deploy"
+
 [[exemptions.paste]]
 version = "1.0.15"
+criteria = "safe-to-deploy"
+
+[[exemptions.pbkdf2]]
+version = "0.12.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.pest]]
@@ -536,6 +616,10 @@ criteria = "safe-to-deploy"
 version = "0.10.2"
 criteria = "safe-to-deploy"
 
+[[exemptions.poly1305]]
+version = "0.7.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.polyval]]
 version = "0.6.2"
 criteria = "safe-to-deploy"
@@ -562,6 +646,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.primeorder]]
 version = "0.13.6"
+criteria = "safe-to-deploy"
+
+[[exemptions.proc-macro-error-attr2]]
+version = "2.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.proc-macro-error2]]
+version = "2.0.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.proptest]]
@@ -632,8 +724,24 @@ criteria = "safe-to-run"
 version = "0.17.14"
 criteria = "safe-to-deploy"
 
+[[exemptions.rust-embed]]
+version = "8.7.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.rust-embed-impl]]
+version = "8.7.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.rust-embed-utils]]
+version = "8.7.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.rustix]]
 version = "0.38.42"
+criteria = "safe-to-deploy"
+
+[[exemptions.rustix]]
+version = "1.1.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustls]]
@@ -680,12 +788,24 @@ criteria = "safe-to-deploy"
 version = "0.58.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.salsa20]]
+version = "0.10.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.same-file]]
+version = "1.0.6"
+criteria = "safe-to-deploy"
+
 [[exemptions.scc]]
 version = "2.2.5"
 criteria = "safe-to-run"
 
 [[exemptions.schannel]]
 version = "0.1.27"
+criteria = "safe-to-deploy"
+
+[[exemptions.scrypt]]
+version = "0.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.sdd]]
@@ -696,12 +816,20 @@ criteria = "safe-to-run"
 version = "0.7.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.secrecy]]
+version = "0.10.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.security-framework]]
 version = "3.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.security-framework-sys]]
 version = "2.14.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.self_cell]]
+version = "0.10.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_json]]
@@ -760,6 +888,10 @@ criteria = "safe-to-deploy"
 version = "0.14.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.tempfile]]
+version = "3.19.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.termcolor]]
 version = "1.4.1"
 criteria = "safe-to-deploy"
@@ -800,6 +932,10 @@ criteria = "safe-to-deploy"
 version = "0.27.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.type-map]]
+version = "0.4.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.typenum]]
 version = "1.17.0"
 criteria = "safe-to-deploy"
@@ -830,6 +966,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.version_check]]
 version = "0.9.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.walkdir]]
+version = "2.5.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.wasi]]
@@ -874,6 +1014,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.winapi-util]]
 version = "0.1.9"
+criteria = "safe-to-deploy"
+
+[[exemptions.x25519-dalek]]
+version = "2.0.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.yansi]]
