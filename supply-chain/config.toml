@@ -68,6 +68,10 @@ criteria = "safe-to-deploy"
 version = "0.10.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.age]]
+version = "0.11.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.ahash]]
 version = "0.8.12"
 criteria = "safe-to-deploy"
@@ -82,10 +86,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.atomic-polyfill]]
 version = "1.0.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.atomic-waker]]
-version = "1.1.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-rs]]
@@ -138,10 +138,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.clap_derive]]
 version = "4.5.18"
-criteria = "safe-to-deploy"
-
-[[exemptions.cobs]]
-version = "0.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.condtype]]
@@ -246,10 +242,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.elliptic-curve]]
 version = "0.13.8"
-criteria = "safe-to-deploy"
-
-[[exemptions.embedded-io]]
-version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.endian-type]]
@@ -624,14 +616,6 @@ criteria = "safe-to-deploy"
 version = "0.7.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.raw-cpuid]]
-version = "11.5.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.redox_syscall]]
-version = "0.5.8"
-criteria = "safe-to-run"
-
 [[exemptions.regex]]
 version = "1.11.1"
 criteria = "safe-to-deploy"
@@ -810,10 +794,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.tower-service]]
 version = "0.3.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.tracing-log]]
-version = "0.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.tracing-opentelemetry]]

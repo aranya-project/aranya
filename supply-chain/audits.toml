@@ -1,11 +1,6 @@
 
 # cargo-vet audits file
 
-[[audits.age]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.11.1"
-
 [[audits.age-core]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
