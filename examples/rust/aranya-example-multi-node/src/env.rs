@@ -1,6 +1,6 @@
 //! Utilities for loading environment variables for the example.
 
-use std::{env, path::Path, str::FromStr};
+use std::{env, net::Ipv4Addr, path::Path, str::FromStr};
 
 use age::secrecy::{ExposeSecret, SecretString};
 use anyhow::{Context, Result};
@@ -152,37 +152,37 @@ impl Default for EnvVars {
             passphrase: "passphrase".into(),
             owner: Device {
                 name: "owner".into(),
-                aqc_addr: Addr::from_str("127.0.0.1:10000").expect("expected addr"),
-                tcp_addr: Addr::from_str("127.0.0.1:10001").expect("expected addr"),
-                sync_addr: Addr::from_str("127.0.0.1:10002").expect("expected addr"),
+                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10000)),
+                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10001)),
+                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10002)),
                 role: Role::Owner,
             },
             admin: Device {
                 name: "admin".into(),
-                aqc_addr: Addr::from_str("127.0.0.1:10003").expect("expected addr"),
-                tcp_addr: Addr::from_str("127.0.0.1:10004").expect("expected addr"),
-                sync_addr: Addr::from_str("127.0.0.1:10005").expect("expected addr"),
+                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
+                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
+                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
                 role: Role::Admin,
             },
             operator: Device {
                 name: "operator".into(),
-                aqc_addr: Addr::from_str("127.0.0.1:10006").expect("expected addr"),
-                tcp_addr: Addr::from_str("127.0.0.1:10007").expect("expected addr"),
-                sync_addr: Addr::from_str("127.0.0.1:10008").expect("expected addr"),
+                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
+                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
+                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
                 role: Role::Operator,
             },
             membera: Device {
                 name: "membera".into(),
-                aqc_addr: Addr::from_str("127.0.0.1:10009").expect("expected addr"),
-                tcp_addr: Addr::from_str("127.0.0.1:10010").expect("expected addr"),
-                sync_addr: Addr::from_str("127.0.0.1:10011").expect("expected addr"),
+                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
+                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
+                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10011)),
                 role: Role::Member,
             },
             memberb: Device {
                 name: "memberb".into(),
-                aqc_addr: Addr::from_str("127.0.0.1:10012").expect("expected addr"),
-                tcp_addr: Addr::from_str("127.0.0.1:10013").expect("expected addr"),
-                sync_addr: Addr::from_str("127.0.0.1:10014").expect("expected addr"),
+                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10012)),
+                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10013)),
+                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10014)),
                 role: Role::Member,
             },
         }
