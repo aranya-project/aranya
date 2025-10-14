@@ -52,6 +52,12 @@ audit-as-crates-io = false
 [policy.aranya-util]
 audit-as-crates-io = false
 
+[policy.aranya-example]
+criteria = "safe-to-run"
+
+[policy.aranya-example-multi-node]
+criteria = "safe-to-run"
+
 [[exemptions.addr2line]]
 version = "0.24.2"
 criteria = "safe-to-deploy"
