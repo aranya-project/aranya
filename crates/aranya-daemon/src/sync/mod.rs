@@ -1,5 +1,6 @@
 //! Aranya syncer for syncing Aranya graph commands.
 pub mod task;
+pub mod transport;
 
 use error::SyncError;
 
@@ -11,7 +12,7 @@ mod error {
 
     use thiserror::Error;
 
-    use super::task::quic::Error as QSError;
+    use super::transport::quic::Error as QSError;
 
     #[derive(Error, Debug)]
     #[non_exhaustive]

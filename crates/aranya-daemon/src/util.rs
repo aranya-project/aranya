@@ -12,7 +12,7 @@ use tokio::{
 
 use crate::{
     keystore::LocalStore,
-    sync::task::quic::{self as qs},
+    sync::transport::quic::{self as qs},
     CE, KS,
 };
 

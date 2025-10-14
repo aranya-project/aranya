@@ -10,32 +10,26 @@ use std::{
 };
 
 use anyhow::Context;
-use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, GraphId, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{Address, GraphId, SyncHelloType, SyncType};
 use aranya_util::Addr;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 use tracing::{debug, instrument, trace, warn};
 
-use crate::{
-    aranya::ClientWithCaches,
-    sync::{
-        task::{
-            quic::{Error, Server, State},
-            PeerCacheKey, SyncPeers, Syncer,
-        },
-        Result as SyncResult,
-    },
+use crate::sync::{
+    task::{SyncPeers, Syncer},
+    transport::quic::{Error, State},
+    Result as SyncResult,
 };
 
 /// Storage for sync hello subscriptions
 #[derive(Debug, Clone)]
 pub struct HelloSubscription {
     /// Delay in milliseconds between notifications to this subscriber
-    delay_milliseconds: u64,
+    pub(crate) delay_milliseconds: u64,
     /// Last notification time for delay management
-    last_notified: Option<Instant>,
+    pub(crate) last_notified: Option<Instant>,
     /// Expiration time of the subscription
-    expires_at: Instant,
+    pub(crate) expires_at: Instant,
 }
 
 /// Type alias for hello subscription storage
@@ -318,138 +312,5 @@ impl Syncer<State> {
         );
 
         Ok(())
-    }
-}
-
-impl<EN, SP> Server<EN, SP>
-where
-    EN: Engine + Send + 'static,
-    SP: StorageProvider + Send + Sync + 'static,
-{
-    /// Processes a hello message.
-    ///
-    /// Handles subscription management and hello notifications.
-    #[instrument(skip_all)]
-    pub async fn process_hello_message(
-        hello_msg: SyncHelloType<Addr>,
-        client_with_caches: ClientWithCaches<EN, SP>,
-        peer_addr: Addr,
-        active_team: &TeamId,
-        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
-        sync_peers: SyncPeers,
-    ) {
-        let graph_id = active_team.into_id().into();
-
-        match hello_msg {
-            SyncHelloType::Subscribe {
-                delay_milliseconds,
-                duration_milliseconds,
-                address,
-            } => {
-                // Calculate expiration time
-                let expires_at = Instant::now() + Duration::from_millis(duration_milliseconds);
-
-                let subscription = HelloSubscription {
-                    delay_milliseconds,
-                    last_notified: None,
-                    expires_at,
-                };
-
-                // Store subscription (replaces any existing subscription for this peer+team)
-                let key = (graph_id, address);
-
-                let mut subscriptions = hello_subscriptions.lock().await;
-                subscriptions.insert(key, subscription);
-            }
-            SyncHelloType::Unsubscribe { address } => {
-                debug!(
-                    ?address,
-                    ?peer_addr,
-                    ?graph_id,
-                    "Received Unsubscribe hello message"
-                );
-
-                // Remove subscription for this peer and team
-                let key = (graph_id, address);
-                let mut subscriptions = hello_subscriptions.lock().await;
-                if subscriptions.remove(&key).is_some() {
-                    debug!(
-                        team_id = ?active_team,
-                        ?address,
-                        "Removed hello subscription successfully"
-                    );
-                } else {
-                    debug!(
-                        team_id = ?active_team,
-                        ?address,
-                        "No subscription found to remove"
-                    );
-                }
-            }
-            SyncHelloType::Hello { head, address } => {
-                debug!(
-                    ?head,
-                    ?peer_addr,
-                    ?address,
-                    ?graph_id,
-                    "Received Hello notification message"
-                );
-
-                if !client_with_caches
-                    .client()
-                    .aranya
-                    .lock()
-                    .await
-                    .command_exists(graph_id, head)
-                {
-                    match sync_peers.sync_on_hello(address, graph_id).await {
-                        Ok(()) => {
-                            debug!(
-                                ?address,
-                                ?peer_addr,
-                                ?graph_id,
-                                ?head,
-                                "Successfully sent sync_on_hello message"
-                            );
-                        }
-                        Err(e) => {
-                            warn!(
-                                error = %e,
-                                ?head,
-                                ?address,
-                                ?peer_addr,
-                                ?graph_id,
-                                "Failed to send sync_on_hello message"
-                            );
-                        }
-                    }
-                }
-
-                // Update the peer cache with the received head_id
-                let key = PeerCacheKey::new(peer_addr, graph_id);
-
-                // Lock both aranya and caches in the correct order.
-                let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;
-                let cache = caches.entry(key).or_default();
-
-                // Update the cache with the received head_id
-                if let Err(e) = aranya.update_heads(graph_id, [head], cache) {
-                    warn!(
-                        error = %e,
-                        ?head,
-                        ?peer_addr,
-                        ?graph_id,
-                        "Failed to update peer cache with hello head_id"
-                    );
-                } else {
-                    debug!(
-                        ?head,
-                        ?peer_addr,
-                        ?graph_id,
-                        "Successfully updated peer cache with hello head"
-                    );
-                }
-            }
-        }
     }
 }

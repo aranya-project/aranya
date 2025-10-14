@@ -44,7 +44,7 @@ use crate::{
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::{quic as qs, SyncPeers},
+    sync::{task::SyncPeers, transport::quic as qs},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
 };

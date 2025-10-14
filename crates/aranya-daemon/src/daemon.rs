@@ -33,9 +33,9 @@ use crate::{
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::{
-        quic::{HelloInfo, PskStore, State as QuicSyncClientState, SyncParams},
-        SyncPeers, Syncer,
+    sync::{
+        task::{hello::HelloInfo, SyncPeers, Syncer},
+        transport::quic::{PskStore, State as QuicSyncClientState, SyncParams},
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -56,7 +56,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::transport::quic::Server<EN, SP>;
 
 mod invalid_graphs {
     use std::{

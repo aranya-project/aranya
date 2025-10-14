@@ -23,11 +23,10 @@ use super::Result as SyncResult;
 use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
 
 pub mod hello;
-pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
-enum Msg {
+pub(crate) enum Msg {
     SyncNow {
         peer: SyncPeer,
         cfg: Option<SyncPeerConfig>,
@@ -55,7 +54,7 @@ enum Msg {
         head: Address,
     },
 }
-type Request = (Msg, oneshot::Sender<Reply>);
+pub(crate) type Request = (Msg, oneshot::Sender<Reply>);
 type Reply = SyncResult<()>;
 
 /// A sync peer.
@@ -95,7 +94,7 @@ pub(crate) enum SyncResponse {
 
 impl SyncPeers {
     /// Create a new peer manager.
-    fn new(sender: mpsc::Sender<Request>) -> Self {
+    pub(crate) fn new(sender: mpsc::Sender<Request>) -> Self {
         Self { sender }
     }
 
@@ -177,7 +176,7 @@ impl SyncPeers {
     }
 }
 
-type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
+pub(crate) type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
 /// Key for looking up syncer peer cache in map.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -189,7 +188,7 @@ pub struct PeerCacheKey {
 }
 
 impl PeerCacheKey {
-    fn new(addr: Addr, id: GraphId) -> Self {
+    pub(super) fn new(addr: Addr, id: GraphId) -> Self {
         Self { addr, id }
     }
 }
@@ -203,19 +202,19 @@ pub struct Syncer<ST> {
     /// Aranya client paired with caches, ensuring safe lock ordering.
     pub(crate) client_with_caches: crate::aranya::ClientWithCaches<crate::EN, crate::SP>,
     /// Keeps track of peer info.
-    peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
+    pub(crate) peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
     /// Receives added/removed peers.
-    recv: mpsc::Receiver<Request>,
+    pub(crate) recv: mpsc::Receiver<Request>,
     /// Delay queue for getting the next peer to sync with.
-    queue: DelayQueue<SyncPeer>,
+    pub(crate) queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
-    send_effects: EffectSender,
+    pub(crate) send_effects: EffectSender,
     /// Keeps track of invalid graphs due to finalization errors.
-    invalid: InvalidGraphs,
+    pub(crate) invalid: InvalidGraphs,
     /// Additional state used by the syncer.
-    state: ST,
+    pub(crate) state: ST,
     /// Sync server address.
-    server_addr: Addr,
+    pub(crate) server_addr: Addr,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]

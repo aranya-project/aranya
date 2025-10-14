@@ -48,9 +48,10 @@ use crate::{
     sync::{
         self,
         task::{
-            quic::{HelloInfo, HelloSubscriptions, PskStore},
+            hello::{HelloInfo, HelloSubscriptions},
             PeerCacheKey, SyncPeer,
         },
+        transport::quic::PskStore,
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,
@@ -60,12 +61,12 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::task::quic::State;
+type TestState = sync::transport::quic::State;
 // Aranya sync client for testing.
 type TestSyncer = sync::task::Syncer<TestState>;
 
 // Aranya sync server for testing.
-type TestServer = sync::task::quic::Server<
+type TestServer = sync::transport::quic::Server<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
 >;
