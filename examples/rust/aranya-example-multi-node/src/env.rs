@@ -1,6 +1,6 @@
 //! Utilities for loading environment variables for the example.
 
-use std::{env, net::Ipv4Addr, path::Path, str::FromStr};
+use std::{env, fmt::Write, net::Ipv4Addr, path::Path, str::FromStr};
 
 use age::secrecy::{ExposeSecret, SecretString};
 use anyhow::{Context, Result};
@@ -77,12 +77,13 @@ impl EnvVars {
     /// Generate environment file.
     pub async fn generate(&self, path: &Path) -> Result<()> {
         let mut buf = "".to_string();
-        buf += &format!("export {}={}\r\n", LOG_LEVEL_ENV_VAR, self.level);
-        buf += &format!(
+        writeln!(buf, "export {}={}\r\n", LOG_LEVEL_ENV_VAR, self.level)?;
+        writeln!(
+            buf,
             "export {}={}\r\n",
             ONBOARDING_PASSPHRASE_ENV_VAR,
             self.passphrase.expose_secret()
-        );
+        )?;
         for device in self.devices() {
             buf += &format!(
                 "export {}_{}={}\r\n",
