@@ -47,10 +47,8 @@ use crate::{
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::{
-            hello::{HelloInfo, HelloSubscriptions},
-            PeerCacheKey, SyncPeer,
-        },
+        services::hello::{HelloInfo, HelloSubscriptions},
+        task::{PeerCacheKey, SyncPeer},
         transport::quic::PskStore,
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},

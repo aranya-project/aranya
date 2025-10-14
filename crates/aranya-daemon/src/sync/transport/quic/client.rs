@@ -29,10 +29,8 @@ use tracing::{debug, error, instrument};
 use crate::{
     aranya::ClientWithCaches,
     sync::{
-        task::{
-            hello::HelloSubscriptions, EffectSender, PeerCacheKey, Request, SyncPeers,
-            SyncResponse, SyncState, Syncer,
-        },
+        services::hello::HelloSubscriptions,
+        task::{EffectSender, PeerCacheKey, Request, SyncPeers, SyncResponse, SyncState, Syncer},
         transport::quic::{
             connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
             psk::PskStore,

@@ -22,8 +22,6 @@ use tracing::{error, info, instrument, trace, warn};
 use super::Result as SyncResult;
 use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
 
-pub mod hello;
-
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
 pub(crate) enum Msg {

@@ -34,7 +34,8 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        task::{hello::HelloInfo, SyncPeers, Syncer},
+        services::hello::HelloInfo,
+        task::{SyncPeers, Syncer},
         transport::quic::{PskStore, State as QuicSyncClientState, SyncParams},
     },
     util::{load_team_psk_pairs, SeedDir},

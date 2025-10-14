@@ -41,10 +41,8 @@ use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 use crate::{
     aranya::ClientWithCaches,
     sync::{
-        task::{
-            hello::{HelloInfo, HelloSubscription, HelloSubscriptions},
-            PeerCacheKey, SyncPeers, SyncResponse,
-        },
+        services::hello::{HelloInfo, HelloSubscription, HelloSubscriptions},
+        task::{PeerCacheKey, SyncPeers, SyncResponse},
         transport::quic::{
             connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
             psk::PskStore,
