@@ -300,7 +300,13 @@ dependencies = ["build-capi-header", "build-capi-lib-experimental"]
 [tasks.run-rust-example]
 category = "examples"
 description = "Run Rust example application"
-cwd = "examples/rust"
+cwd = "examples/rust/aranya-example"
+script = "./run.bash"
+
+[tasks.run-rust-example-multi-node]
+category = "examples"
+description = "Run Rust example application on multiple nodes"
+cwd = "examples/rust/aranya-example-multi-node"
 script = "./run.bash"
 
 # Metrics
