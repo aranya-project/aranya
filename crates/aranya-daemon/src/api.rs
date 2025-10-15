@@ -253,11 +253,17 @@ impl EffectHandler {
                 }
                 LabelAssigned(_) => {}
                 LabelRevoked(label_revoked) => {
-                    // TODO: delete AFC channel if label is revoked from peer.
                     #[cfg(feature = "afc")]
                     if self.device_id == label_revoked.device_id.into() {
                         self.afc
                             .label_deleted(label_revoked.label_id.into())
+                            .await?;
+                    } else {
+                        self.afc
+                            .label_revoked(
+                                label_revoked.label_id.into(),
+                                label_revoked.device_id.into(),
+                            )
                             .await?;
                     }
                     tracing::warn!(effect = ?label_revoked, "received LabelRevoked effect");
