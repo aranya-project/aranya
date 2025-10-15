@@ -210,7 +210,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval)?.build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let team_name = "rust_example";
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
