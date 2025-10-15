@@ -4,8 +4,8 @@ use std::fmt::Debug;
 
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
-use aranya_crypto::{CipherSuite, DeviceId, Engine, KeyStore, Rng};
-use aranya_daemon_api::{self as api};
+use aranya_crypto::{afc::UniPeerEncap, CipherSuite, DeviceId, Engine, KeyStore, Rng};
+use aranya_daemon_api::{self as api, AfcGlobalChannelId};
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId,
@@ -120,7 +120,10 @@ where
     /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId>
+    pub(crate) async fn uni_channel_created(
+        &self,
+        e: &AfcUniChannelCreated,
+    ) -> Result<(ChannelId, AfcGlobalChannelId)>
     where
         E: Engine<CS = C>,
     {
@@ -145,13 +148,16 @@ where
             .add(key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
-        Ok(channel_id)
+        Ok((channel_id, e.channel_key_id.into()))
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.label_id))]
-    pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<ChannelId>
+    pub(crate) async fn uni_channel_received(
+        &self,
+        e: &AfcUniChannelReceived,
+    ) -> Result<(ChannelId, AfcGlobalChannelId)>
     where
         E: Engine<CS = C>,
     {
@@ -176,8 +182,9 @@ where
             .add(key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving uni channel");
+        let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
 
-        Ok(channel_id)
+        Ok((channel_id, encap.id().into_id().into()))
     }
 
     pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>

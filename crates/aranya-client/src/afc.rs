@@ -54,6 +54,28 @@ impl From<Box<[u8]>> for CtrlMsg {
     }
 }
 
+/// A channel ID.
+#[derive(Copy, Clone, Debug)]
+pub struct ChannelId(aranya_daemon_api::AfcGlobalChannelId);
+
+impl From<aranya_daemon_api::AfcGlobalChannelId> for ChannelId {
+    fn from(value: aranya_daemon_api::AfcGlobalChannelId) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ChannelId> for aranya_daemon_api::AfcGlobalChannelId {
+    fn from(value: ChannelId) -> Self {
+        value.0
+    }
+}
+
+impl fmt::Display for ChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
 /// AFC seal error.
 #[derive(Debug, thiserror::Error)]
 pub struct AfcSealError(
@@ -151,7 +173,7 @@ impl Channels {
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(SendChannel, CtrlMsg)> {
-        let (ctrl, channel_id) = self
+        let (ctrl, channel_id, global_channel_id) = self
             .daemon
             .create_afc_uni_send_channel(
                 context::current(),
@@ -165,6 +187,7 @@ impl Channels {
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
+            global_channel_id: global_channel_id.into(),
             channel_id,
             label_id,
         };
@@ -173,7 +196,7 @@ impl Channels {
 
     /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
-        let (label_id, channel_id) = self
+        let (label_id, channel_id, global_channel_id) = self
             .daemon
             .receive_afc_ctrl(context::current(), team_id.__id, ctrl.0)
             .await
@@ -182,6 +205,7 @@ impl Channels {
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
+            global_channel_id: global_channel_id.into(),
             channel_id,
             label_id: LabelId { __id: label_id },
         })
@@ -193,12 +217,16 @@ impl Channels {
 pub struct SendChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
+    global_channel_id: ChannelId,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl SendChannel {
-    // TODO: return channel's unique ID.
+    /// The channel's unique ID.
+    pub fn channel_id(&self) -> ChannelId {
+        self.global_channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
@@ -244,12 +272,16 @@ impl SendChannel {
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
+    global_channel_id: ChannelId,
     channel_id: AfcChannelId,
     label_id: LabelId,
 }
 
 impl ReceiveChannel {
-    // TODO: return channel's unique ID.
+    /// The channel's unique ID.
+    pub fn channel_id(&self) -> ChannelId {
+        self.global_channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {

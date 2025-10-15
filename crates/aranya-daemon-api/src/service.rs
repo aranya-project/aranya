@@ -96,6 +96,11 @@ custom_id! {
     pub struct LabelId;
 }
 
+custom_id! {
+    /// An globally unique AFC channel ID.
+    pub struct AfcGlobalChannelId;
+}
+
 /// A device's public key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
@@ -414,7 +419,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    ) -> Result<(AfcCtrl, AfcChannelId, AfcGlobalChannelId)>;
     /// Delete a AFC channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -422,7 +427,10 @@ pub trait DaemonApi {
     /// Receive AFC ctrl message.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<(LabelId, AfcChannelId)>;
+    async fn receive_afc_ctrl(
+        team: TeamId,
+        ctrl: AfcCtrl,
+    ) -> Result<(LabelId, AfcChannelId, AfcGlobalChannelId)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
