@@ -8,57 +8,6 @@ use core::{
 use aranya_client::aqc;
 use bytes::{Buf as _, Bytes};
 
-/// An AQC channel that can both send and receive data.
-#[derive(Debug)]
-pub struct AqcBidiChannel {
-    pub(crate) inner: aqc::AqcBidiChannel,
-}
-
-impl AqcBidiChannel {
-    pub fn new(channel: aqc::AqcBidiChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-
-/// An AQC channel that can only send data.
-#[derive(Debug)]
-pub struct AqcSendChannel {
-    pub(crate) inner: aqc::AqcSendChannel,
-}
-
-impl AqcSendChannel {
-    pub fn new(channel: aqc::AqcSendChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-
-/// An AQC channel that can only receive data.
-#[derive(Debug)]
-pub struct AqcReceiveChannel {
-    pub(crate) inner: aqc::AqcReceiveChannel,
-}
-
-impl AqcReceiveChannel {
-    pub fn new(channel: aqc::AqcReceiveChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-
-/// Container for an AQC Channel variant.
-///
-/// This needs to be destructured before it can be used, since C doesn't have
-/// dataful enums.
-#[derive(Debug)]
-pub struct AqcPeerChannel {
-    pub(crate) inner: aqc::AqcPeerChannel,
-}
-
-impl AqcPeerChannel {
-    pub fn new(channel: aqc::AqcPeerChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-
 /// An AQC stream that can both send and receive data.
 #[derive(Debug)]
 pub struct AqcBidiStream {
