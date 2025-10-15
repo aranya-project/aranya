@@ -377,7 +377,7 @@ impl AqcPskId {
 mod tests {
     use std::fmt::Debug;
 
-    use aranya_crypto::Rng;
+    use aranya_crypto::{id::IdExt, Rng};
     use serde::de::DeserializeOwned;
 
     use super::*;

@@ -1,9 +1,6 @@
 use core::mem::MaybeUninit;
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    Builder, InvalidArg,
-};
+use aranya_capi_core::{Builder, InvalidArg};
 
 use super::Error;
 use crate::api::defs::{self, TeamId};
@@ -31,10 +28,6 @@ impl CreateTeamConfig {
     }
 }
 
-impl Typed for CreateTeamConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
-}
-
 /// Builder for constructing a [`CreateTeamConfig`].
 #[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {
@@ -49,10 +42,6 @@ impl CreateTeamConfigBuilder {
     pub fn quic(&mut self, cfg: CreateTeamQuicSyncConfig) {
         self.quic_sync = Some(cfg);
     }
-}
-
-impl Typed for CreateTeamConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x69F54A43);
 }
 
 impl Builder for CreateTeamConfigBuilder {
@@ -86,10 +75,6 @@ impl AddTeamConfig {
     }
 }
 
-impl Typed for AddTeamConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xA05F7519);
-}
-
 /// Builder for constructing an [`AddTeamConfig`].
 #[derive(Debug, Default)]
 pub struct AddTeamConfigBuilder {
@@ -110,10 +95,6 @@ impl AddTeamConfigBuilder {
     pub fn quic(&mut self, cfg: AddTeamQuicSyncConfig) {
         self.quic_sync = Some(cfg);
     }
-}
-
-impl Typed for AddTeamConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
 }
 
 impl Builder for AddTeamConfigBuilder {
