@@ -19,7 +19,7 @@ use aranya_daemon_api::SEED_IKM_SIZE;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
-use spideroak_base58::id::ToBase58 as _;
+use spideroak_base58::ToBase58 as _;
 use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};

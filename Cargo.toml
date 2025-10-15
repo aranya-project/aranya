@@ -55,9 +55,9 @@ aranya-policy-lang = { version = "0.8.0" }
 aranya-policy-text = { version = "0.1.2" }
 aranya-policy-vm = { version = "0.13.0", features = ["std"] }
 aranya-runtime = { version = "0.14.0", features = ["std", "libc"] }
-spideroak-base58 = { git = "https://github.com/aranya-project/aranya-core.git", branch = "429-remove_if" }
 
 buggy = { version = "0.1.0" }
+spideroak-base58 = { version = "0.2.0" }
 
 aranya-client = { version = "3.0.0", path = "crates/aranya-client" }
 aranya-daemon = { version = "3.0.0", path = "crates/aranya-daemon" }

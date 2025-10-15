@@ -1704,7 +1704,7 @@ pub unsafe fn aqc_remove_net_identifier(
 #[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 168, align = 8)]
-pub type AqcPeerChannel = Safe<imp::AqcPeerChannel>;
+pub type AqcPeerChannel = Safe<aqc::AqcPeerChannel>;
 
 /// An enum containing all [`AqcPeerChannel`] variants.
 #[cfg(feature = "aqc")]
@@ -1719,19 +1719,19 @@ pub enum AqcChannelType {
 #[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 160, align = 8)]
-pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
+pub type AqcBidiChannel = Safe<aqc::AqcBidiChannel>;
 
 /// An AQC Sender Channel Object.
 #[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 160, align = 8)]
-pub type AqcSendChannel = Safe<imp::AqcSendChannel>;
+pub type AqcSendChannel = Safe<aqc::AqcSendChannel>;
 
 /// An AQC Receiver Channel Object.
 #[cfg(feature = "aqc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 160, align = 8)]
-pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
+pub type AqcReceiveChannel = Safe<aqc::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.
 #[cfg(feature = "aqc")]
@@ -1781,7 +1781,7 @@ pub unsafe fn aqc_create_bidi_channel(
             .create_bidi_channel(team.into(), peer, label_id.into()),
     )?;
 
-    AqcBidiChannel::init(channel, imp::AqcBidiChannel::new(chan));
+    AqcBidiChannel::init(channel, chan);
     Ok(())
 }
 
@@ -1815,7 +1815,7 @@ pub unsafe fn aqc_create_uni_channel(
             .create_uni_channel(team.into(), peer, label_id.into()),
     )?;
 
-    AqcSendChannel::init(channel, imp::AqcSendChannel::new(chan));
+    AqcSendChannel::init(channel, chan);
     Ok(())
 }
 
@@ -1837,7 +1837,7 @@ pub fn aqc_delete_bidi_channel(
             .inner
             .aqc()
             .ok_or(imp::Error::NotEnabled)?
-            .delete_bidi_channel(&mut channel.inner),
+            .delete_bidi_channel(channel),
     )?;
     Ok(())
 }
@@ -1860,7 +1860,7 @@ pub fn aqc_delete_send_uni_channel(
             .inner
             .aqc()
             .ok_or(imp::Error::NotEnabled)?
-            .delete_send_uni_channel(&mut channel.inner),
+            .delete_send_uni_channel(channel),
     )?;
     Ok(())
 }
@@ -1883,7 +1883,7 @@ pub fn aqc_delete_receive_uni_channel(
             .inner
             .aqc()
             .ok_or(imp::Error::NotEnabled)?
-            .delete_receive_uni_channel(&mut channel.inner),
+            .delete_receive_uni_channel(channel),
     )?;
     Ok(())
 }
@@ -1932,7 +1932,7 @@ pub fn aqc_try_receive_channel(
         aqc::AqcPeerChannel::Receive { .. } => AqcChannelType::Receiver,
     };
 
-    AqcPeerChannel::init(channel, imp::AqcPeerChannel::new(chan));
+    AqcPeerChannel::init(channel, chan);
 
     Ok(chan_type)
 }
@@ -1954,9 +1954,9 @@ pub fn aqc_get_bidi_channel(
 ) -> Result<(), imp::Error> {
     if let aqc::AqcPeerChannel::Bidi(channel) =
         // SAFETY: the user is responsible for passing in a valid AqcPeerChannel pointer.
-        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
+        unsafe { Opaque::into_inner(channel.read()).into_inner() }
     {
-        AqcBidiChannel::init(bidi, imp::AqcBidiChannel::new(channel));
+        AqcBidiChannel::init(bidi, channel);
         Ok(())
     } else {
         Err(InvalidArg::new(
@@ -1984,9 +1984,9 @@ pub fn aqc_get_receive_channel(
 ) -> Result<(), imp::Error> {
     if let aqc::AqcPeerChannel::Receive(recv) =
         // SAFETY: the user is responsible for passing in a valid AqcPeerChannel pointer.
-        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
+        unsafe { Opaque::into_inner(channel.read()).into_inner() }
     {
-        AqcReceiveChannel::init(receiver, imp::AqcReceiveChannel::new(recv));
+        AqcReceiveChannel::init(receiver, recv);
         Ok(())
     } else {
         Err(InvalidArg::new(
@@ -2013,7 +2013,7 @@ pub fn aqc_bidi_create_bidi_stream(
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcBidiStream>,
 ) -> Result<(), imp::Error> {
-    let bidi = client.rt.block_on(channel.inner.create_bidi_stream())?;
+    let bidi = client.rt.block_on(channel.create_bidi_stream())?;
 
     AqcBidiStream::init(stream, imp::AqcBidiStream::new(bidi));
     Ok(())
@@ -2091,7 +2091,7 @@ pub fn aqc_bidi_create_uni_stream(
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
-    let send = client.rt.block_on(channel.inner.create_uni_stream())?;
+    let send = client.rt.block_on(channel.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -2120,7 +2120,7 @@ pub fn aqc_bidi_try_receive_stream(
     send_stream: &mut MaybeUninit<AqcSendStream>,
     send_init: &mut MaybeUninit<bool>,
 ) -> Result<(), imp::Error> {
-    let stream = channel.inner.try_receive_stream()?;
+    let stream = channel.try_receive_stream()?;
     match stream {
         aqc::AqcPeerStream::Bidi(bidi) => {
             let (send, recv) = bidi.split();
@@ -2152,7 +2152,7 @@ pub fn aqc_send_create_uni_stream(
     channel: &mut AqcSendChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
-    let send = client.rt.block_on(channel.inner.create_uni_stream())?;
+    let send = client.rt.block_on(channel.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -2175,7 +2175,7 @@ pub fn aqc_recv_try_receive_uni_stream(
     channel: &mut AqcReceiveChannel,
     stream: &mut MaybeUninit<AqcReceiveStream>,
 ) -> Result<(), imp::Error> {
-    let recv = channel.inner.try_receive_uni_stream()?;
+    let recv = channel.try_receive_uni_stream()?;
 
     AqcReceiveStream::init(stream, imp::AqcReceiveStream::new(recv));
     Ok(())
@@ -2241,13 +2241,13 @@ pub unsafe fn aqc_recv_stream_try_recv(
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 96, align = 8)]
-pub type AfcSendChannel = Safe<imp::AfcSendChannel>;
+pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 96, align = 8)]
-pub type AfcReceiveChannel = Safe<imp::AfcReceiveChannel>;
+pub type AfcReceiveChannel = Safe<afc::ReceiveChannel>;
 
 /// An AFC Control Message, used to create the other end of a channel.
 ///
@@ -2256,7 +2256,7 @@ pub type AfcReceiveChannel = Safe<imp::AfcReceiveChannel>;
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
+pub type AfcCtrlMsg = Safe<afc::CtrlMsg>;
 
 /// An AFC Sequence Number, for reordering messages.
 ///
@@ -2264,7 +2264,7 @@ pub type AfcCtrlMsg = Safe<imp::AfcCtrlMsg>;
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
-pub type AfcSeq = Safe<imp::AfcSeq>;
+pub type AfcSeq = Safe<afc::Seq>;
 
 /// The overhead needed for a channel message.
 ///
@@ -2313,8 +2313,8 @@ pub fn afc_create_uni_send_channel(
             label_id.into(),
         ))?;
 
-    AfcSendChannel::init(channel, imp::AfcSendChannel(chan));
-    AfcCtrlMsg::init(control, ctrl.into());
+    AfcSendChannel::init(channel, chan);
+    AfcCtrlMsg::init(control, ctrl);
     Ok(())
 }
 
@@ -2338,7 +2338,7 @@ pub fn afc_recv_ctrl(
     let chan = client
         .rt
         .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl.into()))?;
-    AfcReceiveChannel::init(channel, imp::AfcReceiveChannel(chan));
+    AfcReceiveChannel::init(channel, chan);
     Ok(())
 }
 
@@ -2348,7 +2348,7 @@ pub fn afc_recv_ctrl(
 /// @param[out] __output the corresponding label ID [`LabelId`].
 #[cfg(feature = "afc")]
 pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
-    channel.0.label_id().into()
+    channel.label_id().into()
 }
 
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
@@ -2357,7 +2357,7 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
 /// @param[out] __output the corresponding label ID [`LabelId`].
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId {
-    channel.0.label_id().into()
+    channel.label_id().into()
 }
 
 /// Returns the raw data for a given [`AfcCtrlMsg`].
@@ -2373,7 +2373,7 @@ pub fn afc_ctrl_msg_get_bytes(
     ptr: &mut MaybeUninit<*const u8>,
     len: &mut MaybeUninit<usize>,
 ) {
-    let slice = control.0.as_bytes();
+    let slice = control.as_bytes();
     ptr.write(slice.as_ptr());
     len.write(slice.len());
 }
@@ -2385,7 +2385,7 @@ pub fn afc_ctrl_msg_get_bytes(
 /// @param[out] __output the comparison result (-1 is <, 0 is =, 1 is >).
 #[cfg(feature = "afc")]
 pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
-    afc::Seq::cmp(&seq1.0, &seq2.0) as core::ffi::c_int
+    afc::Seq::cmp(seq1, seq2) as core::ffi::c_int
 }
 
 /// Encrypts and authenticates `plaintext`, and writes it to `dst`.
@@ -2415,7 +2415,7 @@ pub unsafe fn afc_channel_seal(
 
     // SAFETY: the user is responsible for giving us a valid pointer.
     let dst = aranya_capi_core::try_as_mut_slice!(dst, *dst_len);
-    channel.0.seal(dst, plaintext)?;
+    channel.seal(dst, plaintext)?;
     *dst_len = plaintext.len() + ARANYA_AFC_CHANNEL_OVERHEAD;
 
     Ok(())
@@ -2450,9 +2450,9 @@ pub unsafe fn afc_channel_open(
 
     // SAFETY: the user is responsible for giving us a valid pointer.
     let dst = aranya_capi_core::try_as_mut_slice!(dst, *dst_len);
-    let seq_raw = channel.0.open(dst, ciphertext)?;
+    let seq_raw = channel.open(dst, ciphertext)?;
 
-    AfcSeq::init(seq, seq_raw.into());
+    AfcSeq::init(seq, seq_raw);
     // Do our best to set a max bound, even if we can't know if they pass in a larger ciphertext than needed.
     *dst_len = ciphertext.len() - ARANYA_AFC_CHANNEL_OVERHEAD;
 
@@ -2475,7 +2475,7 @@ pub fn afc_send_channel_delete(
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcSendChannel` pointer.
     let channel = unsafe { channel.read().into_inner().into_inner() };
-    client.rt.block_on(channel.0.delete())?;
+    client.rt.block_on(channel.delete())?;
     Ok(())
 }
 
@@ -2495,6 +2495,6 @@ pub fn afc_receive_channel_delete(
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcReceiveChannel` pointer.
     let channel = unsafe { channel.read().into_inner().into_inner() };
-    client.rt.block_on(channel.0.delete())?;
+    client.rt.block_on(channel.delete())?;
     Ok(())
 }

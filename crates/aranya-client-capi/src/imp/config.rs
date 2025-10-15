@@ -94,11 +94,7 @@ pub use aqc::*;
 mod aqc {
     use std::ffi::c_char;
 
-    use aranya_capi_core::{
-        prelude::*,
-        safe::{TypeId, Typed},
-        InvalidArg,
-    };
+    use aranya_capi_core::{prelude::*, InvalidArg};
 
     use crate::{api::defs, imp::Error};
 
@@ -107,10 +103,6 @@ mod aqc {
     pub struct AqcConfig {
         /// Address to bind AQC server to.
         pub addr: *const c_char,
-    }
-
-    impl Typed for AqcConfig {
-        const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
     }
 
     /// Builder for an [`AqcConfig`]
@@ -145,10 +137,6 @@ mod aqc {
             Self::Output::init(out, cfg);
             Ok(())
         }
-    }
-
-    impl Typed for AqcConfigBuilder {
-        const TYPE_ID: TypeId = TypeId::new(0x153AE387);
     }
 
     impl Default for AqcConfigBuilder {

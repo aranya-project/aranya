@@ -103,7 +103,7 @@ mod tests {
     use std::collections::HashSet;
 
     use anyhow::Context as _;
-    use aranya_crypto::{id::IdExt as _, Rng};
+    use aranya_crypto::{id::IdExt, Rng};
     use tempfile::tempdir;
     use test_log::test;
 
@@ -122,8 +122,8 @@ mod tests {
         let mut seen = HashSet::new();
 
         for _ in 0..100 {
-            let team_id = Id::random(&mut Rng).into();
-            let seed_id = Id::random(&mut Rng).into();
+            let team_id = TeamId::random(&mut Rng);
+            let seed_id = PskSeedId::random(&mut Rng);
 
             // may see duplicates by random chance
             if !seen.insert(team_id) {
@@ -158,8 +158,8 @@ mod tests {
             .context("could not create seed dir")?;
 
         for _ in 0..100 {
-            let team_id = Id::random(&mut Rng).into();
-            let seed_id = Id::random(&mut Rng).into();
+            let team_id = TeamId::random(&mut Rng);
+            let seed_id = PskSeedId::random(&mut Rng);
 
             seed_dir
                 .append(&team_id, &seed_id)
