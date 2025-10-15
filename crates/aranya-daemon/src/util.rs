@@ -103,7 +103,7 @@ mod tests {
     use std::collections::HashSet;
 
     use anyhow::Context as _;
-    use aranya_crypto::Rng;
+    use aranya_crypto::{id::IdExt as _, Rng};
     use tempfile::tempdir;
     use test_log::test;
 

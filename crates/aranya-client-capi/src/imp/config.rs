@@ -2,10 +2,7 @@
 
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    Builder, InvalidArg,
-};
+use aranya_capi_core::{Builder, InvalidArg};
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -32,10 +29,6 @@ impl ClientConfig {
     }
 }
 
-impl Typed for ClientConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
-}
-
 /// Builder for a [`ClientConfig`]
 #[derive(Clone, Debug)]
 pub struct ClientConfigBuilder {
@@ -55,10 +48,6 @@ impl ClientConfigBuilder {
     pub fn aqc(&mut self, cfg: AqcConfig) {
         self.aqc = Some(cfg);
     }
-}
-
-impl Typed for ClientConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xAAAA611B);
 }
 
 impl Builder for ClientConfigBuilder {
@@ -178,10 +167,6 @@ pub struct SyncPeerConfig {
     sync_now: bool,
 }
 
-impl Typed for SyncPeerConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
-}
-
 impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
@@ -238,10 +223,6 @@ impl Builder for SyncPeerConfigBuilder {
         Self::Output::init(out, cfg);
         Ok(())
     }
-}
-
-impl Typed for SyncPeerConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xFE81AF7E);
 }
 
 impl Default for SyncPeerConfigBuilder {

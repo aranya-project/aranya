@@ -142,7 +142,7 @@ where
             .lock()
             .await
             .write
-            .add(key.into(), info.label_id)
+            .add(key.into(), info.label_id, info.open_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
         Ok(channel_id)
@@ -173,7 +173,7 @@ where
             .lock()
             .await
             .write
-            .add(key.into(), info.label_id)
+            .add(key.into(), info.label_id, info.seal_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving uni channel");
 
@@ -196,8 +196,18 @@ where
         let shm = self.shm.lock().await;
 
         shm.write
-            .remove_if(|_channel_id, chan_label| chan_label == label_id.into_id().into())
+            .remove_if(|_channel_id, chan_label, _peer_id| chan_label == label_id.into_id().into())
             .map_err(|err| anyhow!("unable to remove AFC channels with label ID: {err}"))
+    }
+
+    pub(crate) async fn label_revoked(&self, label_id: LabelId, peer_id: DeviceId) -> Result<()> {
+        let shm = self.shm.lock().await;
+
+        shm.write
+            .remove_if(|_channel_id, chan_label, chan_peer| {
+                chan_label == label_id.into_id().into() && chan_peer == peer_id
+            })
+            .map_err(|err| anyhow!("unable to remove AFC channels with (label ID, peer ID): {err}"))
     }
 
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {

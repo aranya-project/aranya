@@ -52,6 +52,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 aranya-daemon = { path = "../aranya-daemon", features = ["aqc", "afc", "experimental", "preview"] }
+spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
 serial_test = { workspace = true }

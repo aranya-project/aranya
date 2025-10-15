@@ -138,7 +138,7 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 [[package]]
 name = "aranya-afc-util"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "aranya-aqc-util"
 version = "0.8.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -169,7 +169,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.4.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -186,7 +186,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-core"
 version = "0.5.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-capi-macro",
  "aranya-libc",
@@ -202,7 +202,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-macro"
 version = "0.4.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-capi-codegen",
  "proc-macro2",
@@ -263,16 +263,15 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.10.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
+ "aranya-id",
  "buggy",
  "byteorder",
  "cfg-if",
  "ciborium",
  "ciborium-io",
  "derive-where",
- "proptest",
- "rkyv",
  "rustix",
  "serde",
  "sha3-utils",
@@ -286,7 +285,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto-ffi"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -370,7 +369,7 @@ dependencies = [
 [[package]]
 name = "aranya-device-ffi"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -379,7 +378,7 @@ dependencies = [
 [[package]]
 name = "aranya-envelope-ffi"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -390,7 +389,7 @@ dependencies = [
 [[package]]
 name = "aranya-fast-channels"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "buggy",
@@ -405,9 +404,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aranya-id"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
+dependencies = [
+ "rkyv",
+ "serde",
+ "spideroak-base58",
+ "subtle",
+ "zerocopy 0.8.24",
+ "zerocopy-derive 0.8.24",
+]
+
+[[package]]
 name = "aranya-idam-ffi"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -482,7 +494,7 @@ dependencies = [
 [[package]]
 name = "aranya-libc"
 version = "0.3.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "cfg-if",
  "errno",
@@ -522,7 +534,7 @@ dependencies = [
 [[package]]
 name = "aranya-perspective-ffi"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -531,7 +543,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ast"
 version = "0.8.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-policy-text",
  "rkyv",
@@ -543,7 +555,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-compiler"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-policy-ast",
  "aranya-policy-lang",
@@ -559,7 +571,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-derive"
 version = "0.8.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-policy-lang",
  "prettyplease",
@@ -571,7 +583,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-policy-ifgen-macro",
  "aranya-policy-vm",
@@ -583,7 +595,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen-build"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -598,7 +610,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen-macro"
 version = "0.4.1"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -608,7 +620,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-lang"
 version = "0.8.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -624,7 +636,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-module"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -638,7 +650,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text"
 version = "0.1.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-policy-text-macro",
  "proptest",
@@ -650,7 +662,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text-macro"
 version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "macro-string",
  "proc-macro2",
@@ -661,7 +673,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-vm"
 version = "0.13.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -676,7 +688,7 @@ dependencies = [
 [[package]]
 name = "aranya-runtime"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=425-remove-bidi#fea9b486833361653d9cd4c7274f2a0a49d78229"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=429-remove_if#bc0db414cb16b672de062969c406d3ca6c47115b"
 dependencies = [
  "aranya-crypto",
  "aranya-libc",
@@ -685,6 +697,7 @@ dependencies = [
  "heapless 0.8.0",
  "postcard",
  "serde",
+ "spideroak-base58",
  "spin 0.10.0",
  "thiserror 2.0.12",
  "tracing",

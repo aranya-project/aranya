@@ -1,4 +1,5 @@
 use core::{borrow::Borrow, fmt, marker::PhantomData};
+use std::iter;
 
 use anyhow::Result;
 use aranya_crypto::{
@@ -9,7 +10,7 @@ use aranya_crypto::{
         keys::PublicKey,
         signer::PkError,
     },
-    id::{Id, IdError, Identified},
+    id::{Id, IdError, IdExt as _, Identified},
     unwrapped, CipherSuite, Engine, Oids, Random,
 };
 use ciborium as cbor;
@@ -101,7 +102,7 @@ impl<CS: CipherSuite> PublicApiKey<CS> {
     #[inline]
     pub fn id(&self) -> Result<ApiKeyId, IdError> {
         let pk = &self.0.export();
-        let id = Id::new::<CS>(pk.borrow(), b"ApiKey");
+        let id = Id::new::<CS>(b"ApiKey", iter::once(pk.borrow()));
         Ok(ApiKeyId(id))
     }
 
