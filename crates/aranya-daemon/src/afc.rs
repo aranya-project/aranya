@@ -142,7 +142,7 @@ where
             .lock()
             .await
             .write
-            .add(key.into(), info.label_id)
+            .add(key.into(), info.label_id, info.open_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
         Ok(channel_id)
@@ -173,7 +173,7 @@ where
             .lock()
             .await
             .write
-            .add(key.into(), info.label_id)
+            .add(key.into(), info.label_id, info.seal_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "receiving uni channel");
 

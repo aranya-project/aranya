@@ -292,7 +292,7 @@ pub type Client = Safe<imp::Client>;
 pub const ARANYA_ID_LEN: usize = 32;
 
 const _: () = {
-    assert!(ARANYA_ID_LEN == size_of::<aranya_crypto::Id>());
+    assert!(ARANYA_ID_LEN == size_of::<aranya_id::BaseId>());
 };
 
 /// Cryptographically secure Aranya ID.
@@ -302,15 +302,15 @@ pub struct Id {
     bytes: [u8; ARANYA_ID_LEN],
 }
 
-impl AsRef<aranya_crypto::Id> for Id {
-    fn as_ref(&self) -> &aranya_crypto::Id {
+impl AsRef<aranya_id::BaseId> for Id {
+    fn as_ref(&self) -> &aranya_id::BaseId {
         // SAFETY: Each type is a struct with a single field containing an array of 64 bytes
-        unsafe { &*ptr::from_ref::<[u8; ARANYA_ID_LEN]>(&self.bytes).cast::<aranya_crypto::Id>() }
+        unsafe { &*ptr::from_ref::<[u8; ARANYA_ID_LEN]>(&self.bytes).cast::<aranya_id::BaseId>() }
     }
 }
 
-impl From<aranya_crypto::Id> for Id {
-    fn from(value: aranya_crypto::Id) -> Self {
+impl From<aranya_id::BaseId> for Id {
+    fn from(value: aranya_id::BaseId) -> Self {
         Id {
             bytes: value.into(),
         }
@@ -639,7 +639,7 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
     // SAFETY: Caller must ensure the pointer is a valid C String.
     let cstr = unsafe { CStr::from_ptr(str) };
 
-    aranya_crypto::Id::decode(cstr.to_bytes())
+    aranya_id::BaseId::decode(cstr.to_bytes())
         .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())
         .map(Into::into)
 }
