@@ -1560,6 +1560,8 @@ effect AfcUniChannelCreated {
     label_id id,
     // The channel key ID.
     channel_key_id id,
+    // The channel peer's encapsulated KEM shared secret.
+    encap bytes,
 }
 
 // The effect that is emitted when the peer of a unidirectional
@@ -1630,6 +1632,7 @@ ephemeral command AfcCreateUniChannel {
                     peer_enc_pk: peer_enc_pk,
                     label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
+                    encap: this.peer_encap,
                 }
             }
         }

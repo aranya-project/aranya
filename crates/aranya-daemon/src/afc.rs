@@ -148,7 +148,8 @@ where
             .add(key.into(), info.label_id)
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         debug!(?channel_id, "creating uni channel");
-        Ok((channel_id, e.channel_key_id.into()))
+        let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
+        Ok((channel_id, encap.id().into_id().into()))
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
