@@ -208,11 +208,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
 
-[[audits.redox_syscall]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-run"
-delta = "0.5.8 -> 0.5.10"
-
 [[audits.rfc6979]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -276,6 +271,11 @@ version = "0.4.0"
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
 [[audits.rustversion]]
@@ -327,6 +327,11 @@ version = "0.3.1"
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.3.1 -> 0.3.0"
+
+[[audits.signal-hook-registry]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.4.1 -> 1.4.5"
 
 [[audits.spideroak-base58]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -468,6 +473,11 @@ delta = "0.1.5 -> 0.1.6"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.1.6"
+
+[[audits.zerovec]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.3 -> 0.11.4"
 
 [[trusted.anstream]]
 criteria = "safe-to-deploy"

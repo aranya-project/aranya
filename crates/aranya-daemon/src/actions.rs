@@ -377,39 +377,18 @@ where
         .in_current_span()
     }
 
-    /// Creates a bidirectional AFC channel off graph.
-    #[cfg(feature = "afc")]
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
-    fn create_afc_bidi_channel_off_graph(
-        &self,
-        peer_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_afc_bidi_channel"),
-            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
-        })
-        .in_current_span()
-    }
-
     /// Creates a unidirectional AFC channel.
     #[cfg(feature = "afc")]
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
+    #[instrument(skip(self), fields(open_id = %open_id, label_id = %label_id))]
     fn create_afc_uni_channel_off_graph(
         &self,
-        seal_id: DeviceId,
         open_id: DeviceId,
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_afc_uni_channel"),
-            args: Cow::Owned(vec![
-                Value::from(seal_id),
-                Value::from(open_id),
-                Value::from(label_id),
-            ]),
+            args: Cow::Owned(vec![Value::from(open_id), Value::from(label_id)]),
         })
         .in_current_span()
     }

@@ -15,13 +15,15 @@ workspace = true
 [features]
 default = []
 
+aqc = ["aranya-client/aqc", "aranya-client/experimental"]
+
 datadog = ["dep:metrics-exporter-dogstatsd"]
 prometheus = ["dep:metrics-exporter-prometheus"]
 tcp = ["dep:metrics-exporter-tcp"]
 
 
 [dependencies]
-aranya-client = { workspace = true, features = ["aqc", "experimental"] }
+aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
@@ -52,5 +54,6 @@ metrics-exporter-tcp = { version = "0.11", optional = true }
 [[bin]]
 name = "aranya-metrics"
 path = "src/main.rs"
+required-features = ["aqc"]
 test = false
 bench = false
