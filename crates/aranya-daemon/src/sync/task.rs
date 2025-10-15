@@ -398,7 +398,8 @@ impl<ST: SyncState> Syncer<ST> {
                     });
                     self.invalid.insert(peer.graph_id);
                 }
-            })?;
+            })
+            .with_context(|| format!("peer addr: {}", peer.addr))?;
 
         let effects = sink
             .collect()

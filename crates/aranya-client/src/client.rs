@@ -38,7 +38,8 @@ use crate::{
 };
 
 /// The Device ID.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct DeviceId {
     #[doc(hidden)]
     pub __id: aranya_daemon_api::DeviceId,
@@ -51,7 +52,8 @@ impl Display for DeviceId {
 }
 
 /// The Team ID (a.k.a Graph ID).
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct TeamId {
     #[doc(hidden)]
     pub __id: aranya_daemon_api::TeamId,
