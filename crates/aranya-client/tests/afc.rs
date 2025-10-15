@@ -286,9 +286,6 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     operator_team
         .revoke_label(devices.membera.id, label_id)
         .await?;
-    operator_team
-        .revoke_label(devices.memberb.id, label_id)
-        .await?;
 
     // wait for syncing.
     devices
