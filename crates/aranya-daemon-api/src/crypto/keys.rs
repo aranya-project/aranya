@@ -3,7 +3,6 @@ use std::iter;
 
 use anyhow::Result;
 use aranya_crypto::{
-    custom_id,
     dangerous::spideroak_crypto::{
         import::ImportError,
         kem::{DecapKey as _, Kem},
@@ -13,6 +12,7 @@ use aranya_crypto::{
     id::{IdError, IdExt, Identified},
     unwrapped, CipherSuite, Engine, Oids, Random,
 };
+use aranya_id::custom_id;
 use ciborium as cbor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 

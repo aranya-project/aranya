@@ -7,11 +7,10 @@ use std::collections::hash_map::{self, HashMap};
 use anyhow::bail;
 use aranya_crypto::{
     aqc::{BidiPskId, CipherSuiteId, UniPskId},
-    custom_id,
     subtle::{Choice, ConstantTimeEq},
     zeroize::ZeroizeOnDrop,
-    Id,
 };
+use aranya_id::{custom_id, BaseId};
 pub use aranya_policy_text::{text, Text};
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -40,7 +39,7 @@ macro_rules! psk_map {
     #[derive(Clone, Debug, Serialize, Deserialize)]
     #[cfg_attr(test, derive(PartialEq))]
     $vis struct $name {
-        id: Id,
+        id: BaseId,
         psks: HashMap<CsId, $psk>
     }
 
@@ -56,7 +55,7 @@ macro_rules! psk_map {
         }
 
         /// Returns the channel ID.
-        pub fn channel_id(&self) -> &Id {
+        pub fn channel_id(&self) -> &BaseId {
             &self.id
         }
 
@@ -69,7 +68,7 @@ macro_rules! psk_map {
         /// a PSK for a cipher suite.
         pub fn try_from_fn<I, E, F>(id: I, mut f: F) -> anyhow::Result<Self>
         where
-            I: Into<Id>,
+            I: Into<BaseId>,
             anyhow::Error: From<E>,
             F: FnMut(CipherSuiteId) -> Result<$psk, E>,
         {
@@ -104,7 +103,7 @@ macro_rules! psk_map {
         fn new() -> Self {
             Self {
                 // TODO
-                id: Id::default(),
+                id: BaseId::default(),
                 psks: HashMap::new(),
             }
         }
@@ -349,7 +348,7 @@ pub enum AqcPskId {
 
 impl AqcPskId {
     /// Returns the unique channel ID.
-    pub fn channel_id(&self) -> Id {
+    pub fn channel_id(&self) -> BaseId {
         match self {
             Self::Bidi(v) => (*v.channel_id()).into(),
             Self::Uni(v) => (*v.channel_id()).into(),
@@ -421,11 +420,11 @@ mod tests {
     fn psk_map_test<M, F>(name: &'static str, mut f: F)
     where
         M: PskMap,
-        F: FnMut(Secret, Id, CipherSuiteId) -> M::Psk,
+        F: FnMut(Secret, BaseId, CipherSuiteId) -> M::Psk,
     {
         let mut psks = M::new();
         for (i, &suite) in CipherSuiteId::all().iter().enumerate() {
-            let id = Id::random(&mut Rng);
+            let id = BaseId::random(&mut Rng);
             let secret = secret(&i.to_le_bytes());
             psks.insert(f(secret, id, suite));
         }
