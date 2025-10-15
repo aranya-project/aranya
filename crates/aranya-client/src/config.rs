@@ -87,9 +87,9 @@ impl SyncPeerConfigBuilder {
     ///
     /// By default, the interval is not set. It is an error to call [`build`][Self::build] before
     /// setting the interval with this method
-    pub fn interval(mut self, duration: Duration) -> Result<Self> {
+    pub fn interval(mut self, duration: Duration) -> Self {
         self.interval = Some(duration);
-        Ok(self)
+        self
     }
 
     /// Configures whether the peer will be immediately synced with after being added.

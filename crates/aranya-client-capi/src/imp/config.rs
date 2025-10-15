@@ -188,7 +188,6 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
             .interval(value.interval.into())
-            .expect("interval is valid")
             .sync_now(value.sync_now)
             .sync_on_hello(value.sync_on_hello)
             .build()

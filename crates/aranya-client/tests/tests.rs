@@ -480,7 +480,7 @@ async fn test_hello_subscription() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
 
     let sync_config = SyncPeerConfig::builder()
-        .interval(Duration::from_secs(24 * 60 * 60))? // Long interval to ensure sync on hello is triggered)
+        .interval(Duration::from_secs(24 * 60 * 60)) // Long interval to ensure sync on hello is triggered)
         .sync_now(false)
         .sync_on_hello(true)
         .build()?;
