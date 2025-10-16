@@ -144,7 +144,6 @@ impl Syncer<State> {
     /// * `peer` - The network address of the peer to send the message to
     /// * `id` - The graph ID for the team/graph
     /// * `sync_type` - The hello message to send
-    /// * `operation_name` - Name of the operation for logging
     ///
     /// # Returns
     /// * `Ok(())` if the message was sent successfully
@@ -155,8 +154,17 @@ impl Syncer<State> {
         peer: &Addr,
         id: GraphId,
         sync_type: SyncType<Addr>,
-        operation_name: &str,
     ) -> SyncResult<()> {
+        // Determine operation name from sync_type
+        let operation_name = match &sync_type {
+            SyncType::Hello(hello_type) => match hello_type {
+                SyncHelloType::Subscribe { .. } => "subscribe",
+                SyncHelloType::Unsubscribe { .. } => "unsubscribe",
+                SyncHelloType::Hello { .. } => "hello",
+            },
+            _ => "unknown",
+        };
+
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -213,8 +221,7 @@ impl Syncer<State> {
         };
         let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
 
-        self.send_hello_request(peer, id, sync_type, "subscribe")
-            .await
+        self.send_hello_request(peer, id, sync_type).await
     }
 
     /// Sends an unsubscribe request to a peer to stop hello notifications.
@@ -244,8 +251,7 @@ impl Syncer<State> {
             address: subscriber_server_addr,
         });
 
-        self.send_hello_request(peer, id, sync_type, "unsubscribe")
-            .await
+        self.send_hello_request(peer, id, sync_type).await
     }
 
     /// Sends a hello notification to a specific subscriber.
