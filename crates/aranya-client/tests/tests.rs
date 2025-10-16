@@ -498,9 +498,6 @@ async fn test_hello_subscription() -> Result<()> {
         .await?;
     info!("membera subscribed to hello notifications from admin");
 
-    // Wait a moment to ensure the subscription is active
-    common::sleep(Duration::from_millis(200)).await;
-
     // Before the action, verify that MemberA doesn't know about any labels created by admin
     // (This will be our way to test if sync worked)
     info!("verifying initial state - membera should not see any labels created by admin");

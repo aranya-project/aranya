@@ -332,7 +332,7 @@ where
     #[instrument(skip_all)]
     pub async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client_with_caches: ClientWithCaches<EN, SP>,
+        client: ClientWithCaches<EN, SP>,
         peer_addr: Addr,
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
@@ -395,7 +395,7 @@ where
                     "Received Hello notification message"
                 );
 
-                if !client_with_caches
+                if !client
                     .client()
                     .aranya
                     .lock()
@@ -429,7 +429,7 @@ where
                 let key = PeerCacheKey::new(peer_addr, graph_id);
 
                 // Lock both aranya and caches in the correct order.
-                let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;
+                let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
                 let cache = caches.entry(key).or_default();
 
                 // Update the cache with the received head_id

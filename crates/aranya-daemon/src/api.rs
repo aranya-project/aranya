@@ -333,37 +333,15 @@ impl EffectHandler {
     }
 
     /// Broadcasts hello notifications to subscribers when the graph changes.
-    #[instrument(skip(self), err)]
+    #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
     async fn broadcast_hello_notifications(
         &self,
         graph_id: GraphId,
         head: Address,
     ) -> anyhow::Result<()> {
-        // Use the SyncPeers interface to trigger hello broadcasting
-        // This will be handled by the QUIC syncer which has access to the subscription data
-        if let Err(e) = self.trigger_hello_broadcast(graph_id, head).await {
-            debug!(
-                error = %e,
-                ?graph_id,
-                ?head,
-                "Failed to trigger hello broadcast"
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Triggers hello notification broadcasting via the SyncPeers interface.
-    #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
-    async fn trigger_hello_broadcast(
-        &self,
-        graph_id: GraphId,
-        head: Address,
-    ) -> anyhow::Result<()> {
         if let Some(peers) = &self.peers {
-            info!(?graph_id, ?head, "Calling peers.broadcast_hello");
             if let Err(e) = peers.broadcast_hello(graph_id, head).await {
-                trace!(
+                debug!(
                     error = %e,
                     ?graph_id,
                     ?head,
@@ -372,7 +350,7 @@ impl EffectHandler {
                 return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
             }
         } else {
-            trace!(
+            debug!(
                 ?graph_id,
                 ?head,
                 "No peers interface available for hello broadcasting"
