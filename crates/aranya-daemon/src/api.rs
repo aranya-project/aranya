@@ -249,7 +249,7 @@ impl EffectHandler {
                     self.afc
                         .label_deleted(label_deleted.label_id.into())
                         .await?;
-                    tracing::warn!(effect = ?label_deleted, "received LabelDeleted effect");
+                    tracing::trace!(effect = ?label_deleted, "received LabelDeleted effect");
                 }
                 LabelAssigned(_) => {}
                 LabelRevoked(label_revoked) => {
@@ -266,7 +266,7 @@ impl EffectHandler {
                             )
                             .await?;
                     }
-                    tracing::warn!(effect = ?label_revoked, "received LabelRevoked effect");
+                    tracing::trace!(effect = ?label_revoked, "received LabelRevoked effect");
                 }
                 AqcNetworkNameSet(e) => {
                     #[cfg(feature = "aqc")]
