@@ -144,7 +144,6 @@ typedef struct {
 } Team;
 
 // Forward Declarations
-void print_id(AranyaId id);
 AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
                         const char* aqc_addr);
 AranyaError init_team(Team* t);
@@ -163,14 +162,6 @@ AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
                                        AranyaLabelId* label_id,
                                        AranyaChannelIdent* idents,
                                        int num_peers);
-
-// Print AranyaId as hexidecimal string.
-void print_id(AranyaId id) {
-    for (int i = 0; i < ARANYA_ID_LEN; i++) {
-        printf("%02x", id.bytes[i]);
-    }
-    printf("\n");
-}
 
 // Initialize an Aranya `Client` with the given parameters.
 AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
@@ -848,7 +839,14 @@ AranyaError run_afc_example(Team* t) {
     printf("membera: Getting afc send channel id\n");
     err = aranya_afc_send_channel_get_id(&afc_send_channel, &send_id);
     EXPECT("error getting afc send channel id", err);
-    print_id(send_id.id);
+    char send_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t send_id_str_len              = sizeof(send_id_str);
+    err = aranya_id_to_str(&send_id.id, send_id_str, &send_id_str_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to convert ID to string\n");
+        return err;
+    }
+    printf("membera: afc send channel id: %s \n", send_id_str);
 
     // In production, you would get the underlying buffer from the control
     // message, and send it to the other peer via your transport of choice,
@@ -870,7 +868,14 @@ AranyaError run_afc_example(Team* t) {
     AranyaAfcChannelId recv_id;
     err = aranya_afc_receive_channel_get_id(&afc_recv_channel, &recv_id);
     EXPECT("error getting afc recv channel id", err);
-    print_id(recv_id.id);
+    char recv_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t recv_id_str_len              = sizeof(recv_id_str);
+    err = aranya_id_to_str(&recv_id.id, recv_id_str, &recv_id_str_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to convert ID to string\n");
+        return err;
+    }
+    printf("membera: afc recv channel id: %s \n", recv_id_str);
 
     // Now we need to define some data we want to send, in this case a
     // simple string. We need both the original data, as well as a buffer to
