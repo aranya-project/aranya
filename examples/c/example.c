@@ -967,6 +967,16 @@ static void* membera_aqc_thread(void* arg) {
         ctx->client, &ctx->id, aqc_addrs[MEMBERB], &ctx->label1, &bidi_chan);
     EXPECT("membera: error creating aqc bidi channel", err);
 
+    printf("membera: getting AQC bidi channel id\n");
+    AranyaAqcBidiChannelId bidi_id;
+    err = aranya_aqc_bidi_channel_get_id(&bidi_chan, &bidi_id);
+    EXPECT("error getting AQC bidi channel id", err);
+    char bidi_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t bidi_id_str_len              = sizeof(bidi_id_str);
+    err = aranya_id_to_str(&bidi_id.id, bidi_id_str, &bidi_id_str_len);
+    EXPECT("unable to convert ID to string", err);
+    printf("membera: AQC bidi channel id: %s \n", bidi_id_str);
+
     sleep(1);
 
     // Then, let's receive the uni channel from Member B.
@@ -985,6 +995,15 @@ static void* membera_aqc_thread(void* arg) {
         aranya_aqc_get_receive_channel(&uni_channel, &uni_recv);
         break;
     }
+
+    AranyaAqcUniChannelId recv_id;
+    err = aranya_aqc_receive_channel_get_id(&uni_recv, &recv_id);
+    EXPECT("error getting AQC uni recv channel id", err);
+    char recv_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t recv_id_str_len              = sizeof(recv_id_str);
+    err = aranya_id_to_str(&recv_id.id, recv_id_str, &recv_id_str_len);
+    EXPECT("unable to convert ID to string", err);
+    printf("membera: AQC uni recv channel id: %s \n", recv_id_str);
 
     // Now, let's create a bidirectional stream on our new channel.
     printf("membera: Creating a bidi stream\n");
@@ -1121,11 +1140,29 @@ static void* memberb_aqc_thread(void* arg) {
         goto exit;
     }
 
+    AranyaAqcBidiChannelId bidi_id;
+    err = aranya_aqc_bidi_channel_get_id(&bidi_recv, &bidi_id);
+    EXPECT("error getting AQC bidi channel id", err);
+    char bidi_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t bidi_id_str_len              = sizeof(bidi_id_str);
+    err = aranya_id_to_str(&bidi_id.id, bidi_id_str, &bidi_id_str_len);
+    EXPECT("unable to convert ID to string", err);
+    printf("memberb: AQC bidi channel id: %s \n", bidi_id_str);
+
     // Then, let's create a unidirectional channel in the other direction.
     printf("memberb: creating AQC uni channel \n");
     err = aranya_aqc_create_uni_channel(
         ctx->client, &ctx->id, aqc_addrs[MEMBERA], &ctx->label2, &uni_send);
     EXPECT("memberb: error creating aqc uni channel", err);
+
+    AranyaAqcUniChannelId send_id;
+    err = aranya_aqc_send_channel_get_id(&uni_send, &send_id);
+    EXPECT("error getting AQC uni send channel id", err);
+    char send_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t send_id_str_len              = sizeof(send_id_str);
+    err = aranya_id_to_str(&send_id.id, send_id_str, &send_id_str_len);
+    EXPECT("unable to convert ID to string", err);
+    printf("memberb: AQC uni send channel id: %s \n", send_id_str);
 
     sleep(1);
 
