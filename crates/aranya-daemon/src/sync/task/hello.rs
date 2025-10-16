@@ -291,35 +291,45 @@ impl Syncer<State> {
             );
             e
         })?;
-        let (mut recv, mut send) = stream.split();
 
-        send.send(bytes::Bytes::from(data)).await.map_err(|e| {
-            warn!(
-                error = %e,
-                ?peer,
-                "Failed to send hello message"
+        // Spawn async task to send the notification
+        let peer = *peer;
+        tokio::spawn(async move {
+            let (mut recv, mut send) = stream.split();
+
+            if let Err(e) = send.send(bytes::Bytes::from(data)).await {
+                warn!(
+                    error = %e,
+                    ?peer,
+                    "Failed to send hello message"
+                );
+                return;
+            }
+
+            if let Err(e) = send.close().await {
+                warn!(
+                    error = %e,
+                    ?peer,
+                    "Failed to close send stream"
+                );
+                return;
+            }
+
+            // Read the response to avoid race condition with server
+            let mut response_buf = Vec::new();
+            if let Err(e) = recv.read_to_end(&mut response_buf).await {
+                warn!(
+                    error = %e,
+                    ?peer,
+                    "Failed to read hello notification response"
+                );
+                return;
+            }
+            debug!(
+                response_len = response_buf.len(),
+                "received hello notification response"
             );
-            Error::from(e)
-        })?;
-
-        send.close().await.map_err(|e| {
-            warn!(
-                error = %e,
-                ?peer,
-                "Failed to close send stream"
-            );
-            Error::from(e)
-        })?;
-
-        // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
-            .await
-            .context("failed to read hello notification response")?;
-        debug!(
-            response_len = response_buf.len(),
-            "received hello notification response"
-        );
+        });
 
         Ok(())
     }
