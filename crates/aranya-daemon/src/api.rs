@@ -33,7 +33,7 @@ use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
-use crate::afc::Afc;
+use crate::afc::{Afc, RemoveIfParams};
 #[cfg(feature = "aqc")]
 use crate::aqc::Aqc;
 use crate::{
@@ -247,23 +247,28 @@ impl EffectHandler {
                 LabelDeleted(label_deleted) => {
                     #[cfg(feature = "afc")]
                     self.afc
-                        .label_deleted(label_deleted.label_id.into())
+                        .remove_if(RemoveIfParams {
+                            label_id: Some(label_deleted.label_id.into()),
+                            ..Default::default()
+                        })
                         .await?;
                     tracing::trace!(effect = ?label_deleted, "received LabelDeleted effect");
                 }
                 LabelAssigned(_) => {}
                 LabelRevoked(label_revoked) => {
                     #[cfg(feature = "afc")]
-                    if self.device_id == label_revoked.device_id.into() {
+                    {
+                        let label_id = Some(label_revoked.label_id.into());
+                        let mut peer_id = None;
+                        if self.device_id != label_revoked.device_id.into() {
+                            peer_id = Some(label_revoked.device_id.into());
+                        };
                         self.afc
-                            .label_deleted(label_revoked.label_id.into())
-                            .await?;
-                    } else {
-                        self.afc
-                            .label_revoked(
-                                label_revoked.label_id.into(),
-                                label_revoked.device_id.into(),
-                            )
+                            .remove_if(RemoveIfParams {
+                                label_id,
+                                peer_id,
+                                ..Default::default()
+                            })
                             .await?;
                     }
                     tracing::trace!(effect = ?label_revoked, "received LabelRevoked effect");

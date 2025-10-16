@@ -4,8 +4,8 @@ use std::fmt::Debug;
 
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
-use aranya_crypto::{CipherSuite, DeviceId, Engine, KeyStore, Rng};
-use aranya_daemon_api::{self as api, LabelId};
+use aranya_crypto::{policy::LabelId, CipherSuite, DeviceId, Engine, KeyStore, Rng};
+use aranya_daemon_api::{self as api};
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
     AranyaState, ChannelId,
@@ -19,6 +19,14 @@ use crate::{
     keystore::AranyaStore,
     policy::{AfcUniChannelCreated, AfcUniChannelReceived},
 };
+
+/// Parameters that can be used to delete matching channels from shared-memory.
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) struct RemoveIfParams {
+    pub(crate) channel_id: Option<ChannelId>,
+    pub(crate) label_id: Option<LabelId>,
+    pub(crate) peer_id: Option<DeviceId>,
+}
 
 /// AFC shared memory.
 pub struct AfcShm<C> {
@@ -192,22 +200,30 @@ where
             .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
     }
 
-    pub(crate) async fn label_deleted(&self, label_id: LabelId) -> Result<()> {
+    /// Remove channels matching criteria.
+    pub(crate) async fn remove_if(&self, params: RemoveIfParams) -> Result<()> {
         let shm = self.shm.lock().await;
 
         shm.write
-            .remove_if(|params| params.label_id == label_id.into_id().into())
-            .map_err(|err| anyhow!("unable to remove AFC channels with label ID: {err}"))
-    }
-
-    pub(crate) async fn label_revoked(&self, label_id: LabelId, peer_id: DeviceId) -> Result<()> {
-        let shm = self.shm.lock().await;
-
-        shm.write
-            .remove_if(|params| {
-                params.label_id == label_id.into_id().into() && params.peer_id == peer_id
+            .remove_if(|chan_params| {
+                if let Some(channel_id) = params.channel_id {
+                    if chan_params.channel_id != channel_id {
+                        return false;
+                    }
+                }
+                if let Some(label_id) = params.label_id {
+                    if chan_params.label_id != label_id {
+                        return false;
+                    }
+                }
+                if let Some(peer_id) = params.peer_id {
+                    if chan_params.peer_id != peer_id {
+                        return false;
+                    }
+                }
+                true
             })
-            .map_err(|err| anyhow!("unable to remove AFC channels with (label ID, peer ID): {err}"))
+            .map_err(|err| anyhow!("unable to remove AFC channels matching criteria: {err}"))
     }
 
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
