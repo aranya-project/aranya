@@ -754,6 +754,15 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcSeq {
 } AranyaAfcSeq;
 #endif
 
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Channel ID for AFC channel.
+ */
+typedef struct AranyaAfcChannelId {
+    struct AranyaId id;
+} AranyaAfcChannelId;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -3756,6 +3765,29 @@ AranyaError aranya_afc_send_channel_get_label_id_ext(const struct AranyaAfcSendC
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ * @param[out] __output the corresponding channel ID [`AranyaAfcChannelId`](@ref AranyaAfcChannelId).
+ */
+AranyaError aranya_afc_send_channel_get_channel_id(const struct AranyaAfcSendChannel *channel,
+                                                   struct AranyaAfcChannelId *__output);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ * @param[out] __output the corresponding channel ID [`AranyaAfcChannelId`](@ref AranyaAfcChannelId).
+ */
+AranyaError aranya_afc_send_channel_get_channel_id_ext(const struct AranyaAfcSendChannel *channel,
+                                                       struct AranyaAfcChannelId *__output,
+                                                       struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
  * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  *
  * @param[in]  channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
@@ -3775,6 +3807,29 @@ AranyaError aranya_afc_receive_channel_get_label_id(const struct AranyaAfcReceiv
 AranyaError aranya_afc_receive_channel_get_label_id_ext(const struct AranyaAfcReceiveChannel *channel,
                                                         struct AranyaLabelId *__output,
                                                         struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
+ * @param[out] __output the corresponding channel ID [`AranyaAfcChannelId`](@ref AranyaAfcChannelId).
+ */
+AranyaError aranya_afc_receive_channel_get_channel_id(const struct AranyaAfcReceiveChannel *channel,
+                                                      struct AranyaAfcChannelId *__output);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
+ *
+ * @param[in]  channel the AFC channel object [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
+ * @param[out] __output the corresponding channel ID [`AranyaAfcChannelId`](@ref AranyaAfcChannelId).
+ */
+AranyaError aranya_afc_receive_channel_get_channel_id_ext(const struct AranyaAfcReceiveChannel *channel,
+                                                          struct AranyaAfcChannelId *__output,
+                                                          struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
