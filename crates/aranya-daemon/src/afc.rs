@@ -196,7 +196,7 @@ where
         let shm = self.shm.lock().await;
 
         shm.write
-            .remove_if(|_channel_id, chan_label, _peer_id| chan_label == label_id.into_id().into())
+            .remove_if(|params| params.label_id == label_id.into_id().into())
             .map_err(|err| anyhow!("unable to remove AFC channels with label ID: {err}"))
     }
 
@@ -204,8 +204,8 @@ where
         let shm = self.shm.lock().await;
 
         shm.write
-            .remove_if(|_channel_id, chan_label, chan_peer| {
-                chan_label == label_id.into_id().into() && chan_peer == peer_id
+            .remove_if(|params| {
+                params.label_id == label_id.into_id().into() && params.peer_id == peer_id
             })
             .map_err(|err| anyhow!("unable to remove AFC channels with (label ID, peer ID): {err}"))
     }
