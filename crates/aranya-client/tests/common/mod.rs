@@ -257,7 +257,10 @@ impl DeviceCtx {
                 max_chans: 100,
             }),
             sync: daemon_cfg::SyncConfig {
-                quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
+                quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
+                    addr: addr_any,
+                    client_addr: None,
+                }),
             },
         };
 

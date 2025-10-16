@@ -7,7 +7,7 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::HashMap, convert::Infallible, future::Future, net::Ipv4Addr, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -97,6 +97,7 @@ pub(crate) struct SyncParams {
     pub(crate) psk_store: Arc<PskStore>,
     pub(crate) caches: PeerCacheMap,
     pub(crate) server_addr: Addr,
+    pub(crate) client_addr: Addr,
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -135,7 +136,7 @@ impl SyncState for State {
         // TODO: spawn a task for send/recv?
         let (mut recv, mut send) = stream.split();
 
-        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.server_addr);
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.listen_addr);
 
         // send sync request.
         syncer
@@ -155,7 +156,11 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    fn new(psk_store: Arc<PskStore>, conns: SharedConnectionMap) -> SyncResult<Self> {
+    fn new(
+        psk_store: Arc<PskStore>,
+        conns: SharedConnectionMap,
+        listen_addr: Addr,
+    ) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -170,7 +175,7 @@ impl State {
 
         let client = QuicClient::builder()
             .with_tls(provider)?
-            .with_io((Ipv4Addr::LOCALHOST, 0))
+            .with_io((listen_addr.host(), listen_addr.port()))
             .assume("can set quic client address")?
             .start()
             .map_err(Error::ClientStart)?;
@@ -190,7 +195,7 @@ impl Syncer<State> {
         send_effects: super::EffectSender,
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
-        server_addr: Addr,
+        listen_addr: Addr,
         caches: PeerCacheMap,
     ) -> SyncResult<(
         Self,
@@ -202,7 +207,7 @@ impl Syncer<State> {
         let peers = SyncPeers::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
-        let state = State::new(psk_store, conns.clone())?;
+        let state = State::new(psk_store, conns.clone(), listen_addr)?;
 
         Ok((
             Self {
@@ -213,7 +218,7 @@ impl Syncer<State> {
                 send_effects,
                 invalid,
                 state,
-                server_addr,
+                listen_addr,
                 caches,
             },
             peers,

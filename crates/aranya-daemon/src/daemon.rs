@@ -15,7 +15,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
-use aranya_util::ready;
+use aranya_util::{ready, Addr};
 #[cfg(feature = "aqc")]
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
@@ -141,6 +141,10 @@ impl Daemon {
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
+            let qs_client_addr = match qs_config.client_addr {
+                None => Addr::new(qs_config.addr.host(), 0)?,
+                Some(v) => v,
+            };
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
@@ -179,6 +183,7 @@ impl Daemon {
                     psk_store: Arc::clone(&psk_store),
                     caches: caches.clone(),
                     server_addr: qs_config.addr,
+                    client_addr: qs_client_addr,
                 },
                 invalid_graphs.clone(),
             )
@@ -353,6 +358,7 @@ impl Daemon {
             psk_store,
             caches,
             server_addr,
+            client_addr,
         }: SyncParams,
         invalid_graphs: InvalidGraphs,
     ) -> Result<(
@@ -382,7 +388,7 @@ impl Daemon {
             send_effects,
             invalid_graphs,
             Arc::clone(&psk_store),
-            server_addr,
+            client_addr,
             Arc::clone(&caches),
         )?;
 
@@ -544,7 +550,10 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync: SyncConfig {
-                quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
+                quic: Toggle::Enabled(QuicSyncConfig {
+                    addr: any,
+                    client_addr: None,
+                }),
             },
             #[cfg(feature = "aqc")]
             aqc: Toggle::Enabled(crate::config::AqcConfig {}),

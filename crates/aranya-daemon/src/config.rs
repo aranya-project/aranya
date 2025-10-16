@@ -227,6 +227,8 @@ pub struct AfcConfig {
 pub struct QuicSyncConfig {
     /// Network address of Aranya sync server.
     pub addr: Addr,
+    /// Client listen address.
+    pub client_addr: Option<Addr>,
 }
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -266,6 +268,7 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
+                    client_addr: None,
                 }),
             },
             #[cfg(feature = "aqc")]

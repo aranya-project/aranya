@@ -173,7 +173,7 @@ pub struct Syncer<ST> {
     /// Additional state used by the syncer.
     state: ST,
     /// Sync server address.
-    server_addr: Addr,
+    listen_addr: Addr,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::client`]
     caches: PeerCacheMap,
