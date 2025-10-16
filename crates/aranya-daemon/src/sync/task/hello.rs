@@ -59,32 +59,36 @@ impl Syncer<State> {
         graph_id: GraphId,
         head: Address,
     ) -> SyncResult<()> {
-        // Get all subscribers for this graph
-        let subscribers = {
-            let subscriptions = self.state.hello_subscriptions().lock().await;
-
-            let filtered: Vec<_> = subscriptions
-                .iter()
-                .filter(|((sub_graph_id, _), _)| *sub_graph_id == graph_id)
-                .map(|((_, addr), subscription)| (*addr, subscription.clone()))
-                .collect();
-
-            filtered
-        };
-
         let now = Instant::now();
 
-        // Send hello notification to each subscriber
-        for (subscriber_addr, subscription) in subscribers.iter() {
-            // Check if subscription has expired
-            if now >= subscription.expires_at {
-                // Remove expired subscription
-                let mut subscriptions = self.state.hello_subscriptions().lock().await;
-                subscriptions.remove(&(graph_id, *subscriber_addr));
-                debug!(?subscriber_addr, ?graph_id, "Removed expired subscription");
-                continue;
-            }
+        // Get all valid (non-expired) subscribers for this graph
+        let subscribers = {
+            let mut subscriptions = self.state.hello_subscriptions().lock().await;
 
+            // Remove expired subscriptions and collect valid ones
+            let mut valid_subscribers = Vec::new();
+            subscriptions.retain(|(sub_graph_id, addr), subscription| {
+                if *sub_graph_id == graph_id {
+                    if now >= subscription.expires_at {
+                        // Subscription has expired, remove it
+                        debug!(?addr, ?graph_id, "Removed expired subscription");
+                        false
+                    } else {
+                        // Subscription is valid, collect it
+                        valid_subscribers.push((*addr, subscription.clone()));
+                        true
+                    }
+                } else {
+                    // Keep subscriptions for other graphs
+                    true
+                }
+            });
+
+            valid_subscribers
+        };
+
+        // Send hello notification to each valid subscriber
+        for (subscriber_addr, subscription) in subscribers.iter() {
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
                 let delay = Duration::from_millis(subscription.delay_milliseconds);
