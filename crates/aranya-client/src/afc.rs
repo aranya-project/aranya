@@ -237,7 +237,7 @@ pub struct SendChannel {
 
 impl SendChannel {
     /// The channel's unique ID.
-    pub fn channel_id(&self) -> ChannelId {
+    pub fn id(&self) -> ChannelId {
         self.global_channel_id
     }
 
@@ -292,7 +292,7 @@ pub struct ReceiveChannel {
 
 impl ReceiveChannel {
     /// The channel's unique ID.
-    pub fn channel_id(&self) -> ChannelId {
+    pub fn id(&self) -> ChannelId {
         self.global_channel_id
     }
 

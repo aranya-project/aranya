@@ -2382,8 +2382,8 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
 /// @param[in]  channel the AFC channel object [`AfcSendChannel`].
 /// @param[out] __output the corresponding channel ID [`AfcChannelId`].
 #[cfg(feature = "afc")]
-pub fn afc_send_channel_get_channel_id(channel: &AfcSendChannel) -> AfcChannelId {
-    channel.0.channel_id().into()
+pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
+    channel.0.id().into()
 }
 
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
@@ -2400,8 +2400,8 @@ pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId 
 /// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
 /// @param[out] __output the corresponding channel ID [`AfcChannelId`].
 #[cfg(feature = "afc")]
-pub fn afc_receive_channel_get_channel_id(channel: &AfcReceiveChannel) -> AfcChannelId {
-    channel.0.channel_id().into()
+pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
+    channel.0.id().into()
 }
 
 /// Returns the raw data for a given [`AfcCtrlMsg`].
