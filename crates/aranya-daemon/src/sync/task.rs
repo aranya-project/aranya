@@ -1,10 +1,32 @@
 //! Aranya sync task.
+//!
 //! A task for syncing with Aranya peers at specified intervals.
-//! A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
-//! [`SyncPeers`] handles adding/removing peers for the [`Syncer`].
-//! [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
-//! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
-//! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
+//!
+//! # Architecture
+//!
+//! - A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
+//! - [`SyncPeers`] handles adding/removing peers for the [`Syncer`].
+//! - [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
+//! - [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
+//!
+//! This prevents the need for an `Arc<Mutex>` which would lock until the next peer is retrieved from the [`DelayQueue`].
+//!
+//! # Hello Sync
+//!
+//! The sync task supports "hello" notifications that allow peers to proactively notify each other
+//! when their graph head changes, enabling more responsive synchronization:
+//!
+//! - **Subscriptions**: Peers can subscribe to hello notifications from other peers using
+//!   [`SyncPeers::sync_hello_subscribe`], specifying a delay between notifications and a duration
+//!   for the subscription.
+//! - **Broadcasting**: When a graph head changes, hello notifications are broadcast to all
+//!   subscribers via [`SyncPeers::broadcast_hello`].
+//! - **Sync on Hello**: Peers can be configured to automatically sync when they receive a hello
+//!   notification by setting `sync_on_hello` in their [`SyncPeerConfig`].
+//! - **Unsubscribe**: Peers can unsubscribe from hello notifications using
+//!   [`SyncPeers::sync_hello_unsubscribe`].
+//!
+//! See the [`hello`] module for implementation details.
 
 use std::{collections::HashMap, future::Future, time::Duration};
 
