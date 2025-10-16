@@ -703,7 +703,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[96];
+    uint8_t __for_size_only[120];
 } AranyaAfcSendChannel;
 #endif
 
@@ -717,7 +717,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[96];
+    uint8_t __for_size_only[120];
 } AranyaAfcReceiveChannel;
 #endif
 

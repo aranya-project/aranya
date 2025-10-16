@@ -54,7 +54,7 @@ impl From<Box<[u8]>> for CtrlMsg {
     }
 }
 
-/// A channel ID.
+/// A globally unique channel ID.
 #[derive(Copy, Clone, Debug)]
 pub struct ChannelId(aranya_daemon_api::AfcGlobalChannelId);
 
@@ -67,6 +67,19 @@ impl From<aranya_daemon_api::AfcGlobalChannelId> for ChannelId {
 impl From<ChannelId> for aranya_daemon_api::AfcGlobalChannelId {
     fn from(value: ChannelId) -> Self {
         value.0
+    }
+}
+
+impl From<[u8; 32]> for ChannelId {
+    #[inline]
+    fn from(id: [u8; 32]) -> Self {
+        Self(id.into())
+    }
+}
+
+impl From<ChannelId> for [u8; 32] {
+    fn from(id: ChannelId) -> Self {
+        id.0.into()
     }
 }
 
