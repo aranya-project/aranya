@@ -34,11 +34,12 @@ aqc = ["aranya-client/aqc"]
 
 [dependencies]
 aranya-client = { workspace = true }
+aranya-crypto = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }
-aranya-crypto = { workspace = true }
+aranya-id = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }

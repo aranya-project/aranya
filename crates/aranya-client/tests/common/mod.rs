@@ -10,10 +10,7 @@ use aranya_client::{
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
-use aranya_crypto::{
-    dangerous::spideroak_crypto::{hash::Hash, rust::Sha256},
-    id::ToBase58 as _,
-};
+use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
@@ -22,6 +19,7 @@ use aranya_daemon_api::SEED_IKM_SIZE;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
+use spideroak_base58::ToBase58 as _;
 use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
