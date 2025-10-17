@@ -190,7 +190,7 @@ impl SyncState for State {
 
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
-    async fn broadcast_hello_notifications(
+    async fn broadcast_hello_notifications_impl(
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
         head: Address,
@@ -424,12 +424,6 @@ impl Syncer<State> {
             .await
             .context("failed to read sync response")?;
         debug!(n = recv_buf.len(), "received sync response");
-
-        // Check for empty response (which indicates a hello message response)
-        if recv_buf.is_empty() {
-            debug!("received empty response, likely from hello message - ignoring");
-            return Ok(0);
-        }
 
         // process the sync response.
         let resp = postcard::from_bytes(&recv_buf)

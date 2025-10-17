@@ -272,7 +272,7 @@ pub trait SyncState: Sized {
     ) -> impl Future<Output = SyncResult<()>> + Send;
 
     /// Broadcast hello notifications to all subscribers of a graph.
-    fn broadcast_hello_notifications(
+    fn broadcast_hello_notifications_impl(
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
         head: Address,
@@ -371,7 +371,7 @@ impl<ST: SyncState> Syncer<ST> {
                             .map(|_| ())
                     }
                     Msg::BroadcastHello { graph_id, head } => {
-                        ST::broadcast_hello_notifications(self, graph_id, head).await
+                        ST::broadcast_hello_notifications_impl(self, graph_id, head).await
                     }
                 };
                 if let Err(reply) = tx.send(reply) {
