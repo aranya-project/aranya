@@ -5,10 +5,11 @@ use std::fmt::Debug;
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
 use aranya_crypto::{afc::UniPeerEncap, CipherSuite, DeviceId, Engine, KeyStore, Rng};
-use aranya_daemon_api::{self as api, AfcGlobalChannelId};
+use aranya_daemon_api::{self as api, AfcChannelId};
+pub use aranya_fast_channels::ChannelId as AfcLocalChannelId;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
-    AranyaState, ChannelId,
+    AranyaState,
 };
 use derive_where::derive_where;
 use tokio::sync::Mutex;
@@ -120,7 +121,7 @@ where
     pub(crate) async fn uni_channel_created(
         &self,
         e: &AfcUniChannelCreated,
-    ) -> Result<(ChannelId, AfcGlobalChannelId)>
+    ) -> Result<(AfcLocalChannelId, AfcChannelId)>
     where
         E: Engine<CS = C>,
     {
@@ -153,7 +154,7 @@ where
     pub(crate) async fn uni_channel_received(
         &self,
         e: &AfcUniChannelReceived,
-    ) -> Result<(ChannelId, AfcGlobalChannelId)>
+    ) -> Result<(AfcLocalChannelId, AfcChannelId)>
     where
         E: Engine<CS = C>,
     {
@@ -181,7 +182,7 @@ where
         Ok((channel_id, encap.id().into_id().into()))
     }
 
-    pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>
+    pub(crate) async fn delete_channel(&self, channel_id: AfcLocalChannelId) -> Result<()>
     where
         E: Engine<CS = C>,
     {
