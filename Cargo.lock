@@ -295,7 +295,6 @@ dependencies = [
  "aranya-capi-codegen",
  "aranya-capi-core",
  "aranya-client",
- "aranya-crypto",
  "aranya-daemon-api",
  "aranya-id",
  "aranya-util",
