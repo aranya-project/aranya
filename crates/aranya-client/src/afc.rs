@@ -1,7 +1,7 @@
 //! AFC support.
 use core::fmt;
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     sync::{Arc, Mutex},
 };
 
@@ -55,37 +55,16 @@ impl From<Box<[u8]>> for CtrlMsg {
 }
 
 /// A globally unique channel ID.
-#[derive(Copy, Clone, Debug)]
-pub struct ChannelId(aranya_daemon_api::AfcGlobalChannelId);
-
-impl From<aranya_daemon_api::AfcGlobalChannelId> for ChannelId {
-    fn from(value: aranya_daemon_api::AfcGlobalChannelId) -> Self {
-        Self(value)
-    }
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ChannelId {
+    #[doc(hidden)]
+    pub __id: aranya_daemon_api::AfcGlobalChannelId,
 }
 
-impl From<ChannelId> for aranya_daemon_api::AfcGlobalChannelId {
-    fn from(value: ChannelId) -> Self {
-        value.0
-    }
-}
-
-impl From<[u8; 32]> for ChannelId {
-    #[inline]
-    fn from(id: [u8; 32]) -> Self {
-        Self(id.into())
-    }
-}
-
-impl From<ChannelId> for [u8; 32] {
-    fn from(id: ChannelId) -> Self {
-        id.0.into()
-    }
-}
-
-impl fmt::Display for ChannelId {
+impl Display for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.__id, f)
     }
 }
 
@@ -96,9 +75,9 @@ pub struct AfcSealError(
     aranya_fast_channels::Error,
 );
 
-impl fmt::Display for AfcSealError {
+impl Display for AfcSealError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -109,9 +88,9 @@ pub struct AfcOpenError(
     aranya_fast_channels::Error,
 );
 
-impl fmt::Display for AfcOpenError {
+impl Display for AfcOpenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -200,7 +179,9 @@ impl Channels {
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            global_channel_id: global_channel_id.into(),
+            global_channel_id: ChannelId {
+                __id: global_channel_id,
+            },
             channel_id,
             label_id,
         };
@@ -218,7 +199,9 @@ impl Channels {
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            global_channel_id: global_channel_id.into(),
+            global_channel_id: ChannelId {
+                __id: global_channel_id,
+            },
             channel_id,
             label_id: LabelId { __id: label_id },
         })

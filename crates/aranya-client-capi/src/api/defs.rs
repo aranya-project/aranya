@@ -585,7 +585,7 @@ impl From<afc::ChannelId> for AfcChannelId {
     fn from(value: afc::ChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__id.into(),
             },
         }
     }
@@ -594,7 +594,9 @@ impl From<afc::ChannelId> for AfcChannelId {
 #[cfg(feature = "afc")]
 impl From<&AfcChannelId> for afc::ChannelId {
     fn from(value: &AfcChannelId) -> Self {
-        value.id.bytes.into()
+        Self {
+            __id: value.id.bytes.into(),
+        }
     }
 }
 
