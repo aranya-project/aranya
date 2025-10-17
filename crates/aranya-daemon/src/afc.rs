@@ -2,9 +2,9 @@
 
 use std::fmt::Debug;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
-use aranya_crypto::{CipherSuite, DeviceId, Engine, KeyStore, Rng};
+use aranya_crypto::{policy::LabelId, CipherSuite, DeviceId, Engine, KeyStore, Rng};
 use aranya_daemon_api::{self as api};
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
@@ -19,6 +19,14 @@ use crate::{
     keystore::AranyaStore,
     policy::{AfcUniChannelCreated, AfcUniChannelReceived},
 };
+
+/// Parameters that can be used to delete matching channels from shared-memory.
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) struct RemoveIfParams {
+    pub(crate) channel_id: Option<ChannelId>,
+    pub(crate) label_id: Option<LabelId>,
+    pub(crate) peer_id: Option<DeviceId>,
+}
 
 /// AFC shared memory.
 pub struct AfcShm<C> {
@@ -138,7 +146,7 @@ where
             .await
             .write
             .add(key.into(), info.label_id, info.open_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+            .context("unable to add AFC channel")?;
         debug!(?channel_id, "creating uni channel");
         Ok(channel_id)
     }
@@ -167,12 +175,13 @@ where
             .await
             .write
             .add(key.into(), info.label_id, info.seal_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+            .context("unable to add AFC channel")?;
         debug!(?channel_id, "receiving uni channel");
 
         Ok(channel_id)
     }
 
+    /// Delete a channel.
     pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>
     where
         E: Engine<CS = C>,
@@ -182,7 +191,33 @@ where
             .await
             .write
             .remove(channel_id)
-            .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
+            .context("unable to remove AFC channel")
+    }
+
+    /// Delete all channels.
+    pub(crate) async fn delete_channels(&self) -> Result<()>
+    where
+        E: Engine<CS = C>,
+    {
+        self.shm
+            .lock()
+            .await
+            .write
+            .remove_all()
+            .context("unable to remove AFC channels")
+    }
+
+    /// Remove channels matching criteria.
+    pub(crate) async fn remove_if(&self, params: RemoveIfParams) -> Result<()> {
+        let shm = self.shm.lock().await;
+
+        shm.write
+            .remove_if(|chan| {
+                params.channel_id.is_none_or(|id| chan.channel_id == id)
+                    && params.label_id.is_none_or(|id| chan.label_id == id)
+                    && params.peer_id.is_none_or(|id| chan.peer_id == id)
+            })
+            .context("unable to remove AFC channels matching criteria")
     }
 
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {

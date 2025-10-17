@@ -33,7 +33,7 @@ use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
-use crate::afc::Afc;
+use crate::afc::{Afc, RemoveIfParams};
 #[cfg(feature = "aqc")]
 use crate::aqc::Aqc;
 use crate::{
@@ -128,6 +128,10 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             #[cfg(feature = "aqc")]
             aqc: aqc.clone(),
+            #[cfg(feature = "afc")]
+            afc: afc.clone(),
+            #[cfg(feature = "afc")]
+            device_id: pk.ident_pk.id()?,
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -212,6 +216,10 @@ impl DaemonApiServer {
 struct EffectHandler {
     #[cfg(feature = "aqc")]
     aqc: Option<Arc<Aqc<CE, KS>>>,
+    #[cfg(feature = "afc")]
+    afc: Arc<Afc<CE, CS, KS>>,
+    #[cfg(feature = "afc")]
+    device_id: DeviceId,
 }
 
 impl EffectHandler {
@@ -226,9 +234,29 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
-                TeamTerminated(_team_terminated) => {}
+                TeamTerminated(team_terminated) => {
+                    #[cfg(feature = "afc")]
+                    self.afc.delete_channels().await?;
+                    tracing::trace!(effect = ?team_terminated, "received TeamTerminated effect");
+                }
                 MemberAdded(_member_added) => {}
-                MemberRemoved(_member_removed) => {}
+                MemberRemoved(member_removed) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        if self.device_id == member_removed.device_id.into() {
+                            self.afc.delete_channels().await?;
+                        } else {
+                            let peer_id = Some(member_removed.device_id.into());
+                            self.afc
+                                .remove_if(RemoveIfParams {
+                                    peer_id,
+                                    ..Default::default()
+                                })
+                                .await?;
+                        }
+                    }
+                    tracing::trace!(effect = ?member_removed, "received MemberRemoved effect");
+                }
                 OwnerAssigned(_owner_assigned) => {}
                 AdminAssigned(_admin_assigned) => {}
                 OperatorAssigned(_operator_assigned) => {}
@@ -236,9 +264,35 @@ impl EffectHandler {
                 AdminRevoked(_admin_revoked) => {}
                 OperatorRevoked(_operator_revoked) => {}
                 LabelCreated(_) => {}
-                LabelDeleted(_) => {}
+                LabelDeleted(label_deleted) => {
+                    #[cfg(feature = "afc")]
+                    self.afc
+                        .remove_if(RemoveIfParams {
+                            label_id: Some(label_deleted.label_id.into()),
+                            ..Default::default()
+                        })
+                        .await?;
+                    tracing::trace!(effect = ?label_deleted, "received LabelDeleted effect");
+                }
                 LabelAssigned(_) => {}
-                LabelRevoked(_) => {}
+                LabelRevoked(label_revoked) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        let label_id = Some(label_revoked.label_id.into());
+                        let mut peer_id = None;
+                        if self.device_id != label_revoked.device_id.into() {
+                            peer_id = Some(label_revoked.device_id.into());
+                        };
+                        self.afc
+                            .remove_if(RemoveIfParams {
+                                label_id,
+                                peer_id,
+                                ..Default::default()
+                            })
+                            .await?;
+                    }
+                    tracing::trace!(effect = ?label_revoked, "received LabelRevoked effect");
+                }
                 AqcNetworkNameSet(e) => {
                     #[cfg(feature = "aqc")]
                     if let Some(aqc) = &self.aqc {
