@@ -255,6 +255,7 @@ impl EffectHandler {
                                 .await?;
                         }
                     }
+                    tracing::trace!(effect = ?member_removed, "received MemberRemoved effect");
                 }
                 OwnerAssigned(_owner_assigned) => {}
                 AdminAssigned(_admin_assigned) => {}
