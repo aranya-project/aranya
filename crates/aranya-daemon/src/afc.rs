@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
 use aranya_crypto::{policy::LabelId, CipherSuite, DeviceId, Engine, KeyStore, Rng};
 use aranya_daemon_api::{self as api};
@@ -146,7 +146,7 @@ where
             .await
             .write
             .add(key.into(), info.label_id, info.open_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+            .context("unable to add AFC channel")?;
         debug!(?channel_id, "creating uni channel");
         Ok(channel_id)
     }
@@ -175,7 +175,7 @@ where
             .await
             .write
             .add(key.into(), info.label_id, info.seal_id)
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
+            .context("unable to add AFC channel")?;
         debug!(?channel_id, "receiving uni channel");
 
         Ok(channel_id)
@@ -191,7 +191,7 @@ where
             .await
             .write
             .remove(channel_id)
-            .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
+            .context("unable to remove AFC channel")
     }
 
     /// Delete all channels.
@@ -204,7 +204,7 @@ where
             .await
             .write
             .remove_all()
-            .map_err(|err| anyhow!("unable to remove AFC channels: {err}"))
+            .context("unable to remove AFC channels")
     }
 
     /// Remove channels matching criteria.
@@ -212,25 +212,12 @@ where
         let shm = self.shm.lock().await;
 
         shm.write
-            .remove_if(|chan_params| {
-                if let Some(channel_id) = params.channel_id {
-                    if chan_params.channel_id != channel_id {
-                        return false;
-                    }
-                }
-                if let Some(label_id) = params.label_id {
-                    if chan_params.label_id != label_id {
-                        return false;
-                    }
-                }
-                if let Some(peer_id) = params.peer_id {
-                    if chan_params.peer_id != peer_id {
-                        return false;
-                    }
-                }
-                true
+            .remove_if(|chan| {
+                params.channel_id.is_none_or(|id| chan.channel_id == id)
+                    && params.label_id.is_none_or(|id| chan.label_id == id)
+                    && params.peer_id.is_none_or(|id| chan.peer_id == id)
             })
-            .map_err(|err| anyhow!("unable to remove AFC channels matching criteria: {err}"))
+            .context("unable to remove AFC channels matching criteria")
     }
 
     pub(crate) async fn get_shm_info(&self) -> api::AfcShmInfo {
