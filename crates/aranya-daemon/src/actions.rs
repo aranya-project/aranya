@@ -1,7 +1,7 @@
 //! Aranya graph actions/effects API.
 
 use core::{future::Future, marker::PhantomData};
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
@@ -9,12 +9,9 @@ use aranya_crypto::{Csprng, DeviceId, Rng};
 #[cfg(feature = "aqc")]
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
-use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
-use aranya_policy_vm::{ident, Text, Value};
-use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
-    VmPolicy,
-};
+use aranya_policy_ifgen::{Actionable, VmEffect};
+use aranya_policy_vm::Text;
+use aranya_runtime::{vm_action, ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
 #[cfg(feature = "aqc")]
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
@@ -22,7 +19,7 @@ use tracing::{debug, info, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{self, ChanOp, Effect, KeyBundle, Role},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -109,17 +106,15 @@ where
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
-    #[instrument(skip_all)]
-    async fn with_actor<F>(&self, f: F) -> Result<Vec<Effect>>
-    where
-        F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()>,
-    {
+    async fn call_persistent_action(
+        &self,
+        act: impl Actionable<Interface = policy::Persistent> + Send,
+    ) -> Result<Vec<Effect>> {
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
         {
             let mut client = self.aranya.lock().await;
-            let mut actor = ActorImpl::new(&mut client, &mut sink, &self.graph_id);
-            f(&mut actor)?;
+            act.with_action(|act| client.action(self.graph_id, &mut sink, act))?;
         }
 
         let total = sink.effects.len();
@@ -130,20 +125,17 @@ where
         Ok(sink.collect()?)
     }
 
-    /// Creates a new ephemeral session and invokes an action on it.
-    /// Returns the [`MsgSink`] of serialized ephemeral commands added to the graph
-    /// and a vector of [`Effect`]s produced by the action.
-    #[instrument(skip_all)]
-    #[allow(clippy::type_complexity)] // 2advanced4u
-    async fn session_action<'a, F>(&self, f: F) -> Result<(Vec<Box<[u8]>>, Vec<Effect>)>
-    where
-        F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a>,
-    {
-        let mut client = self.aranya.lock().await;
-        let mut session = client.session(self.graph_id)?;
+    async fn call_session_action(
+        &self,
+        act: impl Actionable<Interface = policy::Ephemeral> + Send,
+    ) -> Result<(Vec<Box<[u8]>>, Vec<Effect>)> {
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();
-        session.action(&client, &mut sink, &mut msg_sink, f())?;
+        {
+            let mut client = self.aranya.lock().await;
+            let mut session = client.session(self.graph_id)?;
+            act.with_action(|act| session.action(&client, &mut sink, &mut msg_sink, act))?;
+        }
         Ok((msg_sink.into_cmds(), sink.collect()?))
     }
 }
@@ -155,38 +147,31 @@ where
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
-    /// Invokes `f` with an [`ActorImpl`].
-    fn with_actor<F>(&self, f: F) -> impl Future<Output = Result<Vec<Effect>>> + Send
-    where
-        F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()> + Send;
+    /// Perform a persistent action.
+    fn call_persistent_action(
+        &self,
+        act: impl Actionable<Interface = policy::Persistent> + Send,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send;
 
     #[allow(clippy::type_complexity)]
     /// Performs a session action.
-    fn session_action<'a, F>(
+    fn call_session_action(
         &self,
-        f: F,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send
-    where
-        F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a> + Send;
+        act: impl Actionable<Interface = policy::Ephemeral> + Send,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send;
 
     /// Terminates the team.
     #[instrument(skip_all)]
     fn terminate_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(|actor| {
-            actor.terminate_team()?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::terminate_team())
+            .in_current_span()
     }
 
     /// Adds a Member instance to the team.
     #[instrument(skip_all)]
     fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.add_member(keys)?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::add_member(keys))
+            .in_current_span()
     }
 
     /// Remove a Member instance from the team.
@@ -195,11 +180,8 @@ where
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.remove_member(device_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::remove_member(device_id.into()))
+            .in_current_span()
     }
 
     /// Assigns role to a team member.
@@ -209,11 +191,8 @@ where
         device_id: DeviceId,
         role: Role,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role)?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::assign_role(device_id.into(), role))
+            .in_current_span()
     }
 
     /// Revokes role from a team member.
@@ -223,31 +202,22 @@ where
         device_id: DeviceId,
         role: Role,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role)?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::revoke_role(device_id.into(), role))
+            .in_current_span()
     }
 
     /// Create a label.
     #[instrument(skip(self), fields(name = %name))]
     fn create_label(&self, name: Text) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_label(name)?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::create_label(name))
+            .in_current_span()
     }
 
     /// Delete a label.
     #[instrument(skip(self), fields(label_id = %label_id))]
     fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.delete_label(label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::delete_label(label_id.into()))
+            .in_current_span()
     }
 
     /// Assigns a label to a device.
@@ -258,11 +228,8 @@ where
         label_id: LabelId,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_label(device_id.into(), label_id.into(), op)?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::assign_label(device_id.into(), label_id.into(), op))
+            .in_current_span()
     }
 
     /// Revokes a label.
@@ -273,11 +240,8 @@ where
         label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %label_id, "revoking AQC label");
-        self.with_actor(move |actor| {
-            actor.revoke_label(device_id.into(), label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::revoke_label(device_id.into(), label_id.into()))
+            .in_current_span()
     }
 
     /// Sets an AQC network name.
@@ -289,10 +253,10 @@ where
         net_identifier: Text,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %net_identifier, "setting AQC network name");
-        self.with_actor(move |actor| {
-            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
-            Ok(())
-        })
+        self.call_persistent_action(policy::set_aqc_network_name(
+            device_id.into(),
+            net_identifier,
+        ))
         .in_current_span()
     }
 
@@ -304,11 +268,8 @@ where
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, "unsetting AQC network name");
-        self.with_actor(move |actor| {
-            actor.unset_aqc_network_name(device_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
+        self.call_persistent_action(policy::unset_aqc_network_name(device_id.into()))
+            .in_current_span()
     }
 
     /// Queries all AQC network names off-graph.
@@ -317,27 +278,24 @@ where
     fn query_aqc_network_names_off_graph(
         &self,
     ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_network_names"),
-            args: Cow::Owned(vec![]),
-        })
-        .and_then(|(_, effects)| {
-            std::future::ready(
-                effects
-                    .into_iter()
-                    .map(|eff| {
-                        let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
-                            anyhow::bail!("bad effect in query_network_names");
-                        };
-                        Ok((
-                            NetIdentifier(eff.net_identifier),
-                            DeviceId::from(eff.device_id),
-                        ))
-                    })
-                    .collect(),
-            )
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_aqc_network_names())
+            .and_then(|(_, effects)| {
+                std::future::ready(
+                    effects
+                        .into_iter()
+                        .map(|eff| {
+                            let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
+                                anyhow::bail!("bad effect in query_network_names");
+                            };
+                            Ok((
+                                NetIdentifier(eff.net_identifier),
+                                DeviceId::from(eff.device_id),
+                            ))
+                        })
+                        .collect(),
+                )
+            })
+            .in_current_span()
     }
 
     /// Creates a bidirectional AQC channel off graph.
@@ -349,10 +307,10 @@ where
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_aqc_bidi_channel"),
-            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
-        })
+        self.call_session_action(policy::create_aqc_bidi_channel(
+            peer_id.into(),
+            label_id.into(),
+        ))
         .in_current_span()
     }
 
@@ -366,14 +324,11 @@ where
         open_id: DeviceId,
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_aqc_uni_channel"),
-            args: Cow::Owned(vec![
-                Value::from(seal_id),
-                Value::from(open_id),
-                Value::from(label_id),
-            ]),
-        })
+        self.call_session_action(policy::create_aqc_uni_channel(
+            seal_id.into(),
+            open_id.into(),
+            label_id.into(),
+        ))
         .in_current_span()
     }
 
@@ -386,10 +341,10 @@ where
         open_id: DeviceId,
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_afc_uni_channel"),
-            args: Cow::Owned(vec![Value::from(open_id), Value::from(label_id)]),
-        })
+        self.call_session_action(policy::create_afc_uni_channel(
+            open_id.into(),
+            label_id.into(),
+        ))
         .in_current_span()
     }
 
@@ -399,11 +354,8 @@ where
     fn query_devices_on_team_off_graph(
         &self,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_devices_on_team"),
-            args: Cow::Owned(vec![]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_devices_on_team())
+            .in_current_span()
     }
 
     /// Query device role off-graph.
@@ -413,11 +365,8 @@ where
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_device_role"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_device_role(device_id.into()))
+            .in_current_span()
     }
 
     /// Query device keybundle off-graph.
@@ -427,11 +376,8 @@ where
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_device_keybundle"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_device_keybundle(device_id.into()))
+            .in_current_span()
     }
 
     /// Query device label assignments off-graph.
@@ -441,11 +387,8 @@ where
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_label_assignments"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_label_assignments(device_id.into()))
+            .in_current_span()
     }
 
     /// Query AQC net identifier off-graph.
@@ -455,11 +398,8 @@ where
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_net_identifier"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_aqc_net_identifier(device_id.into()))
+            .in_current_span()
     }
 
     /// Query AFC net identifier off-graph.
@@ -470,11 +410,8 @@ where
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_net_identifier"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_aqc_net_identifier(device_id.into()))
+            .in_current_span()
     }
 
     /// Query label exists off-graph.
@@ -484,11 +421,8 @@ where
         &self,
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_label_exists"),
-            args: Cow::Owned(vec![Value::from(label_id)]),
-        })
-        .in_current_span()
+        self.call_session_action(policy::query_label_exists(label_id.into()))
+            .in_current_span()
     }
 
     /// Query labels off-graph.
@@ -497,54 +431,8 @@ where
     fn query_labels_off_graph(
         &self,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_labels"),
-            args: Cow::Owned(vec![]),
-        })
-        .in_current_span()
-    }
-}
-
-/// An implementation of [`Actor`].
-///
-/// Simplifies the process of calling an action on the Aranya graph.
-/// Enables more consistency and less repeated code for each action.
-#[derive(Debug)]
-pub struct ActorImpl<'a, EN, SP, CE, S> {
-    client: &'a mut ClientState<EN, SP>,
-    sink: &'a mut S,
-    graph_id: &'a GraphId,
-    _eng: PhantomData<CE>,
-}
-
-impl<'a, EN, SP, CE, S> ActorImpl<'a, EN, SP, CE, S>
-where
-    EN: Engine<Policy = VmPolicy<CE>> + Send + 'static,
-    SP: StorageProvider + Send + 'static,
-    S: Sink<<EN as Engine>::Effect>,
-{
-    /// Creates an [`ActorImpl`].
-    fn new(client: &'a mut ClientState<EN, SP>, sink: &'a mut S, graph_id: &'a GraphId) -> Self {
-        ActorImpl {
-            client,
-            sink,
-            graph_id,
-            _eng: PhantomData,
-        }
-    }
-}
-
-impl<EN, SP, CE, S> Actor for ActorImpl<'_, EN, SP, CE, S>
-where
-    EN: Engine<Policy = VmPolicy<CE>> + Send + 'static,
-    SP: StorageProvider + Send + 'static,
-    CE: aranya_crypto::Engine + Send + Sync,
-    S: Sink<<EN as Engine>::Effect>,
-{
-    /// Calls action on Aranya graph.
-    #[instrument(skip_all)]
-    fn call_action(&mut self, action: VmAction<'_>) -> Result<(), ClientError> {
-        self.client.action(*self.graph_id, self.sink, action)
+        self.call_session_action(policy::query_labels())
+            .in_current_span()
     }
 }
 
