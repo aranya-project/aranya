@@ -2,14 +2,19 @@
 #![allow(clippy::duplicated_attributes)]
 #![allow(clippy::enum_variant_names)]
 #![allow(missing_docs)]
+#![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::vec::Vec;
 use aranya_policy_ifgen::{
-    macros::{actions, effect, effects, value},
+    macros::{action, actions, effect, effects, value},
     BaseId, ClientError, Value, Text,
 };
+#[derive(Debug)]
+pub enum Persistent {}
+#[derive(Debug)]
+pub enum Ephemeral {}
 /// KeyBundle policy struct.
 #[value]
 pub struct KeyBundle {
@@ -281,60 +286,150 @@ pub struct TeamCreated {
 pub struct TeamTerminated {
     pub owner_id: BaseId,
 }
-/// Implements all supported policy actions.
-#[actions]
-pub trait ActorExt {
-    fn create_team(
-        &mut self,
-        owner_keys: KeyBundle,
-        nonce: Vec<u8>,
-    ) -> Result<(), ClientError>;
-    fn terminate_team(&mut self) -> Result<(), ClientError>;
-    fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
-    fn remove_member(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn assign_role(&mut self, device_id: BaseId, role: Role) -> Result<(), ClientError>;
-    fn revoke_role(&mut self, device_id: BaseId, role: Role) -> Result<(), ClientError>;
-    fn set_aqc_network_name(
-        &mut self,
-        device_id: BaseId,
-        net_identifier: Text,
-    ) -> Result<(), ClientError>;
-    fn unset_aqc_network_name(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn create_aqc_bidi_channel(
-        &mut self,
-        peer_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn create_aqc_uni_channel(
-        &mut self,
-        sender_id: BaseId,
-        receiver_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn create_afc_uni_channel(
-        &mut self,
-        receiver_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
-    fn delete_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn assign_label(
-        &mut self,
-        device_id: BaseId,
-        label_id: BaseId,
-        op: ChanOp,
-    ) -> Result<(), ClientError>;
-    fn revoke_label(
-        &mut self,
-        device_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn query_label_exists(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn query_label_assignments(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_aqc_net_identifier(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
+#[actions(interface = Persistent)]
+pub enum PersistentAction {
+    create_team(create_team),
+    terminate_team(terminate_team),
+    add_member(add_member),
+    remove_member(remove_member),
+    assign_role(assign_role),
+    revoke_role(revoke_role),
+    set_aqc_network_name(set_aqc_network_name),
+    unset_aqc_network_name(unset_aqc_network_name),
+    create_label(create_label),
+    delete_label(delete_label),
+    assign_label(assign_label),
+    revoke_label(revoke_label),
 }
+#[actions(interface = Ephemeral)]
+pub enum EphemeralAction {
+    create_aqc_bidi_channel(create_aqc_bidi_channel),
+    create_aqc_uni_channel(create_aqc_uni_channel),
+    create_afc_uni_channel(create_afc_uni_channel),
+    query_label_exists(query_label_exists),
+    query_labels(query_labels),
+    query_label_assignments(query_label_assignments),
+    query_devices_on_team(query_devices_on_team),
+    query_device_role(query_device_role),
+    query_device_keybundle(query_device_keybundle),
+    query_aqc_net_identifier(query_aqc_net_identifier),
+    query_aqc_network_names(query_aqc_network_names),
+}
+/// create_team policy action.
+#[action(interface = Persistent)]
+pub struct create_team {
+    pub owner_keys: KeyBundle,
+    pub nonce: Vec<u8>,
+}
+/// terminate_team policy action.
+#[action(interface = Persistent)]
+pub struct terminate_team {}
+/// add_member policy action.
+#[action(interface = Persistent)]
+pub struct add_member {
+    pub device_keys: KeyBundle,
+}
+/// remove_member policy action.
+#[action(interface = Persistent)]
+pub struct remove_member {
+    pub device_id: BaseId,
+}
+/// assign_role policy action.
+#[action(interface = Persistent)]
+pub struct assign_role {
+    pub device_id: BaseId,
+    pub role: Role,
+}
+/// revoke_role policy action.
+#[action(interface = Persistent)]
+pub struct revoke_role {
+    pub device_id: BaseId,
+    pub role: Role,
+}
+/// set_aqc_network_name policy action.
+#[action(interface = Persistent)]
+pub struct set_aqc_network_name {
+    pub device_id: BaseId,
+    pub net_identifier: Text,
+}
+/// unset_aqc_network_name policy action.
+#[action(interface = Persistent)]
+pub struct unset_aqc_network_name {
+    pub device_id: BaseId,
+}
+/// create_aqc_bidi_channel policy action.
+#[action(interface = Ephemeral)]
+pub struct create_aqc_bidi_channel {
+    pub peer_id: BaseId,
+    pub label_id: BaseId,
+}
+/// create_aqc_uni_channel policy action.
+#[action(interface = Ephemeral)]
+pub struct create_aqc_uni_channel {
+    pub sender_id: BaseId,
+    pub receiver_id: BaseId,
+    pub label_id: BaseId,
+}
+/// create_afc_uni_channel policy action.
+#[action(interface = Ephemeral)]
+pub struct create_afc_uni_channel {
+    pub receiver_id: BaseId,
+    pub label_id: BaseId,
+}
+/// create_label policy action.
+#[action(interface = Persistent)]
+pub struct create_label {
+    pub name: Text,
+}
+/// delete_label policy action.
+#[action(interface = Persistent)]
+pub struct delete_label {
+    pub label_id: BaseId,
+}
+/// assign_label policy action.
+#[action(interface = Persistent)]
+pub struct assign_label {
+    pub device_id: BaseId,
+    pub label_id: BaseId,
+    pub op: ChanOp,
+}
+/// revoke_label policy action.
+#[action(interface = Persistent)]
+pub struct revoke_label {
+    pub device_id: BaseId,
+    pub label_id: BaseId,
+}
+/// query_label_exists policy action.
+#[action(interface = Ephemeral)]
+pub struct query_label_exists {
+    pub label_id: BaseId,
+}
+/// query_labels policy action.
+#[action(interface = Ephemeral)]
+pub struct query_labels {}
+/// query_label_assignments policy action.
+#[action(interface = Ephemeral)]
+pub struct query_label_assignments {
+    pub device_id: BaseId,
+}
+/// query_devices_on_team policy action.
+#[action(interface = Ephemeral)]
+pub struct query_devices_on_team {}
+/// query_device_role policy action.
+#[action(interface = Ephemeral)]
+pub struct query_device_role {
+    pub device_id: BaseId,
+}
+/// query_device_keybundle policy action.
+#[action(interface = Ephemeral)]
+pub struct query_device_keybundle {
+    pub device_id: BaseId,
+}
+/// query_aqc_net_identifier policy action.
+#[action(interface = Ephemeral)]
+pub struct query_aqc_net_identifier {
+    pub device_id: BaseId,
+}
+/// query_aqc_network_names policy action.
+#[action(interface = Ephemeral)]
+pub struct query_aqc_network_names {}
