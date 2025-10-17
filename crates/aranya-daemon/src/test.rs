@@ -43,11 +43,14 @@ use tokio::{
 use crate::{
     actions::Actions,
     api::EffectReceiver,
-    aranya,
+    aranya::{self, ClientWithCaches, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::{quic::PskStore, PeerCacheKey, PeerCacheMap, SyncPeer},
+        task::{
+            quic::{HelloInfo, HelloSubscriptions, PskStore},
+            PeerCacheKey, SyncPeer,
+        },
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,
@@ -245,28 +248,35 @@ impl TestCtx {
             let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
+            let hello_subscriptions = Arc::<Mutex<HelloSubscriptions>>::default();
 
-            let (syncer, conn_map, conn_rx, effects_recv) = {
+            let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);
-                let (syncer, _sync_peers, conn_map, conn_rx) = TestSyncer::new(
-                    client.clone(),
+                let client_with_caches_for_syncer =
+                    ClientWithCaches::new(client.clone(), caches.clone());
+                let (syncer, sync_peers, conn_map, conn_rx) = TestSyncer::new(
+                    client_with_caches_for_syncer,
                     send_effects,
                     InvalidGraphs::default(),
                     psk_store.clone(),
                     Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                    caches.clone(),
+                    hello_subscriptions.clone(),
                 )?;
 
-                (syncer, conn_map, conn_rx, effect_recv)
+                (syncer, sync_peers, conn_map, conn_rx, effect_recv)
             };
 
+            let client_with_caches = ClientWithCaches::new(client.clone(), caches.clone());
             let server: TestServer = TestServer::new(
-                client.clone(),
+                client_with_caches,
                 &local_addr,
                 psk_store.clone(),
                 conn_map,
                 conn_rx,
-                caches.clone(),
+                HelloInfo {
+                    subscriptions: hello_subscriptions.clone(),
+                    sync_peers,
+                },
             )
             .await?;
             let local_addr = server.local_addr()?;
