@@ -6,9 +6,10 @@
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::vec::Vec;
+
 use aranya_policy_ifgen::{
     macros::{actions, effect, effects, value},
-    BaseId, ClientError, Value, Text,
+    BaseId, ClientError, Text, Value,
 };
 /// KeyBundle policy struct.
 #[value]
@@ -285,11 +286,7 @@ pub struct TeamTerminated {
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
-    fn create_team(
-        &mut self,
-        owner_keys: KeyBundle,
-        nonce: Vec<u8>,
-    ) -> Result<(), ClientError>;
+    fn create_team(&mut self, owner_keys: KeyBundle, nonce: Vec<u8>) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
     fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: BaseId) -> Result<(), ClientError>;
@@ -325,11 +322,7 @@ pub trait ActorExt {
         label_id: BaseId,
         op: ChanOp,
     ) -> Result<(), ClientError>;
-    fn revoke_label(
-        &mut self,
-        device_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
+    fn revoke_label(&mut self, device_id: BaseId, label_id: BaseId) -> Result<(), ClientError>;
     fn query_label_exists(&mut self, label_id: BaseId) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
     fn query_label_assignments(&mut self, device_id: BaseId) -> Result<(), ClientError>;
