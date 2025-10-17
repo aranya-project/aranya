@@ -181,6 +181,7 @@ where
         Ok(channel_id)
     }
 
+    /// Delete a channel.
     pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>
     where
         E: Engine<CS = C>,
@@ -190,6 +191,19 @@ where
             .await
             .write
             .remove(channel_id)
+            .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
+    }
+
+    /// Delete all channels.
+    pub(crate) async fn delete_channels(&self) -> Result<()>
+    where
+        E: Engine<CS = C>,
+    {
+        self.shm
+            .lock()
+            .await
+            .write
+            .remove_all()
             .map_err(|err| anyhow!("unable to remove AFC channel: {err}"))
     }
 

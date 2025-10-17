@@ -234,9 +234,28 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
-                TeamTerminated(_team_terminated) => {}
+                TeamTerminated(team_terminated) => {
+                    #[cfg(feature = "afc")]
+                    self.afc.delete_channels().await?;
+                    tracing::trace!(effect = ?team_terminated, "received TeamTerminated effect");
+                }
                 MemberAdded(_member_added) => {}
-                MemberRemoved(_member_removed) => {}
+                MemberRemoved(member_removed) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        if self.device_id == member_removed.device_id.into() {
+                            self.afc.delete_channels().await?;
+                        } else {
+                            let peer_id = Some(member_removed.device_id.into());
+                            self.afc
+                                .remove_if(RemoveIfParams {
+                                    peer_id,
+                                    ..Default::default()
+                                })
+                                .await?;
+                        }
+                    }
+                }
                 OwnerAssigned(_owner_assigned) => {}
                 AdminAssigned(_admin_assigned) => {}
                 OperatorAssigned(_operator_assigned) => {}
