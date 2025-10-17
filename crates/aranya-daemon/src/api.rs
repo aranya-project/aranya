@@ -806,7 +806,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AfcCtrl, api::AfcChannelId)> {
+    ) -> api::Result<(api::AfcCtrl, api::AfcLocalChannelId, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
@@ -825,12 +825,12 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let channel_id = self.afc.uni_channel_created(e).await?;
+        let (local_channel_id, channel_id) = self.afc.uni_channel_created(e).await?;
         info!("afc uni channel created");
 
         let ctrl = get_afc_ctrl(ctrl)?;
 
-        Ok((ctrl, channel_id))
+        Ok((ctrl, local_channel_id, channel_id))
     }
 
     #[cfg(feature = "afc")]
@@ -838,7 +838,7 @@ impl DaemonApi for Api {
     async fn delete_afc_channel(
         self,
         _: context::Context,
-        chan: api::AfcChannelId,
+        chan: api::AfcLocalChannelId,
     ) -> api::Result<()> {
         self.afc.delete_channel(chan).await?;
         info!("afc channel deleted");
@@ -852,7 +852,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcChannelId)> {
+    ) -> api::Result<(api::LabelId, api::AfcLocalChannelId, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
         let graph = GraphId::from(team.into_id());
@@ -866,9 +866,9 @@ impl DaemonApi for Api {
 
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        let channel_id = self.afc.uni_channel_received(e).await?;
+        let (local_channel_id, channel_id) = self.afc.uni_channel_received(e).await?;
 
-        return Ok((e.label_id.into(), channel_id));
+        return Ok((e.label_id.into(), local_channel_id, channel_id));
     }
 
     /// Create a label.

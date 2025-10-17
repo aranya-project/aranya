@@ -529,20 +529,22 @@ pub struct AqcBidiChannelId {
 }
 
 #[cfg(feature = "aqc")]
-impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
-    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
+impl From<aqc::BidiChannelId> for AqcBidiChannelId {
+    fn from(value: aqc::BidiChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__id.into(),
             },
         }
     }
 }
 
 #[cfg(feature = "aqc")]
-impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
+impl From<&AqcBidiChannelId> for aqc::BidiChannelId {
     fn from(value: &AqcBidiChannelId) -> Self {
-        value.id.bytes.into()
+        Self {
+            __id: value.id.bytes.into(),
+        }
     }
 }
 
@@ -555,20 +557,50 @@ pub struct AqcUniChannelId {
 }
 
 #[cfg(feature = "aqc")]
-impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
-    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
+impl From<aqc::UniChannelId> for AqcUniChannelId {
+    fn from(value: aqc::UniChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__id.into(),
             },
         }
     }
 }
 
 #[cfg(feature = "aqc")]
-impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
+impl From<&AqcUniChannelId> for aqc::UniChannelId {
     fn from(value: &AqcUniChannelId) -> Self {
-        value.id.bytes.into()
+        Self {
+            __id: value.id.bytes.into(),
+        }
+    }
+}
+
+/// Channel ID for AFC channel.
+#[cfg(feature = "afc")]
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct AfcChannelId {
+    id: Id,
+}
+
+#[cfg(feature = "afc")]
+impl From<afc::ChannelId> for AfcChannelId {
+    fn from(value: afc::ChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.__id.into(),
+            },
+        }
+    }
+}
+
+#[cfg(feature = "afc")]
+impl From<&AfcChannelId> for afc::ChannelId {
+    fn from(value: &AfcChannelId) -> Self {
+        Self {
+            __id: value.id.bytes.into(),
+        }
     }
 }
 
@@ -1819,6 +1851,33 @@ pub unsafe fn aqc_create_uni_channel(
     Ok(())
 }
 
+/// Returns the [`AqcBidiChannelId`] for the associated [`AqcBidiChannel`].
+///
+/// @param[in]  channel the AQC channel object [`AqcBidiChannel`].
+/// @param[out] __output the corresponding channel ID [`AqcBidiChannelId`].
+#[cfg(feature = "aqc")]
+pub fn aqc_bidi_channel_get_id(channel: &AqcBidiChannel) -> AqcBidiChannelId {
+    channel.aqc_id().into()
+}
+
+/// Returns the [`AqcUniChannelId`] for the associated [`AqcSendChannel`].
+///
+/// @param[in]  channel the AQC channel object [`AqcSendChannel`].
+/// @param[out] __output the corresponding channel ID [`AqcUniChannelId`].
+#[cfg(feature = "aqc")]
+pub fn aqc_send_channel_get_id(channel: &AqcSendChannel) -> AqcUniChannelId {
+    channel.aqc_id().into()
+}
+
+/// Returns the [`AqcUniChannelId`] for the associated [`AqcReceiveChannel`].
+///
+/// @param[in]  channel the AQC channel object [`AqcReceiveChannel`].
+/// @param[out] __output the corresponding channel ID [`AqcUniChannelId`].
+#[cfg(feature = "aqc")]
+pub fn aqc_receive_channel_get_id(channel: &AqcReceiveChannel) -> AqcUniChannelId {
+    channel.aqc_id().into()
+}
+
 /// Delete a bidirectional AQC channel.
 /// Zeroizes PSKs associated with the channel.
 /// Closes all associated QUIC connections and streams.
@@ -2240,13 +2299,13 @@ pub unsafe fn aqc_recv_stream_try_recv(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 120, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 120, align = 8)]
 pub type AfcReceiveChannel = Safe<afc::ReceiveChannel>;
 
 /// An AFC Control Message, used to create the other end of a channel.
@@ -2351,6 +2410,15 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
     channel.label_id().into()
 }
 
+/// Returns the [`AfcChannelId`] for the associated [`AfcSendChannel`].
+///
+/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
+/// @param[out] __output the corresponding channel ID [`AfcChannelId`].
+#[cfg(feature = "afc")]
+pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
+    channel.id().into()
+}
+
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
 ///
 /// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
@@ -2358,6 +2426,15 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId {
     channel.label_id().into()
+}
+
+/// Returns the [`AfcChannelId`] for the associated [`AfcReceiveChannel`].
+///
+/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
+/// @param[out] __output the corresponding channel ID [`AfcChannelId`].
+#[cfg(feature = "afc")]
+pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
+    channel.id().into()
 }
 
 /// Returns the raw data for a given [`AfcCtrlMsg`].
