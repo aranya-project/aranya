@@ -1,7 +1,9 @@
 //! AQC support.
 
-use std::net::SocketAddr;
+use std::{fmt, fmt::Display, net::SocketAddr};
 
+use aranya_crypto::aqc::{BidiChannelId as AqcBidiChannelId, UniChannelId as AqcUniChannelId};
+use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tracing::{debug, instrument};
 
@@ -13,6 +15,34 @@ use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
+
+/// A bidirectional channel ID.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct BidiChannelId {
+    #[doc(hidden)]
+    pub __id: AqcBidiChannelId,
+}
+
+impl Display for BidiChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.__id, f)
+    }
+}
+
+/// A unidirectional channel ID.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct UniChannelId {
+    #[doc(hidden)]
+    pub __id: AqcUniChannelId,
+}
+
+impl Display for UniChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.__id, f)
+    }
+}
 
 /// Aranya QUIC Channels client for managing channels which allow sending and
 /// receiving data with peers.

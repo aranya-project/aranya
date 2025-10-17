@@ -529,20 +529,22 @@ pub struct AqcBidiChannelId {
 }
 
 #[cfg(feature = "aqc")]
-impl From<aranya_crypto::aqc::BidiChannelId> for AqcBidiChannelId {
-    fn from(value: aranya_crypto::aqc::BidiChannelId) -> Self {
+impl From<aqc::BidiChannelId> for AqcBidiChannelId {
+    fn from(value: aqc::BidiChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__id.into(),
             },
         }
     }
 }
 
 #[cfg(feature = "aqc")]
-impl From<&AqcBidiChannelId> for aranya_crypto::aqc::BidiChannelId {
+impl From<&AqcBidiChannelId> for aqc::BidiChannelId {
     fn from(value: &AqcBidiChannelId) -> Self {
-        value.id.bytes.into()
+        Self {
+            __id: value.id.bytes.into(),
+        }
     }
 }
 
@@ -555,20 +557,22 @@ pub struct AqcUniChannelId {
 }
 
 #[cfg(feature = "aqc")]
-impl From<aranya_crypto::aqc::UniChannelId> for AqcUniChannelId {
-    fn from(value: aranya_crypto::aqc::UniChannelId) -> Self {
+impl From<aqc::UniChannelId> for AqcUniChannelId {
+    fn from(value: aqc::UniChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.into(),
+                bytes: value.__id.into(),
             },
         }
     }
 }
 
 #[cfg(feature = "aqc")]
-impl From<&AqcUniChannelId> for aranya_crypto::aqc::UniChannelId {
+impl From<&AqcUniChannelId> for aqc::UniChannelId {
     fn from(value: &AqcUniChannelId) -> Self {
-        value.id.bytes.into()
+        Self {
+            __id: value.id.bytes.into(),
+        }
     }
 }
 
