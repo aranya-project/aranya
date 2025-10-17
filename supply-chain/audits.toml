@@ -384,6 +384,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.6 -> 2.0.12"
 
+[[audits.tinyvec]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.9.0 -> 1.10.0"
+
 [[audits.tokio]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -604,6 +609,12 @@ criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
 end = "2025-12-19"
+
+[[trusted.aranya-id]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2025-10-17"
+end = "2026-10-17"
 
 [[trusted.aranya-idam-ffi]]
 criteria = "safe-to-deploy"
