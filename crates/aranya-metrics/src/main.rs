@@ -346,7 +346,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let keybundle = queries.device_keybundle(ctx.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
 
-    info!("demo aqc functionality");
+    info!("demo afc functionality");
     info!("creating label");
     let label3 = operator.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
