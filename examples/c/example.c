@@ -20,7 +20,6 @@
 
 #define ENABLE_ARANYA_AFC 1
 #define ENABLE_ARANYA_PREVIEW 1
-#define ENABLE_ARANYA_AQC 1
 #define ENABLE_ARANYA_EXPERIMENTAL 1
 #include "aranya-client.h"
 
@@ -94,11 +93,6 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
                                  "127.0.0.1:10003", "127.0.0.1:10004",
                                  "127.0.0.1:10005"};
 
-// List of AQC addresses.
-const char* aqc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
-                           "127.0.0.1:11003", "127.0.0.1:11004",
-                           "127.0.0.1:11005"};
-
 // Aranya client.
 typedef struct {
     // Name of Aranya client.
@@ -144,13 +138,11 @@ typedef struct {
 } Team;
 
 // Forward Declarations
-AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
-                        const char* aqc_addr);
+AranyaError init_client(Client* c, const char* name, const char* daemon_addr);
 AranyaError init_team(Team* t);
 AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
 AranyaError run(Team* t);
 AranyaError run_afc_uni_example(Team* t);
-AranyaError run_aqc_example(Team* t);
 AranyaError cleanup_team(Team* t);
 
 typedef struct AranyaChannelIdent {
@@ -164,33 +156,9 @@ AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
                                        int num_peers);
 
 // Initialize an Aranya `Client` with the given parameters.
-AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
-                        const char* aqc_addr) {
+AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
     AranyaError err;
     c->name = name;
-
-    struct AranyaAqcConfigBuilder aqc_builder;
-    err = aranya_aqc_config_builder_init(&aqc_builder);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to initialize `AranyaAqcConfigBuilder`\n");
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-    err = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set AQC server address\n");
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-
-    // NB: A builder's "_build" method consumes the builder, so
-    // do _not_ call "_cleanup" afterward.
-    struct AranyaAqcConfig aqc_cfg;
-    err = aranya_aqc_config_build(&aqc_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "error initializing AQC config\n");
-        return err;
-    }
 
     struct AranyaClientConfigBuilder cli_builder;
     err = aranya_client_config_builder_init(&cli_builder);
@@ -207,14 +175,6 @@ AranyaError init_client(Client* c, const char* name, const char* daemon_addr,
         return err;
     }
 
-    err = aranya_client_config_builder_set_aqc_config(&cli_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set AQC config\n");
-        aranya_client_config_builder_cleanup(&cli_builder);
-        return err;
-    }
-
-    // NB: A builder's "_build" method consumes the builder, so
     // do _not_ call "_cleanup" afterward.
     struct AranyaClientConfig cli_cfg;
     err = aranya_client_config_build(&cli_builder, &cli_cfg);
@@ -281,8 +241,7 @@ AranyaError init_team(Team* t) {
         printf("initializing client: %s\n", client_names[i]);
 
         Client* client = &t->clients_arr[i];
-        err =
-            init_client(client, client_names[i], daemon_socks[i], aqc_addrs[i]);
+        err            = init_client(client, client_names[i], daemon_socks[i]);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to initialize client %s: %s\n",
                     client->name, aranya_error_to_str(err));
@@ -601,7 +560,6 @@ AranyaError run(Team* t) {
     Client* owner = &t->clients.owner;
     Client* admin = &t->clients.admin;
     Client* operator= & t->clients.operator;
-    Client* membera = &t->clients.membera;
     Client* memberb = &t->clients.memberb;
 
     // initialize logging.
@@ -666,17 +624,6 @@ AranyaError run(Team* t) {
 
     sleep(1);
 
-    // assign AQC network addresses.
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &membera->id, aqc_addrs[MEMBERA]);
-    EXPECT("error assigning aqc net name to membera", err);
-
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &memberb->id, aqc_addrs[MEMBERB]);
-    EXPECT("error assigning aqc net name to memberb", err);
-
-    sleep(1);
-
     // Queries
     printf("running factdb queries\n");
 
@@ -722,53 +669,8 @@ AranyaError run(Team* t) {
         "\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle_len);
 
-    // Query memberb's net identifier.
-    char memberb_aqc_net_identifier[BUFFER_LEN] = {0};
-    size_t memberb_aqc_net_identifier_len = sizeof(memberb_aqc_net_identifier);
-    bool aqc_net_identifier_exists        = false;
-
-    err = aranya_query_aqc_net_identifier(
-        &operator->client, &t->id, &memberb->id, memberb_aqc_net_identifier,
-        &memberb_aqc_net_identifier_len, &aqc_net_identifier_exists);
-    EXPECT("error querying memberb aqc net identifier", err);
-    if (!aqc_net_identifier_exists) {
-        fprintf(stderr, "expected `memberb` to have an AQC net identifier\n");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    printf("%s aqc net identifier: %s \n", t->clients_arr[MEMBERB].name,
-           memberb_aqc_net_identifier);
-
-    // Remove the net identifier.
-    err = aranya_aqc_remove_net_identifier(&operator->client, &t->id,
-                                           &memberb->id, aqc_addrs[MEMBERB]);
-    EXPECT("error removing memberb aqc net identifier", err);
-    printf("removed aqc net identifier `%s` from `%s`\n",
-           memberb_aqc_net_identifier, t->clients_arr[MEMBERB].name);
-
-    // The net identifier should no longer exist.
-    memberb_aqc_net_identifier_len = sizeof(memberb_aqc_net_identifier);
-
-    err = aranya_query_aqc_net_identifier(
-        &operator->client, &t->id, &memberb->id, memberb_aqc_net_identifier,
-        &memberb_aqc_net_identifier_len, &aqc_net_identifier_exists);
-    EXPECT("error querying memberb aqc net identifier", err);
-    if (aqc_net_identifier_exists) {
-        fprintf(stderr, "`memberb` should no longer have a net identifier\n");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
-    // Add the net identifier back.
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &memberb->id, aqc_addrs[MEMBERB]);
-    EXPECT("error assigning aqc net name to memberb", err);
-
     err = run_afc_uni_example(t);
     EXPECT("error running afc uni example", err);
-
-    err = run_aqc_example(t);
-    EXPECT("error running aqc example", err);
 
 exit:
     free(devices);
@@ -915,445 +817,6 @@ typedef struct {
     AranyaLabelId label2;
     AranyaError result;
 } channel_context_t;
-
-static void* membera_aqc_thread(void* arg) {
-    channel_context_t* ctx = (channel_context_t*)arg;
-    AranyaError err;
-
-    AranyaAqcBidiChannel bidi_chan;
-    AranyaAqcPeerChannel uni_channel;
-    AranyaAqcChannelType uni_channel_type;
-    AranyaAqcReceiveChannel uni_recv;
-
-    AranyaAqcBidiStream bidi_stream;
-    AranyaAqcSendStream send_stream;
-    AranyaAqcReceiveStream recv_stream;
-
-    // First, let's create a bidirectional channel to Member B.
-    printf("membera: creating AQC bidi channel \n");
-    err = aranya_aqc_create_bidi_channel(
-        ctx->client, &ctx->id, aqc_addrs[MEMBERB], &ctx->label1, &bidi_chan);
-    EXPECT("membera: error creating aqc bidi channel", err);
-
-    sleep(1);
-
-    // Then, let's receive the uni channel from Member B.
-    printf("membera: Trying to receive the uni channel\n");
-    POLL(aranya_aqc_try_receive_channel(ctx->client, &uni_channel,
-                                        &uni_channel_type),
-         "membera: error receiving aqc uni channel");
-    switch (uni_channel_type) {
-    case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
-        fprintf(stderr,
-                "membera: expected receiver AQC channel, got bidirectional "
-                "channel!\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
-        aranya_aqc_get_receive_channel(&uni_channel, &uni_recv);
-        break;
-    }
-
-    // Now, let's create a bidirectional stream on our new channel.
-    printf("membera: Creating a bidi stream\n");
-    err = aranya_aqc_bidi_create_bidi_stream(ctx->client, &bidi_chan,
-                                             &bidi_stream);
-    EXPECT("membera: error creating an aqc bidi stream", err);
-
-    // Send some data to make sure it works.
-    printf("membera: Sending bidi stream data\n");
-    const char* bidi_string = "hello from aqc membera!";
-    err = aranya_aqc_bidi_stream_send(ctx->client, &bidi_stream,
-                                      (const uint8_t*)bidi_string,
-                                      strnlen(bidi_string, BUFFER_LEN - 1) + 1);
-    EXPECT("membera: Unable to send bidi data from Member A", err);
-
-    sleep(1);
-
-    printf("membera: Creating a send uni stream\n");
-    err = aranya_aqc_bidi_create_uni_stream(ctx->client, &bidi_chan,
-                                            &send_stream);
-    EXPECT("membera: error creating a send uni stream", err);
-
-    sleep(1);
-
-    printf("membera: Sending uni stream data\n");
-    const char* uni_string = "hello from aqc uni membera!";
-    err = aranya_aqc_send_stream_send(ctx->client, &send_stream,
-                                      (const uint8_t*)uni_string,
-                                      strnlen(uni_string, BUFFER_LEN - 1) + 1);
-    EXPECT("membera: Unable to send uni data from Member A", err);
-
-    sleep(1);
-
-    char bidi_buffer[BUFFER_LEN];
-    size_t bidi_recv_length = BUFFER_LEN;
-    memset(bidi_buffer, 0, BUFFER_LEN);
-    printf("membera: Trying to receive member b's stream data\n");
-    POLL(aranya_aqc_bidi_stream_try_recv(&bidi_stream, (uint8_t*)bidi_buffer,
-                                         &bidi_recv_length),
-         "membera: error receiving aqc stream data");
-
-    if (strncmp("hello from aqc memberb!", bidi_buffer, BUFFER_LEN)) {
-        fprintf(stderr, "membera: received string doesn't match\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-    printf("membera: Received AQC bidi stream data: \"%s\"\n", bidi_buffer);
-
-    sleep(1);
-
-    // Now we need to receive the streams opened on those channels.
-    printf("membera: Trying to receive the bidi stream\n");
-    POLL(aranya_aqc_recv_try_receive_uni_stream(&uni_recv, &recv_stream),
-         "membera: error receiving an aqc uni stream");
-
-    char uni_buffer[BUFFER_LEN];
-    size_t uni_recv_length = BUFFER_LEN;
-    memset(bidi_buffer, 0, BUFFER_LEN);
-    printf("membera: Trying to receive member b's stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(&recv_stream, (uint8_t*)uni_buffer,
-                                         &uni_recv_length),
-         "membera: error receving aqc stream data");
-
-    if (strncmp("hello from aqc uni memberb!", uni_buffer, BUFFER_LEN)) {
-        fprintf(stderr, "membera: received string doesn't match\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-    printf("membera: Received AQC bidi stream data: \"%s\"\n", uni_buffer);
-
-    sleep(2);
-
-    printf("membera: cleanup bidi stream\n");
-    err = aranya_aqc_bidi_stream_cleanup(&bidi_stream);
-    EXPECT("membera: cleanup bidi stream", err);
-
-    printf("membera: cleanup recv stream\n");
-    err = aranya_aqc_receive_stream_cleanup(&recv_stream);
-    EXPECT("membera: cleanup recv stream", err);
-
-    printf("membera: cleanup send stream\n");
-    err = aranya_aqc_send_stream_cleanup(&send_stream);
-    EXPECT("membera: cleanup send stream", err);
-
-    printf("membera: deleting AQC bidi channel\n");
-    err = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
-    EXPECT("membera: deleting AQC bidi channel", err);
-
-    printf("membera: cleaning up AQC bidi channel\n");
-    err = aranya_aqc_bidi_channel_cleanup(&bidi_chan);
-    EXPECT("membera: cleaning up AQC bidi channel", err);
-
-    printf("membera: deleting AQC uni channel\n");
-    err = aranya_aqc_delete_receive_uni_channel(ctx->client, &uni_recv);
-    EXPECT("membera: deleting AQC uni channel", err);
-
-    printf("membera: cleaning up AQC uni channel\n");
-    err = aranya_aqc_receive_channel_cleanup(&uni_recv);
-    EXPECT("membera: cleaning up AQC uni channel", err);
-
-exit:
-    ctx->result = err;
-    return NULL;
-}
-
-static void* memberb_aqc_thread(void* arg) {
-    channel_context_t* ctx = (channel_context_t*)arg;
-    AranyaError err;
-
-    AranyaAqcPeerChannel bidi_channel;
-    AranyaAqcChannelType bidi_channel_type;
-    AranyaAqcBidiChannel bidi_recv;
-    AranyaAqcSendChannel uni_send;
-
-    AranyaAqcSendStream bidi_send_stream;
-    AranyaAqcReceiveStream bidi_recv_stream;
-    AranyaAqcSendStream uni_send_stream;
-    AranyaAqcReceiveStream uni_recv_stream;
-
-    // First, let's receive the bidi channel from Member A.
-    printf("memberb: Trying to receive the bidi channel\n");
-    POLL(aranya_aqc_try_receive_channel(ctx->client, &bidi_channel,
-                                        &bidi_channel_type),
-         "memberb: error receiving aqc bidi channel");
-    switch (bidi_channel_type) {
-    case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
-        aranya_aqc_get_bidi_channel(&bidi_channel, &bidi_recv);
-        break;
-    case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
-        fprintf(stderr,
-                "memberb: expected bidirectional AQC channel, got receiver "
-                "channel!\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-
-    // Then, let's create a unidirectional channel in the other direction.
-    printf("memberb: creating AQC uni channel \n");
-    err = aranya_aqc_create_uni_channel(
-        ctx->client, &ctx->id, aqc_addrs[MEMBERA], &ctx->label2, &uni_send);
-    EXPECT("memberb: error creating aqc uni channel", err);
-
-    sleep(1);
-
-    // Now we need to receive the streams opened on those channels.
-    printf("memberb: Trying to receive the bidi stream\n");
-    bool bidi_send_init;
-    POLL(aranya_aqc_bidi_try_receive_stream(&bidi_recv, &bidi_recv_stream,
-                                            &bidi_send_stream, &bidi_send_init),
-         "memberb: error receiving an aqc bidi stream");
-    // Validate that we got a send stream since this is a bidi stream.
-    if (!bidi_send_init) {
-        fprintf(
-            stderr,
-            "memberb: didn't receive an AQC send stream for a bidi stream\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-
-    sleep(1);
-
-    char bidi_buffer[BUFFER_LEN];
-    size_t bidi_recv_length = BUFFER_LEN;
-    memset(bidi_buffer, 0, BUFFER_LEN);
-    printf("memberb: Trying to receive the bidi stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(
-             &bidi_recv_stream, (uint8_t*)bidi_buffer, &bidi_recv_length),
-         "memberb: error receving aqc stream data");
-
-    if (strncmp("hello from aqc membera!", bidi_buffer, BUFFER_LEN)) {
-        fprintf(stderr, "memberb: received string doesn't match\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-    printf("memberb: Received AQC bidi stream data: \"%s\"\n", bidi_buffer);
-
-    printf("memberb: Trying to receive the uni stream\n");
-    bool uni_send_init;
-    POLL(aranya_aqc_bidi_try_receive_stream(&bidi_recv, &uni_recv_stream,
-                                            &uni_send_stream, &uni_send_init),
-         "memberb: error receiving an aqc bidi stream");
-    // Validate that we never got a send stream on this one since it's a uni.
-    if (uni_send_init) {
-        fprintf(stderr,
-                "memberb: received an AQC send stream for a uni stream\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-
-    sleep(1);
-
-    char uni_buffer[BUFFER_LEN];
-    size_t uni_recv_length = BUFFER_LEN;
-    memset(uni_buffer, 0, BUFFER_LEN);
-    printf("memberb: Trying to receive the uni stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(&uni_recv_stream, (uint8_t*)uni_buffer,
-                                         &uni_recv_length),
-         "memberb: error receving aqc stream data");
-
-    if (strncmp("hello from aqc uni membera!", uni_buffer, BUFFER_LEN)) {
-        fprintf(stderr, "memberb: received string doesn't match\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    }
-    printf("memberb: Received AQC uni stream data: \"%s\"\n", uni_buffer);
-
-    // Send some data to make sure it works.
-    printf("memberb: Sending some data back from member b\n");
-    const char* bidi_string = "hello from aqc memberb!";
-    err = aranya_aqc_send_stream_send(ctx->client, &bidi_send_stream,
-                                      (const uint8_t*)bidi_string,
-                                      strnlen(bidi_string, BUFFER_LEN - 1) + 1);
-    EXPECT("memberb: Unable to send bidi data from Member B", err);
-
-    sleep(1);
-
-    // Let's also test a unidirectional channel, just because.
-    err = aranya_aqc_send_create_uni_stream(ctx->client, &uni_send,
-                                            &uni_send_stream);
-    EXPECT("memberb: Unable to open a uni stream from Member B", err);
-
-    // Need to send data to make sure Member A actually receives our stream.
-    const char* uni_string = "hello from aqc uni memberb!";
-    err = aranya_aqc_send_stream_send(ctx->client, &uni_send_stream,
-                                      (const uint8_t*)uni_string,
-                                      strnlen(uni_string, BUFFER_LEN - 1) + 1);
-    EXPECT("memberb: Unable to send uni data from Member B", err);
-
-    sleep(2);
-
-    printf("memberb: cleanup bidi send stream\n");
-    aranya_aqc_send_stream_cleanup(&bidi_send_stream);
-    EXPECT("memberb: cleanup bidi send stream", err);
-
-    printf("memberb: cleanup bidi recv stream\n");
-    aranya_aqc_receive_stream_cleanup(&bidi_recv_stream);
-    EXPECT("memberb: cleanup bidi recv stream", err);
-
-    printf("memberb: cleanup uni send stream\n");
-    aranya_aqc_send_stream_cleanup(&uni_send_stream);
-    EXPECT("memberb: cleanup uni send stream", err);
-
-    printf("memberb: cleanup uni recv stream\n");
-    aranya_aqc_receive_stream_cleanup(&uni_recv_stream);
-    EXPECT("memberb: cleanup uni recv stream", err);
-
-    printf("memberb: deleting AQC bidi channel\n");
-    err = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_recv);
-    EXPECT("memberb: deleting AQC bidi channel", err);
-
-    printf("memberb: cleaning up AQC bidi channel\n");
-    err = aranya_aqc_bidi_channel_cleanup(&bidi_recv);
-    EXPECT("memberb: cleaning up AQC bidi channel", err);
-
-    printf("memberb: deleting AQC uni channel\n");
-    err = aranya_aqc_delete_send_uni_channel(ctx->client, &uni_send);
-    EXPECT("memberb: deleting AQC uni channel", err);
-
-    printf("memberb: cleaning up AQC uni channel\n");
-    err = aranya_aqc_send_channel_cleanup(&uni_send);
-    EXPECT("memberb: cleaning up AQC uni channel", err);
-
-exit:
-    return NULL;
-}
-
-// Run the AQC example.
-AranyaError run_aqc_example(Team* t) {
-    AranyaError err       = ARANYA_ERROR_OTHER;
-    AranyaLabelId* labels = NULL;
-
-    Client* admin = &t->clients.admin;
-    Client* operator= & t->clients.operator;
-    Client* membera = &t->clients.membera;
-    Client* memberb = &t->clients.memberb;
-
-    pthread_t thread1, thread2;
-    channel_context_t ctx_thread1 = {0};
-    channel_context_t ctx_thread2 = {0};
-
-    printf("running AQC demo \n");
-
-    // Create label and assign it to members
-    printf("creating labels\n");
-
-    AranyaLabelId label1_id;
-    AranyaLabelId label2_id;
-    AranyaChannelIdent idents[] = {{&membera->id, ARANYA_CHAN_OP_SEND_RECV},
-                                   {&memberb->id, ARANYA_CHAN_OP_SEND_RECV}};
-    err = aranya_create_assign_label(&operator->client, &t->id, "label1",
-                                     &label1_id, idents, 2);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        goto exit;
-    }
-
-    err = aranya_create_assign_label(&operator->client, &t->id, "label2",
-                                     &label2_id, idents, 2);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        goto exit;
-    }
-
-    sleep(1);
-
-    // Queries
-    printf("query if label exists on team \n");
-    bool exists = false;
-
-    err = aranya_query_label_exists(&membera->client, &t->id, &label1_id,
-                                    &exists);
-    EXPECT("error querying label exists", err);
-    printf("%s label exists: %s \n", t->clients_arr[MEMBERB].name,
-           exists ? "true" : "false");
-
-    char device_str[ARANYA_ID_STR_LEN] = {0};
-    size_t device_str_len              = sizeof(device_str);
-    err = aranya_id_to_str(&memberb->id.id, device_str, &device_str_len);
-    EXPECT("unable to convert ID to string", err);
-    printf("query labels assigned to device: %s\n", device_str);
-    // `labels_len` is intentionally set to 1 when there are 2 labels to test
-    // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
-    size_t labels_len = 1;
-    labels            = calloc(labels_len, sizeof(AranyaLabelId));
-    if (labels == NULL) {
-        abort();
-    }
-    err = aranya_query_device_label_assignments(
-        &operator->client, &t->id, &memberb->id, labels, &labels_len);
-    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-        printf("handling buffer too small error\n");
-        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
-        err =
-            aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
-    }
-    EXPECT("error querying labels assigned to device", err);
-
-    for (size_t i = 0; i < labels_len; i++) {
-        AranyaLabelId label_id            = labels[i];
-        char label_str[ARANYA_ID_STR_LEN] = {0};
-        size_t label_str_len              = sizeof(label_str);
-        err = aranya_id_to_str(&label_id.id, label_str, &label_str_len);
-        EXPECT("unable to convert ID to string", err);
-        printf("label_id: %s at index: %zu/%zu \n", label_str, i, labels_len);
-    }
-
-    char team_str[ARANYA_ID_STR_LEN] = {0};
-    size_t team_str_len              = sizeof(team_str);
-    err = aranya_id_to_str(&t->id.id, team_str, &team_str_len);
-    EXPECT("unable to convert ID to string", err);
-
-    printf("query labels on team: %s\n", team_str);
-    // `labels_len` is intentionally set to 1 when there are 2 labels to test
-    // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
-    labels_len = 1;
-    err = aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
-    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-        printf("handling buffer too small error\n");
-        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
-        err =
-            aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
-    }
-    EXPECT("error querying labels on team", err);
-
-    for (size_t i = 0; i < labels_len; i++) {
-        AranyaLabelId label_id            = labels[i];
-        char label_str[ARANYA_ID_STR_LEN] = {0};
-        size_t label_str_len              = sizeof(label_str);
-        err = aranya_id_to_str(&label_id.id, label_str, &label_str_len);
-        EXPECT("unable to convert ID to string", err);
-        printf("label_id: %s at index: %zu/%zu \n", label_str, i, labels_len);
-    }
-
-    ctx_thread1.id     = t->id;
-    ctx_thread1.label1 = label1_id;
-    ctx_thread1.label2 = label2_id;
-    ctx_thread1.result = ARANYA_ERROR_SUCCESS;
-    ctx_thread2        = ctx_thread1;
-
-    ctx_thread1.client = &membera->client;
-    ctx_thread2.client = &memberb->client;
-
-    pthread_create(&thread1, NULL, membera_aqc_thread, &ctx_thread1);
-    pthread_create(&thread2, NULL, memberb_aqc_thread, &ctx_thread2);
-
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
-
-    // Revoke/delete label using the Operator
-    printf("revoke/delete label\n");
-    err = aranya_revoke_label(&operator->client, &t->id, &membera->id,
-                              &label1_id);
-    EXPECT("error revoking label from membera", err);
-    err = aranya_revoke_label(&operator->client, &t->id, &memberb->id,
-                              &label1_id);
-    EXPECT("error revoking label from memberb", err);
-    err = aranya_delete_label(&admin->client, &t->id, &label1_id);
-    EXPECT("error deleting label", err);
-
-exit:
-    free(labels);
-    return err;
-}
 
 int main(int argc, char* argv[]) {
     Team team       = {0};
