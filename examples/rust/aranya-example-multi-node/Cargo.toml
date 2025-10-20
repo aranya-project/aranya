@@ -14,7 +14,7 @@ workspace = true
 [features]
 default = []
 
-aqc = ["aranya-client/aqc", "aranya-client/experimental"]
+afc = ["aranya-client/afc", "aranya-client/experimental"]
 
 # Enable debugging.
 debug = []
@@ -44,35 +44,35 @@ test-log = { workspace = true }
 [[bin]]
 name = "aranya-example-multi-node"
 path = "src/bin/main.rs"
-required-features = ["aqc"]
+required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-multi-node-owner"
 path = "src/owner/main.rs"
-required-features = ["aqc"]
+required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-multi-node-admin"
 path = "src/admin/main.rs"
-required-features = ["aqc"]
+required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-multi-node-operator"
 path = "src/operator/main.rs"
-required-features = ["aqc"]
+required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-multi-node-membera"
 path = "src/membera/main.rs"
-required-features = ["aqc"]
+required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-multi-node-memberb"
 path = "src/memberb/main.rs"
-required-features = ["aqc"]
+required-features = ["afc"]
 test = false

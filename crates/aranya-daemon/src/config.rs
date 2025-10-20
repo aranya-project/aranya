@@ -103,12 +103,6 @@ pub struct Config {
     #[serde(deserialize_with = "non_empty_path")]
     pub config_dir: PathBuf,
 
-    /// AQC configuration.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    #[serde(default)]
-    pub aqc: Toggle<AqcConfig>,
-
     /// AFC configuration.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -202,13 +196,6 @@ pub struct SyncConfig {
     pub quic: Toggle<QuicSyncConfig>,
 }
 
-/// AQC configuration.
-#[cfg(feature = "aqc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AqcConfig {}
-
 /// AFC configuration.
 #[cfg(feature = "afc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -268,8 +255,6 @@ mod tests {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                 }),
             },
-            #[cfg(feature = "aqc")]
-            aqc: Toggle::Enabled(AqcConfig {}),
             #[cfg(feature = "afc")]
             afc: Toggle::Enabled(AfcConfig {
                 shm_path: "/afc\0"

@@ -15,7 +15,6 @@ workspace = true
 default = []
 
 afc = ["aranya-client/afc", "aranya-client/preview"]
-aqc = ["aranya-client/aqc", "aranya-client/experimental"]
 
 # Enable debugging.
 debug = []
@@ -39,5 +38,5 @@ tracing-subscriber = { workspace = true }
 [[bin]]
 name = "aranya-example"
 path = "src/main.rs"
-required-features = ["afc", "aqc"]
+required-features = ["afc"]
 test = false

@@ -196,22 +196,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aranya-aqc-util"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5132b6f959728d48d43bb44d7374d5e64a70dc4c6ab2308af69b4a70682bcb86"
-dependencies = [
- "aranya-crypto",
- "aranya-policy-vm",
- "buggy",
- "postcard",
- "serde",
- "spin 0.10.0",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
 name = "aranya-capi-codegen"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -351,7 +335,6 @@ version = "3.0.0"
 dependencies = [
  "anyhow",
  "aranya-afc-util",
- "aranya-aqc-util",
  "aranya-crypto",
  "aranya-crypto-ffi",
  "aranya-daemon-api",

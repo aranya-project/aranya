@@ -11,7 +11,6 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel,
     client::{ChanOp, KeyBundle, NetIdentifier, Role},
     AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig, CreateTeamQuicSyncConfig,
     DeviceId, Error,
@@ -386,7 +385,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     );
 
     info!("demo aqc functionality");
-    info!("creating aqc label");
+    info!("creating label");
     let label3 = operator.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
 

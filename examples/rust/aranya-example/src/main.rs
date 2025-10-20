@@ -400,7 +400,7 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     info!("demo aqc functionality");
-    info!("creating aqc label");
+    info!("creating label");
     let label3 = operator_team.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");

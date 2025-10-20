@@ -28,8 +28,6 @@ afc = ["aranya-client/afc"]
 
 # Experimental features
 experimental = ["aranya-client/experimental"]
-# Aranya QUIC channels
-aqc = ["aranya-client/aqc"]
 
 
 [dependencies]

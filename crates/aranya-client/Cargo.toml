@@ -26,8 +26,6 @@ afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 
 # Experimental features
 experimental = ["aranya-daemon-api/experimental"]
-# Aranya QUIC channels
-aqc = ["aranya-daemon-api/aqc"]
 
 
 [dependencies]
@@ -52,7 +50,7 @@ tracing = { workspace = true }
 
 
 [dev-dependencies]
-aranya-daemon = { path = "../aranya-daemon", features = ["aqc", "afc", "experimental", "preview"] }
+aranya-daemon = { path = "../aranya-daemon", features = ["afc", "experimental", "preview"] }
 
 backon = { workspace = true }
 serial_test = { workspace = true }

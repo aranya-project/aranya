@@ -102,9 +102,9 @@ async fn main() -> Result<()> {
     info!("admin: detected that owner has assigned admin role");
 
     // Create label.
-    info!("admin: creating aqc label");
+    info!("admin: creating label");
     let _label1 = team.create_label(text!("label1")).await?;
-    info!("admin: created aqc label");
+    info!("admin: created label");
 
     info!("admin: complete");
 

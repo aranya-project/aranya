@@ -102,7 +102,7 @@ cargo build --bin aranya-daemon --release
 
 ### Key Components
 
-- **AQC (Aranya Quick Channels)**: Fast encrypted communication
+- **AFC (Aranya Fast Channels)**: Fast encrypted communication
   channels
 - **Sync System**: Peer-to-peer state synchronization
   (`crates/aranya-daemon/src/sync/`)

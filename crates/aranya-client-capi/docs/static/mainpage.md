@@ -17,8 +17,8 @@ Before attempting to use this API, verify that you are using a matching version 
 - `aranya_add_device_to_team()` - Add a device to the Aranya team
 - `aranya_add_sync_peer()` - Add peer to sync with
 - `aranya_aqc_assign_net_identifier()` - Assign an AQC network identifier to a device
-- `aranya_create_label()` - Create a new AQC label
-- `aranya_assign_label()` - Assign an AQC label to a device
+- `aranya_create_label()` - Create a new label
+- `aranya_assign_label()` - Assign a label to a device
 - `aranya_aqc_create_bidi_channel()` - Create a bidirectional AQC channel
 - `aranya_aqc_receive_channel()` - Receive an AQC channel
 - `aranya_aqc_bidi_create_bidi_stream()` - Create a bidirectional AQC stream
@@ -72,4 +72,3 @@ Functions suffixed with `_ext` accept an extra `struct AranyaExtError *ext_err` 
          aranya_ext_error_msg(&ext_err, buf, &len);
          // `buf` now holds the detailed error message
      }```
-
