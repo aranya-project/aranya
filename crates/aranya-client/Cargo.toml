@@ -36,11 +36,8 @@ aranya-util = { workspace = true }
 anyhow = { workspace = true }
 aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
-bytes = { workspace = true }
-futures-lite = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
-s2n-quic = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 spideroak-base58 = { workspace = true }
 tarpc = { workspace = true }
