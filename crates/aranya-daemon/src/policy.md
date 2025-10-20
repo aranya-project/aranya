@@ -89,7 +89,7 @@ enum ChanOp {
     // The device can only send data in channels with this
     // label.
     SendOnly,
-    // The device can send and receive data in channels with this
+    // The device can send or receive data in channels with this
     // label.
     SendRecv,
 }
