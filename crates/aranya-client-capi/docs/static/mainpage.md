@@ -16,14 +16,12 @@ Before attempting to use this API, verify that you are using a matching version 
 - `aranya_add_team()` - Add an Aranya team to a device
 - `aranya_add_device_to_team()` - Add a device to the Aranya team
 - `aranya_add_sync_peer()` - Add peer to sync with
-- `aranya_aqc_assign_net_identifier()` - Assign an AQC network identifier to a device
 - `aranya_create_label()` - Create a new label
 - `aranya_assign_label()` - Assign a label to a device
-- `aranya_aqc_create_bidi_channel()` - Create a bidirectional AQC channel
-- `aranya_aqc_receive_channel()` - Receive an AQC channel
-- `aranya_aqc_bidi_create_bidi_stream()` - Create a bidirectional AQC stream
-- `aranya_aqc_bidi_stream_send()` - Send data via bidirectional stream
-- `aranya_aqc_bidi_stream_try_recv()` - Try to receive data via a bidirectional stream
+- `aranya_afc_create_uni_send_channel()` - Create a sending AFC channel
+- `aranya_afc_recv_ctrl()` - Receive an AFC channel
+- `aranya_afc_channel_seal()` - Seal data with AFC channel
+- `aranya_afc_channel_open()` - Open data with AFC channel
 
 # Object Cheat Sheet
 
@@ -41,11 +39,11 @@ Objects for creating an Aranya client and Aranya team:
 - `AranyaSyncPeerConfig`
 - `AranyaSyncPeerConfigBuilder`
 
-Objects for creating AQC (Aranya QUIC) channels and sending/receiving data:
-- `AranyaAqcConfig`
-- `AranyaAqcPeerChannel`
-- `AranyaAqcBidiChannel`
-- `AranyaAqcBidiStream`
+AFC related types:
+- `AranyaAfcSendChannel`
+- `AranyaAfcReceiveChannel`
+- `AranyaAfcCtrlMsg`
+- `AranyaAfcSeq`
 
 # Extended‐error (_ext) Variants
 Functions suffixed with `_ext` accept an extra `struct AranyaExtError *ext_err` parameter for extended error information.
