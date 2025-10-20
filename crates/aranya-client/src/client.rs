@@ -5,7 +5,6 @@ use std::{
     io,
     net::SocketAddr,
     path::Path,
-    str::FromStr,
 };
 
 use anyhow::Context as _;
@@ -143,24 +142,6 @@ impl KeyBundle {
     /// Return public encryption key bytes.
     pub fn encryption(&self) -> &[u8] {
         &self.0.encryption
-    }
-}
-
-/// A device's network identifier.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub(crate) api::NetIdentifier);
-
-impl FromStr for NetIdentifier {
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        Ok(Self(api::NetIdentifier(s.to_string().try_into()?)))
-    }
-
-    type Err = anyhow::Error;
-}
-
-impl Display for NetIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.0, f)
     }
 }
 
@@ -451,7 +432,6 @@ impl Client {
 /// - assigning/revoking device roles.
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
-/// - assigning network identifiers to devices.
 #[derive(Debug)]
 pub struct Team<'a> {
     client: &'a Client,
