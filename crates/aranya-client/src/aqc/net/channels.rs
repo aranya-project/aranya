@@ -1,13 +1,12 @@
 use core::task::{Context, Poll, Waker};
 
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
 
 use super::{AqcChannelId, TryReceiveError};
-use crate::{
-    aqc::api::{BidiChannelId, UniChannelId},
-    error::AqcError,
-};
+use crate::error::AqcError;
+
 mod s2n {
     pub use s2n_quic::{
         connection::Handle,

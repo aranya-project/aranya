@@ -7,7 +7,7 @@ mod api;
 mod crypto;
 mod net;
 
-pub use api::{AqcChannels, BidiChannelId, UniChannelId};
+pub use api::AqcChannels;
 pub(super) use net::AqcClient;
 pub use net::{
     channels::{

@@ -9,7 +9,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use aranya_crypto::aqc::{BidiChannelId as AqcBidiChannelId, UniChannelId as AqcUniChannelId};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
@@ -38,10 +38,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, instrument, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
-use crate::{
-    aqc::api::{BidiChannelId, UniChannelId},
-    error::{aranya_error, AqcError, IpcError},
-};
+use crate::error::{aranya_error, AqcError, IpcError};
 
 pub mod channels;
 
@@ -195,7 +192,7 @@ impl AqcClient {
         label_id: LabelId,
         psks: AqcUniPsks,
     ) -> Result<channels::AqcSendChannel, AqcError> {
-        let channel_id = AqcUniChannelId::from(*psks.channel_id());
+        let channel_id = UniChannelId::from(*psks.channel_id());
         let mut conn = self
             .client_state
             .lock()
@@ -205,7 +202,7 @@ impl AqcClient {
         conn.keep_alive(true)?;
         Ok(channels::AqcSendChannel::new(
             label_id,
-            UniChannelId { __id: channel_id },
+            channel_id,
             conn.handle(),
         ))
     }
@@ -217,7 +214,7 @@ impl AqcClient {
         label_id: LabelId,
         psks: AqcBidiPsks,
     ) -> Result<channels::AqcBidiChannel, AqcError> {
-        let channel_id = AqcBidiChannelId::from(*psks.channel_id());
+        let channel_id = BidiChannelId::from(*psks.channel_id());
         let mut conn = self
             .client_state
             .lock()
@@ -225,11 +222,7 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Bidi(psks))
             .await?;
         conn.keep_alive(true)?;
-        Ok(channels::AqcBidiChannel::new(
-            label_id,
-            BidiChannelId { __id: channel_id },
-            conn,
-        ))
+        Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
 
     /// Receive the next available channel.
@@ -405,9 +398,7 @@ impl AqcClient {
         self.server_keys.load_psks(psks.clone());
         match psks {
             AqcPsks::Bidi(psks) => {
-                let channel_id = AqcChannelId::Bidi(BidiChannelId {
-                    __id: (*psks.channel_id()).into(),
-                });
+                let channel_id = AqcChannelId::Bidi((*psks.channel_id()).into());
                 for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
@@ -420,9 +411,7 @@ impl AqcClient {
                 }
             }
             AqcPsks::Uni(psks) => {
-                let channel_id = AqcChannelId::Uni(UniChannelId {
-                    __id: (*psks.channel_id()).into(),
-                });
+                let channel_id = AqcChannelId::Uni((*psks.channel_id()).into());
                 for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(

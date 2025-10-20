@@ -529,22 +529,20 @@ pub struct AqcBidiChannelId {
 }
 
 #[cfg(feature = "aqc")]
-impl From<aqc::BidiChannelId> for AqcBidiChannelId {
-    fn from(value: aqc::BidiChannelId) -> Self {
+impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
+    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.__id.into(),
+                bytes: value.into(),
             },
         }
     }
 }
 
 #[cfg(feature = "aqc")]
-impl From<&AqcBidiChannelId> for aqc::BidiChannelId {
+impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
     fn from(value: &AqcBidiChannelId) -> Self {
-        Self {
-            __id: value.id.bytes.into(),
-        }
+        value.id.bytes.into()
     }
 }
 
@@ -557,22 +555,20 @@ pub struct AqcUniChannelId {
 }
 
 #[cfg(feature = "aqc")]
-impl From<aqc::UniChannelId> for AqcUniChannelId {
-    fn from(value: aqc::UniChannelId) -> Self {
+impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
+    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.__id.into(),
+                bytes: value.into(),
             },
         }
     }
 }
 
 #[cfg(feature = "aqc")]
-impl From<&AqcUniChannelId> for aqc::UniChannelId {
+impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
     fn from(value: &AqcUniChannelId) -> Self {
-        Self {
-            __id: value.id.bytes.into(),
-        }
+        value.id.bytes.into()
     }
 }
 
@@ -1849,33 +1845,6 @@ pub unsafe fn aqc_create_uni_channel(
 
     AqcSendChannel::init(channel, chan);
     Ok(())
-}
-
-/// Returns the [`AqcBidiChannelId`] for the associated [`AqcBidiChannel`].
-///
-/// @param[in]  channel the AQC channel object [`AqcBidiChannel`].
-/// @param[out] __output the corresponding channel ID [`AqcBidiChannelId`].
-#[cfg(feature = "aqc")]
-pub fn aqc_bidi_channel_get_id(channel: &AqcBidiChannel) -> AqcBidiChannelId {
-    channel.aqc_id().into()
-}
-
-/// Returns the [`AqcUniChannelId`] for the associated [`AqcSendChannel`].
-///
-/// @param[in]  channel the AQC channel object [`AqcSendChannel`].
-/// @param[out] __output the corresponding channel ID [`AqcUniChannelId`].
-#[cfg(feature = "aqc")]
-pub fn aqc_send_channel_get_id(channel: &AqcSendChannel) -> AqcUniChannelId {
-    channel.aqc_id().into()
-}
-
-/// Returns the [`AqcUniChannelId`] for the associated [`AqcReceiveChannel`].
-///
-/// @param[in]  channel the AQC channel object [`AqcReceiveChannel`].
-/// @param[out] __output the corresponding channel ID [`AqcUniChannelId`].
-#[cfg(feature = "aqc")]
-pub fn aqc_receive_channel_get_id(channel: &AqcReceiveChannel) -> AqcUniChannelId {
-    channel.aqc_id().into()
 }
 
 /// Delete a bidirectional AQC channel.
