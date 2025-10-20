@@ -17,14 +17,14 @@
 //! when their graph head changes, enabling more responsive synchronization:
 //!
 //! - **Subscriptions**: Peers can subscribe to hello notifications from other peers using
-//!   [`SyncPeers::sync_hello_subscribe`], specifying a delay between notifications and a duration
+//!   SyncPeers::sync_hello_subscribe, specifying a delay between notifications and a duration
 //!   for the subscription.
 //! - **Broadcasting**: When a graph head changes, hello notifications are broadcast to all
-//!   subscribers via [`SyncPeers::broadcast_hello`].
+//!   subscribers via SyncPeers::broadcast_hello.
 //! - **Sync on Hello**: Peers can be configured to automatically sync when they receive a hello
 //!   notification by setting `sync_on_hello` in their [`SyncPeerConfig`].
 //! - **Unsubscribe**: Peers can unsubscribe from hello notifications using
-//!   [`SyncPeers::sync_hello_unsubscribe`].
+//!   SyncPeers::sync_hello_unsubscribe.
 //!
 //! See the [`hello`] module for implementation details.
 
@@ -222,8 +222,8 @@ impl PeerCacheKey {
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 #[derive(Debug)]
 pub struct Syncer<ST> {
-    /// Aranya client paired with caches, ensuring safe lock ordering.
-    pub(crate) client_with_caches: crate::aranya::ClientWithCaches<crate::EN, crate::SP>,
+    /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
+    pub(crate) client: crate::aranya::ClientWithState<crate::EN, crate::SP>,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
     /// Receives added/removed peers.
@@ -464,18 +464,18 @@ impl<ST: SyncState> Syncer<ST> {
     /// Get peer caches for test inspection.
     #[cfg(test)]
     pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
-        self.client_with_caches.caches_for_test()
+        self.client.caches_for_test()
     }
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
     pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
-        self.client_with_caches.client()
+        self.client.client()
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
     pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
-        self.client_with_caches.client_mut()
+        self.client.client_mut()
     }
 }

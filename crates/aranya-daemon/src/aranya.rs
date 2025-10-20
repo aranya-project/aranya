@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, fmt, ops::Deref, sync::Arc};
 use aranya_runtime::{ClientState, PeerCache};
 use tokio::sync::{Mutex, MutexGuard};
 
-use crate::sync::task::PeerCacheKey;
+use crate::sync::task::{quic::HelloSubscriptions, PeerCacheKey};
 
 /// Thread-safe wrapper for an Aranya client.
 pub struct Client<EN, SP> {
@@ -51,19 +51,28 @@ impl<EN, SP> Deref for Client<EN, SP> {
 /// for the server and state it will reduce the efficiency of the syncer.
 pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
-/// Wrapper that pairs an Aranya client with peer caches.
+/// Wrapper that pairs an Aranya client with peer caches and hello subscriptions.
 ///
 /// Ensures safe lock ordering by providing a method that locks both in the correct order.
 /// The client must always be locked before the caches to prevent deadlocks.
-pub(crate) struct ClientWithCaches<EN, SP> {
+pub(crate) struct ClientWithState<EN, SP> {
     client: Client<EN, SP>,
     caches: PeerCacheMap,
+    hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
 }
 
-impl<EN, SP> ClientWithCaches<EN, SP> {
-    /// Creates a new `ClientWithCaches`.
-    pub fn new(client: Client<EN, SP>, caches: PeerCacheMap) -> Self {
-        Self { client, caches }
+impl<EN, SP> ClientWithState<EN, SP> {
+    /// Creates a new `ClientWithState`.
+    pub fn new(
+        client: Client<EN, SP>,
+        caches: PeerCacheMap,
+        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    ) -> Self {
+        Self {
+            client,
+            caches,
+            hello_subscriptions,
+        }
     }
 
     /// Locks both the client and caches in the correct order.
@@ -88,6 +97,13 @@ impl<EN, SP> ClientWithCaches<EN, SP> {
         &self.client
     }
 
+    /// Returns a reference to the hello subscriptions.
+    ///
+    /// Use this when you need to access or modify hello subscriptions.
+    pub fn hello_subscriptions(&self) -> &Arc<Mutex<HelloSubscriptions>> {
+        &self.hello_subscriptions
+    }
+
     /// Returns a mutable reference to the underlying client.
     ///
     /// Use this when you need mutable access to the client alone without locking the caches.
@@ -105,17 +121,18 @@ impl<EN, SP> ClientWithCaches<EN, SP> {
     }
 }
 
-impl<EN, SP> fmt::Debug for ClientWithCaches<EN, SP> {
+impl<EN, SP> fmt::Debug for ClientWithState<EN, SP> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ClientWithCaches").finish_non_exhaustive()
+        f.debug_struct("ClientWithState").finish_non_exhaustive()
     }
 }
 
-impl<EN, SP> Clone for ClientWithCaches<EN, SP> {
+impl<EN, SP> Clone for ClientWithState<EN, SP> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
             caches: Arc::clone(&self.caches),
+            hello_subscriptions: Arc::clone(&self.hello_subscriptions),
         }
     }
 }

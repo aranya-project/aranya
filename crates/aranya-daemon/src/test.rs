@@ -43,7 +43,7 @@ use tokio::{
 use crate::{
     actions::Actions,
     api::EffectReceiver,
-    aranya::{self, ClientWithCaches, PeerCacheMap},
+    aranya::{self, ClientWithState, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
@@ -252,23 +252,26 @@ impl TestCtx {
 
             let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
                 let (send_effects, effect_recv) = mpsc::channel(1);
-                let client_with_caches_for_syncer =
-                    ClientWithCaches::new(client.clone(), caches.clone());
+                let client_with_state_for_syncer = ClientWithState::new(
+                    client.clone(),
+                    caches.clone(),
+                    hello_subscriptions.clone(),
+                );
                 let (syncer, sync_peers, conn_map, conn_rx) = TestSyncer::new(
-                    client_with_caches_for_syncer,
+                    client_with_state_for_syncer,
                     send_effects,
                     InvalidGraphs::default(),
                     psk_store.clone(),
                     Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                    hello_subscriptions.clone(),
                 )?;
 
                 (syncer, sync_peers, conn_map, conn_rx, effect_recv)
             };
 
-            let client_with_caches = ClientWithCaches::new(client.clone(), caches.clone());
+            let client_with_state =
+                ClientWithState::new(client.clone(), caches.clone(), hello_subscriptions.clone());
             let server: TestServer = TestServer::new(
-                client_with_caches,
+                client_with_state,
                 &local_addr,
                 psk_store.clone(),
                 conn_map,

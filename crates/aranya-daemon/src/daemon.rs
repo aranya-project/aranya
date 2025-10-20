@@ -29,7 +29,7 @@ use crate::afc::Afc;
 use crate::{actions::Actions, aqc::Aqc};
 use crate::{
     api::{ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
-    aranya::{self, ClientWithCaches, PeerCacheMap},
+    aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
@@ -376,21 +376,24 @@ impl Daemon {
         let hello_subscriptions = Arc::default();
 
         // Initialize the syncer
-        let client_with_caches_for_syncer =
-            ClientWithCaches::new(client.clone(), Arc::clone(&caches));
+        let client_with_state_for_syncer = ClientWithState::new(
+            client.clone(),
+            Arc::clone(&caches),
+            Arc::clone(&hello_subscriptions),
+        );
         let (mut syncer, peers, conns, conn_rx) = Syncer::new(
-            client_with_caches_for_syncer,
+            client_with_state_for_syncer,
             send_effects,
             invalid_graphs,
             Arc::clone(&psk_store),
             server_addr,
-            Arc::clone(&hello_subscriptions),
         )?;
 
         info!(addr = %server_addr, "starting QUIC sync server");
-        let client_with_caches = ClientWithCaches::new(client.clone(), caches);
+        let client_with_state =
+            ClientWithState::new(client.clone(), caches, Arc::clone(&hello_subscriptions));
         let server = SyncServer::new(
-            client_with_caches,
+            client_with_state,
             &server_addr,
             psk_store,
             conns,
