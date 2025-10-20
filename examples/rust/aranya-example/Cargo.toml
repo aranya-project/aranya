@@ -22,13 +22,9 @@ debug = []
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
-aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
 backon = { workspace = true }
-buggy = { workspace = true }
-bytes = { workspace = true }
-futures-util = { workspace = true }
 rustix = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "sync"] }

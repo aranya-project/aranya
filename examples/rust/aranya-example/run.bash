@@ -17,7 +17,7 @@ cargo build \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-example \
-    --features afc,aqc \
+    --features afc \
     --locked
 
 echo "Building aranya-daemon..."
@@ -26,7 +26,7 @@ cargo build \
     --manifest-path Cargo.toml \
     --package aranya-daemon \
     --bin aranya-daemon \
-    --features experimental,aqc,preview,afc
+    --features experimental,preview,afc
 
 daemon="${current_dir}/target/release/aranya-daemon"
 example="${current_dir}/target/release/aranya-example"
