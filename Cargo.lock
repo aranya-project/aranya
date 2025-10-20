@@ -443,7 +443,6 @@ dependencies = [
  "aranya-daemon-api",
  "aranya-util",
  "backon",
- "bytes",
  "clap",
  "postcard",
  "rustix 1.1.2",

@@ -40,15 +40,10 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("admin: initializing client");
-    let client = (|| {
-        Client::builder()
-            .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&env.admin.aqc_addr)
-            .connect()
-    })
-    .retry(ExponentialBuilder::default())
-    .await
-    .expect("expected to initialize client");
+    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
+        .retry(ExponentialBuilder::default())
+        .await
+        .expect("expected to initialize client");
     info!("admin: initialized client");
 
     // Get team info from owner.

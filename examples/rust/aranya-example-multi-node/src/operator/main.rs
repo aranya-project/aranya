@@ -1,10 +1,10 @@
 //! Operator device.
 
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{
-    client::{ChanOp, NetIdentifier, Role},
+    client::{ChanOp, Role},
     AddTeamConfig, AddTeamQuicSyncConfig, Client, LabelId, SyncPeerConfig,
 };
 use aranya_example_multi_node::{
@@ -42,15 +42,10 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("operator: initializing client");
-    let client = (|| {
-        Client::builder()
-            .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&env.operator.aqc_addr)
-            .connect()
-    })
-    .retry(ExponentialBuilder::default())
-    .await
-    .expect("expected to initialize client");
+    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
+        .retry(ExponentialBuilder::default())
+        .await
+        .expect("expected to initialize client");
     info!("operator: initialized client");
 
     // Get team info from owner.
@@ -143,27 +138,6 @@ async fn main() -> Result<()> {
             (info2.device_id, info1.device_id)
         }
     };
-
-    // Assign network identifiers for AQC.
-    info!("operator: assigning network identifier to membera");
-    team.assign_aqc_net_identifier(
-        membera,
-        NetIdentifier::from_str(env.membera.aqc_addr.to_string().as_str())
-            .expect("expected net identifier"),
-    )
-    .await
-    .expect("expected to assign net identifier");
-    info!("operator: assigned network identifier to membera");
-
-    info!("operator: assigning network identifier to memberb");
-    team.assign_aqc_net_identifier(
-        memberb,
-        NetIdentifier::from_str(env.memberb.aqc_addr.to_string().as_str())
-            .expect("expected net identifier"),
-    )
-    .await
-    .expect("expected to assign net identifier");
-    info!("operator: assigned network identifier to membera");
 
     // Assign label to members.
     let op = ChanOp::SendRecv;
