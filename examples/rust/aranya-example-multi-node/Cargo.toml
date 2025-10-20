@@ -14,7 +14,7 @@ workspace = true
 [features]
 default = []
 
-afc = ["aranya-client/afc", "aranya-client/experimental"]
+afc = ["aranya-client/afc", "aranya-client/preview"]
 
 # Enable debugging.
 debug = []
