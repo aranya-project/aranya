@@ -165,7 +165,7 @@ impl Channels {
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(SendChannel, CtrlMsg)> {
-        let (ctrl, local_channel_id, channel_id) = self
+        let info = self
             .daemon
             .create_afc_uni_send_channel(
                 context::current(),
@@ -179,16 +179,19 @@ impl Channels {
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id: ChannelId { __id: channel_id },
-            local_channel_id,
+            channel_id: ChannelId {
+                __id: info.channel_id,
+            },
+            local_channel_id: info.local_channel_id,
             label_id,
+            peer_id,
         };
-        Ok((chan, CtrlMsg(ctrl)))
+        Ok((chan, CtrlMsg(info.ctrl)))
     }
 
     /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
-        let (label_id, local_channel_id, channel_id) = self
+        let info = self
             .daemon
             .receive_afc_ctrl(context::current(), team_id.__id, ctrl.0)
             .await
@@ -197,9 +200,14 @@ impl Channels {
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id: ChannelId { __id: channel_id },
-            local_channel_id,
-            label_id: LabelId { __id: label_id },
+            channel_id: ChannelId {
+                __id: info.channel_id,
+            },
+            local_channel_id: info.local_channel_id,
+            label_id: LabelId {
+                __id: info.label_id,
+            },
+            peer_id: DeviceId { __id: info.peer_id },
         })
     }
 }
@@ -212,6 +220,7 @@ pub struct SendChannel {
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    peer_id: DeviceId,
 }
 
 impl SendChannel {
@@ -223,6 +232,11 @@ impl SendChannel {
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
         self.label_id
+    }
+
+    /// The device ID of the user on the other side of the channel.
+    pub fn peer_id(&self) -> DeviceId {
+        self.peer_id
     }
 
     /// Encrypts and authenticates `plaintext` for a channel.
@@ -267,6 +281,7 @@ pub struct ReceiveChannel {
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    peer_id: DeviceId,
 }
 
 impl ReceiveChannel {
@@ -278,6 +293,11 @@ impl ReceiveChannel {
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
         self.label_id
+    }
+
+    /// The device ID of the user on the other side of the channel.
+    pub fn peer_id(&self) -> DeviceId {
+        self.peer_id
     }
 
     /// Decrypts and authenticates `ciphertext` received from

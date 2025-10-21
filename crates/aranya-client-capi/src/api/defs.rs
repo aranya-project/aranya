@@ -1480,13 +1480,13 @@ pub unsafe fn query_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AfcReceiveChannel = Safe<afc::ReceiveChannel>;
 
 /// An AFC Control Message, used to create the other end of a channel.
