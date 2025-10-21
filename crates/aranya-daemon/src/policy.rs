@@ -39,12 +39,6 @@ pub enum Effect {
     AdminRevoked(AdminRevoked),
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
-    AqcBidiChannelCreated(AqcBidiChannelCreated),
-    AqcBidiChannelReceived(AqcBidiChannelReceived),
-    AqcNetworkNameSet(AqcNetworkNameSet),
-    AqcNetworkNameUnset(AqcNetworkNameUnset),
-    AqcUniChannelCreated(AqcUniChannelCreated),
-    AqcUniChannelReceived(AqcUniChannelReceived),
     LabelAssigned(LabelAssigned),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
@@ -57,8 +51,6 @@ pub enum Effect {
     OwnerRevoked(OwnerRevoked),
     QueriedLabel(QueriedLabel),
     QueriedLabelAssignment(QueriedLabelAssignment),
-    QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
-    QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
@@ -96,71 +88,6 @@ pub struct AfcUniChannelReceived {
     pub peer_enc_key_id: BaseId,
     pub label_id: BaseId,
     pub encap: Vec<u8>,
-}
-/// AqcBidiChannelCreated policy effect.
-#[effect]
-pub struct AqcBidiChannelCreated {
-    pub channel_id: BaseId,
-    pub parent_cmd_id: BaseId,
-    pub author_id: BaseId,
-    pub author_enc_key_id: BaseId,
-    pub peer_id: BaseId,
-    pub peer_enc_pk: Vec<u8>,
-    pub label_id: BaseId,
-    pub author_secrets_id: BaseId,
-    pub psk_length_in_bytes: i64,
-}
-/// AqcBidiChannelReceived policy effect.
-#[effect]
-pub struct AqcBidiChannelReceived {
-    pub channel_id: BaseId,
-    pub parent_cmd_id: BaseId,
-    pub author_id: BaseId,
-    pub author_enc_pk: Vec<u8>,
-    pub peer_id: BaseId,
-    pub peer_enc_key_id: BaseId,
-    pub label_id: BaseId,
-    pub encap: Vec<u8>,
-    pub psk_length_in_bytes: i64,
-}
-/// AqcNetworkNameSet policy effect.
-#[effect]
-pub struct AqcNetworkNameSet {
-    pub device_id: BaseId,
-    pub net_identifier: Text,
-}
-/// AqcNetworkNameUnset policy effect.
-#[effect]
-pub struct AqcNetworkNameUnset {
-    pub device_id: BaseId,
-}
-/// AqcUniChannelCreated policy effect.
-#[effect]
-pub struct AqcUniChannelCreated {
-    pub channel_id: BaseId,
-    pub parent_cmd_id: BaseId,
-    pub author_id: BaseId,
-    pub sender_id: BaseId,
-    pub receiver_id: BaseId,
-    pub author_enc_key_id: BaseId,
-    pub peer_enc_pk: Vec<u8>,
-    pub label_id: BaseId,
-    pub author_secrets_id: BaseId,
-    pub psk_length_in_bytes: i64,
-}
-/// AqcUniChannelReceived policy effect.
-#[effect]
-pub struct AqcUniChannelReceived {
-    pub channel_id: BaseId,
-    pub parent_cmd_id: BaseId,
-    pub author_id: BaseId,
-    pub sender_id: BaseId,
-    pub receiver_id: BaseId,
-    pub author_enc_pk: Vec<u8>,
-    pub peer_enc_key_id: BaseId,
-    pub label_id: BaseId,
-    pub encap: Vec<u8>,
-    pub psk_length_in_bytes: i64,
 }
 /// LabelAssigned policy effect.
 #[effect]
@@ -240,17 +167,6 @@ pub struct QueriedLabelAssignment {
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
-/// QueryAqcNetIdentifierResult policy effect.
-#[effect]
-pub struct QueryAqcNetIdentifierResult {
-    pub net_identifier: Text,
-}
-/// QueryAqcNetworkNamesOutput policy effect.
-#[effect]
-pub struct QueryAqcNetworkNamesOutput {
-    pub net_identifier: Text,
-    pub device_id: BaseId,
-}
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
 pub struct QueryDeviceKeyBundleResult {
@@ -296,23 +212,6 @@ pub trait ActorExt {
     fn remove_member(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: BaseId, role: Role) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: BaseId, role: Role) -> Result<(), ClientError>;
-    fn set_aqc_network_name(
-        &mut self,
-        device_id: BaseId,
-        net_identifier: Text,
-    ) -> Result<(), ClientError>;
-    fn unset_aqc_network_name(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn create_aqc_bidi_channel(
-        &mut self,
-        peer_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn create_aqc_uni_channel(
-        &mut self,
-        sender_id: BaseId,
-        receiver_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
         &mut self,
         receiver_id: BaseId,
@@ -337,6 +236,4 @@ pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_aqc_net_identifier(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
 }

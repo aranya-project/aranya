@@ -5,7 +5,6 @@ use std::{
     io,
     net::SocketAddr,
     path::Path,
-    str::FromStr,
 };
 
 use anyhow::Context as _;
@@ -30,8 +29,6 @@ use {
     std::sync::{Arc, Mutex},
 };
 
-#[cfg(feature = "aqc")]
-use crate::aqc::{AqcChannels, AqcClient};
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
@@ -89,7 +86,7 @@ pub enum ChanOp {
     /// The device can only send data in channels with this
     /// label.
     SendOnly,
-    /// The device can send and receive data in channels with this
+    /// The device can send or receive data in channels with this
     /// label.
     SendRecv,
 }
@@ -148,24 +145,6 @@ impl KeyBundle {
     }
 }
 
-/// A device's network identifier.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub(crate) api::NetIdentifier);
-
-impl FromStr for NetIdentifier {
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        Ok(Self(api::NetIdentifier(s.to_string().try_into()?)))
-    }
-
-    type Err = anyhow::Error;
-}
-
-impl Display for NetIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.0, f)
-    }
-}
-
 /// List of device IDs.
 #[derive(Debug)]
 pub struct Devices {
@@ -208,9 +187,6 @@ pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
     daemon_uds_path: Option<&'a Path>,
-    // AQC address.
-    #[cfg(feature = "aqc")]
-    aqc_server_addr: Option<&'a Addr>,
 }
 
 impl ClientBuilder<'_> {
@@ -229,7 +205,6 @@ impl ClientBuilder<'_> {
     /// # async fn main() -> anyhow::Result<()> {
     /// let client = Client::builder()
     ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
-    ///     // .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
     ///     .connect()
     ///     .await?;
     /// #    Ok(())
@@ -296,20 +271,6 @@ impl ClientBuilder<'_> {
             }
             debug!(client = ?want, daemon = ?got, "versions");
 
-            #[cfg(feature = "aqc")]
-            let aqc = if let Some(aqc_addr) = self.aqc_server_addr {
-                let aqc_server_addr = aqc_addr
-                    .lookup()
-                    .await
-                    .context("unable to resolve AQC server address")
-                    .map_err(error::other)?
-                    .next()
-                    .expect("expected AQC server address");
-                Some(AqcClient::new(aqc_server_addr, daemon.clone()).await?)
-            } else {
-                None
-            };
-
             #[cfg(feature = "afc")]
             let afc_keys = {
                 let afc_shm_info = daemon
@@ -323,8 +284,6 @@ impl ClientBuilder<'_> {
 
             let client = Client {
                 daemon,
-                #[cfg(feature = "aqc")]
-                aqc,
                 #[cfg(feature = "afc")]
                 afc_keys,
             };
@@ -346,14 +305,6 @@ impl<'a> ClientBuilder<'a> {
         self.daemon_uds_path = Some(sock);
         self
     }
-
-    /// Specifies the AQC server address.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub fn aqc_server_addr(mut self, addr: &'a Addr) -> Self {
-        self.aqc_server_addr = Some(addr);
-        self
-    }
 }
 
 /// A client for invoking actions on and processing effects from
@@ -367,9 +318,6 @@ impl<'a> ClientBuilder<'a> {
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
-    /// Support for AQC
-    #[cfg(feature = "aqc")]
-    pub(crate) aqc: Option<AqcClient>,
     /// AFC channel keys.
     #[cfg(feature = "afc")]
     afc_keys: Arc<Mutex<AfcChannelKeys>>,
@@ -468,13 +416,6 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Get access to Aranya QUIC Channels.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub fn aqc(&self) -> Option<AqcChannels<'_>> {
-        AqcChannels::new(self)
-    }
-
     /// Get access to Aranya Fast Channels.
     #[cfg(feature = "afc")]
     pub fn afc(&self) -> AfcChannels {
@@ -491,7 +432,6 @@ impl Client {
 /// - assigning/revoking device roles.
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
-/// - assigning network identifiers to devices.
 #[derive(Debug)]
 pub struct Team<'a> {
     client: &'a Client,
@@ -617,52 +557,6 @@ impl Team<'_> {
                 self.team_id.__id,
                 device_id.__id,
                 role.to_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Associate a network identifier to a device for use with AQC.
-    ///
-    /// If the address already exists for this device, it is replaced with the new address. Capable
-    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub async fn assign_aqc_net_identifier(
-        &self,
-        device_id: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .assign_aqc_net_identifier(
-                context::current(),
-                self.team_id.__id,
-                device_id.__id,
-                net_identifier.0,
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Disassociate an AQC network identifier from a device.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub async fn remove_aqc_net_identifier(
-        &self,
-        device_id: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .remove_aqc_net_identifier(
-                context::current(),
-                self.team_id.__id,
-                device_id.__id,
-                net_identifier.0,
             )
             .await
             .map_err(IpcError::new)?
@@ -796,20 +690,6 @@ impl Queries<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(Labels { data })
-    }
-
-    /// Returns the AQC network identifier assigned to the current device.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub async fn aqc_net_identifier(&self, device_id: DeviceId) -> Result<Option<NetIdentifier>> {
-        Ok(self
-            .client
-            .daemon
-            .query_aqc_net_identifier(context::current(), self.team_id.__id, device_id.__id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            .map(NetIdentifier))
     }
 
     /// Returns whether a label exists.

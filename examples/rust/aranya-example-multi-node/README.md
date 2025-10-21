@@ -25,4 +25,4 @@ Start the Aranya daemon `aranya-daemon` executable and Aranya client executable 
 `aranya-daemon --config <path to daemon config file>`
 `aranya-example-multi-node-owner --uds-sock <path to daemon's unix domain socket API>`
 
-Each node's executable will load information such as IP addresses from the environment file and perform operations via the Aranya client such as setting up the team and AQC channels.
+Each node's executable will load information such as IP addresses from the environment file and perform operations via the Aranya client such as setting up the team and AFC channels.

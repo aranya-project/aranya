@@ -30,11 +30,6 @@
     unused_qualifications
 )]
 
-#[cfg(all(feature = "aqc", not(feature = "experimental")))]
-compile_error!(
-    "AQC is currently experimental. Enable the 'experimental' feature to opt into experimental APIs."
-);
-
 pub mod actions;
 pub mod aranya;
 pub mod config;
@@ -46,7 +41,6 @@ pub mod vm_policy;
 #[cfg(feature = "afc")]
 mod afc;
 mod api;
-mod aqc;
 mod daemon;
 mod keystore;
 mod util;

@@ -47,8 +47,6 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
                     }),
                 },
-                #[cfg(feature = "aqc")]
-                aqc: Toggle::Enabled(aranya_daemon::config::AqcConfig {}),
                 #[cfg(feature = "afc")]
                 afc: Toggle::Enabled(aranya_daemon::config::AfcConfig {
                     shm_path,

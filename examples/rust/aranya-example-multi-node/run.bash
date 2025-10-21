@@ -30,7 +30,7 @@ for device in "${devices[@]}"; do
         --release \
         --manifest-path Cargo.toml \
         --bin aranya-example-multi-node-"${device}" \
-        --features aqc \
+        --features afc \
         --locked
 done
 
@@ -43,14 +43,14 @@ cargo build \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-daemon \
-    --features experimental,aqc
+    --features preview,afc
 
 echo "Building aranya-example-multi-node..."
 cargo build \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-example-multi-node \
-    --features aqc
+    --features afc
 
 echo "Running aranya-example-multi-node..."
 "${example}" "${release}" "${workspace}"

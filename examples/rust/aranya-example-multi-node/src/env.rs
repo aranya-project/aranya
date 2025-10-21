@@ -11,7 +11,7 @@ use tokio::fs;
 /// Environment variable name constants.
 const LOG_LEVEL_ENV_VAR: &str = "ARANYA_EXAMPLE";
 const ONBOARDING_PASSPHRASE_ENV_VAR: &str = "ARANYA_ONBOARDING_PASSPHRASE";
-const AQC_ADDR_ENV_VAR: &str = "ARANYA_AQC_ADDR";
+const AFC_ADDR_ENV_VAR: &str = "ARANYA_AFC_ADDR";
 const TCP_ADDR_ENV_VAR: &str = "ARANYA_TCP_ADDR";
 const SYNC_ADDR_ENV_VAR: &str = "ARANYA_SYNC_ADDR";
 
@@ -51,7 +51,7 @@ impl EnvVars {
         for device in DEVICE_LIST {
             let device = Device {
                 name: device.0.to_string(),
-                aqc_addr: env_var(&format!("ARANYA_AQC_ADDR_{}", device.0.to_uppercase()))?,
+                afc_addr: env_var(&format!("ARANYA_AFC_ADDR_{}", device.0.to_uppercase()))?,
                 tcp_addr: env_var(&format!("ARANYA_TCP_ADDR_{}", device.0.to_uppercase()))?,
                 sync_addr: env_var(&format!("ARANYA_SYNC_ADDR_{}", device.0.to_uppercase()))?,
                 role: device.1,
@@ -95,9 +95,9 @@ impl EnvVars {
             writeln!(
                 buf,
                 "export {}_{}={}",
-                AQC_ADDR_ENV_VAR,
+                AFC_ADDR_ENV_VAR,
                 device.name.to_uppercase(),
-                device.aqc_addr
+                device.afc_addr
             )?;
             writeln!(
                 buf,
@@ -125,8 +125,8 @@ impl EnvVars {
                 device.sync_addr.to_string(),
             );
             env::set_var(
-                format!("{}_{}", AQC_ADDR_ENV_VAR, device.name.to_uppercase()),
-                device.aqc_addr.to_string(),
+                format!("{}_{}", AFC_ADDR_ENV_VAR, device.name.to_uppercase()),
+                device.afc_addr.to_string(),
             );
             env::set_var(
                 format!("{}_{}", TCP_ADDR_ENV_VAR, device.name.to_uppercase()),
@@ -156,35 +156,35 @@ impl Default for EnvVars {
             passphrase: "passphrase".into(),
             owner: Device {
                 name: "owner".into(),
-                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10000)),
+                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10000)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10001)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10002)),
                 role: Role::Owner,
             },
             admin: Device {
                 name: "admin".into(),
-                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
+                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
                 role: Role::Admin,
             },
             operator: Device {
                 name: "operator".into(),
-                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
+                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
                 role: Role::Operator,
             },
             membera: Device {
                 name: "membera".into(),
-                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
+                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10011)),
                 role: Role::Member,
             },
             memberb: Device {
                 name: "memberb".into(),
-                aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10012)),
+                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10012)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10013)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10014)),
                 role: Role::Member,
@@ -198,8 +198,8 @@ impl Default for EnvVars {
 pub struct Device {
     /// Device name.
     pub name: String,
-    /// AQC address.
-    pub aqc_addr: Addr,
+    /// AFC address.
+    pub afc_addr: Addr,
     /// TCP address.
     pub tcp_addr: Addr,
     /// Sync address.

@@ -39,8 +39,6 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
                 logs_dir = {logs_dir:?}
                 config_dir = {config_dir:?}
 
-                aqc.enable = true
-
                 [afc]
                 enable = true
                 shm_path = {shm:?}

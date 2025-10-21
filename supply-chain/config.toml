@@ -326,10 +326,6 @@ criteria = "safe-to-run"
 version = "1.3.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.futures-lite]]
-version = "2.6.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.futures-task]]
 version = "0.3.31"
 criteria = "safe-to-deploy"

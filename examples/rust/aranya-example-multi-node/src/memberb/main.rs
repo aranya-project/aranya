@@ -2,14 +2,13 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
-use aranya_client::{
-    aqc::{AqcPeerChannel, AqcPeerStream},
-    AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig,
-};
+use anyhow::Result;
+use aranya_client::{afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
+    get_member_peer,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
+    tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -42,15 +41,10 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("memberb: initializing client");
-    let client = (|| {
-        Client::builder()
-            .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&env.memberb.aqc_addr)
-            .connect()
-    })
-    .retry(ExponentialBuilder::default())
-    .await
-    .expect("expected to initialize client");
+    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
+        .retry(ExponentialBuilder::default())
+        .await
+        .expect("expected to initialize client");
     info!("memberb: initialized client");
 
     // Get team info from owner.
@@ -157,39 +151,37 @@ async fn main() -> Result<()> {
     info!("memberb: removing operator sync peer");
     team.remove_sync_peer(env.operator.sync_addr).await?;
 
-    // Receive bidi channel.
-    info!("memberb: receiving AQC bidi channel");
-    let AqcPeerChannel::Bidi(mut chan) = client
-        .aqc()
-        .context("AQC is enabled")?
-        .receive_channel()
-        .await
-        .expect("expected to receive channel")
-    else {
-        bail!("expected a bidirectional channel");
-    };
-    info!("memberb: received AQC bidi channel");
+    let membera = get_member_peer(&client, team_info.team_id).await?;
 
-    // Receive bidi steam.
-    let AqcPeerStream::Bidi(mut stream) = chan
-        .receive_stream()
-        .await
-        .expect("expected to receive stream")
-    else {
-        bail!("expected a bidirectional stream");
-    };
-    info!("memberb: received bidi stream");
+    let receiver = TcpServer::bind(env.memberb.afc_addr).await?;
+    let mut sender = TcpClient::new();
 
-    // Receive data.
-    let data = stream.receive().await?.expect("expected to receive data");
-    info!("memberb: received AQC data");
+    info!("memberb: creating recv channel");
+    let ctrl = receiver.recv().await?;
+    let opener = client
+        .afc()
+        .recv_ctrl(team_info.team_id, ctrl.into_boxed_slice().into())
+        .await?;
 
-    // Send data.
-    stream.send(data).await.expect("expected to send data");
-    info!("memberb: sent AQC data");
+    info!("memberb: receiving AFC data");
+    let resp = receiver.recv().await?;
+    let mut msg_recv = vec![0u8; resp.len() - Channels::OVERHEAD];
+    opener.open(&mut msg_recv, &resp)?;
+    info!("memberb: received AFC data");
 
-    // Wait for membera to receive data before closing stream.
-    sleep(SYNC_INTERVAL).await;
+    info!("memberb: creating send channel");
+    let (sealer, ctrl) = client
+        .afc()
+        .create_uni_send_channel(team_info.team_id, membera, opener.label_id())
+        .await?;
+    sender.send(env.membera.afc_addr, ctrl.as_bytes()).await?;
+
+    info!("memberb: sending AFC data");
+    let msg_send = b"hello";
+    let mut req = vec![0u8; msg_send.len() + Channels::OVERHEAD];
+    sealer.seal(&mut req, msg_send)?;
+    sender.send(env.membera.afc_addr, &req).await?;
+    info!("memberb: sent AFC data");
 
     info!("memberb: complete");
 
