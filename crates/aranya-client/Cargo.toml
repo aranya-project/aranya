@@ -39,7 +39,6 @@ buggy = { workspace = true, features = ["std"] }
 futures-util = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-spideroak-base58 = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
@@ -48,6 +47,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 aranya-daemon = { path = "../aranya-daemon", features = ["afc", "experimental", "preview"] }
+spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
 serial_test = { workspace = true }
