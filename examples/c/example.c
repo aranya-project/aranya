@@ -142,7 +142,7 @@ AranyaError init_client(Client* c, const char* name, const char* daemon_addr);
 AranyaError init_team(Team* t);
 AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
 AranyaError run(Team* t);
-AranyaError run_afc_uni_example(Team* t);
+AranyaError run_afc_example(Team* t);
 AranyaError cleanup_team(Team* t);
 
 typedef struct AranyaChannelIdent {
@@ -669,8 +669,8 @@ AranyaError run(Team* t) {
         "\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle_len);
 
-    err = run_afc_uni_example(t);
-    EXPECT("error running afc uni example", err);
+    err = run_afc_example(t);
+    EXPECT("error running afc example", err);
 
 exit:
     free(devices);
@@ -697,8 +697,8 @@ exit:
     return err;
 }
 
-// Run the AFC unidirectional example.
-AranyaError run_afc_uni_example(Team* t) {
+// Run the AFC example.
+AranyaError run_afc_example(Team* t) {
     Client* operator= & t->clients.operator;
     Client* membera = &t->clients.membera;
     Client* memberb = &t->clients.memberb;
@@ -729,12 +729,26 @@ AranyaError run_afc_uni_example(Team* t) {
     // Create a new uni send channel, which will give back an `AranyaAfcChannel`
     // and a control message to send to the other peer (in this case, it's local
     // so there's no "transport" layer sending the ctrl_msg to Member B).
+    printf("membera: Creating an afc send channel\n");
     AranyaAfcSendChannel afc_send_channel;
     AranyaAfcCtrlMsg recv_message;
     err = aranya_afc_create_uni_send_channel(&membera->client, &t->id,
                                              &memberb->id, &label_id,
                                              &afc_send_channel, &recv_message);
     EXPECT("error creating a uni send channel for membera", err);
+
+    AranyaAfcChannelId send_id;
+    printf("membera: Getting afc send channel id\n");
+    err = aranya_afc_send_channel_get_id(&afc_send_channel, &send_id);
+    EXPECT("error getting afc send channel id", err);
+    char send_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t send_id_str_len              = sizeof(send_id_str);
+    err = aranya_id_to_str(&send_id.id, send_id_str, &send_id_str_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to convert ID to string\n");
+        return err;
+    }
+    printf("membera: afc send channel id: %s \n", send_id_str);
 
     // In production, you would get the underlying buffer from the control
     // message, and send it to the other peer via your transport of choice,
@@ -746,14 +760,29 @@ AranyaError run_afc_uni_example(Team* t) {
 
     // Note that since we created a uni send channel on Member A's side above,
     // Member B here will get a uni receive channel.
+    printf("memberb: Receiving ctrl message for afc recv channel\n");
     AranyaAfcReceiveChannel afc_recv_channel;
     err = aranya_afc_recv_ctrl(&memberb->client, &t->id, bytes_ptr, bytes_len,
                                &afc_recv_channel);
     EXPECT("error creating a channel from control message", err);
 
-    // Now we need to define some data we want to send, in this case a simple
-    // string. We need both the original data, as well as a buffer to store the
-    // resulting ciphertext, which includes some additional overhead.
+    printf("membera: Getting afc receive channel id\n");
+    AranyaAfcChannelId recv_id;
+    err = aranya_afc_receive_channel_get_id(&afc_recv_channel, &recv_id);
+    EXPECT("error getting afc recv channel id", err);
+    char recv_id_str[ARANYA_ID_STR_LEN] = {0};
+    size_t recv_id_str_len              = sizeof(recv_id_str);
+    err = aranya_id_to_str(&recv_id.id, recv_id_str, &recv_id_str_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to convert ID to string\n");
+        return err;
+    }
+    printf("membera: afc recv channel id: %s \n", recv_id_str);
+
+    // Now we need to define some data we want to send, in this case a
+    // simple string. We need both the original data, as well as a buffer to
+    // store the resulting ciphertext, which includes some additional
+    // overhead.
     const char* afc_msg   = "one way msg";
     size_t afc_msg_len    = strlen(afc_msg);
     size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
@@ -764,6 +793,7 @@ AranyaError run_afc_uni_example(Team* t) {
 
     // Use the channel to encrypt and authenticate our data, and store the
     // encrypted result in our ciphertext buffer.
+    printf("membera: Sealing afc data for memberb\n");
     err = aranya_afc_channel_seal(&afc_send_channel, (const uint8_t*)afc_msg,
                                   afc_msg_len, ciphertext, &ciphertext_len);
     EXPECT("error sealing afc message", err);
@@ -783,6 +813,7 @@ AranyaError run_afc_uni_example(Team* t) {
     // Here, we open the message and get back the original data, as well as a
     // sequence number, which allows you to reorder messages that may have been
     // received out-of-order using `aranya_afc_seq_cmp()` to compare two seq.
+    printf("memberb: Opening afc data from membera\n");
     AranyaAfcSeq seq;
     err = aranya_afc_channel_open(&afc_recv_channel, ciphertext, ciphertext_len,
                                   plaintext, &plaintext_len, &seq);
@@ -793,6 +824,7 @@ AranyaError run_afc_uni_example(Team* t) {
         EXPECT("plaintext does not match input text", ARANYA_ERROR_BUG);
     }
 
+    printf("deleting afc channels\n");
     err = aranya_afc_send_channel_delete(&membera->client, &afc_send_channel);
     EXPECT("error deleting membera's channel", err);
 

@@ -77,6 +77,7 @@ pub struct AfcUniChannelCreated {
     pub peer_enc_pk: Vec<u8>,
     pub label_id: BaseId,
     pub channel_key_id: BaseId,
+    pub encap: Vec<u8>,
 }
 /// AfcUniChannelReceived policy effect.
 #[effect]
