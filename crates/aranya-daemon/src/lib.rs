@@ -54,6 +54,7 @@ mod util;
 #[cfg(test)]
 mod test;
 
+pub use aranya_util::Addr;
 pub use daemon::*;
 pub use keystore::AranyaStore;
 

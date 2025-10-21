@@ -525,13 +525,15 @@ mod tests {
 
     use std::time::Duration;
 
-    use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::{QuicSyncConfig, SyncConfig, Toggle};
+    use crate::{
+        config::{QuicSyncConfig, SyncConfig, Toggle},
+        Addr,
+    };
 
     /// Tests running the daemon.
     #[test(tokio::test)]

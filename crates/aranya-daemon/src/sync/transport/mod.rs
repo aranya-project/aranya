@@ -2,11 +2,13 @@
 
 use std::{future::Future, time::Duration};
 
-use aranya_runtime::{Address, Engine, GraphId, Sink};
-use aranya_util::Addr;
+use aranya_runtime::{Address, GraphId};
 
 use super::Result as SyncResult;
-use crate::sync::manager::SyncManager;
+use crate::{
+    sync::{manager::SyncManager, types::SyncPeer},
+    Addr,
+};
 
 pub mod quic;
 
@@ -16,7 +18,14 @@ pub trait Transport: Sized {
     /// Syncs with the peer.
     ///
     /// Returns the number of commands that were received and successfully processed.
-    fn sync_impl<S>(
+    async fn execute_sync(
+        &self,
+        peer: &SyncPeer,
+        request: &[u8],
+        response: &mut [u8],
+    ) -> SyncResult<usize>;
+    /*
+    fn execute_sync<S>(
         syncer: &mut SyncManager<Self>,
         id: GraphId,
         sink: &mut S,
@@ -24,6 +33,7 @@ pub trait Transport: Sized {
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
+    */
 
     /// Subscribe to hello notifications from a sync peer.
     fn sync_hello_subscribe_impl(

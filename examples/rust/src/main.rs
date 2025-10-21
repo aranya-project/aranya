@@ -15,7 +15,7 @@ use aranya_client::{
     SyncPeerConfig,
 };
 use aranya_daemon_api::text;
-use aranya_util::Addr;
+use crate::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
 use bytes::Bytes;

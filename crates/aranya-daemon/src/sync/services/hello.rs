@@ -11,14 +11,16 @@ use std::{
 
 use anyhow::Context;
 use aranya_runtime::{Address, GraphId, SyncHelloType, SyncType};
-use aranya_util::Addr;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 use tracing::{debug, instrument, trace, warn};
 
-use crate::sync::{
-    manager::{SyncManager, SyncHandle},
-    transport::quic::{Error, State},
-    Result as SyncResult,
+use crate::{
+    sync::{
+        manager::{SyncHandle, SyncManager},
+        transport::quic::{Error, State},
+        Result as SyncResult,
+    },
+    Addr,
 };
 
 /// A hello subscription from a peer.

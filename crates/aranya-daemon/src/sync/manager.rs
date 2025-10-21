@@ -197,7 +197,7 @@ impl<T: Transport> SyncManager<T> {
     pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
         let mut sink = VecSink::new();
 
-        let cmd_count = T::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+        let cmd_count = T::execute_sync(self, peer.graph_id, &mut sink, &peer.addr)
             .await
             .inspect_err(|err| {
                 warn!(

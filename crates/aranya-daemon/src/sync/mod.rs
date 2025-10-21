@@ -1,10 +1,12 @@
 //! Aranya syncer for syncing Aranya graph commands.
 pub mod manager;
+pub mod protocol;
 pub mod services;
 pub mod transport;
 pub mod types;
 
 use error::SyncError;
+pub(crate) use types::PeerCacheMap;
 
 /// Possible sync related errors
 pub type Result<T> = core::result::Result<T, SyncError>;

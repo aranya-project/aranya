@@ -2,9 +2,8 @@ use std::net::Ipv4Addr;
 
 use aranya_daemon::{
     config::{Config, QuicSyncConfig, SyncConfig, Toggle},
-    Daemon,
+    Addr, Daemon,
 };
-use aranya_util::Addr;
 use divan::AllocProfiler;
 use tokio::runtime::Runtime;
 

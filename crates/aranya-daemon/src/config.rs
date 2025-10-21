@@ -8,11 +8,12 @@ use std::{
 use anyhow::{Context, Result};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::shm;
-use aranya_util::Addr;
 use serde::{
     de::{self, DeserializeOwned},
     Deserialize, Serialize,
 };
+
+use crate::Addr;
 
 mod toggle;
 pub use toggle::Toggle;

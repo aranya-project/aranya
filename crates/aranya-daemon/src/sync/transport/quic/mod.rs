@@ -13,12 +13,13 @@ mod server;
 
 use std::sync::Arc;
 
-use aranya_util::Addr;
 pub use client::Error;
 pub(crate) use client::State;
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 pub(crate) use server::Server;
+
+use crate::Addr;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";

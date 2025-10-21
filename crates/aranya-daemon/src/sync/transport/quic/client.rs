@@ -89,16 +89,14 @@ impl Transport for State {
     /// Syncs with the peer.
     ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
-    #[instrument(skip_all)]
-    async fn sync_impl<S>(
-        syncer: &mut SyncManager<Self>,
-        id: GraphId,
-        sink: &mut S,
-        peer: &Addr,
-    ) -> SyncResult<usize>
-    where
-        S: Sink<<crate::EN as Engine>::Effect> + Send,
-    {
+    async fn execute_sync(
+        &self,
+        peer: &SyncPeer,
+        request: &[u8],
+        response: &mut [u8],
+    ) -> SyncResult<usize> {
+        Ok(0)
+        /*
         // Sets the active team before starting a QUIC connection
         syncer.state.store().set_team(id.into_id().into());
 
@@ -124,6 +122,7 @@ impl Transport for State {
             .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
 
         Ok(cmd_count)
+        */
     }
 
     /// Subscribe to hello notifications from a sync peer.

@@ -347,48 +347,6 @@ where
         }
     }
 
-    /// Processes a poll message.
-    ///
-    /// Handles sync poll requests and generates sync responses.
-    #[instrument(skip_all)]
-    async fn process_poll_message(
-        request_msg: SyncRequestMessage,
-        client_with_caches: ClientWithCaches<EN, SP>,
-        peer_addr: Addr,
-        peer_server_addr: Addr,
-        active_team: &TeamId,
-    ) -> SyncResult<Box<[u8]>> {
-        let mut resp = SyncResponder::new(peer_addr);
-        let storage_id = check_request(active_team, &request_msg)?;
-
-        resp.receive(request_msg).context("sync recv failed")?;
-
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        let len = {
-            // Lock both aranya and caches in the correct order.
-            let (mut aranya, mut caches) = client_with_caches.lock_aranya_and_caches().await;
-            let key = SyncPeer::new(peer_server_addr, storage_id);
-            let cache = caches.entry(key).or_default();
-
-            resp.poll(&mut buf, aranya.provider(), cache)
-                        .or_else(|err| {
-                            if matches!(
-                                err,
-                                aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
-                            ) {
-                                warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
-                                Ok(0)
-                            } else {
-                                Err(err)
-                            }
-                        })
-                        .context("sync resp poll failed")?
-        };
-        debug!(len = len, "sync poll finished");
-        buf.truncate(len);
-        Ok(buf.into())
-    }
-
     /// Processes a hello message.
     ///
     /// Handles subscription management and hello notifications.
