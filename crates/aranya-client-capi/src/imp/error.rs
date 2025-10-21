@@ -3,8 +3,6 @@ use core::{ffi::c_char, mem::MaybeUninit};
 use aranya_capi_core::{write_c_str, ExtendedError, InvalidArg, WriteCStrError};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
-#[cfg(feature = "aqc")]
-use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
 
@@ -59,35 +57,6 @@ pub enum Error {
 impl From<afc::Error> for Error {
     fn from(value: afc::Error) -> Self {
         Self::Client(aranya_client::Error::Afc(value))
-    }
-}
-
-#[cfg(feature = "aqc")]
-impl From<AqcError> for Error {
-    fn from(value: AqcError) -> Self {
-        Self::Client(aranya_client::Error::Aqc(value))
-    }
-}
-
-#[cfg(feature = "aqc")]
-impl From<TryReceiveError<AqcError>> for Error {
-    fn from(value: TryReceiveError<AqcError>) -> Self {
-        match value {
-            TryReceiveError::Closed => Self::Closed,
-            TryReceiveError::Empty => Self::WouldBlock,
-            TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
-        }
-    }
-}
-
-#[cfg(feature = "aqc")]
-impl From<TryReceiveError<aranya_client::Error>> for Error {
-    fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
-        match value {
-            TryReceiveError::Closed => Self::Closed,
-            TryReceiveError::Empty => Self::WouldBlock,
-            TryReceiveError::Error(e) => Self::Client(e),
-        }
     }
 }
 

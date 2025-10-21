@@ -23,8 +23,6 @@ afc = ["dep:aranya-fast-channels"]
 
 # Experimental features
 experimental = []
-# Aranya QUIC channels
-aqc = ["aranya-crypto/aqc"]
 
 
 [dependencies]

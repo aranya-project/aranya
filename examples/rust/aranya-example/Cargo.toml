@@ -15,7 +15,6 @@ workspace = true
 default = []
 
 afc = ["aranya-client/afc", "aranya-client/preview"]
-aqc = ["aranya-client/aqc", "aranya-client/experimental"]
 
 # Enable debugging.
 debug = []
@@ -23,13 +22,9 @@ debug = []
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
-aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
 backon = { workspace = true }
-buggy = { workspace = true }
-bytes = { workspace = true }
-futures-util = { workspace = true }
 rustix = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "sync"] }
@@ -39,5 +34,5 @@ tracing-subscriber = { workspace = true }
 [[bin]]
 name = "aranya-example"
 path = "src/main.rs"
-required-features = ["afc", "aqc"]
+required-features = ["afc"]
 test = false

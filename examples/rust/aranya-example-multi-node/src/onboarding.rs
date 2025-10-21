@@ -64,10 +64,10 @@ impl Onboard {
     where
         T: Serialize,
     {
-        let mut stream = TcpClient::connect(peer).await?;
+        let mut stream = TcpClient::new();
         let serialized = postcard::to_allocvec::<T>(data)?;
         let ciphertext = self.encryptor.encrypt(&serialized)?;
-        stream.send(&ciphertext).await?;
+        stream.send(peer, &ciphertext).await?;
 
         Ok(())
     }

@@ -48,8 +48,6 @@ There are currently three classifications of feature sets we can build:
 
 AFC is a preview feature that can be enabled with the `afc` and `preview` feature flags.
 
-AQC is an experimental feature that can be enabled with the `aqc` and `experimental` feature flags.
-
 Rather than requiring feature flags to be manually specified with `cargo build --features ...`, `cargo make` commands are provided in [Makefile.toml](Makefile.toml) for each feature set.
 
 ## Cargo Make

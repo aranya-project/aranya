@@ -150,8 +150,6 @@ async fn test_query_functions() -> Result<()> {
 
     // TODO(nikki): device_label_assignments, label_exists, labels
 
-    // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
-
     Ok(())
 }
 

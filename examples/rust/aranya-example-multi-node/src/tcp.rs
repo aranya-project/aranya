@@ -35,28 +35,27 @@ impl TcpServer {
 }
 
 /// Simple TCP client for demo purposes.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TcpClient {
-    stream: TcpStream,
+    _priv: (),
 }
 
 impl TcpClient {
-    /// Connect to peer's TCP server.
-    pub async fn connect(peer: Addr) -> Result<Self> {
-        let stream = (|| TcpStream::connect(peer.to_socket_addrs()))
-            .retry(ExponentialBuilder::default())
-            .await
-            .with_context(|| "unable to connect to TCP server")?;
-        Ok(Self { stream })
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Send data to peer's TCP server.
-    pub async fn send(&mut self, data: &[u8]) -> Result<()> {
-        self.stream
+    pub async fn send(&mut self, peer: Addr, data: &[u8]) -> Result<()> {
+        let mut stream = (|| TcpStream::connect(peer.to_socket_addrs()))
+            .retry(ExponentialBuilder::default())
+            .await
+            .with_context(|| "unable to connect to TCP server")?;
+        stream
             .write_all(data)
             .await
             .with_context(|| "unable to send data to peer via TCP stream")?;
-        self.stream
+        stream
             .flush()
             .await
             .with_context(|| "unable to flush TCP stream")?;
