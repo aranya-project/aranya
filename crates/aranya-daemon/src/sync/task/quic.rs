@@ -136,7 +136,7 @@ impl SyncState for State {
         // TODO: spawn a task for send/recv?
         let (mut recv, mut send) = stream.split();
 
-        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.listen_addr);
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.client_addr);
 
         // send sync request.
         syncer
@@ -159,7 +159,7 @@ impl State {
     fn new(
         psk_store: Arc<PskStore>,
         conns: SharedConnectionMap,
-        listen_addr: Addr,
+        client_addr: Addr,
     ) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -175,7 +175,7 @@ impl State {
 
         let client = QuicClient::builder()
             .with_tls(provider)?
-            .with_io((listen_addr.host(), listen_addr.port()))
+            .with_io((client_addr.host(), client_addr.port()))
             .assume("can set quic client address")?
             .start()
             .map_err(Error::ClientStart)?;
@@ -195,7 +195,7 @@ impl Syncer<State> {
         send_effects: super::EffectSender,
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
-        listen_addr: Addr,
+        client_addr: Addr,
         caches: PeerCacheMap,
     ) -> SyncResult<(
         Self,
@@ -207,7 +207,7 @@ impl Syncer<State> {
         let peers = SyncPeers::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
-        let state = State::new(psk_store, conns.clone(), listen_addr)?;
+        let state = State::new(psk_store, conns.clone(), client_addr)?;
 
         Ok((
             Self {
@@ -218,7 +218,7 @@ impl Syncer<State> {
                 send_effects,
                 invalid,
                 state,
-                listen_addr,
+                client_addr,
                 caches,
             },
             peers,
