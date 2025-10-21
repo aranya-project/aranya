@@ -991,7 +991,7 @@ pub fn create_team_config_build(
 /// Sync Peer config.
 ///
 /// Use a [`SyncPeerConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 32, align = 8)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 
 /// Builder for a Sync Peer config [`SyncPeerConfig`].
@@ -1039,7 +1039,7 @@ pub fn sync_peer_config_builder_set_interval(
         );
     }
 
-    cfg.interval(interval);
+    cfg.interval(Some(interval));
     Ok(())
 }
 

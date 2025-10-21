@@ -235,7 +235,7 @@ impl State {
 impl Syncer<State> {
     /// Creates a new [`Syncer`].
     pub(crate) fn new(
-        client_with_state: ClientWithState<crate::EN, crate::SP>,
+        client: ClientWithState<crate::EN, crate::SP>,
         send_effects: super::EffectSender,
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
@@ -254,7 +254,7 @@ impl Syncer<State> {
 
         Ok((
             Self {
-                client: client_with_state,
+                client,
                 peers: HashMap::new(),
                 recv,
                 queue: DelayQueue::new(),
@@ -427,8 +427,7 @@ impl Syncer<State> {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
                 // Lock both aranya and caches in the correct order.
-                let (mut aranya, mut caches) =
-                    self.client.lock_aranya_and_caches().await;
+                let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
                 let mut trx = aranya.transaction(*id);
                 aranya
                     .add_commands(&mut trx, sink, &cmds)
@@ -454,7 +453,7 @@ impl Syncer<State> {
 #[derive_where(Debug)]
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client_with_state: ClientWithState<EN, SP>,
+    client: ClientWithState<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
     server_keys: Arc<PskStore>,
@@ -478,7 +477,7 @@ where
 
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
-        Arc::clone(self.client_with_state.hello_subscriptions())
+        Arc::clone(self.client.hello_subscriptions())
     }
 
     /// Creates a new `Server`.
@@ -491,7 +490,7 @@ where
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        client_with_state: ClientWithState<EN, SP>,
+        client: ClientWithState<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
         conns: SharedConnectionMap,
@@ -523,7 +522,7 @@ where
             .map_err(Error::ServerStart)?;
 
         Ok(Self {
-            client_with_state,
+            client,
             server,
             server_keys,
             conns,
@@ -597,7 +596,7 @@ where
     ) -> impl Future<Output = ()> {
         let active_team = key.id.into_id().into();
         let peer = key.addr;
-        let client_with_state = self.client_with_state.clone();
+        let client = self.client.clone();
         let sync_peers = self.sync_peers.clone();
         async move {
             // Accept incoming streams.
@@ -608,7 +607,7 @@ where
             {
                 debug!("received incoming QUIC stream");
                 Self::sync(
-                    client_with_state.clone(),
+                    client.clone(),
                     peer.into(),
                     stream,
                     &active_team,
@@ -628,7 +627,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     pub async fn sync(
-        client_with_state: ClientWithState<EN, SP>,
+        client: ClientWithState<EN, SP>,
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
@@ -642,7 +641,7 @@ where
 
         // Generate a sync response for a sync request.
         let sync_response_res =
-            Self::sync_respond(client_with_state, peer, &recv_buf, active_team, sync_peers).await;
+            Self::sync_respond(client, peer, &recv_buf, active_team, sync_peers).await;
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
@@ -669,7 +668,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client_with_state: ClientWithState<EN, SP>,
+        client: ClientWithState<EN, SP>,
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
@@ -698,14 +697,8 @@ where
                 request: request_msg,
                 address: peer_server_addr,
             } => {
-                Self::process_poll_message(
-                    request_msg,
-                    client_with_state,
-                    addr,
-                    peer_server_addr,
-                    active_team,
-                )
-                .await
+                Self::process_poll_message(request_msg, client, addr, peer_server_addr, active_team)
+                    .await
             }
             SyncType::Subscribe { .. } => {
                 bug!("Push subscribe messages are not implemented")
@@ -717,14 +710,7 @@ where
                 bug!("Push messages are not implemented")
             }
             SyncType::Hello(hello_msg) => {
-                Self::process_hello_message(
-                    hello_msg,
-                    client_with_state,
-                    addr,
-                    active_team,
-                    sync_peers,
-                )
-                .await;
+                Self::process_hello_message(hello_msg, client, addr, active_team, sync_peers).await;
                 // Hello messages are fire-and-forget, return empty response
                 // Note: returning empty response which will be ignored by client
                 Ok(Box::new([]))
@@ -738,7 +724,7 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client_with_state: ClientWithState<EN, SP>,
+        client: ClientWithState<EN, SP>,
         peer_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,
@@ -751,7 +737,7 @@ where
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         let len = {
             // Lock both aranya and caches in the correct order.
-            let (mut aranya, mut caches) = client_with_state.lock_aranya_and_caches().await;
+            let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
             let key = PeerCacheKey::new(peer_server_addr, storage_id);
             let cache = caches.entry(key).or_default();
 

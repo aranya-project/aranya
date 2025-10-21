@@ -352,7 +352,7 @@ where
     #[instrument(skip_all)]
     pub async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client_with_state: ClientWithState<EN, SP>,
+        client: ClientWithState<EN, SP>,
         peer_addr: Addr,
         active_team: &TeamId,
         sync_peers: SyncPeers,
@@ -377,7 +377,7 @@ where
                 // Store subscription (replaces any existing subscription for this peer+team)
                 let key = (graph_id, address);
 
-                let mut subscriptions = client_with_state.hello_subscriptions().lock().await;
+                let mut subscriptions = client.hello_subscriptions().lock().await;
                 subscriptions.insert(key, subscription);
             }
             SyncHelloType::Unsubscribe { address } => {
@@ -390,7 +390,7 @@ where
 
                 // Remove subscription for this peer and team
                 let key = (graph_id, address);
-                let mut subscriptions = client_with_state.hello_subscriptions().lock().await;
+                let mut subscriptions = client.hello_subscriptions().lock().await;
                 if subscriptions.remove(&key).is_some() {
                     debug!(
                         team_id = ?active_team,
@@ -414,7 +414,7 @@ where
                     "Received Hello notification message"
                 );
 
-                if !client_with_state
+                if !client
                     .client()
                     .aranya
                     .lock()
@@ -448,7 +448,7 @@ where
                 let key = PeerCacheKey::new(peer_addr, graph_id);
 
                 // Lock both aranya and caches in the correct order.
-                let (mut aranya, mut caches) = client_with_state.lock_aranya_and_caches().await;
+                let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
                 let cache = caches.entry(key).or_default();
 
                 // Update the cache with the received head_id

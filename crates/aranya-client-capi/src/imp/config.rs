@@ -6,7 +6,6 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_client::config::MAX_SYNC_INTERVAL;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -155,7 +154,7 @@ mod aqc {
 /// Configuration values for syncing with a peer
 #[derive(Clone, Debug)]
 pub struct SyncPeerConfig {
-    interval: Duration,
+    interval: Option<Duration>,
     sync_now: bool,
     sync_on_hello: bool,
 }
@@ -163,7 +162,7 @@ pub struct SyncPeerConfig {
 impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
-            .interval(value.interval.into())
+            .interval(value.interval.map(|d| d.into()))
             .sync_now(value.sync_now)
             .sync_on_hello(value.sync_on_hello)
             .build()
@@ -180,14 +179,14 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 /// Builder for a [`SyncPeerConfig`]
 #[derive(Clone, Debug)]
 pub struct SyncPeerConfigBuilder {
-    interval: Duration,
+    interval: Option<Duration>,
     sync_now: bool,
     sync_on_hello: bool,
 }
 
 impl SyncPeerConfigBuilder {
     /// Set the interval at which syncing occurs
-    pub fn interval(&mut self, duration: Duration) {
+    pub fn interval(&mut self, duration: Option<Duration>) {
         self.interval = duration;
     }
 
@@ -228,9 +227,7 @@ impl Builder for SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: Duration {
-                nanos: MAX_SYNC_INTERVAL.as_nanos() as u64,
-            },
+            interval: None,
             sync_now: true,
             sync_on_hello: false,
         }

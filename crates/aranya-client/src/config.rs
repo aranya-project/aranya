@@ -18,7 +18,7 @@ pub const MAX_SYNC_INTERVAL: Duration = Duration::from_secs(365 * 24 * 60 * 60);
 /// Configuration info for syncing with a peer.
 #[derive(Debug, Clone)]
 pub struct SyncPeerConfig {
-    interval: Duration,
+    interval: Option<Duration>,
     sync_now: bool,
     sync_on_hello: bool,
 }
@@ -56,26 +56,20 @@ impl SyncPeerConfigBuilder {
 
     /// Attempts to build a [`SyncPeerConfig`] using the provided parameters.
     pub fn build(self) -> Result<SyncPeerConfig> {
-        let Some(interval) = self.interval else {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "interval",
-                "must call `SyncPeerConfigBuilder::interval`",
-            ))
-            .into());
-        };
-
         // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
         // in DelayQueue::insert() (which calculates deadline as current_time + interval)
-        if interval > MAX_SYNC_INTERVAL {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "duration",
-                "must not exceed 1 year to prevent overflow",
-            ))
-            .into());
+        if let Some(interval) = self.interval {
+            if interval > MAX_SYNC_INTERVAL {
+                return Err(ConfigError::InvalidArg(InvalidArg::new(
+                    "duration",
+                    "must not exceed 1 year to prevent overflow",
+                ))
+                .into());
+            }
         }
 
         Ok(SyncPeerConfig {
-            interval,
+            interval: self.interval,
             sync_now: self.sync_now,
             sync_on_hello: self.sync_on_hello,
         })
@@ -85,10 +79,9 @@ impl SyncPeerConfigBuilder {
     ///
     /// The interval must be less than 1 year to prevent overflow when calculating deadlines.
     ///
-    /// By default, the interval is not set. It is an error to call [`build`][Self::build] before
-    /// setting the interval with this method
-    pub fn interval(mut self, duration: Duration) -> Self {
-        self.interval = Some(duration);
+    /// By default, the interval is not set (None), which means the peer will not be periodically synced.
+    pub fn interval(mut self, duration: Option<Duration>) -> Self {
+        self.interval = duration;
         self
     }
 

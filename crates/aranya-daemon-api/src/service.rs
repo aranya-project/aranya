@@ -245,8 +245,8 @@ impl fmt::Debug for Secret {
 /// Configuration values for syncing with a peer
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SyncPeerConfig {
-    /// The interval at which syncing occurs
-    pub interval: Duration,
+    /// The interval at which syncing occurs. If None, the peer will not be periodically synced.
+    pub interval: Option<Duration>,
     /// Determines if a peer should be synced with immediately after they're added
     pub sync_now: bool,
     /// Determines if the peer should be synced with when a hello message is received

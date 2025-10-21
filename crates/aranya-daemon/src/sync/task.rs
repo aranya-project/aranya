@@ -224,8 +224,8 @@ impl PeerCacheKey {
 pub struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(crate) client: crate::aranya::ClientWithState<crate::EN, crate::SP>,
-    /// Keeps track of peer info.
-    peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
+    /// Keeps track of peer info. The Key is None if the peer has no interval configured.
+    peers: HashMap<SyncPeer, (SyncPeerConfig, Option<Key>)>,
     /// Receives added/removed peers.
     recv: mpsc::Receiver<Request>,
     /// Delay queue for getting the next peer to sync with.
@@ -282,15 +282,18 @@ pub trait SyncState: Sized {
 impl<ST> Syncer<ST> {
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
-        let new_key = self.queue.insert(peer.clone(), cfg.interval);
-        if let Some((_, old_key)) = self.peers.insert(peer, (cfg, new_key)) {
-            self.queue.remove(&old_key);
+        // Only insert into delay queue if interval is configured
+        let new_key = cfg
+            .interval
+            .map(|interval| self.queue.insert(peer.clone(), interval));
+        if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
+            self.queue.remove(&key);
         }
     }
 
     /// Remove a peer from the delay queue.
     fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some((_, key)) = self.peers.remove(&peer) {
+        if let Some((_, Some(key))) = self.peers.remove(&peer) {
             self.queue.remove(&key);
         }
     }
@@ -383,7 +386,8 @@ impl<ST: SyncState> Syncer<ST> {
             Some(expired) = self.queue.next() => {
                 let peer = expired.into_inner();
                 let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
-                *key = self.queue.insert(peer.clone(), cfg.interval);
+                // Re-insert into queue if interval is still configured
+                *key = cfg.interval.map(|interval| self.queue.insert(peer.clone(), interval));
                 // sync with peer.
                 self.sync(&peer).await?;
             }
@@ -414,7 +418,9 @@ impl<ST: SyncState> Syncer<ST> {
                     self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
                         if !keep {
-                            self.queue.remove(key);
+                            if let Some(k) = key {
+                                self.queue.remove(k);
+                            }
                         }
                         keep
                     });
