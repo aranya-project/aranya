@@ -222,22 +222,16 @@ impl EffectHandler {
                 TeamCreated(_team_created) => {}
                 TeamTerminated(_team_terminated) => {
                     #[cfg(feature = "afc")]
-                    {
-                        self.afc.delete_channels().await?;
-                        continue;
-                    }
-
-                    #[cfg(not(feature = "afc"))]
-                    tracing::warn!(effect = ?_team_terminated, "received TeamTerminated effect");
+                    self.afc.delete_channels().await?;
                 }
                 MemberAdded(_member_added) => {}
-                MemberRemoved(member_removed) => {
+                MemberRemoved(_member_removed) => {
                     #[cfg(feature = "afc")]
                     {
-                        if self.device_id == member_removed.device_id.into() {
+                        if self.device_id == _member_removed.device_id.into() {
                             self.afc.delete_channels().await?;
                         } else {
-                            let peer_id = Some(member_removed.device_id.into());
+                            let peer_id = Some(_member_removed.device_id.into());
                             self.afc
                                 .remove_if(RemoveIfParams {
                                     peer_id,
@@ -245,11 +239,7 @@ impl EffectHandler {
                                 })
                                 .await?;
                         }
-                        continue;
                     }
-
-                    #[cfg(not(feature = "afc"))]
-                    tracing::warn!(effect = ?member_removed, "received MemberRemoved effect");
                 }
                 OwnerAssigned(_owner_assigned) => {}
                 AdminAssigned(_admin_assigned) => {}
@@ -258,29 +248,23 @@ impl EffectHandler {
                 AdminRevoked(_admin_revoked) => {}
                 OperatorRevoked(_operator_revoked) => {}
                 LabelCreated(_) => {}
-                LabelDeleted(label_deleted) => {
+                LabelDeleted(_label_deleted) => {
                     #[cfg(feature = "afc")]
-                    {
-                        self.afc
-                            .remove_if(RemoveIfParams {
-                                label_id: Some(label_deleted.label_id.into()),
-                                ..Default::default()
-                            })
-                            .await?;
-                        continue;
-                    }
-
-                    #[cfg(not(feature = "afc"))]
-                    tracing::warn!(effect = ?label_deleted, "received LabelDeleted effect");
+                    self.afc
+                        .remove_if(RemoveIfParams {
+                            label_id: Some(_label_deleted.label_id.into()),
+                            ..Default::default()
+                        })
+                        .await?;
                 }
                 LabelAssigned(_) => {}
-                LabelRevoked(label_revoked) => {
+                LabelRevoked(_label_revoked) => {
                     #[cfg(feature = "afc")]
                     {
-                        let label_id = Some(label_revoked.label_id.into());
+                        let label_id = Some(_label_revoked.label_id.into());
                         let mut peer_id = None;
-                        if self.device_id != label_revoked.device_id.into() {
-                            peer_id = Some(label_revoked.device_id.into());
+                        if self.device_id != _label_revoked.device_id.into() {
+                            peer_id = Some(_label_revoked.device_id.into());
                         };
                         self.afc
                             .remove_if(RemoveIfParams {
@@ -289,11 +273,7 @@ impl EffectHandler {
                                 ..Default::default()
                             })
                             .await?;
-                        continue;
                     }
-
-                    #[cfg(not(feature = "afc"))]
-                    tracing::warn!(effect = ?label_revoked, "received LabelRevoked effect");
                 }
                 QueriedLabel(_) => {}
                 AfcUniChannelCreated(_) => {}
