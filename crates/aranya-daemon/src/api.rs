@@ -234,10 +234,15 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
-                TeamTerminated(team_terminated) => {
+                TeamTerminated(_team_terminated) => {
                     #[cfg(feature = "afc")]
-                    self.afc.delete_channels().await?;
-                    tracing::trace!(effect = ?team_terminated, "received TeamTerminated effect");
+                    {
+                        self.afc.delete_channels().await?;
+                        continue;
+                    }
+
+                    #[cfg(not(feature = "afc"))]
+                    tracing::warn!(effect = ?_team_terminated, "received TeamTerminated effect");
                 }
                 MemberAdded(_member_added) => {}
                 MemberRemoved(member_removed) => {
@@ -254,8 +259,11 @@ impl EffectHandler {
                                 })
                                 .await?;
                         }
+                        continue;
                     }
-                    tracing::trace!(effect = ?member_removed, "received MemberRemoved effect");
+
+                    #[cfg(not(feature = "afc"))]
+                    tracing::warn!(effect = ?member_removed, "received MemberRemoved effect");
                 }
                 OwnerAssigned(_owner_assigned) => {}
                 AdminAssigned(_admin_assigned) => {}
@@ -266,13 +274,18 @@ impl EffectHandler {
                 LabelCreated(_) => {}
                 LabelDeleted(label_deleted) => {
                     #[cfg(feature = "afc")]
-                    self.afc
-                        .remove_if(RemoveIfParams {
-                            label_id: Some(label_deleted.label_id.into()),
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::trace!(effect = ?label_deleted, "received LabelDeleted effect");
+                    {
+                        self.afc
+                            .remove_if(RemoveIfParams {
+                                label_id: Some(label_deleted.label_id.into()),
+                                ..Default::default()
+                            })
+                            .await?;
+                        continue;
+                    }
+
+                    #[cfg(not(feature = "afc"))]
+                    tracing::warn!(effect = ?label_deleted, "received LabelDeleted effect");
                 }
                 LabelAssigned(_) => {}
                 LabelRevoked(label_revoked) => {
@@ -290,8 +303,11 @@ impl EffectHandler {
                                 ..Default::default()
                             })
                             .await?;
+                        continue;
                     }
-                    tracing::trace!(effect = ?label_revoked, "received LabelRevoked effect");
+
+                    #[cfg(not(feature = "afc"))]
+                    tracing::warn!(effect = ?label_revoked, "received LabelRevoked effect");
                 }
                 AqcNetworkNameSet(e) => {
                     #[cfg(feature = "aqc")]
