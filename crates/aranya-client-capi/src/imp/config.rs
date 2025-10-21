@@ -33,10 +33,6 @@ impl ClientConfig {
     }
 }
 
-impl Typed for ClientConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
-}
-
 /// Builder for a [`ClientConfig`]
 #[derive(Clone, Debug)]
 pub struct ClientConfigBuilder {
@@ -56,10 +52,6 @@ impl ClientConfigBuilder {
     pub fn aqc(&mut self, cfg: AqcConfig) {
         self.aqc = Some(cfg);
     }
-}
-
-impl Typed for ClientConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xAAAA611B);
 }
 
 impl Builder for ClientConfigBuilder {
@@ -106,11 +98,7 @@ pub use aqc::*;
 mod aqc {
     use std::ffi::c_char;
 
-    use aranya_capi_core::{
-        prelude::*,
-        safe::{TypeId, Typed},
-        InvalidArg,
-    };
+    use aranya_capi_core::{prelude::*, InvalidArg};
 
     use crate::{api::defs, imp::Error};
 
@@ -119,10 +107,6 @@ mod aqc {
     pub struct AqcConfig {
         /// Address to bind AQC server to.
         pub addr: *const c_char,
-    }
-
-    impl Typed for AqcConfig {
-        const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
     }
 
     /// Builder for an [`AqcConfig`]
@@ -159,10 +143,6 @@ mod aqc {
         }
     }
 
-    impl Typed for AqcConfigBuilder {
-        const TYPE_ID: TypeId = TypeId::new(0x153AE387);
-    }
-
     impl Default for AqcConfigBuilder {
         fn default() -> Self {
             Self {
@@ -178,10 +158,6 @@ pub struct SyncPeerConfig {
     interval: Duration,
     sync_now: bool,
     sync_on_hello: bool,
-}
-
-impl Typed for SyncPeerConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
 }
 
 impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
@@ -247,10 +223,6 @@ impl Builder for SyncPeerConfigBuilder {
         Self::Output::init(out, cfg);
         Ok(())
     }
-}
-
-impl Typed for SyncPeerConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xFE81AF7E);
 }
 
 impl Default for SyncPeerConfigBuilder {

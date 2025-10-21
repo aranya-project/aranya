@@ -28,10 +28,12 @@ aqc = ["aranya-crypto/aqc"]
 
 
 [dependencies]
+aranya-util = { workspace = true }
+
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"], optional = true }
+aranya-id = { workspace = true }
 aranya-policy-text = { workspace = true }
-aranya-util = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }

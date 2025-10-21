@@ -1,9 +1,6 @@
 use core::{ffi::c_char, mem::MaybeUninit};
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    write_c_str, ExtendedError, InvalidArg, WriteCStrError,
-};
+use aranya_capi_core::{write_c_str, ExtendedError, InvalidArg, WriteCStrError};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
 #[cfg(feature = "aqc")]
@@ -125,10 +122,6 @@ impl ExtError {
             write_c_str(msg, &"", len).map_err(Into::into)
         }
     }
-}
-
-impl Typed for ExtError {
-    const TYPE_ID: TypeId = TypeId::new(0xa2a040);
 }
 
 impl ExtendedError for ExtError {

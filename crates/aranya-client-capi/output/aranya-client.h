@@ -780,17 +780,6 @@ const char *aranya_error_to_str(uint32_t err);
 AranyaError aranya_ext_error_init(struct AranyaExtError *out);
 
 /**
- * Initializes `AranyaExtError`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaExtError
- */
-AranyaError aranya_ext_error_init_ext(struct AranyaExtError *out,
-                                      struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_ext_error_init`.
@@ -798,16 +787,6 @@ AranyaError aranya_ext_error_init_ext(struct AranyaExtError *out,
  * @relates AranyaExtError
  */
 AranyaError aranya_ext_error_cleanup(struct AranyaExtError *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_ext_error_init`.
- *
- * @relates AranyaExtError
- */
-AranyaError aranya_ext_error_cleanup_ext(struct AranyaExtError *ptr,
-                                         struct AranyaExtError *__ext_err);
 
 /**
  * Copies the extended error's message into `msg`.
@@ -887,16 +866,6 @@ AranyaError aranya_client_init_ext(struct AranyaClient *client,
  * @relates AranyaClient
  */
 AranyaError aranya_client_cleanup(struct AranyaClient *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_client_init`.
- *
- * @relates AranyaClient
- */
-AranyaError aranya_client_cleanup_ext(struct AranyaClient *ptr,
-                                      struct AranyaExtError *__ext_err);
 
 /**
  * Initializes logging.
@@ -999,17 +968,6 @@ AranyaError aranya_get_device_id_ext(const struct AranyaClient *client,
 AranyaError aranya_client_config_builder_init(struct AranyaClientConfigBuilder *out);
 
 /**
- * Initializes `AranyaClientConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaClientConfigBuilder
- */
-AranyaError aranya_client_config_builder_init_ext(struct AranyaClientConfigBuilder *out,
-                                                  struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_client_config_builder_init`.
@@ -1017,16 +975,6 @@ AranyaError aranya_client_config_builder_init_ext(struct AranyaClientConfigBuild
  * @relates AranyaClientConfigBuilder
  */
 AranyaError aranya_client_config_builder_cleanup(struct AranyaClientConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_client_config_builder_init`.
- *
- * @relates AranyaClientConfigBuilder
- */
-AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBuilder *ptr,
-                                                     struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig).
@@ -1094,19 +1042,6 @@ AranyaError aranya_aqc_config_builder_init(struct AranyaAqcConfigBuilder *out);
 
 #if defined(ENABLE_ARANYA_AQC)
 /**
- * Initializes `AranyaAqcConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAqcConfigBuilder
- */
-AranyaError aranya_aqc_config_builder_init_ext(struct AranyaAqcConfigBuilder *out,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_aqc_config_builder_init`.
@@ -1114,18 +1049,6 @@ AranyaError aranya_aqc_config_builder_init_ext(struct AranyaAqcConfigBuilder *ou
  * @relates AranyaAqcConfigBuilder
  */
 AranyaError aranya_aqc_config_builder_cleanup(struct AranyaAqcConfigBuilder *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_config_builder_init`.
- *
- * @relates AranyaAqcConfigBuilder
- */
-AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder *ptr,
-                                                  struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AQC)
@@ -1228,17 +1151,6 @@ AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientC
 AranyaError aranya_add_team_quic_sync_config_builder_init(struct AranyaAddTeamQuicSyncConfigBuilder *out);
 
 /**
- * Initializes `AranyaAddTeamQuicSyncConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAddTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_add_team_quic_sync_config_builder_init_ext(struct AranyaAddTeamQuicSyncConfigBuilder *out,
-                                                              struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_add_team_quic_sync_config_builder_init`.
@@ -1246,16 +1158,6 @@ AranyaError aranya_add_team_quic_sync_config_builder_init_ext(struct AranyaAddTe
  * @relates AranyaAddTeamQuicSyncConfigBuilder
  */
 AranyaError aranya_add_team_quic_sync_config_builder_cleanup(struct AranyaAddTeamQuicSyncConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_add_team_quic_sync_config_builder_init`.
- *
- * @relates AranyaAddTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_add_team_quic_sync_config_builder_cleanup_ext(struct AranyaAddTeamQuicSyncConfigBuilder *ptr,
-                                                                 struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaCreateTeamQuicSyncConfigBuilder`.
@@ -1268,17 +1170,6 @@ AranyaError aranya_add_team_quic_sync_config_builder_cleanup_ext(struct AranyaAd
 AranyaError aranya_create_team_quic_sync_config_builder_init(struct AranyaCreateTeamQuicSyncConfigBuilder *out);
 
 /**
- * Initializes `AranyaCreateTeamQuicSyncConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaCreateTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_create_team_quic_sync_config_builder_init_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *out,
-                                                                 struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_create_team_quic_sync_config_builder_init`.
@@ -1286,16 +1177,6 @@ AranyaError aranya_create_team_quic_sync_config_builder_init_ext(struct AranyaCr
  * @relates AranyaCreateTeamQuicSyncConfigBuilder
  */
 AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCreateTeamQuicSyncConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_create_team_quic_sync_config_builder_init`.
- *
- * @relates AranyaCreateTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_create_team_quic_sync_config_builder_cleanup_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *ptr,
-                                                                    struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
@@ -1472,17 +1353,6 @@ AranyaError aranya_add_team_quic_sync_config_build_ext(struct AranyaAddTeamQuicS
 AranyaError aranya_add_team_config_builder_init(struct AranyaAddTeamConfigBuilder *out);
 
 /**
- * Initializes `AranyaAddTeamConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAddTeamConfigBuilder
- */
-AranyaError aranya_add_team_config_builder_init_ext(struct AranyaAddTeamConfigBuilder *out,
-                                                    struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_add_team_config_builder_init`.
@@ -1490,16 +1360,6 @@ AranyaError aranya_add_team_config_builder_init_ext(struct AranyaAddTeamConfigBu
  * @relates AranyaAddTeamConfigBuilder
  */
 AranyaError aranya_add_team_config_builder_cleanup(struct AranyaAddTeamConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_add_team_config_builder_init`.
- *
- * @relates AranyaAddTeamConfigBuilder
- */
-AranyaError aranya_add_team_config_builder_cleanup_ext(struct AranyaAddTeamConfigBuilder *ptr,
-                                                       struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaCreateTeamConfigBuilder`.
@@ -1512,17 +1372,6 @@ AranyaError aranya_add_team_config_builder_cleanup_ext(struct AranyaAddTeamConfi
 AranyaError aranya_create_team_config_builder_init(struct AranyaCreateTeamConfigBuilder *out);
 
 /**
- * Initializes `AranyaCreateTeamConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaCreateTeamConfigBuilder
- */
-AranyaError aranya_create_team_config_builder_init_ext(struct AranyaCreateTeamConfigBuilder *out,
-                                                       struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_create_team_config_builder_init`.
@@ -1530,16 +1379,6 @@ AranyaError aranya_create_team_config_builder_init_ext(struct AranyaCreateTeamCo
  * @relates AranyaCreateTeamConfigBuilder
  */
 AranyaError aranya_create_team_config_builder_cleanup(struct AranyaCreateTeamConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_create_team_config_builder_init`.
- *
- * @relates AranyaCreateTeamConfigBuilder
- */
-AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTeamConfigBuilder *ptr,
-                                                          struct AranyaExtError *__ext_err);
 
 /**
  * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
@@ -1691,17 +1530,6 @@ AranyaError aranya_create_team_config_build_ext(struct AranyaCreateTeamConfigBui
 AranyaError aranya_sync_peer_config_builder_init(struct AranyaSyncPeerConfigBuilder *out);
 
 /**
- * Initializes `AranyaSyncPeerConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfigBuilder *out,
-                                                     struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
@@ -1709,16 +1537,6 @@ AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfig
  * @relates AranyaSyncPeerConfigBuilder
  */
 AranyaError aranya_sync_peer_config_builder_cleanup(struct AranyaSyncPeerConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerConfigBuilder *ptr,
-                                                        struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to build a [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig).
@@ -2823,35 +2641,11 @@ AranyaError aranya_aqc_peer_channel_cleanup(struct AranyaAqcPeerChannel *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_peer_channel_init`.
- *
- * @relates AranyaAqcPeerChannel
- */
-AranyaError aranya_aqc_peer_channel_cleanup_ext(struct AranyaAqcPeerChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_aqc_bidi_channel_init`.
  *
  * @relates AranyaAqcBidiChannel
  */
 AranyaError aranya_aqc_bidi_channel_cleanup(struct AranyaAqcBidiChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_bidi_channel_init`.
- *
- * @relates AranyaAqcBidiChannel
- */
-AranyaError aranya_aqc_bidi_channel_cleanup_ext(struct AranyaAqcBidiChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AQC)
@@ -2869,35 +2663,11 @@ AranyaError aranya_aqc_send_channel_cleanup(struct AranyaAqcSendChannel *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_send_channel_init`.
- *
- * @relates AranyaAqcSendChannel
- */
-AranyaError aranya_aqc_send_channel_cleanup_ext(struct AranyaAqcSendChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_aqc_receive_channel_init`.
  *
  * @relates AranyaAqcReceiveChannel
  */
 AranyaError aranya_aqc_receive_channel_cleanup(struct AranyaAqcReceiveChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_receive_channel_init`.
- *
- * @relates AranyaAqcReceiveChannel
- */
-AranyaError aranya_aqc_receive_channel_cleanup_ext(struct AranyaAqcReceiveChannel *ptr,
-                                                   struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AQC)
@@ -2915,18 +2685,6 @@ AranyaError aranya_aqc_bidi_stream_cleanup(struct AranyaAqcBidiStream *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_bidi_stream_init`.
- *
- * @relates AranyaAqcBidiStream
- */
-AranyaError aranya_aqc_bidi_stream_cleanup_ext(struct AranyaAqcBidiStream *ptr,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_aqc_send_stream_init`.
  *
  * @relates AranyaAqcSendStream
@@ -2938,35 +2696,11 @@ AranyaError aranya_aqc_send_stream_cleanup(struct AranyaAqcSendStream *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_send_stream_init`.
- *
- * @relates AranyaAqcSendStream
- */
-AranyaError aranya_aqc_send_stream_cleanup_ext(struct AranyaAqcSendStream *ptr,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_aqc_receive_stream_init`.
  *
  * @relates AranyaAqcReceiveStream
  */
 AranyaError aranya_aqc_receive_stream_cleanup(struct AranyaAqcReceiveStream *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_receive_stream_init`.
- *
- * @relates AranyaAqcReceiveStream
- */
-AranyaError aranya_aqc_receive_stream_cleanup_ext(struct AranyaAqcReceiveStream *ptr,
-                                                  struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AQC)
@@ -3651,35 +3385,11 @@ AranyaError aranya_afc_send_channel_cleanup(struct AranyaAfcSendChannel *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_afc_send_channel_init`.
- *
- * @relates AranyaAfcSendChannel
- */
-AranyaError aranya_afc_send_channel_cleanup_ext(struct AranyaAfcSendChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_afc_receive_channel_init`.
  *
  * @relates AranyaAfcReceiveChannel
  */
 AranyaError aranya_afc_receive_channel_cleanup(struct AranyaAfcReceiveChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_afc_receive_channel_init`.
- *
- * @relates AranyaAfcReceiveChannel
- */
-AranyaError aranya_afc_receive_channel_cleanup_ext(struct AranyaAfcReceiveChannel *ptr,
-                                                   struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
@@ -3697,35 +3407,11 @@ AranyaError aranya_afc_ctrl_msg_cleanup(struct AranyaAfcCtrlMsg *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_afc_ctrl_msg_init`.
- *
- * @relates AranyaAfcCtrlMsg
- */
-AranyaError aranya_afc_ctrl_msg_cleanup_ext(struct AranyaAfcCtrlMsg *ptr,
-                                            struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_afc_seq_init`.
  *
  * @relates AranyaAfcSeq
  */
 AranyaError aranya_afc_seq_cleanup(struct AranyaAfcSeq *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_afc_seq_init`.
- *
- * @relates AranyaAfcSeq
- */
-AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
-                                       struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)

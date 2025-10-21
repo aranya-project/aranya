@@ -4,13 +4,13 @@ use core::{borrow::Borrow, error, fmt, hash::Hash, ops::Deref, time::Duration};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
-    custom_id,
     default::DefaultEngine,
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine,
 };
+use aranya_id::custom_id;
 pub use aranya_policy_text::{text, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
