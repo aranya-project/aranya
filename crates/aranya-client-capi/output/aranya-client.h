@@ -553,7 +553,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[32];
+    uint8_t __for_size_only[40];
 } AranyaSyncPeerConfig;
 
 /**
