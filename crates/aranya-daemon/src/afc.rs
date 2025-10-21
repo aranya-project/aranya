@@ -4,11 +4,14 @@ use std::fmt::Debug;
 
 use anyhow::{Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
-use aranya_crypto::{policy::LabelId, CipherSuite, DeviceId, Engine, KeyStore, Rng};
-use aranya_daemon_api::{self as api};
+use aranya_crypto::{
+    afc::UniPeerEncap, policy::LabelId, CipherSuite, DeviceId, Engine, KeyStore, Rng,
+};
+use aranya_daemon_api::{self as api, AfcChannelId};
+pub use aranya_fast_channels::ChannelId as AfcLocalChannelId;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
-    AranyaState, ChannelId,
+    AranyaState,
 };
 use derive_where::derive_where;
 use tokio::sync::Mutex;
@@ -23,7 +26,7 @@ use crate::{
 /// Parameters that can be used to delete matching channels from shared-memory.
 #[derive(Copy, Clone, Debug, Default)]
 pub(crate) struct RemoveIfParams {
-    pub(crate) channel_id: Option<ChannelId>,
+    pub(crate) channel_id: Option<AfcLocalChannelId>,
     pub(crate) label_id: Option<LabelId>,
     pub(crate) peer_id: Option<DeviceId>,
 }
@@ -125,7 +128,10 @@ where
     /// Handles the [`AfcUniChannelCreated`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.author_enc_key_id))]
-    pub(crate) async fn uni_channel_created(&self, e: &AfcUniChannelCreated) -> Result<ChannelId>
+    pub(crate) async fn uni_channel_created(
+        &self,
+        e: &AfcUniChannelCreated,
+    ) -> Result<(AfcLocalChannelId, AfcChannelId)>
     where
         E: Engine<CS = C>,
     {
@@ -148,13 +154,17 @@ where
             .add(key.into(), info.label_id, info.open_id)
             .context("unable to add AFC channel")?;
         debug!(?channel_id, "creating uni channel");
-        Ok(channel_id)
+        let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
+        Ok((channel_id, encap.id().into_id().into()))
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
     /// the channel ID.
     #[instrument(skip_all, fields(id = %e.label_id))]
-    pub(crate) async fn uni_channel_received(&self, e: &AfcUniChannelReceived) -> Result<ChannelId>
+    pub(crate) async fn uni_channel_received(
+        &self,
+        e: &AfcUniChannelReceived,
+    ) -> Result<(AfcLocalChannelId, AfcChannelId)>
     where
         E: Engine<CS = C>,
     {
@@ -177,12 +187,13 @@ where
             .add(key.into(), info.label_id, info.seal_id)
             .context("unable to add AFC channel")?;
         debug!(?channel_id, "receiving uni channel");
+        let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
 
-        Ok(channel_id)
+        Ok((channel_id, encap.id().into_id().into()))
     }
 
     /// Delete a channel.
-    pub(crate) async fn delete_channel(&self, channel_id: ChannelId) -> Result<()>
+    pub(crate) async fn delete_channel(&self, channel_id: AfcLocalChannelId) -> Result<()>
     where
         E: Engine<CS = C>,
     {

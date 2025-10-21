@@ -572,6 +572,34 @@ impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
     }
 }
 
+/// Channel ID for AFC channel.
+#[cfg(feature = "afc")]
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct AfcChannelId {
+    id: Id,
+}
+
+#[cfg(feature = "afc")]
+impl From<afc::ChannelId> for AfcChannelId {
+    fn from(value: afc::ChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.__id.into(),
+            },
+        }
+    }
+}
+
+#[cfg(feature = "afc")]
+impl From<&AfcChannelId> for afc::ChannelId {
+    fn from(value: &AfcChannelId) -> Self {
+        Self {
+            __id: value.id.bytes.into(),
+        }
+    }
+}
+
 /// Initializes logging.
 ///
 /// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
@@ -2240,13 +2268,13 @@ pub unsafe fn aqc_recv_stream_try_recv(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 120, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 120, align = 8)]
 pub type AfcReceiveChannel = Safe<afc::ReceiveChannel>;
 
 /// An AFC Control Message, used to create the other end of a channel.
@@ -2351,6 +2379,15 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
     channel.label_id().into()
 }
 
+/// Returns the [`AfcChannelId`] for the associated [`AfcSendChannel`].
+///
+/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
+/// @param[out] __output the corresponding channel ID [`AfcChannelId`].
+#[cfg(feature = "afc")]
+pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
+    channel.id().into()
+}
+
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
 ///
 /// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
@@ -2358,6 +2395,15 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId {
     channel.label_id().into()
+}
+
+/// Returns the [`AfcChannelId`] for the associated [`AfcReceiveChannel`].
+///
+/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
+/// @param[out] __output the corresponding channel ID [`AfcChannelId`].
+#[cfg(feature = "afc")]
+pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
+    channel.id().into()
 }
 
 /// Returns the raw data for a given [`AfcCtrlMsg`].
