@@ -518,6 +518,7 @@ async fn main() -> Result<()> {
         .create_uni_send_channel(team_id, memberb.id, label3)
         .await
         .expect("expected to create afc send channel");
+    info!("created afc channel: {}", send.id());
 
     // memberb receives AFC channel.
     info!("receiving afc recv channel");
@@ -526,6 +527,7 @@ async fn main() -> Result<()> {
         .recv_ctrl(team_id, ctrl)
         .await
         .expect("expected to receive afc channel");
+    info!("received afc channel: {}", recv.id());
 
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();

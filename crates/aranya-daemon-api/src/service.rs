@@ -288,7 +288,7 @@ mod aqc_stub {
     pub type AqcUniPsks = Never;
 }
 #[cfg(not(feature = "afc"))]
-use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
+use afc_stub::{AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcShmInfo};
 #[cfg(not(feature = "afc"))]
 mod afc_stub {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -296,6 +296,7 @@ mod afc_stub {
     pub type AfcCtrl = Never;
     pub type AfcShmInfo = Never;
     pub type AfcChannelId = Never;
+    pub type AfcLocalChannelId = Never;
 }
 
 #[tarpc::service]
@@ -428,15 +429,18 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    ) -> Result<(AfcCtrl, AfcLocalChannelId, AfcChannelId)>;
     /// Delete a AFC channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
+    async fn delete_afc_channel(chan: AfcLocalChannelId) -> Result<()>;
     /// Receive AFC ctrl message.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<(LabelId, AfcChannelId)>;
+    async fn receive_afc_ctrl(
+        team: TeamId,
+        ctrl: AfcCtrl,
+    ) -> Result<(LabelId, AfcLocalChannelId, AfcChannelId)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
