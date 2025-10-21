@@ -2,10 +2,7 @@
 
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    Builder, InvalidArg,
-};
+use aranya_capi_core::{Builder, InvalidArg};
 
 use super::Error;
 use crate::api::defs::{self, Duration};
