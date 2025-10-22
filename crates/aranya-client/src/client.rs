@@ -153,8 +153,8 @@ pub struct Devices {
 
 impl Devices {
     /// Return iterator for list of devices.
-    pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
-        self.data.iter()
+    pub fn iter(&self) -> impl Iterator<Item = DeviceId> + use<'_> {
+        self.data.iter().copied()
     }
 
     #[doc(hidden)]
