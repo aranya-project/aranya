@@ -59,7 +59,6 @@ TODO: talk about how queries are `QueryXResult`, etc.
 
 ```policy
 use afc
-use aqc
 use crypto
 use device
 use envelope
@@ -68,8 +67,6 @@ use perspective
 ```
 
 - [`afc`][afc-ffi]: [AFC][afc] functionality, such as creating
-  channels.
-- [`aqc`][aqc-ffi]: [AQC][aqc] functionality, such as creating
   channels.
 - [`crypto`][crypto-ffi]: core cryptographic functionality, like
   command signing and verification.
@@ -255,7 +252,7 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 
 The Device Encryption Key is a KEM key used to securely send
 encapsulated secret keys to other devices. It is primarily used
-by AFC and AQC.
+by AFC.
 
 ```policy
 // Records the public half of the device's Encryption Key.
@@ -601,8 +598,8 @@ fact Role[role_id id]=>{name string, author_id id, default bool}
 Generating a role's ID from its originating command prevents
 devices from accidentally creating the same role on diverging
 branches, which could cause a fail-open security bug. See the
-[design][aqc-label-design] of AQC labels for more information
-about a similar situation.
+[design][label-design] of labels for more information about a
+similar situation.
 
 ```policy
 // Returns the globally unique ID for a role created by the
@@ -669,13 +666,6 @@ enum SimplePerm {
     AssignLabel,
     RevokeLabel,
 
-    // AQC
-    CanUseAqc,
-    SetAqcNetworkName,
-    UnsetAqcNetworkName,
-    CreateAqcUniChannel,
-    CreateAqcBidiChannel,
-
     // AFC
     CanUseAfc,
     CreateAfcUniChannel,
@@ -699,12 +689,6 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::ChangeLabelManagingRole => { return "ChangeLabelManagingRole" }
         SimplePerm::AssignLabel => { return "AssignLabel" }
         SimplePerm::RevokeLabel => { return "RevokeLabel" }
-
-        SimplePerm::CanUseAqc => { return "CanUseAqc" }
-        SimplePerm::SetAqcNetworkName => { return "SetAqcNetworkName" }
-        SimplePerm::UnsetAqcNetworkName => { return "UnsetAqcNetworkName" }
-        SimplePerm::CreateAqcUniChannel => { return "CreateAqcUniChannel" }
-        SimplePerm::CreateAqcBidiChannel => { return "CreateAqcBidiChannel" }
 
         SimplePerm::CanUseAfc => { return "CanUseAfc" }
         SimplePerm::CreateAfcUniChannel => { return "CreateAfcUniChannel" }
@@ -738,15 +722,6 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         "ChangeLabelManagingRole" => { return Some(SimplePerm::ChangeLabelManagingRole) }
         "AssignLabel" => { return Some(SimplePerm::AssignLabel) }
         "RevokeLabel" => { return Some(SimplePerm::RevokeLabel) }
-
-        //
-        // AQC
-        //
-        "CanUseAqc" => { return Some(SimplePerm::CanUseAqc) }
-        "SetAqcNetworkName" => { return Some(SimplePerm::SetAqcNetworkName) }
-        "UnsetAqcNetworkName" => { return Some(SimplePerm::UnsetAqcNetworkName) }
-        "CreateAqcUniChannel" => { return Some(SimplePerm::CreateAqcUniChannel) }
-        "CreateAqcBidiChannel" => { return Some(SimplePerm::CreateAqcBidiChannel) }
 
         //
         // AFC
@@ -1688,15 +1663,13 @@ roles with fixed names.
 - `admin`
     - Can create and delete labels
     - Can change label managing roles
-    - Can unset AQC network names
     - Typically manages the `operator` role
 - `operator`
     - Can assign and revoke labels
-    - Can set and unset AQC network names
     - Typically manages the `member` role
 - `member`
-    - Can create and delete AFC and AQC channels (for labels they
-      have been granted permission to use)
+    - Can create and delete AFC channels (for labels they have been
+      granted permission to use)
 
 **Important**: The owner role (created during team creation) should
 be used sparingly. After setting up default roles, the owner
@@ -1812,8 +1785,6 @@ command SetupDefaultRole {
 
                     assign_perm_to_role(role_id, SimplePerm::AssignLabel)
                     assign_perm_to_role(role_id, SimplePerm::RevokeLabel)
-                    assign_perm_to_role(role_id, SimplePerm::SetAqcNetworkName)
-                    assign_perm_to_role(role_id, SimplePerm::UnsetAqcNetworkName)
                     assign_perm_to_role(role_id, SimplePerm::AssignRole)
                     assign_perm_to_role(role_id, SimplePerm::RevokeRole)
 
@@ -1838,10 +1809,6 @@ command SetupDefaultRole {
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
                     })
-
-                    assign_perm_to_role(role_id, SimplePerm::CanUseAqc)
-                    assign_perm_to_role(role_id, SimplePerm::CreateAqcUniChannel)
-                    assign_perm_to_role(role_id, SimplePerm::CreateAqcBidiChannel)
 
                     assign_perm_to_role(role_id, SimplePerm::CanUseAfc)
                     assign_perm_to_role(role_id, SimplePerm::CreateAfcUniChannel)
@@ -2579,9 +2546,6 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
 
-            assign_perm_to_role(owner_role_id, SimplePerm::SetAqcNetworkName)
-            assign_perm_to_role(owner_role_id, SimplePerm::UnsetAqcNetworkName)
-
             assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRole)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagingRole)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeLabelManagingRole)
@@ -2850,7 +2814,6 @@ command RemoveDevice {
         // Clean up optional per-device facts that may or may not
         // exist.
         let assigned_role = query AssignedRole[device_id: this.device_id]
-        let aqc_net = query AqcNetId[device_id: this.device_id]
         let device_gen = check_unwrap query DeviceGeneration[device_id: this.device_id]
         let next_gen = device_gen.generation + 1
 
@@ -2874,64 +2837,31 @@ command RemoveDevice {
                 ]=>{}
             }
 
-            if aqc_net is Some {
-                finish {
-                    delete AqcNetId[device_id: this.device_id]
-
-                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                        generation: next_gen
-                    }
-                    delete_role_assignment(this.device_id, role_id)
-                    delete_device_core(this.device_id)
-
-                    emit DeviceRemoved {
-                        device_id: this.device_id,
-                        author_id: author.device_id,
-                    }
+            finish {
+                update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
+                    generation: next_gen
                 }
-            } else {
-                finish {
-                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                        generation: next_gen
-                    }
-                    delete_role_assignment(this.device_id, role_id)
-                    delete_device_core(this.device_id)
+                delete_role_assignment(this.device_id, role_id)
+                delete_device_core(this.device_id)
 
-                    emit DeviceRemoved {
-                        device_id: this.device_id,
-                        author_id: author.device_id,
-                    }
+                emit DeviceRemoved {
+                    device_id: this.device_id,
+                    author_id: author.device_id,
                 }
             }
         } else {
             // TODO(eric): Consider adding an index on
             // `device_id` so we can sanity-check that no stray
             // role assignments remain.
-            if aqc_net is Some {
-                finish {
-                    delete AqcNetId[device_id: this.device_id]
-
-                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                        generation: next_gen
-                    }
-                    delete_device_core(this.device_id)
-
-                    emit DeviceRemoved {
-                        device_id: this.device_id,
-                        author_id: author.device_id,
-                    }
+            finish {
+                update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
+                    generation: next_gen
                 }
-            } else {
-                finish {
-                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                        generation: next_gen
-                    }
-                    delete_device_core(this.device_id)
+                delete_device_core(this.device_id)
 
-                    emit DeviceRemoved {
-                        device_id: this.device_id,
-                        author_id: author.device_id,
-                    }
+                emit DeviceRemoved {
+                    device_id: this.device_id,
+                    author_id: author.device_id,
                 }
             }
         }
@@ -2957,15 +2887,14 @@ function can_remove_self(device_id id) bool {
 }
 ```
 
-## AFC and AQC
+## AFC
 
 ### Labels
 
-Labels provide topic segmentation for AFC and AQC. Devices can
-only participate in a channel if they have been granted
-permission to use the channel's label, either directly or through
-their assigned role. Devices can be granted permission to use an
-arbitrary number of labels.
+Labels provide topic segmentation for AFC. Devices can only participate
+in a channel if they have been granted permission to use the channel's
+label, either directly or through their assigned role. Devices can be
+granted permission to use an arbitrary number of labels.
 
 ```policy
 // Records a label.
@@ -2983,7 +2912,7 @@ fact Label[label_id id]=>{name string, author_id id}
 Generating a label's ID from its originating command prevents
 devices from accidentally creating the same label on diverging
 branches, which could cause a fail-open security bug. See the
-[design][aqc-label-design] of AQC labels for more information.
+[design][afc-label-design] of AFC labels for more information.
 
 ```policy
 // Returns the globally unique ID for a label created by the
@@ -3010,9 +2939,9 @@ roles called the label's _managing roles_. A device that has been
 assigned one of the managing roles is allowed to perform the
 following:
 
-- Assign the label to *any* device that is allowed to use AQC,
+- Assign the label to *any* device that is allowed to use AFC,
   except itself.
-- Assign the label to *any* role that is allowed to use AQC,
+- Assign the label to *any* role that is allowed to use AFC,
   except for the device's current role.
 - Revoke the label from *any* device.
 - Revoke the label from *any* role.
@@ -3423,7 +3352,7 @@ fact LabelAssignedToRole[label_id id, role_id id]=>{op enum ChanOp}
 // - `CanManageLabel(label_id)`
 //
 // The target role must have the following permissions:
-// - `CanUseAqc`
+// - `CanUseAfc`
 action assign_label_to_role(role_id id, label_id id, op enum ChanOp) {
     publish AssignLabelToRole {
         role_id: role_id,
@@ -3474,8 +3403,8 @@ command AssignLabelToRole {
         check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
         check can_manage_label(author.device_id, this.label_id)
 
-        // The role must be able to use AQC.
-        check role_has_simple_perm(this.role_id, SimplePerm::CanUseAqc)
+        // The role must be able to use AFC.
+        check role_has_simple_perm(this.role_id, SimplePerm::CanUseAfc)
 
         // Make sure we uphold `AssignedLabelToRole`'s foreign
         // keys.
@@ -3542,7 +3471,7 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 // - It is an error if the label does not exist.
 // - It is an error if the device has already been granted
 //   permission to use this label for its current generation.
-// - It is an error if the device is not permitted to use AQC.
+// - It is an error if the device is not permitted to use AFC.
 //
 // # Required Permissions
 //
@@ -3601,9 +3530,8 @@ command AssignLabelToDevice {
         check exists Device[device_id: this.device_id]
         check exists Label[label_id: this.label_id]
 
-        // Devices must be fully configured for AQC before labels
-        // can be assigned directly to them.
-        check can_use_aqc(this.device_id)
+        // The target device must be able to use AFC.
+        check device_has_simple_perm(this.device_id, SimplePerm::CanUseAfc)
 
         let existing_assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
@@ -4170,7 +4098,7 @@ ephemeral command QueryLabelsAssignedToDevice {
 
 #### Label Directionality
 
-AFC and AQC channels are either bidirectional or unidirectional.
+AFC channels are either bidirectional or unidirectional.
 In a unidirectional channel one peer is permitted to send data
 and the other to receive data.
 
@@ -4253,6 +4181,8 @@ effect AfcUniChannelCreated {
     label_id id,
     // The channel key ID.
     channel_key_id id,
+    // The channel peer's encapsulated KEM shared secret.
+    encap bytes,
 }
 
 // Emitted when the peer of a unidirectional AFC channel
@@ -4319,6 +4249,7 @@ ephemeral command AfcCreateUniChannel {
                     author_enc_key_id: sender.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
+                    encap: this.peer_encap,
                 }
             }
         } else if current_device_id == receiver_id {
@@ -4378,707 +4309,6 @@ function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) b
 }
 ```
 
-### AQC
-
-#### Overview
-
-[Aranya QUIC Channels][aqc] provide end-to-end encrypted,
-topic-segmented communication between two devices in a team.
-
-Channels are secured with TLS 1.3 using pre-shared keys (PSK)
-derived from the participants' Device Encryption Keys using HPKE.
-
-```policy
-// Reports whether `size` is a valid PSK length (in bytes).
-//
-// Per the AQC specification, PSKs must be in the range [32, 2^16).
-function is_valid_psk_length(size int) bool {
-    return size >= 32 && size < 65536
-}
-```
-
-#### Network IDs
-
-Each device that wants to participate in an AQC channel must be
-assigned a _network identifier_. A network identifier is an
-opaque string that is used to identify the device on the network.
-This can be a hostname, an IP address, or any other string that
-that operating system understands.
-
-```policy
-// Stores a device's associated network identifier for AQC.
-fact AqcNetId[device_id id]=>{net_id string}
-
-function can_use_aqc(device_id id) bool {
-    // A device can use AQC if it has an AQC network ID.
-    return exists AqcNetId[device_id: device_id]
-}
-
-// Returns the device's AQC network identifier, if it exists.
-//
-// # Caveats
-//
-// This function does NOT check whether the device exists.
-function aqc_net_id(device_id id) optional string {
-    let f = query AqcNetId[device_id: device_id]
-    if f is Some {
-        return Some((unwrap f).net_id)
-    }
-    return None
-}
-
-// TODO(eric): Why do we call it both a "network ID" and
-// "network name"?
-
-// Sets the device's AQC network name.
-//
-// # Required Permissions
-//
-// - `SetAqcNetworkName`
-action set_aqc_network_name(device_id id, net_id string) {
-    publish SetAqcNetworkName {
-        device_id: device_id,
-        net_id: net_id,
-    }
-}
-
-// Emitted when a device's AQC network name is set.
-effect AqcNetworkNameSet {
-    // The ID of the device whose network name was set.
-    device_id id,
-    // The network name that was set.
-    net_id string,
-}
-
-// TODO(eric): rename this to update/upsert/something?
-command SetAqcNetworkName {
-    fields {
-        device_id id,
-        net_id string,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::SetAqcNetworkName)
-        let device = get_device(this.device_id)
-        check device_has_simple_perm(author.device_id, SimplePerm::SetAqcNetworkName)
-
-        let opt_net_id = aqc_net_id(this.device_id)
-
-        if opt_net_id is Some {
-            let net_id = unwrap opt_net_id
-            finish {
-                update AqcNetId[device_id: this.device_id]=>{net_id: net_id} to {
-                    net_id: this.net_id
-                }
-
-                emit AqcNetworkNameSet {
-                    device_id: device.device_id,
-                    net_id: this.net_id,
-                }
-            }
-        } else {
-            finish {
-                create AqcNetId[device_id: this.device_id]=>{net_id: this.net_id}
-
-                emit AqcNetworkNameSet {
-                    device_id: device.device_id,
-                    net_id: this.net_id,
-                }
-            }
-        }
-    }
-}
-```
-
-### UnsetAqcNetworkName
-
-Dissociates an AQC network name and address from a device.
-
-```policy
-action unset_aqc_network_name(device_id id) {
-    publish UnsetAqcNetworkName {
-        device_id: device_id,
-    }
-}
-
-effect AqcNetworkNameUnset {
-    device_id id,
-    net_id string,
-}
-
-command UnsetAqcNetworkName {
-    fields {
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::UnsetAqcNetworkName)
-        let device = get_device(this.device_id)
-        check device_has_simple_perm(author.device_id, SimplePerm::UnsetAqcNetworkName)
-
-        check exists AqcNetId[device_id: this.device_id]
-
-        let old_mapping = unwrap query AqcNetId[device_id: this.device_id]
-
-        finish {
-            delete AqcNetId[device_id: this.device_id]
-
-            emit AqcNetworkNameUnset {
-                device_id: device.device_id,
-                net_id: old_mapping.net_id,
-            }
-        }
-    }
-}
-```
-
-#### `query_aqc_net_id`
-
-Returns the AQC nework ID for a device.
-
-```policy
-ephemeral action query_aqc_net_id(device_id id) {
-    publish QueryAqcNetId {
-        device_id: device_id,
-    }
-}
-
-effect QueryAqcNetIdResult {
-    // Network name assigned to the device.
-    net_id optional string,
-}
-
-ephemeral command QueryAqcNetId {
-    fields {
-        // ID of device whose network name is being queried.
-        device_id id,
-    }
-
-    // TODO(eric): We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        // Check that the team is active and return the author's
-        // info if they exist in the team.
-        let author = get_device(this.device_id)
-        let net_id = aqc_net_id(author.device_id)
-
-        finish {
-            emit QueryAqcNetIdResult {
-                net_id: net_id,
-            }
-        }
-    }
-}
-```
-
-#### `query_aqc_network_names`
-
-Returns all associated AQC network IDs.
-
-```policy
-ephemeral action query_aqc_network_names() {
-    map AqcNetId[device_id: ?] as f {
-        publish QueryAqcNetworkNames {
-            net_id: f.net_id,
-            device_id: f.device_id,
-        }
-    }
-}
-
-effect QueryAqcNetworkNamesResult {
-    // AQC network name assigned to device.
-    net_id string,
-    // Device ID of the device with assigned network name.
-    device_id id,
-}
-
-ephemeral command QueryAqcNetworkNames {
-    fields {
-        // AQC network name assigned to device.
-        net_id string,
-        // Device ID of device with assigned network name.
-        device_id id,
-    }
-
-    // TODO(eric): We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        finish {
-            emit QueryAqcNetworkNamesResult {
-                net_id: this.net_id,
-                device_id: this.device_id,
-            }
-        }
-    }
-}
-```
-
-### AQC Bidirectional Channel Creation
-
-Creates a bidirectional AQC channel for off-graph messaging.
-
-```policy
-ephemeral action create_aqc_bidi_channel(peer_id id, label_id id) {
-    let parent_cmd_id = perspective::head_id()
-    let author_id = device::current_device_id()
-    let author = get_device(author_id)
-    let peer_enc_pk = get_enc_pk(peer_id)
-
-    let ch = aqc::create_bidi_channel(
-        parent_cmd_id,
-        author.enc_key_id,
-        author_id,
-        peer_enc_pk,
-        peer_id,
-        label_id,
-    )
-
-    publish AqcCreateBidiChannel {
-        channel_id: ch.channel_id,
-        peer_id: peer_id,
-        label_id: label_id,
-        peer_encap: ch.peer_encap,
-        author_secrets_id: ch.author_secrets_id,
-        psk_length_in_bytes: ch.psk_length_in_bytes,
-    }
-}
-
-// Reports whether the devices have permission to create
-// a bidirectional AQC channel with each other.
-//
-// # Caveats
-//
-// - It does NOT check whether the devices exist.
-function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
-    // Devices cannot create channels with themselves.
-    //
-    // This should have been caught by the AQC FFI, so check
-    // instead of just returning false.
-    check device1 != device2
-
-    // Both devices must have permissions to read (recv) and
-    // write (send) data.
-    let device1_op = get_allowed_chan_op_for_label(device1, label_id)
-    if device1_op is None {
-        return false
-    }
-    if (unwrap device1_op) != ChanOp::SendRecv {
-        return false
-    }
-
-    let device2_op = get_allowed_chan_op_for_label(device2, label_id)
-    if device2_op is None {
-        return false
-    }
-    if (unwrap device2_op) != ChanOp::SendRecv {
-        return false
-    }
-
-    // TODO(eric): Check that both devices have network IDs.
-
-    return true
-}
-
-// Emitted when the author of a bidirectional AQC channel
-// successfully processes the `AqcCreateBidiChannel` command.
-effect AqcBidiChannelCreated {
-    // Uniquely identifies the channel.
-    channel_id id,
-    // The unique ID of the previous command.
-    parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The channel author's encryption key ID.
-    author_enc_key_id id,
-    // The channel peer's device Id.
-    peer_id id,
-    // The channel peer's encoded public encryption key.
-    peer_enc_pk bytes,
-    // The channel label.
-    label_id id,
-    // A unique ID that the author can use to look up the
-    // channel's secrets.
-    author_secrets_id id,
-    // The size in bytes of the PSK.
-    //
-    // Per the AQC specification, this must be at least 32 and
-    // less than 2^16.
-    psk_length_in_bytes int,
-}
-
-// Emitted when the peer of a bidirectional AQC channel
-// successfully processes the `AqcCreateBidiChannel` command.
-effect AqcBidiChannelReceived {
-    // Uniquely identifies the channel.
-    channel_id id,
-    // The unique ID of the previous command.
-    parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The channel author's encoded public encryption key.
-    author_enc_pk bytes,
-    // The channel peer's device Id.
-    peer_id id,
-    // The channel peer's encryption key ID.
-    peer_enc_key_id id,
-    // The channel label.
-    label_id id,
-    // The channel peer's encapsulated KEM shared secret.
-    encap bytes,
-    // The size in bytes of the PSK.
-    //
-    // Per the AQC specification, this must be at least 32 and
-    // less than 2^16.
-    psk_length_in_bytes int,
-}
-```
-
-```policy
-ephemeral command AqcCreateBidiChannel {
-    fields {
-        // Uniquely identifies the channel.
-        channel_id id,
-        // The channel peer's device ID.
-        peer_id id,
-        // The label applied to the channel.
-        label_id id,
-        // The channel peer's encapsulated KEM shared secret.
-        peer_encap bytes,
-        // A unique ID that the author can use to look up the
-        // channel's secrets.
-        author_secrets_id id,
-        // The size in bytes of the PSK.
-        //
-        // Per the AQC specification, this must be at least 32.
-        psk_length_in_bytes int,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateAqcBidiChannel)
-        let peer = get_device(this.peer_id)
-
-        check is_valid_psk_length(this.psk_length_in_bytes)
-
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
-
-        // Check that both devices have been granted permission
-        // to use the label for for send and recv.
-        check can_create_aqc_bidi_channel(author.device_id, peer.device_id, label.label_id)
-
-        let parent_cmd_id = envelope::parent_id(envelope)
-        let current_device_id = device::current_device_id()
-
-        if current_device_id == author.device_id {
-            // We're the channel author.
-            let peer_enc_pk = get_enc_pk(peer.device_id)
-
-            finish {
-                emit AqcBidiChannelCreated {
-                    channel_id: this.channel_id,
-                    parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    author_enc_key_id: author.enc_key_id,
-                    peer_id: peer.device_id,
-                    peer_enc_pk: peer_enc_pk,
-                    label_id: label.label_id,
-                    author_secrets_id: this.author_secrets_id,
-                    psk_length_in_bytes: this.psk_length_in_bytes,
-                }
-            }
-        } else if current_device_id == peer.device_id {
-            // We're the channel peer.
-            let author_enc_pk = get_enc_pk(author.device_id)
-
-            finish {
-                emit AqcBidiChannelReceived {
-                    channel_id: this.channel_id,
-                    parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    author_enc_pk: author_enc_pk,
-                    peer_id: peer.device_id,
-                    peer_enc_key_id: peer.enc_key_id,
-                    label_id: label.label_id,
-                    encap: this.peer_encap,
-                    psk_length_in_bytes: this.psk_length_in_bytes,
-                }
-            }
-        } else {
-            // This is an off-graph session command, so only the
-            // communicating peers should process this command.
-            check false
-        }
-    }
-}
-```
-
-### AQC Unidirectional Channel Creation
-
-Creates a unidirectional AQC channel for off-graph messaging.
-
-```policy
-ephemeral action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
-    let parent_cmd_id = perspective::head_id()
-    let author = get_device(device::current_device_id())
-    let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
-    let peer_enc_pk = get_enc_pk(peer_id)
-
-    let ch = aqc::create_uni_channel(
-        parent_cmd_id,
-        author.enc_key_id,
-        peer_enc_pk,
-        sender_id,
-        receiver_id,
-        label_id,
-    )
-
-    publish AqcCreateUniChannel {
-        channel_id: ch.channel_id,
-        sender_id: sender_id,
-        receiver_id: receiver_id,
-        label_id: label_id,
-        peer_encap: ch.peer_encap,
-        author_secrets_id: ch.author_secrets_id,
-        psk_length_in_bytes: ch.psk_length_in_bytes,
-    }
-}
-
-// Emitted when the author of a unidirectional AQC channel
-// successfully processes the `AqcCreateUniChannel` command.
-effect AqcUniChannelCreated {
-    // Uniquely identifies the channel.
-    channel_id id,
-    // The unique ID of the previous command.
-    parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The device ID of the participant that can send data.
-    sender_id id,
-    // The device ID of the participant that can receive data.
-    receiver_id id,
-    // The channel author's encryption key ID.
-    author_enc_key_id id,
-    // The channel peer's encoded public encryption key.
-    peer_enc_pk bytes,
-    // The channel label.
-    label_id id,
-    // A unique ID that the author can use to look up the
-    // channel's secrets.
-    author_secrets_id id,
-    // The size in bytes of the PSK.
-    //
-    // Per the AQC specification, this must be at least 32 and
-    // less than 2^16.
-    psk_length_in_bytes int,
-}
-
-// Emitted when the peer of a unidirectional AQC channel
-// successfully processes the `AqcCreateUniChannel` command.
-effect AqcUniChannelReceived {
-    // Uniquely identifies the channel.
-    channel_id id,
-    // The unique ID of the previous command.
-    parent_cmd_id id,
-    // The channel author's device ID.
-    author_id id,
-    // The device ID of the participant that can send data.
-    sender_id id,
-    // The device ID of the participant that can receive data.
-    receiver_id id,
-    // The channel author's encryption key ID.
-    author_enc_pk bytes,
-    // The channel peer's encryption key ID.
-    peer_enc_key_id id,
-    // The channel label.
-    label_id id,
-    // The channel peer's encapsulated KEM shared secret.
-    encap bytes,
-    // The size in bytes of the PSK.
-    //
-    // Per the AQC specification, this must be at least 32 and
-    // less than 2^16.
-    psk_length_in_bytes int,
-}
-```
-
-```policy
-ephemeral command AqcCreateUniChannel {
-    fields {
-        // Uniquely identifies the channel.
-        channel_id id,
-        // The device ID of the participant that can send data.
-        sender_id id,
-        // The device ID of the participant that can receive
-        // data.
-        receiver_id id,
-        // The label applied to the channel.
-        label_id id,
-        // A unique ID that the author can use to look up the
-        // channel's secrets.
-        author_secrets_id id,
-        // The channel peer's encapsulated KEM shared secret.
-        peer_encap bytes,
-        // The size in bytes of the PSK.
-        //
-        // Per the AQC specification, this must be at least 32.
-        psk_length_in_bytes int,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateAqcUniChannel)
-
-        // Ensure that the author is one of the channel
-        // participants.
-        check author.device_id == this.sender_id ||
-              author.device_id == this.receiver_id
-
-        let peer_id = if author.device_id == this.sender_id {
-            :this.receiver_id
-        } else {
-            :this.sender_id
-        }
-        let peer = check_unwrap try_find_device(peer_id)
-
-        check is_valid_psk_length(this.psk_length_in_bytes)
-
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
-
-        // Check that both devices have been granted permission
-        // to use the label for their respective directions.
-        check can_create_aqc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
-
-        let parent_cmd_id = envelope::parent_id(envelope)
-        let current_device_id = device::current_device_id()
-
-        if current_device_id == author.device_id {
-            // We authored this command.
-            let peer_enc_pk = get_enc_pk(peer_id)
-
-            finish {
-                emit AqcUniChannelCreated {
-                    channel_id: this.channel_id,
-                    parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    sender_id: this.sender_id,
-                    receiver_id: this.receiver_id,
-                    author_enc_key_id: author.enc_key_id,
-                    peer_enc_pk: peer_enc_pk,
-                    label_id: label.label_id,
-                    author_secrets_id: this.author_secrets_id,
-                    psk_length_in_bytes: this.psk_length_in_bytes,
-                }
-            }
-        } else if current_device_id == peer.device_id {
-            // We're the intended recipient of this command.
-            let author_enc_pk = get_enc_pk(author.device_id)
-
-            finish {
-                emit AqcUniChannelReceived {
-                    channel_id: this.channel_id,
-                    parent_cmd_id: parent_cmd_id,
-                    author_id: author.device_id,
-                    sender_id: this.sender_id,
-                    receiver_id: this.receiver_id,
-                    author_enc_pk: author_enc_pk,
-                    peer_enc_key_id: peer.enc_key_id,
-                    label_id: label.label_id,
-                    encap: this.peer_encap,
-                    psk_length_in_bytes: this.psk_length_in_bytes,
-                }
-            }
-        } else {
-            // This is an off-graph session command, so only the
-            // communicating peers should process this command.
-            check false
-        }
-    }
-}
-```
-
-```policy
-// Reports whether the devices have permission to create
-// a unidirectional AQC channel with each other.
-function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) bool {
-    // Devices cannot create channels with themselves.
-    //
-    // This should have been caught by the AQC FFI, so check
-    // instead of just returning false.
-    check sender_id != receiver_id
-
-    // The writer must have permissions to write (send) data.
-    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
-    if writer_op is None {
-        return false
-    }
-    match unwrap writer_op {
-        ChanOp::RecvOnly => { return false }
-        ChanOp::SendOnly => {}
-        ChanOp::SendRecv => {}
-    }
-
-    // The reader must have permission to read (receive) data.
-    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id)
-    if reader_op is None {
-        return false
-    }
-    match unwrap reader_op {
-        ChanOp::RecvOnly => {}
-        ChanOp::SendOnly => { return false }
-        ChanOp::SendRecv => {}
-    }
-
-    return true
-}
-```
-
-```policy
-// Selects the ID which doesn't match `Device_id`.
-function select_peer_id(device_id id, id_a id, id_b id) id {
-    if device_id == id_a {
-        return id_b
-    } else if device_id == id_b {
-        return id_a
-    } else {
-        check false
-    }
-}
-```
-
 ## Query APIs
 
 Policy language v2 does not support defining queries against the
@@ -5102,9 +4332,6 @@ data for closed teams is not returned.
 [//]: # (links)
 
 [actions]: https://aranya-project.github.io/policy-language-v1/#actions
-[aqc-ffi]: https://crates.io/crates/aranya-aqc-util
-[aqc-label-design]: https://aranya-project.github.io/aranya-quic-channels/#label-design
-[aqc]: https://aranya-project.github.io/aranya-quic-channels/
 [aranya-core/229]: https://github.com/aranya-project/aranya-core/issues/229
 [commands]: https://aranya-project.github.io/policy-language-v1/#commands
 [crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi

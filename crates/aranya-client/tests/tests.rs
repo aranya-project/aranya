@@ -299,8 +299,6 @@ async fn test_query_functions() -> Result<()> {
 
     // TODO(nikki): device_label_assignments, label_exists, labels
 
-    // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
-
     Ok(())
 }
 
@@ -927,13 +925,8 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
 
-    let owner_net = devices.owner.aqc_net_id();
     let owner_id = devices.owner.id;
     let owner_team = devices.owner.client.team(team_id);
-    owner_team
-        .device(owner_id)
-        .assign_aqc_net_identifier(owner_net)
-        .await?;
 
     let label = owner_team
         .create_label(text!("device-self-label"), roles.owner().id)
@@ -977,63 +970,6 @@ async fn test_assign_label_to_device_requires_network_id() -> Result<()> {
         Ok(_) => bail!("expected assigning label without network id to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected assign_label error: {err:?}"),
-    }
-
-    Ok(())
-}
-
-/// Setting a network identifier requires the appropriate simple permission.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_set_aqc_network_name_requires_permission() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_set_aqc_network_name_requires_permission").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-
-    let membera_net = devices.membera.aqc_net_id();
-    let membera_id = devices.membera.id;
-    let owner_team = devices.owner.client.team(team_id);
-    owner_team
-        .add_device(devices.membera.pk.clone(), Some(roles.member().id))
-        .await?;
-
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
-    let membera_team = devices.membera.client.team(team_id);
-    membera_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
-
-    match membera_team
-        .device(membera_id)
-        .assign_aqc_net_identifier(membera_net)
-        .await
-    {
-        Ok(_) => bail!("expected setting network name without permission to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_aqc_net_identifier error: {err:?}"),
-    }
-
-    Ok(())
-}
-
-/// Unsetting a network identifier requires that one is present.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_unset_aqc_network_name_requires_entry() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_unset_aqc_network_name_requires_entry").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    devices.setup_default_roles(team_id).await?;
-
-    let owner_net = devices.owner.aqc_net_id();
-    let owner_id = devices.owner.id;
-    let owner_team = devices.owner.client.team(team_id);
-    match owner_team
-        .device(owner_id)
-        .remove_aqc_net_identifier(owner_net)
-        .await
-    {
-        Ok(_) => bail!("expected removing missing network name to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected remove_aqc_net_identifier error: {err:?}"),
     }
 
     Ok(())

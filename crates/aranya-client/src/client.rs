@@ -8,29 +8,6 @@ mod team;
 
 use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
-use anyhow::Context as _;
-use aranya_crypto::{Csprng, Rng};
-// TODO(eric): Wrap these.
-pub use aranya_daemon_api::KeyBundle;
-use aranya_daemon_api::{
-    crypto::{
-        txp::{self, LengthDelimitedCodec},
-        PublicApiKey,
-    },
-    DaemonApiClient, Version, CS,
-};
-use aranya_util::{error::ReportExt, Addr};
-use tarpc::context;
-use tokio::{fs, net::UnixStream};
-use tracing::{debug, error, info};
-#[cfg(feature = "afc")]
-use {
-    crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
-    std::sync::{Arc, Mutex},
-};
-
-#[cfg(feature = "aqc")]
-use crate::aqc::{AqcChannels, AqcClient};
 #[doc(inline)]
 pub use crate::client::{
     device::{Device, DeviceId, Devices},
@@ -43,6 +20,26 @@ use crate::{
     config::{AddTeamConfig, CreateTeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
+use anyhow::Context as _;
+use aranya_crypto::{Csprng, Rng};
+// TODO(eric): Wrap these.
+pub use aranya_daemon_api::KeyBundle;
+use aranya_daemon_api::{
+    crypto::{
+        txp::{self, LengthDelimitedCodec},
+        PublicApiKey,
+    },
+    DaemonApiClient, Version, CS,
+};
+use aranya_util::error::ReportExt;
+use tarpc::context;
+use tokio::{fs, net::UnixStream};
+use tracing::{debug, error, info};
+#[cfg(feature = "afc")]
+use {
+    crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
+    std::sync::{Arc, Mutex},
+};
 
 /// Builds a [`Client`].
 #[derive(Clone, Debug)]
@@ -50,22 +47,28 @@ pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
     uds_path: Option<&'a Path>,
-    // AQC address.
-    #[cfg(feature = "aqc")]
-    aqc_addr: Option<&'a Addr>,
 }
 
 impl ClientBuilder<'_> {
     /// Creates a new client builder.
     pub fn new() -> Self {
-        Self {
-            uds_path: None,
-            #[cfg(feature = "aqc")]
-            aqc_addr: None,
-        }
+        Self { uds_path: None }
     }
 
-    /// Connects to the daemon.
+    /// Creates a client connection to the daemon.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use std::net::Ipv4Addr;
+    /// # use aranya_client::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()> {
+    /// let client = Client::builder()
+    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
+    ///     .connect()
+    ///     .await?;
+    /// #    Ok(())
+    /// # }
     pub async fn connect(self) -> Result<Client> {
         let Some(uds_path) = self.uds_path else {
             return Err(IpcError::new(InvalidArg::new(
@@ -127,20 +130,6 @@ impl ClientBuilder<'_> {
             }
             debug!(client = ?want, daemon = ?got, "versions");
 
-            #[cfg(feature = "aqc")]
-            let aqc = if let Some(aqc_addr) = self.aqc_addr {
-                let aqc_server_addr = aqc_addr
-                    .lookup()
-                    .await
-                    .context("unable to resolve AQC server address")
-                    .map_err(error::other)?
-                    .next()
-                    .expect("expected AQC server address");
-                Some(AqcClient::new(aqc_server_addr, daemon.clone()).await?)
-            } else {
-                None
-            };
-
             #[cfg(feature = "afc")]
             let afc_keys = {
                 let afc_shm_info = daemon
@@ -154,8 +143,6 @@ impl ClientBuilder<'_> {
 
             let client = Client {
                 daemon,
-                #[cfg(feature = "aqc")]
-                aqc,
                 #[cfg(feature = "afc")]
                 afc_keys,
             };
@@ -177,14 +164,6 @@ impl<'a> ClientBuilder<'a> {
         self.uds_path = Some(sock);
         self
     }
-
-    /// Specifies the AQC server address.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub fn with_aqc_server_addr(mut self, addr: &'a Addr) -> Self {
-        self.aqc_addr = Some(addr);
-        self
-    }
 }
 
 /// A client for invoking actions on and processing effects from
@@ -198,9 +177,6 @@ impl<'a> ClientBuilder<'a> {
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
-    /// Support for AQC
-    #[cfg(feature = "aqc")]
-    pub(crate) aqc: Option<AqcClient>,
     /// AFC channel keys.
     #[cfg(feature = "afc")]
     afc_keys: Arc<Mutex<AfcChannelKeys>>,
@@ -292,13 +268,6 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-    }
-
-    /// Get access to Aranya QUIC Channels.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    pub fn aqc(&self) -> Option<AqcChannels<'_>> {
-        AqcChannels::new(self)
     }
 
     /// Get access to Aranya Fast Channels.

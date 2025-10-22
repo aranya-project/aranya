@@ -2,7 +2,7 @@ use core::{error, fmt};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_crypto::{keystore::fs_keystore, tls::PskSeedId, Id};
+use aranya_crypto::{keystore::fs_keystore, tls::PskSeedId};
 use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
@@ -65,7 +65,7 @@ impl SeedDir {
     }
 
     async fn read_id(path: PathBuf) -> Result<PskSeedId> {
-        const ID_SIZE: usize = size_of::<Id>();
+        const ID_SIZE: usize = size_of::<PskSeedId>();
         let bytes = read(path).await?;
         let arr: [u8; ID_SIZE] = bytes.try_into().map_err(|input| {
             anyhow::anyhow!(
@@ -119,7 +119,7 @@ mod tests {
     use std::collections::HashSet;
 
     use anyhow::Context as _;
-    use aranya_crypto::Rng;
+    use aranya_crypto::{id::IdExt, Rng};
     use tempfile::tempdir;
     use test_log::test;
 
@@ -138,8 +138,8 @@ mod tests {
         let mut seen = HashSet::new();
 
         for _ in 0..100 {
-            let team_id = Id::random(&mut Rng).into();
-            let seed_id = Id::random(&mut Rng).into();
+            let team_id = TeamId::random(&mut Rng);
+            let seed_id = PskSeedId::random(&mut Rng);
 
             // may see duplicates by random chance
             if !seen.insert(team_id) {
@@ -174,8 +174,8 @@ mod tests {
             .context("could not create seed dir")?;
 
         for _ in 0..100 {
-            let team_id = Id::random(&mut Rng).into();
-            let seed_id = Id::random(&mut Rng).into();
+            let team_id = TeamId::random(&mut Rng);
+            let seed_id = PskSeedId::random(&mut Rng);
 
             seed_dir
                 .append(&team_id, &seed_id)

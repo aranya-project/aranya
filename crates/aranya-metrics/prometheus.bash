@@ -13,8 +13,8 @@ if ! command -v pushgateway >/dev/null 2>&1; then
 fi
 
 echo "Building our binaries..."
-cargo build --bin aranya-daemon --release --features aqc,experimental
-cargo build --bin aranya-metrics --release --features prometheus,aqc
+cargo build --bin aranya-daemon --release --features afc,preview
+cargo build --bin aranya-metrics --release --features prometheus,afc
 
 # We assume that if they installed prometheus, it's already running in the background.
 echo "Starting pushgateway..."

@@ -3,8 +3,8 @@ use core::ops::{Deref, DerefMut};
 use anyhow::Result;
 use aranya_crypto::{
     engine::WrappedKey,
+    id::BaseId,
     keystore::{self, fs_keystore, KeyStore, Occupied, Vacant},
-    Id,
 };
 
 macro_rules! impl_typed_keystore {
@@ -33,7 +33,7 @@ macro_rules! impl_typed_keystore {
             #[inline]
             fn entry<T: WrappedKey>(
                 &mut self,
-                id: Id,
+                id: BaseId,
             ) -> Result<keystore::Entry<'_, Self, T>, Self::Error> {
                 use keystore::Entry;
                 self.0.entry(id).map(|entry| match entry {
@@ -43,14 +43,14 @@ macro_rules! impl_typed_keystore {
             }
 
             #[inline]
-            fn get<T: WrappedKey>(&self, id: Id) -> Result<Option<T>, Self::Error> {
+            fn get<T: WrappedKey>(&self, id: BaseId) -> Result<Option<T>, Self::Error> {
                 self.0.get(id)
             }
 
             #[inline]
             fn try_insert<T: WrappedKey>(
                 &mut self,
-                id: Id,
+                id: BaseId,
                 key: T,
             ) -> Result<(), Self::Error> {
                 self.0.try_insert(id, key)
@@ -59,7 +59,7 @@ macro_rules! impl_typed_keystore {
             #[inline]
             fn remove<T: WrappedKey>(
                 &mut self,
-                id: Id,
+                id: BaseId,
             ) -> Result<Option<T>, Self::Error> {
                 self.0.remove(id)
             }

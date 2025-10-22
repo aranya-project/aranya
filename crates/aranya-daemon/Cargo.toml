@@ -23,8 +23,6 @@ afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 
 # Experimental features
 experimental = ["aranya-daemon-api/experimental"]
-# Aranya QUIC channels
-aqc = ["aranya-daemon-api/aqc"]
 
 
 [dependencies]
@@ -32,7 +30,6 @@ aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
 aranya-afc-util = { workspace = true }
-aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
@@ -51,7 +48,6 @@ buggy = { workspace = true }
 
 
 anyhow = { workspace = true }
-bimap = "0.6"
 bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }

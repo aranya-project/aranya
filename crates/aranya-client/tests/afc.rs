@@ -20,18 +20,27 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
+    // create default roles
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team
+        .create_label(text!("label1"), default_roles.operator().id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label_id, op)
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label_id, op)
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
@@ -79,18 +88,27 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
+    // create default roles
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team
+        .create_label(text!("label1"), default_roles.operator().id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label_id, op)
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label_id, op)
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
@@ -148,18 +166,27 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
+    // create default roles
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
 
     let operator_team = devices.operator.client.team(team_id);
 
-    let label_id = operator_team.create_label(text!("label1")).await?;
+    let label_id = operator_team
+        .create_label(text!("label1"), default_roles.operator().id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label_id, op)
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label_id, op)
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
@@ -227,29 +254,42 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
+    // create default roles
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
-    devices.add_all_device_roles(team_id).await?;
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
 
     let operator_team = devices.operator.client.team(team_id);
 
     // First label.
-    let label_id1 = operator_team.create_label(text!("label1")).await?;
+    let label_id1 = operator_team
+        .create_label(text!("label1"), default_roles.operator().id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label_id1, op)
+        .device(devices.membera.id)
+        .assign_label(label_id1, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label_id1, op)
+        .device(devices.memberb.id)
+        .assign_label(label_id1, op)
         .await?;
 
     // Second label.
-    let label_id2 = operator_team.create_label(text!("label2")).await?;
+    let label_id2 = operator_team
+        .create_label(text!("label2"), default_roles.operator().id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(devices.membera.id, label_id2, op)
+        .device(devices.membera.id)
+        .assign_label(label_id2, op)
         .await?;
     operator_team
-        .assign_label(devices.memberb.id, label_id2, op)
+        .device(devices.memberb.id)
+        .assign_label(label_id2, op)
         .await?;
 
     // wait for syncing.
