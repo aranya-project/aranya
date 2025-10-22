@@ -1,6 +1,5 @@
 use std::{
     env,
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -13,6 +12,7 @@ use aranya_client::{
     SyncPeerConfig,
 };
 use aranya_daemon_api::text;
+use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{

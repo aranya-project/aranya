@@ -22,6 +22,7 @@ debug = []
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
+aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
 backon = { workspace = true }
