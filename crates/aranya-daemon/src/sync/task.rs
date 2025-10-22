@@ -188,6 +188,7 @@ impl SyncPeers {
     }
 
     /// Trigger sync with a peer based on hello message.
+    /// Will be ignored if `SyncPeerConfig::sync_on_hello` is false.
     pub(crate) async fn sync_on_hello(&self, addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::SyncOnHello { peer }).await
