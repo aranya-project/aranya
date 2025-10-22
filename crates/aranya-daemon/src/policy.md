@@ -305,6 +305,10 @@ effect TeamCreated {
 }
 
 command CreateTeam {
+    attributes {
+        init: true
+    }
+
     fields {
         // The initial owner's public DeviceKeys.
         owner_keys struct KeyBundle,
@@ -403,6 +407,10 @@ effect TeamTerminated{
 }
 
 command TerminateTeam {
+    attributes {
+        priority: 0
+    }
+
     fields {}
 
     seal { return seal_command(serialize(this)) }
@@ -455,6 +463,10 @@ effect MemberAdded {
 }
 
 command AddMember {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The new device's public DeviceKeys.
         device_keys struct KeyBundle,
@@ -511,6 +523,10 @@ effect MemberRemoved {
 }
 
 command RemoveMember{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The removed device's ID.
         device_id id,
@@ -597,6 +613,10 @@ effect OwnerAssigned {
 }
 
 command AssignOwner{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The assigned device's ID.
         device_id id,
@@ -651,6 +671,10 @@ effect AdminAssigned {
 }
 
 command AssignAdmin{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The assigned device's ID.
         device_id id,
@@ -692,6 +716,10 @@ effect OperatorAssigned {
 }
 
 command AssignOperator{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The assigned device's ID.
         device_id id,
@@ -772,6 +800,10 @@ effect OwnerRevoked {
 }
 
 command RevokeOwner{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The revoked device's ID.
         device_id id,
@@ -826,6 +858,10 @@ effect AdminRevoked {
 }
 
 command RevokeAdmin{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The revoked device's ID.
         device_id id,
@@ -867,6 +903,10 @@ effect OperatorRevoked {
 }
 
 command RevokeOperator{
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The revoked device's ID.
         device_id id,
@@ -1082,6 +1122,10 @@ action create_label(name string) {
 }
 
 command CreateLabel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The label name.
         label_name string,
@@ -1150,6 +1194,10 @@ Removes a label from the whitelist. This operation will result in the label revo
 
 ```policy
 command DeleteLabel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The unique ID of the label being deleted.
         label_id id,
@@ -1231,6 +1279,10 @@ action assign_label(device_id id, label_id id, op enum ChanOp) {
 }
 
 command AssignLabel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -1319,6 +1371,10 @@ action revoke_label(device_id id, label_id id) {
 }
 
 command RevokeLabel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The target device.
         device_id id,
