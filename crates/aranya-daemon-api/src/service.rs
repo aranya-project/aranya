@@ -234,17 +234,12 @@ pub struct Label {
 
 // TODO(jdygert): tarpc does not cfg return types properly.
 #[cfg(not(feature = "afc"))]
-use afc_stub::{
-    AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcReceiveChannelInfo, AfcSendChannelInfo, AfcShmInfo,
-};
+use afc_stub::{AfcReceiveChannelInfo, AfcSendChannelInfo, AfcShmInfo};
 #[cfg(not(feature = "afc"))]
 mod afc_stub {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub enum Never {}
-    pub type AfcCtrl = Never;
     pub type AfcShmInfo = Never;
-    pub type AfcChannelId = Never;
-    pub type AfcLocalChannelId = Never;
     pub type AfcSendChannelInfo = Never;
     pub type AfcReceiveChannelInfo = Never;
 }
