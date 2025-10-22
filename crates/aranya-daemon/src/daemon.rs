@@ -7,17 +7,12 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::{KeyBundle, PublicKeys};
-#[cfg(feature = "aqc")]
-use aranya_runtime::StorageProvider;
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
 use aranya_util::{ready, Addr};
-#[cfg(feature = "aqc")]
-use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
@@ -26,8 +21,6 @@ use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
-#[cfg(feature = "aqc")]
-use crate::{actions::Actions, aqc::Aqc};
 use crate::{
     api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
     aranya,
@@ -190,45 +183,6 @@ impl Daemon {
             .await?;
             let local_addr = sync_server.local_addr()?;
 
-            #[cfg(feature = "aqc")]
-            let aqc = if let Toggle::Enabled(_) = &cfg.aqc {
-                let graph_ids = client
-                    .aranya
-                    .lock()
-                    .await
-                    .provider()
-                    .list_graph_ids()?
-                    .flatten()
-                    .collect::<Vec<_>>();
-
-                let peers = {
-                    let mut peers = BTreeMap::new();
-                    for graph_id in &graph_ids {
-                        let effects = client.actions(graph_id).query_aqc_network_names().await?;
-                        let graph_peers =
-                            BiBTreeMap::from_iter(effects.into_iter().filter_map(|e| {
-                                if let policy::Effect::QueryAqcNetworkNamesResult(e) = e {
-                                    Some((NetIdentifier(e.net_id), e.device_id.into()))
-                                } else {
-                                    None
-                                }
-                            }));
-                        peers.insert(*graph_id, graph_peers);
-                    }
-                    peers
-                };
-                Some(Aqc::new(
-                    eng.clone(),
-                    pks.ident_pk.id()?,
-                    aranya_store
-                        .try_clone()
-                        .context("unable to clone keystore")?,
-                    peers,
-                ))
-            } else {
-                None
-            };
-
             #[cfg(feature = "afc")]
             let afc = {
                 let Toggle::Enabled(afc_cfg) = &cfg.afc else {
@@ -263,8 +217,6 @@ impl Daemon {
                 peers,
                 recv_effects,
                 invalid: invalid_graphs,
-                #[cfg(feature = "aqc")]
-                aqc,
                 #[cfg(feature = "afc")]
                 afc,
                 crypto,
@@ -555,8 +507,6 @@ mod tests {
                     client_addr: None,
                 }),
             },
-            #[cfg(feature = "aqc")]
-            aqc: Toggle::Enabled(crate::config::AqcConfig {}),
             #[cfg(feature = "afc")]
             afc: Toggle::Enabled(crate::config::AfcConfig {
                 shm_path,

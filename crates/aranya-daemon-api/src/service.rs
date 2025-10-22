@@ -4,7 +4,6 @@ use core::{borrow::Borrow, error, fmt, hash::Hash, net::SocketAddr, ops::Deref, 
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
-    custom_id,
     dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
@@ -12,6 +11,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine,
 };
+use aranya_id::custom_id;
 pub use aranya_policy_text::{text, InvalidText, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
@@ -19,13 +19,10 @@ pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
 pub mod afc;
-pub mod aqc;
 pub mod quic_sync;
 
 #[cfg(feature = "afc")]
 pub use self::afc::*;
-#[cfg(feature = "aqc")]
-pub use self::aqc::*;
 pub use self::quic_sync::*;
 
 /// CE = Crypto Engine
@@ -96,6 +93,11 @@ custom_id! {
 custom_id! {
     /// The Team ID (a.k.a Graph ID).
     pub struct TeamId;
+}
+
+custom_id! {
+    /// A label ID.
+    pub struct LabelId;
 }
 
 custom_id! {
@@ -193,21 +195,6 @@ pub struct Label {
     pub author_id: DeviceId,
 }
 
-custom_id! {
-    /// An AQC label ID.
-    pub struct LabelId;
-}
-
-custom_id! {
-    /// An AQC bidi channel ID.
-    pub struct AqcBidiChannelId;
-}
-
-custom_id! {
-    /// An AQC uni channel ID.
-    pub struct AqcUniChannelId;
-}
-
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Ikm([u8; SEED_IKM_SIZE]);
@@ -303,25 +290,14 @@ pub enum ChanOp {
     /// The device can only send data in channels with this
     /// label.
     SendOnly,
-    /// The device can send and receive data in channels with this
+    /// The device can send or receive data in channels with this
     /// label.
     SendRecv,
 }
 
 // TODO(jdygert): tarpc does not cfg return types properly.
-#[cfg(not(feature = "aqc"))]
-use aqc_stub::{AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks};
-#[cfg(not(feature = "aqc"))]
-mod aqc_stub {
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    pub enum Never {}
-    pub type AqcCtrl = Never;
-    pub type AqcPsks = Never;
-    pub type AqcBidiPsks = Never;
-    pub type AqcUniPsks = Never;
-}
 #[cfg(not(feature = "afc"))]
-use afc_stub::{AfcChannelId, AfcCtrl, AfcShmInfo};
+use afc_stub::{AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcShmInfo};
 #[cfg(not(feature = "afc"))]
 mod afc_stub {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -329,6 +305,7 @@ mod afc_stub {
     pub type AfcCtrl = Never;
     pub type AfcShmInfo = Never;
     pub type AfcChannelId = Never;
+    pub type AfcLocalChannelId = Never;
 }
 
 #[tarpc::service]
@@ -478,61 +455,6 @@ pub trait DaemonApi {
     /// Returns all labels assigned to the device.
     async fn labels_assigned_to_device(team: TeamId, device: DeviceId) -> Result<Box<[Label]>>;
 
-    //
-    // AQC network identifiers
-    //
-
-    /// Assign a QUIC channels network identifier to a device.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn assign_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
-    /// Remove a QUIC channels network identifier from a device.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn remove_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
-    /// Returns a device's AQC network identifier.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn aqc_net_id(team: TeamId, device: DeviceId) -> Result<Option<NetIdentifier>>;
-
-    //
-    // AQC bidi channels
-    //
-
-    /// Creates an AQC bidi channel.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn create_aqc_bidi_channel(
-        team: TeamId,
-        peer: NetIdentifier,
-        label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcBidiPsks)>;
-    /// Create a unidirectional QUIC channel.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn create_aqc_uni_channel(
-        team: TeamId,
-        peer: NetIdentifier,
-        label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcUniPsks)>;
-    /// Delete a QUIC bidi channel.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
-    /// Delete a QUIC uni channel.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
-
-    //
-    // AQC misc
-    //
-
-    /// Receive AQC ctrl message.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
-
     /// Gets AFC shared-memory configuration info.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -544,16 +466,16 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcChannelId)>;
+    ) -> Result<(AfcCtrl, AfcLocalChannelId, AfcChannelId)>;
     /// Delete a AFC channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn delete_afc_channel(chan: AfcChannelId) -> Result<()>;
+    async fn delete_afc_channel(chan: AfcLocalChannelId) -> Result<()>;
     /// Receive AFC ctrl message.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn receive_afc_ctrl(
         team: TeamId,
         ctrl: AfcCtrl,
-    ) -> Result<(LabelId, AfcChannelId)>;
+    ) -> Result<(LabelId, AfcLocalChannelId, AfcChannelId)>;
 }

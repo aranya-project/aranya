@@ -11,13 +11,9 @@ use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, Role, TeamId},
     config::CreateTeamConfig,
-    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, NetIdentifier,
-    SyncPeerConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
-use aranya_crypto::{
-    dangerous::spideroak_crypto::{hash::Hash, rust::Sha256},
-    id::ToBase58 as _,
-};
+use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
@@ -26,6 +22,7 @@ use aranya_daemon_api::{KeyBundle, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
+use spideroak_base58::ToBase58 as _;
 use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
@@ -251,7 +248,6 @@ impl DeviceCtx {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
-            aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
             afc: Toggle::Enabled(daemon_cfg::AfcConfig {
                 shm_path: afc_shm_path,
                 max_chans: 100,
@@ -286,15 +282,10 @@ impl DeviceCtx {
             .context("unable to start daemon")?;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
-        let client = (|| {
-            let builder = Client::builder().with_daemon_uds_path(&uds_path);
-            #[cfg(feature = "aqc")]
-            let builder = builder.with_aqc_server_addr(&addr_any);
-            builder.connect()
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to init client")?;
+        let client = (|| Client::builder().with_daemon_uds_path(&uds_path).connect())
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -368,19 +359,6 @@ impl DeviceCtx {
         }
 
         Ok(roles)
-    }
-
-    #[cfg(feature = "aqc")]
-    #[allow(unused, reason = "module compiled for each test file")]
-    pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier::try_from(
-            self.client
-                .aqc()
-                .expect("AQC enabled")
-                .server_addr()
-                .to_string(),
-        )
-        .expect("socket addr is valid text")
     }
 }
 

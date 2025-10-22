@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "crates/*",
+    "examples/rust/*",
 ]
 
 
@@ -35,26 +36,27 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-fast-channels = { version = "0.13.0", features = ["alloc"] }
-aranya-afc-util = { version = "0.14.0", features = ["alloc"] }
-aranya-aqc-util = { version = "0.8.0", features = ["alloc"] }
-aranya-capi-core = { version = "0.5.0" }
-aranya-capi-codegen = { version = "0.4.0" }
-aranya-crypto = { version = "0.10.0", features = ["alloc", "fs-keystore", "clone-aead", "std", "tls"] }
-aranya-crypto-ffi = { version = "0.13.0" }
-aranya-device-ffi = { version = "0.13.0" }
-aranya-envelope-ffi = { version = "0.13.0" }
-aranya-idam-ffi = { version = "0.13.0" }
-aranya-perspective-ffi = { version = "0.13.0" }
-aranya-policy-compiler = { version = "0.13.0" }
-aranya-policy-ifgen = { version = "0.14.0", features = ["serde"] }
-aranya-policy-ifgen-build = { version = "0.7.0" }
-aranya-policy-lang = { version = "0.8.0" }
-aranya-policy-text = { version = "0.1.2" }
-aranya-policy-vm = { version = "0.13.0", features = ["std"] }
-aranya-runtime = { version = "0.14.0", features = ["std", "libc"] }
+aranya-fast-channels = { version = "0.14.0", features = ["alloc"] }
+aranya-afc-util = { version = "0.15.0", features = ["alloc"] }
+aranya-capi-core = { version = "0.6.0" }
+aranya-capi-codegen = { version = "0.5.0" }
+aranya-crypto = { version = "0.11.0", features = ["alloc", "fs-keystore", "clone-aead", "std", "tls"] }
+aranya-crypto-ffi = { version = "0.14.0" }
+aranya-device-ffi = { version = "0.14.0" }
+aranya-envelope-ffi = { version = "0.14.0" }
+aranya-id = { version = "0.1.0" }
+aranya-idam-ffi = { version = "0.14.0" }
+aranya-perspective-ffi = { version = "0.14.0" }
+aranya-policy-compiler = { version = "0.14.0" }
+aranya-policy-ifgen = { version = "0.15.0", features = ["serde"] }
+aranya-policy-ifgen-build = { version = "0.8.0" }
+aranya-policy-lang = { version = "0.8.1" }
+aranya-policy-text = { version = "0.1.3" }
+aranya-policy-vm = { version = "0.14.0", features = ["std"] }
+aranya-runtime = { version = "0.15.0", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
+spideroak-base58 = { version = "0.2.0" }
 
 aranya-client = { version = "3.0.0", path = "crates/aranya-client" }
 aranya-daemon = { version = "3.0.0", path = "crates/aranya-daemon" }
@@ -64,12 +66,11 @@ aranya-util = { version = "3.0.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
-bytes = { version = "1.0" }
+bytes = { version = "1.10.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 derive-where = { version = "1" }
 divan = { version = "0.1", default-features = false }
-futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
 heapless = { version = "0.8", default-features = false }
 http = { version = "1" }
@@ -78,13 +79,14 @@ metrics = { version = "0.24" }
 metrics-util = { version = "0.20" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
+rustix = { version = "1.1.2", features = ["shm"] }
 s2n-quic = { version = "1.58.0-psk.2", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
 sysinfo = { version = "0.36" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
-tempfile = { version = "3.6.0" }
+tempfile = { version = "3.17.1" }
 test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
 thiserror = { version = "2.0" }
 tokio = { version = "1.44" }

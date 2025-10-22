@@ -48,8 +48,6 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                         client_addr: None,
                     }),
                 },
-                #[cfg(feature = "aqc")]
-                aqc: Toggle::Enabled(aranya_daemon::config::AqcConfig {}),
                 #[cfg(feature = "afc")]
                 afc: Toggle::Enabled(aranya_daemon::config::AfcConfig {
                     shm_path,

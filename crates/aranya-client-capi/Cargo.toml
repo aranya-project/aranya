@@ -28,8 +28,6 @@ afc = ["aranya-client/afc"]
 
 # Experimental features
 experimental = ["aranya-client/experimental"]
-# Aranya QUIC channels
-aqc = ["aranya-client/aqc"]
 
 
 [dependencies]
@@ -38,11 +36,10 @@ aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }
-aranya-crypto = { workspace = true }
+aranya-id = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
-bytes = { workspace = true }
 postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

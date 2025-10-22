@@ -5,10 +5,7 @@ use tarpc::context;
 use tracing::instrument;
 
 use crate::{
-    client::{
-        ChanOp, Client, InvalidNetIdentifier, KeyBundle, Label, LabelId, Labels, NetIdentifier,
-        Role,
-    },
+    client::{ChanOp, Client, KeyBundle, Label, LabelId, Labels, Role},
     error::{aranya_error, IpcError, Result},
     util::{custom_id, impl_slice_iter_wrapper, impl_vec_into_iter_wrapper},
 };
@@ -136,73 +133,5 @@ impl Device<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-    }
-
-    /// Assigns an AQC network identifier to the device.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    #[instrument(skip(self, net_identifier))]
-    pub async fn assign_aqc_net_identifier<I>(&self, net_identifier: I) -> Result<()>
-    where
-        I: TryInto<NetIdentifier>,
-    {
-        self.client
-            .daemon
-            .assign_aqc_net_id(
-                context::current(),
-                self.team_id,
-                self.id,
-                net_identifier
-                    .try_into()
-                    .map_err(|_| InvalidNetIdentifier(()))?
-                    .into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Removes the device's AQC network identifier.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    #[instrument(skip(self, net_identifier))]
-    pub async fn remove_aqc_net_identifier<I>(&self, net_identifier: I) -> Result<()>
-    where
-        I: TryInto<NetIdentifier>,
-    {
-        self.client
-            .daemon
-            .remove_aqc_net_id(
-                context::current(),
-                self.team_id,
-                self.id,
-                net_identifier
-                    .try_into()
-                    .map_err(|_| InvalidNetIdentifier(()))?
-                    .into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Returns the AQC network identifier assigned to the
-    /// device, if any.
-    // TODO(eric): documented whether this returns `None` if the
-    // device does not exist or if the device exists but does not
-    // have a net ID.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    #[instrument(skip(self))]
-    pub async fn aqc_net_id(&self) -> Result<Option<NetIdentifier>> {
-        let id = self
-            .client
-            .daemon
-            .aqc_net_id(context::current(), self.team_id, self.id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            .map(|id| NetIdentifier(id.0));
-        Ok(id)
     }
 }

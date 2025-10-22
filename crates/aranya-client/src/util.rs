@@ -13,7 +13,7 @@ macro_rules! custom_id {
         $vis:vis struct $name:ident => $api:ident;
     ) => {
         $(#[$meta])*
-        #[derive(Copy, Clone, core::hash::Hash, Eq, PartialEq, Ord, PartialOrd)]
+        #[derive(Copy, Clone, core::hash::Hash, Eq, PartialEq, Ord, PartialOrd, serde::Serialize, serde::Deserialize)]
         $vis struct $name(aranya_daemon_api::$api);
 
         impl $name {
@@ -31,9 +31,9 @@ macro_rules! custom_id {
         }
 
         #[doc(hidden)]
-        impl From<aranya_crypto::Id> for $name {
+        impl From<aranya_crypto::BaseId> for $name {
             #[inline]
-            fn from(id: aranya_crypto::Id) -> Self {
+            fn from(id: aranya_crypto::BaseId) -> Self {
                 Self(id.into())
             }
         }

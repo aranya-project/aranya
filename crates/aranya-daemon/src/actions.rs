@@ -3,10 +3,10 @@
 use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_aqc_util::LabelId;
-use aranya_crypto::{policy::RoleId, Csprng, DeviceId, Id, Rng};
-#[cfg(feature = "aqc")]
-use aranya_daemon_api::NetIdentifier;
+use aranya_crypto::{
+    policy::{LabelId, RoleId},
+    BaseId, Csprng, DeviceId, Rng,
+};
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_text::Text;
@@ -15,10 +15,9 @@ use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
 };
-#[cfg(feature = "aqc")]
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument, warn, Instrument};
+use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
@@ -278,63 +277,6 @@ where
         .in_current_span()
     }
 
-    /// Sets an AQC network name.
-    #[cfg(feature = "aqc")]
-    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
-    fn set_aqc_network_name(
-        &self,
-        device_id: DeviceId,
-        net_identifier: Text,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %net_identifier, "setting AQC network name");
-        self.with_actor(move |actor| {
-            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Unsets an AQC network name.
-    #[cfg(feature = "aqc")]
-    #[instrument(skip(self), fields(device_id = %device_id))]
-    fn unset_aqc_network_name(
-        &self,
-        device_id: DeviceId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, "unsetting AQC network name");
-        self.with_actor(move |actor| {
-            actor.unset_aqc_network_name(device_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Queries all AQC network names off-graph.
-    #[cfg(feature = "aqc")]
-    #[instrument(skip(self))]
-    fn query_aqc_network_names_off_graph(
-        &self,
-    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_network_names"),
-            args: Cow::Owned(vec![]),
-        })
-        .and_then(|SessionData { effects, .. }| {
-            std::future::ready(
-                effects
-                    .into_iter()
-                    .map(|eff| {
-                        let Effect::QueryAqcNetworkNamesResult(eff) = eff else {
-                            anyhow::bail!("bad effect in query_network_names");
-                        };
-                        Ok((NetIdentifier(eff.net_id), DeviceId::from(eff.device_id)))
-                    })
-                    .collect(),
-            )
-        })
-        .in_current_span()
-    }
-
     /// Invokes `assign_role_management_perm`.
     #[instrument(skip(self))]
     fn assign_role_management_perm(
@@ -369,45 +311,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `create_aqc_bidi_channel`.
-    ///
-    /// It returns the control message alongside the effects.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(%peer_id, %label_id))]
-    fn create_aqc_bidi_channel(
-        &self,
-        peer_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<SessionData>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_aqc_bidi_channel"),
-            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
-        })
-        .in_current_span()
-    }
-
-    /// Invokes `create_aqc_uni_channel`.
-    ///
-    /// It returns the control message alongside the effects.
-    #[cfg(feature = "aqc")]
-    #[instrument(skip(self), fields(%seal_id, %open_id, %label_id))]
-    fn create_aqc_uni_channel(
-        &self,
-        seal_id: DeviceId,
-        open_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<SessionData>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_aqc_uni_channel"),
-            args: Cow::Owned(vec![
-                Value::from(seal_id),
-                Value::from(open_id),
-                Value::from(label_id),
-            ]),
-        })
-        .in_current_span()
-    }
-
     /// Invokes `create_label`.
     #[instrument(skip(self), fields(%name, %managing_role_id))]
     fn create_label(
@@ -418,21 +321,6 @@ where
         self.with_actor(move |actor| {
             actor.create_label(name, managing_role_id.into())?;
             Ok(())
-        })
-        .in_current_span()
-    }
-    /// Creates a bidirectional AFC channel off graph.
-    #[cfg(feature = "afc")]
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
-    fn create_afc_bidi_channel_off_graph(
-        &self,
-        peer_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<SessionData>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_afc_bidi_channel"),
-            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
         })
         .in_current_span()
     }
@@ -531,20 +419,6 @@ where
         .in_current_span()
     }
 
-    /// Query AQC net identifier off-graph.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_aqc_net_identifier_off_graph(
-        &self,
-        device_id: DeviceId,
-    ) -> impl Future<Output = Result<SessionData>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_net_identifier"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
-    }
-
     /// Invokes `query_label`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
@@ -610,7 +484,10 @@ where
 
     /// Invokes `query_role_owners`.
     #[instrument(skip(self), fields(%role_id))]
-    fn query_role_owners(&self, role_id: Id) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn query_role_owners(
+        &self,
+        role_id: BaseId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.session_action(move || VmAction {
             name: ident!("query_role_owners"),
             args: Cow::Owned(vec![Value::Id(role_id)]),
@@ -750,7 +627,7 @@ where
 
     /// Invokes `terminate_team`.
     #[instrument(skip(self))]
-    fn terminate_team(&self, team_id: Id) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn terminate_team(&self, team_id: BaseId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.terminate_team(team_id)?;
             Ok(())

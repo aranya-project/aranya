@@ -1,17 +1,18 @@
 use core::{borrow::Borrow, fmt, marker::PhantomData};
+use std::iter;
 
 use anyhow::Result;
 use aranya_crypto::{
-    custom_id,
     dangerous::spideroak_crypto::{
         import::ImportError,
         kem::{DecapKey as _, Kem},
         keys::PublicKey,
         signer::PkError,
     },
-    id::{Id, IdError, Identified},
+    id::{IdError, IdExt, Identified},
     unwrapped, CipherSuite, Engine, Oids, Random,
 };
+use aranya_id::custom_id;
 use ciborium as cbor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -101,8 +102,8 @@ impl<CS: CipherSuite> PublicApiKey<CS> {
     #[inline]
     pub fn id(&self) -> Result<ApiKeyId, IdError> {
         let pk = &self.0.export();
-        let id = Id::new::<CS>(pk.borrow(), b"ApiKey");
-        Ok(ApiKeyId(id))
+        let id = ApiKeyId::new::<CS>(b"ApiKey", iter::once(pk.borrow()));
+        Ok(id)
     }
 
     pub(crate) fn as_inner(&self) -> &<<CS as CipherSuite>::Kem as Kem>::EncapKey {
