@@ -3,25 +3,20 @@
 
 use std::{
     env,
-    net::{Ipv4Addr, SocketAddr},
+    net::SocketAddr,
     path::{Path, PathBuf},
-    str::FromStr,
     time::{Duration, Instant},
 };
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel,
-    client::{ChanOp, KeyBundle, NetIdentifier, Role},
+    afc::Channels,
+    client::{ChanOp, KeyBundle, Role},
     AddTeamConfig, AddTeamQuicSyncConfig, Client, CreateTeamConfig, CreateTeamQuicSyncConfig,
     DeviceId, Error,
 };
 use aranya_daemon_api::text;
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
-use buggy::BugExt as _;
-use bytes::Bytes;
-use futures_util::future::try_join;
 use tempfile::TempDir;
 use tokio::{
     fs,
@@ -137,7 +132,6 @@ impl Daemon {
 #[clippy::has_significant_drop]
 struct ClientCtx {
     client: Client,
-    aqc_addr: SocketAddr,
     pk: KeyBundle,
     id: DeviceId,
     /// This needs to be stored so it lasts for the same lifetime as `Daemon`.
@@ -172,7 +166,10 @@ impl ClientCtx {
                 logs_dir = {logs_dir:?}
                 config_dir = {config_dir:?}
 
-                aqc.enable = true
+                [afc]
+                enable = true
+                shm_path = "/shm_${user_name}"
+                max_chans = 10
 
                 [sync.quic]
                 enable = true
@@ -184,19 +181,12 @@ impl ClientCtx {
         };
 
         let uds_sock = work_path.join("run").join("uds.sock");
-        let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let client = (|| {
-            Client::builder()
-                .daemon_uds_path(&uds_sock)
-                .aqc_server_addr(&any_addr)
-                .connect()
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to initialize client")?;
+        let client = (|| Client::builder().daemon_uds_path(&uds_sock).connect())
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to initialize client")?;
 
-        let aqc_addr = client.aqc().context("AQC not enabled")?.server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -205,7 +195,6 @@ impl ClientCtx {
 
         Ok(Self {
             client,
-            aqc_addr,
             pk,
             id,
             _work_dir,
@@ -215,10 +204,6 @@ impl ClientCtx {
 
     async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
-    }
-
-    fn aqc_net_id(&self) -> NetIdentifier {
-        NetIdentifier::from_str(self.aqc_addr.to_string().as_str()).expect("addr is valid text")
     }
 }
 
@@ -317,9 +302,6 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let admin_addr = ctx.admin.aranya_local_addr().await?;
     let operator_addr = ctx.operator.aranya_local_addr().await?;
 
-    // get aqc addresses.
-    debug!(?ctx.membera.aqc_addr, ?ctx.memberb.aqc_addr);
-
     // setup sync peers.
     info!("adding admin to team");
     owner.add_device_to_team(ctx.admin.pk).await?;
@@ -355,17 +337,6 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     operator.add_device_to_team(ctx.memberb.pk.clone()).await?;
     memberb.sync_now(operator_addr, None).await?;
 
-    info!("assigning aqc net identifiers");
-    operator
-        .assign_aqc_net_identifier(ctx.membera.id, ctx.membera.aqc_net_id())
-        .await?;
-    operator
-        .assign_aqc_net_identifier(ctx.memberb.id, ctx.memberb.aqc_net_id())
-        .await?;
-
-    membera.sync_now(operator_addr, None).await?;
-    memberb.sync_now(operator_addr, None).await?;
-
     // fact database queries
     let queries = membera.queries();
     let devices = queries.devices_on_team().await?;
@@ -374,19 +345,9 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("membera role: {:?}", role);
     let keybundle = queries.device_keybundle(ctx.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
-    let queried_membera_net_ident = queries.aqc_net_identifier(ctx.membera.id).await?;
-    info!(
-        "membera queried_membera_net_ident: {:?}",
-        queried_membera_net_ident
-    );
-    let queried_memberb_net_ident = queries.aqc_net_identifier(ctx.memberb.id).await?;
-    info!(
-        "memberb queried_memberb_net_ident: {:?}",
-        queried_memberb_net_ident
-    );
 
-    info!("demo aqc functionality");
-    info!("creating aqc label");
+    info!("demo afc functionality");
+    info!("creating label");
     let label3 = operator.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
 
@@ -399,59 +360,25 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     membera.sync_now(operator_addr, None).await?;
     memberb.sync_now(operator_addr, None).await?;
 
-    // Creating and receiving a channel "blocks" until both sides have
-    // joined the channel, so we do them concurrently with `try_join`.
-    let (mut created_aqc_chan, mut received_aqc_chan) = try_join(
-        async {
-            // membera creates a bidirectional channel.
-            info!("membera creating acq bidi channel");
-            let chan = ctx
-                .membera
-                .client
-                .aqc()
-                .context("AQC not enabled")?
-                .create_bidi_channel(team_id, ctx.memberb.aqc_net_id(), label3)
-                .await?;
-            Ok(chan)
-        },
-        async {
-            // memberb receives a bidirectional channel.
-            info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(chan) = ctx
-                .memberb
-                .client
-                .aqc()
-                .context("AQC not enabled")?
-                .receive_channel()
-                .await?
-            else {
-                bail!("expected a bidirectional channel");
-            };
-            Ok(chan)
-        },
-    )
-    .await?;
+    info!("memmbera creating channel");
+    let (created_afc_chan, ctrl) = ctx
+        .membera
+        .client
+        .afc()
+        .create_uni_send_channel(team_id, ctx.memberb.id, label3)
+        .await?;
+    info!("memmberb receiving channel");
+    let received_afc_chan = ctx.memberb.client.afc().recv_ctrl(team_id, ctrl).await?;
 
-    // membera creates a new stream on the channel.
-    info!("membera creating aqc bidi stream");
-    let mut bidi1 = created_aqc_chan.create_bidi_stream().await?;
+    info!("membera sealing afc data");
+    let send_msg = b"hello";
+    let mut ciphertext = vec![0u8; send_msg.len() + Channels::OVERHEAD];
+    created_afc_chan.seal(&mut ciphertext, send_msg)?;
 
-    // membera sends data via the aqc stream.
-    info!("membera sending aqc data");
-    let msg = Bytes::from_static(b"hello");
-    bidi1.send(msg.clone()).await?;
-
-    // memberb receives channel stream created by membera.
-    info!("memberb receiving aqc bidi stream");
-    let mut peer2 = received_aqc_chan
-        .receive_stream()
-        .await
-        .assume("stream not received")?;
-
-    // memberb receives data from stream.
-    info!("memberb receiving acq data");
-    let bytes = peer2.receive().await?.assume("no data received")?;
-    assert_eq!(bytes, msg);
+    info!("memberb opening afc data");
+    let mut recv_msg = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
+    received_afc_chan.open(&mut recv_msg, &ciphertext)?;
+    assert_eq!(send_msg.as_slice(), recv_msg.as_slice());
 
     info!("revoking label from membera");
     operator.revoke_label(ctx.membera.id, label3).await?;

@@ -40,15 +40,10 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("admin: initializing client");
-    let client = (|| {
-        Client::builder()
-            .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&env.admin.aqc_addr)
-            .connect()
-    })
-    .retry(ExponentialBuilder::default())
-    .await
-    .expect("expected to initialize client");
+    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
+        .retry(ExponentialBuilder::default())
+        .await
+        .expect("expected to initialize client");
     info!("admin: initialized client");
 
     // Get team info from owner.
@@ -104,9 +99,9 @@ async fn main() -> Result<()> {
     info!("admin: detected that owner has assigned admin role");
 
     // Create label.
-    info!("admin: creating aqc label");
+    info!("admin: creating label");
     let _label1 = team.create_label(text!("label1")).await?;
-    info!("admin: created aqc label");
+    info!("admin: created label");
 
     info!("admin: complete");
 

@@ -190,7 +190,6 @@ impl DeviceCtx {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
-            aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
             afc: Toggle::Enabled(daemon_cfg::AfcConfig {
                 shm_path: afc_shm_path,
                 max_chans: 100,
@@ -225,10 +224,6 @@ impl DeviceCtx {
         let client = (|| {
             let mut builder = Client::builder();
             builder = builder.daemon_uds_path(&uds_path);
-            #[cfg(feature = "aqc")]
-            {
-                builder = builder.aqc_server_addr(&addr_any);
-            }
             builder.connect()
         })
         .retry(ExponentialBuilder::default())

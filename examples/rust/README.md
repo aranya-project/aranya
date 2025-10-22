@@ -11,9 +11,9 @@ Before running the examples, ensure [cargo-make](https://github.com/sagiegurari/
 How to run the example:
 `cargo make run-rust-example`
 
-Runs an example which sets up an Aranya team with `owner`, `admin`, `operator`, `membera`, and `memberb` devices. The `operator` creates a label and assigns it to `membera` and `memberb`. The member devices use this label to create a secure AQC channel between them.
+Runs an example which sets up an Aranya team with `owner`, `admin`, `operator`, `membera`, and `memberb` devices. The `operator` creates a label and assigns it to `membera` and `memberb`. The member devices use this label to create a secure AFC channel between them.
 
-Once the secure AQC channel has been created, the devices send data both ways via the channel.
+Once the secure AFC channel has been created, the devices seal and open data via the channel.
 
 More information can be found in the [README.md](aranya-example/README.md)
 
