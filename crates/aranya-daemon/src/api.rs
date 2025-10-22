@@ -8,8 +8,9 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
-    Engine, KeyStore as _, KeyStoreExt as _, Rng,
+    default::WrappedKey,
+    policy::{GroupId, LabelId},
+    Csprng, DeviceId, EncryptionKey, EncryptionPublicKey, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
@@ -228,13 +229,13 @@ impl EffectHandler {
                 MemberRemoved(_member_removed) => {
                     #[cfg(feature = "afc")]
                     {
-                        if self.device_id == _member_removed.device_id.into() {
+                        let removed_member = DeviceId::from_base(_member_removed.device_id);
+                        if self.device_id == removed_member {
                             self.afc.delete_channels().await?;
                         } else {
-                            let peer_id = Some(_member_removed.device_id.into());
                             self.afc
                                 .remove_if(RemoveIfParams {
-                                    peer_id,
+                                    peer_id: Some(removed_member),
                                     ..Default::default()
                                 })
                                 .await?;
@@ -252,7 +253,7 @@ impl EffectHandler {
                     #[cfg(feature = "afc")]
                     self.afc
                         .remove_if(RemoveIfParams {
-                            label_id: Some(_label_deleted.label_id.into()),
+                            label_id: Some(LabelId::from_base(_label_deleted.label_id)),
                             ..Default::default()
                         })
                         .await?;
@@ -261,11 +262,9 @@ impl EffectHandler {
                 LabelRevoked(_label_revoked) => {
                     #[cfg(feature = "afc")]
                     {
-                        let label_id = Some(_label_revoked.label_id.into());
-                        let mut peer_id = None;
-                        if self.device_id != _label_revoked.device_id.into() {
-                            peer_id = Some(_label_revoked.device_id.into());
-                        };
+                        let label_id = Some(LabelId::from_base(_label_revoked.label_id));
+                        let peer_id = Some(DeviceId::from_base(_label_revoked.device_id))
+                            .filter(|&id| id != self.device_id);
                         self.afc
                             .remove_if(RemoveIfParams {
                                 label_id,
@@ -349,7 +348,7 @@ impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<()> {
-        if self.invalid.contains(team.into_id().into()) {
+        if self.invalid.contains(GraphId::transmute(team)) {
             // TODO: return custom daemon error type
             anyhow::bail!("team {team} invalid due to graph finalization error")
         }
@@ -378,7 +377,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
-        self.device_id().map(|id| id.into_id().into())
+        self.device_id().map(api::DeviceId::transmute)
     }
 
     #[cfg(feature = "afc")]
@@ -398,7 +397,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .add_peer(peer, team.into_id().into(), cfg)
+            .add_peer(peer, GraphId::transmute(team), cfg)
             .await?;
         Ok(())
     }
@@ -414,7 +413,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .sync_now(peer, team.into_id().into(), cfg)
+            .sync_now(peer, GraphId::transmute(team), cfg)
             .await?;
         Ok(())
     }
@@ -429,7 +428,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .remove_peer(peer, team.into_id().into())
+            .remove_peer(peer, GraphId::transmute(team))
             .await
             .context("unable to remove sync peer")?;
         Ok(())
@@ -458,7 +457,7 @@ impl DaemonApi for Api {
             .aranya
             .lock()
             .await
-            .remove_graph(team.into_id().into())
+            .remove_graph(GraphId::transmute(team))
             .context("unable to remove graph from storage")?;
 
         Ok(())
@@ -481,7 +480,7 @@ impl DaemonApi for Api {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
-        let team_id: api::TeamId = graph_id.into_id().into();
+        let team_id = api::TeamId::transmute(graph_id);
 
         match cfg.quic_sync {
             Some(qs_cfg) => {
@@ -529,7 +528,7 @@ impl DaemonApi for Api {
             (seed, enc_sk)
         };
 
-        let group = GroupId::from(team.into_id());
+        let group = GroupId::transmute(team);
         let (encap_key, encrypted_seed) = enc_sk
             .seal_psk_seed(&mut Rng, &seed.0, &peer_enc_pk, &group)
             .context("could not seal psk seed")?;
@@ -551,7 +550,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
+            .actions(&GraphId::transmute(team))
             .add_member(keys.into())
             .await
             .context("unable to add device to team")?;
@@ -568,8 +567,8 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
-            .remove_member(device.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .remove_member(DeviceId::transmute(device))
             .await
             .context("unable to remove device from team")?;
         Ok(())
@@ -586,8 +585,8 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
-            .assign_role(device.into_id().into(), role.into())
+            .actions(&GraphId::transmute(team))
+            .assign_role(DeviceId::transmute(device), role.into())
             .await
             .context("unable to assign role")?;
         Ok(())
@@ -604,8 +603,8 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
-            .revoke_role(device.into_id().into(), role.into())
+            .actions(&GraphId::transmute(team))
+            .revoke_role(DeviceId::transmute(device), role.into())
             .await
             .context("unable to revoke device role")?;
         Ok(())
@@ -620,16 +619,21 @@ impl DaemonApi for Api {
         peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<(api::AfcCtrl, api::AfcLocalChannelId, api::AfcChannelId)> {
+        use aranya_crypto::policy::LabelId;
+
         self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
 
-        let graph = GraphId::from(team.into_id());
+        let graph = GraphId::transmute(team);
 
         let (ctrl, effects) = self
             .client
             .actions(&graph)
-            .create_afc_uni_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
+            .create_afc_uni_channel_off_graph(
+                DeviceId::transmute(peer_id),
+                LabelId::transmute(label),
+            )
             .await?;
 
         let [Effect::AfcUniChannelCreated(e)] = effects.as_slice() else {
@@ -668,7 +672,7 @@ impl DaemonApi for Api {
     ) -> api::Result<(api::LabelId, api::AfcLocalChannelId, api::AfcChannelId)> {
         self.check_team_valid(team).await?;
 
-        let graph = GraphId::from(team.into_id());
+        let graph = GraphId::transmute(team);
         let mut session = self.client.session_new(&graph).await?;
 
         let effects = self.client.session_receive(&mut session, &ctrl).await?;
@@ -681,7 +685,11 @@ impl DaemonApi for Api {
 
         let (local_channel_id, channel_id) = self.afc.uni_channel_received(e).await?;
 
-        return Ok((e.label_id.into(), local_channel_id, channel_id));
+        return Ok((
+            api::LabelId::transmute(e.label_id),
+            local_channel_id,
+            channel_id,
+        ));
     }
 
     /// Create a label.
@@ -696,12 +704,12 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&GraphId::transmute(team))
             .create_label(label_name)
             .await
             .context("unable to create label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label_id.into())
+            Ok(api::LabelId::transmute(e.label_id))
         } else {
             Err(anyhow!("unable to create label").into())
         }
@@ -719,8 +727,8 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
-            .delete_label(label_id.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .delete_label(LabelId::transmute(label_id))
             .await
             .context("unable to delete label")?;
         if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
@@ -744,10 +752,10 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&GraphId::transmute(team))
             .assign_label(
-                device.into_id().into(),
-                label_id.into_id().into(),
+                DeviceId::transmute(device),
+                LabelId::transmute(label_id),
                 op.into(),
             )
             .await
@@ -772,8 +780,8 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
-            .revoke_label(device.into_id().into(), label_id.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .revoke_label(DeviceId::transmute(device), LabelId::transmute(label_id))
             .await
             .context("unable to revoke label")?;
         if let Some(Effect::LabelRevoked(_e)) = find_effect!(&effects, Effect::LabelRevoked(_e)) {
@@ -794,14 +802,14 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&GraphId::transmute(team))
             .query_devices_on_team_off_graph()
             .await
             .context("unable to query devices on team")?;
         let mut devices: Vec<api::DeviceId> = Vec::new();
         for e in effects {
             if let Effect::QueryDevicesOnTeamResult(e) = e {
-                devices.push(e.device_id.into());
+                devices.push(api::DeviceId::transmute(e.device_id));
             }
         }
         return Ok(devices);
@@ -818,8 +826,8 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
-            .query_device_role_off_graph(device.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .query_device_role_off_graph(DeviceId::transmute(device))
             .await
             .context("unable to query device role")?;
         if let Some(Effect::QueryDeviceRoleResult(e)) =
@@ -842,8 +850,8 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
-            .query_device_keybundle_off_graph(device.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .query_device_keybundle_off_graph(DeviceId::transmute(device))
             .await
             .context("unable to query device keybundle")?;
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
@@ -867,8 +875,8 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
-            .query_label_assignments_off_graph(device.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .query_label_assignments_off_graph(DeviceId::transmute(device))
             .await
             .context("unable to query device label assignments")?;
         let mut labels: Vec<api::Label> = Vec::new();
@@ -876,7 +884,7 @@ impl DaemonApi for Api {
             if let Effect::QueriedLabelAssignment(e) = e {
                 debug!("found label: {}", e.label_id);
                 labels.push(api::Label {
-                    id: e.label_id.into(),
+                    id: api::LabelId::transmute(e.label_id),
                     name: e.label_name,
                 });
             }
@@ -896,8 +904,8 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
-            .query_label_exists_off_graph(label_id.into_id().into())
+            .actions(&GraphId::transmute(team))
+            .query_label_exists_off_graph(LabelId::transmute(label_id))
             .await
             .context("unable to query label")?;
         if let Some(Effect::QueryLabelExistsResult(_e)) =
@@ -920,7 +928,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&GraphId::transmute(team))
             .query_labels_off_graph()
             .await
             .context("unable to query labels")?;
@@ -929,7 +937,7 @@ impl DaemonApi for Api {
             if let Effect::QueriedLabel(e) = e {
                 debug!("found label: {}", e.label_id);
                 labels.push(api::Label {
-                    id: e.label_id.into(),
+                    id: api::LabelId::transmute(e.label_id),
                     name: e.label_name,
                 });
             }
@@ -942,15 +950,9 @@ impl Api {
     async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
         let crypto = &mut *self.crypto.lock().await;
 
-        let id = seed.id().context("getting seed id")?;
-
-        let wrapped_key = crypto
-            .engine
-            .wrap(seed.clone().into_inner())
-            .context("wrapping seed")?;
-        crypto
+        let id = crypto
             .local_store
-            .try_insert(id.into_id(), wrapped_key)
+            .insert_key(&mut crypto.engine, seed.into_inner())
             .context("inserting seed")?;
 
         if let Err(e) = self
@@ -961,7 +963,7 @@ impl Api {
         {
             match crypto
                 .local_store
-                .remove::<WrappedKey<CS>>(id.into_id())
+                .remove::<WrappedKey<CS>>(id.as_base())
                 .context("could not remove seed from keystore")
             {
                 Ok(_) => return Err(e),
