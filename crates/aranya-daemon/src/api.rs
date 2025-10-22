@@ -33,7 +33,7 @@ use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
-use crate::afc::Afc;
+use crate::afc::{Afc, RemoveIfParams};
 use crate::{
     actions::{Actions, SessionData},
     daemon::{CE, CS, KS},
@@ -117,7 +117,12 @@ impl DaemonApiServer {
             .context("could not canonicalize uds_path")?;
         #[cfg(feature = "afc")]
         let afc = Arc::new(afc);
-        let effect_handler = EffectHandler {};
+        let effect_handler = EffectHandler {
+            #[cfg(feature = "afc")]
+            afc: afc.clone(),
+            #[cfg(feature = "afc")]
+            device_id: pk.ident_pk.id()?,
+        };
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
@@ -196,7 +201,12 @@ impl DaemonApiServer {
 
 /// Handles effects from an Aranya action.
 #[derive(Clone, Debug)]
-struct EffectHandler {}
+struct EffectHandler {
+    #[cfg(feature = "afc")]
+    afc: Arc<Afc<CE, CS, KS>>,
+    #[cfg(feature = "afc")]
+    device_id: DeviceId,
+}
 
 impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
@@ -210,9 +220,27 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
-                TeamTerminated(_team_terminated) => {}
+                TeamTerminated(_team_terminated) => {
+                    #[cfg(feature = "afc")]
+                    self.afc.delete_channels().await?;
+                }
                 DeviceAdded(_device_added) => {}
-                DeviceRemoved(_device_removed) => {}
+                DeviceRemoved(_device_removed) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        if self.device_id == _device_removed.device_id.into() {
+                            self.afc.delete_channels().await?;
+                        } else {
+                            let peer_id = Some(_device_removed.device_id.into());
+                            self.afc
+                                .remove_if(RemoveIfParams {
+                                    peer_id,
+                                    ..Default::default()
+                                })
+                                .await?;
+                        }
+                    }
+                }
                 RoleAssigned(_role_assigned) => {}
                 // AdminAssigned is now just RoleAssigned - handled above
                 // OperatorAssigned is now just RoleAssigned - handled above
@@ -220,10 +248,34 @@ impl EffectHandler {
                 // AdminRevoked is now just RoleRevoked - handled above
                 // OperatorRevoked is now just RoleRevoked - handled above
                 LabelCreated(_) => {}
-                LabelDeleted(_) => {}
+                LabelDeleted(_label_deleted) => {
+                    #[cfg(feature = "afc")]
+                    self.afc
+                        .remove_if(RemoveIfParams {
+                            label_id: Some(_label_deleted.label_id.into()),
+                            ..Default::default()
+                        })
+                        .await?;
+                }
                 AssignedLabelToDevice(_) => {}
                 AssignedLabelToRole(_) => {}
-                LabelRevokedFromDevice(_) => {}
+                LabelRevokedFromDevice(_label_revoked) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        let label_id = Some(_label_revoked.label_id.into());
+                        let mut peer_id = None;
+                        if self.device_id != _label_revoked.device_id.into() {
+                            peer_id = Some(_label_revoked.device_id.into());
+                        };
+                        self.afc
+                            .remove_if(RemoveIfParams {
+                                label_id,
+                                peer_id,
+                                ..Default::default()
+                            })
+                            .await?;
+                    }
+                }
                 LabelRevokedFromRole(_) => {}
                 QueryLabelResult(_) => {}
                 AfcUniChannelCreated(_) => {}

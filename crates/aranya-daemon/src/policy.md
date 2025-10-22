@@ -3700,6 +3700,8 @@ action revoke_label_from_device(device_id id, label_id id) {
 // Emitted when the `RevokeLabelFromDevice` command is
 // successfully processed.
 effect LabelRevokedFromDevice {
+    // The ID of the device the label was removed from.
+    device_id id,
     // The ID of the label that was revoked.
     label_id id,
     // The name of the label that was revoked.
@@ -3727,6 +3729,7 @@ command RevokeLabelFromDevice {
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
         check can_manage_label(author.device_id, this.label_id)
+        let target = get_device(this.device_id)
 
         // We need to get label info before deleting
         let label = check_unwrap query Label[label_id: this.label_id]
@@ -3749,6 +3752,7 @@ command RevokeLabelFromDevice {
             ]
 
             emit LabelRevokedFromDevice {
+                device_id: target.device_id,
                 label_id: this.label_id,
                 label_name: label.name,
                 label_author_id: label.author_id,

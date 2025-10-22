@@ -141,6 +141,7 @@ pub struct LabelManagingRoleRevoked {
 /// LabelRevokedFromDevice policy effect.
 #[effect]
 pub struct LabelRevokedFromDevice {
+    pub device_id: BaseId,
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
