@@ -3,7 +3,6 @@
 
 use std::{
     env,
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -16,6 +15,7 @@ use aranya_client::{
     DeviceId, Error,
 };
 use aranya_daemon_api::text;
+use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::{
