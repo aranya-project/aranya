@@ -234,7 +234,9 @@ pub struct Label {
 
 // TODO(jdygert): tarpc does not cfg return types properly.
 #[cfg(not(feature = "afc"))]
-use afc_stub::{AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcShmInfo};
+use afc_stub::{
+    AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcReceiveChannelInfo, AfcSendChannelInfo, AfcShmInfo,
+};
 #[cfg(not(feature = "afc"))]
 mod afc_stub {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
