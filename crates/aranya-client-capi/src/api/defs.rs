@@ -1600,6 +1600,15 @@ pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
     channel.id().into()
 }
 
+/// Returns the [`DeviceId`] for the peer on the other end of the channel.
+///
+/// @param[in]  channel the AFC channel object.
+/// @param[out] __output the peer's ID.
+#[cfg(feature = "afc")]
+pub fn afc_send_channel_get_peer_id(channel: &AfcSendChannel) -> DeviceId {
+    channel.peer_id().into()
+}
+
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
 ///
 /// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
@@ -1616,6 +1625,15 @@ pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId 
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
     channel.id().into()
+}
+
+/// Returns the [`DeviceId`] for the peer on the other end of the channel.
+///
+/// @param[in]  channel the AFC channel object.
+/// @param[out] __output the peer's ID.
+#[cfg(feature = "afc")]
+pub fn afc_receive_channel_get_peer_id(channel: &AfcReceiveChannel) -> DeviceId {
+    channel.peer_id().into()
 }
 
 /// Returns the raw data for a given [`AfcCtrlMsg`].
