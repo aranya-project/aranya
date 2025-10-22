@@ -232,7 +232,9 @@ impl EffectHandler {
                 RoleAssigned(_role_assigned) => {}
                 // AdminAssigned is now just RoleAssigned - handled above
                 // OperatorAssigned is now just RoleAssigned - handled above
-                RoleRevoked(_role_revoked) => {}
+                RoleRevoked(_role_revoked) => {
+                    // TODO: delete channels where label is no longer assigned to the device or role
+                }
                 // AdminRevoked is now just RoleRevoked - handled above
                 // OperatorRevoked is now just RoleRevoked - handled above
                 LabelCreated(_) => {}
@@ -240,7 +242,9 @@ impl EffectHandler {
                 AssignedLabelToDevice(_) => {}
                 AssignedLabelToRole(_) => {}
                 LabelRevokedFromDevice(_) => {}
-                LabelRevokedFromRole(_) => {}
+                LabelRevokedFromRole(_) => {
+                    // TODO: delete channels where label is no longer assigned to the device or role
+                }
                 AqcNetworkNameSet(e) => {
                     #[cfg(feature = "aqc")]
                     if let Some(aqc) = &self.aqc {
@@ -279,12 +283,16 @@ impl EffectHandler {
                 LabelManagingRoleAdded(_) => {}
                 LabelManagingRoleRevoked(_) => {}
                 PermAddedToRole(_) => {}
-                PermRemovedFromRole(_) => {}
+                PermRemovedFromRole(_) => {
+                    // TODO: delete channels where afc permission has been revoked.
+                }
                 RoleOwnerAdded(_) => {}
                 RoleOwnerRemoved(_) => {}
                 RoleManagementPermAssigned(_) => {}
                 RoleManagementPermRevoked(_) => {}
-                RoleChanged(_) => {}
+                RoleChanged(_) => {
+                    // TODO: delete channels where label is no longer assigned to the device or role
+                }
                 QueryLabelsResult(_) => {}
                 QueryLabelsAssignedToRoleResult(_) => {}
                 QueryTeamRolesResult(_) => {}
