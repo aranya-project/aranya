@@ -428,7 +428,7 @@ where
                                 ?peer_addr,
                                 ?graph_id,
                                 ?head,
-                                "Successfully sent sync_on_hello message"
+                                "Successfully sent sync_on_hello request to Syncer"
                             );
                         }
                         Err(e) => {
