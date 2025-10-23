@@ -2,7 +2,6 @@
 
 mod device;
 mod label;
-mod net_id;
 mod role;
 mod team;
 
@@ -12,7 +11,6 @@ use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 pub use crate::client::{
     device::{Device, DeviceId, Devices},
     label::{ChanOp, Label, LabelId, Labels},
-    net_id::{InvalidNetIdentifier, NetIdentifier},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };

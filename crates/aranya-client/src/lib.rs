@@ -45,8 +45,8 @@ pub use aranya_policy_text::{text, Text};
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, InvalidNetIdentifier, Label, LabelId, Labels,
-        NetIdentifier, Role, RoleId, Roles, Team, TeamId,
+        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, Role, RoleId, Roles,
+        Team, TeamId,
     },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
