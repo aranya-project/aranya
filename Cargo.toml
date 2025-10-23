@@ -67,6 +67,7 @@ backon = { version = "1.2.0" }
 bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
+dashmap = { version = "6" }
 derive-where = { version = "1" }
 divan = { version = "0.1", default-features = false }
 futures-lite = { version = "2.6.0" }

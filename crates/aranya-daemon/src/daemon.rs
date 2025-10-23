@@ -36,7 +36,7 @@ use crate::{
     sync::{
         manager::{SyncHandle, SyncManager},
         services::hello::HelloInfo,
-        transport::quic::{PskStore, State as QuicSyncClientState, SyncParams},
+        transport::quic::{PskStore, QuicTransport as QuicSyncClientState, SyncParams},
         types::PeerCacheMap,
     },
     util::{load_team_psk_pairs, SeedDir},

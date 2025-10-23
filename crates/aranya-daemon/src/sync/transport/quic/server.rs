@@ -44,9 +44,9 @@ use crate::{
         manager::SyncHandle,
         services::hello::{HelloInfo, HelloSubscription, HelloSubscriptions},
         transport::quic::{
-            connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap},
+            connections::{ConnectionKey, ConnectionUpdate, SharedConnections},
             psk::PskStore,
-            Error, ALPN_QUIC_SYNC,
+            QuicError, ALPN_QUIC_SYNC,
         },
         types::{SyncPeer, SyncResponse},
         Result as SyncResult, SyncError,
@@ -64,7 +64,7 @@ pub struct Server<EN, SP> {
     server: QuicServer,
     server_keys: Arc<PskStore>,
     /// Connection map shared with [`super::Syncer`]
-    conns: SharedConnectionMap,
+    conns: SharedConnections,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Storage for sync hello subscriptions
@@ -96,7 +96,7 @@ where
         client_with_caches: ClientWithCaches<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-        conns: SharedConnectionMap,
+        conns: SharedConnections,
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
         hello_info: HelloInfo,
     ) -> SyncResult<Self> {
@@ -122,7 +122,7 @@ where
             .assume("can set sync server addr")?
             .with_congestion_controller(Bbr::default())?
             .start()
-            .map_err(Error::ServerStart)?;
+            .map_err(QuicError::ServerStart)?;
 
         Ok(Self {
             client_with_caches,
@@ -274,7 +274,7 @@ where
             data_len
         };
         debug!(n = data_len, "server sent sync response");
-        send.close().await.map_err(Error::from)?;
+        send.close().await.map_err(QuicError::from)?;
 
         Ok(())
     }
@@ -480,7 +480,7 @@ fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<G
         bug!("Should be a SyncRequest")
     };
     if team_id.as_bytes() != storage_id.as_bytes() {
-        return Err(SyncError::QuicSync(Error::InvalidPSK));
+        return Err(SyncError::QuicSync(QuicError::InvalidPSK));
     }
 
     Ok(*storage_id)

@@ -17,7 +17,7 @@ use tracing::{debug, instrument, trace, warn};
 use crate::{
     sync::{
         manager::{SyncHandle, SyncManager},
-        transport::quic::{Error, State},
+        transport::quic::{QuicError, QuicTransport},
         Result as SyncResult,
     },
     Addr,
@@ -46,7 +46,7 @@ pub struct HelloInfo {
     pub sync_peers: SyncHandle,
 }
 
-impl SyncManager<State> {
+impl SyncManager<QuicTransport> {
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
     pub async fn broadcast_hello_notifications(
@@ -158,8 +158,8 @@ impl SyncManager<State> {
         // Send the message
         send.send(bytes::Bytes::from(data))
             .await
-            .map_err(Error::from)?;
-        send.close().await.map_err(Error::from)?;
+            .map_err(QuicError::from)?;
+        send.close().await.map_err(QuicError::from)?;
 
         // Read the response to avoid race condition with server
         let mut response_buf = Vec::new();
@@ -290,7 +290,7 @@ impl SyncManager<State> {
                 ?peer,
                 "Failed to send hello message"
             );
-            Error::from(e)
+            QuicError::from(e)
         })?;
 
         send.close().await.map_err(|e| {
@@ -299,7 +299,7 @@ impl SyncManager<State> {
                 ?peer,
                 "Failed to close send stream"
             );
-            Error::from(e)
+            QuicError::from(e)
         })?;
 
         // Read the response to avoid race condition with server

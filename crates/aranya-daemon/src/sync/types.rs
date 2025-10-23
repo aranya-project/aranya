@@ -1,10 +1,13 @@
 //! TODO(nikki): docs
 
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use aranya_runtime::{Address, GraphId, PeerCache};
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 
 use crate::Addr;
 
@@ -13,7 +16,7 @@ use crate::Addr;
 /// Contains the information needed to sync with a single peer:
 /// - network address
 /// - Aranya graph id
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SyncPeer {
     /// The peer address.
     pub addr: Addr,
@@ -29,7 +32,7 @@ impl SyncPeer {
 }
 
 /// The specific sync operation to perform.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum SyncType {
     /// Regular poll-based sync.
     Poll,
@@ -53,7 +56,7 @@ pub enum SyncType {
 ///
 /// For a given peer, there should only be one cache. If separate caches are used
 /// for the server and state it will reduce the efficiency of the syncer.
-pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<SyncPeer, PeerCache>>>;
+pub(crate) type PeerCacheMap = Arc<DashMap<SyncPeer, PeerCache>>;
 
 /// A response to a sync request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,4 +65,19 @@ pub(crate) enum SyncResponse {
     Ok(Box<[u8]>),
     /// Failure.
     Err(String),
+}
+
+#[derive(Debug)]
+pub struct SyncGuard {
+    pub peer: SyncPeer,
+    pub started_at: Instant,
+}
+
+impl SyncGuard {
+    pub fn new(peer: SyncPeer) -> Self {
+        Self {
+            peer,
+            started_at: Instant::now(),
+        }
+    }
 }

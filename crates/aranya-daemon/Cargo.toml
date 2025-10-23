@@ -50,10 +50,12 @@ buggy = { workspace = true }
 
 
 anyhow = { workspace = true }
+async-trait = "0.1"
 bimap = "0.6"
 bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
+dashmap = { workspace = true }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
 metrics = { workspace = true }

@@ -13,8 +13,8 @@ mod server;
 
 use std::sync::Arc;
 
-pub use client::Error;
-pub(crate) use client::State;
+pub use client::QuicError;
+pub(crate) use client::QuicTransport;
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 pub(crate) use server::Server;

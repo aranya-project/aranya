@@ -3,46 +3,35 @@
 //! the client access to a mutable connection [handle][Handle]. The corresponding [stream acceptor][StreamAcceptor],
 //! that's used by the sync server, is sent over a channel when new connections are inserted in the map.
 
-use std::{
-    collections::{btree_map::Entry, BTreeMap},
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::sync::Arc;
 
-use aranya_runtime::GraphId;
+use dashmap::{DashMap, Entry};
 use s2n_quic::{
     application::Error as AppError,
     connection::{Handle, StreamAcceptor},
     Connection,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tracing::debug;
 
-/// A [`ConnectionKey`] and [`StreamAcceptor`] pair that is sent over a channel
-/// when a new connection is inserted.
-pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
-type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
+use crate::sync::SyncPeer;
 
-/// Unique key for a connection with a peer.
-///
-/// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub(crate) struct ConnectionKey {
-    pub(super) addr: SocketAddr,
-    pub(super) id: GraphId,
-}
+/// A [`SyncPeer`] and [`StreamAcceptor`] pair that is sent over a channel
+/// when a new connection is inserted.
+pub(crate) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 
 /// Thread-safe map for sharing QUIC connections between sync peers.
 ///
 /// This map stores persistent QUIC connections indexed by [`ConnectionKey`].
-#[derive(Clone, Debug)]
-pub struct SharedConnectionMap {
+#[derive(Debug, Clone)]
+pub struct SharedConnections {
     tx: mpsc::Sender<ConnectionUpdate>,
-    handles: Arc<Mutex<ConnectionMap>>,
+    handles: Arc<DashMap<SyncPeer, Handle>>,
 }
 
-impl SharedConnectionMap {
+impl SharedConnections {
     pub(crate) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
+        // TODO(nikki): const generic
         let (tx, rx) = mpsc::channel(32);
         (
             Self {
@@ -57,8 +46,8 @@ impl SharedConnectionMap {
     ///
     /// If the handle does not match the one in the map,
     /// it has been replaced and does not need to be removed.
-    pub(super) async fn remove(&mut self, key: ConnectionKey, handle: Handle) {
-        match self.handles.lock().await.entry(key) {
+    pub(super) async fn remove(&self, peer: SyncPeer, handle: Handle) {
+        match self.handles.entry(peer) {
             Entry::Vacant(_) => {}
             Entry::Occupied(entry) => {
                 if entry.get().id() == handle.id() {
@@ -88,11 +77,11 @@ impl SharedConnectionMap {
     ///
     /// Returns an error if the connection creation closure fails.
     pub(super) async fn get_or_try_insert_with(
-        &mut self,
-        key: ConnectionKey,
-        make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
-    ) -> Result<Handle, super::Error> {
-        let (handle, maybe_acceptor) = match self.handles.lock().await.entry(key) {
+        &self,
+        peer: SyncPeer,
+        make_conn: impl AsyncFnOnce() -> Result<Connection, super::QuicError>,
+    ) -> Result<Handle, super::QuicError> {
+        let (handle, maybe_acceptor) = match self.handles.entry(peer) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");
 
@@ -115,7 +104,7 @@ impl SharedConnectionMap {
 
         if let Some(acceptor) = maybe_acceptor {
             debug!("created new quic connection");
-            self.tx.send((key, acceptor)).await.ok();
+            self.tx.send((peer, acceptor)).await.ok();
         }
         Ok(handle)
     }
@@ -135,13 +124,13 @@ impl SharedConnectionMap {
     /// # Returns
     ///
     /// * `Handle` - The connection handle
-    pub(super) async fn insert(&mut self, key: ConnectionKey, conn: Connection) -> Handle {
-        let (handle, acceptor) = match self.handles.lock().await.entry(key) {
+    pub(super) async fn insert(&self, peer: SyncPeer, conn: Connection) -> Handle {
+        let (handle, acceptor) = match self.handles.entry(peer) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");
 
                 if entry.get_mut().ping().is_ok() {
-                    debug!(connection_key = ?key, "Closing the connection because an open connection was already found");
+                    debug!(connection_key = ?peer, "Closing the connection because an open connection was already found");
                     conn.close(AppError::UNKNOWN);
                     return entry.get().clone();
                 } else {
@@ -159,7 +148,7 @@ impl SharedConnectionMap {
         };
 
         debug!("created new quic connection");
-        self.tx.send((key, acceptor)).await.ok();
+        self.tx.send((peer, acceptor)).await.ok();
 
         handle
     }

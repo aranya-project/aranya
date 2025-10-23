@@ -6,7 +6,8 @@ pub mod transport;
 pub mod types;
 
 use error::SyncError;
-pub(crate) use types::PeerCacheMap;
+pub(crate) use transport::Transport;
+pub(crate) use types::{PeerCacheMap, SyncPeer};
 
 /// Possible sync related errors
 pub type Result<T> = core::result::Result<T, SyncError>;
@@ -16,7 +17,7 @@ mod error {
 
     use thiserror::Error;
 
-    use super::transport::quic::Error as QSError;
+    use super::transport::quic::QuicError as QSError;
 
     #[derive(Error, Debug)]
     #[non_exhaustive]

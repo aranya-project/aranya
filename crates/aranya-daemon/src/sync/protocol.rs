@@ -14,10 +14,9 @@ use metrics::counter;
 use tracing::{debug, warn};
 
 use super::{
-    manager::EffectSender,
-    transport::Transport,
-    types::{SyncPeer, SyncResponse, SyncType},
-    PeerCacheMap, Result,
+    manager::{EffectSender, ProtocolConfig},
+    types::{SyncResponse, SyncType},
+    PeerCacheMap, Result, SyncPeer, Transport,
 };
 use crate::{vm_policy::VecSink, Addr, Client};
 
@@ -35,6 +34,7 @@ pub enum SyncResult {
 /// This is designed so that each peer gets a dedicated buffer to request/respond with.
 #[derive(Debug)]
 pub struct SyncProtocol {
+    peer: SyncPeer,
     client: Client,
     caches: PeerCacheMap,
     server_addr: Addr,
@@ -45,17 +45,13 @@ pub struct SyncProtocol {
 
 impl SyncProtocol {
     /// Create a new sync protocol handler.
-    pub fn new(
-        client: Client,
-        caches: PeerCacheMap,
-        server_addr: Addr,
-        send_effects: EffectSender,
-    ) -> Self {
+    pub fn new(peer: SyncPeer, config: ProtocolConfig) -> Self {
         Self {
-            client,
-            caches,
-            server_addr,
-            send_effects,
+            peer,
+            client: config.client,
+            caches: config.caches,
+            server_addr: config.server_addr,
+            send_effects: config.send_effects,
             request_buf: vec![0; MAX_SYNC_MESSAGE_SIZE],
             response_buf: vec![0; MAX_SYNC_MESSAGE_SIZE],
         }
@@ -65,11 +61,10 @@ impl SyncProtocol {
     pub async fn execute_sync(
         &mut self,
         transport: &impl Transport,
-        peer: &SyncPeer,
         sync_type: SyncType,
     ) -> Result<SyncResult> {
         let req_len: usize = match &sync_type {
-            SyncType::Poll => self.build_poll_request(peer).await?,
+            SyncType::Poll => self.build_poll_request().await?,
             SyncType::HelloSubscribe { delay, duration } => {
                 self.build_hello_subscribe(*delay, *duration)?
             }
@@ -78,13 +73,17 @@ impl SyncProtocol {
         };
 
         let resp_len = transport
-            .execute_sync(peer, &self.request_buf[..req_len], &mut self.response_buf)
+            .execute_sync(
+                &self.peer,
+                &self.request_buf[..req_len],
+                &mut self.response_buf,
+            )
             .await?;
 
         let result = match sync_type {
             SyncType::Poll => {
                 let count = self
-                    .process_poll_response(peer, &self.response_buf[..resp_len])
+                    .process_poll_response(&self.response_buf[..resp_len])
                     .await?;
                 SyncResult::CommandsProcessed(count)
             }
@@ -119,11 +118,10 @@ impl SyncProtocol {
 
         let len = {
             let mut aranya = self.client.aranya.lock().await;
-            let mut caches = self.caches.lock().await;
             let peer = SyncPeer::new(peer_server_addr, storage_id);
-            let cache = caches.entry(peer).or_insert_with(PeerCache::default);
+            let mut cache = self.caches.entry(peer).or_insert_with(PeerCache::default);
 
-            resp.poll(&mut self.response_buf, aranya.provider(), cache)
+            resp.poll(&mut self.response_buf, aranya.provider(), &mut cache)
                 .or_else(|err| {
                     if matches!(
                         err,
@@ -141,7 +139,7 @@ impl SyncProtocol {
         Ok(&self.response_buf[..len])
     }
 
-    async fn process_poll_response(&self, peer: &SyncPeer, response_data: &[u8]) -> Result<usize> {
+    async fn process_poll_response(&self, response_data: &[u8]) -> Result<usize> {
         // Check for empty response (which indicates a hello message response)
         if response_data.is_empty() {
             debug!("received empty response, likely from hello message - ignoring");
@@ -161,7 +159,9 @@ impl SyncProtocol {
             return Ok(0);
         }
 
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, peer.addr);
+        let graph_id = self.peer.graph_id;
+        let addr = self.peer.addr;
+        let mut sync_requester = SyncRequester::new(graph_id, &mut Rng, addr);
         let cmds = match sync_requester.receive(&data)? {
             Some(cmds) => cmds,
             None => return Ok(0),
@@ -175,8 +175,7 @@ impl SyncProtocol {
 
         let mut sink = VecSink::new();
         let mut aranya = self.client.aranya.lock().await;
-        let mut caches = self.caches.lock().await;
-        let mut trx = aranya.transaction(peer.graph_id);
+        let mut trx = aranya.transaction(graph_id);
         aranya
             .add_commands(&mut trx, &mut sink, &cmds)
             .context("unable to add received commands")?;
@@ -184,15 +183,16 @@ impl SyncProtocol {
             .commit(&mut trx, &mut sink)
             .context("commit failed")?;
 
-        let cache = caches
-            .entry(peer.clone())
+        let mut cache = self
+            .caches
+            .entry(self.peer.clone())
             .or_insert_with(PeerCache::default);
 
         aranya
             .update_heads(
-                peer.graph_id,
+                graph_id,
                 cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                cache,
+                &mut cache,
             )
             .context("failed to update cache heads")?;
 
@@ -202,26 +202,26 @@ impl SyncProtocol {
         if !effects.is_empty() {
             counter!("sync.effects_sent").increment(effects.len() as u64);
 
-            if let Err(e) = self.send_effects.send((peer.graph_id, effects)).await {
-                warn!(peer = %peer.addr, graph = %peer.graph_id, error = %e, "failed to send effects");
+            if let Err(e) = self.send_effects.send((graph_id, effects)).await {
+                warn!(peer = %addr, graph = %graph_id, error = %e, "failed to send effects");
             }
         }
 
         Ok(cmds.len())
     }
 
-    async fn build_poll_request(&mut self, peer: &SyncPeer) -> Result<usize> {
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, self.server_addr);
+    async fn build_poll_request(&mut self) -> Result<usize> {
+        let mut sync_requester = SyncRequester::new(self.peer.graph_id, &mut Rng, self.server_addr);
 
         let len = {
             let mut aranya = self.client.aranya.lock().await;
-            let mut caches = self.caches.lock().await;
-            let cache = caches
-                .entry(peer.clone())
+            let mut cache = self
+                .caches
+                .entry(self.peer.clone())
                 .or_insert_with(PeerCache::default);
 
             let (len, _) = sync_requester
-                .poll(&mut self.request_buf, aranya.provider(), cache)
+                .poll(&mut self.request_buf, aranya.provider(), &mut cache)
                 .context("sync poll failed")?;
             len
         };
