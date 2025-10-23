@@ -55,7 +55,6 @@ use crate::{
         task::{PeerCacheKey, Syncer},
         Result as SyncResult, SyncError,
     },
-    InvalidGraphs,
 };
 
 mod connections;
@@ -234,7 +233,6 @@ impl Syncer<State> {
     pub(crate) fn new(
         client: Client<crate::EN, crate::SP>,
         send_effects: super::EffectSender,
-        invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         server_addr: Addr,
         recv: mpsc::Receiver<Request>,
@@ -248,7 +246,6 @@ impl Syncer<State> {
             recv,
             queue: DelayQueue::new(),
             send_effects,
-            invalid,
             state,
             server_addr,
         })

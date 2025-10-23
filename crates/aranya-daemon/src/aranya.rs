@@ -17,13 +17,45 @@ use crate::sync::task::{quic::HelloSubscriptions, PeerCacheKey};
 /// for the server and state it will reduce the efficiency of the syncer.
 pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
-/// Thread-safe wrapper for an Aranya client.
+mod invalid_graphs {
+    use std::{collections::HashSet, sync::RwLock};
+
+    use aranya_runtime::GraphId;
+
+    /// Keeps track of which graphs have had a finalization error.
+    ///
+    /// Once a finalization error has occurred for a graph,
+    /// the graph error is permanent.
+    /// The API will prevent subsequent operations on the invalid graph.
+    #[derive(Debug, Default)]
+    pub(crate) struct InvalidGraphs {
+        // NB: Since the locking is short and not held over await points,
+        // we use a standard rwlock instead of tokio's.
+        map: RwLock<HashSet<GraphId>>,
+    }
+
+    impl InvalidGraphs {
+        pub fn insert(&self, graph_id: GraphId) {
+            #[allow(clippy::expect_used)]
+            self.map.write().expect("poisoned").insert(graph_id);
+        }
+
+        pub fn contains(&self, graph_id: GraphId) -> bool {
+            #[allow(clippy::expect_used)]
+            self.map.read().expect("poisoned").contains(&graph_id)
+        }
+    }
+}
+pub(crate) use invalid_graphs::InvalidGraphs;
+
+/// Shared Aranya client and related state.
 #[derive_where(Clone)]
 pub struct Client<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
     caches: PeerCacheMap,
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    invalid_graphs: Arc<InvalidGraphs>,
 }
 
 impl<EN, SP> fmt::Debug for Client<EN, SP> {
@@ -39,6 +71,7 @@ impl<EN, SP> Client<EN, SP> {
             aranya: Arc::new(Mutex::new(aranya)),
             caches: Arc::default(),
             hello_subscriptions: Arc::default(),
+            invalid_graphs: Arc::default(),
         }
     }
 
@@ -67,6 +100,10 @@ impl<EN, SP> Client<EN, SP> {
     /// Use this when you need to access or modify hello subscriptions.
     pub async fn lock_hello_subscriptions(&self) -> MutexGuard<'_, HelloSubscriptions> {
         self.hello_subscriptions.lock().await
+    }
+
+    pub(crate) fn invalid_graphs(&self) -> &InvalidGraphs {
+        &self.invalid_graphs
     }
 
     /// Returns a clone of the peer caches Arc for test inspection.

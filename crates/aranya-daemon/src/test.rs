@@ -46,7 +46,7 @@ use crate::{
         task::{quic::PskStore, PeerCacheKey, SyncPeer},
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
-    AranyaStore, InvalidGraphs,
+    AranyaStore,
 };
 
 // Aranya graph client for testing.
@@ -247,7 +247,6 @@ impl TestCtx {
             let syncer = TestSyncer::new(
                 client.clone(),
                 send_effects,
-                InvalidGraphs::default(),
                 psk_store.clone(),
                 local_addr.into(),
                 syncer_recv,

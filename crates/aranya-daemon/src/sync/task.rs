@@ -42,7 +42,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
+use crate::{daemon::EF, vm_policy::VecSink};
 
 pub mod hello;
 pub mod quic;
@@ -233,8 +233,6 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
-    /// Keeps track of invalid graphs due to finalization errors.
-    invalid: InvalidGraphs,
     /// Additional state used by the syncer.
     state: ST,
     /// Sync server address.
@@ -419,7 +417,7 @@ impl<ST: SyncState> Syncer<ST> {
                         }
                         keep
                     });
-                    self.invalid.insert(peer.graph_id);
+                    self.client.invalid_graphs().insert(peer.graph_id);
                 }
             })
             .with_context(|| format!("peer addr: {}", peer.addr))?;
