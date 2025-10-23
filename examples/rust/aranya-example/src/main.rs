@@ -190,6 +190,7 @@ async fn main() -> Result<()> {
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder()
         .interval(Some(sync_interval))
+        .sync_on_hello(true)
         .build()?;
 
     let team_name = "rust_example";
