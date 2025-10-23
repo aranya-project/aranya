@@ -62,7 +62,7 @@ impl QuicTransport {
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
         client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        client_config.preshared_keys = psk_store.clone(); // Pass the Arc<ClientPresharedKeys>
+        client_config.preshared_keys = psk_store.clone(); // Pass the Arc<PskStore>
 
         // Client builder doesn't support adding preshared keys
         #[allow(deprecated)]

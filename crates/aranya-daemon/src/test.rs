@@ -47,7 +47,7 @@ use crate::{
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        services::hello::{HelloInfo, HelloSubscriptions},
+        services::hello::{HelloService, HelloSubscriptions},
         transport::quic::PskStore,
         types::{PeerCacheMap, SyncPeer},
     },
@@ -64,7 +64,7 @@ type TestState = sync::transport::quic::QuicTransport;
 type TestSyncer = sync::manager::SyncManager<TestState>;
 
 // Aranya sync server for testing.
-type TestServer = sync::transport::quic::Server<
+type TestServer = sync::transport::quic::QuicServer<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
 >;
@@ -272,7 +272,7 @@ impl TestCtx {
                 psk_store.clone(),
                 conn_map,
                 conn_rx,
-                HelloInfo {
+                HelloService {
                     subscriptions: hello_subscriptions.clone(),
                     sync_peers,
                 },

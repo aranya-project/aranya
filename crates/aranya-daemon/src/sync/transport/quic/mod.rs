@@ -17,7 +17,7 @@ pub use client::QuicError;
 pub(crate) use client::QuicTransport;
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
-pub(crate) use server::Server;
+pub(crate) use server::QuicServer;
 
 use crate::Addr;
 

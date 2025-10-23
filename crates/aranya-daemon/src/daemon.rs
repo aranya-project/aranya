@@ -35,7 +35,7 @@ use crate::{
     policy,
     sync::{
         manager::{SyncHandle, SyncManager},
-        services::hello::HelloInfo,
+        services::hello::HelloService,
         transport::quic::{PskStore, QuicTransport as QuicSyncClientState, SyncParams},
         types::PeerCacheMap,
     },
@@ -58,7 +58,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::transport::quic::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::transport::quic::QuicServer<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -397,7 +397,7 @@ impl Daemon {
             psk_store,
             conns,
             conn_rx,
-            HelloInfo {
+            HelloService {
                 subscriptions: hello_subscriptions,
                 sync_peers: peers.clone(),
             },

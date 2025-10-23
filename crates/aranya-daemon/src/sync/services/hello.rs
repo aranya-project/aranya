@@ -39,7 +39,7 @@ pub type HelloSubscriptions = HashMap<(GraphId, Addr), HelloSubscription>;
 
 /// Hello-related information combining subscriptions and sync peers.
 #[derive(Debug, Clone)]
-pub struct HelloInfo {
+pub struct HelloService {
     /// Storage for sync hello subscriptions
     pub subscriptions: Arc<Mutex<HelloSubscriptions>>,
     /// Interface to trigger sync operations
