@@ -897,7 +897,7 @@ pub fn sync_peer_config_build(
 /// this function
 ///
 /// @param[in,out] cfg a pointer to the builder for a sync config
-/// @param[in] interval Set the interval at which syncing occurs
+/// @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 pub fn sync_peer_config_builder_set_interval(
@@ -943,15 +943,19 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
     cfg.sync_now(false);
 }
 
-/// Enables automatic syncing when a hello message is received from this peer
+/// Sets whether automatic syncing should occur when a hello message is received from this peer
 /// indicating they have a head that we don't have.
 ///
 /// By default, sync on hello is disabled.
 /// @param[in,out] cfg a pointer to the builder for a sync config
+/// @param[in] sync_on_hello whether to enable or disable sync on hello
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_set_sync_on_hello(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.sync_on_hello(true);
+pub fn sync_peer_config_builder_set_sync_on_hello(
+    cfg: &mut SyncPeerConfigBuilder,
+    sync_on_hello: bool,
+) {
+    cfg.sync_on_hello(sync_on_hello);
 }
 
 /// Assign a role to a device.
