@@ -68,7 +68,7 @@ pub(crate) use connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMa
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 
-pub(crate) use super::hello::{HelloInfo, HelloSubscriptions};
+pub(crate) use super::hello::HelloSubscriptions;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -240,33 +240,21 @@ impl Syncer<State> {
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         server_addr: Addr,
-    ) -> SyncResult<(
-        Self,
-        SyncPeers,
-        SharedConnectionMap,
-        mpsc::Receiver<ConnectionUpdate>,
-    )> {
-        let (send, recv) = mpsc::channel::<Request>(128);
-        let peers = SyncPeers::new(send);
+        recv: mpsc::Receiver<Request>,
+        conns: SharedConnectionMap,
+    ) -> SyncResult<Self> {
+        let state = State::new(psk_store, conns)?;
 
-        let (conns, conn_rx) = SharedConnectionMap::new();
-        let state = State::new(psk_store, conns.clone())?;
-
-        Ok((
-            Self {
-                client,
-                peers: HashMap::new(),
-                recv,
-                queue: DelayQueue::new(),
-                send_effects,
-                invalid,
-                state,
-                server_addr,
-            },
-            peers,
-            conns,
-            conn_rx,
-        ))
+        Ok(Self {
+            client,
+            peers: HashMap::new(),
+            recv,
+            queue: DelayQueue::new(),
+            send_effects,
+            invalid,
+            state,
+            server_addr,
+        })
     }
 
     /// Establishes a QUIC connection to a peer and opens a bidirectional stream.
@@ -470,11 +458,6 @@ where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
-    /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> anyhow::Result<SocketAddr> {
-        Ok(self.server.local_addr()?)
-    }
-
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         Arc::clone(self.client.hello_subscriptions())
@@ -493,10 +476,21 @@ where
         client: ClientWithState<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-        conns: SharedConnectionMap,
-        conn_rx: mpsc::Receiver<ConnectionUpdate>,
-        hello_info: HelloInfo,
-    ) -> SyncResult<Self> {
+        _hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+    ) -> SyncResult<(
+        Self,
+        SyncPeers,
+        SharedConnectionMap,
+        mpsc::Receiver<Request>,
+        SocketAddr,
+    )> {
+        // Create shared connection map and channel for connection updates
+        let (conns, server_conn_rx) = SharedConnectionMap::new();
+
+        // Create channel for SyncPeers communication with Syncer
+        let (send, syncer_recv) = mpsc::channel::<Request>(128);
+        let sync_peers = SyncPeers::new(send);
+
         // Create Server Config
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
@@ -521,18 +515,24 @@ where
             .start()
             .map_err(Error::ServerStart)?;
 
-        Ok(Self {
+        let local_addr = server
+            .local_addr()
+            .context("unable to get server local address")?;
+
+        let server_instance = Self {
             client,
             server,
             server_keys,
-            conns,
-            conn_rx,
-            sync_peers: hello_info.sync_peers,
-        })
+            conns: conns.clone(),
+            conn_rx: server_conn_rx,
+            sync_peers: sync_peers.clone(),
+        };
+
+        Ok((server_instance, sync_peers, conns, syncer_recv, local_addr))
     }
 
     /// Begins accepting incoming requests.
-    #[instrument(skip_all, fields(addr = ?self.local_addr()))]
+    #[instrument(skip_all, fields(addr = ?self.server.local_addr().ok()))]
     #[allow(clippy::disallowed_macros, reason = "tokio::select! uses unreachable!")]
     pub async fn serve(mut self, ready: ready::Notifier) {
         info!("QUIC sync server listening for incoming connections");

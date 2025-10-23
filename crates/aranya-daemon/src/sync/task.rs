@@ -49,7 +49,7 @@ pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
-enum Msg {
+pub(crate) enum Msg {
     SyncNow {
         peer: SyncPeer,
         cfg: Option<SyncPeerConfig>,
@@ -77,8 +77,8 @@ enum Msg {
         head: Address,
     },
 }
-type Request = (Msg, oneshot::Sender<Reply>);
-type Reply = SyncResult<()>;
+pub(crate) type Request = (Msg, oneshot::Sender<Reply>);
+pub(crate) type Reply = SyncResult<()>;
 
 /// A sync peer.
 ///
@@ -297,12 +297,6 @@ impl<ST> Syncer<ST> {
         if let Some((_, Some(key))) = self.peers.remove(&peer) {
             self.queue.remove(&key);
         }
-    }
-
-    /// Updates the server address to the actual listening address.
-    /// This should be called after the server starts and we know its actual listening address.
-    pub fn update_server_addr(&mut self, actual_addr: std::net::SocketAddr) {
-        self.server_addr = actual_addr.into();
     }
 }
 

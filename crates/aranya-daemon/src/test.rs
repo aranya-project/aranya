@@ -48,7 +48,7 @@ use crate::{
     sync::{
         self,
         task::{
-            quic::{HelloInfo, HelloSubscriptions, PskStore},
+            quic::{HelloSubscriptions, PskStore},
             PeerCacheKey, SyncPeer,
         },
     },
@@ -245,44 +245,38 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
+            let bind_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
             let hello_subscriptions = Arc::<Mutex<HelloSubscriptions>>::default();
 
-            let (syncer, sync_peers, conn_map, conn_rx, effects_recv) = {
-                let (send_effects, effect_recv) = mpsc::channel(1);
-                let client_with_state_for_syncer = ClientWithState::new(
-                    client.clone(),
-                    caches.clone(),
-                    hello_subscriptions.clone(),
-                );
-                let (syncer, sync_peers, conn_map, conn_rx) = TestSyncer::new(
-                    client_with_state_for_syncer,
-                    send_effects,
-                    InvalidGraphs::default(),
-                    psk_store.clone(),
-                    Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                )?;
+            let (send_effects, effects_recv) = mpsc::channel(1);
 
-                (syncer, sync_peers, conn_map, conn_rx, effect_recv)
-            };
-
-            let client_with_state =
+            // Create server first to get the actual listening address
+            let client_with_state_for_server =
                 ClientWithState::new(client.clone(), caches.clone(), hello_subscriptions.clone());
-            let server: TestServer = TestServer::new(
-                client_with_state,
-                &local_addr,
+            let (server, _sync_peers, conn_map, syncer_recv, local_addr): (TestServer, _, _, _, _) =
+                TestServer::new(
+                    client_with_state_for_server,
+                    &bind_addr,
+                    psk_store.clone(),
+                    hello_subscriptions.clone(),
+                )
+                .await?;
+
+            // Create syncer with the actual server address
+            let client_with_state_for_syncer =
+                ClientWithState::new(client.clone(), caches.clone(), server.hello_subscriptions());
+            let syncer = TestSyncer::new(
+                client_with_state_for_syncer,
+                send_effects,
+                InvalidGraphs::default(),
                 psk_store.clone(),
+                local_addr.into(),
+                syncer_recv,
                 conn_map,
-                conn_rx,
-                HelloInfo {
-                    subscriptions: hello_subscriptions.clone(),
-                    sync_peers,
-                },
-            )
-            .await?;
-            let local_addr = server.local_addr()?;
+            )?;
+
             (syncer, server, local_addr, pk, psk_store, effects_recv)
         };
 

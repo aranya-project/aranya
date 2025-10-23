@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -28,7 +28,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{HelloInfo, PskStore, State as QuicSyncClientState, SyncParams},
+        quic::{PskStore, State as QuicSyncClientState, SyncParams},
         SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -161,22 +161,22 @@ impl Daemon {
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, syncer, peers, recv_effects) = Self::setup_aranya(
-                &cfg,
-                eng.clone(),
-                aranya_store
-                    .try_clone()
-                    .context("unable to clone keystore")?,
-                &pks,
-                SyncParams {
-                    psk_store: Arc::clone(&psk_store),
-                    server_addr: qs_config.addr,
-                },
-                caches,
-                invalid_graphs.clone(),
-            )
-            .await?;
-            let local_addr = sync_server.local_addr()?;
+            let (client, sync_server, syncer, peers, recv_effects, local_addr) =
+                Self::setup_aranya(
+                    &cfg,
+                    eng.clone(),
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    &pks,
+                    SyncParams {
+                        psk_store: Arc::clone(&psk_store),
+                        server_addr: qs_config.addr,
+                    },
+                    caches,
+                    invalid_graphs.clone(),
+                )
+                .await?;
 
             #[cfg(feature = "afc")]
             let afc = {
@@ -313,6 +313,7 @@ impl Daemon {
         Syncer<QuicSyncClientState>,
         SyncPeers,
         EffectReceiver,
+        SocketAddr,
     )> {
         let device_id = pk.ident_pk.id()?;
 
@@ -331,46 +332,35 @@ impl Daemon {
         // Create shared hello subscriptions for both server and syncer
         let hello_subscriptions = Arc::default();
 
-        // Initialize the syncer
-        let client_with_state_for_syncer = ClientWithState::new(
+        // Create the sync server
+        let client_with_state_for_server = ClientWithState::new(
             client.clone(),
             Arc::clone(&caches),
             Arc::clone(&hello_subscriptions),
         );
-        let (mut syncer, peers, conns, conn_rx) = Syncer::new(
-            client_with_state_for_syncer,
-            send_effects,
-            invalid_graphs,
-            Arc::clone(&psk_store),
-            server_addr,
-        )?;
-
-        info!(addr = %server_addr, "starting QUIC sync server");
-        let client_with_state =
-            ClientWithState::new(client.clone(), caches, Arc::clone(&hello_subscriptions));
-        let server = SyncServer::new(
-            client_with_state,
+        let (server, peers, conns, syncer_recv, server_addr) = SyncServer::new(
+            client_with_state_for_server,
             &server_addr,
-            psk_store,
-            conns,
-            conn_rx,
-            HelloInfo {
-                subscriptions: hello_subscriptions,
-                sync_peers: peers.clone(),
-            },
+            Arc::clone(&psk_store),
+            hello_subscriptions,
         )
         .await
         .context("unable to initialize QUIC sync server")?;
 
-        // Update the syncer with the actual server listening address
-        let actual_server_addr = server
-            .local_addr()
-            .context("unable to get server local address")?;
-        syncer.update_server_addr(actual_server_addr);
+        // Initialize the syncer
+        let client_with_state_for_syncer =
+            ClientWithState::new(client.clone(), caches, server.hello_subscriptions());
+        let syncer = Syncer::new(
+            client_with_state_for_syncer,
+            send_effects,
+            invalid_graphs,
+            psk_store,
+            server_addr.into(),
+            syncer_recv,
+            conns,
+        )?;
 
-        info!(device_id = %device_id, actual_server_addr = %actual_server_addr, "set up Aranya");
-
-        Ok((client, server, syncer, peers, recv_effects))
+        Ok((client, server, syncer, peers, recv_effects, server_addr))
     }
 
     /// Loads the crypto engine.
