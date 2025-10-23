@@ -17,7 +17,7 @@ use tokio::{io::AsyncReadExt, sync::Mutex};
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
-    aranya::ClientWithState,
+    aranya::Client,
     sync::{
         task::{
             quic::{Error, Server, State},
@@ -63,7 +63,7 @@ impl Syncer<State> {
 
         // Get all valid (non-expired) subscribers for this graph
         let subscribers = {
-            let mut subscriptions = self.client.hello_subscriptions().lock().await;
+            let mut subscriptions = self.client.lock_hello_subscriptions().await;
 
             // Remove expired subscriptions and collect valid ones
             let mut valid_subscribers = Vec::new();
@@ -103,7 +103,7 @@ impl Syncer<State> {
             {
                 Ok(()) => {
                     // Update the last notified time
-                    let mut subscriptions = self.client.hello_subscriptions().lock().await;
+                    let mut subscriptions = self.client.lock_hello_subscriptions().await;
                     if let Some(sub) = subscriptions.get_mut(&(graph_id, *subscriber_addr)) {
                         sub.last_notified = Some(now);
                     } else {
@@ -350,7 +350,7 @@ where
     #[instrument(skip_all)]
     pub async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         peer_addr: Addr,
         active_team: &TeamId,
         sync_peers: SyncPeers,
@@ -375,7 +375,7 @@ where
                 // Store subscription (replaces any existing subscription for this peer+team)
                 let key = (graph_id, address);
 
-                let mut subscriptions = client.hello_subscriptions().lock().await;
+                let mut subscriptions = client.lock_hello_subscriptions().await;
                 subscriptions.insert(key, subscription);
             }
             SyncHelloType::Unsubscribe { address } => {
@@ -388,7 +388,7 @@ where
 
                 // Remove subscription for this peer and team
                 let key = (graph_id, address);
-                let mut subscriptions = client.hello_subscriptions().lock().await;
+                let mut subscriptions = client.lock_hello_subscriptions().await;
                 if subscriptions.remove(&key).is_some() {
                     debug!(
                         team_id = ?active_team,
@@ -412,13 +412,7 @@ where
                     "Received Hello notification message"
                 );
 
-                if !client
-                    .client()
-                    .aranya
-                    .lock()
-                    .await
-                    .command_exists(graph_id, head)
-                {
+                if !client.lock_aranya().await.command_exists(graph_id, head) {
                     match sync_peers.sync_on_hello(address, graph_id).await {
                         Ok(()) => {
                             debug!(

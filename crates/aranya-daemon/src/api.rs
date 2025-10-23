@@ -334,7 +334,7 @@ impl EffectHandler {
     async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
         let client = self.client.as_ref()?;
 
-        let mut aranya = client.aranya.lock().await;
+        let mut aranya = client.lock_aranya().await;
         let storage = aranya.provider().get_storage(graph_id).ok()?;
 
         storage.get_head_address().ok()
@@ -566,8 +566,7 @@ impl DaemonApi for Api {
         self.seed_id_dir.remove(&team).await?;
 
         self.client
-            .aranya
-            .lock()
+            .lock_aranya()
             .await
             .remove_graph(team.into_id().into())
             .context("unable to remove graph from storage")?;

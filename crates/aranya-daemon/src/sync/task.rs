@@ -224,7 +224,7 @@ impl PeerCacheKey {
 #[derive(Debug)]
 pub struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(crate) client: crate::aranya::ClientWithState<crate::EN, crate::SP>,
+    pub(crate) client: crate::aranya::Client<crate::EN, crate::SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Option<Key>)>,
     /// Receives added/removed peers.
@@ -471,12 +471,12 @@ impl<ST: SyncState> Syncer<ST> {
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
     pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
-        self.client.client()
+        &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
     pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
-        self.client.client_mut()
+        &mut self.client
     }
 }
