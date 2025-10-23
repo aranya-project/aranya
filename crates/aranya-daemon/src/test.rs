@@ -41,7 +41,7 @@ use tokio::{
 };
 
 use crate::{
-    actions::Actions,
+    actions::PersistentActor,
     api::EffectReceiver,
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
@@ -133,7 +133,7 @@ impl TestDevice {
 
     pub fn actions(
         &self,
-    ) -> impl Actions<
+    ) -> PersistentActor<
         PolicyEngine<DefaultEngine<Rng>, Store>,
         LinearStorageProvider<FileManager>,
         DefaultEngine<Rng>,

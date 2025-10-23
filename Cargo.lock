@@ -181,7 +181,7 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 [[package]]
 name = "aranya-afc-util"
 version = "0.15.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
@@ -197,7 +197,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.5.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -214,7 +214,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-core"
 version = "0.6.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-capi-macro",
  "aranya-libc",
@@ -230,7 +230,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-macro"
 version = "0.5.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-capi-codegen",
  "proc-macro2",
@@ -288,7 +288,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.11.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-id",
  "buggy",
@@ -310,7 +310,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto-ffi"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -393,7 +393,7 @@ dependencies = [
 [[package]]
 name = "aranya-device-ffi"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -402,7 +402,7 @@ dependencies = [
 [[package]]
 name = "aranya-envelope-ffi"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -450,7 +450,7 @@ dependencies = [
 [[package]]
 name = "aranya-fast-channels"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "buggy",
@@ -467,7 +467,7 @@ dependencies = [
 [[package]]
 name = "aranya-id"
 version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "derive-where",
  "paste",
@@ -482,7 +482,7 @@ dependencies = [
 [[package]]
 name = "aranya-idam-ffi"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -557,7 +557,7 @@ dependencies = [
 [[package]]
 name = "aranya-libc"
 version = "0.4.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "cfg-if",
  "errno",
@@ -593,7 +593,7 @@ dependencies = [
 [[package]]
 name = "aranya-perspective-ffi"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -602,7 +602,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ast"
 version = "0.8.1"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-policy-text",
  "rkyv",
@@ -614,7 +614,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-compiler"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-policy-ast",
  "aranya-policy-lang",
@@ -630,7 +630,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-derive"
 version = "0.9.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-policy-lang",
  "prettyplease",
@@ -642,7 +642,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen"
 version = "0.15.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-policy-ifgen-macro",
  "aranya-policy-vm",
@@ -654,7 +654,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen-build"
 version = "0.8.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -669,7 +669,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen-macro"
 version = "0.4.2"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -679,7 +679,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-lang"
 version = "0.8.1"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -695,7 +695,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-module"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-id",
  "aranya-policy-ast",
@@ -709,7 +709,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text"
 version = "0.1.3"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-policy-text-macro",
  "proptest",
@@ -721,7 +721,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-text-macro"
 version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "macro-string",
  "proc-macro2",
@@ -732,7 +732,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-vm"
 version = "0.14.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -747,7 +747,7 @@ dependencies = [
 [[package]]
 name = "aranya-runtime"
 version = "0.15.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#aae6332ad861181189b00a9334d6d799135c4bd2"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=ifgen-effect-conv#b35a2bbdbe584d3b1d6969433ef0ec6103baa6c6"
 dependencies = [
  "aranya-crypto",
  "aranya-libc",

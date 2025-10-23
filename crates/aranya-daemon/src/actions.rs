@@ -1,6 +1,6 @@
 //! Aranya graph actions/effects API.
 
-use core::{future::Future, marker::PhantomData};
+use core::marker::PhantomData;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -8,13 +8,15 @@ use aranya_crypto::{policy::LabelId, Csprng, DeviceId, Rng};
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_vm::Text;
-use aranya_runtime::{vm_action, ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
+use aranya_runtime::{
+    vm_action, ClientState, Engine, GraphId, NullSink, Session, StorageProvider, VmPolicy,
+};
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument, warn, Instrument};
+use tracing::{debug, info, instrument, warn};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, KeyBundle, Role},
+    policy::{self, ChanOp, KeyBundle, Role},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -33,7 +35,7 @@ where
         &self,
         owner_keys: KeyBundle,
         nonce: Option<&[u8]>,
-    ) -> Result<(GraphId, Vec<Effect>)> {
+    ) -> Result<(GraphId, Vec<policy::Effect>)> {
         let mut sink = VecSink::new();
         let id = self
             .aranya
@@ -51,11 +53,27 @@ where
         Ok((id, sink.collect()?))
     }
 
-    /// Returns an implementation of [`Actions`] for a particular
-    /// storage.
     #[instrument(skip_all, fields(id = %id))]
-    pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
-        ActionsImpl {
+    pub fn actions(&self, id: &GraphId) -> PersistentActor<EN, SP, CE> {
+        PersistentActor {
+            aranya: Arc::clone(&self.aranya),
+            graph_id: *id,
+            _eng: PhantomData,
+        }
+    }
+
+    #[instrument(skip_all, fields(id = %id))]
+    pub fn ephemeral_actions(&self, id: &GraphId) -> EphemeralActor<EN, SP, CE> {
+        EphemeralActor {
+            aranya: Arc::clone(&self.aranya),
+            graph_id: *id,
+            _eng: PhantomData,
+        }
+    }
+
+    #[instrument(skip_all, fields(id = %id))]
+    pub fn queries(&self, id: &GraphId) -> QueryActor<EN, SP, CE> {
+        QueryActor {
             aranya: Arc::clone(&self.aranya),
             graph_id: *id,
             _eng: PhantomData,
@@ -77,7 +95,7 @@ where
         &self,
         session: &mut Session<SP, EN>,
         command: &[u8],
-    ) -> Result<Vec<Effect>> {
+    ) -> Result<Vec<policy::Effect>> {
         let client = self.aranya.lock().await;
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
@@ -85,8 +103,7 @@ where
     }
 }
 
-/// Implements [`Actions`] for a particular storage.
-struct ActionsImpl<EN, SP, CE> {
+pub struct PersistentActor<EN, SP, CE> {
     /// Aranya client graph state.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// Aranya graph ID.
@@ -95,16 +112,16 @@ struct ActionsImpl<EN, SP, CE> {
     _eng: PhantomData<CE>,
 }
 
-impl<EN, SP, CE> Actions<EN, SP, CE> for ActionsImpl<EN, SP, CE>
+impl<EN, SP, CE> PersistentActor<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
-    async fn call_persistent_action(
+    async fn call(
         &self,
         act: impl Actionable<Interface = policy::Persistent> + Send,
-    ) -> Result<Vec<Effect>> {
+    ) -> Result<Vec<policy::Effect>> {
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
         {
@@ -120,10 +137,113 @@ where
         Ok(sink.collect()?)
     }
 
-    async fn call_session_action(
+    /// Terminates the team.
+    #[instrument(skip_all)]
+    pub async fn terminate_team(&self) -> Result<policy::TeamTerminated> {
+        self.call(policy::terminate_team()).await.and_then(get_one)
+    }
+
+    /// Adds a Member instance to the team.
+    #[instrument(skip_all)]
+    pub async fn add_member(&self, keys: KeyBundle) -> Result<policy::MemberAdded> {
+        self.call(policy::add_member(keys)).await.and_then(get_one)
+    }
+
+    /// Remove a Member instance from the team.
+    #[instrument(skip(self), fields(device_id = %device_id))]
+    pub async fn remove_member(&self, device_id: DeviceId) -> Result<policy::MemberRemoved> {
+        self.call(policy::remove_member(device_id.as_base()))
+            .await
+            .and_then(get_one)
+    }
+
+    /// Assigns role to a team member.
+    #[instrument(skip_all)]
+    pub async fn assign_role(&self, device_id: DeviceId, role: Role) -> Result<policy::Effect> {
+        self.call(policy::assign_role(device_id.as_base(), role))
+            .await
+            .and_then(get_one)
+    }
+
+    /// Revokes role from a team member.
+    #[instrument(skip_all)]
+    pub async fn revoke_role(&self, device_id: DeviceId, role: Role) -> Result<policy::Effect> {
+        self.call(policy::revoke_role(device_id.as_base(), role))
+            .await
+            .and_then(get_one)
+    }
+
+    /// Create a label.
+    #[instrument(skip(self), fields(name = %name))]
+    pub async fn create_label(&self, name: Text) -> Result<policy::LabelCreated> {
+        self.call(policy::create_label(name))
+            .await
+            .and_then(get_one)
+    }
+
+    /// Delete a label.
+    #[instrument(skip(self), fields(label_id = %label_id))]
+    pub async fn delete_label(&self, label_id: LabelId) -> Result<policy::LabelDeleted> {
+        self.call(policy::delete_label(label_id.as_base()))
+            .await
+            .and_then(get_one)
+    }
+
+    /// Assigns a label to a device.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
+    pub async fn assign_label(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> Result<policy::LabelAssigned> {
+        self.call(policy::assign_label(
+            device_id.as_base(),
+            label_id.as_base(),
+            op,
+        ))
+        .await
+        .and_then(get_one)
+    }
+
+    /// Revokes a label.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
+    pub async fn revoke_label(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<policy::LabelRevoked> {
+        info!(%device_id, %label_id, "revoking label");
+        self.call(policy::revoke_label(
+            device_id.as_base(),
+            label_id.as_base(),
+        ))
+        .await
+        .and_then(get_one)
+    }
+}
+
+pub struct EphemeralActor<EN, SP, CE> {
+    /// Aranya client graph state.
+    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    /// Aranya graph ID.
+    graph_id: GraphId,
+    /// Crypto engine.
+    _eng: PhantomData<CE>,
+}
+
+type EphemeralOutput = (Vec<Box<[u8]>>, Vec<policy::Effect>);
+
+impl<EN, SP, CE> EphemeralActor<EN, SP, CE>
+where
+    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
+    SP: StorageProvider + Send + 'static,
+    CE: aranya_crypto::Engine + Send + Sync + 'static,
+{
+    async fn call(
         &self,
         act: impl Actionable<Interface = policy::Ephemeral> + Send,
-    ) -> Result<(Vec<Box<[u8]>>, Vec<Effect>)> {
+    ) -> Result<(Vec<Box<[u8]>>, Vec<policy::Effect>)> {
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();
         {
@@ -133,197 +253,107 @@ where
         }
         Ok((msg_sink.into_cmds(), sink.collect()?))
     }
+
+    /// Creates a unidirectional AFC channel.
+    #[cfg(feature = "afc")]
+    #[instrument(skip(self), fields(open_id = %open_id, label_id = %label_id))]
+    pub async fn create_afc_uni_channel(
+        &self,
+        open_id: DeviceId,
+        label_id: LabelId,
+    ) -> Result<EphemeralOutput> {
+        self.call(policy::create_afc_uni_channel(
+            open_id.as_base(),
+            label_id.as_base(),
+        ))
+        .await
+    }
 }
 
-/// A programmatic API for policy actions.
-pub trait Actions<EN, SP, CE>
+pub struct QueryActor<EN, SP, CE> {
+    /// Aranya client graph state.
+    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    /// Aranya graph ID.
+    graph_id: GraphId,
+    /// Crypto engine.
+    _eng: PhantomData<CE>,
+}
+
+impl<EN, SP, CE> QueryActor<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
-    /// Perform a persistent action.
-    fn call_persistent_action(
-        &self,
-        act: impl Actionable<Interface = policy::Persistent> + Send,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send;
-
-    #[allow(clippy::type_complexity)]
-    /// Performs a session action.
-    fn call_session_action(
+    async fn query(
         &self,
         act: impl Actionable<Interface = policy::Ephemeral> + Send,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send;
-
-    /// Terminates the team.
-    #[instrument(skip_all)]
-    fn terminate_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::terminate_team())
-            .in_current_span()
+    ) -> Result<Vec<policy::Effect>> {
+        let mut sink = VecSink::new();
+        {
+            let mut client = self.aranya.lock().await;
+            let mut session = client.session(self.graph_id)?;
+            act.with_action(|act| session.action(&client, &mut sink, &mut NullSink, act))?;
+        }
+        Ok(sink.collect()?)
     }
 
-    /// Adds a Member instance to the team.
-    #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::add_member(keys))
-            .in_current_span()
-    }
-
-    /// Remove a Member instance from the team.
-    #[instrument(skip(self), fields(device_id = %device_id))]
-    fn remove_member(
-        &self,
-        device_id: DeviceId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::remove_member(device_id.as_base()))
-            .in_current_span()
-    }
-
-    /// Assigns role to a team member.
-    #[instrument(skip_all)]
-    fn assign_role(
-        &self,
-        device_id: DeviceId,
-        role: Role,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::assign_role(device_id.as_base(), role))
-            .in_current_span()
-    }
-
-    /// Revokes role from a team member.
-    #[instrument(skip_all)]
-    fn revoke_role(
-        &self,
-        device_id: DeviceId,
-        role: Role,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::revoke_role(device_id.as_base(), role))
-            .in_current_span()
-    }
-
-    /// Create a label.
-    #[instrument(skip(self), fields(name = %name))]
-    fn create_label(&self, name: Text) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::create_label(name))
-            .in_current_span()
-    }
-
-    /// Delete a label.
-    #[instrument(skip(self), fields(label_id = %label_id))]
-    fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::delete_label(label_id.as_base()))
-            .in_current_span()
-    }
-
-    /// Assigns a label to a device.
-    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
-    fn assign_label(
-        &self,
-        device_id: DeviceId,
-        label_id: LabelId,
-        op: ChanOp,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::assign_label(
-            device_id.as_base(),
-            label_id.as_base(),
-            op,
-        ))
-        .in_current_span()
-    }
-
-    /// Revokes a label.
-    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
-    fn revoke_label(
-        &self,
-        device_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %label_id, "revoking label");
-        self.call_persistent_action(policy::revoke_label(
-            device_id.as_base(),
-            label_id.as_base(),
-        ))
-        .in_current_span()
-    }
-
-    /// Creates a unidirectional AFC channel.
-    #[cfg(feature = "afc")]
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(open_id = %open_id, label_id = %label_id))]
-    fn create_afc_uni_channel_off_graph(
-        &self,
-        open_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::create_afc_uni_channel(
-            open_id.as_base(),
-            label_id.as_base(),
-        ))
-        .in_current_span()
-    }
-
-    /// Query devices on team off-graph.
-    #[allow(clippy::type_complexity)]
+    /// Query devices on team.
     #[instrument(skip(self))]
-    fn query_devices_on_team_off_graph(
-        &self,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::query_devices_on_team())
-            .in_current_span()
+    pub async fn query_devices_on_team(&self) -> Result<Vec<policy::QueryDevicesOnTeamResult>> {
+        self.query(policy::query_devices_on_team())
+            .await
+            .and_then(get_many)
     }
 
-    /// Query device role off-graph.
-    #[allow(clippy::type_complexity)]
+    /// Query device role.
     #[instrument(skip(self))]
-    fn query_device_role_off_graph(
+    pub async fn query_device_role(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::query_device_role(device_id.as_base()))
-            .in_current_span()
+    ) -> Result<policy::QueryDeviceRoleResult> {
+        self.query(policy::query_device_role(device_id.as_base()))
+            .await
+            .and_then(get_one)
     }
 
-    /// Query device keybundle off-graph.
-    #[allow(clippy::type_complexity)]
+    /// Query device keybundle.
     #[instrument(skip(self))]
-    fn query_device_keybundle_off_graph(
+    pub async fn query_device_keybundle(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::query_device_keybundle(device_id.as_base()))
-            .in_current_span()
+    ) -> Result<policy::QueryDeviceKeyBundleResult> {
+        self.query(policy::query_device_keybundle(device_id.as_base()))
+            .await
+            .and_then(get_one)
     }
 
-    /// Query device label assignments off-graph.
-    #[allow(clippy::type_complexity)]
+    /// Query device label assignments.
     #[instrument(skip(self))]
-    fn query_label_assignments_off_graph(
+    pub async fn query_label_assignments(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::query_label_assignments(device_id.as_base()))
-            .in_current_span()
+    ) -> Result<Vec<policy::QueriedLabelAssignment>> {
+        self.query(policy::query_label_assignments(device_id.as_base()))
+            .await
+            .and_then(get_many)
     }
 
-    /// Query label exists off-graph.
-    #[allow(clippy::type_complexity)]
+    /// Query label exists.
     #[instrument(skip(self))]
-    fn query_label_exists_off_graph(
+    pub async fn query_label_exists(
         &self,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::query_label_exists(label_id.as_base()))
-            .in_current_span()
+    ) -> Result<policy::QueryLabelExistsResult> {
+        self.query(policy::query_label_exists(label_id.as_base()))
+            .await
+            .and_then(get_one)
     }
 
-    /// Query labels off-graph.
-    #[allow(clippy::type_complexity)]
+    /// Query labels.
     #[instrument(skip(self))]
-    fn query_labels_off_graph(
-        &self,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.call_session_action(policy::query_labels())
-            .in_current_span()
+    pub async fn query_labels(&self) -> Result<Vec<policy::QueriedLabel>> {
+        self.query(policy::query_labels()).await.and_then(get_many)
     }
 }
 
@@ -336,4 +366,28 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
             sign_key: postcard::to_allocvec(&pk.sign_pk)?,
         })
     }
+}
+
+/// Extract a single expected effect of a given type.
+fn get_one<E>(effects: Vec<policy::Effect>) -> Result<E>
+where
+    policy::Effect: TryInto<E, Error: std::error::Error + Send + Sync + 'static>,
+{
+    let mut iter = effects.into_iter();
+    let effect = iter.next().context("no effects")?;
+    if iter.next().is_some() {
+        anyhow::bail!("too many effects");
+    }
+    effect.try_into().context("bad effect")
+}
+
+/// Extract many expected effect of a given type.
+fn get_many<E>(effects: Vec<policy::Effect>) -> Result<Vec<E>>
+where
+    policy::Effect: TryInto<E, Error: std::error::Error + Send + Sync + 'static>,
+{
+    effects
+        .into_iter()
+        .map(|e| e.try_into().context("bad effect"))
+        .collect()
 }
