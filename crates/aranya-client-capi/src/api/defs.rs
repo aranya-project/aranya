@@ -948,14 +948,14 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// By default, sync on hello is disabled.
 /// @param[in,out] cfg a pointer to the builder for a sync config
-/// @param[in] sync_on_hello whether to enable or disable sync on hello
+/// @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 pub fn sync_peer_config_builder_set_sync_on_hello(
     cfg: &mut SyncPeerConfigBuilder,
-    sync_on_hello: bool,
+    sync_on_hello: u32,
 ) {
-    cfg.sync_on_hello(sync_on_hello);
+    cfg.sync_on_hello(sync_on_hello != 0);
 }
 
 /// Assign a role to a device.
