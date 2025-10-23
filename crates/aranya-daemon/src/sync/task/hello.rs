@@ -5,7 +5,6 @@
 
 use std::{
     collections::HashMap,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -13,7 +12,7 @@ use anyhow::Context;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{Address, Engine, GraphId, StorageProvider, SyncHelloType, SyncType};
 use aranya_util::Addr;
-use tokio::{io::AsyncReadExt, sync::Mutex};
+use tokio::io::AsyncReadExt;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
@@ -41,15 +40,6 @@ pub struct HelloSubscription {
 /// Type alias for hello subscription storage
 /// Maps from (team_id, subscriber_address) to subscription details
 pub type HelloSubscriptions = HashMap<(GraphId, Addr), HelloSubscription>;
-
-/// Hello-related information combining subscriptions and sync peers.
-#[derive(Debug, Clone)]
-pub struct HelloInfo {
-    /// Storage for sync hello subscriptions
-    pub subscriptions: Arc<Mutex<HelloSubscriptions>>,
-    /// Interface to trigger sync operations
-    pub sync_peers: SyncPeers,
-}
 
 impl Syncer<State> {
     /// Broadcast hello notifications to all subscribers of a graph.
