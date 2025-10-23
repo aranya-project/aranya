@@ -30,8 +30,8 @@ use crate::{
 /// Storage for sync hello subscriptions
 #[derive(Debug, Clone)]
 pub struct HelloSubscription {
-    /// Delay in milliseconds between notifications to this subscriber
-    delay_milliseconds: u64,
+    /// Delay between notifications to this subscriber
+    delay: Duration,
     /// Last notification time for delay management
     last_notified: Option<Instant>,
     /// Expiration time of the subscription
@@ -91,8 +91,7 @@ impl Syncer<State> {
         for (subscriber_addr, subscription) in subscribers.iter() {
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
-                let delay = Duration::from_millis(subscription.delay_milliseconds);
-                if now - last_notified < delay {
+                if now - last_notified < subscription.delay {
                     continue;
                 }
             }
@@ -155,16 +154,6 @@ impl Syncer<State> {
         id: GraphId,
         sync_type: SyncType<Addr>,
     ) -> SyncResult<()> {
-        // Determine operation name from sync_type
-        let operation_name = match &sync_type {
-            SyncType::Hello(hello_type) => match hello_type {
-                SyncHelloType::Subscribe { .. } => "subscribe",
-                SyncHelloType::Unsubscribe { .. } => "unsubscribe",
-                SyncHelloType::Hello { .. } => "hello",
-            },
-            _ => "unknown",
-        };
-
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -178,6 +167,15 @@ impl Syncer<State> {
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
 
+        // Determine operation name from sync_type
+        let operation_name = match &sync_type {
+            SyncType::Hello(hello_type) => match hello_type {
+                SyncHelloType::Subscribe { .. } => "subscribe",
+                SyncHelloType::Unsubscribe { .. } => "unsubscribe",
+                SyncHelloType::Hello { .. } => "hello",
+            },
+            _ => "unknown",
+        };
         // Read the response to avoid race condition with server
         let mut response_buf = Vec::new();
         recv.read_to_end(&mut response_buf)
@@ -369,7 +367,7 @@ where
                 let expires_at = Instant::now() + Duration::from_millis(duration_milliseconds);
 
                 let subscription = HelloSubscription {
-                    delay_milliseconds,
+                    delay: Duration::from_millis(delay_milliseconds),
                     last_notified: None,
                     expires_at,
                 };
