@@ -9,8 +9,8 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, InvalidNetIdentifier, KeyBundle, Label, LabelId,
-        Labels, Role, RoleId, Roles,
+        ChanOp, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,
+        Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -353,8 +353,12 @@ impl Team<'_> {
                 self.id,
                 label_name
                     .try_into()
-                    // TODO(eric): Use a different error.
-                    .map_err(|_| InvalidNetIdentifier(()))?,
+                    // TODO(chip): Use a more specific error?
+                    .map_err(|_| {
+                        error::OtherError::from(anyhow::anyhow!(
+                            "cannot convert label_name to Text"
+                        ))
+                    })?,
                 managing_role_id.into_api(),
             )
             .await
