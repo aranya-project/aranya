@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{error, fmt, hash::Hash, net::SocketAddr, time::Duration};
+use core::{error, fmt, hash::Hash, time::Duration};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
@@ -205,10 +205,13 @@ impl fmt::Debug for Secret {
 /// Configuration values for syncing with a peer
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SyncPeerConfig {
-    /// The interval at which syncing occurs
-    pub interval: Duration,
+    /// The interval at which syncing occurs. If None, the peer will not be periodically synced.
+    pub interval: Option<Duration>,
     /// Determines if a peer should be synced with immediately after they're added
     pub sync_now: bool,
+    /// Determines if the peer should be synced with when a hello message is received
+    /// indicating they have a head that we don't have
+    pub sync_on_hello: bool,
 }
 
 /// Valid channel operations for a label assignment.
@@ -251,7 +254,7 @@ pub trait DaemonApi {
     async fn version() -> Result<Version>;
 
     /// Gets local address the Aranya sync server is bound to.
-    async fn aranya_local_addr() -> Result<SocketAddr>;
+    async fn aranya_local_addr() -> Result<Addr>;
 
     /// Gets the public key bundle for this device
     async fn get_key_bundle() -> Result<KeyBundle>;
@@ -264,6 +267,17 @@ pub trait DaemonApi {
 
     /// Sync with peer immediately.
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
+
+    /// Subscribe to hello notifications from a sync peer.
+    async fn sync_hello_subscribe(
+        peer: Addr,
+        team: TeamId,
+        delay: Duration,
+        duration: Duration,
+    ) -> Result<()>;
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    async fn sync_hello_unsubscribe(peer: Addr, team: TeamId) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
