@@ -743,12 +743,6 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
 // verify whether a role grants a permission and use
 // `device_has_simple_perm` to verify whether a device has
 // a permission.
-//
-// TODO(eric): Should this be
-// 1. fact RoleHasPerm[role_id id, perm string]
-// 2. fact RoleHasPerm[role_id id]=>{perm string}
-// 3. fact RoleHasPerm[role_id id]=>{perm enum SimplePerm}
-// 4. fact RoleHasPerm[role_id id, perm enum SimplePerm]
 fact RoleHasPerm[role_id id, perm enum SimplePerm]=>{}
 
 // A wrapper for `create RoleHasPerm`.
@@ -827,8 +821,6 @@ command AddPermToRole {
         check can_change_role_perms(author.device_id, this.role_id)
 
         // The role must not already have the permission.
-        //
-        // TODO(eric): Should this case be a no-op or an error?
         check !role_has_simple_perm(this.role_id, this.perm)
 
         let perm_str = simple_perm_to_str(this.perm)
