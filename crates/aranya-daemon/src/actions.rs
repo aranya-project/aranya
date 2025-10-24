@@ -392,6 +392,22 @@ where
         .in_current_span()
     }
 
+    /// Invokes `query_role_has_perm`.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_role_has_perm(
+        &self,
+        role_id: RoleId,
+        perm: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_role_has_perm"),
+            args: Cow::Owned(vec![Value::from(role_id), Value::from(perm)]),
+        })
+        .map_ok(|SessionData { effects, .. }| effects)
+        .in_current_span()
+    }
+
     /// Invokes `query_device_role`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]

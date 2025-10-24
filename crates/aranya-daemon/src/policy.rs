@@ -48,6 +48,7 @@ pub enum Effect {
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsAssignedToRoleResult(QueryLabelsAssignedToRoleResult),
     QueryLabelsResult(QueryLabelsResult),
+    QueryRoleHasPermResult(QueryRoleHasPermResult),
     QueryRoleOwnersResult(QueryRoleOwnersResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
     RoleAssigned(RoleAssigned),
@@ -216,6 +217,13 @@ pub struct QueryLabelsResult {
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
+/// QueryRoleHasPermResult policy effect.
+#[effect]
+pub struct QueryRoleHasPermResult {
+    pub role_id: BaseId,
+    pub perm: Text,
+    pub has_perm: bool,
+}
 /// QueryRoleOwnersResult policy effect.
 #[effect]
 pub struct QueryRoleOwnersResult {
@@ -359,6 +367,11 @@ pub trait ActorExt {
         &mut self,
         device_id: BaseId,
         role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn query_role_has_perm(
+        &mut self,
+        role_id: BaseId,
+        perm: Text,
     ) -> Result<(), ClientError>;
     fn query_team_roles(&mut self) -> Result<(), ClientError>;
     fn query_role_owners(&mut self, role_id: BaseId) -> Result<(), ClientError>;

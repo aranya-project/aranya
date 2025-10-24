@@ -4,7 +4,9 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+#[cfg(feature = "afc")]
+use std::str::FromStr as _;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
@@ -33,9 +35,11 @@ use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
+use crate::actions::SessionData;
+#[cfg(feature = "afc")]
 use crate::afc::{Afc, RemoveIfParams};
 use crate::{
-    actions::{Actions, SessionData},
+    actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated},
@@ -232,38 +236,44 @@ impl EffectHandler {
                 DeviceRemoved(_device_removed) => {
                     #[cfg(feature = "afc")]
                     {
-                        if self.device_id == _device_removed.device_id.into() {
-                            self.afc.delete_channels().await?;
-                        } else {
-                            let peer_id = Some(_device_removed.device_id.into());
-                            self.afc
-                                .remove_if(RemoveIfParams {
-                                    peer_id,
-                                    ..Default::default()
-                                })
+                        // Delete AFC channels for the device that was removed.
+                        self.delete_device_afc_channels(_device_removed.device_id.into())
+                            .await?;
+                    }
+                }
+                RoleAssigned(_role_assigned) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        // Delete channels for devices where new role does not have the `CanUseAfc` permission)
+                        if !self
+                            .client
+                            .query_role_has_perm(
+                                graph.into_id().into(),
+                                _role_assigned.role_id.into(),
+                                "CanUseAfc".into(),
+                            )
+                            .await?
+                        {
+                            self.delete_device_afc_channels(_role_assigned.device_id.into())
                                 .await?;
                         }
                     }
                 }
-                RoleAssigned(_role_assigned) => {}
                 // AdminAssigned is now just RoleAssigned - handled above
                 // OperatorAssigned is now just RoleAssigned - handled above
                 RoleRevoked(_role_revoked) => {
-                    // TODO: delete channels where label is no longer assigned to the device or role
                     #[cfg(feature = "afc")]
                     {
-                        let labels = self.client.query_labels_assigned_to_role(graph, _role_revoked.role_id).await?;
-                        for l in labels {
-
-                        }
-                        self.client.query_device_can_use_label(graph, _role_revoked.device_id, label)
-                        let device_labels = self.client.query_labels_assigned_to_device(team, device) _role_revoked.device_id;
+                        // Delete AFC channels for devices where role was revoked (this means the device no longer has the `CanUseAfc` permission)
+                        self.delete_device_afc_channels(_role_revoked.device_id.into())
+                            .await?;
                     }
                 }
                 // AdminRevoked is now just RoleRevoked - handled above
                 // OperatorRevoked is now just RoleRevoked - handled above
                 LabelCreated(_) => {}
                 LabelDeleted(_label_deleted) => {
+                    // Delete AFC channels with the label that was deleted.
                     #[cfg(feature = "afc")]
                     self.afc
                         .remove_if(RemoveIfParams {
@@ -273,7 +283,9 @@ impl EffectHandler {
                         .await?;
                 }
                 AssignedLabelToDevice(_) => {}
-                AssignedLabelToRole(_) => {}
+                AssignedLabelToRole(_) => {
+                    // TODO: we're removing label assignments from roles.
+                }
                 LabelRevokedFromDevice(_label_revoked) => {
                     #[cfg(feature = "afc")]
                     {
@@ -292,7 +304,7 @@ impl EffectHandler {
                     }
                 }
                 LabelRevokedFromRole(_) => {
-                    // TODO: delete channels where label is no longer assigned to the device or role
+                    // TODO: we're removing label assignments from roles.
                 }
                 QueryLabelResult(_) => {}
                 AfcUniChannelCreated(_) => {}
@@ -304,22 +316,81 @@ impl EffectHandler {
                 LabelManagingRoleAdded(_) => {}
                 LabelManagingRoleRevoked(_) => {}
                 PermAddedToRole(_) => {}
-                PermRemovedFromRole(_) => {
-                    // TODO: delete channels where afc permission has been revoked.
+                PermRemovedFromRole(_perm_removed_from_role) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        // Delete channels where `CanUseAfc` permission has been revoked.
+                        if _perm_removed_from_role.perm == "CanUseAfc" {
+                            let devices = self
+                                .client
+                                .query_devices_on_team(graph.into_id().into())
+                                .await?;
+                            for device in devices {
+                                if let Some(role) = self
+                                    .client
+                                    .query_device_role(
+                                        graph.into_id().into(),
+                                        device.into_id().into(),
+                                    )
+                                    .await?
+                                {
+                                    if role.id == _perm_removed_from_role.role_id.into() {
+                                        self.delete_device_afc_channels(device.into_id().into())
+                                            .await?;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 RoleOwnerAdded(_) => {}
                 RoleOwnerRemoved(_) => {}
                 RoleManagementPermAssigned(_) => {}
                 RoleManagementPermRevoked(_) => {}
-                RoleChanged(_) => {
-                    // TODO: delete channels where label is no longer assigned to the device or role
+                RoleChanged(_role_changed) => {
+                    #[cfg(feature = "afc")]
+                    {
+                        // Delete channels for devices where new role does not have the `CanUseAfc` permission)
+                        if !self
+                            .client
+                            .query_role_has_perm(
+                                graph.into_id().into(),
+                                _role_changed.new_role_id.into(),
+                                "CanUseAfc".into(),
+                            )
+                            .await?
+                        {
+                            self.delete_device_afc_channels(_role_changed.device_id.into())
+                                .await?;
+                        }
+                    }
                 }
                 QueryLabelsResult(_) => {}
                 QueryLabelsAssignedToRoleResult(_) => {}
                 QueryTeamRolesResult(_) => {}
                 QueryRoleOwnersResult(_) => {}
+                QueryRoleHasPermResult(_) => {}
                 RoleCreated(_) => {}
             }
+        }
+        Ok(())
+    }
+
+    // Delete all AFC channels for a particular device.
+    #[cfg(feature = "afc")]
+    async fn delete_device_afc_channels(&self, device_id: DeviceId) -> anyhow::Result<()> {
+        if self.device_id == device_id {
+            // Delete all AFC channels from the current device.
+            self.afc.delete_channels().await?;
+        } else {
+            // Delete all AFC channels matching the peer's device ID.
+            let peer_id = Some(device_id);
+            self.afc
+                .remove_if(RemoveIfParams {
+                    peer_id,
+                    ..Default::default()
+                })
+                .await?;
         }
         Ok(())
     }
@@ -437,6 +508,28 @@ impl Client {
             })
             .collect();
         Ok(roles)
+    }
+
+    // Query role has permission.
+    #[cfg(feature = "afc")]
+    async fn query_role_has_perm(
+        &self,
+        team: api::TeamId,
+        role_id: api::RoleId,
+        perm: String,
+    ) -> api::Result<bool> {
+        let effects = self
+            .actions(&team.into_id().into())
+            .query_role_has_perm(role_id.into_id().into(), Text::from_str(perm.as_str())?)
+            .await
+            .context("unable to query device role")?;
+        if let Some(Effect::QueryRoleHasPermResult(e)) =
+            find_effect!(&effects, Effect::QueryRoleHasPermResult(_))
+        {
+            Ok(e.has_perm)
+        } else {
+            Ok(false)
+        }
     }
 
     // Query device keybundle.
@@ -578,49 +671,6 @@ impl Client {
         }
         Ok(labels)
     }
-
-    // Query all labels assigned to a device (directly or indirectly via a role).
-    // This will return the union of labels assigned to the device and labels assigned to the device's role.
-    async fn query_all_labels_assigned_to_device(&self, team: api::TeamId,
-        device: api::DeviceId) -> anyhow::Result<Vec<api::Label>> {        
-        let mut labels = self.query_labels_assigned_to_device(team, device).await?;
-        if let Some(role) = self.query_device_role(team, device).await? {
-            labels.append(&mut self.query_labels_assigned_to_role(team, role.id).await?);
-        }
-        // Collect into HashSet to retain only unique values.
-        Ok(labels.iter().collect::<HashSet<_>>().into_iter().map(|l| l.clone()).collect())
-    }
-
-    // Query whether a device is allowed to use a label.
-    async fn query_device_can_use_label(&self, team: api::TeamId,
-        device: api::DeviceId, label: api::LabelId) -> anyhow::Result<bool> {     
-        // TODO: does it matter which query is run first?  
-        for l in self.query_labels_assigned_to_device(team, device).await? {
-            if l.id == label {
-                return Ok(true);
-            }
-        }
-        if let Some(role) = self.query_device_role(team, device).await? {
-            for l in self.query_labels_assigned_to_role(team, role.id).await? {
-                if l.id == label {
-                    return Ok(true);
-                }
-            }
-        }
-
-        return Ok(false);
-    }
-
-    // Query labels revoked from device after role revocation.
-    async fn query_labels_revoked_from_device(&self, team: api::TeamId,
-        device: api::DeviceId, role: api::RoleId) -> anyhow::Result<Vec<api::Label>> {     
-       let role_labels= self.query_labels_assigned_to_role(team, role).await?.into_iter().collect::<HashSet<_>>();
-        let device_labels = self.query_labels_assigned_to_device(team, device).await?.into_iter().collect::<HashSet<_>>();
-        let revoked_labels = (&role_labels - &device_labels).into_iter().map(|l| l.clone()).collect();
-        Ok(revoked_labels)
-
-    }
-
 }
 
 impl DaemonApi for Api {
