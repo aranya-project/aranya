@@ -245,6 +245,7 @@ impl EffectHandler {
                     #[cfg(feature = "afc")]
                     {
                         // Delete channels for devices where new role does not have the `CanUseAfc` permission)
+                        // TODO: use something other than a string for "CanUseAfc" perm.
                         if !self
                             .client
                             .query_role_has_perm(
@@ -322,6 +323,7 @@ impl EffectHandler {
                         // Delete channels where `CanUseAfc` permission has been revoked.
                         // This queries for a list of devices which means a device could be missed by the query if `PermRemovedFromRole`` and `DeviceRemoved`` happen back-to-back.
                         // This is acceptable because AFC channels will be deleted from the device when `DeviceRemoved` is handled later.
+                        // TODO: use something other than a string for "CanUseAfc" perm.
                         if _perm_removed_from_role.perm == "CanUseAfc" {
                             for device in self
                                 .client
@@ -348,6 +350,7 @@ impl EffectHandler {
                         // If the role has the `CanUseAfc` permission before running the query, the device's AFC channel will not be deleted.
                         // If the role does not have the `CanUseAfc` permission, the device's AFC channel will be deleted.
                         // If you do not want any AFC channels to be deleted when assigning a role, you must ensure the `CanUseAfc` permission is assigned to the role before assigning it to a device.
+                        // TODO: use something other than a string for "CanUseAfc" perm.
                         if !self
                             .client
                             .query_role_has_perm(
