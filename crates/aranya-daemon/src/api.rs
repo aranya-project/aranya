@@ -320,25 +320,19 @@ impl EffectHandler {
                     #[cfg(feature = "afc")]
                     {
                         // Delete channels where `CanUseAfc` permission has been revoked.
+                        // This queries for a list of devices which means a device could be missed by the query if `PermRemovedFromRole`` and `DeviceRemoved`` happen back-to-back.
+                        // This is acceptable because AFC channels will be deleted from the device when `DeviceRemoved` is handled later.
                         if _perm_removed_from_role.perm == "CanUseAfc" {
-                            let devices = self
+                            for device in self
                                 .client
-                                .query_devices_on_team(graph.into_id().into())
-                                .await?;
-                            for device in devices {
-                                if let Some(role) = self
-                                    .client
-                                    .query_device_role(
-                                        graph.into_id().into(),
-                                        device.into_id().into(),
-                                    )
-                                    .await?
-                                {
-                                    if role.id == _perm_removed_from_role.role_id.into() {
-                                        self.delete_device_afc_channels(device.into_id().into())
-                                            .await?;
-                                    }
-                                }
+                                .query_devices_with_role(
+                                    graph.into_id().into(),
+                                    _perm_removed_from_role.role_id,
+                                )
+                                .await?
+                            {
+                                self.delete_device_afc_channels(device.into_id().into())
+                                    .await?;
                             }
                         }
                     }
@@ -351,6 +345,9 @@ impl EffectHandler {
                     #[cfg(feature = "afc")]
                     {
                         // Delete channels for devices where new role does not have the `CanUseAfc` permission)
+                        // If the role has the `CanUseAfc` permission before running the query, the device's AFC channel will not be deleted.
+                        // If the role does not have the `CanUseAfc` permission, the device's AFC channel will be deleted.
+                        // If you do not want any AFC channels to be deleted when assigning a role, you must ensure the `CanUseAfc` permission is assigned to the role before assigning it to a device.
                         if !self
                             .client
                             .query_role_has_perm(
@@ -475,6 +472,30 @@ impl Client {
             .into_iter()
             .filter_map(|e| {
                 if let Effect::QueryDevicesOnTeamResult(e) = e {
+                    Some(e.device_id.into())
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(devices)
+    }
+
+    // Query devices with role.
+    async fn query_devices_with_role(
+        &self,
+        team: api::TeamId,
+        role: api::RoleId,
+    ) -> api::Result<Vec<api::DeviceId>> {
+        let devices = self
+            .actions(&team.into_id().into())
+            .query_devices_with_role(role)?
+            .await
+            .context("unable to query devices with role")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryDevicesWithRoleResult(e) = e {
                     Some(e.device_id.into())
                 } else {
                     warn!(name = e.name(), "unexpected effect");

@@ -435,6 +435,21 @@ where
         .in_current_span()
     }
 
+    /// Invokes `query_devices_with_role`.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_devices_with_with(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_devices_with_role"),
+            args: Cow::Owned(vec![Value::from(role_id)]),
+        })
+        .map_ok(|SessionData { effects, .. }| effects)
+        .in_current_span()
+    }
+
     /// Invokes `query_label`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]

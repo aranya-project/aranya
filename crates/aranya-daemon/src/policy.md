@@ -459,6 +459,66 @@ ephemeral command QueryDevicesOnTeam {
 }
 ```
 
+#### `query_devices_with_role`
+
+Returns a list of devices with a certain role.
+
+```policy
+// Emits `QueryDevicesWithRole` for each device on the team with specified role.
+ephemeral action query_devices_with_role(role_id id) {
+    // Publishing `QueryDevicesWithRole` emits
+    // `QueryDevicesWithRoleResult`.
+    map Device[device_id: ?] as f {
+        publish QueryDevicesWithRole {
+            device_id: f.device_id,
+            role_id: role_id,
+        }
+    }
+}
+
+// Emitted when a device is queried by `query_devices_with_role`.
+effect QueryDevicesWithRoleResult {
+    // The ID of a device on the team.
+    device_id id,
+    // The ID of the role.
+    role_id id,
+}
+
+// A trampoline that forwards `device_id` to the effect.
+ephemeral command QueryDevicesWithRole {
+    fields {
+        device_id id,
+        role_id id,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Get the role assigned to the device.
+        let role_id = unwrap try_get_assigned_role(this.device_id)
+        if role_id is None {
+            finish {}
+        } else {
+            if role_id == this.role_id {
+                finish {
+                    emit QueryDevicesWithRoleResult {
+                        device_id: this.device_id,
+                        role_id: this.role_id,
+                    }
+                }
+            } else {
+                finish {}
+            }
+        }
+    }
+}
+```
+
 #### `query_device_role`
 
 Returns the role assigned to a device.
@@ -2275,7 +2335,7 @@ command RevokeRole {
 
 ### Role Queries
 
-#### `query_role_perms`
+#### `query_role_has_perm`
 
 ```policy
 // Emits `QueryRoleHasPerm` indicating whether the permission is assigned to the role.
