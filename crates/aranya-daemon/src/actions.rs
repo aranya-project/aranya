@@ -8,10 +8,9 @@ use aranya_crypto::{policy::LabelId, Csprng, DeviceId, Rng};
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::{ident, Text, Value};
-#[cfg(feature = "afc")]
-use aranya_runtime::Session;
 use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Sink, StorageProvider, VmPolicy,
+    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
+    VmPolicy,
 };
 use tokio::sync::Mutex;
 use tracing::{debug, info, instrument, warn, Instrument};
