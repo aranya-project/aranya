@@ -1250,13 +1250,13 @@ function can_change_role_perms(device_id id, target_role_id id) bool {
     // At this point we believe the following to be true:
     //
     // - `device_role_id` refers to a role that exists
-    // - `device_role_id` refers to the role revoked to
+    // - `device_role_id` refers to the role assigned to
     //   `device_id`
     //
     // We do NOT know whether `device_id` refers to a device
     // that exists.
     //
-    // We do NOT know whether `role_id` refers to a role that
+    // We do NOT know whether `target_role_id` refers to a role that
     // exists.
     return exists CanChangeRolePerms[
         target_role_id: target_role_id,
@@ -2124,7 +2124,7 @@ command ChangeRole {
         check can_revoke_role(author.device_id, this.old_role_id)
         check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
 
-        // The author must have permission to revoke the old role.
+        // The author must have permission to assign the new role.
         check exists Role[role_id: this.new_role_id]
         check can_assign_role(author.device_id, this.new_role_id)
         check device_has_simple_perm(author.device_id, SimplePerm::AssignRole)
@@ -3272,7 +3272,7 @@ command DeleteLabel {
             // storage layer does not yet support prefix deletion.
             // See https://github.com/aranya-project/aranya-core/issues/229
             //
-            // delete AssignedLabel[label_id: label.label_id, device_id: ?]
+            // delete LabelAssignedToDevice[label_id: label.label_id, device_id: ?]
             // delete CanManageLabel[label_id: label.label_id, managing_role_id: ?]
 
             delete Label[label_id: label.label_id]

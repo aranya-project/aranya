@@ -9,7 +9,7 @@ use crate::{
 };
 
 custom_id! {
-    /// An AQC label ID.
+    /// An AFC label ID.
     pub struct LabelId;
 }
 
