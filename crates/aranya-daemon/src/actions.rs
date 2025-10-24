@@ -1,7 +1,7 @@
 //! Aranya graph actions/effects API.
 
 use core::{future::Future, marker::PhantomData};
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
 
 use anyhow::{Context, Result};
 use aranya_crypto::{policy::LabelId, Csprng, DeviceId, Rng};
@@ -12,7 +12,6 @@ use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
 };
-use tokio::sync::Mutex;
 use tracing::{debug, info, instrument, warn, Instrument};
 
 use crate::{
@@ -39,8 +38,7 @@ where
     ) -> Result<(GraphId, Vec<Effect>)> {
         let mut sink = VecSink::new();
         let id = self
-            .aranya
-            .lock()
+            .lock_aranya()
             .await
             .new_graph(
                 &[0u8],
@@ -59,7 +57,7 @@ where
     #[instrument(skip_all, fields(id = %id))]
     pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
         ActionsImpl {
-            aranya: Arc::clone(&self.aranya),
+            client: self.clone(),
             graph_id: *id,
             _eng: PhantomData,
         }
@@ -69,7 +67,7 @@ where
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
     #[instrument(skip_all, fields(id = %id))]
     pub(crate) async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(*id)?;
+        let session = self.lock_aranya().await.session(*id)?;
         Ok(session)
     }
 
@@ -81,7 +79,7 @@ where
         session: &mut Session<SP, EN>,
         command: &[u8],
     ) -> Result<Vec<Effect>> {
-        let client = self.aranya.lock().await;
+        let client = self.lock_aranya().await;
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
         Ok(sink.collect()?)
@@ -91,7 +89,7 @@ where
 /// Implements [`Actions`] for a particular storage.
 struct ActionsImpl<EN, SP, CE> {
     /// Aranya client graph state.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    client: Client<EN, SP>,
     /// Aranya graph ID.
     graph_id: GraphId,
     /// Crypto engine.
@@ -112,7 +110,7 @@ where
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
         {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.client.lock_aranya().await;
             let mut actor = ActorImpl::new(&mut client, &mut sink, &self.graph_id);
             f(&mut actor)?;
         }
@@ -134,7 +132,7 @@ where
     where
         F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a>,
     {
-        let mut client = self.aranya.lock().await;
+        let mut client = self.client.lock_aranya().await;
         let mut session = client.session(self.graph_id)?;
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();

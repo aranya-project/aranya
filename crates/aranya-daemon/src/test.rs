@@ -8,7 +8,6 @@
 )]
 
 use std::{
-    collections::BTreeMap,
     fs,
     net::Ipv4Addr,
     ops::{Deref, DerefMut},
@@ -33,32 +32,25 @@ use serial_test::serial;
 use tempfile::{tempdir, TempDir};
 use test_log::test;
 use tokio::{
-    sync::{
-        mpsc::{self, Receiver},
-        Mutex,
-    },
+    sync::mpsc::{self, Receiver},
     task::{self, AbortHandle},
 };
 
 use crate::{
     actions::Actions,
     api::EffectReceiver,
-    aranya::{self, ClientWithState, PeerCacheMap},
+    aranya::Client,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::{
-            quic::{HelloSubscriptions, PskStore},
-            PeerCacheKey, SyncPeer,
-        },
+        task::{quic::PskStore, PeerCacheKey, SyncPeer},
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
-    AranyaStore, InvalidGraphs,
+    AranyaStore,
 };
 
 // Aranya graph client for testing.
-type TestClient =
-    aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+type TestClient = Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 type TestState = sync::task::quic::State;
 // Aranya sync client for testing.
@@ -216,8 +208,6 @@ impl TestCtx {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let caches = PeerCacheMap::new(Mutex::new(BTreeMap::new()));
-
         let (syncer, server, local_addr, pk, psk_store, effects_recv) = {
             let mut store = {
                 let path = root.join("keystore");
@@ -233,7 +223,7 @@ impl TestCtx {
 
             let pk = bundle.public_keys(&mut eng, &store)?;
 
-            let graph = ClientState::new(
+            let client = Client::new(ClientState::new(
                 PolicyEngine::new(
                     TEST_POLICY_1,
                     eng,
@@ -241,36 +231,22 @@ impl TestCtx {
                     bundle.device_id,
                 )?,
                 LinearStorageProvider::new(FileManager::new(&storage_dir)?),
-            );
+            ));
 
-            let aranya = Arc::new(Mutex::new(graph));
-            let client = TestClient::new(Arc::clone(&aranya));
             let bind_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
-            let hello_subscriptions = Arc::<Mutex<HelloSubscriptions>>::default();
 
             let (send_effects, effects_recv) = mpsc::channel(1);
 
             // Create server first to get the actual listening address
-            let client_with_state_for_server =
-                ClientWithState::new(client.clone(), caches.clone(), hello_subscriptions.clone());
             let (server, _sync_peers, conn_map, syncer_recv, local_addr): (TestServer, _, _, _, _) =
-                TestServer::new(
-                    client_with_state_for_server,
-                    &bind_addr,
-                    psk_store.clone(),
-                    hello_subscriptions.clone(),
-                )
-                .await?;
+                TestServer::new(client.clone(), &bind_addr, psk_store.clone()).await?;
 
             // Create syncer with the actual server address
-            let client_with_state_for_syncer =
-                ClientWithState::new(client.clone(), caches.clone(), server.hello_subscriptions());
             let syncer = TestSyncer::new(
-                client_with_state_for_syncer,
+                client.clone(),
                 send_effects,
-                InvalidGraphs::default(),
                 psk_store.clone(),
                 local_addr.into(),
                 syncer_recv,

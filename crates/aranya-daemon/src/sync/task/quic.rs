@@ -44,21 +44,17 @@ use s2n_quic::{
     Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    io::AsyncReadExt,
-    sync::{mpsc, Mutex},
-};
+use tokio::{io::AsyncReadExt, sync::mpsc};
 use tokio_util::time::DelayQueue;
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::{Request, SyncPeers, SyncResponse, SyncState};
 use crate::{
-    aranya::ClientWithState,
+    aranya::Client,
     sync::{
         task::{PeerCacheKey, Syncer},
         Result as SyncResult, SyncError,
     },
-    InvalidGraphs,
 };
 
 mod connections;
@@ -235,9 +231,8 @@ impl State {
 impl Syncer<State> {
     /// Creates a new [`Syncer`].
     pub(crate) fn new(
-        client: ClientWithState<crate::EN, crate::SP>,
+        client: Client<crate::EN, crate::SP>,
         send_effects: super::EffectSender,
-        invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         server_addr: Addr,
         recv: mpsc::Receiver<Request>,
@@ -251,7 +246,6 @@ impl Syncer<State> {
             recv,
             queue: DelayQueue::new(),
             send_effects,
-            invalid,
             state,
             server_addr,
         })
@@ -441,7 +435,7 @@ impl Syncer<State> {
 #[derive_where(Debug)]
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client: ClientWithState<EN, SP>,
+    client: Client<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
     server_keys: Arc<PskStore>,
@@ -458,11 +452,6 @@ where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
-    /// Returns a reference to the hello subscriptions for hello notification broadcasting.
-    pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
-        Arc::clone(self.client.hello_subscriptions())
-    }
-
     /// Creates a new `Server`.
     ///
     /// # Panics
@@ -473,10 +462,9 @@ where
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-        _hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
         SyncPeers,
@@ -627,7 +615,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     pub async fn sync(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
@@ -668,7 +656,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
@@ -724,7 +712,7 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         peer_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,

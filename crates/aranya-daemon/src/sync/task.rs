@@ -42,7 +42,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
+use crate::{daemon::EF, vm_policy::VecSink};
 
 pub mod hello;
 pub mod quic;
@@ -224,7 +224,7 @@ impl PeerCacheKey {
 #[derive(Debug)]
 pub struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(crate) client: crate::aranya::ClientWithState<crate::EN, crate::SP>,
+    pub(crate) client: crate::aranya::Client<crate::EN, crate::SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Option<Key>)>,
     /// Receives added/removed peers.
@@ -233,8 +233,6 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
-    /// Keeps track of invalid graphs due to finalization errors.
-    invalid: InvalidGraphs,
     /// Additional state used by the syncer.
     state: ST,
     /// Sync server address.
@@ -419,7 +417,7 @@ impl<ST: SyncState> Syncer<ST> {
                         }
                         keep
                     });
-                    self.invalid.insert(peer.graph_id);
+                    self.client.invalid_graphs().insert(peer.graph_id);
                 }
             })
             .with_context(|| format!("peer addr: {}", peer.addr))?;
@@ -471,12 +469,12 @@ impl<ST: SyncState> Syncer<ST> {
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
     pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
-        self.client.client()
+        &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
     pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
-        self.client.client_mut()
+        &mut self.client
     }
 }
