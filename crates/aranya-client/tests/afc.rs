@@ -456,6 +456,21 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     Ok(())
 }
 
+// TODO: demonstrate terminating the team deletes the AFC channel.
+// `close_team()` is not implemented yet.
+
+// TODO: Demonstrate removing one of the channel devices from the team deletes the AFC channel.
+
+// TODO: Demonstrate revoking the role from a device deletes the AFC channel.
+// Each device can only have one role assigned to it.
+// Therefore, revoking the role implicitly removes the `CanUseAfc` perm.
+
+// TODO: Demonstrate assigning a role to a device without `CanUseAfc` perm deletes the AFC channel.
+
+// TODO: Demonstrate changing the device's role to a new role without `CanUseAfc` perm deletes the AFC channel.
+
+// TODO: Demonstrate removing the `CanUseAfc` perm from a device's role deletes the AFC channel.
+
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
