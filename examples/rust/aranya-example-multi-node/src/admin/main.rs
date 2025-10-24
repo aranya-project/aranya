@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{client::Role, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::text;
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -40,10 +40,14 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("admin: initializing client");
-    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to initialize client");
+    let client = (|| {
+        Client::builder()
+            .with_daemon_uds_path(&args.uds_sock)
+            .connect()
+    })
+    .retry(ExponentialBuilder::default())
+    .await
+    .expect("expected to initialize client");
     info!("admin: initialized client");
 
     // Get team info from owner.
@@ -87,10 +91,18 @@ async fn main() -> Result<()> {
 
     // Loop until this device has the `Admin` role assigned to it.
     info!("admin: waiting for owner to assign admin role");
-    let queries = team.queries();
+    let admin_role = team
+        .roles()
+        .await?
+        .iter()
+        .find(|r| r.name == "admin")
+        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
+        .clone();
     loop {
-        if let Ok(Role::Admin) = queries.device_role(device_id).await {
-            break;
+        if let Ok(Some(r)) = team.device(device_id).role().await {
+            if r == admin_role {
+                break;
+            }
         }
         sleep(SLEEP_INTERVAL).await;
     }
@@ -98,7 +110,7 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let _label1 = team.create_label(text!("label1")).await?;
+    let _label1 = team.create_label(text!("label1"), admin_role.id).await?;
     info!("admin: created label");
 
     info!("admin: complete");

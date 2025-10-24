@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{client::Role, Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
+use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo},
@@ -41,10 +41,14 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("owner: initializing client");
-    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to initialize client");
+    let client = (|| {
+        Client::builder()
+            .with_daemon_uds_path(&args.uds_sock)
+            .connect()
+    })
+    .retry(ExponentialBuilder::default())
+    .await
+    .expect("expected to initialize client");
     info!("owner: initialized client");
 
     // Create team.
@@ -87,24 +91,28 @@ async fn main() -> Result<()> {
         let info: DeviceInfo = onboard.recv().await?;
         info!("owner: received device ID from {}", device.name);
 
-        team.add_device_to_team(info.pk).await?;
+        team.add_device(info.pk, None).await?;
         info!("owner: added device to team {}", device.name);
 
-        // Devices are assigned the `Role::Member` role by default when added to the team. No need to assign it again.
-        if device.role != Role::Member {
-            // Assign role to device.
-            info!(
-                "owner: assigning role {:?} to device {}",
-                device.role, device.name
-            );
-            team.assign_role(info.device_id, device.role)
-                .await
-                .expect("expected to assign role");
-            info!(
-                "owner: assigned role {:?} to device {}",
-                device.role, device.name
-            );
-        }
+        // We did not assign a role by default, so let's add one.
+        info!(
+            "owner: assigning role {:?} to device {}",
+            device.role, device.name
+        );
+        let role = team
+            .roles()
+            .await?
+            .iter()
+            .find(|r| *r.name == *device.role)
+            .ok_or_else(|| anyhow::anyhow!("role not found"))?
+            .clone();
+        team.assign_role(info.device_id, role.id)
+            .await
+            .expect("expected to assign role");
+        info!(
+            "owner: assigned role {:?} to device {}",
+            device.role, device.name
+        );
     }
 
     info!("owner: complete");

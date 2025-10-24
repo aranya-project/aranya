@@ -1,7 +1,8 @@
+use core::{error, fmt};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_crypto::tls::PskSeedId;
+use aranya_crypto::{keystore::fs_keystore, tls::PskSeedId};
 use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
@@ -11,9 +12,9 @@ use tokio::{
 };
 
 use crate::{
+    daemon::{CE, KS},
     keystore::LocalStore,
     sync::task::quic::{self as qs},
-    CE, KS,
 };
 
 #[derive(Debug)]
@@ -96,6 +97,21 @@ pub(crate) async fn load_team_psk_pairs(
     }
 
     Ok(out)
+}
+
+// TODO(eric): Add a blanket impl for `Clone`?
+pub trait TryClone: Sized {
+    type Error: fmt::Display + fmt::Debug + error::Error + Send + Sync + 'static;
+
+    fn try_clone(&self) -> Result<Self, Self::Error>;
+}
+
+impl TryClone for fs_keystore::Store {
+    type Error = fs_keystore::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        fs_keystore::Store::try_clone(self)
+    }
 }
 
 #[cfg(test)]

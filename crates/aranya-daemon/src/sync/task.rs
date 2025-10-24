@@ -27,7 +27,7 @@ use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
     vm_policy::VecSink,
-    InvalidGraphs,
+    InvalidGraphs, EN,
 };
 
 pub mod quic;
@@ -173,7 +173,7 @@ pub struct Syncer<ST> {
     /// Additional state used by the syncer.
     state: ST,
     /// Sync server address.
-    server_addr: Addr,
+    client_addr: Addr,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::client`]
     caches: PeerCacheMap,
@@ -192,7 +192,7 @@ pub trait SyncState: Sized {
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
-        S: Sink<<crate::EN as Engine>::Effect> + Send;
+        S: Sink<<EN as Engine>::Effect> + Send;
 }
 
 impl<ST> Syncer<ST> {
@@ -307,13 +307,13 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
+    pub fn client(&self) -> &crate::aranya::Client<EN, crate::SP> {
         &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, crate::SP> {
         &mut self.client
     }
 }

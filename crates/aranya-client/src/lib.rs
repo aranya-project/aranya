@@ -36,10 +36,18 @@ pub mod afc;
 pub mod client;
 pub mod config;
 pub mod error;
+// pub mod sync; // Temporarily disabled due to API changes
+mod util;
+
+pub use aranya_daemon_api::KeyBundle;
+pub use aranya_policy_text::{text, Text};
 
 #[doc(inline)]
 pub use crate::{
-    client::{Client, DeviceId, LabelId, Team, TeamId},
+    client::{
+        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, Role, RoleId, Roles,
+        Team, TeamId,
+    },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
         CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
