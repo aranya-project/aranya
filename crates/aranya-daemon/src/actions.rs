@@ -438,7 +438,7 @@ where
     /// Invokes `query_devices_with_role`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_devices_with_with(
+    fn query_devices_with_role(
         &self,
         role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {

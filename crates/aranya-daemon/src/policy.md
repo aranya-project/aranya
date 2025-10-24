@@ -500,11 +500,12 @@ ephemeral command QueryDevicesWithRole {
         check team_exists()
 
         // Get the role assigned to the device.
-        let role_id = unwrap try_get_assigned_role(this.device_id)
-        if role_id is None {
+        let assigned_role = try_get_assigned_role(this.device_id)
+        if assigned_role is None {
             finish {}
         } else {
-            if role_id == this.role_id {
+            let role = unwrap assigned_role
+            if role.role_id == this.role_id {
                 finish {
                     emit QueryDevicesWithRoleResult {
                         device_id: this.device_id,

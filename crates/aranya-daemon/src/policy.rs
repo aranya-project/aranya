@@ -44,6 +44,7 @@ pub enum Effect {
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
+    QueryDevicesWithRoleResult(QueryDevicesWithRoleResult),
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsAssignedToRoleResult(QueryLabelsAssignedToRoleResult),
@@ -187,6 +188,12 @@ pub struct QueryDeviceRoleResult {
 pub struct QueryDevicesOnTeamResult {
     pub device_id: BaseId,
 }
+/// QueryDevicesWithRoleResult policy effect.
+#[effect]
+pub struct QueryDevicesWithRoleResult {
+    pub device_id: BaseId,
+    pub role_id: BaseId,
+}
 /// QueryLabelResult policy effect.
 #[effect]
 pub struct QueryLabelResult {
@@ -317,6 +324,7 @@ pub struct TeamTerminated {
 #[actions]
 pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
+    fn query_devices_with_role(&mut self, role_id: BaseId) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn add_perm_to_role(

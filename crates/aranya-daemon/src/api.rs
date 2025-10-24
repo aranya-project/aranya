@@ -327,7 +327,7 @@ impl EffectHandler {
                                 .client
                                 .query_devices_with_role(
                                     graph.into_id().into(),
-                                    _perm_removed_from_role.role_id,
+                                    _perm_removed_from_role.role_id.into(),
                                 )
                                 .await?
                             {
@@ -367,6 +367,7 @@ impl EffectHandler {
                 QueryTeamRolesResult(_) => {}
                 QueryRoleOwnersResult(_) => {}
                 QueryRoleHasPermResult(_) => {}
+                QueryDevicesWithRoleResult(_) => {}
                 RoleCreated(_) => {}
             }
         }
@@ -490,7 +491,7 @@ impl Client {
     ) -> api::Result<Vec<api::DeviceId>> {
         let devices = self
             .actions(&team.into_id().into())
-            .query_devices_with_role(role)?
+            .query_devices_with_role(role.into_id().into())
             .await
             .context("unable to query devices with role")?
             .into_iter()
