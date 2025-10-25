@@ -4,7 +4,7 @@ mod common;
 
 #[cfg(feature = "afc")]
 use {
-    crate::common::DevicesCtx,
+    crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL},
     anyhow::{Context, Result},
     aranya_client::afc::Channels,
     aranya_client::client::ChanOp,
@@ -27,35 +27,25 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
+    devices.add_all_sync_peers(team_id).await?;
 
-    let operator_team = devices.operator.client.team(team_id);
+    let owner_team = devices.owner.client.team(team_id);
 
-    let label_id = operator_team
-        .create_label(text!("label1"), default_roles.operator().id)
+    sleep(SLEEP_INTERVAL).await;
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
         .await?;
+    // wait for syncing.
+    sleep(SLEEP_INTERVAL).await;
+
     let op = ChanOp::SendRecv;
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id, op)
-        .await?;
-
-    // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
-    devices
-        .membera
-        .client
-        .team(team_id)
-        .sync_now(operator_addr, None)
-        .await?;
-    devices
-        .memberb
-        .client
-        .team(team_id)
-        .sync_now(operator_addr, None)
         .await?;
 
     // Create uni channel.
