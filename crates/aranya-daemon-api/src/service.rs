@@ -411,6 +411,8 @@ pub trait DaemonApi {
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
+    /// Changes the assigned role of a device.
+    async fn change_role(team: TeamId, device: DeviceId, old_role: RoleId, new_role: RoleId) -> Result<()>;
     /// Returns the role assigned to the device.
     async fn device_role(team: TeamId, device: DeviceId) -> Result<Option<Role>>;
 
