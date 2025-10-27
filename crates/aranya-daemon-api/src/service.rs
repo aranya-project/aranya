@@ -272,8 +272,9 @@ pub trait DaemonApi {
     async fn sync_hello_subscribe(
         peer: Addr,
         team: TeamId,
-        delay: Duration,
+        graph_change_delay: Duration,
         duration: Duration,
+        schedule_delay: Duration,
     ) -> Result<()>;
 
     /// Unsubscribe from hello notifications from a sync peer.

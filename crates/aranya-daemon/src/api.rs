@@ -504,13 +504,20 @@ impl DaemonApi for Api {
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
-        delay: Duration,
+        graph_change_delay: Duration,
         duration: Duration,
+        schedule_delay: Duration,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         self.peers
-            .sync_hello_subscribe(peer, team.into_id().into(), delay, duration)
+            .sync_hello_subscribe(
+                peer,
+                team.into_id().into(),
+                graph_change_delay,
+                duration,
+                schedule_delay,
+            )
             .await?;
         Ok(())
     }

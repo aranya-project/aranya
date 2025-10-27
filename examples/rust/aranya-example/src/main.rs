@@ -279,15 +279,16 @@ async fn main() -> Result<()> {
     // Admin subscribes to hello notifications from Owner with 2-second delay
     info!("admin subscribing to hello notifications from owner");
     let duration = Duration::from_secs(30);
-    let delay = Duration::from_millis(1000);
+    let graph_change_delay = Duration::from_millis(1000);
+    let schedule_delay = Duration::from_secs(5);
     admin_team
-        .sync_hello_subscribe(owner_addr, delay * 2, duration)
+        .sync_hello_subscribe(owner_addr, graph_change_delay * 2, duration, schedule_delay)
         .await?;
 
     // Operator subscribes to hello notifications from Admin with 1-second delay
     info!("operator subscribing to hello notifications from admin");
     operator_team
-        .sync_hello_subscribe(admin_addr, delay, duration)
+        .sync_hello_subscribe(admin_addr, graph_change_delay, duration, schedule_delay)
         .await?;
 
     sleep(sleep_interval).await;

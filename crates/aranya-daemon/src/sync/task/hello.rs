@@ -11,9 +11,10 @@ use std::{
 
 use anyhow::Context;
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, GraphId, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{Address, Engine, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
 use aranya_util::Addr;
 use tokio::{io::AsyncReadExt, sync::Mutex};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
@@ -30,12 +31,16 @@ use crate::{
 /// Storage for sync hello subscriptions
 #[derive(Debug, Clone)]
 pub struct HelloSubscription {
-    /// Delay between notifications to this subscriber
-    delay: Duration,
+    /// Delay between notifications when graph changes (rate limiting)
+    graph_change_delay: Duration,
     /// Last notification time for delay management
     last_notified: Option<Instant>,
     /// Expiration time of the subscription
     expires_at: Instant,
+    /// Schedule-based sending delay
+    schedule_delay: Duration,
+    /// Token to cancel the scheduled sending task
+    cancel_token: CancellationToken,
 }
 
 /// Type alias for hello subscription storage
@@ -91,7 +96,7 @@ impl Syncer<State> {
         for (subscriber_addr, subscription) in subscribers.iter() {
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
-                if now - last_notified < subscription.delay {
+                if now - last_notified < subscription.graph_change_delay {
                     continue;
                 }
             }
@@ -194,7 +199,9 @@ impl Syncer<State> {
     /// # Arguments
     /// * `peer` - The network address of the peer to send the subscribe request to
     /// * `id` - The graph ID for the team/graph to subscribe to
-    /// * `delay_milliseconds` - Delay in milliseconds between notifications (0 = immediate)
+    /// * `graph_change_delay` - Delay between notifications when graph changes (rate limiting)
+    /// * `duration` - How long the subscription should last
+    /// * `schedule_delay` - Schedule-based hello sending delay
     /// * `subscriber_server_addr` - The address where this subscriber's QUIC sync server is listening
     ///
     /// # Returns
@@ -205,16 +212,16 @@ impl Syncer<State> {
         &mut self,
         peer: &Addr,
         id: GraphId,
-        delay: Duration,
+        graph_change_delay: Duration,
         duration: Duration,
+        schedule_delay: Duration,
         subscriber_server_addr: Addr,
     ) -> SyncResult<()> {
         // Create the subscribe message
-        let delay_milliseconds = delay.as_millis() as u64;
-        let duration_milliseconds = duration.as_millis() as u64;
         let hello_msg = SyncHelloType::Subscribe {
-            delay_milliseconds,
-            duration_milliseconds,
+            graph_change_delay,
+            duration,
+            schedule_delay,
             address: subscriber_server_addr,
         };
         let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
@@ -339,6 +346,94 @@ impl Syncer<State> {
     }
 }
 
+/// Spawns a background task to send scheduled hello messages.
+///
+/// The task will periodically send hello notifications to the subscriber at the specified interval,
+/// regardless of whether the graph has changed. The task will exit when the subscription expires
+/// or the cancellation token is triggered.
+fn spawn_scheduled_hello_sender<EN, SP>(
+    graph_id: GraphId,
+    subscriber_addr: Addr,
+    schedule_delay: Duration,
+    expires_at: Instant,
+    cancel_token: CancellationToken,
+    sync_peers: SyncPeers,
+    client: ClientWithState<EN, SP>,
+) where
+    EN: Engine + Send + 'static,
+    SP: StorageProvider + Send + Sync + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            // Wait for either the schedule delay or cancellation
+            tokio::select! {
+                _ = tokio::time::sleep(schedule_delay) => {
+                    // Check if subscription has expired
+                    if Instant::now() >= expires_at {
+                        debug!(
+                            ?graph_id,
+                            ?subscriber_addr,
+                            "Scheduled hello sender exiting: subscription expired"
+                        );
+                        break;
+                    }
+
+                    // Get the current head address
+                    let head = {
+                        let mut aranya = client.client().aranya.lock().await;
+                        match aranya.provider().get_storage(graph_id) {
+                            Ok(storage) => match storage.get_head_address() {
+                                Ok(addr) => addr,
+                                Err(e) => {
+                                    warn!(
+                                        error = %e,
+                                        ?graph_id,
+                                        "Failed to get head address for scheduled hello"
+                                    );
+                                    continue;
+                                }
+                            },
+                            Err(e) => {
+                                warn!(
+                                    error = %e,
+                                    ?graph_id,
+                                    "Failed to get storage for scheduled hello"
+                                );
+                                continue;
+                            }
+                        }
+                    };
+
+                    // Send scheduled hello notification
+                    if let Err(e) = sync_peers.broadcast_hello(graph_id, head).await {
+                        warn!(
+                            error = %e,
+                            ?graph_id,
+                            ?subscriber_addr,
+                            "Failed to broadcast scheduled hello"
+                        );
+                    } else {
+                        trace!(
+                            ?graph_id,
+                            ?subscriber_addr,
+                            ?head,
+                            "Sent scheduled hello notification"
+                        );
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                    debug!(
+                        ?graph_id,
+                        ?subscriber_addr,
+                        "Scheduled hello sender exiting: cancelled"
+                    );
+                    break;
+                }
+            }
+        }
+    });
+}
+
 impl<EN, SP> Server<EN, SP>
 where
     EN: Engine + Send + 'static,
@@ -359,24 +454,65 @@ where
 
         match hello_msg {
             SyncHelloType::Subscribe {
-                delay_milliseconds,
-                duration_milliseconds,
+                graph_change_delay,
+                duration,
+                schedule_delay,
                 address,
             } => {
                 // Calculate expiration time
-                let expires_at = Instant::now() + Duration::from_millis(duration_milliseconds);
+                let expires_at = Instant::now() + duration;
+
+                let key = (graph_id, address);
+
+                // Check if there's an existing subscription and cancel its scheduled task
+                {
+                    let mut subscriptions = client.hello_subscriptions().lock().await;
+                    if let Some(old_subscription) = subscriptions.get(&key) {
+                        old_subscription.cancel_token.cancel();
+                        debug!(
+                            ?address,
+                            ?graph_id,
+                            "Cancelled previous scheduled hello sender"
+                        );
+                    }
+                }
+
+                // Create a new cancellation token for the new subscription
+                let cancel_token = CancellationToken::new();
 
                 let subscription = HelloSubscription {
-                    delay: Duration::from_millis(delay_milliseconds),
+                    graph_change_delay,
                     last_notified: None,
                     expires_at,
+                    schedule_delay,
+                    cancel_token: cancel_token.clone(),
                 };
 
                 // Store subscription (replaces any existing subscription for this peer+team)
-                let key = (graph_id, address);
+                {
+                    let mut subscriptions = client.hello_subscriptions().lock().await;
+                    subscriptions.insert(key, subscription);
+                }
 
-                let mut subscriptions = client.hello_subscriptions().lock().await;
-                subscriptions.insert(key, subscription);
+                // Spawn the scheduled hello sender task
+                spawn_scheduled_hello_sender(
+                    graph_id,
+                    address,
+                    schedule_delay,
+                    expires_at,
+                    cancel_token,
+                    sync_peers.clone(),
+                    client.clone(),
+                );
+
+                debug!(
+                    ?address,
+                    ?graph_id,
+                    ?graph_change_delay,
+                    ?schedule_delay,
+                    ?expires_at,
+                    "Created hello subscription and spawned scheduled sender"
+                );
             }
             SyncHelloType::Unsubscribe { address } => {
                 debug!(
@@ -389,11 +525,13 @@ where
                 // Remove subscription for this peer and team
                 let key = (graph_id, address);
                 let mut subscriptions = client.hello_subscriptions().lock().await;
-                if subscriptions.remove(&key).is_some() {
+                if let Some(subscription) = subscriptions.remove(&key) {
+                    // Cancel the scheduled sending task
+                    subscription.cancel_token.cancel();
                     debug!(
                         team_id = ?active_team,
                         ?address,
-                        "Removed hello subscription successfully"
+                        "Removed hello subscription and cancelled scheduled sender"
                     );
                 } else {
                     debug!(

@@ -164,12 +164,20 @@ impl SyncState for State {
         syncer: &mut Syncer<Self>,
         id: GraphId,
         peer: &Addr,
-        delay: Duration,
+        graph_change_delay: Duration,
         duration: Duration,
+        schedule_delay: Duration,
     ) -> SyncResult<()> {
         syncer.state.store().set_team(id.into_id().into());
         syncer
-            .send_sync_hello_subscribe_request(peer, id, delay, duration, syncer.server_addr)
+            .send_sync_hello_subscribe_request(
+                peer,
+                id,
+                graph_change_delay,
+                duration,
+                schedule_delay,
+                syncer.server_addr,
+            )
             .await
     }
 

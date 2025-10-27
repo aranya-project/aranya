@@ -1319,16 +1319,18 @@ pub unsafe fn remove_sync_peer(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] peer the peer's Aranya network address [`Addr`].
-/// @param[in] delay minimum delay between notifications.
+/// @param[in] graph_change_delay minimum delay between notifications when graph changes.
 /// @param[in] duration how long the subscription should remain active.
+/// @param[in] schedule_delay interval for periodic scheduled hello sends.
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_hello_subscribe(
     client: &Client,
     team: &TeamId,
     peer: Addr,
-    delay: Duration,
+    graph_change_delay: Duration,
     duration: Duration,
+    schedule_delay: Duration,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
@@ -1336,8 +1338,9 @@ pub unsafe fn sync_hello_subscribe(
         .rt
         .block_on(client.inner.team(team.into()).sync_hello_subscribe(
             addr,
-            delay.into(),
+            graph_change_delay.into(),
             duration.into(),
+            schedule_delay.into(),
         ))?;
     Ok(())
 }

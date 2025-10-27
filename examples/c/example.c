@@ -629,16 +629,19 @@ AranyaError run(Team* t) {
 
     // Admin subscribes to hello notifications from Owner with 2-second delay
     printf("admin subscribing to hello notifications from owner\n");
-    AranyaDuration delay    = ARANYA_DURATION_MILLISECONDS * 1000;
-    AranyaDuration duration = ARANYA_DURATION_MILLISECONDS * 30000;
+    AranyaDuration graph_change_delay = ARANYA_DURATION_MILLISECONDS * 1000;
+    AranyaDuration duration           = ARANYA_DURATION_MILLISECONDS * 30000;
+    AranyaDuration schedule_delay     = ARANYA_DURATION_MILLISECONDS * 5000;
     err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
-                                      delay * 2, duration);
+                                      graph_change_delay * 2, duration,
+                                      schedule_delay);
     EXPECT("error subscribing admin to owner hello notifications", err);
 
     // Operator subscribes to hello notifications from Admin with 1-second delay
     printf("operator subscribing to hello notifications from admin\n");
     err = aranya_sync_hello_subscribe(&operator->client, &t->id,
-                                      sync_addrs[ADMIN], delay, duration);
+                                      sync_addrs[ADMIN], graph_change_delay,
+                                      duration, schedule_delay);
     EXPECT("error subscribing operator to admin hello notifications", err);
 
     sleep(1);

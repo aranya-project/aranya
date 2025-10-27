@@ -504,12 +504,20 @@ impl Team<'_> {
     pub async fn sync_hello_subscribe(
         &self,
         peer: Addr,
-        delay: Duration,
+        graph_change_delay: Duration,
         duration: Duration,
+        schedule_delay: Duration,
     ) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_subscribe(context::current(), peer, self.team_id.__id, delay, duration)
+            .sync_hello_subscribe(
+                context::current(),
+                peer,
+                self.team_id.__id,
+                graph_change_delay,
+                duration,
+                schedule_delay,
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
