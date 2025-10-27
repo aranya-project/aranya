@@ -2405,6 +2405,10 @@ effect QueryRoleOwnersResult {
 
 // A trampoline command to forward data to `QueryRoleOwnersResult`.
 ephemeral command QueryRoleOwners {
+    attributes {
+        priority: 0
+    }
+
     fields {
         role_id id,
         name string,
@@ -4308,6 +4312,10 @@ effect AfcUniChannelReceived {
 }
 
 ephemeral command AfcCreateUniChannel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The device ID of the participant that can receive
         // data.
