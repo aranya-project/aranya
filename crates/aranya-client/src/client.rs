@@ -63,7 +63,7 @@ impl ClientBuilder<'_> {
     /// # #[tokio::main]
     /// # async fn main() -> anyhow::Result<()> {
     /// let client = Client::builder()
-    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
+    ///     .with_daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
     ///     .connect()
     ///     .await?;
     /// #    Ok(())
