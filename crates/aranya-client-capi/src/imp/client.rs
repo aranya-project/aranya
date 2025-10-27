@@ -1,25 +1,14 @@
 use core::{mem::MaybeUninit, ops::Deref};
 
-use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::KeyBundle;
 
 use crate::imp;
 
 /// An instance of an Aranya Client, along with an async runtime.
+#[derive(Debug)]
 pub struct Client {
     pub(crate) inner: aranya_client::Client,
     pub(crate) rt: tokio::runtime::Runtime,
-}
-
-impl Client {
-    /// Useful for deref coercion.
-    pub(crate) fn imp(&self) -> &Self {
-        self
-    }
-}
-
-impl Typed for Client {
-    const TYPE_ID: TypeId = TypeId::new(0xBBAFB41C);
 }
 
 /// Serializes a [`KeyBundle`] into the output buffer.
@@ -52,10 +41,6 @@ pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
 /// An Aranya role.
 #[derive(Debug)]
 pub struct Role(aranya_client::Role);
-
-impl Typed for Role {
-    const TYPE_ID: TypeId = TypeId::new(0xA1B2C3D4);
-}
 
 impl Deref for Role {
     type Target = aranya_client::Role;

@@ -45,23 +45,28 @@ rm -rf "${out}"
 
 port=10001
 for device in "${devices[@]}"; do
-    cat <<EOF >"${example}/configs/${device}-config.json"
-{
-    "name": "${device}",
-    "runtime_dir": "${out}/${device}/run",
-    "state_dir": "${out}/${device}/state",
-    "cache_dir": "${out}/${device}/cache",
-    "logs_dir": "${out}/${device}/log",
-    "config_dir": "${out}/${device}/config",
-    "sync_addr": "127.0.0.1:${port}",
-    "quic_sync": {},
-}
+    cat <<EOF >"${example}/configs/${device}-config.toml"
+name = "${device}"
+runtime_dir = "${out}/${device}/run"
+state_dir = "${out}/${device}/state"
+cache_dir = "${out}/${device}/cache"
+logs_dir = "${out}/${device}/log"
+config_dir = "${out}/${device}/config"
+
+[afc]
+enable = true
+shm_path = "/test_shm_${device}"
+max_chans = 100
+
+[sync.quic]
+enable = true
+addr = "127.0.0.1:${port}"
 EOF
     port=$((port + 1))
 done
 
 # build the daemon.
-cargo build --bin aranya-daemon --release
+cargo build -p aranya-daemon --bin aranya-daemon --package aranya-daemon --features experimental,preview,afc --release
 
 # copy the aranya-client.h header file
 mkdir -p "${example}/include"
@@ -86,9 +91,9 @@ for device in "${devices[@]}"; do
     done
 
     # Note: set ARANYA_DAEMON=debug to debug daemons.
-    cfg_path="${example}/configs/${device}-config.json"
+    cfg_path="${example}/configs/${device}-config.toml"
 
-    ARANYA_DAEMON="aranya_daemon::aqc=trace,aranya_daemon::api=debug" \
+    ARANYA_DAEMON="aranya_daemon::afc=trace,aranya_daemon::api=debug" \
         "${release}/aranya-daemon" \
         --config "${cfg_path}" &
 done

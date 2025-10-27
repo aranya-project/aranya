@@ -16,16 +16,25 @@ workspace = true
 [features]
 default = []
 
+# Preview features
+preview = ["aranya-daemon-api/preview"]
+# Aranya Fast Channels
+afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
+
+# Experimental features
+experimental = ["aranya-daemon-api/experimental"]
+
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
-aranya-aqc-util = { workspace = true }
+aranya-afc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
 aranya-envelope-ffi = { workspace = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"], optional = true }
 aranya-idam-ffi = { workspace = true }
 aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }
@@ -39,13 +48,11 @@ buggy = { workspace = true }
 
 
 anyhow = { workspace = true }
-bimap = "0.6"
 bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
-deser-hjson = { version = "2" }
+derive-where = { workspace = true }
 futures-util = { workspace = true }
-itertools = { version = "0.14" }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }
@@ -61,17 +68,19 @@ tokio = { workspace = true, features = [
     "time",
 ] }
 tokio-util = { workspace = true, features = ["time"] }
+toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+
 [dev-dependencies]
 aranya-crypto = { workspace = true, features = ["memstore"] }
-
+divan = { workspace = true }
 pretty_assertions = { workspace = true }
-serde_json = { version = "1" }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
+
 
 [build-dependencies]
 aranya-policy-ifgen-build = { workspace = true }
@@ -81,3 +90,12 @@ aranya-policy-ifgen-build = { workspace = true }
 name = "aranya-daemon"
 path = "src/main.rs"
 test = false
+
+
+[[bench]]
+name = "metrics"
+harness = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["experimental", "preview"]

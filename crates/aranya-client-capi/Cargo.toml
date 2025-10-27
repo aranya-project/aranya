@@ -15,22 +15,31 @@ workspace = true
 
 [lib]
 crate-type = ["rlib", "cdylib"]
+doctest = false
 
 
 [features]
 default = []
 
+# Preview features
+preview = ["aranya-client/preview"]
+# Aranya Fast Channels
+afc = ["aranya-client/afc"]
+
+# Experimental features
+experimental = ["aranya-client/experimental"]
+
 
 [dependencies]
 aranya-client = { workspace = true }
+aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }
-aranya-crypto = { workspace = true }
+aranya-id = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
-bytes = { workspace = true }
 postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -44,3 +53,7 @@ aranya-capi-codegen = { workspace = true }
 anyhow = { workspace = true }
 quote = "1"
 syn = "2"
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["experimental", "preview"]

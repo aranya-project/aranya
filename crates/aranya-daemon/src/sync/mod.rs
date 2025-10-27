@@ -7,6 +7,8 @@ use error::SyncError;
 pub type Result<T> = core::result::Result<T, SyncError>;
 
 mod error {
+    use std::convert::Infallible;
+
     use thiserror::Error;
 
     use super::task::quic::Error as QSError;
@@ -29,8 +31,26 @@ mod error {
     }
 
     impl From<SyncError> for aranya_daemon_api::Error {
-        fn from(value: SyncError) -> Self {
-            Self::from_err(value)
+        fn from(err: SyncError) -> Self {
+            Self::from_err(err)
+        }
+    }
+
+    impl From<Infallible> for SyncError {
+        fn from(err: Infallible) -> Self {
+            match err {}
+        }
+    }
+
+    impl SyncError {
+        pub fn is_parallel_finalize(&self) -> bool {
+            use aranya_runtime::ClientError;
+            match self {
+                Self::Other(err) => err
+                    .downcast_ref::<ClientError>()
+                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
+                _ => false,
+            }
         }
     }
 }

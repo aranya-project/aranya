@@ -113,7 +113,7 @@ confidence-threshold = 0.8
 exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
-    { allow = ["AGPL-3.0"], crate = "aranya-aqc-util" },
+    { allow = ["AGPL-3.0"], crate = "aranya-afc-util" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-codegen" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-core" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-macro" },
@@ -121,6 +121,8 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-crypto-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-device-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-envelope-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-fast-channels" },
+    { allow = ["AGPL-3.0"], crate = "aranya-id" },
     { allow = ["AGPL-3.0"], crate = "aranya-idam-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-libc" },
     { allow = ["AGPL-3.0"], crate = "aranya-perspective-ffi" },
@@ -142,6 +144,9 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-daemon-api" },
     { allow = ["AGPL-3.0"], crate = "aranya-keygen" },
     { allow = ["AGPL-3.0"], crate = "aranya-util" },
+
+    { allow = ["AGPL-3.0"], crate = "aranya-example" },
+    { allow = ["AGPL-3.0"], crate = "aranya-example-multi-node" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
@@ -235,24 +240,27 @@ deny = [
 # this is set there is no point setting `deny`
 #exact = true
 
-# Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
+    "base64@0.21.7",
     "generic-array@0.14.7",
     "getrandom@0.2.15",
     "heapless@0.7.17",
     "hash32@0.2.1",
+    "linux-raw-sys@0.4.15",
     "rand@0.7.3",
     "rand@0.8.5",
     "rand_chacha@0.2.2",
     "rand_chacha@0.3.1",
     "rand_core@0.6.4",
     "rand_core@0.5.1",
-    "regex-automata@0.1.10",
-    "regex-syntax@0.6.29",
+    "rustix@0.38.44",
+    "rustc-hash@1.1.0",
+    "self_cell@0.10.3",
+    "socket2@0.5.8",
     "spin@0.9.8",
-    "syn@1.0.109",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
+    "toml@0.5.11",
     "untrusted@0.7.1",
     "getrandom@0.1.16",
     "getrandom@0.2.15",
@@ -260,7 +268,7 @@ skip = [
     "heapless@0.7.17",
     "zerocopy@0.7.35",
     "zerocopy-derive@0.7.35",
-]
+] # Certain crates/versions that will be skipped when doing duplicate detection.
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
 # dependencies starting at the specified crate, up to a certain depth, which is

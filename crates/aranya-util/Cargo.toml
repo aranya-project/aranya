@@ -13,13 +13,19 @@ rust-version.workspace = true
 workspace = true
 
 
+[features]
+default = []
+
+
 [dependencies]
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
+bytes = { workspace = true }
 futures-util = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
     "macros",
@@ -28,6 +34,7 @@ tokio = { workspace = true, features = [
 ] }
 tokio-util = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
+
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["time"] }

@@ -13,10 +13,25 @@ rust-version.workspace = true
 workspace = true
 
 
+[features]
+default = []
+
+# Preview features
+preview = []
+# Aranya Fast Channels
+afc = ["dep:aranya-fast-channels"]
+
+# Experimental features
+experimental = []
+
+
 [dependencies]
-aranya-crypto = { workspace = true }
-aranya-policy-text = { workspace = true }
 aranya-util = { workspace = true }
+
+aranya-crypto = { workspace = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"], optional = true }
+aranya-id = { workspace = true }
+aranya-policy-text = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
@@ -24,20 +39,20 @@ bytes = { workspace = true, features = ["serde"] }
 ciborium = { workspace = true }
 futures-util = { workspace = true }
 pin-project = { version = "1.1" }
-postcard = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 tokio = { workspace = true }
 tokio-serde = { version = "0.9", features = ["messagepack"] }
-tracing = { workspace = true }
+
 
 [dev-dependencies]
 backon = { workspace = true }
+postcard = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
-# Used by `custom_id!`.
-[package.metadata.cargo-machete]
-ignored = ["postcard"]
+
+[package.metadata.cargo-all-features]
+always_include_features = ["experimental", "preview"]

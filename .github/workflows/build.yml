@@ -1,5 +1,8 @@
 name: "Build"
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: ["main"]
@@ -16,19 +19,21 @@ env:
   REV: ${{ github.run_id }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ github.ref != 'refs/heads/main' || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   build-release:
     strategy:
       matrix:
+        features: ["default", "preview", "experimental"]
+        runner: ["ubuntu2404-arm64-4core", "ubuntu-latest"]
         include:
           - runner: "ubuntu2404-arm64-4core"
             artifact: "aranya-daemon-aarch64-unknown-linux-gnu"
           - runner: "ubuntu-latest"
             artifact: "aranya-daemon-x86_64-unknown-linux-gnu"
-    name: build daemon ${{ matrix.artifact }}
+    name: build daemon ${{ matrix.artifact }} (${{ matrix.features }})
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +42,7 @@ jobs:
 
       - name: Build code
         run: |
-          cargo make build
+          cargo make build-${{ matrix.features }}
           cargo make tgz-daemon
 
       - name: Verify build didn't change any checked-in files
@@ -46,19 +51,21 @@ jobs:
       - name: Publish daemon
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ matrix.artifact }}-${{ matrix.features }}
           path: aranya-daemon.tar.gz
           if-no-files-found: error
 
   build-aranya-lib:
     strategy:
       matrix:
+        features: ["default", "preview", "experimental"]
+        runner: ["ubuntu2404-arm64-4core", "ubuntu-latest"]
         include:
           - runner: "ubuntu2404-arm64-4core"
             artifact: "aranya-client-capi-aarch64-unknown-linux-gnu"
           - runner: "ubuntu-latest"
             artifact: "aranya-client-capi-x86_64-unknown-linux-gnu"
-    name: build lib ${{ matrix.artifact }}
+    name: build lib ${{ matrix.artifact }} (${{ matrix.features }})
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -69,13 +76,13 @@ jobs:
       - name: Build Aranya Shared Library
         run: |
           cargo make build-capi-header
-          cargo make build-capi-lib
+          cargo make build-capi-lib-${{ matrix.features }}
           cargo make tgz-capi
           cargo make git-unchanged
 
       - name: Publish aranya lib
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ matrix.artifact }}-${{ matrix.features }}
           path: aranya-client-lib.tar.gz
           if-no-files-found: error

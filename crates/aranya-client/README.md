@@ -9,7 +9,7 @@
 [docs-badge]: https://docs.rs/aranya-client/badge.svg
 [docs-url]: https://docs.rs/aranya-client/latest/aranya_client/
 [license-badge]: https://img.shields.io/crates/l/aranya-client.svg
-[license-url]: ../../LICENSE.md
+[license-url]: https://github.com/aranya-project/aranya/blob/main/LICENSE.md
 
 ## Overview
 
@@ -34,16 +34,16 @@ The client provides the following functionality:
 - Create and delete Fast Channels channels as determined by the implemented
   policy
 - Send and receive encrypted data using Aranya Fast Channels. Fast Channels
-  supports bidirectional encrypted data exchange over TCP transport.
+  supports encrypted data exchange over TCP transport.
 Note: The functionality noted 'as determined by the implemented policy' are
-defined in the [default policy](../aranya-daemon/src/policy.md). As such, these
+defined in the [default policy](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/src/policy.md). As such, these
 may differ depending on the policy implemented in your application.
 
 ## Examples
 
 An instance of the daemon must be running before the client can perform
 actions. Instructions for running an instance of the `daemon` binary can be
-found in the `aranya-daemon` [README](../aranya-daemon/README.md).
+found in the `aranya-daemon` [README](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/README.md).
 
 For a full demonstration of the client's capabilities, see the
 [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
