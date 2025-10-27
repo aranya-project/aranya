@@ -302,6 +302,28 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Changes `role` assigned to `device`.
+    #[instrument(skip(self))]
+    pub async fn change_role(
+        &self,
+        device: DeviceId,
+        old_role: RoleId,
+        new_role: RoleId,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .change_role(
+                context::current(),
+                self.id,
+                device.into_api(),
+                old_role.into_api(),
+                new_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Revokes `role` from `device`.
     #[instrument(skip(self))]
     pub async fn revoke_role(&self, device: DeviceId, role: RoleId) -> Result<()> {

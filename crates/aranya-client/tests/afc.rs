@@ -674,11 +674,11 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
     Ok(())
 }
 
-/// Demonstrate assigning a role to a device without `CanUseAfc` perm deletes the AFC channel.
+/// Demonstrate changing device to a role without `CanUseAfc` perm deletes the AFC channel.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_afc_uni_chan_assign_role_without_perm() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_afc_uni_chan_assign_role_without_perm").await?;
+async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_chan_change_role_without_perm").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -756,10 +756,18 @@ async fn test_afc_uni_chan_assign_role_without_perm() -> Result<()> {
     // Assign roles without `CanUseAfc` permission.
     // TODO: this shouldn't work because assigning a role should be rejected if the device already has a role.
     owner_team
-        .assign_role(devices.membera.id, default_roles.operator().id)
+        .change_role(
+            devices.membera.id,
+            default_roles.member().id,
+            default_roles.operator().id,
+        )
         .await?;
     owner_team
-        .assign_role(devices.memberb.id, default_roles.operator().id)
+        .change_role(
+            devices.memberb.id,
+            default_roles.member().id,
+            default_roles.operator().id,
+        )
         .await?;
 
     // wait for syncing.
