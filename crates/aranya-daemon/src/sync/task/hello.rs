@@ -37,9 +37,6 @@ pub struct HelloSubscription {
     last_notified: Option<Instant>,
     /// Expiration time of the subscription
     expires_at: Instant,
-    /// Schedule-based sending delay
-    #[allow(dead_code)] // Used in spawn_scheduled_hello_sender
-    schedule_delay: Duration,
     /// Token to cancel the scheduled sending task
     cancel_token: CancellationToken,
 }
@@ -486,7 +483,6 @@ where
                     graph_change_delay,
                     last_notified: None,
                     expires_at,
-                    schedule_delay,
                     cancel_token: cancel_token.clone(),
                 };
 
