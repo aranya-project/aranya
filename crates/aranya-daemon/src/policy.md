@@ -525,7 +525,7 @@ ephemeral command QueryDevicesWithRole {
 Returns the role assigned to a device.
 
 ```policy
-// Emits `QueryDeviceRoleResult` for each role assigned to the
+// Emits `QueryDeviceRoleResult` if a role is assigned to the
 // device.
 ephemeral action query_device_role(device_id id) {
     publish QueryDeviceRole {
@@ -533,8 +533,9 @@ ephemeral action query_device_role(device_id id) {
     }
 }
 
-// Emitted when a device's roles are queried by
-// `query_device_roles`.
+// Emitted when a device's role is queried by
+// `query_device_roles`. This is the same structure as the
+// `Role` fact.
 effect QueryDeviceRoleResult {
     // The role's ID.
     role_id id,
@@ -596,7 +597,7 @@ ephemeral action query_device_keybundle(device_id id) {
 // `query_device_keybundle`.
 effect QueryDeviceKeyBundleResult {
     // NB: We don't include the device ID here since the caller
-    // of the action should already know it.
+    // must already know it as it was provided to the action.
     device_keys struct KeyBundle,
 }
 
@@ -636,7 +637,7 @@ ephemeral command QueryDeviceKeyBundle {
 Aranya uses [Role-Based Access Control][rbac] (RBAC) for system
 authorization. Devices are only authorized to access certain
 resources if they have been assigned the requisite role. Aranya
-primarily uses RBAC to strict which commands devices are
+primarily uses RBAC to restrict which commands devices are
 authorized to publish, but custom policy can use roles for many
 other purposes.
 

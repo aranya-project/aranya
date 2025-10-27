@@ -1307,12 +1307,6 @@ async fn test_assign_label_to_current_role_rejected() -> Result<()> {
     let roles = load_default_roles(owner).await?;
     let owner_role = role_id_by_name(&roles, "owner");
 
-    owner
-        .actions()
-        .add_perm_to_role(owner_role, text!("CanUseAqc"))
-        .await
-        .context("adding CanUseAqc to owner role should succeed")?;
-
     let effects = owner
         .actions()
         .create_label(text!("SELF_ROLE_LABEL"), owner_role.into_id().into())
