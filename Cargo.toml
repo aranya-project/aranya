@@ -109,3 +109,25 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+aranya-runtime = { path = "../aranya-core/crates/aranya-runtime" }
+aranya-crypto = { path = "../aranya-core/crates/aranya-crypto" }
+aranya-policy-compiler = { path = "../aranya-core/crates/aranya-policy-compiler" }
+aranya-policy-vm = { path = "../aranya-core/crates/aranya-policy-vm" }
+aranya-fast-channels = { path = "../aranya-core/crates/aranya-fast-channels" }
+aranya-afc-util = { path = "../aranya-core/crates/aranya-afc-util" }
+aranya-capi-core = { path = "../aranya-core/crates/aranya-capi-core" }
+aranya-capi-codegen = { path = "../aranya-core/crates/aranya-capi-codegen" }
+aranya-crypto-ffi = { path = "../aranya-core/crates/aranya-crypto-ffi" }
+aranya-device-ffi = { path = "../aranya-core/crates/aranya-device-ffi" }
+aranya-envelope-ffi = { path = "../aranya-core/crates/aranya-envelope-ffi" }
+aranya-id = { path = "../aranya-core/crates/aranya-id" }
+aranya-idam-ffi = { path = "../aranya-core/crates/aranya-idam-ffi" }
+aranya-perspective-ffi = { path = "../aranya-core/crates/aranya-perspective-ffi" }
+aranya-policy-ifgen = { path = "../aranya-core/crates/aranya-policy-ifgen" }
+aranya-policy-ifgen-build = { path = "../aranya-core/crates/aranya-policy-ifgen-build" }
+aranya-policy-lang = { path = "../aranya-core/crates/aranya-policy-lang" }
+aranya-policy-text = { path = "../aranya-core/crates/aranya-policy-text" }
+aranya-policy-ast = { path = "../aranya-core/crates/aranya-policy-ast" }
+aranya-policy-module = { path = "../aranya-core/crates/aranya-policy-module" }
