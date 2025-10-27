@@ -27,7 +27,6 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
-    devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
@@ -95,7 +94,6 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
-    devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
@@ -173,7 +171,6 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
-    devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
@@ -259,7 +256,6 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
-    devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
@@ -361,7 +357,6 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
-    devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
@@ -471,7 +466,6 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
-    devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
 
