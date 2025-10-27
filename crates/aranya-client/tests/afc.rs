@@ -754,6 +754,7 @@ async fn test_afc_uni_chan_assign_role_without_perm() -> Result<()> {
         .await?;
 
     // Assign roles without `CanUseAfc` permission.
+    // TODO: this shouldn't work because assigning a role should be rejected if the device already has a role.
     owner_team
         .assign_role(devices.membera.id, default_roles.operator().id)
         .await?;
