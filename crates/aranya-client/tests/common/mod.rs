@@ -343,13 +343,13 @@ impl DeviceCtx {
         if grant_delegations {
             let mappings = [
                 // admin -> operator
-                ("admin -> operator", roles.operator().id, roles.admin().id),
+                ("admin -> operator", roles.admin().id, roles.operator().id),
                 // admin -> member
-                ("admin -> member", roles.member().id, roles.admin().id),
+                ("admin -> member", roles.admin().id, roles.member().id),
                 // operator -> member
-                ("operator -> member", roles.member().id, roles.operator().id),
+                ("operator -> member", roles.operator().id, roles.member().id),
             ];
-            for (name, role, manager) in mappings {
+            for (name, manager, role) in mappings {
                 self.client
                     .team(team_id)
                     .assign_role_management_permission(role, manager, text!("CanAssignRole"))
