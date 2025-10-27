@@ -755,18 +755,10 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 
     // Assign roles without `CanUseAfc` permission.
     owner_team
-        .change_role(
-            devices.membera.id,
-            default_roles.member().id,
-            default_roles.operator().id,
-        )
+        .assign_role(devices.membera.id, default_roles.operator().id)
         .await?;
     owner_team
-        .change_role(
-            devices.memberb.id,
-            default_roles.member().id,
-            default_roles.operator().id,
-        )
+        .assign_role(devices.memberb.id, default_roles.operator().id)
         .await?;
 
     // wait for syncing.
