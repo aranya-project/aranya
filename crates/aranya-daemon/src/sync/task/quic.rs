@@ -634,7 +634,7 @@ where
 
     /// Responds to a sync.
     #[instrument(skip_all)]
-    pub async fn sync(
+    pub(crate) async fn sync(
         client: ClientWithState<EN, SP>,
         peer: Addr,
         stream: BidirectionalStream,

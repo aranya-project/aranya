@@ -38,6 +38,7 @@ pub struct HelloSubscription {
     /// Expiration time of the subscription
     expires_at: Instant,
     /// Schedule-based sending delay
+    #[allow(dead_code)] // Used in spawn_scheduled_hello_sender
     schedule_delay: Duration,
     /// Token to cancel the scheduled sending task
     cancel_token: CancellationToken,
@@ -363,6 +364,7 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
+    #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
     tokio::spawn(async move {
         loop {
             // Wait for either the schedule delay or cancellation
@@ -443,7 +445,7 @@ where
     ///
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
-    pub async fn process_hello_message(
+    pub(crate) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
         client: ClientWithState<EN, SP>,
         peer_addr: Addr,
@@ -466,7 +468,7 @@ where
 
                 // Check if there's an existing subscription and cancel its scheduled task
                 {
-                    let mut subscriptions = client.hello_subscriptions().lock().await;
+                    let subscriptions = client.hello_subscriptions().lock().await;
                     if let Some(old_subscription) = subscriptions.get(&key) {
                         old_subscription.cancel_token.cancel();
                         debug!(
