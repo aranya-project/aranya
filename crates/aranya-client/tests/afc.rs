@@ -787,10 +787,6 @@ async fn test_afc_uni_chan_assign_role_without_perm() -> Result<()> {
     Ok(())
 }
 
-// TODO: Demonstrate changing the device's role to a new role without `CanUseAfc` perm deletes the AFC channel.
-
-// TODO: Demonstrate removing the `CanUseAfc` perm from a device's role deletes the AFC channel.
-
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
