@@ -5,11 +5,11 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
 use aranya_daemon_api::text;
@@ -227,28 +227,6 @@ async fn main() -> Result<()> {
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    // Create default roles
-    info!("creating default roles");
-    let owner_role = owner
-        .client
-        .team(team_id)
-        .roles()
-        .await?
-        .into_iter()
-        .find(|role| role.name == "owner" && role.default)
-        .context("unable to find owner role")?;
-    let roles = owner_team.setup_default_roles(owner_role.id).await?;
-    let admin_role = roles
-        .iter()
-        .find(|r| r.name == "admin")
-        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
-        .clone();
-    let operator_role = roles
-        .iter()
-        .find(|r| r.name == "operator")
-        .ok_or_else(|| anyhow::anyhow!("no operator role"))?
-        .clone();
-
     let add_team_cfg = {
         let qs_cfg = AddTeamQuicSyncConfig::builder()
             .seed_ikm(seed_ikm)
@@ -259,6 +237,28 @@ async fn main() -> Result<()> {
             .build()?
     };
 
+    let owner_role = owner_team
+        .device(owner.id)
+        .role()
+        .await?
+        .expect("owner role");
+    let roles = owner_team.setup_default_roles(owner_role.id).await?;
+    let admin_role = roles
+        .clone()
+        .into_iter()
+        .find(|role| role.name == "admin" && role.default)
+        .expect("expected admin role");
+    let operator_role = roles
+        .clone()
+        .into_iter()
+        .find(|role| role.name == "operator" && role.default)
+        .expect("expected operator role");
+    let member_role = roles
+        .clone()
+        .into_iter()
+        .find(|role| role.name == "member" && role.default)
+        .expect("expected member role");
+
     let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
     let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
     let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
@@ -268,29 +268,9 @@ async fn main() -> Result<()> {
     info!("adding admin to team");
     owner_team.add_device(admin.pk, Some(admin_role.id)).await?;
 
-    sleep(sleep_interval).await;
-
     info!("adding operator to team");
-    owner_team.add_device(operator.pk, None).await?;
-
-    sleep(sleep_interval).await;
-
-    // Admin tries to assign a role
-    match admin_team.assign_role(operator.id, operator_role.id).await {
-        Ok(()) => bail!("expected role assignment to fail"),
-        Err(Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected error: {err:?}"),
-    }
-
-    // Admin syncs with the Owner peer and retries the role
-    // assignment command
-    admin_team.sync_now(owner_addr.into(), None).await?;
-
-    sleep(sleep_interval).await;
-
-    info!("assigning role");
-    admin_team
-        .assign_role(operator.id, operator_role.id)
+    owner_team
+        .add_device(operator.pk, Some(operator_role.id))
         .await?;
 
     info!("adding sync peers");
@@ -355,11 +335,15 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    operator_team.add_device(membera.pk.clone(), None).await?;
+    owner_team
+        .add_device(membera.pk.clone(), Some(member_role.id))
+        .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device(memberb.pk.clone(), None).await?;
+    owner_team
+        .add_device(memberb.pk.clone(), Some(member_role.id))
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -367,25 +351,24 @@ async fn main() -> Result<()> {
     // fact database queries
     let devices = membera_team.devices().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
-    let role = membera_team
-        .device(membera.id)
-        .role()
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("no role for membera"))?;
-    info!("membera role: {:?}", role);
-    let keybundle = membera_team.device(membera.id).keybundle().await?;
-    info!("membera keybundle: {:?}", keybundle);
+    let owner_device = owner_team.device(owner.id);
+    let owner_role = owner_device.role().await?.expect("expected owner role");
+    info!("owner role: {:?}", owner_role);
+    let keybundle = owner_device.keybundle().await?;
+    info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
-    let label3 = operator_team.create_label(text!("label3"), role.id).await?;
+    let label3 = owner_team
+        .create_label(text!("label3"), owner_role.id)
+        .await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
-    operator_team
+    owner_team
         .device(membera.id)
         .assign_label(label3, op)
         .await?;
     info!("assigning label to memberb");
-    operator_team
+    owner_team
         .device(memberb.id)
         .assign_label(label3, op)
         .await?;
@@ -456,17 +439,11 @@ async fn main() -> Result<()> {
     info!("completed afc demo");
 
     info!("revoking label from membera");
-    operator_team
-        .device(membera.id)
-        .revoke_label(label3)
-        .await?;
+    owner_team.device(membera.id).revoke_label(label3).await?;
     info!("revoking label from memberb");
-    operator_team
-        .device(memberb.id)
-        .revoke_label(label3)
-        .await?;
+    owner_team.device(memberb.id).revoke_label(label3).await?;
     info!("deleting label");
-    admin_team.delete_label(label3).await?;
+    owner_team.delete_label(label3).await?;
 
     info!("completed example Aranya application");
 
