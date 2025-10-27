@@ -4,7 +4,7 @@ mod common;
 
 #[cfg(feature = "afc")]
 use {
-    crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL},
+    crate::common::DevicesCtx,
     anyhow::{Context, Result},
     aranya_client::afc::Channels,
     aranya_client::client::ChanOp,
@@ -30,14 +30,9 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     devices.add_all_sync_peers(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-
-    sleep(SLEEP_INTERVAL).await;
     let label_id = owner_team
         .create_label(text!("label1"), default_roles.owner().id)
         .await?;
-    // wait for syncing.
-    sleep(SLEEP_INTERVAL).await;
-
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -46,6 +41,21 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     owner_team
         .device(devices.memberb.id)
         .assign_label(label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Create uni channel.
@@ -85,35 +95,35 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
+    devices.add_all_sync_peers(team_id).await?;
 
-    let operator_team = devices.operator.client.team(team_id);
-
-    let label_id = operator_team
-        .create_label(text!("label1"), default_roles.operator().id)
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
         .await?;
     let op = ChanOp::SendRecv;
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
     devices
         .membera
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -163,35 +173,35 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
+    devices.add_all_sync_peers(team_id).await?;
 
-    let operator_team = devices.operator.client.team(team_id);
-
-    let label_id = operator_team
-        .create_label(text!("label1"), default_roles.operator().id)
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
         .await?;
     let op = ChanOp::SendRecv;
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
     devices
         .membera
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -249,35 +259,35 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
+    devices.add_all_sync_peers(team_id).await?;
 
-    let operator_team = devices.operator.client.team(team_id);
-
-    let label_id = operator_team
-        .create_label(text!("label1"), default_roles.operator().id)
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
         .await?;
     let op = ChanOp::SendRecv;
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
     devices
         .membera
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -307,7 +317,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .context("unable to open afc message")?;
 
     // Revoke label from member devices.
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .revoke_label(label_id)
         .await?;
@@ -317,13 +327,13 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Try open/seal after channels are deleted.
@@ -351,35 +361,35 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
+    devices.add_all_sync_peers(team_id).await?;
 
-    let operator_team = devices.operator.client.team(team_id);
-
-    let label_id = operator_team
-        .create_label(text!("label1"), default_roles.operator().id)
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
         .await?;
     let op = ChanOp::SendRecv;
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id, op)
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
     devices
         .membera
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -409,6 +419,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
     devices
         .admin
         .client
@@ -417,22 +428,20 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .await?;
 
     // Delete label.
-    let admin_team = devices.admin.client.team(team_id);
-    admin_team.delete_label(label_id).await?;
+    owner_team.delete_label(label_id).await?;
 
     // wait for syncing.
-    let admin_addr = devices.admin.aranya_local_addr().await?.into();
     devices
         .membera
         .client
         .team(team_id)
-        .sync_now(admin_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(admin_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Try open/seal after channels are deleted.
@@ -462,50 +471,50 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     devices
         .add_all_device_roles(team_id, &default_roles)
         .await?;
+    devices.add_all_sync_peers(team_id).await?;
 
-    let operator_team = devices.operator.client.team(team_id);
+    let owner_team = devices.owner.client.team(team_id);
 
     // First label.
-    let label_id1 = operator_team
-        .create_label(text!("label1"), default_roles.operator().id)
-        .await?;
     let op = ChanOp::SendRecv;
-    operator_team
+    let label_id1 = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
+        .await?;
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id1, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id1, op)
         .await?;
 
     // Second label.
-    let label_id2 = operator_team
-        .create_label(text!("label2"), default_roles.operator().id)
+    let label_id2 = owner_team
+        .create_label(text!("label2"), default_roles.owner().id)
         .await?;
-    let op = ChanOp::SendRecv;
-    operator_team
+    owner_team
         .device(devices.membera.id)
         .assign_label(label_id2, op)
         .await?;
-    operator_team
+    owner_team
         .device(devices.memberb.id)
         .assign_label(label_id2, op)
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
     devices
         .membera
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(operator_addr, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();

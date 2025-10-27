@@ -7,17 +7,6 @@ mod team;
 
 use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
-#[doc(inline)]
-pub use crate::client::{
-    device::{Device, DeviceId, Devices},
-    label::{ChanOp, Label, LabelId, Labels},
-    role::{Role, RoleId, Roles},
-    team::{Team, TeamId},
-};
-use crate::{
-    config::{AddTeamConfig, CreateTeamConfig},
-    error::{self, aranya_error, InvalidArg, IpcError, Result},
-};
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
 // TODO(eric): Wrap these.
@@ -37,6 +26,18 @@ use tracing::{debug, error, info};
 use {
     crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
     std::sync::{Arc, Mutex},
+};
+
+#[doc(inline)]
+pub use crate::client::{
+    device::{Device, DeviceId, Devices},
+    label::{ChanOp, Label, LabelId, Labels},
+    role::{Role, RoleId, Roles},
+    team::{Team, TeamId},
+};
+use crate::{
+    config::{AddTeamConfig, CreateTeamConfig},
+    error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
 
 /// Builds a [`Client`].
