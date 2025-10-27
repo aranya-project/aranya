@@ -179,14 +179,10 @@ impl ClientCtx {
 
         let uds_sock = work_path.join("run").join("uds.sock");
 
-        let client = (|| {
-            Client::builder()
-                .with_daemon_uds_path(&uds_sock)
-                .connect()
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to initialize client")?;
+        let client = (|| Client::builder().with_daemon_uds_path(&uds_sock).connect())
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to initialize client")?;
 
         let pk = client
             .get_key_bundle()

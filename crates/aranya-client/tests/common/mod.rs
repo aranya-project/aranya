@@ -345,7 +345,7 @@ impl DeviceCtx {
                 // admin -> operator
                 ("admin -> operator", roles.admin().id, roles.operator().id),
                 // admin -> member
-                ("admin -> member",roles.admin().id , roles.member().id),
+                ("admin -> member", roles.admin().id, roles.member().id),
                 // operator -> member
                 ("operator -> member", roles.operator().id, roles.member().id),
             ];
