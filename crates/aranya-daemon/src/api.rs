@@ -1024,6 +1024,27 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[instrument(skip(self), err)]
+    async fn change_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device_id: api::DeviceId,
+        old_role_id: api::RoleId,
+        new_role_id: api::RoleId,
+    ) -> api::Result<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .change_role(
+                device_id.into_id().into(),
+                old_role_id.into_id().into(),
+                new_role_id.into_id().into(),
+            )
+            .await
+            .context("unable to change device role")?;
+        Ok(())
+    }
+
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
     async fn create_afc_uni_send_channel(
