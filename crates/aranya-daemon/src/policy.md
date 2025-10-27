@@ -4245,6 +4245,7 @@ ephemeral command AfcCreateUniChannel {
                     author_enc_key_id: sender.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
+                    channel_key_id: this.channel_key_id,
                     encap: this.peer_encap,
                 }
             }
