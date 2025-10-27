@@ -227,6 +227,33 @@ async fn main() -> Result<()> {
     let team_id = owner_team.team_id();
     info!(%team_id);
 
+    // Create default roles
+    info!("creating default roles");
+    let owner_role = owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .into_iter()
+        .find(|role| role.name == "owner" && role.default)
+        .context("unable to find owner role")?;
+    let roles = owner_team.setup_default_roles(owner_role.id).await?;
+    let admin_role = roles
+        .iter()
+        .find(|r| r.name == "admin")
+        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
+        .clone();
+    let operator_role = roles
+        .iter()
+        .find(|r| r.name == "operator")
+        .ok_or_else(|| anyhow::anyhow!("no operator role"))?
+        .clone();
+    let member_role = roles
+        .iter()
+        .find(|r| r.name == "member")
+        .ok_or_else(|| anyhow::anyhow!("no member role"))?
+        .clone();
+
     let add_team_cfg = {
         let qs_cfg = AddTeamQuicSyncConfig::builder()
             .seed_ikm(seed_ikm)
@@ -236,28 +263,6 @@ async fn main() -> Result<()> {
             .team_id(team_id)
             .build()?
     };
-
-    let owner_role = owner_team
-        .device(owner.id)
-        .role()
-        .await?
-        .expect("owner role");
-    let roles = owner_team.setup_default_roles(owner_role.id).await?;
-    let admin_role = roles
-        .clone()
-        .into_iter()
-        .find(|role| role.name == "admin" && role.default)
-        .expect("expected admin role");
-    let operator_role = roles
-        .clone()
-        .into_iter()
-        .find(|role| role.name == "operator" && role.default)
-        .expect("expected operator role");
-    let member_role = roles
-        .clone()
-        .into_iter()
-        .find(|role| role.name == "member" && role.default)
-        .expect("expected member role");
 
     let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
     let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
