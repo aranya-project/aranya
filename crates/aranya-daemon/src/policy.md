@@ -506,13 +506,9 @@ ephemeral command QueryDeviceRole {
             finish {}
         } else {
             let role = unwrap assigned_role
+            let eff = role as QueryDeviceRoleResult
             finish {
-                emit QueryDeviceRoleResult {
-                    role_id: role.role_id,
-                    name: role.name,
-                    author_id: role.author_id,
-                    default: role.default,
-                }
+                emit eff
             }
         }
     }
@@ -2312,13 +2308,9 @@ ephemeral command QueryTeamRoles {
     policy {
         check team_exists()
 
+        let eff = this as QueryTeamRolesResult
         finish {
-            emit QueryTeamRolesResult {
-                role_id: this.role_id,
-                name: this.name,
-                author_id: this.author_id,
-                default: this.default,
-            }
+            emit eff
         }
     }
 }
@@ -2370,13 +2362,9 @@ ephemeral command QueryRoleOwners {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        let eff = this as QueryRoleOwnersResult
         finish {
-            emit QueryRoleOwnersResult {
-                role_id: this.role_id,
-                name: this.name,
-                author_id: this.author_id,
-                default: this.default,
-            }
+            emit eff
         }
     }
 }
