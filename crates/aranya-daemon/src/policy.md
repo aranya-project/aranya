@@ -112,8 +112,7 @@ command CommandFoo {
 }
 ```
 
-Commands are ordered first by weave ancestry, then priority, then by comparing their IDs.
-The weave ancestry is the deterministic order that commands are added to the graph when weaving branches together.
+Branches in the graph are deterministically ordered by the braid algorithm. Higher priority commands are generally evaluated before lower priority commands.
 CreateTeam is the first command (a.k.a. the init command), so it doesn't need an assigned priority.
 CreateTeam is automatically the highest priority based on ancestry.
 
