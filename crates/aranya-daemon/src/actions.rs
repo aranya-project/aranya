@@ -29,6 +29,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct SessionData {
     /// The serialized messages
+    #[cfg(feature = "afc")]
     pub ctrl: Vec<Box<[u8]>>,
     /// The effects produced
     pub effects: Vec<Effect>,
@@ -153,6 +154,7 @@ where
         let mut msg_sink = MsgSink::new();
         session.action(&client, &mut sink, &mut msg_sink, f())?;
         Ok(SessionData {
+            #[cfg(feature = "afc")]
             ctrl: msg_sink.into_cmds(),
             effects: sink.collect()?,
         })
@@ -333,32 +335,6 @@ where
             actor.delete_label(label_id.into())?;
             Ok(())
         })
-        .in_current_span()
-    }
-
-    /// Invokes `query_aqc_net_id`.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_aqc_net_id(
-        &self,
-        device_id: DeviceId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_net_id"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
-    /// Invokes `query_aqc_network_names`.
-    #[instrument(skip(self))]
-    fn query_aqc_network_names(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_network_names"),
-            args: Cow::Owned(vec![]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
     }
 
