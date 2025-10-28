@@ -284,9 +284,6 @@ impl EffectHandler {
                         .await?;
                 }
                 AssignedLabelToDevice(_) => {}
-                AssignedLabelToRole(_) => {
-                    // TODO: we're removing label assignments from roles.
-                }
                 LabelRevokedFromDevice(_label_revoked) => {
                     #[cfg(feature = "afc")]
                     {
@@ -303,9 +300,6 @@ impl EffectHandler {
                             })
                             .await?;
                     }
-                }
-                LabelRevokedFromRole(_) => {
-                    // TODO: we're removing label assignments from roles.
                 }
                 QueryLabelResult(_) => {}
                 AfcUniChannelCreated(_) => {}
@@ -366,7 +360,6 @@ impl EffectHandler {
                     }
                 }
                 QueryLabelsResult(_) => {}
-                QueryLabelsAssignedToRoleResult(_) => {}
                 QueryTeamRolesResult(_) => {}
                 QueryRoleOwnersResult(_) => {}
                 QueryRoleHasPermResult(_) => {}
@@ -1397,73 +1390,6 @@ impl DaemonApi for Api {
             .await
             .context("unable to revoke role management permission")?;
         Ok(())
-    }
-
-    #[instrument(skip(self), err)]
-    async fn assign_label_to_role(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-        label: api::LabelId,
-        op: api::ChanOp,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .assign_label_to_role(role.into_id().into(), label.into_id().into(), op.into())
-            .await
-            .context("unable to assign label to role")?;
-        if let Some(Effect::AssignedLabelToRole(_e)) =
-            find_effect!(&effects, Effect::AssignedLabelToRole(_e))
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to assign label to role").into())
-        }
-    }
-
-    #[instrument(skip(self), err)]
-    async fn revoke_label_from_role(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-        label: api::LabelId,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .revoke_label_from_role(role.into_id().into(), label.into_id().into())
-            .await
-            .context("unable to revoke label from role")?;
-        if let Some(Effect::LabelRevokedFromRole(_e)) =
-            find_effect!(&effects, Effect::LabelRevokedFromRole(_e))
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to revoke label from role").into())
-        }
-    }
-
-    #[instrument(skip(self), err)]
-    async fn labels_assigned_to_role(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-    ) -> api::Result<Box<[api::Label]>> {
-        self.check_team_valid(team).await?;
-
-        Ok(self
-            .client
-            .query_labels_assigned_to_role(team, role)
-            .await?
-            .into_boxed_slice())
     }
 }
 

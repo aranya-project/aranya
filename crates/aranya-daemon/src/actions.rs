@@ -248,21 +248,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `assign_label_to_role`.
-    #[instrument(skip(self), fields(%role_id, %label_id, %op))]
-    fn assign_label_to_role(
-        &self,
-        role_id: RoleId,
-        label_id: LabelId,
-        op: ChanOp,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_label_to_role(role_id.into(), label_id.into(), op)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
     /// Invokes `assign_role`.
     #[instrument(skip(self), fields(%device_id, %role_id))]
     fn assign_role(
@@ -488,20 +473,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `query_labels_assigned_to_role`.
-    #[instrument(skip(self), fields(%role))]
-    fn query_labels_assigned_to_role(
-        &self,
-        role: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_labels_assigned_to_role"),
-            args: Cow::Owned(vec![Value::from(role.into_id())]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
     /// Invokes `query_team_roles`.
     #[instrument(skip(self))]
     fn query_team_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
@@ -577,20 +548,6 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.revoke_label_from_device(device_id.into(), label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Invokes `revoke_label_from_role`.
-    #[instrument(skip(self), fields(%role_id, %label_id))]
-    fn revoke_label_from_role(
-        &self,
-        role_id: RoleId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.revoke_label_from_role(role_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()

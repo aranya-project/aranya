@@ -438,17 +438,6 @@ pub trait DaemonApi {
     // Label assignments
     //
 
-    /// Assigns a label to a role.
-    async fn assign_label_to_role(
-        team: TeamId,
-        role: RoleId,
-        label: LabelId,
-        op: ChanOp,
-    ) -> Result<()>;
-    /// Revokes a label from a role.
-    async fn revoke_label_from_role(team: TeamId, role: RoleId, label: LabelId) -> Result<()>;
-    /// Returns all labels assigned to the role.
-    async fn labels_assigned_to_role(team: TeamId, role: RoleId) -> Result<Box<[Label]>>;
     /// Assigns a label to a device.
     async fn assign_label_to_device(
         team: TeamId,
