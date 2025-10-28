@@ -8,8 +8,10 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
-    Engine, KeyStore as _, KeyStoreExt as _, Rng,
+    default::WrappedKey,
+    policy::{GroupId, LabelId, RoleId},
+    Csprng, DeviceId, EncryptionKey, EncryptionPublicKey, Engine, KeyStore as _, KeyStoreExt as _,
+    Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
@@ -42,7 +44,10 @@ use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{ChanOp, Effect, KeyBundle, RoleCreated},
+    policy::{
+        ChanOp, Effect, KeyBundle, QueryDeviceKeyBundleResult, QueryDeviceRoleResult,
+        QueryLabelResult, QueryTeamRolesResult, RoleCreated,
+    },
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
@@ -460,9 +465,9 @@ impl Api {
 
 impl Client {
     // Query devices on team.
-    async fn query_devices_on_team(&self, team: api::TeamId) -> api::Result<Vec<api::DeviceId>> {
+    async fn query_devices_on_team(&self, graph: GraphId) -> api::Result<Vec<DeviceId>> {
         let devices = self
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .query_devices_on_team()
             .await
             .context("unable to query devices on team")?
@@ -482,12 +487,12 @@ impl Client {
     // Query devices with role.
     async fn query_devices_with_role(
         &self,
-        team: api::TeamId,
-        role: api::RoleId,
-    ) -> api::Result<Vec<api::DeviceId>> {
+        graph: GraphId,
+        role: RoleId,
+    ) -> api::Result<Vec<DeviceId>> {
         let devices = self
-            .actions(&team.into_id().into())
-            .query_devices_with_role(role.into_id().into())
+            .actions(&graph)
+            .query_devices_with_role(role)
             .await
             .context("unable to query devices with role")?
             .into_iter()
@@ -504,21 +509,16 @@ impl Client {
     }
 
     // Query team roles.
-    async fn query_team_roles(&self, team: api::TeamId) -> api::Result<Vec<api::Role>> {
+    async fn query_team_roles(&self, graph: GraphId) -> api::Result<Vec<QueryTeamRolesResult>> {
         let roles = self
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .query_team_roles()
             .await
             .context("unable to query team roles")?
             .into_iter()
             .filter_map(|e| {
                 if let Effect::QueryTeamRolesResult(e) = e {
-                    Some(api::Role {
-                        id: e.role_id.into(),
-                        name: e.name,
-                        author_id: e.author_id.into(),
-                        default: e.default,
-                    })
+                    Some(e)
                 } else {
                     warn!(name = e.name(), "unexpected effect");
                     None
@@ -532,13 +532,13 @@ impl Client {
     #[cfg(feature = "afc")]
     async fn query_role_has_perm(
         &self,
-        team: api::TeamId,
-        role_id: api::RoleId,
+        graph: GraphId,
+        role_id: RoleId,
         perm: Text,
     ) -> api::Result<bool> {
         let effects = self
-            .actions(&team.into_id().into())
-            .query_role_has_perm(role_id.into_id().into(), perm)
+            .actions(&graph)
+            .query_role_has_perm(role_id, perm)
             .await
             .context("unable to query device role")?;
         if let Some(Effect::QueryRoleHasPermResult(e)) =
@@ -553,18 +553,18 @@ impl Client {
     // Query device keybundle.
     async fn query_device_keybundle(
         &self,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<api::KeyBundle> {
+        graph: GraphId,
+        device: DeviceId,
+    ) -> api::Result<QueryDeviceKeyBundleResult> {
         let effects = self
-            .actions(&team.into_id().into())
-            .query_device_keybundle(device.into_id().into())
+            .actions(&graph)
+            .query_device_keybundle(device)
             .await
             .context("unable to query device keybundle")?;
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
-            Ok(api::KeyBundle::from(e.device_keys))
+            Ok(e)
         } else {
             Err(anyhow!("unable to query device keybundle").into())
         }
@@ -573,23 +573,18 @@ impl Client {
     // Query device role.
     async fn query_device_role(
         &self,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Option<api::Role>> {
+        graph: GraphId,
+        device: DeviceId,
+    ) -> api::Result<Option<QueryDeviceRoleResult>> {
         let effects = self
-            .actions(&team.into_id().into())
-            .query_device_role(device.into_id().into())
+            .actions(&graph)
+            .query_device_role(device)
             .await
             .context("unable to query device role")?;
         if let Some(Effect::QueryDeviceRoleResult(e)) =
             find_effect!(&effects, Effect::QueryDeviceRoleResult(_))
         {
-            Ok(Some(api::Role {
-                id: e.role_id.into(),
-                name: e.name.clone(),
-                author_id: e.author_id.into(),
-                default: e.default,
-            }))
+            Ok(Some(e.clone()))
         } else {
             Ok(None)
         }
@@ -598,43 +593,35 @@ impl Client {
     // Query label info.
     async fn query_label(
         &self,
-        team: api::TeamId,
-        label_id: api::LabelId,
-    ) -> api::Result<Option<api::Label>> {
+        graph: GraphId,
+        label_id: LabelId,
+    ) -> api::Result<Option<QueryLabelResult>> {
         let effects = self
-            .actions(&team.into_id().into())
-            .query_label(label_id.into_id().into())
+            .actions(&graph)
+            .query_label(label_id)
             .await
             .context("unable to query label")?;
         if let Some(Effect::QueryLabelResult(e)) =
             find_effect!(&effects, Effect::QueryLabelResult(_e))
         {
-            Ok(Some(api::Label {
-                id: e.label_id.into(),
-                name: e.label_name.clone(),
-                author_id: e.label_author_id.into(),
-            }))
+            Ok(Some(e.clone()))
         } else {
             Ok(None)
         }
     }
 
     // Query labels on team.
-    async fn query_labels(&self, team: api::TeamId) -> api::Result<Vec<api::Label>> {
+    async fn query_labels(&self, graph: GraphId) -> api::Result<Vec<QueryLabelResult>> {
         let effects = self
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .query_labels()
             .await
             .context("unable to query labels")?;
-        let mut labels: Vec<api::Label> = Vec::new();
+        let mut labels: Vec<QueryLabelResult> = Vec::new();
         for e in effects {
             if let Effect::QueryLabelResult(e) = e {
                 debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name.clone(),
-                    author_id: e.label_author_id.into(),
-                });
+                labels.push(e);
             }
         }
         Ok(labels)
@@ -658,31 +645,6 @@ impl Client {
                 labels.push(api::Label {
                     id: e.label_id.into(),
                     name: e.label_name,
-                    author_id: e.label_author_id.into(),
-                });
-            }
-        }
-        Ok(labels)
-    }
-
-    // Query labels assigned to role.
-    async fn query_labels_assigned_to_role(
-        &self,
-        team: api::TeamId,
-        role: api::RoleId,
-    ) -> anyhow::Result<Vec<api::Label>> {
-        let effects = self
-            .actions(&team.into_id().into())
-            .query_labels_assigned_to_role(role.into_id().into())
-            .await
-            .context("unable to query role label assignments")?;
-        let mut labels = Vec::new();
-        for e in effects {
-            if let Effect::QueryLabelsAssignedToRoleResult(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name.clone(),
                     author_id: e.label_author_id.into(),
                 });
             }
@@ -936,8 +898,11 @@ impl DaemonApi for Api {
 
         Ok(self
             .client
-            .query_devices_on_team(team)
+            .query_devices_on_team(team.into_id().into())
             .await?
+            .iter()
+            .map(|d| d.into_id().into())
+            .collect::<Vec<_>>()
             .into_boxed_slice())
     }
 
@@ -950,7 +915,11 @@ impl DaemonApi for Api {
     ) -> api::Result<api::KeyBundle> {
         self.check_team_valid(team).await?;
 
-        self.client.query_device_keybundle(team, device).await
+        let e = self
+            .client
+            .query_device_keybundle(team.into_id().into(), device.into_id().into())
+            .await?;
+        Ok(api::KeyBundle::from(e.device_keys))
     }
 
     #[instrument(skip(self), err)]
@@ -978,7 +947,19 @@ impl DaemonApi for Api {
     ) -> api::Result<Option<api::Role>> {
         self.check_team_valid(team).await?;
 
-        self.client.query_device_role(team, device).await
+        let e = self
+            .client
+            .query_device_role(team.into_id().into(), device.into_id().into())
+            .await?;
+        if let Some(e) = e {
+            return Ok(Some(api::Role {
+                id: e.role_id.into(),
+                name: e.name,
+                author_id: e.author_id.into(),
+                default: e.default,
+            }));
+        }
+        Ok(None)
     }
 
     #[instrument(skip(self), err)]
@@ -1220,14 +1201,35 @@ impl DaemonApi for Api {
     ) -> api::Result<Option<api::Label>> {
         self.check_team_valid(team).await?;
 
-        self.client.query_label(team, label_id).await
+        let e = self
+            .client
+            .query_label(team.into_id().into(), label_id.into_id().into())
+            .await?;
+        if let Some(e) = e {
+            return Ok(Some(api::Label {
+                id: e.label_id.into(),
+                name: e.label_name.clone(),
+                author_id: e.label_author_id.into(),
+            }));
+        }
+        Ok(None)
     }
 
     #[instrument(skip(self), err)]
     async fn labels(self, _: context::Context, team: api::TeamId) -> api::Result<Vec<api::Label>> {
         self.check_team_valid(team).await?;
 
-        self.client.query_labels(team).await
+        Ok(self
+            .client
+            .query_labels(team.into_id().into())
+            .await?
+            .iter()
+            .map(|e| api::Label {
+                id: e.label_id.into(),
+                name: e.label_name.clone(),
+                author_id: e.label_author_id.into(),
+            })
+            .collect::<Vec<_>>())
     }
 
     #[instrument(skip(self), err)]
@@ -1271,7 +1273,19 @@ impl DaemonApi for Api {
     ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
-        Ok(self.client.query_team_roles(team).await?.into_boxed_slice())
+        Ok(self
+            .client
+            .query_team_roles(team.into_id().into())
+            .await?
+            .iter()
+            .map(|e| api::Role {
+                id: e.role_id.into(),
+                name: e.name.clone(),
+                author_id: e.author_id.into(),
+                default: e.default,
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice())
     }
 
     //
