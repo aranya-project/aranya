@@ -861,7 +861,7 @@ effect PermRemovedFromRole {
 
 command RemovePermFromRole {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
@@ -1497,7 +1497,7 @@ effect RoleManagementPermRevoked {
 
 command RevokeRoleManagementPerm {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
@@ -2027,7 +2027,7 @@ effect RoleAssigned {
 
 command AssignRole {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
@@ -2126,7 +2126,7 @@ effect RoleChanged {
 
 command ChangeRole {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
@@ -2238,7 +2238,7 @@ effect RoleRevoked {
 
 command RevokeRole {
     attributes {
-        priority: 2
+        priority: 20
     }
 
     fields {
@@ -2664,7 +2664,7 @@ effect TeamTerminated {
 
 command TerminateTeam {
     attributes {
-        priority: 4
+        priority: 40
     }
 
     fields {
@@ -2826,7 +2826,7 @@ effect DeviceRemoved {
 
 command RemoveDevice {
     attributes {
-        priority: 3
+        priority: 30
     }
 
     fields {
@@ -3134,7 +3134,7 @@ effect LabelManagingRoleRevoked {
 
 command RevokeLabelManagingRole {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
@@ -3299,7 +3299,7 @@ effect LabelDeleted {
 
 command DeleteLabel {
     attributes {
-        priority: 2
+        priority: 20
     }
 
     fields {
@@ -3694,7 +3694,7 @@ effect LabelRevokedFromRole {
 
 command RevokeLabelFromRole {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
@@ -3779,7 +3779,7 @@ effect LabelRevokedFromDevice {
 
 command RevokeLabelFromDevice {
     attributes {
-        priority: 1
+        priority: 10
     }
 
     fields {
