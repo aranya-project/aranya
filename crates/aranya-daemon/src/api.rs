@@ -346,7 +346,7 @@ impl EffectHandler {
                     #[cfg(feature = "afc")]
                     {
                         // Delete channels for devices where new role does not have the `CanUseAfc` permission)
-                        // If the role has the `CanUseAfc` permission before running the query, the device's AFC channel will not be deleted.
+                        // If the role has the `CanUseAfc` permission before running the query, the device's AFC channel will not be deleted. If the `CanUseAfc` permission is later revoked from the role, the AFC channel will be deleted when `PermRemovedFromRole` is handled.
                         // If the role does not have the `CanUseAfc` permission, the device's AFC channel will be deleted.
                         // If you do not want any AFC channels to be deleted when assigning a role, you must ensure the `CanUseAfc` permission is assigned to the role before assigning it to a device.
                         // TODO: use something other than a string for "CanUseAfc" perm.
