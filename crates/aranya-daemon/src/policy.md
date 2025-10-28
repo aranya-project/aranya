@@ -119,8 +119,8 @@ CreateTeam is automatically the highest priority based on ancestry.
 In general, deletion and revocation commands should be higher priority than create/modify/use commands. E.g.:
 TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseFoo(100)
 
-Commands that must be called first are higher priority than commands that depend on them.
-For example, a command to assign a label to a device would be higher priority than a command that uses the label based on ancestry in the weave.
+Commands that must be called first should have a higher priority than commands that depend on them.
+For example, a command to create/assign a label to a device should be higher priority than a command that uses the label based.
 Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
 For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
 
