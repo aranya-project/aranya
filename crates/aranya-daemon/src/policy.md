@@ -101,6 +101,38 @@ publish to the graph. Commands are signed with the device's
 Signing Key. The policy controls which commands each device is
 authorized to publish.
 
+## Command Priorities
+
+Priorities can defined for commands by specifying the `priority` attribute in the command's `attribute` block:
+```
+command CommandFoo {
+    attributes {
+        priority: 100
+    }
+}
+```
+
+Commands are ordered first by weave ancestry, then priority, then by comparing their IDs.
+The weave ancestry is the deterministic order that commands are added to the graph when weaving branches together.
+CreateTeam is the first command (a.k.a. the init command), so it doesn't need an assigned priority.
+CreateTeam is automatically the highest priority based on ancestry.
+
+In general, deletion and revocation commands should be higher priority than create/modify/use commands. E.g.:
+TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseFoo(100)
+
+Commands that must be called first are higher priority than commands that depend on them.
+For example, a command to assign a label to a device would be higher priority than a command that uses the label based on ancestry in the weave.
+Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
+For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
+
+Command priorities will be required to be defined for each command in the policy. Even the zero priority should be defined. That way, the policy can be audited and does not have any default priorities that cannot be audited.
+
+Ephemeral commands do not need to specify a priority since they are automatically lower priority than all commands on the graph before the ephemeral command is evaluated.
+
+While we could assign sequential priorities (0, 1, 2, ...) to commands to achieve the desired prioritization, this doesn't leave any room for adding new priorities in between priorities that were already defined.
+Therefore, initial priorities are defined with room between them for new priorities to be added later. E.g.:
+100, 200, 300, etc.
+
 ### API Stability and Backward Compatibility
 
 Actions and effects are part of a policy's public API.
