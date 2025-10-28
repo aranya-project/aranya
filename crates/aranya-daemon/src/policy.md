@@ -797,7 +797,7 @@ effect PermAddedToRole {
 
 command AddPermToRole {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -861,7 +861,7 @@ effect PermRemovedFromRole {
 
 command RemovePermFromRole {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
@@ -1009,7 +1009,7 @@ effect RoleOwnerAdded {
 
 command AddRoleOwner {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -1082,7 +1082,7 @@ effect RoleOwnerRemoved {
 
 command RemoveRoleOwner {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -1352,7 +1352,7 @@ effect RoleManagementPermAssigned {
 
 command AssignRoleManagementPerm {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -1497,7 +1497,7 @@ effect RoleManagementPermRevoked {
 
 command RevokeRoleManagementPerm {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
@@ -1735,7 +1735,7 @@ action setup_default_roles(owning_role_id id) {
 
 command SetupDefaultRole {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -2027,7 +2027,7 @@ effect RoleAssigned {
 
 command AssignRole {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
@@ -2126,7 +2126,7 @@ effect RoleChanged {
 
 command ChangeRole {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
@@ -2238,7 +2238,7 @@ effect RoleRevoked {
 
 command RevokeRole {
     attributes {
-        priority: 20
+        priority: 300
     }
 
     fields {
@@ -2664,7 +2664,7 @@ effect TeamTerminated {
 
 command TerminateTeam {
     attributes {
-        priority: 40
+        priority: 500
     }
 
     fields {
@@ -2733,7 +2733,7 @@ effect DeviceAdded {
 
 command AddDevice {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -2826,7 +2826,7 @@ effect DeviceRemoved {
 
 command RemoveDevice {
     attributes {
-        priority: 30
+        priority: 400
     }
 
     fields {
@@ -3059,7 +3059,7 @@ effect LabelManagingRoleAdded {
 
 command AddLabelManagingRole {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -3134,7 +3134,7 @@ effect LabelManagingRoleRevoked {
 
 command RevokeLabelManagingRole {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
@@ -3214,7 +3214,7 @@ effect LabelCreated {
 
 command CreateLabel {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -3299,7 +3299,7 @@ effect LabelDeleted {
 
 command DeleteLabel {
     attributes {
-        priority: 20
+        priority: 300
     }
 
     fields {
@@ -3427,7 +3427,7 @@ effect AssignedLabelToRole {
 
 command AssignLabelToRole {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -3555,7 +3555,7 @@ effect AssignedLabelToDevice {
 
 command AssignLabelToDevice {
     attributes {
-        priority: 0
+        priority: 100
     }
 
     fields {
@@ -3694,7 +3694,7 @@ effect LabelRevokedFromRole {
 
 command RevokeLabelFromRole {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
@@ -3779,7 +3779,7 @@ effect LabelRevokedFromDevice {
 
 command RevokeLabelFromDevice {
     attributes {
-        priority: 10
+        priority: 200
     }
 
     fields {
