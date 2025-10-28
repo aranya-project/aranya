@@ -101,6 +101,37 @@ publish to the graph. Commands are signed with the device's
 Signing Key. The policy controls which commands each device is
 authorized to publish.
 
+## Command Priorities
+
+Priorities can defined for commands by specifying the `priority` attribute in the command's `attributes` block:
+```
+command CommandFoo {
+    attributes {
+        priority: 100
+    }
+}
+```
+
+Branches in the graph are deterministically ordered by the braid algorithm. Higher priority commands are generally evaluated before lower priority commands.
+CreateTeam is the first command (a.k.a. the init command), so it doesn't need an assigned priority.
+CreateTeam is automatically the highest priority based on ancestry.
+
+In general, deletion and revocation commands should be higher priority than create/modify/use commands. E.g.:
+TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseFoo(100)
+
+Commands that must be called first should have a higher priority than commands that depend on them.
+For example, a command to create/assign a label to a device should be higher priority than a command that uses the label based.
+Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
+For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
+
+Command priorities will be required to be defined for each command in the policy. Even the zero priority should be defined. That way, the policy can be audited and does not have any default priorities that cannot be audited.
+
+Ephemeral commands do not need to specify a priority since they do not participate in braiding.
+
+While we could assign sequential priorities (0, 1, 2, ...) to commands to achieve the desired prioritization, this doesn't leave any room for adding new priorities in between priorities that were already defined.
+Therefore, initial priorities are defined with room between them for new priorities to be added later. E.g.:
+100, 200, 300, etc.
+
 ### API Stability and Backward Compatibility
 
 Actions and effects are part of a policy's public API.
@@ -796,6 +827,10 @@ effect PermAddedToRole {
 }
 
 command AddPermToRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role to which the permission is being
         // added.
@@ -856,6 +891,10 @@ effect PermRemovedFromRole {
 }
 
 command RemovePermFromRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the role from which the permission is being
         // removed.
@@ -1000,6 +1039,10 @@ effect RoleOwnerAdded {
 }
 
 command AddRoleOwner {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role whose owning role is being
         // changed.
@@ -1069,6 +1112,10 @@ effect RoleOwnerRemoved {
 }
 
 command RemoveRoleOwner {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role whose owning role is being
         // changed.
@@ -1335,6 +1382,10 @@ effect RoleManagementPermAssigned {
 }
 
 command AssignRoleManagementPerm {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // assigned.
@@ -1476,6 +1527,10 @@ effect RoleManagementPermRevoked {
 }
 
 command RevokeRoleManagementPerm {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // removed.
@@ -1710,6 +1765,10 @@ action setup_default_roles(owning_role_id id) {
 }
 
 command SetupDefaultRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The name of the default role.
         name enum DefaultRoleName,
@@ -1998,6 +2057,10 @@ effect RoleAssigned {
 }
 
 command AssignRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -2093,6 +2156,10 @@ effect RoleChanged {
 }
 
 command ChangeRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -2201,6 +2268,10 @@ effect RoleRevoked {
 }
 
 command RevokeRole {
+    attributes {
+        priority: 300
+    }
+
     fields {
         // The ID of the device having its role revoked.
         device_id id,
@@ -2431,6 +2502,10 @@ effect TeamCreated {
 }
 
 command CreateTeam {
+    attributes {
+        init: true
+    }
+
     fields {
         // The initial owner's public Device Keys.
         owner_keys struct KeyBundle,
@@ -2619,6 +2694,10 @@ effect TeamTerminated {
 }
 
 command TerminateTeam {
+    attributes {
+        priority: 500
+    }
+
     fields {
         // The ID of the team being terminated.
         team_id id,
@@ -2684,6 +2763,10 @@ effect DeviceAdded {
 }
 
 command AddDevice {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
@@ -2773,6 +2856,10 @@ effect DeviceRemoved {
 }
 
 command RemoveDevice {
+    attributes {
+        priority: 400
+    }
+
     fields {
         // The ID of the device being removed from the team.
         device_id id,
@@ -3002,6 +3089,10 @@ effect LabelManagingRoleAdded {
 }
 
 command AddLabelManagingRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -3073,6 +3164,10 @@ effect LabelManagingRoleRevoked {
 }
 
 command RevokeLabelManagingRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -3149,6 +3244,10 @@ effect LabelCreated {
 }
 
 command CreateLabel {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The label name.
         label_name string,
@@ -3230,6 +3329,10 @@ effect LabelDeleted {
 }
 
 command DeleteLabel {
+    attributes {
+        priority: 300
+    }
+
     fields {
         // The unique ID of the label being deleted.
         label_id id,
@@ -3354,6 +3457,10 @@ effect AssignedLabelToRole {
 }
 
 command AssignLabelToRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The target role.
         role_id id,
@@ -3478,6 +3585,10 @@ effect AssignedLabelToDevice {
 }
 
 command AssignLabelToDevice {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -3613,6 +3724,10 @@ effect LabelRevokedFromRole {
 }
 
 command RevokeLabelFromRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The target role.
         role_id id,
@@ -3694,6 +3809,10 @@ effect LabelRevokedFromDevice {
 }
 
 command RevokeLabelFromDevice {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The target device.
         device_id id,
