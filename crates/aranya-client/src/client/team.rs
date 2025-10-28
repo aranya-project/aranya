@@ -9,8 +9,7 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,
-        Roles,
+        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -424,64 +423,6 @@ impl Team<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
-            .into_iter()
-            .map(Label::from_api)
-            .collect();
-        Ok(Labels { labels })
-    }
-
-    /// Assigns a label to a role.
-    #[instrument(skip(self))]
-    pub async fn assign_label_to_role(
-        &self,
-        role: RoleId,
-        label: LabelId,
-        op: ChanOp,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .assign_label_to_role(
-                context::current(),
-                self.id,
-                role.into_api(),
-                label.into_api(),
-                op.to_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Revokes a label from a role.
-    #[instrument(skip(self))]
-    pub async fn revoke_label_from_role(&self, role: RoleId, label: LabelId) -> Result<()> {
-        self.client
-            .daemon
-            .revoke_label_from_role(
-                context::current(),
-                self.id,
-                role.into_api(),
-                label.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Returns the list of labels assigned to a role.
-    #[instrument(skip(self))]
-    pub async fn labels_assigned_to_role(&self, role: RoleId) -> Result<Labels> {
-        let labels = self
-            .client
-            .daemon
-            .labels_assigned_to_role(context::current(), self.id, role.into_api())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            // This _should_ just be `into_iter`, but the
-            // compiler chooses the `&Box` impl. It's the same
-            // end result, though.
-            .into_vec()
             .into_iter()
             .map(Label::from_api)
             .collect();

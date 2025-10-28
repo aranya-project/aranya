@@ -412,7 +412,12 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Changes the assigned role of a device.
-    async fn change_role(team: TeamId, device: DeviceId, old_role: RoleId, new_role: RoleId) -> Result<()>;
+    async fn change_role(
+        team: TeamId,
+        device: DeviceId,
+        old_role: RoleId,
+        new_role: RoleId,
+    ) -> Result<()>;
     /// Returns the role assigned to the device.
     async fn device_role(team: TeamId, device: DeviceId) -> Result<Option<Role>>;
 
@@ -433,17 +438,6 @@ pub trait DaemonApi {
     // Label assignments
     //
 
-    /// Assigns a label to a role.
-    async fn assign_label_to_role(
-        team: TeamId,
-        role: RoleId,
-        label: LabelId,
-        op: ChanOp,
-    ) -> Result<()>;
-    /// Revokes a label from a role.
-    async fn revoke_label_from_role(team: TeamId, role: RoleId, label: LabelId) -> Result<()>;
-    /// Returns all labels assigned to the role.
-    async fn labels_assigned_to_role(team: TeamId, role: RoleId) -> Result<Box<[Label]>>;
     /// Assigns a label to a device.
     async fn assign_label_to_device(
         team: TeamId,

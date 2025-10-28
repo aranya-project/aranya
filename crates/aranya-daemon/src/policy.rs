@@ -30,7 +30,6 @@ pub enum Effect {
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
     AssignedLabelToDevice(AssignedLabelToDevice),
-    AssignedLabelToRole(AssignedLabelToRole),
     DeviceAdded(DeviceAdded),
     DeviceRemoved(DeviceRemoved),
     LabelCreated(LabelCreated),
@@ -38,7 +37,6 @@ pub enum Effect {
     LabelManagingRoleAdded(LabelManagingRoleAdded),
     LabelManagingRoleRevoked(LabelManagingRoleRevoked),
     LabelRevokedFromDevice(LabelRevokedFromDevice),
-    LabelRevokedFromRole(LabelRevokedFromRole),
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
@@ -46,7 +44,6 @@ pub enum Effect {
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
-    QueryLabelsAssignedToRoleResult(QueryLabelsAssignedToRoleResult),
     QueryLabelsResult(QueryLabelsResult),
     QueryRoleOwnersResult(QueryRoleOwnersResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
@@ -86,13 +83,6 @@ pub struct AfcUniChannelReceived {
 #[effect]
 pub struct AssignedLabelToDevice {
     pub device: BaseId,
-    pub label_id: BaseId,
-    pub author_id: BaseId,
-}
-/// AssignedLabelToRole policy effect.
-#[effect]
-pub struct AssignedLabelToRole {
-    pub role_id: BaseId,
     pub label_id: BaseId,
     pub author_id: BaseId,
 }
@@ -147,13 +137,6 @@ pub struct LabelRevokedFromDevice {
     pub label_author_id: BaseId,
     pub author_id: BaseId,
 }
-/// LabelRevokedFromRole policy effect.
-#[effect]
-pub struct LabelRevokedFromRole {
-    pub role_id: BaseId,
-    pub label_id: BaseId,
-    pub author_id: BaseId,
-}
 /// PermAddedToRole policy effect.
 #[effect]
 pub struct PermAddedToRole {
@@ -197,14 +180,6 @@ pub struct QueryLabelResult {
 #[effect]
 pub struct QueryLabelsAssignedToDeviceResult {
     pub device_id: BaseId,
-    pub label_id: BaseId,
-    pub label_name: Text,
-    pub label_author_id: BaseId,
-}
-/// QueryLabelsAssignedToRoleResult policy effect.
-#[effect]
-pub struct QueryLabelsAssignedToRoleResult {
-    pub role_id: BaseId,
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
@@ -390,22 +365,11 @@ pub trait ActorExt {
         managing_role_id: BaseId,
     ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn assign_label_to_role(
-        &mut self,
-        role_id: BaseId,
-        label_id: BaseId,
-        op: ChanOp,
-    ) -> Result<(), ClientError>;
     fn assign_label_to_device(
         &mut self,
         device_id: BaseId,
         label_id: BaseId,
         op: ChanOp,
-    ) -> Result<(), ClientError>;
-    fn revoke_label_from_role(
-        &mut self,
-        role_id: BaseId,
-        label_id: BaseId,
     ) -> Result<(), ClientError>;
     fn revoke_label_from_device(
         &mut self,
@@ -414,10 +378,6 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn query_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn query_labels_assigned_to_role(
-        &mut self,
-        role_id: BaseId,
-    ) -> Result<(), ClientError>;
     fn query_labels_assigned_to_device(
         &mut self,
         device_id: BaseId,
