@@ -2472,7 +2472,7 @@ effect TeamCreated {
 
 command CreateTeam {
     attributes {
-        priority: 0
+        init: true
     }
 
     fields {
