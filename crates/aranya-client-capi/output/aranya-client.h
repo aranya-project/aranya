@@ -1304,7 +1304,7 @@ AranyaError aranya_sync_peer_config_build_ext(struct AranyaSyncPeerConfigBuilder
  * this function
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
- * @param[in] interval Set the interval at which syncing occurs
+ * @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1319,7 +1319,7 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
  * this function
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
- * @param[in] interval Set the interval at which syncing occurs
+ * @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1380,26 +1380,30 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
                                                                struct AranyaExtError *__ext_err);
 
 /**
- * Enables automatic syncing when a hello message is received from this peer
+ * Sets whether automatic syncing should occur when a hello message is received from this peer
  * indicating they have a head that we don't have.
  *
  * By default, sync on hello is disabled.
  * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
-AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncPeerConfigBuilder *cfg);
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                              uint32_t sync_on_hello);
 
 /**
- * Enables automatic syncing when a hello message is received from this peer
+ * Sets whether automatic syncing should occur when a hello message is received from this peer
  * indicating they have a head that we don't have.
  *
  * By default, sync on hello is disabled.
  * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_on_hello_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                                  uint32_t sync_on_hello,
                                                                   struct AranyaExtError *__ext_err);
 
 /**
@@ -1934,16 +1938,18 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param[in] delay minimum delay between notifications.
+ * @param[in] graph_change_delay minimum delay between notifications when graph changes.
  * @param[in] duration how long the subscription should remain active.
+ * @param[in] schedule_delay interval for periodic scheduled hello sends.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         AranyaAddr peer,
-                                        AranyaDuration delay,
-                                        AranyaDuration duration);
+                                        AranyaDuration graph_change_delay,
+                                        AranyaDuration duration,
+                                        AranyaDuration schedule_delay);
 
 /**
  * Subscribe to hello notifications from a sync peer.
@@ -1953,16 +1959,18 @@ AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param[in] delay minimum delay between notifications.
+ * @param[in] graph_change_delay minimum delay between notifications when graph changes.
  * @param[in] duration how long the subscription should remain active.
+ * @param[in] schedule_delay interval for periodic scheduled hello sends.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_hello_subscribe_ext(const struct AranyaClient *client,
                                             const struct AranyaTeamId *team,
                                             AranyaAddr peer,
-                                            AranyaDuration delay,
+                                            AranyaDuration graph_change_delay,
                                             AranyaDuration duration,
+                                            AranyaDuration schedule_delay,
                                             struct AranyaExtError *__ext_err);
 
 /**
