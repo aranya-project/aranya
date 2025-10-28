@@ -499,10 +499,10 @@ Returns a list of devices with a certain role.
 ephemeral action query_devices_with_role(role_id id) {
     // Publishing `QueryDevicesWithRole` emits
     // `QueryDevicesWithRoleResult`.
-    map Device[device_id: ?] as f {
+    map RoleAssignmentIndex[role_id: role_id, device_id: ?] as f {
         publish QueryDevicesWithRole {
             device_id: f.device_id,
-            role_id: role_id,
+            role_id: f.role_id,
         }
     }
 }
@@ -530,21 +530,10 @@ ephemeral command QueryDevicesWithRole {
     policy {
         check team_exists()
 
-        // Get the role assigned to the device.
-        let assigned_role = try_get_assigned_role(this.device_id)
-        if assigned_role is None {
-            finish {}
-        } else {
-            let role = unwrap assigned_role
-            if role.role_id == this.role_id {
-                finish {
-                    emit QueryDevicesWithRoleResult {
-                        device_id: this.device_id,
-                        role_id: this.role_id,
-                    }
-                }
-            } else {
-                finish {}
+        finish {
+            emit QueryDevicesWithRoleResult {
+                device_id: this.device_id,
+                role_id: this.role_id,
             }
         }
     }
