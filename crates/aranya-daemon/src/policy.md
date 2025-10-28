@@ -515,7 +515,7 @@ effect QueryDevicesWithRoleResult {
     role_id id,
 }
 
-// Only returns a `QueryDevicesWithRoleResult` effect for devices with the `role_id` role.
+// A trampoline that forwards `device_id` and `role_id` to the effect.
 ephemeral command QueryDevicesWithRole {
     fields {
         device_id id,
@@ -530,11 +530,9 @@ ephemeral command QueryDevicesWithRole {
     policy {
         check team_exists()
 
+        let eff = this as QueryDevicesWithRoleResult
         finish {
-            emit QueryDevicesWithRoleResult {
-                device_id: this.device_id,
-                role_id: this.role_id,
-            }
+            emit eff
         }
     }
 }
