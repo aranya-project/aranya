@@ -127,7 +127,7 @@ For example, deleting a label should be higher priority than assigning a label t
 
 Command priorities will be required to be defined for each command in the policy. Even the zero priority should be defined. That way, the policy can be audited and does not have any default priorities that cannot be audited.
 
-Ephemeral commands do not need to specify a priority since they are automatically lower priority than all commands on the graph before the ephemeral command is evaluated.
+Ephemeral commands do not need to specify a priority since they do not participate in braiding.
 
 While we could assign sequential priorities (0, 1, 2, ...) to commands to achieve the desired prioritization, this doesn't leave any room for adding new priorities in between priorities that were already defined.
 Therefore, initial priorities are defined with room between them for new priorities to be added later. E.g.:
