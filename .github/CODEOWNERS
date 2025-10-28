@@ -2,3 +2,6 @@
 
 examples/c @nikki-aranya
 crates/aranya-metrics @nikki-aranya
+crates/aranya-client-capi @nikki-aranya
+
+crates/aranya-daemon/src/policy.md @chip-so
