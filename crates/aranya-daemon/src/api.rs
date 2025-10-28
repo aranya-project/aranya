@@ -4,8 +4,6 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-#[cfg(feature = "afc")]
-use std::str::FromStr as _;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
@@ -20,6 +18,8 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
+#[cfg(feature = "afc")]
+use aranya_policy_vm::text;
 use aranya_runtime::GraphId;
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 #[cfg(feature = "afc")]
@@ -251,7 +251,7 @@ impl EffectHandler {
                             .query_role_has_perm(
                                 graph.into_id().into(),
                                 _role_assigned.role_id.into(),
-                                "CanUseAfc".into(),
+                                text!("CanUseAfc"),
                             )
                             .await?
                         {
@@ -356,7 +356,7 @@ impl EffectHandler {
                             .query_role_has_perm(
                                 graph.into_id().into(),
                                 _role_changed.new_role_id.into(),
-                                "CanUseAfc".into(),
+                                text!("CanUseAfc"),
                             )
                             .await?
                         {
@@ -541,11 +541,11 @@ impl Client {
         &self,
         team: api::TeamId,
         role_id: api::RoleId,
-        perm: String,
+        perm: Text,
     ) -> api::Result<bool> {
         let effects = self
             .actions(&team.into_id().into())
-            .query_role_has_perm(role_id.into_id().into(), Text::from_str(perm.as_str())?)
+            .query_role_has_perm(role_id.into_id().into(), perm)
             .await
             .context("unable to query device role")?;
         if let Some(Effect::QueryRoleHasPermResult(e)) =

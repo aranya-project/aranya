@@ -866,9 +866,7 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
     let mut devices = DevicesCtx::new("test_cannot_assign_role_twice").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
