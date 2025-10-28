@@ -165,6 +165,12 @@ impl<'a> ClientBuilder<'a> {
     }
 }
 
+impl Default for ClientBuilder<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A client for invoking actions on and processing effects from
 /// the Aranya graph.
 ///
