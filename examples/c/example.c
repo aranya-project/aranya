@@ -629,9 +629,9 @@ AranyaError run(Team* t) {
 
     // Admin subscribes to hello notifications from Owner with 2-second delay
     printf("admin subscribing to hello notifications from owner\n");
-    AranyaDuration graph_change_delay = ARANYA_DURATION_MILLISECONDS * 1000;
-    AranyaDuration duration           = ARANYA_DURATION_MILLISECONDS * 30000;
-    AranyaDuration schedule_delay     = ARANYA_DURATION_MILLISECONDS * 5000;
+    AranyaDuration graph_change_delay = ARANYA_DURATION_MILLISECONDS * 1000ULL;
+    AranyaDuration duration           = ARANYA_DURATION_MILLISECONDS * 30000ULL;
+    AranyaDuration schedule_delay     = ARANYA_DURATION_MILLISECONDS * 5000ULL;
     err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
                                       graph_change_delay * 2, duration,
                                       schedule_delay);
