@@ -860,6 +860,28 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
     Ok(())
 }
 
+/// Test that a role cannot be assigned if a role is already assigned.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_cannot_assign_role_twice() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_cannot_assign_role_twice").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    let r = owner_team
+        .assign_role(devices.membera.id, roles.operator().id)
+        .await;
+
+    assert!(matches!(r, Err(aranya_client::Error::Aranya(_))));
+
+    Ok(())
+}
+
 /// Deleting a label requires `DeleteLabel` and label management rights.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_delete_label_requires_permission() -> Result<()> {

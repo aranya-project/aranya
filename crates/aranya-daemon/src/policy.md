@@ -1263,7 +1263,7 @@ function can_revoke_role(device_id id, target_role_id id) bool {
     // At this point we believe the following to be true:
     //
     // - `device_role_id` refers to a role that exists
-    // - `device_role_id` refers to the role revoked to
+    // - `device_role_id` refers to the role assigned to
     //   `device_id`
     //
     // We do NOT know whether `device_id` refers to a device
