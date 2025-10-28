@@ -701,31 +701,11 @@ AranyaError aranya_client_cleanup(struct AranyaClient *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_client_init`.
- *
- * @relates AranyaClient
- */
-AranyaError aranya_client_cleanup_ext(struct AranyaClient *ptr,
-                                      struct AranyaExtError *__ext_err);
-
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_role_init`.
  *
  * @relates AranyaRole
  */
 AranyaError aranya_role_cleanup(struct AranyaRole *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_role_init`.
- *
- * @relates AranyaRole
- */
-AranyaError aranya_role_cleanup_ext(struct AranyaRole *ptr,
-                                    struct AranyaExtError *__ext_err);
 
 /**
  * Get ID of role.
@@ -1456,7 +1436,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_setup_default_riles(struct AranyaClient *client,
+AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team);
 
 /**
@@ -1473,7 +1453,7 @@ AranyaError aranya_setup_default_riles(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_setup_default_riles_ext(struct AranyaClient *client,
+AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            struct AranyaExtError *__ext_err);
 
