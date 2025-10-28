@@ -438,10 +438,6 @@ effect QueryDevicesOnTeamResult {
 
 // A trampoline that forwards `device_id` to the effect.
 ephemeral command QueryDevicesOnTeam {
-    attributes {
-        priority: 0
-    }
-
     fields {
         device_id id,
     }
@@ -491,10 +487,6 @@ effect QueryDeviceRoleResult {
 }
 
 ephemeral command QueryDeviceRole {
-    attributes {
-        priority: 0
-    }
-
     fields {
         device_id id,
     }
@@ -545,10 +537,6 @@ effect QueryDeviceKeyBundleResult {
 }
 
 ephemeral command QueryDeviceKeyBundle {
-    attributes {
-        priority: 0
-    }
-
     fields {
         // The device whose key bundle is being queried.
         device_id id,
@@ -2345,10 +2333,6 @@ effect QueryTeamRolesResult {
 
 // A trampoline command to forward data to `QueryTeamRolesResult`.
 ephemeral command QueryTeamRoles {
-    attributes {
-        priority: 0
-    }
-
     fields {
         role_id id,
         name string,
@@ -2405,10 +2389,6 @@ effect QueryRoleOwnersResult {
 
 // A trampoline command to forward data to `QueryRoleOwnersResult`.
 ephemeral command QueryRoleOwners {
-    attributes {
-        priority: 0
-    }
-
     fields {
         role_id id,
         name string,
@@ -3963,10 +3943,6 @@ effect QueryLabelResult {
 }
 
 ephemeral command QueryLabel {
-    attributes {
-        priority: 0
-    }
-
     fields {
         label_id id,
     }
@@ -4025,10 +4001,6 @@ effect QueryLabelsResult {
 
 // Trampoline to forward info to `QueriedLabelsResult`.
 ephemeral command QueryLabels {
-    attributes {
-        priority: 0
-    }
-
     fields {
         label_id id,
         label_name string,
@@ -4098,10 +4070,6 @@ effect QueryLabelsAssignedToRoleResult {
 }
 
 ephemeral command QueryLabelsAssignedToRole {
-    attributes {
-        priority: 0
-    }
-
     fields {
         role_id id,
         label_id id,
@@ -4169,10 +4137,6 @@ effect QueryLabelsAssignedToDeviceResult {
 }
 
 ephemeral command QueryLabelsAssignedToDevice {
-    attributes {
-        priority: 0
-    }
-
     fields {
         device_id id,
         label_id id,
@@ -4312,10 +4276,6 @@ effect AfcUniChannelReceived {
 }
 
 ephemeral command AfcCreateUniChannel {
-    attributes {
-        priority: 0
-    }
-
     fields {
         // The device ID of the participant that can receive
         // data.
