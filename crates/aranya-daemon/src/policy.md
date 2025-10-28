@@ -3399,137 +3399,6 @@ to overlap, including having different `ChanOp`s. When
 determining whether a device is allowed to use a label, the more
 permissive `ChanOp` is used.
 
-##### Label Assignment to Roles
-
-```policy
-// Records that a role was granted permission to use a label for
-// certain channel operations.
-//
-// # Foreign Keys
-//
-// - `label_id` refers to the `Label` fact.
-// - `role_id` refers to the `Role` fact.
-//
-// # Caveats
-//
-// We do not yet support prefix deletion, so this fact is NOT
-// deleted when the label or the role are deleted. Use TODO to
-// verify whether a role is allowed to use the label instead of
-// checking this fact directly.
-fact LabelAssignedToRole[label_id id, role_id id]=>{op enum ChanOp}
-
-// Grants the role permission to use the label.
-//
-// - It is an error if the author does not have permission to assign
-//   this label.
-// - It is an error if `role_id` refers to the author's current
-//   role.
-// - It is an error if the role does not exist.
-// - It is an error if the label does not exist.
-// - It is an error if the role has already been granted
-//   permission to use this label.
-//
-// # Required Permissions
-//
-// The author must have the following permissions:
-// - `AssignLabel`
-// - `CanManageLabel(label_id)`
-//
-// The target role must have the following permissions:
-// - `CanUseAfc`
-action assign_label_to_role(role_id id, label_id id, op enum ChanOp) {
-    publish AssignLabelToRole {
-        role_id: role_id,
-        label_id: label_id,
-        op: op,
-    }
-}
-
-// Emitted when the `AssignLabelToRole` command is successfully
-// processed.
-effect AssignedLabelToRole {
-    // The ID of the role that was assigned the label.
-    role_id id,
-    // The ID of the label that was assigned.
-    label_id id,
-    // The ID of the device that assigned the label.
-    author_id id,
-}
-
-command AssignLabelToRole {
-    attributes {
-        priority: 100
-    }
-
-    fields {
-        // The target role.
-        role_id id,
-        // The label being assigned to the target role.
-        label_id id,
-        // The channel operations the role is allowed to use the
-        // label for.
-        op enum ChanOp,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-
-        // Devices are never allowed to assign labels to their
-        // current role.
-        //
-        // Perform this check before we make more fact database
-        // queries.
-        let assigned_role_id = get_assigned_role_id(author.device_id)
-        check assigned_role_id != this.role_id
-
-        // The author must be allowed to assign this label.
-        check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
-        check can_manage_label(author.device_id, this.label_id)
-
-        // The role must be able to use AFC.
-        check role_has_simple_perm(this.role_id, SimplePerm::CanUseAfc)
-
-        // Make sure we uphold `AssignedLabelToRole`'s foreign
-        // keys.
-        //
-        // NB: We do not check `exists Role[...]` because
-        // `role_has_simple_perm` already checks whether the role
-        // exists.
-        check exists Label[label_id: this.label_id]
-        check !exists LabelAssignedToRole[
-            label_id: this.label_id,
-            role_id: this.role_id,
-        ]
-
-        // At this point we believe the following to be true:
-        //
-        // - the team is active
-        // - `author` has the `AssignLabel` permission
-        // - `author` is allowed to manage `this.label_id`
-        // - `this.role_id` refers to a role that exists
-        // - `this.label_id` refers to a label that exists
-        // - the label is not already assigned to `this.role_id`
-        finish {
-            create LabelAssignedToRole[
-                label_id: this.label_id,
-                role_id: this.role_id,
-            ]=>{op: this.op}
-
-            emit AssignedLabelToRole {
-                role_id: this.role_id,
-                label_id: this.label_id,
-                author_id: author.device_id,
-            }
-        }
-    }
-}
-```
-
 ##### Label Assignment to Devices
 
 ```policy
@@ -3694,87 +3563,6 @@ command AssignLabelToDevice {
 #### Label Revocation
 
 ```policy
-// Revokes permission to use a label from a role.
-//
-// - It is an error if the role does not exist.
-// - It is an error if the label does not exist.
-// - It is an error if the role has not been granted permission
-//   to use this label.
-//
-// # Required Permissions
-//
-// - `RevokeLabel`
-// - `CanManageLabel(label_id)`
-action revoke_label_from_role(role_id id, label_id id) {
-    publish RevokeLabelFromRole {
-        role_id: role_id,
-        label_id: label_id,
-    }
-}
-
-// Emitted when the `RevokeLabelFromRole` command is successfully
-// processed.
-effect LabelRevokedFromRole {
-    // The ID of the role that had the label revoked.
-    role_id id,
-    // The ID of the label that was revoked.
-    label_id id,
-    // The ID of the device that revoked the label.
-    author_id id,
-}
-
-command RevokeLabelFromRole {
-    attributes {
-        priority: 200
-    }
-
-    fields {
-        // The target role.
-        role_id id,
-        // The label being assigned to the target device.
-        label_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
-        check can_manage_label(author.device_id, this.label_id)
-
-        check exists Role[role_id: this.role_id]
-        check exists Label[label_id: this.label_id]
-        check exists LabelAssignedToRole[
-            label_id: this.label_id,
-            role_id: this.role_id,
-        ]
-
-        // At this point we believe the following to be true:
-        //
-        // - the team is active
-        // - `author` has the `RevokeLabel` permission
-        // - `author` is allowed to manage `this.label_id`
-        // - `this.role_id` refers to a role that exists
-        // - `this.label_id` refers to a label that exists
-        // - the label is currently assigned to `this.role_id`
-        finish {
-            delete LabelAssignedToRole[
-                label_id: this.label_id,
-                role_id: this.role_id,
-            ]
-
-            emit LabelRevokedFromRole {
-                role_id: this.role_id,
-                label_id: this.label_id,
-                author_id: author.device_id,
-            }
-        }
-    }
-}
-
 // Revokes permission to use a label from a device.
 //
 // - It is an error if the device does not exist.
@@ -3873,13 +3661,6 @@ command RevokeLabelFromDevice {
 //
 // - It does NOT check whether the device exists.
 function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum ChanOp {
-    // First test to see if the device's role has been granted
-    // permission to use the label.
-    let role_id = get_assigned_role_id(device_id)
-    let assigned_to_role = query LabelAssignedToRole[
-        label_id: label_id,
-        role_id: role_id,
-    ]
 
     // Now see if the device was directly granted permission
     // to use the label.
@@ -3887,28 +3668,8 @@ function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum 
         label_id: label_id,
         device_id: device_id,
     ]
-
-    let role_op = if assigned_to_role is Some {
-        : Some((unwrap assigned_to_role).op)
-    } else {
-        : None
-    }
     let device_op = device_assignment_op(device_id, assigned_to_dev)
-
-    if role_op is None {
-        return device_op
-    }
-    if device_op is None {
-        return role_op
-    }
-
-    let role_op_val = unwrap role_op
-    let device_op_val = unwrap device_op
-
-    if chan_op_rank(role_op_val) >= chan_op_rank(device_op_val) {
-        return Some(role_op_val)
-    }
-    return Some(device_op_val)
+    return device_op
 }
 
 // Returns the channel operation for a device-specific label
@@ -4057,82 +3818,6 @@ ephemeral command QueryLabels {
 }
 ```
 
-##### `query_labels_assigned_to_role`
-
-Returns a list of all labels that have been assigned to
-a particular role.
-
-```policy
-// Emits `QueryLabelsAssignedToRoleResult` for all labels that
-// have been assigned to the role.
-// If the role has not been assigned any labels, then no effects
-// are emitted.
-ephemeral action query_labels_assigned_to_role(role_id id) {
-    // TODO: make this query more efficient when policy supports
-    // it. The key order is optimized for `delete`.
-    map LabelAssignedToRole[label_id: ?, role_id: ?] as f {
-        if f.role_id == role_id {
-            // Skip entries where the Label has been deleted.
-            // This is necessary because LabelAssignedToRole
-            // facts are not yet deleted because we do not have
-            // prefix deletion.
-            if exists Label[label_id: f.label_id] {
-                let label = check_unwrap query Label[label_id: f.label_id]
-                publish QueryLabelsAssignedToRole {
-                    role_id: f.role_id,
-                    label_id: f.label_id,
-                    label_name: label.name,
-                    label_author_id: label.author_id,
-                }
-            }
-        }
-    }
-}
-
-effect QueryLabelsAssignedToRoleResult {
-    // The role the label is assigned to.
-    role_id id,
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
-}
-
-ephemeral command QueryLabelsAssignedToRole {
-    fields {
-        role_id id,
-        label_id id,
-        label_name string,
-        label_author_id id,
-    }
-
-    // TODO(eric): We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        if !exists Role[role_id: this.role_id] {
-            // TODO(eric): Or should we raise a check error?
-            finish {}
-        } else {
-            finish {
-                emit QueryLabelsAssignedToRoleResult {
-                    role_id: this.role_id,
-                    label_id: this.label_id,
-                    label_name: this.label_name,
-                    label_author_id: this.label_author_id,
-                }
-            }
-        }
-    }
-}
-```
-
 ##### `query_labels_assigned_to_device`
 
 ```policy
@@ -4218,16 +3903,6 @@ enum ChanOp {
     // The device can send and receive data in channels with this
     // label.
     SendRecv,
-}
-
-// Returns a numeric rank for `ChanOp` so permissions can be
-// compared. Higher ranks are more permissive.
-function chan_op_rank(op enum ChanOp) int {
-    match op {
-        ChanOp::RecvOnly => { return 0 }
-        ChanOp::SendOnly => { return 1 }
-        ChanOp::SendRecv => { return 2 }
-    }
 }
 ```
 
