@@ -103,7 +103,7 @@ authorized to publish.
 
 ## Command Priorities
 
-Priorities can defined for commands by specifying the `priority` attribute in the command's `attribute` block:
+Priorities can defined for commands by specifying the `priority` attribute in the command's `attributes` block:
 ```
 command CommandFoo {
     attributes {
