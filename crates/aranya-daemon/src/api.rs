@@ -33,9 +33,11 @@ use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
+use crate::actions::SessionData;
+#[cfg(feature = "afc")]
 use crate::afc::{Afc, RemoveIfParams};
 use crate::{
-    actions::{Actions, SessionData},
+    actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated},
