@@ -515,7 +515,7 @@ effect QueryDevicesWithRoleResult {
     role_id id,
 }
 
-// A trampoline that forwards `device_id` to the effect.
+// Only returns a `QueryDevicesWithRoleResult` effect for devices with the `role_id` role.
 ephemeral command QueryDevicesWithRole {
     fields {
         device_id id,
