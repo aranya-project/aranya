@@ -136,7 +136,7 @@ impl SyncState for State {
         // TODO: spawn a task for send/recv?
         let (mut recv, mut send) = stream.split();
 
-        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.client_addr);
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.server_addr);
 
         // send sync request.
         syncer
@@ -196,6 +196,7 @@ impl Syncer<State> {
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         client_addr: Addr,
+        server_addr: Addr,
         caches: PeerCacheMap,
     ) -> SyncResult<(
         Self,
@@ -218,7 +219,7 @@ impl Syncer<State> {
                 send_effects,
                 invalid,
                 state,
-                client_addr,
+                server_addr,
                 caches,
             },
             peers,

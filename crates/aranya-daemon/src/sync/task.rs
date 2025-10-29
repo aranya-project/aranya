@@ -172,8 +172,8 @@ pub struct Syncer<ST> {
     invalid: InvalidGraphs,
     /// Additional state used by the syncer.
     state: ST,
-    /// Sync server address.
-    client_addr: Addr,
+    /// Sync server address. Peers will make incoming connections to us on this address.
+    server_addr: Addr,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::client`]
     caches: PeerCacheMap,
