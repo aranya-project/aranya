@@ -1,5 +1,7 @@
 //! Owner device.
 
+#![allow(clippy::panic)]
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -70,6 +72,19 @@ async fn main() -> Result<()> {
         .expect("expected to create team");
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
+
+    {
+        let roles = team.roles().await.expect("could not query roles");
+        let mut roles = roles.iter();
+        let owner_role = roles.next().expect("missing role");
+        if roles.next().is_some() {
+            panic!("unexpected roles");
+        }
+        assert_eq!(owner_role.name, "owner");
+        team.setup_default_roles(owner_role.id)
+            .await
+            .expect("could not set up default roles");
+    }
 
     // Send team ID and IKM to each device except for itself.
     // Receive the device ID and public key bundle from each device.
