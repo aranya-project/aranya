@@ -26,11 +26,11 @@ impl SeedDir {
         Ok(Self(p))
     }
 
-    pub(crate) async fn get(&self, team_id: &TeamId) -> Result<PskSeedId> {
+    pub(crate) async fn get(&self, team_id: TeamId) -> Result<PskSeedId> {
         Self::read_id(self.0.join(team_id.to_string())).await
     }
 
-    pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &PskSeedId) -> Result<()> {
+    pub(crate) async fn append(&self, team_id: TeamId, seed_id: PskSeedId) -> Result<()> {
         let file_name = self.0.join(team_id.to_string());
 
         // fail if a file with the same name already exists
@@ -42,7 +42,7 @@ impl SeedDir {
         Ok(())
     }
 
-    pub(crate) async fn remove(&self, team_id: &TeamId) -> Result<()> {
+    pub(crate) async fn remove(&self, team_id: TeamId) -> Result<()> {
         let file_name = self.0.join(team_id.to_string());
         remove_file(file_name)
             .await
@@ -86,7 +86,7 @@ pub(crate) async fn load_team_psk_pairs(
     let mut out = Vec::new();
 
     for (team_id, seed_id) in pairs {
-        let Some(seed) = qs::PskSeed::load(eng, store, &seed_id)? else {
+        let Some(seed) = qs::PskSeed::load(eng, store, seed_id)? else {
             continue;
         };
 
@@ -147,7 +147,7 @@ mod tests {
             }
 
             seed_dir
-                .append(&team_id, &seed_id)
+                .append(team_id, seed_id)
                 .await
                 .context("could not append")?;
 
@@ -178,11 +178,11 @@ mod tests {
             let seed_id = PskSeedId::random(&mut Rng);
 
             seed_dir
-                .append(&team_id, &seed_id)
+                .append(team_id, seed_id)
                 .await
                 .context("could not append")?;
 
-            assert!(seed_dir.remove(&team_id).await.is_ok())
+            assert!(seed_dir.remove(team_id).await.is_ok())
         }
 
         Ok(())
