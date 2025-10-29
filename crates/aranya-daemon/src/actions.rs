@@ -570,6 +570,7 @@ where
 }
 
 /// An implementation of [`Actor`].
+///
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
 #[derive(Debug)]
