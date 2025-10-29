@@ -4144,7 +4144,7 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
     // Devices cannot create channels with themselves.
     //
     // This should have been caught by the AFC FFI
-    if sender_id != receiver_id {
+    if sender_id == receiver_id {
         return false
     }
 

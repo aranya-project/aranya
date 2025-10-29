@@ -220,7 +220,7 @@ where
                     chan.label_id,
                 ) {
                     if is_valid {
-                        return true;
+                        return false;
                     }
                 }
                 if let Ok(is_valid) = crate::actions::query_valid_afc(
@@ -231,10 +231,10 @@ where
                     chan.label_id,
                 ) {
                     if is_valid {
-                        return true;
+                        return false;
                     }
                 }
-                false
+                true
             })
             .context("unable to remove AFC channels matching criteria")
     }
