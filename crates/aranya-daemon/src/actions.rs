@@ -53,6 +53,7 @@ where
         Ok((id, sink.collect()?))
     }
 
+    /// Create an actor used to call persistent actions.
     #[instrument(skip_all, fields(%graph_id))]
     pub fn actions(&self, graph_id: GraphId) -> PersistentActor<EN, SP, CE> {
         PersistentActor {
@@ -62,6 +63,7 @@ where
         }
     }
 
+    /// Create an actor used to call ephemeral actions.
     #[instrument(skip_all, fields(%graph_id))]
     pub fn ephemeral_actions(&self, graph_id: GraphId) -> EphemeralActor<EN, SP, CE> {
         EphemeralActor {
@@ -71,6 +73,7 @@ where
         }
     }
 
+    /// Create an actor used to call queries.
     #[instrument(skip_all, fields(%graph_id))]
     pub fn queries(&self, graph_id: GraphId) -> QueryActor<EN, SP, CE> {
         QueryActor {
@@ -103,6 +106,8 @@ where
     }
 }
 
+/// An actor used to call persistent actions.
+#[derive(Debug)]
 pub struct PersistentActor<EN, SP, CE> {
     /// Aranya client graph state.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
@@ -223,6 +228,8 @@ where
     }
 }
 
+/// An actor used to call ephemeral actions.
+#[derive(Debug)]
 pub struct EphemeralActor<EN, SP, CE> {
     /// Aranya client graph state.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
@@ -270,6 +277,8 @@ where
     }
 }
 
+/// An actor used to call queries.
+#[derive(Debug)]
 pub struct QueryActor<EN, SP, CE> {
     /// Aranya client graph state.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
