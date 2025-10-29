@@ -450,8 +450,6 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     Ok(())
 }
 
-// TODO: demonstrate terminating the team deletes the AFC channel once `close_team()` is implemented.
-
 /// Demonstrate removing channel devices from the team deletes the AFC channel.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
