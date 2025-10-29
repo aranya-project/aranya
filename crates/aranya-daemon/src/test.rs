@@ -243,7 +243,7 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
+            let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
 
@@ -254,7 +254,8 @@ impl TestCtx {
                     send_effects,
                     InvalidGraphs::default(),
                     psk_store.clone(),
-                    Addr::from((Ipv4Addr::LOCALHOST, 0)),
+                    any_local_addr,
+                    any_local_addr,
                     caches.clone(),
                 )?;
 
@@ -263,7 +264,7 @@ impl TestCtx {
 
             let server: TestServer = TestServer::new(
                 client.clone(),
-                &local_addr,
+                &any_local_addr,
                 psk_store.clone(),
                 conn_map,
                 conn_rx,

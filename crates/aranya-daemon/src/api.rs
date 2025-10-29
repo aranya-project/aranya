@@ -226,11 +226,7 @@ impl EffectHandler {
                 DeviceAdded(_) => {}
                 DeviceRemoved(_) => {}
                 RoleAssigned(_) => {}
-                // AdminAssigned is now just RoleAssigned - handled above
-                // OperatorAssigned is now just RoleAssigned - handled above
                 RoleRevoked(_) => {}
-                // AdminRevoked is now just RoleRevoked - handled above
-                // OperatorRevoked is now just RoleRevoked - handled above
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
                 AssignedLabelToDevice(_) => {}

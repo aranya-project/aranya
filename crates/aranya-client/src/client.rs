@@ -41,17 +41,17 @@ use crate::{
 };
 
 /// Builds a [`Client`].
-#[derive(Clone, Debug)]
+#[derive(Debug, Default)]
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
-    uds_path: Option<&'a Path>,
+    daemon_uds_path: Option<&'a Path>,
 }
 
 impl ClientBuilder<'_> {
     /// Creates a new client builder.
     pub fn new() -> Self {
-        Self { uds_path: None }
+        Self::default()
     }
 
     /// Creates a client connection to the daemon.
@@ -69,7 +69,7 @@ impl ClientBuilder<'_> {
     /// #    Ok(())
     /// # }
     pub async fn connect(self) -> Result<Client> {
-        let Some(uds_path) = self.uds_path else {
+        let Some(uds_path) = self.daemon_uds_path else {
             return Err(IpcError::new(InvalidArg::new(
                 "daemon_uds_path",
                 "must specify the daemon's UDS path",
@@ -160,14 +160,8 @@ impl<'a> ClientBuilder<'a> {
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn with_daemon_uds_path(mut self, sock: &'a Path) -> Self {
-        self.uds_path = Some(sock);
+        self.daemon_uds_path = Some(sock);
         self
-    }
-}
-
-impl Default for ClientBuilder<'_> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
