@@ -8,10 +8,8 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey,
-    policy::{GroupId, LabelId, RoleId},
-    Csprng, DeviceId, EncryptionKey, EncryptionPublicKey, Engine, KeyStore as _, KeyStoreExt as _,
-    Rng,
+    default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
+    Engine, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
@@ -20,8 +18,6 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
-#[cfg(feature = "afc")]
-use aranya_policy_vm::text;
 use aranya_runtime::GraphId;
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 #[cfg(feature = "afc")]
@@ -39,15 +35,12 @@ use tracing::{debug, error, info, instrument, trace, warn};
 #[cfg(feature = "afc")]
 use crate::actions::SessionData;
 #[cfg(feature = "afc")]
-use crate::afc::{Afc, RemoveIfParams};
+use crate::afc::Afc;
 use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{
-        ChanOp, Effect, KeyBundle, QueryDeviceKeyBundleResult, QueryDeviceRoleResult,
-        QueryLabelResult, QueryTeamRolesResult, RoleCreated,
-    },
+    policy::{ChanOp, Effect, KeyBundle, RoleCreated},
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
@@ -127,8 +120,6 @@ impl DaemonApiServer {
         #[cfg(feature = "afc")]
         let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
-            #[cfg(feature = "afc")]
-            client: client.clone(),
             #[cfg(feature = "afc")]
             afc: afc.clone(),
             #[cfg(feature = "afc")]
@@ -214,8 +205,6 @@ impl DaemonApiServer {
 #[derive(Clone, Debug)]
 struct EffectHandler {
     #[cfg(feature = "afc")]
-    client: Client,
-    #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
     #[cfg(feature = "afc")]
     device_id: DeviceId,
@@ -232,80 +221,20 @@ impl EffectHandler {
         for effect in effects {
             trace!(?effect, "handling effect");
             match effect {
-                TeamCreated(_team_created) => {}
-                TeamTerminated(_team_terminated) => {
-                    #[cfg(feature = "afc")]
-                    self.afc.delete_channels().await?;
-                }
-                DeviceAdded(_device_added) => {}
-                DeviceRemoved(_device_removed) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        // Delete AFC channels for the device that was removed.
-                        self.delete_device_afc_channels(_device_removed.device_id.into())
-                            .await?;
-                    }
-                }
-                RoleAssigned(_role_assigned) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        // Delete channels for devices where new role does not have the `CanUseAfc` permission)
-                        // TODO: use something other than a string for "CanUseAfc" perm.
-                        if !self
-                            .client
-                            .query_role_has_perm(
-                                graph.into_id().into(),
-                                _role_assigned.role_id.into(),
-                                text!("CanUseAfc"),
-                            )
-                            .await?
-                        {
-                            self.delete_device_afc_channels(_role_assigned.device_id.into())
-                                .await?;
-                        }
-                    }
-                }
+                TeamCreated(_) => {}
+                TeamTerminated(_) => {}
+                DeviceAdded(_) => {}
+                DeviceRemoved(_) => {}
+                RoleAssigned(_) => {}
                 // AdminAssigned is now just RoleAssigned - handled above
                 // OperatorAssigned is now just RoleAssigned - handled above
-                RoleRevoked(_role_revoked) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        // Delete AFC channels for devices where role was revoked (this means the device no longer has the `CanUseAfc` permission)
-                        self.delete_device_afc_channels(_role_revoked.device_id.into())
-                            .await?;
-                    }
-                }
+                RoleRevoked(_) => {}
                 // AdminRevoked is now just RoleRevoked - handled above
                 // OperatorRevoked is now just RoleRevoked - handled above
                 LabelCreated(_) => {}
-                LabelDeleted(_label_deleted) => {
-                    // Delete AFC channels with the label that was deleted.
-                    #[cfg(feature = "afc")]
-                    self.afc
-                        .remove_if(RemoveIfParams {
-                            label_id: Some(_label_deleted.label_id.into()),
-                            ..Default::default()
-                        })
-                        .await?;
-                }
+                LabelDeleted(_) => {}
                 AssignedLabelToDevice(_) => {}
-                LabelRevokedFromDevice(_label_revoked) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        let label_id = Some(_label_revoked.label_id.into());
-                        let mut peer_id = None;
-                        if self.device_id != _label_revoked.device_id.into() {
-                            peer_id = Some(_label_revoked.device_id.into());
-                        };
-                        self.afc
-                            .remove_if(RemoveIfParams {
-                                label_id,
-                                peer_id,
-                                ..Default::default()
-                            })
-                            .await?;
-                    }
-                }
+                LabelRevokedFromDevice(_) => {}
                 QueryLabelResult(_) => {}
                 AfcUniChannelCreated(_) => {}
                 AfcUniChannelReceived(_) => {}
@@ -316,80 +245,24 @@ impl EffectHandler {
                 LabelManagingRoleAdded(_) => {}
                 LabelManagingRoleRevoked(_) => {}
                 PermAddedToRole(_) => {}
-                PermRemovedFromRole(_perm_removed_from_role) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        // Delete channels where `CanUseAfc` permission has been revoked.
-                        // This queries for a list of devices which means a device could be missed by the query if `PermRemovedFromRole`` and `DeviceRemoved`` happen back-to-back.
-                        // This is acceptable because AFC channels will be deleted from the device when `DeviceRemoved` is handled later.
-                        // TODO: use something other than a string for "CanUseAfc" perm.
-                        if _perm_removed_from_role.perm == "CanUseAfc" {
-                            for device in self
-                                .client
-                                .query_devices_with_role(
-                                    graph.into_id().into(),
-                                    _perm_removed_from_role.role_id.into(),
-                                )
-                                .await?
-                            {
-                                self.delete_device_afc_channels(device.into_id().into())
-                                    .await?;
-                            }
-                        }
-                    }
-                }
+                PermRemovedFromRole(_) => {}
                 RoleOwnerAdded(_) => {}
                 RoleOwnerRemoved(_) => {}
                 RoleManagementPermAssigned(_) => {}
                 RoleManagementPermRevoked(_) => {}
-                RoleChanged(_role_changed) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        // Delete channels for devices where new role does not have the `CanUseAfc` permission)
-                        // If the role has the `CanUseAfc` permission before running the query, the device's AFC channel will not be deleted. If the `CanUseAfc` permission is later revoked from the role, the AFC channel will be deleted when `PermRemovedFromRole` is handled.
-                        // If the role does not have the `CanUseAfc` permission, the device's AFC channel will be deleted.
-                        // If you do not want any AFC channels to be deleted when assigning a role, you must ensure the `CanUseAfc` permission is assigned to the role before assigning it to a device.
-                        // TODO: use something other than a string for "CanUseAfc" perm.
-                        if !self
-                            .client
-                            .query_role_has_perm(
-                                graph.into_id().into(),
-                                _role_changed.new_role_id.into(),
-                                text!("CanUseAfc"),
-                            )
-                            .await?
-                        {
-                            self.delete_device_afc_channels(_role_changed.device_id.into())
-                                .await?;
-                        }
-                    }
-                }
+                RoleChanged(_) => {}
                 QueryLabelsResult(_) => {}
                 QueryTeamRolesResult(_) => {}
                 QueryRoleOwnersResult(_) => {}
-                QueryRoleHasPermResult(_) => {}
-                QueryDevicesWithRoleResult(_) => {}
+                QueryAfcChannelIsValidResult(_) => {}
                 RoleCreated(_) => {}
+                CheckValidAfcChannels(_) => {
+                    #[cfg(feature = "afc")]
+                    self.afc
+                        .remove_invalid_channels(graph, self.device_id)
+                        .await?;
+                }
             }
-        }
-        Ok(())
-    }
-
-    // Delete all AFC channels for a particular device.
-    #[cfg(feature = "afc")]
-    async fn delete_device_afc_channels(&self, device_id: DeviceId) -> anyhow::Result<()> {
-        if self.device_id == device_id {
-            // Delete all AFC channels from the current device.
-            self.afc.delete_channels().await?;
-        } else {
-            // Delete all AFC channels matching the peer's device ID.
-            let peer_id = Some(device_id);
-            self.afc
-                .remove_if(RemoveIfParams {
-                    peer_id,
-                    ..Default::default()
-                })
-                .await?;
         }
         Ok(())
     }
@@ -460,196 +333,6 @@ impl Api {
             anyhow::bail!("team {team} invalid due to graph finalization error")
         }
         Ok(())
-    }
-}
-
-impl Client {
-    // Query devices on team.
-    async fn query_devices_on_team(&self, graph: GraphId) -> api::Result<Vec<DeviceId>> {
-        let devices = self
-            .actions(&graph)
-            .query_devices_on_team()
-            .await
-            .context("unable to query devices on team")?
-            .into_iter()
-            .filter_map(|e| {
-                if let Effect::QueryDevicesOnTeamResult(e) = e {
-                    Some(e.device_id.into())
-                } else {
-                    warn!(name = e.name(), "unexpected effect");
-                    None
-                }
-            })
-            .collect();
-        Ok(devices)
-    }
-
-    // Query devices with role.
-    async fn query_devices_with_role(
-        &self,
-        graph: GraphId,
-        role: RoleId,
-    ) -> api::Result<Vec<DeviceId>> {
-        let devices = self
-            .actions(&graph)
-            .query_devices_with_role(role)
-            .await
-            .context("unable to query devices with role")?
-            .into_iter()
-            .filter_map(|e| {
-                if let Effect::QueryDevicesWithRoleResult(e) = e {
-                    Some(e.device_id.into())
-                } else {
-                    warn!(name = e.name(), "unexpected effect");
-                    None
-                }
-            })
-            .collect();
-        Ok(devices)
-    }
-
-    // Query team roles.
-    async fn query_team_roles(&self, graph: GraphId) -> api::Result<Vec<QueryTeamRolesResult>> {
-        let roles = self
-            .actions(&graph)
-            .query_team_roles()
-            .await
-            .context("unable to query team roles")?
-            .into_iter()
-            .filter_map(|e| {
-                if let Effect::QueryTeamRolesResult(e) = e {
-                    Some(e)
-                } else {
-                    warn!(name = e.name(), "unexpected effect");
-                    None
-                }
-            })
-            .collect();
-        Ok(roles)
-    }
-
-    // Query role has permission.
-    #[cfg(feature = "afc")]
-    async fn query_role_has_perm(
-        &self,
-        graph: GraphId,
-        role_id: RoleId,
-        perm: Text,
-    ) -> api::Result<bool> {
-        let effects = self
-            .actions(&graph)
-            .query_role_has_perm(role_id, perm)
-            .await
-            .context("unable to query device role")?;
-        if let Some(Effect::QueryRoleHasPermResult(e)) =
-            find_effect!(&effects, Effect::QueryRoleHasPermResult(_))
-        {
-            Ok(e.has_perm)
-        } else {
-            Ok(false)
-        }
-    }
-
-    // Query device keybundle.
-    async fn query_device_keybundle(
-        &self,
-        graph: GraphId,
-        device: DeviceId,
-    ) -> api::Result<QueryDeviceKeyBundleResult> {
-        let effects = self
-            .actions(&graph)
-            .query_device_keybundle(device)
-            .await
-            .context("unable to query device keybundle")?;
-        if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
-            find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
-        {
-            Ok(e)
-        } else {
-            Err(anyhow!("unable to query device keybundle").into())
-        }
-    }
-
-    // Query device role.
-    async fn query_device_role(
-        &self,
-        graph: GraphId,
-        device: DeviceId,
-    ) -> api::Result<Option<QueryDeviceRoleResult>> {
-        let effects = self
-            .actions(&graph)
-            .query_device_role(device)
-            .await
-            .context("unable to query device role")?;
-        if let Some(Effect::QueryDeviceRoleResult(e)) =
-            find_effect!(&effects, Effect::QueryDeviceRoleResult(_))
-        {
-            Ok(Some(e.clone()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    // Query label info.
-    async fn query_label(
-        &self,
-        graph: GraphId,
-        label_id: LabelId,
-    ) -> api::Result<Option<QueryLabelResult>> {
-        let effects = self
-            .actions(&graph)
-            .query_label(label_id)
-            .await
-            .context("unable to query label")?;
-        if let Some(Effect::QueryLabelResult(e)) =
-            find_effect!(&effects, Effect::QueryLabelResult(_e))
-        {
-            Ok(Some(e.clone()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    // Query labels on team.
-    async fn query_labels(&self, graph: GraphId) -> api::Result<Vec<QueryLabelResult>> {
-        let effects = self
-            .actions(&graph)
-            .query_labels()
-            .await
-            .context("unable to query labels")?;
-        let mut labels: Vec<QueryLabelResult> = Vec::new();
-        for e in effects {
-            if let Effect::QueryLabelResult(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(e);
-            }
-        }
-        Ok(labels)
-    }
-
-    // Query labels assigned to device.
-    async fn query_labels_assigned_to_device(
-        &self,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> anyhow::Result<Vec<api::Label>> {
-        let effects = self
-            .actions(&team.into_id().into())
-            .query_labels_assigned_to_device(device.into_id().into())
-            .await
-            .context("unable to query device label assignments")?;
-        let mut labels = Vec::new();
-        for e in effects {
-            if let Effect::QueryLabelsAssignedToDeviceResult(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name,
-                    author_id: e.label_author_id.into(),
-                });
-            }
-        }
-        Ok(labels)
     }
 }
 
@@ -896,14 +579,23 @@ impl DaemonApi for Api {
     ) -> api::Result<Box<[api::DeviceId]>> {
         self.check_team_valid(team).await?;
 
-        Ok(self
+        let devices = self
             .client
-            .query_devices_on_team(team.into_id().into())
-            .await?
-            .iter()
-            .map(|d| d.into_id().into())
-            .collect::<Vec<_>>()
-            .into_boxed_slice())
+            .actions(&team.into_id().into())
+            .query_devices_on_team()
+            .await
+            .context("unable to query devices on team")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryDevicesOnTeamResult(e) = e {
+                    Some(e.device_id.into())
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(devices)
     }
 
     #[instrument(skip(self), err)]
@@ -915,11 +607,19 @@ impl DaemonApi for Api {
     ) -> api::Result<api::KeyBundle> {
         self.check_team_valid(team).await?;
 
-        let e = self
+        let effects = self
             .client
-            .query_device_keybundle(team.into_id().into(), device.into_id().into())
-            .await?;
-        Ok(api::KeyBundle::from(e.device_keys))
+            .actions(&team.into_id().into())
+            .query_device_keybundle(device.into_id().into())
+            .await
+            .context("unable to query device keybundle")?;
+        if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
+            find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
+        {
+            Ok(api::KeyBundle::from(e.device_keys))
+        } else {
+            Err(anyhow!("unable to query device keybundle").into())
+        }
     }
 
     #[instrument(skip(self), err)]
@@ -931,11 +631,24 @@ impl DaemonApi for Api {
     ) -> api::Result<Box<[api::Label]>> {
         self.check_team_valid(team).await?;
 
-        return Ok(self
+        let effects = self
             .client
-            .query_labels_assigned_to_device(team, device)
-            .await?
-            .into_boxed_slice());
+            .actions(&team.into_id().into())
+            .query_labels_assigned_to_device(device.into_id().into())
+            .await
+            .context("unable to query device label assignments")?;
+        let mut labels = Vec::new();
+        for e in effects {
+            if let Effect::QueryLabelsAssignedToDeviceResult(e) = e {
+                debug!("found label: {}", e.label_id);
+                labels.push(api::Label {
+                    id: e.label_id.into(),
+                    name: e.label_name,
+                    author_id: e.label_author_id.into(),
+                });
+            }
+        }
+        return Ok(labels.into_boxed_slice());
     }
 
     #[instrument(skip(self), err)]
@@ -947,19 +660,24 @@ impl DaemonApi for Api {
     ) -> api::Result<Option<api::Role>> {
         self.check_team_valid(team).await?;
 
-        let e = self
+        let effects = self
             .client
-            .query_device_role(team.into_id().into(), device.into_id().into())
-            .await?;
-        if let Some(e) = e {
-            return Ok(Some(api::Role {
+            .actions(&team.into_id().into())
+            .query_device_role(device.into_id().into())
+            .await
+            .context("unable to query device role")?;
+        if let Some(Effect::QueryDeviceRoleResult(e)) =
+            find_effect!(&effects, Effect::QueryDeviceRoleResult(_))
+        {
+            Ok(Some(api::Role {
                 id: e.role_id.into(),
-                name: e.name,
+                name: e.name.clone(),
                 author_id: e.author_id.into(),
                 default: e.default,
-            }));
+            }))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     #[instrument(skip(self), err)]
@@ -1201,35 +919,47 @@ impl DaemonApi for Api {
     ) -> api::Result<Option<api::Label>> {
         self.check_team_valid(team).await?;
 
-        let e = self
+        let effects = self
             .client
-            .query_label(team.into_id().into(), label_id.into_id().into())
-            .await?;
-        if let Some(e) = e {
-            return Ok(Some(api::Label {
+            .actions(&team.into_id().into())
+            .query_label(label_id.into_id().into())
+            .await
+            .context("unable to query label")?;
+        if let Some(Effect::QueryLabelResult(e)) =
+            find_effect!(&effects, Effect::QueryLabelResult(_e))
+        {
+            Ok(Some(api::Label {
                 id: e.label_id.into(),
                 name: e.label_name.clone(),
                 author_id: e.label_author_id.into(),
-            }));
+            }))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     #[instrument(skip(self), err)]
     async fn labels(self, _: context::Context, team: api::TeamId) -> api::Result<Vec<api::Label>> {
         self.check_team_valid(team).await?;
 
-        Ok(self
+        let effects = self
             .client
-            .query_labels(team.into_id().into())
-            .await?
-            .iter()
-            .map(|e| api::Label {
-                id: e.label_id.into(),
-                name: e.label_name.clone(),
-                author_id: e.label_author_id.into(),
-            })
-            .collect::<Vec<_>>())
+            .actions(&team.into_id().into())
+            .query_labels()
+            .await
+            .context("unable to query labels")?;
+        let mut labels: Vec<api::Label> = Vec::new();
+        for e in effects {
+            if let Effect::QueryLabelResult(e) = e {
+                debug!("found label: {}", e.label_id);
+                labels.push(api::Label {
+                    id: e.label_id.into(),
+                    name: e.label_name.clone(),
+                    author_id: e.label_author_id.into(),
+                });
+            }
+        }
+        Ok(labels)
     }
 
     #[instrument(skip(self), err)]
@@ -1273,19 +1003,28 @@ impl DaemonApi for Api {
     ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
-        Ok(self
+        let roles = self
             .client
-            .query_team_roles(team.into_id().into())
-            .await?
-            .iter()
-            .map(|e| api::Role {
-                id: e.role_id.into(),
-                name: e.name.clone(),
-                author_id: e.author_id.into(),
-                default: e.default,
+            .actions(&team.into_id().into())
+            .query_team_roles()
+            .await
+            .context("unable to query team roles")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryTeamRolesResult(e) = e {
+                    Some(api::Role {
+                        id: e.role_id.into(),
+                        name: e.name,
+                        author_id: e.author_id.into(),
+                        default: e.default,
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
             })
-            .collect::<Vec<_>>()
-            .into_boxed_slice())
+            .collect();
+        Ok(roles)
     }
 
     //

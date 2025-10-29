@@ -11,6 +11,8 @@ use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_text::Text;
 use aranya_policy_vm::{ident, Value};
+#[cfg(feature = "afc")]
+use aranya_runtime::NullSink;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
@@ -353,17 +355,22 @@ where
         .in_current_span()
     }
 
-    /// Invokes `query_role_has_perm`.
+    /// Invokes `query_afc_channel_is_valid`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_role_has_perm(
+    fn query_afc_channel_is_valid(
         &self,
-        role_id: RoleId,
-        perm: Text,
+        sender_id: DeviceId,
+        receiver_id: DeviceId,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.session_action(move || VmAction {
-            name: ident!("query_role_has_perm"),
-            args: Cow::Owned(vec![Value::from(role_id), Value::from(perm)]),
+            name: ident!("query_afc_channel_is_valid"),
+            args: Cow::Owned(vec![
+                Value::from(sender_id),
+                Value::from(receiver_id),
+                Value::from(label_id),
+            ]),
         })
         .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
@@ -391,21 +398,6 @@ where
         self.session_action(move || VmAction {
             name: ident!("query_devices_on_team"),
             args: Cow::Owned(vec![]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
-    /// Invokes `query_devices_with_role`.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_devices_with_role(
-        &self,
-        role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_devices_with_role"),
-            args: Cow::Owned(vec![Value::from(role_id)]),
         })
         .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
@@ -651,4 +643,36 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
             sign_key: postcard::to_allocvec(&pk.sign_pk)?,
         })
     }
+}
+
+#[cfg(feature = "afc")]
+pub(crate) fn query_valid_afc<EN, SP, CE>(
+    aranya: &mut ClientState<EN, SP>,
+    graph_id: GraphId,
+    sender_id: DeviceId,
+    receiver_id: DeviceId,
+    label_id: LabelId,
+) -> Result<bool>
+where
+    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect>,
+    SP: StorageProvider,
+    CE: aranya_crypto::Engine,
+{
+    let mut session = aranya.session(graph_id)?;
+    let mut sink = VecSink::new();
+    session.action(
+        aranya,
+        &mut sink,
+        &mut NullSink,
+        vm_action!(query_afc_channel_is_valid(sender_id, receiver_id, label_id)),
+    )?;
+    let effects = sink.collect()?;
+    for e in effects {
+        if let Effect::QueryAfcChannelIsValidResult(e) = e {
+            if e.is_valid {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }

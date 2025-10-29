@@ -191,6 +191,7 @@ impl Daemon {
                     )
                 };
                 Afc::new(
+                    client.clone(),
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store

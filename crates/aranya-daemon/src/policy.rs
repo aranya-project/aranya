@@ -30,6 +30,7 @@ pub enum Effect {
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
     AssignedLabelToDevice(AssignedLabelToDevice),
+    CheckValidAfcChannels(CheckValidAfcChannels),
     DeviceAdded(DeviceAdded),
     DeviceRemoved(DeviceRemoved),
     LabelCreated(LabelCreated),
@@ -39,14 +40,13 @@ pub enum Effect {
     LabelRevokedFromDevice(LabelRevokedFromDevice),
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
+    QueryAfcChannelIsValidResult(QueryAfcChannelIsValidResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
-    QueryDevicesWithRoleResult(QueryDevicesWithRoleResult),
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsResult(QueryLabelsResult),
-    QueryRoleHasPermResult(QueryRoleHasPermResult),
     QueryRoleOwnersResult(QueryRoleOwnersResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
     RoleAssigned(RoleAssigned),
@@ -88,6 +88,9 @@ pub struct AssignedLabelToDevice {
     pub label_id: BaseId,
     pub author_id: BaseId,
 }
+/// CheckValidAfcChannels policy effect.
+#[effect]
+pub struct CheckValidAfcChannels {}
 /// DeviceAdded policy effect.
 #[effect]
 pub struct DeviceAdded {
@@ -153,6 +156,14 @@ pub struct PermRemovedFromRole {
     pub perm: Text,
     pub author_id: BaseId,
 }
+/// QueryAfcChannelIsValidResult policy effect.
+#[effect]
+pub struct QueryAfcChannelIsValidResult {
+    pub sender_id: BaseId,
+    pub receiver_id: BaseId,
+    pub label_id: BaseId,
+    pub is_valid: bool,
+}
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
 pub struct QueryDeviceKeyBundleResult {
@@ -170,12 +181,6 @@ pub struct QueryDeviceRoleResult {
 #[effect]
 pub struct QueryDevicesOnTeamResult {
     pub device_id: BaseId,
-}
-/// QueryDevicesWithRoleResult policy effect.
-#[effect]
-pub struct QueryDevicesWithRoleResult {
-    pub device_id: BaseId,
-    pub role_id: BaseId,
 }
 /// QueryLabelResult policy effect.
 #[effect]
@@ -198,13 +203,6 @@ pub struct QueryLabelsResult {
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
-}
-/// QueryRoleHasPermResult policy effect.
-#[effect]
-pub struct QueryRoleHasPermResult {
-    pub role_id: BaseId,
-    pub perm: Text,
-    pub has_perm: bool,
 }
 /// QueryRoleOwnersResult policy effect.
 #[effect]
@@ -299,7 +297,12 @@ pub struct TeamTerminated {
 #[actions]
 pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_devices_with_role(&mut self, role_id: BaseId) -> Result<(), ClientError>;
+    fn query_afc_channel_is_valid(
+        &mut self,
+        sender_id: BaseId,
+        receiver_id: BaseId,
+        label_id: BaseId,
+    ) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn add_perm_to_role(
@@ -350,11 +353,6 @@ pub trait ActorExt {
         &mut self,
         device_id: BaseId,
         role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn query_role_has_perm(
-        &mut self,
-        role_id: BaseId,
-        perm: Text,
     ) -> Result<(), ClientError>;
     fn query_team_roles(&mut self) -> Result<(), ClientError>;
     fn query_role_owners(&mut self, role_id: BaseId) -> Result<(), ClientError>;
