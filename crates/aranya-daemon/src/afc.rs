@@ -201,40 +201,37 @@ where
     }
 
     /// Remove channels that are no longer valid from shared-memory.
+    /// Hold `Client` lock so all queries are run on the same graph state.
     pub(crate) async fn remove_invalid_channels(
         &self,
         graph: GraphId,
         device_id: DeviceId,
     ) -> Result<()> {
         let shm = self.shm.lock().await;
-
         let mut client = self.client.aranya.lock().await;
+
         shm.write
             .remove_if(|chan| {
                 // TODO: run a single query when channel direction is added to remove_if() params
-                if let Ok(is_valid) = crate::actions::query_valid_afc(
+                let sender_valid = crate::actions::query_afc_channel_is_valid(
                     &mut client,
                     graph,
                     device_id,
                     chan.peer_id,
                     chan.label_id,
-                ) {
-                    if is_valid {
-                        return false;
-                    }
-                }
-                if let Ok(is_valid) = crate::actions::query_valid_afc(
+                )
+                .is_ok_and(|v| v);
+
+                let receiver_valid = crate::actions::query_afc_channel_is_valid(
                     &mut client,
                     graph,
                     chan.peer_id,
                     device_id,
                     chan.label_id,
-                ) {
-                    if is_valid {
-                        return false;
-                    }
-                }
-                true
+                )
+                .is_ok_and(|v| v);
+
+                !sender_valid && !receiver_valid
             })
             .context("unable to remove AFC channels matching criteria")
     }

@@ -4128,12 +4128,13 @@ ephemeral command AfcCreateUniChannel {
 // Reports whether an AFC channel is valid according to the policy.
 // The following criteria must be met for an AFC channel to be valid:
 // - The label must exist
-// - The device ID of the sender cannot match the device ID of the receiver
-// - Sender/receiver devices must be members of the team
 // - The label must be assigned to the sender with write permissions: `SendOnly` or `SendRecv`
 // - The label must be assigned to the receiver with read permissions: `RecvOnly` or `SendRecv`
-// - The sender must have `CreateAfcUniChannel` permission.
-// - The sender/receiver must both have `CanUseAfc` permission assigned to their respective roles
+// - The sender must have `CreateAfcUniChannel` permission assigned to its respective role.
+// - Sender and receiver devices must:
+//   - Be members of the team
+//   - Not have matching device IDs
+//   - Have `CanUseAfc` permission assigned to their respective roles
 function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) bool {
     // The label must exist.
     let label = query Label[label_id: label_id]

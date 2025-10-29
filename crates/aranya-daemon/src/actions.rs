@@ -355,27 +355,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `query_afc_channel_is_valid`.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_afc_channel_is_valid(
-        &self,
-        sender_id: DeviceId,
-        receiver_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_afc_channel_is_valid"),
-            args: Cow::Owned(vec![
-                Value::from(sender_id),
-                Value::from(receiver_id),
-                Value::from(label_id),
-            ]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
     /// Invokes `query_device_role`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
@@ -646,7 +625,7 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
 }
 
 #[cfg(feature = "afc")]
-pub(crate) fn query_valid_afc<EN, SP, CE>(
+pub(crate) fn query_afc_channel_is_valid<EN, SP, CE>(
     aranya: &mut ClientState<EN, SP>,
     graph_id: GraphId,
     sender_id: DeviceId,
@@ -667,12 +646,10 @@ where
         vm_action!(query_afc_channel_is_valid(sender_id, receiver_id, label_id)),
     )?;
     let effects = sink.collect()?;
-    for e in effects {
+    Ok(effects.iter().any(|e| {
         if let Effect::QueryAfcChannelIsValidResult(e) = e {
-            if e.is_valid {
-                return Ok(true);
-            }
+            return e.is_valid;
         }
-    }
-    Ok(false)
+        false
+    }))
 }
