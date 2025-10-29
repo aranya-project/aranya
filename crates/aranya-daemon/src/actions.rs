@@ -53,20 +53,20 @@ where
 
     /// Returns an implementation of [`Actions`] for a particular
     /// storage.
-    #[instrument(skip_all, fields(id = %id))]
-    pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
+    #[instrument(skip_all, fields(%graph_id))]
+    pub fn actions(&self, graph_id: GraphId) -> impl Actions<EN, SP, CE> {
         ActionsImpl {
             aranya: Arc::clone(&self.aranya),
-            graph_id: *id,
+            graph_id,
             _eng: PhantomData,
         }
     }
 
     /// Create new ephemeral Session.
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
-    #[instrument(skip_all, fields(id = %id))]
-    pub(crate) async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(*id)?;
+    #[instrument(skip_all, fields(%graph_id))]
+    pub(crate) async fn session_new(&self, graph_id: GraphId) -> Result<Session<SP, EN>> {
+        let session = self.aranya.lock().await.session(graph_id)?;
         Ok(session)
     }
 
