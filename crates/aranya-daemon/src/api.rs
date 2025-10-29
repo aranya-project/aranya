@@ -36,7 +36,6 @@ use tracing::{debug, error, info, instrument, trace, warn};
 #[cfg(feature = "afc")]
 use crate::afc::{Afc, RemoveIfParams};
 use crate::{
-    actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -46,16 +45,6 @@ use crate::{
 };
 
 mod quic_sync;
-
-/// Find the first effect matching a given pattern.
-///
-/// Returns `None` if there are no matching effects.
-#[macro_export]
-macro_rules! find_effect {
-    ($effects:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
-        $effects.into_iter().find(|e| matches!(e, $pattern $(if $guard)?))
-    }
-}
 
 pub(crate) type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
@@ -629,11 +618,8 @@ impl DaemonApi for Api {
 
         let (ctrl, effects) = self
             .client
-            .actions(graph)
-            .create_afc_uni_channel_off_graph(
-                DeviceId::transmute(peer_id),
-                LabelId::transmute(label),
-            )
+            .ephemeral_actions(graph)
+            .create_afc_uni_channel(DeviceId::transmute(peer_id), LabelId::transmute(label))
             .await?;
 
         let [Effect::AfcUniChannelCreated(e)] = effects.as_slice() else {
@@ -702,17 +688,14 @@ impl DaemonApi for Api {
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 
-        let effects = self
+        let effect = self
             .client
             .actions(GraphId::transmute(team))
             .create_label(label_name)
             .await
             .context("unable to create label")?;
-        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(api::LabelId::transmute(e.label_id))
-        } else {
-            Err(anyhow!("unable to create label").into())
-        }
+
+        Ok(api::LabelId::transmute(effect.label_id))
     }
 
     /// Delete a label.
@@ -725,17 +708,13 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        let effects = self
-            .client
+        self.client
             .actions(GraphId::transmute(team))
             .delete_label(LabelId::transmute(label_id))
             .await
             .context("unable to delete label")?;
-        if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to delete label").into())
-        }
+
+        Ok(())
     }
 
     /// Assign a label.
@@ -750,8 +729,7 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        let effects = self
-            .client
+        self.client
             .actions(GraphId::transmute(team))
             .assign_label(
                 DeviceId::transmute(device),
@@ -760,11 +738,8 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to assign label")?;
-        if let Some(Effect::LabelAssigned(_e)) = find_effect!(&effects, Effect::LabelAssigned(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to assign label").into())
-        }
+
+        Ok(())
     }
 
     /// Revoke a label.
@@ -778,17 +753,13 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        let effects = self
-            .client
+        self.client
             .actions(GraphId::transmute(team))
             .revoke_label(DeviceId::transmute(device), LabelId::transmute(label_id))
             .await
             .context("unable to revoke label")?;
-        if let Some(Effect::LabelRevoked(_e)) = find_effect!(&effects, Effect::LabelRevoked(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to revoke label").into())
-        }
+
+        Ok(())
     }
 
     /// Query devices on team.
@@ -800,20 +771,19 @@ impl DaemonApi for Api {
     ) -> api::Result<Vec<api::DeviceId>> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let effects = self
             .client
-            .actions(GraphId::transmute(team))
-            .query_devices_on_team_off_graph()
+            .queries(GraphId::transmute(team))
+            .query_devices_on_team()
             .await
             .context("unable to query devices on team")?;
-        let mut devices: Vec<api::DeviceId> = Vec::new();
-        for e in effects {
-            if let Effect::QueryDevicesOnTeamResult(e) = e {
-                devices.push(api::DeviceId::transmute(e.device_id));
-            }
-        }
-        return Ok(devices);
+
+        Ok(effects
+            .into_iter()
+            .map(|e| api::DeviceId::transmute(e.device_id))
+            .collect())
     }
+
     /// Query device role.
     #[instrument(skip(self), err)]
     async fn query_device_role(
@@ -824,19 +794,14 @@ impl DaemonApi for Api {
     ) -> api::Result<api::Role> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let effect = self
             .client
-            .actions(GraphId::transmute(team))
-            .query_device_role_off_graph(DeviceId::transmute(device))
+            .queries(GraphId::transmute(team))
+            .query_device_role(DeviceId::transmute(device))
             .await
             .context("unable to query device role")?;
-        if let Some(Effect::QueryDeviceRoleResult(e)) =
-            find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
-        {
-            Ok(api::Role::from(e.role))
-        } else {
-            Err(anyhow!("unable to query device role").into())
-        }
+
+        Ok(api::Role::from(effect.role))
     }
     /// Query device keybundle.
     #[instrument(skip(self), err)]
@@ -848,19 +813,14 @@ impl DaemonApi for Api {
     ) -> api::Result<api::KeyBundle> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let effect = self
             .client
-            .actions(GraphId::transmute(team))
-            .query_device_keybundle_off_graph(DeviceId::transmute(device))
+            .queries(GraphId::transmute(team))
+            .query_device_keybundle(DeviceId::transmute(device))
             .await
             .context("unable to query device keybundle")?;
-        if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
-            find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
-        {
-            Ok(api::KeyBundle::from(e.device_keys))
-        } else {
-            Err(anyhow!("unable to query device keybundle").into())
-        }
+
+        Ok(api::KeyBundle::from(effect.device_keys))
     }
 
     /// Query device label assignments.
@@ -873,23 +833,20 @@ impl DaemonApi for Api {
     ) -> api::Result<Vec<api::Label>> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let effects = self
             .client
-            .actions(GraphId::transmute(team))
-            .query_label_assignments_off_graph(DeviceId::transmute(device))
+            .queries(GraphId::transmute(team))
+            .query_label_assignments(DeviceId::transmute(device))
             .await
             .context("unable to query device label assignments")?;
-        let mut labels: Vec<api::Label> = Vec::new();
-        for e in effects {
-            if let Effect::QueriedLabelAssignment(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: api::LabelId::transmute(e.label_id),
-                    name: e.label_name,
-                });
-            }
-        }
-        return Ok(labels);
+
+        Ok(effects
+            .into_iter()
+            .map(|e| api::Label {
+                id: api::LabelId::transmute(e.label_id),
+                name: e.label_name,
+            })
+            .collect())
     }
 
     /// Query label exists.
@@ -902,19 +859,14 @@ impl DaemonApi for Api {
     ) -> api::Result<bool> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let _effect = self
             .client
-            .actions(GraphId::transmute(team))
-            .query_label_exists_off_graph(LabelId::transmute(label_id))
+            .queries(GraphId::transmute(team))
+            .query_label_exists(LabelId::transmute(label_id))
             .await
             .context("unable to query label")?;
-        if let Some(Effect::QueryLabelExistsResult(_e)) =
-            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
-        {
-            Ok(true)
-        } else {
-            Err(anyhow!("unable to query whether label exists").into())
-        }
+
+        Ok(true)
     }
 
     /// Query list of labels.
@@ -926,23 +878,20 @@ impl DaemonApi for Api {
     ) -> api::Result<Vec<api::Label>> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let effects = self
             .client
-            .actions(GraphId::transmute(team))
-            .query_labels_off_graph()
+            .queries(GraphId::transmute(team))
+            .query_labels()
             .await
             .context("unable to query labels")?;
-        let mut labels: Vec<api::Label> = Vec::new();
-        for e in effects {
-            if let Effect::QueriedLabel(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: api::LabelId::transmute(e.label_id),
-                    name: e.label_name,
-                });
-            }
-        }
-        Ok(labels)
+
+        Ok(effects
+            .into_iter()
+            .map(|e| api::Label {
+                id: api::LabelId::transmute(e.label_id),
+                name: e.label_name,
+            })
+            .collect())
     }
 }
 
