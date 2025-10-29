@@ -16,7 +16,7 @@ pub async fn get_member_peer(
     let team = client.team(team);
     let queries = team.queries();
     let devices = queries.devices_on_team().await?;
-    for &device in devices.iter() {
+    for device in devices.iter() {
         if device.__id == this_device.__id {
             continue;
         }
