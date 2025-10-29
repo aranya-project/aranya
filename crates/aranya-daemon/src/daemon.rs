@@ -341,6 +341,7 @@ impl Daemon {
             invalid_graphs,
             Arc::clone(&psk_store),
             client_addr,
+            server_addr,
             Arc::clone(&caches),
         )?;
 
