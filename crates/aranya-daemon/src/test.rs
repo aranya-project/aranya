@@ -138,7 +138,7 @@ impl TestDevice {
         LinearStorageProvider<FileManager>,
         DefaultEngine<Rng>,
     > {
-        self.syncer.client().actions(&self.graph_id)
+        self.syncer.client().actions(self.graph_id)
     }
 }
 

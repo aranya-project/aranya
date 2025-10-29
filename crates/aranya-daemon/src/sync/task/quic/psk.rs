@@ -41,10 +41,10 @@ impl PskSeed {
     pub(crate) fn load(
         eng: &mut CE,
         store: &LocalStore<KS>,
-        id: &PskSeedId,
+        id: PskSeedId,
     ) -> Result<Option<Self>> {
         store
-            .get_key(eng, *id)
+            .get_key(eng, id)
             .map(|r| r.map(Self))
             .map_err(Into::into)
     }

@@ -53,38 +53,38 @@ where
         Ok((id, sink.collect()?))
     }
 
-    #[instrument(skip_all, fields(id = %id))]
-    pub fn actions(&self, id: &GraphId) -> PersistentActor<EN, SP, CE> {
+    #[instrument(skip_all, fields(%graph_id))]
+    pub fn actions(&self, graph_id: GraphId) -> PersistentActor<EN, SP, CE> {
         PersistentActor {
             aranya: Arc::clone(&self.aranya),
-            graph_id: *id,
+            graph_id,
             _eng: PhantomData,
         }
     }
 
-    #[instrument(skip_all, fields(id = %id))]
-    pub fn ephemeral_actions(&self, id: &GraphId) -> EphemeralActor<EN, SP, CE> {
+    #[instrument(skip_all, fields(%graph_id))]
+    pub fn ephemeral_actions(&self, graph_id: GraphId) -> EphemeralActor<EN, SP, CE> {
         EphemeralActor {
             aranya: Arc::clone(&self.aranya),
-            graph_id: *id,
+            graph_id,
             _eng: PhantomData,
         }
     }
 
-    #[instrument(skip_all, fields(id = %id))]
-    pub fn queries(&self, id: &GraphId) -> QueryActor<EN, SP, CE> {
+    #[instrument(skip_all, fields(%graph_id))]
+    pub fn queries(&self, graph_id: GraphId) -> QueryActor<EN, SP, CE> {
         QueryActor {
             aranya: Arc::clone(&self.aranya),
-            graph_id: *id,
+            graph_id,
             _eng: PhantomData,
         }
     }
 
     /// Create new ephemeral Session.
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
-    #[instrument(skip_all, fields(id = %id))]
-    pub(crate) async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(*id)?;
+    #[instrument(skip_all, fields(%graph_id))]
+    pub(crate) async fn session_new(&self, graph_id: GraphId) -> Result<Session<SP, EN>> {
+        let session = self.aranya.lock().await.session(graph_id)?;
         Ok(session)
     }
 
