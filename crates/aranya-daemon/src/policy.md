@@ -1244,6 +1244,7 @@ fact CanRevokeRole[target_role_id id, managing_role_id id]=>{}
 //
 // If true, `CanRevokeRole(target_role_id, device_role_id)` holds.
 function can_revoke_role(device_id id, target_role_id id) bool {
+    check device_has_simple_perm(device_id, SimplePerm::RevokeRole)
     let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
@@ -2189,7 +2190,6 @@ command ChangeRole {
         // The author must have permission to revoke the old role.
         let old_role = check_unwrap query Role[role_id: this.old_role_id]
         check can_revoke_role(author.device_id, this.old_role_id)
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
 
         // The author must have permission to assign the new role.
         check exists Role[role_id: this.new_role_id]
@@ -2291,7 +2291,6 @@ command RevokeRole {
         let author = get_author(envelope)
 
         // The author must have permission to revoke the role.
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
         check can_revoke_role(author.device_id, this.role_id)
 
         let role = check_unwrap query Role[role_id: this.role_id]
