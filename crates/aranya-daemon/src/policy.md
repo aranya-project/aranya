@@ -1404,6 +1404,7 @@ command AssignRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::CanChangeRolePerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         // Make sure we uphold the invariants for
@@ -1549,6 +1550,7 @@ command RevokeRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::CanChangeRolePerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         let perm = role_management_perm_to_str(this.perm)
