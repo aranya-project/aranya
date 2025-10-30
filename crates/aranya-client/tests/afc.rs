@@ -450,6 +450,348 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     Ok(())
 }
 
+/// Demonstrate removing channel devices from the team deletes the AFC channel.
+#[cfg(feature = "afc")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_uni_chan_remove_devices() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_chan_remove_devices").await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
+        .await?;
+    let op = ChanOp::SendRecv;
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
+
+    // Create uni channel.
+    let (chan, ctrl) = membera_afc
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .await
+        .context("unable to create afc uni channel")?;
+
+    // Receive uni channel.
+    let recv = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .context("unable to receive afc uni channel")?;
+
+    // Seal data.
+    let afc_msg = "afc msg".as_bytes();
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")?;
+
+    // Open data.
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")?;
+
+    // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .admin
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    // Remove channel devices from team.
+    owner_team.remove_device(devices.membera.id).await?;
+    owner_team.remove_device(devices.memberb.id).await?;
+
+    // wait for syncing.
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
+    // Try open/seal after channels are deleted.
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
+    Ok(())
+}
+
+/// Demonstrate revoking the role from a device deletes the AFC channel.
+/// Each device can only have one role assigned to it.
+/// Therefore, revoking the role implicitly removes the `CanUseAfc` perm.
+#[cfg(feature = "afc")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_uni_chan_revoke_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_chan_revoke_role").await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
+        .await?;
+    let op = ChanOp::SendRecv;
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
+
+    // Create uni channel.
+    let (chan, ctrl) = membera_afc
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .await
+        .context("unable to create afc uni channel")?;
+
+    // Receive uni channel.
+    let recv = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .context("unable to receive afc uni channel")?;
+
+    // Seal data.
+    let afc_msg = "afc msg".as_bytes();
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")?;
+
+    // Open data.
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")?;
+
+    // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .admin
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    // Revoke roles from channel devices.
+    owner_team
+        .revoke_role(devices.membera.id, default_roles.member().id)
+        .await?;
+    owner_team
+        .revoke_role(devices.memberb.id, default_roles.member().id)
+        .await?;
+
+    // wait for syncing.
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
+    // Try open/seal after channels are deleted.
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
+    Ok(())
+}
+
+/// Demonstrate changing device to a role without `CanUseAfc` perm deletes the AFC channel.
+#[cfg(feature = "afc")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_uni_chan_change_role_without_perm").await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
+        .await?;
+    let op = ChanOp::SendRecv;
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
+    let membera_afc = devices.membera.client.afc();
+    let memberb_afc = devices.memberb.client.afc();
+
+    // Create uni channel.
+    let (chan, ctrl) = membera_afc
+        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .await
+        .context("unable to create afc uni channel")?;
+
+    // Receive uni channel.
+    let recv = memberb_afc
+        .recv_ctrl(team_id, ctrl)
+        .await
+        .context("unable to receive afc uni channel")?;
+
+    // Seal data.
+    let afc_msg = "afc msg".as_bytes();
+    let mut ciphertext = vec![0u8; afc_msg.len() + Channels::OVERHEAD];
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")?;
+
+    // Open data.
+    let mut plaintext = vec![0u8; ciphertext.len() - Channels::OVERHEAD];
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")?;
+
+    // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .admin
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    // Assign roles without `CanUseAfc` permission.
+    owner_team
+        .change_role(
+            devices.membera.id,
+            default_roles.member().id,
+            default_roles.operator().id,
+        )
+        .await?;
+    owner_team
+        .change_role(
+            devices.memberb.id,
+            default_roles.member().id,
+            default_roles.operator().id,
+        )
+        .await?;
+
+    // wait for syncing.
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
+    // Try open/seal after channels are deleted.
+    chan.seal(&mut ciphertext, afc_msg)
+        .context("unable to seal afc message")
+        .expect_err("expected seal to fail");
+    recv.open(&mut plaintext, &ciphertext)
+        .context("unable to open afc message")
+        .expect_err("expected open to fail");
+
+    Ok(())
+}
+
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
