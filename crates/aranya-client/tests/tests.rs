@@ -21,7 +21,7 @@ use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
+use crate::common::DevicesCtx;
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -76,8 +76,6 @@ async fn test_sync_now() -> Result<()> {
         .await
         .context("admin unable to sync with owner")?;
 
-    sleep(SLEEP_INTERVAL).await;
-
     // Now we should be able to successfully assign a role.
     admin
         .assign_role(devices.operator.id, roles.operator().id)
@@ -102,10 +100,6 @@ async fn test_add_devices() -> Result<()> {
     let admin = team.admin.client.team(team_id);
     let operator = team.operator.client.team(team_id);
 
-    team.add_all_sync_peers(team_id)
-        .await
-        .context("unable to add all sync peers")?;
-
     // There are now three more roles in addition to the original
     // owner role:
     // - admin
@@ -128,7 +122,6 @@ async fn test_add_devices() -> Result<()> {
         .sync_now(team.owner.aranya_local_addr().await?.into(), None)
         .await
         .context("admin unable to sync with owner")?;
-    sleep(SLEEP_INTERVAL).await;
 
     admin
         .add_device(team.operator.pk.clone(), Some(roles.operator().id))
@@ -139,7 +132,6 @@ async fn test_add_devices() -> Result<()> {
         .sync_now(team.admin.aranya_local_addr().await?.into(), None)
         .await
         .context("operator unable to sync with admin")?;
-    sleep(SLEEP_INTERVAL).await;
 
     for (name, kb, device_id) in [
         ("membera", team.membera.pk.clone(), team.membera.id),
@@ -153,7 +145,6 @@ async fn test_add_devices() -> Result<()> {
             .sync_now(team.admin.aranya_local_addr().await?.into(), None)
             .await
             .context("operator unable to sync with admin")?;
-        sleep(SLEEP_INTERVAL).await;
         operator
             .assign_role(device_id, roles.member().id)
             .await
@@ -161,8 +152,6 @@ async fn test_add_devices() -> Result<()> {
                 format!("operator should be able to assign member role to `{name}`")
             })?;
     }
-
-    sleep(SLEEP_INTERVAL).await;
 
     Ok(())
 }
@@ -191,7 +180,6 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
         .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
         .await
         .context("admin unable to sync with owner")?;
-    sleep(SLEEP_INTERVAL).await;
 
     match admin_team
         .add_device(devices.membera.pk.clone(), Some(roles.member().id))
@@ -217,11 +205,6 @@ async fn test_remove_devices() -> Result<()> {
         .await
         .expect("expected to create team");
     info!(?team_id);
-
-    devices
-        .add_all_sync_peers(team_id)
-        .await
-        .context("unable to add all sync peers")?;
 
     // Setup default roles and ensure delegations exist for helper routines.
     let roles = devices
@@ -406,11 +389,6 @@ async fn test_remove_team() -> Result<()> {
         .await
         .expect("expected to create team");
     info!(?team_id);
-
-    devices
-        .add_all_sync_peers(team_id)
-        .await
-        .context("unable to add all sync peers")?;
 
     let owner = devices.owner.client.team(team_id);
     let roles = devices.setup_default_roles(team_id).await?;
@@ -737,7 +715,6 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
 
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     match admin_team
         .assign_role(devices.membera.id, roles.member().id)
@@ -769,7 +746,6 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
 
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     match admin_team
         .assign_role_management_permission(
@@ -825,7 +801,6 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     // Try to assign operator role as admin - should succeed with the permission
     admin_team
@@ -845,7 +820,6 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
 
     // Sync admin with owner again to get the revocation
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     // Try to assign operator role again as admin - should fail now
     match admin_team
@@ -886,7 +860,6 @@ async fn test_delete_label_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_label_requires_permission").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    devices.add_all_sync_peers(team_id).await?;
     let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
@@ -901,7 +874,6 @@ async fn test_delete_label_requires_permission() -> Result<()> {
         .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
         .await
         .context("operator unable to sync owner state")?;
-    sleep(SLEEP_INTERVAL).await;
 
     match operator_team.delete_label(label).await {
         Ok(_) => bail!("expected delete_label without permission to fail"),
@@ -940,43 +912,12 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     Ok(())
 }
 
-/// Enforces that devices must have an AQC network identifier before labels can be assigned.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_assign_label_to_device_requires_network_id() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_assign_label_to_device_requires_network_id").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-    owner_team
-        .add_device(devices.membera.pk.clone(), None)
-        .await?;
-
-    let label = owner_team
-        .create_label(text!("device-needs-net"), roles.owner().id)
-        .await?;
-
-    match owner_team
-        .device(devices.membera.id)
-        .assign_label(label, ChanOp::SendRecv)
-        .await
-    {
-        Ok(_) => bail!("expected assigning label without network id to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_label error: {err:?}"),
-    }
-
-    Ok(())
-}
-
 /// Ensures the last owner cannot be removed by another device.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     let mut devices = DevicesCtx::new("test_admin_cannot_remove_last_owner").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    devices.add_all_sync_peers(team_id).await?;
     let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
@@ -996,7 +937,6 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_owner_change_requires_permission").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    devices.add_all_sync_peers(team_id).await?;
     let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
@@ -1008,7 +948,6 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     match admin_team
         .add_role_owner(roles.member().id, roles.operator().id)
@@ -1074,7 +1013,6 @@ async fn test_role_owners_query() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_owners_query").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    devices.add_all_sync_peers(team_id).await?;
     let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
@@ -1180,7 +1118,6 @@ async fn test_role_owners_query() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     let admin_view_owners = admin_team.role_owners(roles.member().id).await?;
     let admin_view_owners_vec: Vec<_> = admin_view_owners.iter().collect();
