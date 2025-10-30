@@ -985,7 +985,7 @@ impl DaemonApi for Api {
             .context("unable to query labels")?;
         let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
-            if let Effect::QueryLabelResult(e) = e {
+            if let Effect::QueryLabelsResult(e) = e {
                 debug!("found label: {}", e.label_id);
                 labels.push(api::Label {
                     id: e.label_id.into(),
