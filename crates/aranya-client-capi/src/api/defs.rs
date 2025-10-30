@@ -468,6 +468,40 @@ impl Addr {
     }
 }
 
+/// The name of a permission.
+///
+/// E.g. "CanAssignRole"
+///
+/// Refer to the "Role Management" section of the policy for an exhaustive list.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct Permission(*const c_char);
+
+impl Permission {
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(Text::try_from(cstr)?)
+    }
+}
+
+/// The name of a Role.
+///
+/// E.g. "Owner"
+///
+/// Refer to the policy for an exhaustive list.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleName(*const c_char);
+
+impl RoleName {
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(Text::try_from(cstr)?)
+    }
+}
+
 /// Channel ID for AFC channel.
 #[cfg(feature = "afc")]
 #[repr(C)]
@@ -934,11 +968,22 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// - operator
 /// - member
 ///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
+/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn setup_default_roles(
+    client: &mut Client,
+    team: &TeamId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
     // First get the owner role ID by looking at existing roles
     let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
 
@@ -952,13 +997,205 @@ pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp
             ))
         })?;
 
+    let default_roles = client
+        .rt
+        .block_on(
+            client
+                .inner
+                .team(team.into())
+                .setup_default_roles(owner_role.id),
+        )?
+        .__into_data();
+
+    if *roles_len < default_roles.len() {
+        *roles_len = default_roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(default_roles) {
+        Role::init(dst, imp::Role(src));
+    }
+
+    Ok(())
+}
+
+/// Adds `owning_role` as an owner of role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role ID of the subject role [`RoleId`].
+/// @param[in] owning_role ID of the owning role [`RoleId`].
+pub fn add_role_owner(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    owning_role: &RoleId,
+) -> Result<(), imp::Error> {
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .setup_default_roles(owner_role.id),
+            .add_role_owner(role.into(), owning_role.into()),
     )?;
+
     Ok(())
+}
+
+/// Removes an owning_role as an owner of role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] owning_role ID of the owning role [`RoleId`].
+pub fn remove_role_owner(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    owning_role: &RoleId,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_role_owner(role.into(), owning_role.into()),
+    )?;
+
+    Ok(())
+}
+
+/// Returns the roles that own role.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`Role`].
+/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in,out] roles_len the number of roles written to the buffer.
+pub fn role_owners(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let owning_roles = client
+        .rt
+        .block_on(client.inner.team(team.into()).role_owners(role.into()))?
+        .__into_data();
+
+    if *roles_len < owning_roles.len() {
+        *roles_len = owning_roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(owning_roles) {
+        Role::init(dst, imp::Role(src));
+    }
+
+    Ok(())
+}
+
+pub fn assign_role_management_permission(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    managing_role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_role_management_permission(role.into(), managing_role.into(), perm),
+    )?;
+
+    Ok(())
+}
+
+pub fn revoke_role_management_permission(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    managing_role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .revoke_role_management_permission(role.into(), managing_role.into(), perm),
+    )?;
+
+    Ok(())
+}
+
+/// Returns all of the roles for this team.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] roles_out returns a list of roles on the team [`Role`].
+/// @param[in,out] roles_len the number of roles written to the buffer.
+///
+/// @relates AranyaClient.
+pub fn roles(
+    client: &Client,
+    team: &TeamId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let all_roles = client
+        .rt
+        .block_on(client.inner.team(team.into()).roles())?
+        .__into_data();
+
+    if *roles_len < all_roles.len() {
+        *roles_len = all_roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(all_roles) {
+        Role::init(dst, imp::Role(src));
+    }
+
+    Ok(())
+}
+
+/// Gets a role ID from a list using the given `name`.
+///
+/// `__output` will be a valid pointer if the value returned
+/// by this function is `ARANYA_ERROR_SUCCESS`.
+///
+/// @param[in] role_list the list of roles [`Role`].
+/// @param[in] role_list_len the length of the list of roles [`Role`].
+/// @param[in] name the name used to search for the role [`RoleName`].
+/// @param[out] __output an out pointer to the ID of the [`Role`] that was found.
+///
+/// @relates Role.
+pub fn get_role_id_by_name(role_list: &[Role], name: RoleName) -> Result<RoleId, imp::Error> {
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let name = unsafe { name.as_underlying()? };
+
+    role_list
+        .iter()
+        .find(|role| role.name == name)
+        .ok_or_else(|| anyhow::anyhow!("Missing role with the given name").into())
+        .map(|r| r.id.into())
 }
 
 /// Assign a role to a device.

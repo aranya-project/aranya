@@ -40,7 +40,7 @@ pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
 
 /// An Aranya role.
 #[derive(Debug)]
-pub struct Role(aranya_client::Role);
+pub struct Role(pub(crate) aranya_client::Role);
 
 impl Deref for Role {
     type Target = aranya_client::Role;
