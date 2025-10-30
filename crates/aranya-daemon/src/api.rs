@@ -35,7 +35,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 #[cfg(feature = "afc")]
 use crate::actions::SessionData;
 #[cfg(feature = "afc")]
-use crate::afc::{Afc, RemoveIfParams};
+use crate::afc::Afc;
 use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
@@ -221,58 +221,16 @@ impl EffectHandler {
         for effect in effects {
             trace!(?effect, "handling effect");
             match effect {
-                TeamCreated(_team_created) => {}
-                TeamTerminated(_team_terminated) => {
-                    #[cfg(feature = "afc")]
-                    self.afc.delete_channels().await?;
-                }
-                DeviceAdded(_device_added) => {}
-                DeviceRemoved(_device_removed) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        if self.device_id == _device_removed.device_id.into() {
-                            self.afc.delete_channels().await?;
-                        } else {
-                            let peer_id = Some(_device_removed.device_id.into());
-                            self.afc
-                                .remove_if(RemoveIfParams {
-                                    peer_id,
-                                    ..Default::default()
-                                })
-                                .await?;
-                        }
-                    }
-                }
-                RoleAssigned(_role_assigned) => {}
-                RoleRevoked(_role_revoked) => {}
+                TeamCreated(_) => {}
+                TeamTerminated(_) => {}
+                DeviceAdded(_) => {}
+                DeviceRemoved(_) => {}
+                RoleAssigned(_) => {}
+                RoleRevoked(_) => {}
                 LabelCreated(_) => {}
-                LabelDeleted(_label_deleted) => {
-                    #[cfg(feature = "afc")]
-                    self.afc
-                        .remove_if(RemoveIfParams {
-                            label_id: Some(_label_deleted.label_id.into()),
-                            ..Default::default()
-                        })
-                        .await?;
-                }
+                LabelDeleted(_) => {}
                 AssignedLabelToDevice(_) => {}
-                LabelRevokedFromDevice(_label_revoked) => {
-                    #[cfg(feature = "afc")]
-                    {
-                        let label_id = Some(_label_revoked.label_id.into());
-                        let mut peer_id = None;
-                        if self.device_id != _label_revoked.device_id.into() {
-                            peer_id = Some(_label_revoked.device_id.into());
-                        };
-                        self.afc
-                            .remove_if(RemoveIfParams {
-                                label_id,
-                                peer_id,
-                                ..Default::default()
-                            })
-                            .await?;
-                    }
-                }
+                LabelRevokedFromDevice(_) => {}
                 QueryLabelResult(_) => {}
                 AfcUniChannelCreated(_) => {}
                 AfcUniChannelReceived(_) => {}
@@ -292,7 +250,14 @@ impl EffectHandler {
                 QueryLabelsResult(_) => {}
                 QueryTeamRolesResult(_) => {}
                 QueryRoleOwnersResult(_) => {}
+                QueryAfcChannelIsValidResult(_) => {}
                 RoleCreated(_) => {}
+                CheckValidAfcChannels(_) => {
+                    #[cfg(feature = "afc")]
+                    self.afc
+                        .remove_invalid_channels(graph, self.device_id)
+                        .await?;
+                }
             }
         }
         Ok(())

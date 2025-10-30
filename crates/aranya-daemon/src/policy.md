@@ -490,6 +490,68 @@ ephemeral command QueryDevicesOnTeam {
 }
 ```
 
+#### `query_valid_afc_channel`
+
+Returns whether an AFC channel is valid.
+
+```policy
+// Emits `QueryAfcChannelIsValid` indicating whether the specified AFC channel is valid.
+ephemeral action query_afc_channel_is_valid(sender_id id, receiver_id id, label_id id) {
+    // Publishing `QueryAfcChannelIsValid` emits
+    // `QueryAfcChannelIsValidResult`.
+    publish QueryAfcChannelIsValid {
+        sender_id: sender_id,
+        receiver_id: receiver_id,
+        label_id: label_id,
+    }
+}
+
+// Emitted when an AFC channel is queried by `query_afc_channel_is_valid`.
+effect QueryAfcChannelIsValidResult {
+    // The ID of the sender device.
+    sender_id id,
+    // The ID of the receiver device.
+    receiver_id id,
+    // The ID of the label.
+    label_id id,
+    // Whether the AFC channel is valid.
+    is_valid bool,
+}
+
+// Returns a `QueryAfcChannelIsValidResult` effect indicating whether the AFC channel is valid.
+ephemeral command QueryAfcChannelIsValid {
+    fields {
+        // The ID of the sender device.
+        sender_id id,
+        // The ID of the receiver device.
+        receiver_id id,
+        // The ID of the label.
+        label_id id,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that both devices have permission to create the AFC channel.
+        let is_valid = afc_uni_channel_is_valid(this.sender_id, this.receiver_id, this.label_id)
+        finish {
+            // TODO: substruct selection from `this`
+            emit QueryAfcChannelIsValidResult {
+                sender_id: this.sender_id,
+                receiver_id: this.receiver_id,
+                label_id: this.label_id,
+                is_valid: is_valid
+            }
+        }
+    }
+}
+```
+
 #### `query_device_role`
 
 Returns the role assigned to a device.
@@ -2119,6 +2181,7 @@ command AssignRole {
                 role_id: this.role_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2239,6 +2302,7 @@ command ChangeRole {
                 old_role_id: this.old_role_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2330,6 +2394,7 @@ command RevokeRole {
                 role_id: this.role_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2695,6 +2760,10 @@ effect TeamTerminated {
     owner_id id,
 }
 
+// This effect is emitted when a command could cause certain AFC channels to be invalidated.
+// When the effect is handled, the user should run the `query_afc_channel_is_valid()` query to determine which of its AFC channels are still valid.
+effect CheckValidAfcChannels{}
+
 command TerminateTeam {
     attributes {
         priority: 500
@@ -2729,6 +2798,8 @@ command TerminateTeam {
                 team_id: current_team_id,
                 owner_id: author.device_id,
             }
+
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2918,6 +2989,7 @@ command RemoveDevice {
                     device_id: this.device_id,
                     author_id: author.device_id,
                 }
+                emit CheckValidAfcChannels {}
             }
         } else {
             // TODO(eric): Consider adding an index on
@@ -2933,6 +3005,7 @@ command RemoveDevice {
                     device_id: this.device_id,
                     author_id: author.device_id,
                 }
+                emit CheckValidAfcChannels {}
             }
         }
     }
@@ -3377,6 +3450,7 @@ command DeleteLabel {
                 label_id: label.label_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -3648,6 +3722,7 @@ command RevokeLabelFromDevice {
                 label_author_id: label.author_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -4004,17 +4079,13 @@ ephemeral command AfcCreateUniChannel {
 
         let sender = get_author(envelope)
         let sender_id = sender.device_id
-        check device_has_simple_perm(sender_id, SimplePerm::CreateAfcUniChannel)
 
         let receiver_id = this.receiver_id
         let receiver = check_unwrap try_find_device(receiver_id)
 
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
 
-        // Check that both devices have been granted permission
-        // to use the label for their respective directions.
-        check can_create_afc_uni_channel(sender_id, receiver_id, label.label_id)
+        // Check that both devices have permission to create the AFC channel.
+        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -4029,7 +4100,7 @@ ephemeral command AfcCreateUniChannel {
                     receiver_id: receiver_id,
                     author_enc_key_id: sender.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
-                    label_id: label.label_id,
+                    label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                     encap: this.peer_encap,
                 }
@@ -4056,14 +4127,39 @@ ephemeral command AfcCreateUniChannel {
     }
 }
 
-// Reports whether the devices have permission to create
-// a unidirectional AFC channel with each other.
-function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) bool {
+// Reports whether an AFC channel is valid according to the policy.
+// The following criteria must be met for an AFC channel to be valid:
+// - The label must exist
+// - The label must be assigned to the sender with write permissions: `SendOnly` or `SendRecv`
+// - The label must be assigned to the receiver with read permissions: `RecvOnly` or `SendRecv`
+// - The sender must have `CreateAfcUniChannel` permission assigned to its respective role.
+// - Sender and receiver devices must:
+//   - Be members of the team
+//   - Not have matching device IDs
+//   - Have `CanUseAfc` permission assigned to their respective roles
+function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) bool {
+    // The label must exist.
+    let label = query Label[label_id: label_id]
+    if label is None {
+        return false
+    }
+
     // Devices cannot create channels with themselves.
     //
-    // This should have been caught by the AFC FFI, so check
-    // instead of just returning false.
-    check sender_id != receiver_id
+    // This should have been caught by the AFC FFI
+    if sender_id == receiver_id {
+        return false
+    }
+
+    // Devices must be members of the team
+    let sender = try_find_device(sender_id)
+    if sender is None {
+        return false
+    }
+    let receiver = try_find_device(receiver_id)
+    if receiver is None {
+        return false
+    }
 
     // The writer must have permissions to write (send) data.
     let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
@@ -4085,6 +4181,18 @@ function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) b
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
         ChanOp::SendRecv => {}
+    }
+
+    // Sender must have `CreateAfcUniChannel`, `CanUseAfc` permissions
+    if !device_has_simple_perm(sender_id, SimplePerm::CreateAfcUniChannel) {
+        return false
+    }
+    if !device_has_simple_perm(sender_id, SimplePerm::CanUseAfc) {
+        return false
+    }
+    // Receiver must have `CanUseAfc` permission
+    if !device_has_simple_perm(receiver_id, SimplePerm::CanUseAfc) {
+        return false
     }
 
     return true

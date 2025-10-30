@@ -11,6 +11,8 @@ use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_text::Text;
 use aranya_policy_vm::{ident, Value};
+#[cfg(feature = "afc")]
+use aranya_runtime::NullSink;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
@@ -621,4 +623,34 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
             sign_key: postcard::to_allocvec(&pk.sign_pk)?,
         })
     }
+}
+
+#[cfg(feature = "afc")]
+pub(crate) fn query_afc_channel_is_valid<EN, SP, CE>(
+    aranya: &mut ClientState<EN, SP>,
+    graph_id: GraphId,
+    sender_id: DeviceId,
+    receiver_id: DeviceId,
+    label_id: LabelId,
+) -> Result<bool>
+where
+    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect>,
+    SP: StorageProvider,
+    CE: aranya_crypto::Engine,
+{
+    let mut session = aranya.session(graph_id)?;
+    let mut sink = VecSink::new();
+    session.action(
+        aranya,
+        &mut sink,
+        &mut NullSink,
+        vm_action!(query_afc_channel_is_valid(sender_id, receiver_id, label_id)),
+    )?;
+    let effects = sink.collect()?;
+    Ok(effects.iter().any(|e| {
+        if let Effect::QueryAfcChannelIsValidResult(e) = e {
+            return e.is_valid;
+        }
+        false
+    }))
 }
