@@ -262,6 +262,7 @@ impl Syncer<State> {
             invalid,
             state,
             server_addr,
+            hello_tasks: tokio::task::JoinSet::new(),
         })
     }
 

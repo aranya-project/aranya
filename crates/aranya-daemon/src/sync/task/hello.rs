@@ -303,7 +303,7 @@ impl Syncer<State> {
 
         // Spawn async task to send the notification
         let peer = *peer;
-        tokio::spawn(async move {
+        self.hello_tasks.spawn(async move {
             let (mut recv, mut send) = stream.split();
 
             if let Err(e) = send.send(bytes::Bytes::from(data)).await {

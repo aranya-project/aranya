@@ -35,9 +35,11 @@ use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, Address, Engine, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
+use derive_where::derive_where;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinSet;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
@@ -224,7 +226,7 @@ impl PeerCacheKey {
 ///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
-#[derive(Debug)]
+#[derive_where(Debug; ST)]
 pub struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(crate) client: crate::aranya::ClientWithState<crate::EN, crate::SP>,
@@ -242,6 +244,9 @@ pub struct Syncer<ST> {
     state: ST,
     /// Sync server address.
     server_addr: Addr,
+    /// Tracks spawned hello notification tasks for lifecycle management.
+    #[derive_where(skip)]
+    hello_tasks: JoinSet<()>,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
