@@ -244,11 +244,7 @@ impl EffectHandler {
                     }
                 }
                 RoleAssigned(_role_assigned) => {}
-                // AdminAssigned is now just RoleAssigned - handled above
-                // OperatorAssigned is now just RoleAssigned - handled above
                 RoleRevoked(_role_revoked) => {}
-                // AdminRevoked is now just RoleRevoked - handled above
-                // OperatorRevoked is now just RoleRevoked - handled above
                 LabelCreated(_) => {}
                 LabelDeleted(_label_deleted) => {
                     #[cfg(feature = "afc")]
