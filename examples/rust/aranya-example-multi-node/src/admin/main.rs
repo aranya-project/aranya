@@ -90,14 +90,16 @@ async fn main() -> Result<()> {
         .await?;
 
     // Loop until this device has the `Admin` role assigned to it.
+    info!("admin: finding admin role");
+    let admin_role = loop {
+        if let Ok(roles) = team.roles().await {
+            if let Some(role) = roles.into_iter().find(|role| role.name == "admin") {
+                break role;
+            }
+        }
+        sleep(SLEEP_INTERVAL).await;
+    };
     info!("admin: waiting for owner to assign admin role");
-    let admin_role = team
-        .roles()
-        .await?
-        .iter()
-        .find(|r| r.name == "admin")
-        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
-        .clone();
     loop {
         if let Ok(Some(r)) = team.device(device_id).role().await {
             if r == admin_role {
@@ -110,8 +112,22 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let _label1 = team.create_label(text!("label1"), admin_role.id).await?;
+    let label1 = team.create_label(text!("label1"), admin_role.id).await?;
     info!("admin: created label");
+
+    info!("admin: finding operator role");
+    let operator_role = loop {
+        if let Ok(roles) = team.roles().await {
+            if let Some(role) = roles.into_iter().find(|role| role.name == "operator") {
+                break role;
+            }
+        }
+        sleep(SLEEP_INTERVAL).await;
+    };
+
+    info!("admin: assigning operator role to manage label1");
+    team.add_label_managing_role(label1, operator_role.id)
+        .await?;
 
     info!("admin: complete");
 
