@@ -33,17 +33,6 @@ impl Team<'_> {
     pub fn team_id(&self) -> TeamId {
         TeamId::from_api(self.id)
     }
-
-    /// Closes the team, preventing any further operations on it.
-    #[instrument(skip(self))]
-    pub async fn close_team(&self) -> Result<()> {
-        self.client
-            .daemon
-            .close_team(context::current(), self.id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
 }
 
 impl Team<'_> {

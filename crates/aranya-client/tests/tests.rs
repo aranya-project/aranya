@@ -21,7 +21,7 @@ use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::DevicesCtx;
+use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -81,6 +81,51 @@ async fn test_sync_now() -> Result<()> {
         .assign_role(devices.operator.id, roles.operator().id)
         .await
         .context("admin unable to assign role to operator")?;
+
+    Ok(())
+}
+
+/// Tests adding sync peers.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_sync_peers() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_sync_peers").await?;
+    let team_id = devices
+        .create_and_add_team()
+        .await
+        .expect("expected to create team");
+
+    // create default roles
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    devices
+        .add_all_sync_peers(team_id)
+        .await
+        .context("unable to add all sync peers")?;
+
+    // TODO: if this is removed the label queries have a seal error.
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    // Add a command to graph by having the owner create a label.
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .create_label(text!("label1"), roles.owner().id)
+        .await?;
+
+    // Wait for syncing.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify peers automatically sync command with sync peer.
+    // They should receive the label that was created.
+    let owner_team_labels = owner_team.labels().await?;
+    assert_eq!(owner_team_labels.iter().count(), 1);
+
+    let membera_team = devices.membera.client.team(team_id);
+    let membera_team_labels = membera_team.labels().await?;
+    assert_eq!(membera_team_labels.iter().count(), 1);
+
+    let memberb_team = devices.memberb.client.team(team_id);
+    let memberb_team_labels = memberb_team.labels().await?;
+    assert_eq!(memberb_team_labels.iter().count(), 1);
 
     Ok(())
 }
@@ -309,13 +354,18 @@ async fn test_query_functions() -> Result<()> {
     let keybundle = memberb.device(devices.membera.id).keybundle().await?;
     debug!("membera keybundle: {:?}", keybundle);
 
+    // Make sure membera can query labels assigned to it.
     let membera_labels = memberb
         .device(devices.membera.id)
         .label_assignments()
         .await?;
     assert_eq!(membera_labels.iter().count(), 1);
+
+    // Make sure owner can query labels created on the team.
     let team_labels = owner_team.labels().await?;
     assert_eq!(team_labels.iter().count(), 1);
+
+    // Make sure owner can query whether certain labels exist on the team.
     assert!(owner_team.label(label_id).await?.is_some());
 
     Ok(())

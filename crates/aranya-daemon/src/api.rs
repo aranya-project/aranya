@@ -485,13 +485,6 @@ impl DaemonApi for Api {
         Ok(team_id)
     }
 
-    #[instrument(skip(self), err)]
-    async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        todo!();
-    }
-
     //
     // Device onboarding
     //
