@@ -213,7 +213,7 @@ where
         let shm = self.shm.lock().await;
         let mut client = self.client.aranya.lock().await;
 
-        // Use cache since remove_if callback currently must always produce same result.
+        // TODO: aranya-core#467 use cache since remove_if callback currently must always produce same result.
         let mut cache = HashMap::new();
 
         shm.write
@@ -223,7 +223,7 @@ where
                     Entry::Vacant(e) => e,
                 };
 
-                // TODO: run a single query when channel direction is added to remove_if() params
+                // TODO: aranya-core#464 run a single query when channel direction is added to remove_if() params
                 let sender_valid = crate::actions::query_afc_channel_is_valid(
                     &mut client,
                     graph,
@@ -242,7 +242,8 @@ where
                 )
                 .is_ok_and(|v| v);
 
-                *e.insert(!sender_valid && !receiver_valid)
+                let channel_invalid = *e.insert(!sender_valid && !receiver_valid);
+                channel_invalid
             })
             .context("unable to remove AFC channels matching criteria")
     }
