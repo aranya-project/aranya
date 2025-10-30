@@ -1,6 +1,9 @@
 //! Implementation of daemon's AFC handler.
 
-use std::fmt::Debug;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::Debug,
+};
 
 use anyhow::{Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
@@ -210,8 +213,16 @@ where
         let shm = self.shm.lock().await;
         let mut client = self.client.aranya.lock().await;
 
+        // Use cache since remove_if callback currently must always produce same result.
+        let mut cache = HashMap::new();
+
         shm.write
             .remove_if(|chan| {
+                let e = match cache.entry((chan.peer_id, chan.label_id)) {
+                    Entry::Occupied(e) => return *e.get(),
+                    Entry::Vacant(e) => e,
+                };
+
                 // TODO: run a single query when channel direction is added to remove_if() params
                 let sender_valid = crate::actions::query_afc_channel_is_valid(
                     &mut client,
@@ -231,7 +242,7 @@ where
                 )
                 .is_ok_and(|v| v);
 
-                !sender_valid && !receiver_valid
+                *e.insert(!sender_valid && !receiver_valid)
             })
             .context("unable to remove AFC channels matching criteria")
     }
