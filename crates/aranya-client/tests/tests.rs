@@ -11,6 +11,8 @@
 
 mod common;
 
+use std::ptr;
+
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::{ChanOp, RoleId},
@@ -22,6 +24,41 @@ use test_log::test;
 use tracing::{debug, info};
 
 use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
+
+/// Tests getting keybundle and device ID.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_get_keybundle_device_id() -> Result<()> {
+    let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
+
+    // Note: get_device_id() and get_key_bundle() are already invoked in `DevicesCtx::new()`.
+    // This test makes sure we don't accidentally break the API from a backward compatibility standpoint.
+    assert_eq!(
+        devices.owner.client.get_device_id().await?,
+        devices.owner.id
+    );
+    assert_eq!(
+        devices.owner.client.get_key_bundle().await?,
+        devices.owner.pk
+    );
+
+    Ok(())
+}
+
+/// Tests generating random numbers with the aranya client.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_client_rand() -> Result<()> {
+    let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
+
+    let mut buf1 = vec![0u8; 100];
+    devices.owner.client.rand(&mut buf1).await;
+    let mut buf2 = vec![0u8; 100];
+    devices.owner.client.rand(&mut buf2).await;
+
+    // Randomly generated numbers should never match.
+    assert_ne!(buf1, buf2);
+
+    Ok(())
+}
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -85,10 +122,10 @@ async fn test_sync_now() -> Result<()> {
     Ok(())
 }
 
-/// Tests adding sync peers.
+/// Tests adding/removing sync peers.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_add_sync_peers() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_add_sync_peers").await?;
+async fn test_add_remove_sync_peers() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_remove_sync_peers").await?;
     let team_id = devices
         .create_and_add_team()
         .await
@@ -126,6 +163,37 @@ async fn test_add_sync_peers() -> Result<()> {
     let memberb_team = devices.memberb.client.team(team_id);
     let memberb_team_labels = memberb_team.labels().await?;
     assert_eq!(memberb_team_labels.iter().count(), 1);
+
+    // Remove sync peers.
+    for device in devices.devices() {
+        for peer in devices.devices() {
+            if ptr::eq(device, peer) {
+                continue;
+            }
+            device
+                .client
+                .team(team_id)
+                .remove_sync_peer(peer.aranya_local_addr().await?.into())
+                .await?;
+        }
+    }
+
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    membera_team.remove_sync_peer(owner_addr).await?;
+    let membera_addr = devices.membera.aranya_local_addr().await?.into();
+    owner_team.remove_sync_peer(membera_addr).await?;
+
+    // Create another label.
+    owner_team
+        .create_label(text!("label2"), roles.owner().id)
+        .await?;
+
+    // Wait for syncing.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify device doesn't see label after sync peer is removed.
+    let labels_after_removing_sync_peer = membera_team.labels().await?;
+    assert_eq!(labels_after_removing_sync_peer.iter().count(), 1);
 
     Ok(())
 }
@@ -1071,6 +1139,10 @@ async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
 
     Ok(())
 }
+
+// TODO: add test to verify role owner cannot perform role owner operations after `remove_role_owner()`
+
+// TODO: add test to verify role owner can perform role permissions changes
 
 /// Removing a non-existent owning role should produce a policy failure, not a runtime error.
 #[test(tokio::test(flavor = "multi_thread"))]
