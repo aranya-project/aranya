@@ -399,6 +399,26 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Add label managing role
+    #[instrument(skip(self))]
+    pub async fn add_label_managing_role(
+        &self,
+        label_id: LabelId,
+        managing_role_id: RoleId,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .add_label_managing_role(
+                context::current(),
+                self.id,
+                label_id.into_api(),
+                managing_role_id.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Returns a label if it exists.
     #[instrument(skip(self))]
     pub async fn label(&self, label_id: LabelId) -> Result<Option<Label>> {

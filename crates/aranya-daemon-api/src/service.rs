@@ -435,6 +435,16 @@ pub trait DaemonApi {
     async fn labels(team: TeamId) -> Result<Vec<Label>>;
 
     //
+    // Label management
+    //
+
+    async fn add_label_managing_role(
+        team: TeamId,
+        label_id: LabelId,
+        managing_role_id: RoleId,
+    ) -> Result<()>;
+
+    //
     // Label assignments
     //
 

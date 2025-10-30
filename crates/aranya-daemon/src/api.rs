@@ -890,6 +890,30 @@ impl DaemonApi for Api {
         }
     }
 
+    async fn add_label_managing_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        label_id: api::LabelId,
+        managing_role_id: api::RoleId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(team.into_id().into())
+            .add_label_managing_role(label_id.into_id().into(), managing_role_id.into_id().into())
+            .await
+            .context("unable to add label managing role")?;
+        if let Some(Effect::LabelManagingRoleAdded(_e)) =
+            find_effect!(&effects, Effect::LabelManagingRoleAdded(_e))
+        {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to add label managing role").into())
+        }
+    }
+
     #[instrument(skip(self), err)]
     async fn assign_label_to_device(
         self,

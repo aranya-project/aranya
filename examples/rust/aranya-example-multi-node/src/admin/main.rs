@@ -113,8 +113,24 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let _label1 = team.create_label(text!("label1"), admin_role.id).await?;
+    let label1 = team.create_label(text!("label1"), admin_role.id).await?;
     info!("admin: created label");
+
+    info!("admin: finding operator role");
+    let operator_role = 'outer: loop {
+        if let Ok(roles) = team.roles().await {
+            for role in roles {
+                if role.name == "operator" {
+                    break 'outer role;
+                }
+            }
+        }
+        sleep(SLEEP_INTERVAL).await;
+    };
+
+    info!("admin: assigning operator role to manage label1");
+    team.add_label_managing_role(label1, operator_role.id)
+        .await?;
 
     info!("admin: complete");
 
