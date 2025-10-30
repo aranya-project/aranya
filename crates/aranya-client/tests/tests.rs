@@ -226,14 +226,12 @@ async fn test_remove_devices() -> Result<()> {
     owner.remove_device(devices.memberb.id).await?;
     assert_eq!(owner.devices().await?.iter().count(), 3);
 
-    // TODO: Implement role revocation with proper RoleId system
     owner.remove_device(devices.operator.id).await?;
     assert_eq!(owner.devices().await?.iter().count(), 2);
 
     owner.remove_device(devices.admin.id).await?;
     assert_eq!(owner.devices().await?.iter().count(), 1);
 
-    // TODO: Implement role revocation with proper RoleId system
     owner
         .remove_device(devices.owner.id)
         .await
@@ -260,6 +258,37 @@ async fn test_query_functions() -> Result<()> {
     // Tell all peers to sync with one another, and assign their roles.
     devices.add_all_device_roles(team_id, &roles).await?;
 
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), roles.owner().id)
+        .await?;
+
+    // Assigning labels to devices with the "member" role should succeed since it does not have `CanUseAfc` permission.
+    let op = ChanOp::SendRecv;
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
+        .await?;
+
+    // wait for syncing.
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(owner_addr, None)
+        .await?;
+
     // Test all our fact database queries.
     let memberb = devices.membera.client.team(team_id);
 
@@ -280,7 +309,14 @@ async fn test_query_functions() -> Result<()> {
     let keybundle = memberb.device(devices.membera.id).keybundle().await?;
     debug!("membera keybundle: {:?}", keybundle);
 
-    // TODO(nikki): device_label_assignments, label_exists, labels
+    let membera_labels = memberb
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(membera_labels.iter().count(), 1);
+    let team_labels = owner_team.labels().await?;
+    assert_eq!(team_labels.iter().count(), 1);
+    assert!(owner_team.label(label_id).await?.is_some());
 
     Ok(())
 }
