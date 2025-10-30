@@ -1884,7 +1884,8 @@ command SetupDefaultRole {
 
 ### Role Deletion
 
-TODO
+Role deletion is waiting on prefix query deletion (see
+https://github.com/aranya-project/aranya-core/issues/229)
 
 ### Role Assignment
 
