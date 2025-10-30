@@ -1372,14 +1372,14 @@ function can_change_role_perms(device_id id, target_role_id id) bool {
 }
 
 enum RoleManagementPerm {
-    // Grants a device the ability to assign the role to any
-    // device except itself.
+    // Grants a managing role the ability to assign the target role
+    // to any device except itself.
     CanAssignRole,
-    // Grants a device the ability to revoke the role from any
-    // device.
+    // Grants a managing role the ability to revoke the target role
+    // from any device.
     CanRevokeRole,
-    // Grants a device the ability to change the permissions
-    // assigned to the role.
+    // Grants a managing role the ability to change the permissions
+    // assigned to the target role.
     CanChangeRolePerms,
 }
 
@@ -1467,7 +1467,6 @@ command AssignRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
-        // TODO check device_has_simple_perm(author.device_id, SimplePerm::CanChangeRolePerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         // Make sure we uphold the invariants for
@@ -1613,7 +1612,6 @@ command RevokeRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
-        // TODO check device_has_simple_perm(author.device_id, SimplePerm::CanChangeRolePerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         let perm = role_management_perm_to_str(this.perm)
