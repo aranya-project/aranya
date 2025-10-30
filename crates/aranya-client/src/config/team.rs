@@ -118,9 +118,8 @@ impl AddTeamConfig {
 
 impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
-        let id: [u8; 32] = value.id.into();
         Self {
-            team_id: aranya_daemon_api::TeamId::from(id),
+            team_id: value.id.into_api(),
             quic_sync: value.quic_sync.map(Into::into),
         }
     }

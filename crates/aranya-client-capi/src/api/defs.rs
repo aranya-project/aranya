@@ -368,7 +368,7 @@ impl From<&RoleId> for aranya_client::RoleId {
 
 /// Get ID of role.
 ///
-/// @param role the role [`Role`].
+/// @param[in] role the role [`Role`].
 pub fn role_get_id(role: &Role) -> RoleId {
     role.deref().id.into()
 }
@@ -377,7 +377,7 @@ pub fn role_get_id(role: &Role) -> RoleId {
 ///
 /// The resulting string must not be freed.
 ///
-/// @param role the role [`Role`].
+/// @param[in] role the role [`Role`].
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
     role.deref().name.as_ptr().cast()
@@ -385,7 +385,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 
 /// Get the author of a role.
 ///
-/// @param role the role [`Role`].
+/// @param[in] role the role [`Role`].
 pub fn role_get_author(role: &Role) -> DeviceId {
     role.deref().author_id.into()
 }
@@ -1204,10 +1204,10 @@ pub fn get_role_id_by_name(role_list: &[Role], name: RoleName) -> Result<RoleId,
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param role_id the ID of the role to assign to the device.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] role_id the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
@@ -1229,10 +1229,10 @@ pub fn assign_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param role_id the ID of the role to revoke from the device.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] role_id the ID of the role to revoke from the device.
 ///
 /// @relates AranyaClient.
 pub fn revoke_role(
@@ -1254,10 +1254,10 @@ pub fn revoke_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param name label name string [`LabelName`].
-/// @param managing_role_id the ID of the role that manages this
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] name label name string [`LabelName`].
+/// @param[in] managing_role_id the ID of the role that manages this
 ///        label [`RoleId`].
 ///
 /// @relates AranyaClient.
@@ -1468,11 +1468,11 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param keybundle_len is the length of the serialized keybundle.
-/// @param role_id the ID of the role to assign to the device.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param[in] keybundle_len is the length of the serialized keybundle.
+/// @param[in] role_id the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(

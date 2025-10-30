@@ -30,7 +30,7 @@ pub enum Effect {
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
     AssignedLabelToDevice(AssignedLabelToDevice),
-    AssignedLabelToRole(AssignedLabelToRole),
+    CheckValidAfcChannels(CheckValidAfcChannels),
     DeviceAdded(DeviceAdded),
     DeviceRemoved(DeviceRemoved),
     LabelCreated(LabelCreated),
@@ -38,15 +38,14 @@ pub enum Effect {
     LabelManagingRoleAdded(LabelManagingRoleAdded),
     LabelManagingRoleRevoked(LabelManagingRoleRevoked),
     LabelRevokedFromDevice(LabelRevokedFromDevice),
-    LabelRevokedFromRole(LabelRevokedFromRole),
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
+    QueryAfcChannelIsValidResult(QueryAfcChannelIsValidResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
-    QueryLabelsAssignedToRoleResult(QueryLabelsAssignedToRoleResult),
     QueryLabelsResult(QueryLabelsResult),
     QueryRoleOwnersResult(QueryRoleOwnersResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
@@ -89,13 +88,9 @@ pub struct AssignedLabelToDevice {
     pub label_id: BaseId,
     pub author_id: BaseId,
 }
-/// AssignedLabelToRole policy effect.
+/// CheckValidAfcChannels policy effect.
 #[effect]
-pub struct AssignedLabelToRole {
-    pub role_id: BaseId,
-    pub label_id: BaseId,
-    pub author_id: BaseId,
-}
+pub struct CheckValidAfcChannels {}
 /// DeviceAdded policy effect.
 #[effect]
 pub struct DeviceAdded {
@@ -147,13 +142,6 @@ pub struct LabelRevokedFromDevice {
     pub label_author_id: BaseId,
     pub author_id: BaseId,
 }
-/// LabelRevokedFromRole policy effect.
-#[effect]
-pub struct LabelRevokedFromRole {
-    pub role_id: BaseId,
-    pub label_id: BaseId,
-    pub author_id: BaseId,
-}
 /// PermAddedToRole policy effect.
 #[effect]
 pub struct PermAddedToRole {
@@ -167,6 +155,14 @@ pub struct PermRemovedFromRole {
     pub role_id: BaseId,
     pub perm: Text,
     pub author_id: BaseId,
+}
+/// QueryAfcChannelIsValidResult policy effect.
+#[effect]
+pub struct QueryAfcChannelIsValidResult {
+    pub sender_id: BaseId,
+    pub receiver_id: BaseId,
+    pub label_id: BaseId,
+    pub is_valid: bool,
 }
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
@@ -197,14 +193,6 @@ pub struct QueryLabelResult {
 #[effect]
 pub struct QueryLabelsAssignedToDeviceResult {
     pub device_id: BaseId,
-    pub label_id: BaseId,
-    pub label_name: Text,
-    pub label_author_id: BaseId,
-}
-/// QueryLabelsAssignedToRoleResult policy effect.
-#[effect]
-pub struct QueryLabelsAssignedToRoleResult {
-    pub role_id: BaseId,
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
@@ -309,6 +297,12 @@ pub struct TeamTerminated {
 #[actions]
 pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
+    fn query_afc_channel_is_valid(
+        &mut self,
+        sender_id: BaseId,
+        receiver_id: BaseId,
+        label_id: BaseId,
+    ) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
     fn add_perm_to_role(
@@ -390,22 +384,11 @@ pub trait ActorExt {
         managing_role_id: BaseId,
     ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn assign_label_to_role(
-        &mut self,
-        role_id: BaseId,
-        label_id: BaseId,
-        op: ChanOp,
-    ) -> Result<(), ClientError>;
     fn assign_label_to_device(
         &mut self,
         device_id: BaseId,
         label_id: BaseId,
         op: ChanOp,
-    ) -> Result<(), ClientError>;
-    fn revoke_label_from_role(
-        &mut self,
-        role_id: BaseId,
-        label_id: BaseId,
     ) -> Result<(), ClientError>;
     fn revoke_label_from_device(
         &mut self,
@@ -414,10 +397,6 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn query_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn query_labels_assigned_to_role(
-        &mut self,
-        role_id: BaseId,
-    ) -> Result<(), ClientError>;
     fn query_labels_assigned_to_device(
         &mut self,
         device_id: BaseId,

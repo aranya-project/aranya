@@ -45,7 +45,7 @@ use crate::{
     actions::Actions,
     api::EffectReceiver,
     aranya,
-    policy::{ChanOp, Effect, KeyBundle as DeviceKeyBundle},
+    policy::{Effect, KeyBundle as DeviceKeyBundle},
     sync::{
         self,
         task::{quic::PskStore, PeerCacheKey, PeerCacheMap, SyncPeer},
@@ -139,7 +139,7 @@ impl TestDevice {
         LinearStorageProvider<FileManager>,
         DefaultEngine<Rng>,
     > {
-        self.syncer.client().actions(&self.graph_id)
+        self.syncer.client().actions(self.graph_id)
     }
 }
 
@@ -243,7 +243,7 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
+            let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
 
@@ -254,7 +254,8 @@ impl TestCtx {
                     send_effects,
                     InvalidGraphs::default(),
                     psk_store.clone(),
-                    Addr::from((Ipv4Addr::LOCALHOST, 0)),
+                    any_local_addr,
+                    any_local_addr,
                     caches.clone(),
                 )?;
 
@@ -263,7 +264,7 @@ impl TestCtx {
 
             let server: TestServer = TestServer::new(
                 client.clone(),
-                &local_addr,
+                &any_local_addr,
                 psk_store.clone(),
                 conn_map,
                 conn_rx,
@@ -1013,13 +1014,6 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
         .await
         .context("owner should be able to delete label")?;
 
-    let err = owner
-        .actions()
-        .assign_label_to_role(owner_role, label_id, ChanOp::SendRecv)
-        .await
-        .expect_err("expected assigning deleted label to fail");
-    expect_not_authorized(err);
-
     Ok(())
 }
 
@@ -1297,42 +1291,6 @@ async fn test_revoke_label_managing_role_requires_existing_fact() -> Result<()> 
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_assign_label_to_current_role_rejected() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-
-    let effects = owner
-        .actions()
-        .create_label(text!("SELF_ROLE_LABEL"), owner_role.into_id().into())
-        .await
-        .context("label creation should succeed")?;
-    let label_id: LabelId = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id),
-            _ => None,
-        })
-        .expect("expected label created effect")
-        .into();
-
-    let err = owner
-        .actions()
-        .assign_label_to_role(owner_role, label_id, ChanOp::SendRecv)
-        .await
-        .expect_err("expected assigning label to managing role to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
 async fn test_change_role_requires_remaining_owner() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
@@ -1479,43 +1437,6 @@ async fn test_change_role_rejects_mismatched_current_role() -> Result<()> {
         .change_role(device_id(membera)?, operator_role, member_role)
         .await
         .expect_err("expected change_role with wrong old_role to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_assign_label_to_role_requires_can_use_aqc() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    let effects = owner
-        .actions()
-        .create_label(text!("ROLE_NEEDS_AQC"), owner_role.into_id().into())
-        .await
-        .context("label creation should succeed")?;
-    let label_id: LabelId = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id),
-            _ => None,
-        })
-        .expect("expected label created effect")
-        .into();
-
-    let err = owner
-        .actions()
-        .assign_label_to_role(admin_role, label_id, ChanOp::SendRecv)
-        .await
-        .expect_err("expected assigning label to non-AQC role to fail");
     expect_not_authorized(err);
 
     Ok(())

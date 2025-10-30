@@ -11,6 +11,8 @@ use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_text::Text;
 use aranya_policy_vm::{ident, Value};
+#[cfg(feature = "afc")]
+use aranya_runtime::NullSink;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
@@ -29,6 +31,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct SessionData {
     /// The serialized messages
+    #[cfg(feature = "afc")]
     pub ctrl: Vec<Box<[u8]>>,
     /// The effects produced
     pub effects: Vec<Effect>,
@@ -69,20 +72,20 @@ where
 
     /// Returns an implementation of [`Actions`] for a particular
     /// storage.
-    #[instrument(skip_all, fields(id = %id))]
-    pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
+    #[instrument(skip_all, fields(%graph_id))]
+    pub fn actions(&self, graph_id: GraphId) -> impl Actions<EN, SP, CE> {
         ActionsImpl {
             aranya: Arc::clone(&self.aranya),
-            graph_id: *id,
+            graph_id,
             _eng: PhantomData,
         }
     }
 
     /// Create new ephemeral Session.
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
-    #[instrument(skip_all, fields(id = %id))]
-    pub(crate) async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(*id)?;
+    #[instrument(skip_all, fields(%graph_id))]
+    pub(crate) async fn session_new(&self, graph_id: GraphId) -> Result<Session<SP, EN>> {
+        let session = self.aranya.lock().await.session(graph_id)?;
         Ok(session)
     }
 
@@ -153,6 +156,7 @@ where
         let mut msg_sink = MsgSink::new();
         session.action(&client, &mut sink, &mut msg_sink, f())?;
         Ok(SessionData {
+            #[cfg(feature = "afc")]
             ctrl: msg_sink.into_cmds(),
             effects: sink.collect()?,
         })
@@ -248,21 +252,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `assign_label_to_role`.
-    #[instrument(skip(self), fields(%role_id, %label_id, %op))]
-    fn assign_label_to_role(
-        &self,
-        role_id: RoleId,
-        label_id: LabelId,
-        op: ChanOp,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_label_to_role(role_id.into(), label_id.into(), op)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
     /// Invokes `assign_role`.
     #[instrument(skip(self), fields(%device_id, %role_id))]
     fn assign_role(
@@ -351,32 +340,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `query_aqc_net_id`.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_aqc_net_id(
-        &self,
-        device_id: DeviceId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_net_id"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
-    /// Invokes `query_aqc_network_names`.
-    #[instrument(skip(self))]
-    fn query_aqc_network_names(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_aqc_network_names"),
-            args: Cow::Owned(vec![]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
     /// Invokes `query_device_keybundle`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
@@ -452,20 +415,6 @@ where
         self.session_action(move || VmAction {
             name: ident!("query_labels_assigned_to_device"),
             args: Cow::Owned(vec![Value::from(device.into_id())]),
-        })
-        .map_ok(|SessionData { effects, .. }| effects)
-        .in_current_span()
-    }
-
-    /// Invokes `query_labels_assigned_to_role`.
-    #[instrument(skip(self), fields(%role))]
-    fn query_labels_assigned_to_role(
-        &self,
-        role: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_labels_assigned_to_role"),
-            args: Cow::Owned(vec![Value::from(role.into_id())]),
         })
         .map_ok(|SessionData { effects, .. }| effects)
         .in_current_span()
@@ -551,20 +500,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `revoke_label_from_role`.
-    #[instrument(skip(self), fields(%role_id, %label_id))]
-    fn revoke_label_from_role(
-        &self,
-        role_id: RoleId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.revoke_label_from_role(role_id.into(), label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
     /// Invokes `revoke_label_managing_role`.
     #[instrument(skip(self), fields(%label_id, %managing_role_id))]
     fn revoke_label_managing_role(
@@ -637,6 +572,7 @@ where
 }
 
 /// An implementation of [`Actor`].
+///
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
 #[derive(Debug)]
@@ -687,4 +623,34 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
             sign_key: postcard::to_allocvec(&pk.sign_pk)?,
         })
     }
+}
+
+#[cfg(feature = "afc")]
+pub(crate) fn query_afc_channel_is_valid<EN, SP, CE>(
+    aranya: &mut ClientState<EN, SP>,
+    graph_id: GraphId,
+    sender_id: DeviceId,
+    receiver_id: DeviceId,
+    label_id: LabelId,
+) -> Result<bool>
+where
+    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect>,
+    SP: StorageProvider,
+    CE: aranya_crypto::Engine,
+{
+    let mut session = aranya.session(graph_id)?;
+    let mut sink = VecSink::new();
+    session.action(
+        aranya,
+        &mut sink,
+        &mut NullSink,
+        vm_action!(query_afc_channel_is_valid(sender_id, receiver_id, label_id)),
+    )?;
+    let effects = sink.collect()?;
+    Ok(effects.iter().any(|e| {
+        if let Effect::QueryAfcChannelIsValidResult(e) = e {
+            return e.is_valid;
+        }
+        false
+    }))
 }

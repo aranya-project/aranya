@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{borrow::Borrow, error, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
+use core::{error, fmt, hash::Hash, net::SocketAddr, time::Duration};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
@@ -148,43 +148,6 @@ pub struct AddTeamConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamConfig {
     pub quic_sync: Option<CreateTeamQuicSyncConfig>,
-}
-
-/// A device's network identifier.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub Text);
-
-impl Borrow<str> for NetIdentifier {
-    #[inline]
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<T> AsRef<T> for NetIdentifier
-where
-    T: ?Sized,
-    <Self as Deref>::Target: AsRef<T>,
-{
-    #[inline]
-    fn as_ref(&self) -> &T {
-        self.deref().as_ref()
-    }
-}
-
-impl Deref for NetIdentifier {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Display for NetIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
 }
 
 /// A label.
@@ -438,17 +401,6 @@ pub trait DaemonApi {
     // Label assignments
     //
 
-    /// Assigns a label to a role.
-    async fn assign_label_to_role(
-        team: TeamId,
-        role: RoleId,
-        label: LabelId,
-        op: ChanOp,
-    ) -> Result<()>;
-    /// Revokes a label from a role.
-    async fn revoke_label_from_role(team: TeamId, role: RoleId, label: LabelId) -> Result<()>;
-    /// Returns all labels assigned to the role.
-    async fn labels_assigned_to_role(team: TeamId, role: RoleId) -> Result<Box<[Label]>>;
     /// Assigns a label to a device.
     async fn assign_label_to_device(
         team: TeamId,

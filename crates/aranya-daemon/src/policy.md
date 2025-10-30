@@ -101,6 +101,37 @@ publish to the graph. Commands are signed with the device's
 Signing Key. The policy controls which commands each device is
 authorized to publish.
 
+## Command Priorities
+
+Priorities can defined for commands by specifying the `priority` attribute in the command's `attributes` block:
+```
+command CommandFoo {
+    attributes {
+        priority: 100
+    }
+}
+```
+
+Branches in the graph are deterministically ordered by the braid algorithm. Higher priority commands are generally evaluated before lower priority commands.
+CreateTeam is the first command (a.k.a. the init command), so it doesn't need an assigned priority.
+CreateTeam is automatically the highest priority based on ancestry.
+
+In general, deletion and revocation commands should be higher priority than create/modify/use commands. E.g.:
+TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseFoo(100)
+
+Commands that must be called first should have a higher priority than commands that depend on them.
+For example, a command to create/assign a label to a device should be higher priority than a command that uses the label based.
+Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
+For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
+
+Command priorities will be required to be defined for each command in the policy. Even the zero priority should be defined. That way, the policy can be audited and does not have any default priorities that cannot be audited.
+
+Ephemeral commands do not need to specify a priority since they do not participate in braiding.
+
+While we could assign sequential priorities (0, 1, 2, ...) to commands to achieve the desired prioritization, this doesn't leave any room for adding new priorities in between priorities that were already defined.
+Therefore, initial priorities are defined with room between them for new priorities to be added later. E.g.:
+100, 200, 300, etc.
+
 ### API Stability and Backward Compatibility
 
 Actions and effects are part of a policy's public API.
@@ -459,6 +490,68 @@ ephemeral command QueryDevicesOnTeam {
 }
 ```
 
+#### `query_valid_afc_channel`
+
+Returns whether an AFC channel is valid.
+
+```policy
+// Emits `QueryAfcChannelIsValid` indicating whether the specified AFC channel is valid.
+ephemeral action query_afc_channel_is_valid(sender_id id, receiver_id id, label_id id) {
+    // Publishing `QueryAfcChannelIsValid` emits
+    // `QueryAfcChannelIsValidResult`.
+    publish QueryAfcChannelIsValid {
+        sender_id: sender_id,
+        receiver_id: receiver_id,
+        label_id: label_id,
+    }
+}
+
+// Emitted when an AFC channel is queried by `query_afc_channel_is_valid`.
+effect QueryAfcChannelIsValidResult {
+    // The ID of the sender device.
+    sender_id id,
+    // The ID of the receiver device.
+    receiver_id id,
+    // The ID of the label.
+    label_id id,
+    // Whether the AFC channel is valid.
+    is_valid bool,
+}
+
+// Returns a `QueryAfcChannelIsValidResult` effect indicating whether the AFC channel is valid.
+ephemeral command QueryAfcChannelIsValid {
+    fields {
+        // The ID of the sender device.
+        sender_id id,
+        // The ID of the receiver device.
+        receiver_id id,
+        // The ID of the label.
+        label_id id,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that both devices have permission to create the AFC channel.
+        let is_valid = afc_uni_channel_is_valid(this.sender_id, this.receiver_id, this.label_id)
+        finish {
+            // TODO: substruct selection from `this`
+            emit QueryAfcChannelIsValidResult {
+                sender_id: this.sender_id,
+                receiver_id: this.receiver_id,
+                label_id: this.label_id,
+                is_valid: is_valid
+            }
+        }
+    }
+}
+```
+
 #### `query_device_role`
 
 Returns the role assigned to a device.
@@ -796,6 +889,10 @@ effect PermAddedToRole {
 }
 
 command AddPermToRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role to which the permission is being
         // added.
@@ -856,6 +953,10 @@ effect PermRemovedFromRole {
 }
 
 command RemovePermFromRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the role from which the permission is being
         // removed.
@@ -1000,6 +1101,10 @@ effect RoleOwnerAdded {
 }
 
 command AddRoleOwner {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role whose owning role is being
         // changed.
@@ -1069,6 +1174,10 @@ effect RoleOwnerRemoved {
 }
 
 command RemoveRoleOwner {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role whose owning role is being
         // changed.
@@ -1197,12 +1306,13 @@ fact CanRevokeRole[target_role_id id, managing_role_id id]=>{}
 //
 // If true, `CanRevokeRole(target_role_id, device_role_id)` holds.
 function can_revoke_role(device_id id, target_role_id id) bool {
+    check device_has_simple_perm(device_id, SimplePerm::RevokeRole)
     let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
     //
     // - `device_role_id` refers to a role that exists
-    // - `device_role_id` refers to the role revoked to
+    // - `device_role_id` refers to the role assigned to
     //   `device_id`
     //
     // We do NOT know whether `device_id` refers to a device
@@ -1335,6 +1445,10 @@ effect RoleManagementPermAssigned {
 }
 
 command AssignRoleManagementPerm {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // assigned.
@@ -1353,6 +1467,7 @@ command AssignRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
+        // TODO check device_has_simple_perm(author.device_id, SimplePerm::CanChangeRolePerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         // Make sure we uphold the invariants for
@@ -1476,6 +1591,10 @@ effect RoleManagementPermRevoked {
 }
 
 command RevokeRoleManagementPerm {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // removed.
@@ -1494,6 +1613,7 @@ command RevokeRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
+        // TODO check device_has_simple_perm(author.device_id, SimplePerm::CanChangeRolePerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         let perm = role_management_perm_to_str(this.perm)
@@ -1710,6 +1830,10 @@ action setup_default_roles(owning_role_id id) {
 }
 
 command SetupDefaultRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The name of the default role.
         name enum DefaultRoleName,
@@ -1823,7 +1947,8 @@ command SetupDefaultRole {
 
 ### Role Deletion
 
-TODO
+Role deletion is waiting on prefix query deletion (see
+https://github.com/aranya-project/aranya-core/issues/229)
 
 ### Role Assignment
 
@@ -1998,6 +2123,10 @@ effect RoleAssigned {
 }
 
 command AssignRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -2052,6 +2181,7 @@ command AssignRole {
                 role_id: this.role_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2093,6 +2223,10 @@ effect RoleChanged {
 }
 
 command ChangeRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -2119,7 +2253,6 @@ command ChangeRole {
         // The author must have permission to revoke the old role.
         let old_role = check_unwrap query Role[role_id: this.old_role_id]
         check can_revoke_role(author.device_id, this.old_role_id)
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
 
         // The author must have permission to assign the new role.
         check exists Role[role_id: this.new_role_id]
@@ -2169,6 +2302,7 @@ command ChangeRole {
                 old_role_id: this.old_role_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2201,6 +2335,10 @@ effect RoleRevoked {
 }
 
 command RevokeRole {
+    attributes {
+        priority: 300
+    }
+
     fields {
         // The ID of the device having its role revoked.
         device_id id,
@@ -2217,7 +2355,6 @@ command RevokeRole {
         let author = get_author(envelope)
 
         // The author must have permission to revoke the role.
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
         check can_revoke_role(author.device_id, this.role_id)
 
         let role = check_unwrap query Role[role_id: this.role_id]
@@ -2257,6 +2394,7 @@ command RevokeRole {
                 role_id: this.role_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2431,6 +2569,10 @@ effect TeamCreated {
 }
 
 command CreateTeam {
+    attributes {
+        init: true
+    }
+
     fields {
         // The initial owner's public Device Keys.
         owner_keys struct KeyBundle,
@@ -2618,7 +2760,15 @@ effect TeamTerminated {
     owner_id id,
 }
 
+// This effect is emitted when a command could cause certain AFC channels to be invalidated.
+// When the effect is handled, the user should run the `query_afc_channel_is_valid()` query to determine which of its AFC channels are still valid.
+effect CheckValidAfcChannels{}
+
 command TerminateTeam {
+    attributes {
+        priority: 500
+    }
+
     fields {
         // The ID of the team being terminated.
         team_id id,
@@ -2648,6 +2798,8 @@ command TerminateTeam {
                 team_id: current_team_id,
                 owner_id: author.device_id,
             }
+
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -2684,6 +2836,10 @@ effect DeviceAdded {
 }
 
 command AddDevice {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
@@ -2773,6 +2929,10 @@ effect DeviceRemoved {
 }
 
 command RemoveDevice {
+    attributes {
+        priority: 400
+    }
+
     fields {
         // The ID of the device being removed from the team.
         device_id id,
@@ -2829,6 +2989,7 @@ command RemoveDevice {
                     device_id: this.device_id,
                     author_id: author.device_id,
                 }
+                emit CheckValidAfcChannels {}
             }
         } else {
             // TODO(eric): Consider adding an index on
@@ -2844,6 +3005,7 @@ command RemoveDevice {
                     device_id: this.device_id,
                     author_id: author.device_id,
                 }
+                emit CheckValidAfcChannels {}
             }
         }
     }
@@ -3002,6 +3164,10 @@ effect LabelManagingRoleAdded {
 }
 
 command AddLabelManagingRole {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -3073,6 +3239,10 @@ effect LabelManagingRoleRevoked {
 }
 
 command RevokeLabelManagingRole {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -3149,6 +3319,10 @@ effect LabelCreated {
 }
 
 command CreateLabel {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The label name.
         label_name string,
@@ -3230,6 +3404,10 @@ effect LabelDeleted {
 }
 
 command DeleteLabel {
+    attributes {
+        priority: 300
+    }
+
     fields {
         // The unique ID of the label being deleted.
         label_id id,
@@ -3272,6 +3450,7 @@ command DeleteLabel {
                 label_id: label.label_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -3295,133 +3474,6 @@ device's role need not be mutually exclusive. They are permitted
 to overlap, including having different `ChanOp`s. When
 determining whether a device is allowed to use a label, the more
 permissive `ChanOp` is used.
-
-##### Label Assignment to Roles
-
-```policy
-// Records that a role was granted permission to use a label for
-// certain channel operations.
-//
-// # Foreign Keys
-//
-// - `label_id` refers to the `Label` fact.
-// - `role_id` refers to the `Role` fact.
-//
-// # Caveats
-//
-// We do not yet support prefix deletion, so this fact is NOT
-// deleted when the label or the role are deleted. Use TODO to
-// verify whether a role is allowed to use the label instead of
-// checking this fact directly.
-fact LabelAssignedToRole[label_id id, role_id id]=>{op enum ChanOp}
-
-// Grants the role permission to use the label.
-//
-// - It is an error if the author does not have permission to assign
-//   this label.
-// - It is an error if `role_id` refers to the author's current
-//   role.
-// - It is an error if the role does not exist.
-// - It is an error if the label does not exist.
-// - It is an error if the role has already been granted
-//   permission to use this label.
-//
-// # Required Permissions
-//
-// The author must have the following permissions:
-// - `AssignLabel`
-// - `CanManageLabel(label_id)`
-//
-// The target role must have the following permissions:
-// - `CanUseAfc`
-action assign_label_to_role(role_id id, label_id id, op enum ChanOp) {
-    publish AssignLabelToRole {
-        role_id: role_id,
-        label_id: label_id,
-        op: op,
-    }
-}
-
-// Emitted when the `AssignLabelToRole` command is successfully
-// processed.
-effect AssignedLabelToRole {
-    // The ID of the role that was assigned the label.
-    role_id id,
-    // The ID of the label that was assigned.
-    label_id id,
-    // The ID of the device that assigned the label.
-    author_id id,
-}
-
-command AssignLabelToRole {
-    fields {
-        // The target role.
-        role_id id,
-        // The label being assigned to the target role.
-        label_id id,
-        // The channel operations the role is allowed to use the
-        // label for.
-        op enum ChanOp,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-
-        // Devices are never allowed to assign labels to their
-        // current role.
-        //
-        // Perform this check before we make more fact database
-        // queries.
-        let assigned_role_id = get_assigned_role_id(author.device_id)
-        check assigned_role_id != this.role_id
-
-        // The author must be allowed to assign this label.
-        check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
-        check can_manage_label(author.device_id, this.label_id)
-
-        // The role must be able to use AFC.
-        check role_has_simple_perm(this.role_id, SimplePerm::CanUseAfc)
-
-        // Make sure we uphold `AssignedLabelToRole`'s foreign
-        // keys.
-        //
-        // NB: We do not check `exists Role[...]` because
-        // `role_has_simple_perm` already checks whether the role
-        // exists.
-        check exists Label[label_id: this.label_id]
-        check !exists LabelAssignedToRole[
-            label_id: this.label_id,
-            role_id: this.role_id,
-        ]
-
-        // At this point we believe the following to be true:
-        //
-        // - the team is active
-        // - `author` has the `AssignLabel` permission
-        // - `author` is allowed to manage `this.label_id`
-        // - `this.role_id` refers to a role that exists
-        // - `this.label_id` refers to a label that exists
-        // - the label is not already assigned to `this.role_id`
-        finish {
-            create LabelAssignedToRole[
-                label_id: this.label_id,
-                role_id: this.role_id,
-            ]=>{op: this.op}
-
-            emit AssignedLabelToRole {
-                role_id: this.role_id,
-                label_id: this.label_id,
-                author_id: author.device_id,
-            }
-        }
-    }
-}
-```
 
 ##### Label Assignment to Devices
 
@@ -3478,6 +3530,10 @@ effect AssignedLabelToDevice {
 }
 
 command AssignLabelToDevice {
+    attributes {
+        priority: 100
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -3583,83 +3639,6 @@ command AssignLabelToDevice {
 #### Label Revocation
 
 ```policy
-// Revokes permission to use a label from a role.
-//
-// - It is an error if the role does not exist.
-// - It is an error if the label does not exist.
-// - It is an error if the role has not been granted permission
-//   to use this label.
-//
-// # Required Permissions
-//
-// - `RevokeLabel`
-// - `CanManageLabel(label_id)`
-action revoke_label_from_role(role_id id, label_id id) {
-    publish RevokeLabelFromRole {
-        role_id: role_id,
-        label_id: label_id,
-    }
-}
-
-// Emitted when the `RevokeLabelFromRole` command is successfully
-// processed.
-effect LabelRevokedFromRole {
-    // The ID of the role that had the label revoked.
-    role_id id,
-    // The ID of the label that was revoked.
-    label_id id,
-    // The ID of the device that revoked the label.
-    author_id id,
-}
-
-command RevokeLabelFromRole {
-    fields {
-        // The target role.
-        role_id id,
-        // The label being assigned to the target device.
-        label_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
-        check can_manage_label(author.device_id, this.label_id)
-
-        check exists Role[role_id: this.role_id]
-        check exists Label[label_id: this.label_id]
-        check exists LabelAssignedToRole[
-            label_id: this.label_id,
-            role_id: this.role_id,
-        ]
-
-        // At this point we believe the following to be true:
-        //
-        // - the team is active
-        // - `author` has the `RevokeLabel` permission
-        // - `author` is allowed to manage `this.label_id`
-        // - `this.role_id` refers to a role that exists
-        // - `this.label_id` refers to a label that exists
-        // - the label is currently assigned to `this.role_id`
-        finish {
-            delete LabelAssignedToRole[
-                label_id: this.label_id,
-                role_id: this.role_id,
-            ]
-
-            emit LabelRevokedFromRole {
-                role_id: this.role_id,
-                label_id: this.label_id,
-                author_id: author.device_id,
-            }
-        }
-    }
-}
-
 // Revokes permission to use a label from a device.
 //
 // - It is an error if the device does not exist.
@@ -3694,6 +3673,10 @@ effect LabelRevokedFromDevice {
 }
 
 command RevokeLabelFromDevice {
+    attributes {
+        priority: 200
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -3739,6 +3722,7 @@ command RevokeLabelFromDevice {
                 label_author_id: label.author_id,
                 author_id: author.device_id,
             }
+            emit CheckValidAfcChannels {}
         }
     }
 }
@@ -3754,13 +3738,6 @@ command RevokeLabelFromDevice {
 //
 // - It does NOT check whether the device exists.
 function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum ChanOp {
-    // First test to see if the device's role has been granted
-    // permission to use the label.
-    let role_id = get_assigned_role_id(device_id)
-    let assigned_to_role = query LabelAssignedToRole[
-        label_id: label_id,
-        role_id: role_id,
-    ]
 
     // Now see if the device was directly granted permission
     // to use the label.
@@ -3768,28 +3745,8 @@ function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum 
         label_id: label_id,
         device_id: device_id,
     ]
-
-    let role_op = if assigned_to_role is Some {
-        : Some((unwrap assigned_to_role).op)
-    } else {
-        : None
-    }
     let device_op = device_assignment_op(device_id, assigned_to_dev)
-
-    if role_op is None {
-        return device_op
-    }
-    if device_op is None {
-        return role_op
-    }
-
-    let role_op_val = unwrap role_op
-    let device_op_val = unwrap device_op
-
-    if chan_op_rank(role_op_val) >= chan_op_rank(device_op_val) {
-        return Some(role_op_val)
-    }
-    return Some(device_op_val)
+    return device_op
 }
 
 // Returns the channel operation for a device-specific label
@@ -3938,82 +3895,6 @@ ephemeral command QueryLabels {
 }
 ```
 
-##### `query_labels_assigned_to_role`
-
-Returns a list of all labels that have been assigned to
-a particular role.
-
-```policy
-// Emits `QueryLabelsAssignedToRoleResult` for all labels that
-// have been assigned to the role.
-// If the role has not been assigned any labels, then no effects
-// are emitted.
-ephemeral action query_labels_assigned_to_role(role_id id) {
-    // TODO: make this query more efficient when policy supports
-    // it. The key order is optimized for `delete`.
-    map LabelAssignedToRole[label_id: ?, role_id: ?] as f {
-        if f.role_id == role_id {
-            // Skip entries where the Label has been deleted.
-            // This is necessary because LabelAssignedToRole
-            // facts are not yet deleted because we do not have
-            // prefix deletion.
-            if exists Label[label_id: f.label_id] {
-                let label = check_unwrap query Label[label_id: f.label_id]
-                publish QueryLabelsAssignedToRole {
-                    role_id: f.role_id,
-                    label_id: f.label_id,
-                    label_name: label.name,
-                    label_author_id: label.author_id,
-                }
-            }
-        }
-    }
-}
-
-effect QueryLabelsAssignedToRoleResult {
-    // The role the label is assigned to.
-    role_id id,
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
-}
-
-ephemeral command QueryLabelsAssignedToRole {
-    fields {
-        role_id id,
-        label_id id,
-        label_name string,
-        label_author_id id,
-    }
-
-    // TODO(eric): We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        if !exists Role[role_id: this.role_id] {
-            // TODO(eric): Or should we raise a check error?
-            finish {}
-        } else {
-            finish {
-                emit QueryLabelsAssignedToRoleResult {
-                    role_id: this.role_id,
-                    label_id: this.label_id,
-                    label_name: this.label_name,
-                    label_author_id: this.label_author_id,
-                }
-            }
-        }
-    }
-}
-```
-
 ##### `query_labels_assigned_to_device`
 
 ```policy
@@ -4099,16 +3980,6 @@ enum ChanOp {
     // The device can send and receive data in channels with this
     // label.
     SendRecv,
-}
-
-// Returns a numeric rank for `ChanOp` so permissions can be
-// compared. Higher ranks are more permissive.
-function chan_op_rank(op enum ChanOp) int {
-    match op {
-        ChanOp::RecvOnly => { return 0 }
-        ChanOp::SendOnly => { return 1 }
-        ChanOp::SendRecv => { return 2 }
-    }
 }
 ```
 
@@ -4208,17 +4079,13 @@ ephemeral command AfcCreateUniChannel {
 
         let sender = get_author(envelope)
         let sender_id = sender.device_id
-        check device_has_simple_perm(sender_id, SimplePerm::CreateAfcUniChannel)
 
         let receiver_id = this.receiver_id
         let receiver = check_unwrap try_find_device(receiver_id)
 
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
 
-        // Check that both devices have been granted permission
-        // to use the label for their respective directions.
-        check can_create_afc_uni_channel(sender_id, receiver_id, label.label_id)
+        // Check that both devices have permission to create the AFC channel.
+        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -4233,7 +4100,7 @@ ephemeral command AfcCreateUniChannel {
                     receiver_id: receiver_id,
                     author_enc_key_id: sender.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
-                    label_id: label.label_id,
+                    label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                     encap: this.peer_encap,
                 }
@@ -4260,14 +4127,39 @@ ephemeral command AfcCreateUniChannel {
     }
 }
 
-// Reports whether the devices have permission to create
-// a unidirectional AFC channel with each other.
-function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) bool {
+// Reports whether an AFC channel is valid according to the policy.
+// The following criteria must be met for an AFC channel to be valid:
+// - The label must exist
+// - The label must be assigned to the sender with write permissions: `SendOnly` or `SendRecv`
+// - The label must be assigned to the receiver with read permissions: `RecvOnly` or `SendRecv`
+// - The sender must have `CreateAfcUniChannel` permission assigned to its respective role.
+// - Sender and receiver devices must:
+//   - Be members of the team
+//   - Not have matching device IDs
+//   - Have `CanUseAfc` permission assigned to their respective roles
+function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) bool {
+    // The label must exist.
+    let label = query Label[label_id: label_id]
+    if label is None {
+        return false
+    }
+
     // Devices cannot create channels with themselves.
     //
-    // This should have been caught by the AFC FFI, so check
-    // instead of just returning false.
-    check sender_id != receiver_id
+    // This should have been caught by the AFC FFI
+    if sender_id == receiver_id {
+        return false
+    }
+
+    // Devices must be members of the team
+    let sender = try_find_device(sender_id)
+    if sender is None {
+        return false
+    }
+    let receiver = try_find_device(receiver_id)
+    if receiver is None {
+        return false
+    }
 
     // The writer must have permissions to write (send) data.
     let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
@@ -4289,6 +4181,18 @@ function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) b
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
         ChanOp::SendRecv => {}
+    }
+
+    // Sender must have `CreateAfcUniChannel`, `CanUseAfc` permissions
+    if !device_has_simple_perm(sender_id, SimplePerm::CreateAfcUniChannel) {
+        return false
+    }
+    if !device_has_simple_perm(sender_id, SimplePerm::CanUseAfc) {
+        return false
+    }
+    // Receiver must have `CanUseAfc` permission
+    if !device_has_simple_perm(receiver_id, SimplePerm::CanUseAfc) {
+        return false
     }
 
     return true

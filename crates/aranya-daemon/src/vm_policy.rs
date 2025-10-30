@@ -185,6 +185,7 @@ impl MsgSink {
     }
 
     /// Returns the collected commands.
+    #[cfg(feature = "afc")]
     pub(crate) fn into_cmds(self) -> Vec<Box<[u8]>> {
         self.cmds
     }

@@ -191,6 +191,7 @@ impl Daemon {
                     )
                 };
                 Afc::new(
+                    client.clone(),
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store
@@ -341,6 +342,7 @@ impl Daemon {
             invalid_graphs,
             Arc::clone(&psk_store),
             client_addr,
+            server_addr,
             Arc::clone(&caches),
         )?;
 

@@ -214,7 +214,7 @@ pub struct AfcConfig {
 pub struct QuicSyncConfig {
     /// Network address of Aranya sync server.
     pub addr: Addr,
-    /// Client listen address.
+    /// Client bind address.
     pub client_addr: Option<Addr>,
 }
 
