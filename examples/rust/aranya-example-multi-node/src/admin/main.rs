@@ -90,17 +90,16 @@ async fn main() -> Result<()> {
         .await?;
 
     // Loop until this device has the `Admin` role assigned to it.
-    info!("admin: waiting for owner to assign admin role");
-    let admin_role = 'outer: loop {
+    info!("admin: finding admin role");
+    let admin_role = loop {
         if let Ok(roles) = team.roles().await {
-            for role in roles {
-                if role.name == "admin" {
-                    break 'outer role;
-                }
+            if let Some(role) = roles.into_iter().find(|role| role.name == "admin") {
+                break role;
             }
         }
         sleep(SLEEP_INTERVAL).await;
     };
+    info!("admin: waiting for owner to assign admin role");
     loop {
         if let Ok(Some(r)) = team.device(device_id).role().await {
             if r == admin_role {
@@ -117,12 +116,10 @@ async fn main() -> Result<()> {
     info!("admin: created label");
 
     info!("admin: finding operator role");
-    let operator_role = 'outer: loop {
+    let operator_role = loop {
         if let Ok(roles) = team.roles().await {
-            for role in roles {
-                if role.name == "operator" {
-                    break 'outer role;
-                }
+            if let Some(role) = roles.into_iter().find(|role| role.name == "operator") {
+                break role;
             }
         }
         sleep(SLEEP_INTERVAL).await;
