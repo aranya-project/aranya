@@ -252,6 +252,7 @@ dependencies = [
  "aranya-daemon",
  "aranya-daemon-api",
  "aranya-fast-channels",
+ "aranya-policy-text",
  "aranya-util",
  "backon",
  "buggy",
@@ -345,6 +346,7 @@ dependencies = [
  "aranya-policy-ifgen",
  "aranya-policy-ifgen-build",
  "aranya-policy-lang",
+ "aranya-policy-text",
  "aranya-policy-vm",
  "aranya-runtime",
  "aranya-util",
@@ -582,7 +584,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
- "aranya-daemon-api",
  "backon",
  "http",
  "libc",

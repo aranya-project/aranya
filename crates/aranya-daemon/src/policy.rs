@@ -24,49 +24,41 @@ pub enum ChanOp {
     SendOnly,
     SendRecv,
 }
-/// Role policy enum.
-#[value]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
-}
 /// Enum of policy effects that can occur in response to a policy action.
 #[effects]
 pub enum Effect {
-    AdminAssigned(AdminAssigned),
-    AdminRevoked(AdminRevoked),
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
-    LabelAssigned(LabelAssigned),
+    AssignedLabelToDevice(AssignedLabelToDevice),
+    CheckValidAfcChannels(CheckValidAfcChannels),
+    DeviceAdded(DeviceAdded),
+    DeviceRemoved(DeviceRemoved),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
-    LabelRevoked(LabelRevoked),
-    MemberAdded(MemberAdded),
-    MemberRemoved(MemberRemoved),
-    OperatorAssigned(OperatorAssigned),
-    OperatorRevoked(OperatorRevoked),
-    OwnerAssigned(OwnerAssigned),
-    OwnerRevoked(OwnerRevoked),
-    QueriedLabel(QueriedLabel),
-    QueriedLabelAssignment(QueriedLabelAssignment),
+    LabelManagingRoleAdded(LabelManagingRoleAdded),
+    LabelManagingRoleRevoked(LabelManagingRoleRevoked),
+    LabelRevokedFromDevice(LabelRevokedFromDevice),
+    PermAddedToRole(PermAddedToRole),
+    PermRemovedFromRole(PermRemovedFromRole),
+    QueryAfcChannelIsValidResult(QueryAfcChannelIsValidResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
-    QueryLabelExistsResult(QueryLabelExistsResult),
+    QueryLabelResult(QueryLabelResult),
+    QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
+    QueryLabelsResult(QueryLabelsResult),
+    QueryRoleOwnersResult(QueryRoleOwnersResult),
+    QueryTeamRolesResult(QueryTeamRolesResult),
+    RoleAssigned(RoleAssigned),
+    RoleChanged(RoleChanged),
+    RoleCreated(RoleCreated),
+    RoleManagementPermAssigned(RoleManagementPermAssigned),
+    RoleManagementPermRevoked(RoleManagementPermRevoked),
+    RoleOwnerAdded(RoleOwnerAdded),
+    RoleOwnerRemoved(RoleOwnerRemoved),
+    RoleRevoked(RoleRevoked),
     TeamCreated(TeamCreated),
     TeamTerminated(TeamTerminated),
-}
-/// AdminAssigned policy effect.
-#[effect]
-pub struct AdminAssigned {
-    pub device_id: BaseId,
-}
-/// AdminRevoked policy effect.
-#[effect]
-pub struct AdminRevoked {
-    pub device_id: BaseId,
 }
 /// AfcUniChannelCreated policy effect.
 #[effect]
@@ -89,12 +81,26 @@ pub struct AfcUniChannelReceived {
     pub label_id: BaseId,
     pub encap: Vec<u8>,
 }
-/// LabelAssigned policy effect.
+/// AssignedLabelToDevice policy effect.
 #[effect]
-pub struct LabelAssigned {
+pub struct AssignedLabelToDevice {
+    pub device: BaseId,
     pub label_id: BaseId,
-    pub label_name: Text,
-    pub label_author_id: BaseId,
+    pub author_id: BaseId,
+}
+/// CheckValidAfcChannels policy effect.
+#[effect]
+pub struct CheckValidAfcChannels {}
+/// DeviceAdded policy effect.
+#[effect]
+pub struct DeviceAdded {
+    pub device_id: BaseId,
+    pub device_keys: KeyBundle,
+}
+/// DeviceRemoved policy effect.
+#[effect]
+pub struct DeviceRemoved {
+    pub device_id: BaseId,
     pub author_id: BaseId,
 }
 /// LabelCreated policy effect.
@@ -103,6 +109,7 @@ pub struct LabelCreated {
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
+    pub managing_role_id: BaseId,
 }
 /// LabelDeleted policy effect.
 #[effect]
@@ -112,60 +119,50 @@ pub struct LabelDeleted {
     pub label_id: BaseId,
     pub author_id: BaseId,
 }
-/// LabelRevoked policy effect.
+/// LabelManagingRoleAdded policy effect.
 #[effect]
-pub struct LabelRevoked {
+pub struct LabelManagingRoleAdded {
+    pub label_id: BaseId,
+    pub managing_role_id: BaseId,
+    pub author_id: BaseId,
+}
+/// LabelManagingRoleRevoked policy effect.
+#[effect]
+pub struct LabelManagingRoleRevoked {
+    pub label_id: BaseId,
+    pub managing_role_id: BaseId,
+    pub author_id: BaseId,
+}
+/// LabelRevokedFromDevice policy effect.
+#[effect]
+pub struct LabelRevokedFromDevice {
     pub device_id: BaseId,
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
     pub author_id: BaseId,
 }
-/// MemberAdded policy effect.
+/// PermAddedToRole policy effect.
 #[effect]
-pub struct MemberAdded {
-    pub device_id: BaseId,
-    pub device_keys: KeyBundle,
+pub struct PermAddedToRole {
+    pub role_id: BaseId,
+    pub perm: Text,
+    pub author_id: BaseId,
 }
-/// MemberRemoved policy effect.
+/// PermRemovedFromRole policy effect.
 #[effect]
-pub struct MemberRemoved {
-    pub device_id: BaseId,
+pub struct PermRemovedFromRole {
+    pub role_id: BaseId,
+    pub perm: Text,
+    pub author_id: BaseId,
 }
-/// OperatorAssigned policy effect.
+/// QueryAfcChannelIsValidResult policy effect.
 #[effect]
-pub struct OperatorAssigned {
-    pub device_id: BaseId,
-}
-/// OperatorRevoked policy effect.
-#[effect]
-pub struct OperatorRevoked {
-    pub device_id: BaseId,
-}
-/// OwnerAssigned policy effect.
-#[effect]
-pub struct OwnerAssigned {
-    pub device_id: BaseId,
-}
-/// OwnerRevoked policy effect.
-#[effect]
-pub struct OwnerRevoked {
-    pub device_id: BaseId,
-}
-/// QueriedLabel policy effect.
-#[effect]
-pub struct QueriedLabel {
+pub struct QueryAfcChannelIsValidResult {
+    pub sender_id: BaseId,
+    pub receiver_id: BaseId,
     pub label_id: BaseId,
-    pub label_name: Text,
-    pub label_author_id: BaseId,
-}
-/// QueriedLabelAssignment policy effect.
-#[effect]
-pub struct QueriedLabelAssignment {
-    pub device_id: BaseId,
-    pub label_id: BaseId,
-    pub label_name: Text,
-    pub label_author_id: BaseId,
+    pub is_valid: bool,
 }
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
@@ -175,65 +172,238 @@ pub struct QueryDeviceKeyBundleResult {
 /// QueryDeviceRoleResult policy effect.
 #[effect]
 pub struct QueryDeviceRoleResult {
-    pub role: Role,
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
 }
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
 pub struct QueryDevicesOnTeamResult {
     pub device_id: BaseId,
 }
-/// QueryLabelExistsResult policy effect.
+/// QueryLabelResult policy effect.
 #[effect]
-pub struct QueryLabelExistsResult {
+pub struct QueryLabelResult {
     pub label_id: BaseId,
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
+/// QueryLabelsAssignedToDeviceResult policy effect.
+#[effect]
+pub struct QueryLabelsAssignedToDeviceResult {
+    pub device_id: BaseId,
+    pub label_id: BaseId,
+    pub label_name: Text,
+    pub label_author_id: BaseId,
+}
+/// QueryLabelsResult policy effect.
+#[effect]
+pub struct QueryLabelsResult {
+    pub label_id: BaseId,
+    pub label_name: Text,
+    pub label_author_id: BaseId,
+}
+/// QueryRoleOwnersResult policy effect.
+#[effect]
+pub struct QueryRoleOwnersResult {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
+}
+/// QueryTeamRolesResult policy effect.
+#[effect]
+pub struct QueryTeamRolesResult {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
+}
+/// RoleAssigned policy effect.
+#[effect]
+pub struct RoleAssigned {
+    pub device_id: BaseId,
+    pub role_id: BaseId,
+    pub author_id: BaseId,
+}
+/// RoleChanged policy effect.
+#[effect]
+pub struct RoleChanged {
+    pub device_id: BaseId,
+    pub old_role_id: BaseId,
+    pub new_role_id: BaseId,
+    pub author_id: BaseId,
+}
+/// RoleCreated policy effect.
+#[effect]
+pub struct RoleCreated {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub owning_role_id: BaseId,
+    pub default: bool,
+}
+/// RoleManagementPermAssigned policy effect.
+#[effect]
+pub struct RoleManagementPermAssigned {
+    pub target_role_id: BaseId,
+    pub managing_role_id: BaseId,
+    pub perm: Text,
+    pub author_id: BaseId,
+}
+/// RoleManagementPermRevoked policy effect.
+#[effect]
+pub struct RoleManagementPermRevoked {
+    pub target_role_id: BaseId,
+    pub managing_role_id: BaseId,
+    pub perm: Text,
+    pub author_id: BaseId,
+}
+/// RoleOwnerAdded policy effect.
+#[effect]
+pub struct RoleOwnerAdded {
+    pub target_role_id: BaseId,
+    pub new_role_owner: BaseId,
+    pub author_id: BaseId,
+}
+/// RoleOwnerRemoved policy effect.
+#[effect]
+pub struct RoleOwnerRemoved {
+    pub target_role_id: BaseId,
+    pub owning_role_id: BaseId,
+    pub author_id: BaseId,
+}
+/// RoleRevoked policy effect.
+#[effect]
+pub struct RoleRevoked {
+    pub device_id: BaseId,
+    pub role_id: BaseId,
+    pub author_id: BaseId,
+}
 /// TeamCreated policy effect.
 #[effect]
 pub struct TeamCreated {
+    pub team_id: BaseId,
     pub owner_id: BaseId,
 }
 /// TeamTerminated policy effect.
 #[effect]
 pub struct TeamTerminated {
+    pub team_id: BaseId,
     pub owner_id: BaseId,
 }
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
+    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
+    fn query_afc_channel_is_valid(
+        &mut self,
+        sender_id: BaseId,
+        receiver_id: BaseId,
+        label_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
+    fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
+    fn add_perm_to_role(
+        &mut self,
+        role_id: BaseId,
+        perm_str: Text,
+    ) -> Result<(), ClientError>;
+    fn remove_perm_from_role(
+        &mut self,
+        role_id: BaseId,
+        perm_str: Text,
+    ) -> Result<(), ClientError>;
+    fn add_role_owner(
+        &mut self,
+        target_role_id: BaseId,
+        new_owning_role: BaseId,
+    ) -> Result<(), ClientError>;
+    fn remove_role_owner(
+        &mut self,
+        target_role_id: BaseId,
+        owning_role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn assign_role_management_perm(
+        &mut self,
+        target_role_id: BaseId,
+        managing_role_id: BaseId,
+        perm: Text,
+    ) -> Result<(), ClientError>;
+    fn revoke_role_management_perm(
+        &mut self,
+        target_role_id: BaseId,
+        managing_role_id: BaseId,
+        perm: Text,
+    ) -> Result<(), ClientError>;
+    fn setup_default_roles(&mut self, owning_role_id: BaseId) -> Result<(), ClientError>;
+    fn assign_role(
+        &mut self,
+        device_id: BaseId,
+        role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn change_role(
+        &mut self,
+        device_id: BaseId,
+        old_role_id: BaseId,
+        new_role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn revoke_role(
+        &mut self,
+        device_id: BaseId,
+        role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn query_team_roles(&mut self) -> Result<(), ClientError>;
+    fn query_role_owners(&mut self, role_id: BaseId) -> Result<(), ClientError>;
     fn create_team(
         &mut self,
         owner_keys: KeyBundle,
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
-    fn terminate_team(&mut self) -> Result<(), ClientError>;
-    fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
-    fn remove_member(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn assign_role(&mut self, device_id: BaseId, role: Role) -> Result<(), ClientError>;
-    fn revoke_role(&mut self, device_id: BaseId, role: Role) -> Result<(), ClientError>;
-    fn create_afc_uni_channel(
+    fn terminate_team(&mut self, team_id: BaseId) -> Result<(), ClientError>;
+    fn add_device(
         &mut self,
-        receiver_id: BaseId,
-        label_id: BaseId,
+        device_keys: KeyBundle,
+        initial_role_id: Option<BaseId>,
     ) -> Result<(), ClientError>;
-    fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
+    fn remove_device(&mut self, device_id: BaseId) -> Result<(), ClientError>;
+    fn add_label_managing_role(
+        &mut self,
+        label_id: BaseId,
+        managing_role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn revoke_label_managing_role(
+        &mut self,
+        label_id: BaseId,
+        managing_role_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn create_label(
+        &mut self,
+        name: Text,
+        managing_role_id: BaseId,
+    ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn assign_label(
+    fn assign_label_to_device(
         &mut self,
         device_id: BaseId,
         label_id: BaseId,
         op: ChanOp,
     ) -> Result<(), ClientError>;
-    fn revoke_label(
+    fn revoke_label_from_device(
         &mut self,
         device_id: BaseId,
         label_id: BaseId,
     ) -> Result<(), ClientError>;
-    fn query_label_exists(&mut self, label_id: BaseId) -> Result<(), ClientError>;
+    fn query_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn query_label_assignments(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
+    fn query_labels_assigned_to_device(
+        &mut self,
+        device_id: BaseId,
+    ) -> Result<(), ClientError>;
+    fn create_afc_uni_channel(
+        &mut self,
+        receiver_id: BaseId,
+        label_id: BaseId,
+    ) -> Result<(), ClientError>;
 }

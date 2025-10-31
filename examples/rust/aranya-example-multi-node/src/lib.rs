@@ -14,14 +14,17 @@ pub async fn get_member_peer(
 ) -> anyhow::Result<aranya_client::DeviceId> {
     let this_device = client.get_device_id().await?;
     let team = client.team(team);
-    let queries = team.queries();
-    let devices = queries.devices_on_team().await?;
-    for device in devices.iter() {
-        if device.__id == this_device.__id {
+    let devices = team.devices().await?;
+    for &device in devices.iter() {
+        if device == this_device {
             continue;
         }
-        let role = queries.device_role(device).await?;
-        if role == aranya_client::client::Role::Member {
+        let role = team
+            .device(device)
+            .role()
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("no role"))?;
+        if role.name == "member" && role.default {
             return Ok(device);
         }
     }

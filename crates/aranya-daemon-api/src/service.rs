@@ -4,6 +4,7 @@ use core::{error, fmt, hash::Hash, net::SocketAddr, time::Duration};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
+    dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
@@ -11,7 +12,7 @@ use aranya_crypto::{
     EncryptionPublicKey, Engine,
 };
 use aranya_id::custom_id;
-pub use aranya_policy_text::{text, Text};
+pub use aranya_policy_text::{text, InvalidText, Text};
 use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
@@ -56,6 +57,12 @@ impl From<anyhow::Error> for Error {
     }
 }
 
+impl From<InvalidText> for Error {
+    fn from(err: InvalidText) -> Self {
+        Self(format!("{err:?}"))
+    }
+}
+
 impl From<semver::Error> for Error {
     fn from(err: semver::Error) -> Self {
         Self::from_err(err)
@@ -93,21 +100,39 @@ custom_id! {
     pub struct LabelId;
 }
 
-/// A device's public key bundle.
+custom_id! {
+    /// A role ID.
+    pub struct RoleId;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Role {
+    /// Uniquely identifies the role.
+    pub id: RoleId,
+    /// The role's friendly name.
+    pub name: Text,
+    /// The author of the role.
+    pub author_id: DeviceId,
+    /// Is this a default role?
+    pub default: bool,
+}
+
+/// A device's public key bundle.
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
     pub encryption: Vec<u8>,
 }
 
-/// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
+impl fmt::Debug for KeyBundle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeyBundle")
+            .field("identity", &Hex::new(&*self.identity))
+            .field("signing", &Hex::new(&*self.signing))
+            .field("encryption", &Hex::new(&*self.encryption))
+            .finish()
+    }
 }
 
 // Note: any fields added to this type should be public
@@ -123,6 +148,14 @@ pub struct AddTeamConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamConfig {
     pub quic_sync: Option<CreateTeamQuicSyncConfig>,
+}
+
+/// A label.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Label {
+    pub id: LabelId,
+    pub name: Text,
+    pub author_id: DeviceId,
 }
 
 /// A PSK IKM.
@@ -225,13 +258,6 @@ pub enum ChanOp {
     SendRecv,
 }
 
-/// A label.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct Label {
-    pub id: LabelId,
-    pub name: Text,
-}
-
 // TODO(jdygert): tarpc does not cfg return types properly.
 #[cfg(not(feature = "afc"))]
 use afc_stub::{AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcShmInfo};
@@ -247,27 +273,29 @@ mod afc_stub {
 
 #[tarpc::service]
 pub trait DaemonApi {
+    //
+    // Misc
+    //
+
     /// Returns the daemon's version.
     async fn version() -> Result<Version>;
-
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
-
     /// Gets the public key bundle for this device
     async fn get_key_bundle() -> Result<KeyBundle>;
-
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
 
+    //
+    // Syncing
+    //
+
     /// Adds the peer for automatic periodic syncing.
     async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
-
     /// Sync with peer immediately.
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
-
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
-
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
     async fn add_team(cfg: AddTeamConfig) -> Result<()>;
 
@@ -279,34 +307,122 @@ pub trait DaemonApi {
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
+    /// Encrypts the team's syncing PSK(s) for the peer.
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> Result<WrappedSeed>;
 
-    /// Add device to the team.
-    async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
+    //
+    // Device onboarding
+    //
+
+    /// Adds a device to the team with optional initial roles.
+    async fn add_device_to_team(
+        team: TeamId,
+        keys: KeyBundle,
+        initial_role: Option<RoleId>,
+    ) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
+    /// Returns all the devices on the team.
+    async fn devices_on_team(team: TeamId) -> Result<Box<[DeviceId]>>;
+    /// Returns the device's key bundle.
+    async fn device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+
+    //
+    // Role creation
+    //
+
+    /// Configures the team with default roles from policy.
+    ///
+    /// It returns the default roles that were created.
+    async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the current team roles.
+    async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
+
+    //
+    // Role management
+    //
+
+    /// Adds an owning role to the target role.
+    async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Removes an owning role from the target role.
+    async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Returns the roles that own the target role.
+    async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Assigns a role management permission to a role.
+    async fn assign_role_management_perm(
+        team: TeamId,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()>;
+    /// Revokes a role management permission from a role.
+    async fn revoke_role_management_perm(
+        team: TeamId,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()>;
+
+    //
+    // Role assignment
+    //
 
     /// Assign a role to a device.
-    async fn assign_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
-    async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
-
-    // Create a label.
-    async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
-    // Delete a label.
-    async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
-    // Assign a label to a device.
-    async fn assign_label(
+    async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
+    /// Changes the assigned role of a device.
+    async fn change_role(
         team: TeamId,
         device: DeviceId,
+        old_role: RoleId,
+        new_role: RoleId,
+    ) -> Result<()>;
+    /// Returns the role assigned to the device.
+    async fn device_role(team: TeamId, device: DeviceId) -> Result<Option<Role>>;
+
+    //
+    // Label creation
+    //
+
+    /// Create a label.
+    async fn create_label(team: TeamId, name: Text, managing_role_id: RoleId) -> Result<LabelId>;
+    /// Delete a label.
+    async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
+    /// Returns a specific label.
+    async fn label(team: TeamId, label: LabelId) -> Result<Option<Label>>;
+    /// Returns all labels on the team.
+    async fn labels(team: TeamId) -> Result<Vec<Label>>;
+
+    //
+    // Label management
+    //
+
+    async fn add_label_managing_role(
+        team: TeamId,
         label_id: LabelId,
+        managing_role_id: RoleId,
+    ) -> Result<()>;
+
+    //
+    // Label assignments
+    //
+
+    /// Assigns a label to a device.
+    async fn assign_label_to_device(
+        team: TeamId,
+        device: DeviceId,
+        label: LabelId,
         op: ChanOp,
     ) -> Result<()>;
-    // Revoke a label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
+    /// Revokes a label from a device.
+    async fn revoke_label_from_device(team: TeamId, device: DeviceId, label: LabelId)
+        -> Result<()>;
+    /// Returns all labels assigned to the device.
+    async fn labels_assigned_to_device(team: TeamId, device: DeviceId) -> Result<Box<[Label]>>;
 
     /// Gets AFC shared-memory configuration info.
     #[cfg(feature = "afc")]
@@ -331,17 +447,4 @@ pub trait DaemonApi {
         team: TeamId,
         ctrl: AfcCtrl,
     ) -> Result<(LabelId, AfcLocalChannelId, AfcChannelId)>;
-
-    /// Query devices on team.
-    async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
-    /// Query device role.
-    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
-    /// Query device keybundle.
-    async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
-    /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
-    // Query labels on team.
-    async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
-    /// Query whether a label exists.
-    async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
 }

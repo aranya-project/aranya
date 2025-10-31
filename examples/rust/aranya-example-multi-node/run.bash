@@ -22,35 +22,17 @@ pushd ../../../
 
 current_dir="$(pwd)"
 
-devices=("owner" "admin" "operator" "membera" "memberb")
-
-for device in "${devices[@]}"; do
-    echo "Building aranya-example-multi-node-${device}..."
-    cargo build \
-        --release \
-        --manifest-path Cargo.toml \
-        --bin aranya-example-multi-node-"${device}" \
-        --features afc \
-        --locked
-done
+echo "Building binaries..."
+cargo build \
+    --release \
+    --package aranya-example-multi-node \
+    --package aranya-daemon \
+    --features afc,preview \
+    --locked
 
 workspace="${current_dir}/examples/rust/aranya-example-multi-node"
 release="${current_dir}/target/release"
 example="${current_dir}/target/release/aranya-example-multi-node"
-
-echo "Building aranya-daemon..."
-cargo build \
-    --release \
-    --manifest-path Cargo.toml \
-    --bin aranya-daemon \
-    --features preview,afc
-
-echo "Building aranya-example-multi-node..."
-cargo build \
-    --release \
-    --manifest-path Cargo.toml \
-    --bin aranya-example-multi-node \
-    --features afc
 
 echo "Running aranya-example-multi-node..."
 "${example}" "${release}" "${workspace}"

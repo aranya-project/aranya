@@ -41,6 +41,12 @@ pub enum Error {
     Other(#[from] OtherError),
 }
 
+impl From<core::convert::Infallible> for Error {
+    fn from(value: core::convert::Infallible) -> Self {
+        match value {}
+    }
+}
+
 /// Some other error occurred.
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
