@@ -1,6 +1,5 @@
 use std::{
     env,
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -13,6 +12,7 @@ use aranya_client::{
     SyncPeerConfig,
 };
 use aranya_daemon_api::text;
+use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{
@@ -141,7 +141,7 @@ impl ClientCtx {
         })
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 }
@@ -188,7 +188,10 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder()
+        .interval(Some(sync_interval))
+        .sync_on_hello(true)
+        .build()?;
 
     let team_name = "rust_example";
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
@@ -263,69 +266,96 @@ async fn main() -> Result<()> {
 
     // Admin syncs with the Owner peer and retries the role
     // assignment command
-    admin_team.sync_now(owner_addr.into(), None).await?;
+    admin_team.sync_now(owner_addr, None).await?;
 
     sleep(sleep_interval).await;
 
     info!("assigning role");
     admin_team.assign_role(operator.id, Role::Operator).await?;
 
+    // Demo hello subscription functionality
+    info!("demonstrating hello subscription");
+
+    // Admin subscribes to hello notifications from Owner with 2-second delay
+    info!("admin subscribing to hello notifications from owner");
+    let duration = Duration::from_secs(30);
+    let graph_change_delay = Duration::from_millis(1000);
+    let schedule_delay = Duration::from_secs(5);
+    admin_team
+        .sync_hello_subscribe(owner_addr, graph_change_delay * 2, duration, schedule_delay)
+        .await?;
+
+    // Operator subscribes to hello notifications from Admin with 1-second delay
+    info!("operator subscribing to hello notifications from admin");
+    operator_team
+        .sync_hello_subscribe(admin_addr, graph_change_delay, duration, schedule_delay)
+        .await?;
+
+    sleep(sleep_interval).await;
+
+    // Later, unsubscribe from hello notifications
+    info!("admin unsubscribing from hello notifications from owner");
+    admin_team.sync_hello_unsubscribe(owner_addr).await?;
+
+    info!("operator unsubscribing from hello notifications from admin");
+    operator_team.sync_hello_unsubscribe(admin_addr).await?;
+
+    sleep(sleep_interval).await;
+
     info!("adding sync peers");
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .add_sync_peer(membera_addr, sync_cfg.clone())
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .add_sync_peer(membera_addr, sync_cfg.clone())
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .add_sync_peer(membera_addr, sync_cfg.clone())
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_cfg.clone())
+        .add_sync_peer(memberb_addr, sync_cfg.clone())
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
-    memberb_team
-        .add_sync_peer(membera_addr.into(), sync_cfg)
-        .await?;
+    memberb_team.add_sync_peer(membera_addr, sync_cfg).await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;

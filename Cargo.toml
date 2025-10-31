@@ -64,6 +64,7 @@ aranya-daemon-api = { version = "3.0.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "3.0.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "3.0.0", path = "crates/aranya-util" }
 
+# External dependencies
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
 bytes = { version = "1.10.0" }
@@ -72,7 +73,6 @@ clap = { version = "4", features = ["derive"] }
 derive-where = { version = "1" }
 divan = { version = "0.1", default-features = false }
 futures-util = { version = "0.3.30" }
-heapless = { version = "0.8", default-features = false }
 http = { version = "1" }
 libc = { version = "0.2" }
 metrics = { version = "0.24" }
@@ -109,3 +109,25 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-id = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-text = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-ast = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }
+aranya-policy-module = { git = "https://github.com/aranya-project/aranya-core.git", branch = "118-sync-hello-from-v0.15.0" }

@@ -624,6 +624,28 @@ AranyaError run(Team* t) {
 
     sleep(1);
 
+    // Demo hello subscription functionality
+    printf("demonstrating hello subscription\n");
+
+    // Admin subscribes to hello notifications from Owner with 2-second delay
+    printf("admin subscribing to hello notifications from owner\n");
+    AranyaDuration graph_change_delay = ARANYA_DURATION_MILLISECONDS * 1000ULL;
+    AranyaDuration duration           = ARANYA_DURATION_MILLISECONDS * 30000ULL;
+    AranyaDuration schedule_delay     = ARANYA_DURATION_MILLISECONDS * 5000ULL;
+    err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
+                                      graph_change_delay * 2, duration,
+                                      schedule_delay);
+    EXPECT("error subscribing admin to owner hello notifications", err);
+
+    // Operator subscribes to hello notifications from Admin with 1-second delay
+    printf("operator subscribing to hello notifications from admin\n");
+    err = aranya_sync_hello_subscribe(&operator->client, &t->id,
+                                      sync_addrs[ADMIN], graph_change_delay,
+                                      duration, schedule_delay);
+    EXPECT("error subscribing operator to admin hello notifications", err);
+
+    sleep(1);
+
     // Queries
     printf("running factdb queries\n");
 
@@ -668,6 +690,17 @@ AranyaError run(Team* t) {
         "%s key bundle len: %zu"
         "\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle_len);
+
+    // Later, unsubscribe from hello notifications
+    printf("admin unsubscribing from hello notifications from owner\n");
+    err = aranya_sync_hello_unsubscribe(&admin->client, &t->id,
+                                        sync_addrs[OWNER]);
+    EXPECT("error unsubscribing admin from owner hello notifications", err);
+
+    printf("operator unsubscribing from hello notifications from admin\n");
+    err = aranya_sync_hello_unsubscribe(&operator->client, &t->id,
+                                        sync_addrs[ADMIN]);
+    EXPECT("error unsubscribing operator from admin hello notifications", err);
 
     err = run_afc_example(t);
     EXPECT("error running afc example", err);

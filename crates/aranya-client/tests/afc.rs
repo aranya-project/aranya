@@ -35,7 +35,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -94,7 +94,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -163,7 +163,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -242,7 +242,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -336,7 +336,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -389,7 +389,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     admin_team.delete_label(label_id).await?;
 
     // wait for syncing.
-    let admin_addr = devices.admin.aranya_local_addr().await?.into();
+    let admin_addr = devices.admin.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -449,7 +449,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .membera
         .client

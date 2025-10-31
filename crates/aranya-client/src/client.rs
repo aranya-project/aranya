@@ -3,11 +3,11 @@
 use std::{
     fmt::{self, Debug, Display},
     io,
-    net::SocketAddr,
     path::Path,
+    time::Duration,
 };
 
-use anyhow::Context as _;
+use anyhow::{self, Context as _};
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     self as api,
@@ -330,7 +330,7 @@ impl Client {
     }
 
     /// Returns the address that the Aranya sync server is bound to.
-    pub async fn local_addr(&self) -> Result<SocketAddr> {
+    pub async fn local_addr(&self) -> Result<Addr> {
         self.daemon
             .aranya_local_addr(context::current())
             .await
@@ -488,6 +488,48 @@ impl Team<'_> {
                 self.team_id.__id,
                 cfg.map(Into::into),
             )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Subscribe to hello notifications from a sync peer.
+    ///
+    /// This will request the peer to send hello notifications when their graph head changes.
+    /// The `delay` parameter specifies the minimum delay between notifications.
+    /// The `duration` parameter specifies how long the subscription should last.
+    ///
+    /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
+    /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.
+    pub async fn sync_hello_subscribe(
+        &self,
+        peer: Addr,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_subscribe(
+                context::current(),
+                peer,
+                self.team_id.__id,
+                graph_change_delay,
+                duration,
+                schedule_delay,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    ///
+    /// This will stop receiving hello notifications from the specified peer.
+    pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_unsubscribe(context::current(), peer, self.team_id.__id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
