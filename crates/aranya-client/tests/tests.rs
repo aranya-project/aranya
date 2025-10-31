@@ -436,6 +436,22 @@ async fn test_query_functions() -> Result<()> {
     // Make sure owner can query whether certain labels exist on the team.
     assert!(owner_team.label(label_id).await?.is_some());
 
+    // Query role assigned to a device.
+    assert_eq!(
+        roles.member().id,
+        memberb
+            .device(devices.memberb.id)
+            .role()
+            .await?
+            .expect("expected role")
+            .id
+    );
+
+    // Query all the roles on the team.
+    // TODO: this is returning 1 role when it should return 4.
+    let membera_team = devices.membera.client.team(team_id);
+    assert_eq!(membera_team.roles().await.iter().count(), 4);
+
     Ok(())
 }
 
