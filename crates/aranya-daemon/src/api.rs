@@ -816,7 +816,7 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&graph)
+            .actions(graph)
             .create_label(label_name)
             .await
             .context("unable to create label")?;

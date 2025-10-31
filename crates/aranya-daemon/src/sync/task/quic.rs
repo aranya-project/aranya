@@ -706,8 +706,14 @@ where
                 request: request_msg,
                 address: peer_server_addr,
             } => {
-                Self::process_poll_message(request_msg, client, addr, peer_server_addr, active_team)
-                    .await
+                Self::process_poll_message(
+                    request_msg,
+                    client,
+                    addr,
+                    peer_server_addr,
+                    &active_team,
+                )
+                .await
             }
             SyncType::Subscribe { .. } => {
                 bug!("Push subscribe messages are not implemented")
@@ -719,7 +725,8 @@ where
                 bug!("Push messages are not implemented")
             }
             SyncType::Hello(hello_msg) => {
-                Self::process_hello_message(hello_msg, client, addr, active_team, sync_peers).await;
+                Self::process_hello_message(hello_msg, client, addr, &active_team, sync_peers)
+                    .await;
                 // Hello messages are fire-and-forget, return empty response
                 // Note: returning empty response which will be ignored by client
                 Ok(Box::new([]))
@@ -739,7 +746,7 @@ where
         active_team: &TeamId,
     ) -> SyncResult<Box<[u8]>> {
         let mut resp = SyncResponder::new(peer_addr);
-        let storage_id = check_request(active_team, &request_msg)?;
+        let storage_id = check_request(*active_team, &request_msg)?;
 
         resp.receive(request_msg).context("sync recv failed")?;
 
