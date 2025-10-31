@@ -11,6 +11,50 @@ use {
     aranya_daemon_api::text,
 };
 
+/// Demonstrate assigning a label to a device requires `CanUseAfc` permission.
+#[cfg(feature = "afc")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_assign_label() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_assign_label").await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+
+    // create default roles
+    let default_roles = devices.setup_default_roles(team_id).await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices
+        .add_all_device_roles(team_id, &default_roles)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let label_id = owner_team
+        .create_label(text!("label1"), default_roles.owner().id)
+        .await?;
+    let op = ChanOp::SendRecv;
+
+    // Assigning labels to devices with the "operator" role should fail since it does not have `CanUseAfc` permission.
+    owner_team
+        .device(devices.operator.id)
+        .assign_label(label_id, op)
+        .await
+        .context("unable to assign label")
+        .expect_err("expected label assignment to fail");
+
+    // Assigning labels to devices with the "member" role should succeed since it does not have `CanUseAfc` permission.
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .assign_label(label_id, op)
+        .await?;
+
+    Ok(())
+}
+
 /// Demonstrate creating a unidirectional AFC channel.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]

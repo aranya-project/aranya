@@ -170,7 +170,7 @@ impl DevicesCtx {
         Ok(team_id)
     }
 
-    fn devices(&self) -> [&DeviceCtx; 5] {
+    pub(crate) fn devices(&self) -> [&DeviceCtx; 5] {
         [
             &self.owner,
             &self.admin,
