@@ -151,7 +151,7 @@ impl SyncState for State {
 
         // receive sync response.
         let cmd_count = syncer
-            .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
+            .receive_sync_response(&mut recv, &mut sync_requester, id, sink, peer)
             .await
             .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
 
@@ -393,7 +393,7 @@ impl Syncer<State> {
         &self,
         recv: &mut ReceiveStream,
         syncer: &mut SyncRequester<A>,
-        id: &GraphId,
+        id: GraphId,
         sink: &mut S,
         peer: &Addr,
     ) -> SyncResult<usize>
@@ -425,16 +425,16 @@ impl Syncer<State> {
             if !cmds.is_empty() {
                 // Lock both aranya and caches in the correct order.
                 let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-                let mut trx = aranya.transaction(*id);
+                let mut trx = aranya.transaction(id);
                 aranya
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 aranya.commit(&mut trx, sink).context("commit failed")?;
                 debug!("committed");
-                let key = PeerCacheKey::new(*peer, *id);
+                let key = PeerCacheKey::new(*peer, id);
                 let cache = caches.entry(key).or_default();
                 aranya
-                    .update_heads(*id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
+                    .update_heads(id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
                     .context("failed to update cache heads")?;
                 return Ok(cmds.len());
             }
@@ -619,7 +619,7 @@ where
                     client.clone(),
                     peer.into(),
                     stream,
-                    &active_team,
+                    active_team,
                     sync_peers.clone(),
                 )
                 .await
@@ -639,7 +639,7 @@ where
         client: ClientWithState<EN, SP>,
         peer: Addr,
         stream: BidirectionalStream,
-        active_team: &TeamId,
+        active_team: TeamId,
         sync_peers: SyncPeers,
     ) -> SyncResult<()> {
         let mut recv_buf = Vec::new();
@@ -680,7 +680,7 @@ where
         client: ClientWithState<EN, SP>,
         addr: Addr,
         request_data: &[u8],
-        active_team: &TeamId,
+        active_team: TeamId,
         sync_peers: SyncPeers,
     ) -> SyncResult<Box<[u8]>> {
         debug!(
@@ -770,7 +770,7 @@ where
     }
 }
 
-fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<GraphId> {
+fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> SyncResult<GraphId> {
     let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };

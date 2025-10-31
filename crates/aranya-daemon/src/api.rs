@@ -570,7 +570,7 @@ impl DaemonApi for Api {
             self.remove_team_quic_sync(team, data)?;
         }
 
-        self.seed_id_dir.remove(&team).await?;
+        self.seed_id_dir.remove(team).await?;
 
         self.client
             .aranya
@@ -635,8 +635,8 @@ impl DaemonApi for Api {
         let (seed, enc_sk) = {
             let crypto = &mut *self.crypto.lock().await;
             let seed = {
-                let seed_id = self.seed_id_dir.get(&team).await?;
-                qs::PskSeed::load(&mut crypto.engine, &crypto.local_store, &seed_id)?
+                let seed_id = self.seed_id_dir.get(team).await?;
+                qs::PskSeed::load(&mut crypto.engine, &crypto.local_store, seed_id)?
                     .context("no seed in dir")?
             };
             let enc_sk: EncryptionKey<CS> = crypto
@@ -669,7 +669,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .add_member(keys.into())
             .await
             .context("unable to add device to team")?;
@@ -686,7 +686,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .remove_member(device.into_id().into())
             .await
             .context("unable to remove device from team")?;
@@ -704,7 +704,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .assign_role(device.into_id().into(), role.into())
             .await
             .context("unable to assign role")?;
@@ -722,7 +722,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .revoke_role(device.into_id().into(), role.into())
             .await
             .context("unable to revoke device role")?;
@@ -746,7 +746,7 @@ impl DaemonApi for Api {
 
         let (ctrl, effects) = self
             .client
-            .actions(&graph)
+            .actions(graph)
             .create_afc_uni_channel_off_graph(peer_id.into_id().into(), label.into_id().into())
             .await?;
 
@@ -787,7 +787,7 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         let graph = GraphId::from(team.into_id());
-        let mut session = self.client.session_new(&graph).await?;
+        let mut session = self.client.session_new(graph).await?;
 
         let effects = self.client.session_receive(&mut session, &ctrl).await?;
 
@@ -841,7 +841,7 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .delete_label(label_id.into_id().into())
             .await
             .context("unable to delete label")?;
@@ -866,7 +866,7 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .assign_label(
                 device.into_id().into(),
                 label_id.into_id().into(),
@@ -894,7 +894,7 @@ impl DaemonApi for Api {
 
         let effects = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .revoke_label(device.into_id().into(), label_id.into_id().into())
             .await
             .context("unable to revoke label")?;
@@ -916,7 +916,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .query_devices_on_team_off_graph()
             .await
             .context("unable to query devices on team")?;
@@ -940,7 +940,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .query_device_role_off_graph(device.into_id().into())
             .await
             .context("unable to query device role")?;
@@ -964,7 +964,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .query_device_keybundle_off_graph(device.into_id().into())
             .await
             .context("unable to query device keybundle")?;
@@ -989,7 +989,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .query_label_assignments_off_graph(device.into_id().into())
             .await
             .context("unable to query device label assignments")?;
@@ -1018,7 +1018,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .query_label_exists_off_graph(label_id.into_id().into())
             .await
             .context("unable to query label")?;
@@ -1042,7 +1042,7 @@ impl DaemonApi for Api {
 
         let (_ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(team.into_id().into())
             .query_labels_off_graph()
             .await
             .context("unable to query labels")?;
@@ -1077,7 +1077,7 @@ impl Api {
 
         if let Err(e) = self
             .seed_id_dir
-            .append(&team, &id)
+            .append(team, id)
             .await
             .context("could not write seed id to file")
         {
