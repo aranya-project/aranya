@@ -710,7 +710,7 @@ AranyaError aranya_role_cleanup(struct AranyaRole *ptr);
 /**
  * Get ID of role.
  *
- * @param role the role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
  */
 AranyaError aranya_role_get_id(const struct AranyaRole *role,
                                struct AranyaRoleId *__output);
@@ -718,7 +718,7 @@ AranyaError aranya_role_get_id(const struct AranyaRole *role,
 /**
  * Get ID of role.
  *
- * @param role the role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
  */
 AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
                                    struct AranyaRoleId *__output,
@@ -729,7 +729,7 @@ AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
  *
  * The resulting string must not be freed.
  *
- * @param role the role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
  */
 AranyaError aranya_role_get_name(const struct AranyaRole *role,
                                  const char **__output);
@@ -737,7 +737,7 @@ AranyaError aranya_role_get_name(const struct AranyaRole *role,
 /**
  * Get the author of a role.
  *
- * @param role the role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
  */
 AranyaError aranya_role_get_author(const struct AranyaRole *role,
                                    struct AranyaDeviceId *__output);
@@ -745,7 +745,7 @@ AranyaError aranya_role_get_author(const struct AranyaRole *role,
 /**
  * Get the author of a role.
  *
- * @param role the role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
  */
 AranyaError aranya_role_get_author_ext(const struct AranyaRole *role,
                                        struct AranyaDeviceId *__output,
@@ -1431,8 +1431,8 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  * - operator
  * - member
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1448,8 +1448,8 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  * - operator
  * - member
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1464,10 +1464,10 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role_id the ID of the role to assign to the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role_id the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -1483,10 +1483,10 @@ AranyaError aranya_assign_role(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role_id the ID of the role to assign to the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role_id the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -1501,10 +1501,10 @@ AranyaError aranya_assign_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role_id the ID of the role to revoke from the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role_id the ID of the role to revoke from the device.
  *
  * @relates AranyaClient.
  */
@@ -1518,10 +1518,10 @@ AranyaError aranya_revoke_role(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role_id the ID of the role to revoke from the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role_id the ID of the role to revoke from the device.
  *
  * @relates AranyaClient.
  */
@@ -1536,10 +1536,10 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
- * @param managing_role_id the ID of the role that manages this
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param[in] managing_role_id the ID of the role that manages this
  *        label [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
@@ -1555,10 +1555,10 @@ AranyaError aranya_create_label(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
- * @param managing_role_id the ID of the role that manages this
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param[in] managing_role_id the ID of the role that manages this
  *        label [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
@@ -1860,11 +1860,11 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keybundle serialized keybundle byte buffer `KeyBundle`.
- * @param keybundle_len is the length of the serialized keybundle.
- * @param role_id the ID of the role to assign to the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
+ * @param[in] role_id the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -1879,11 +1879,11 @@ AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keybundle serialized keybundle byte buffer `KeyBundle`.
- * @param keybundle_len is the length of the serialized keybundle.
- * @param role_id the ID of the role to assign to the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
+ * @param[in] role_id the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
