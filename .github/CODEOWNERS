@@ -1,1 +1,8 @@
-* @djohnson-spideroak @elagergren-spideroak @gknopf-aranya @jdygert-spok
+* @djohnson-spideroak @gknopf-aranya @jdygert-spok @ssweetney-spok
+
+crates/aranya-client-capi @djohnson-spideroak @gknopf-aranya @jdygert-spok @ssweetney-spok @nikki-aranya
+examples/c @djohnson-spideroak @gknopf-aranya @jdygert-spok @ssweetney-spok @nikki-aranya
+
+crates/aranya-metrics @djohnson-spideroak @gknopf-aranya @jdygert-spok @nikki-aranya
+
+crates/aranya-daemon/src/policy.md @djohnson-spideroak @gknopf-aranya @jdygert-spok @chip-so
