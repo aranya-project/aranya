@@ -306,7 +306,7 @@ function try_find_device(device_id id) optional struct Device {
     // consistency checks (at the storage layer?) will be able
     // to check for corrupted records, etc.
     //
-    // check valid_device_invariants(device_id)
+    debug_assert(valid_device_invariants(device_id))
 
     return query Device[device_id: device_id]
 }
@@ -345,7 +345,7 @@ function get_device_keybundle(device_id id) struct KeyBundle {
     //
     // See the comment in `try_find_device`.
     //
-    // check valid_device_invariants(device_id)
+    debug_assert(valid_device_invariants(device_id))
 
     let ident_key = check_unwrap query DeviceIdentKey[device_id: device_id]
     let sign_key = check_unwrap query DeviceSignKey[device_id: device_id]
@@ -396,7 +396,7 @@ function get_enc_pk(device_id id) bytes {
     //
     // See the comment in `try_find_device`.
     //
-    // check valid_device_invariants(device_id)
+    debug_assert(valid_device_invariants(device_id))
 
     let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
     return device_enc_pk.key
