@@ -38,8 +38,10 @@ use buggy::BugExt;
 use derive_where::derive_where;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
-use tokio::task::JoinSet;
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinSet,
+};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
