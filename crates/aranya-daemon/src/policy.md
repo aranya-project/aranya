@@ -306,7 +306,7 @@ function try_find_device(device_id id) optional struct Device {
     // consistency checks (at the storage layer?) will be able
     // to check for corrupted records, etc.
     //
-    // check valid_device_invariants(device_id)
+    debug_assert(valid_device_invariants(device_id))
 
     return query Device[device_id: device_id]
 }
@@ -345,7 +345,7 @@ function get_device_keybundle(device_id id) struct KeyBundle {
     //
     // See the comment in `try_find_device`.
     //
-    // check valid_device_invariants(device_id)
+    debug_assert(valid_device_invariants(device_id))
 
     let ident_key = check_unwrap query DeviceIdentKey[device_id: device_id]
     let sign_key = check_unwrap query DeviceSignKey[device_id: device_id]
@@ -396,7 +396,7 @@ function get_enc_pk(device_id id) bytes {
     //
     // See the comment in `try_find_device`.
     //
-    // check valid_device_invariants(device_id)
+    debug_assert(valid_device_invariants(device_id))
 
     let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
     return device_enc_pk.key
@@ -1055,9 +1055,8 @@ function device_owns_role(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `target_role_id` refers to a role
     // that exists.
@@ -1268,9 +1267,8 @@ function can_assign_role(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `role_id` refers to a role that
     // exists.
@@ -1314,9 +1312,8 @@ function can_revoke_role(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `role_id` refers to a role that
     // exists.
@@ -1359,9 +1356,8 @@ function can_change_role_perms(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `target_role_id` refers to a role that
     // exists.
@@ -3127,9 +3123,8 @@ function can_manage_label(device_id id, label_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `label_id` refers to a label that
     // exists.
@@ -3181,12 +3176,12 @@ command AddLabelManagingRole {
 
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::ChangeLabelManagingRole)
-        check can_manage_label(author.device_id, this.label_id)
 
         // Make sure we uphold `CanManageLabel`'s foreign keys.
         check exists Label[label_id: this.label_id]
         check exists Role[role_id: this.managing_role_id]
 
+        check can_manage_label(author.device_id, this.label_id)
         check !exists CanManageLabel[
             label_id: this.label_id,
             managing_role_id: this.managing_role_id,
@@ -3558,12 +3553,13 @@ command AssignLabelToDevice {
         check author.device_id != this.device_id
 
         check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
-        check can_manage_label(author.device_id, this.label_id)
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
         check exists Device[device_id: this.device_id]
         check exists Label[label_id: this.label_id]
+
+        check can_manage_label(author.device_id, this.label_id)
 
         // The target device must be able to use AFC.
         check device_has_simple_perm(this.device_id, SimplePerm::CanUseAfc)
