@@ -1,6 +1,6 @@
 //! Transport-independent sync protocol implementation.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Context as _;
 use aranya_crypto::Rng;
@@ -10,7 +10,9 @@ use aranya_runtime::{
     SyncRequestMessage, SyncRequester, SyncResponder, MAX_SYNC_MESSAGE_SIZE,
 };
 use buggy::bug;
+use dashmap::DashMap;
 use metrics::counter;
+use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
 use super::{
@@ -260,5 +262,48 @@ impl SyncProtocol {
         let data = postcard::to_slice(&sync_type, &mut self.request_buf)
             .context("failed to create unsubscribe message")?;
         Ok(data.len())
+    }
+}
+
+/// Shared store of SyncProtocol instances, one per peer.
+///
+/// This is designed so that a single buffer can be reused across multiple sync operations.
+#[derive(Debug, Clone)]
+struct ProtocolStore {
+    protocols: Arc<DashMap<SyncPeer, Arc<Mutex<SyncProtocol>>>>,
+    config: ProtocolConfig,
+}
+
+impl ProtocolStore {
+    /// Create a new protocol store.
+    pub fn new(config: ProtocolConfig) -> Self {
+        Self {
+            protocols: Arc::default(),
+            config,
+        }
+    }
+
+    /// Get or create the protocol for a peer.
+    pub fn get(&self, peer: &SyncPeer) -> Arc<Mutex<SyncProtocol>> {
+        let handle = self
+            .protocols
+            .entry(*peer)
+            .or_insert_with(|| Arc::new(Mutex::new(SyncProtocol::new(*peer, self.config.clone()))));
+        Arc::clone(&handle)
+    }
+
+    /// Remove a peer from the store.
+    pub fn remove(&self, peer: &SyncPeer) {
+        self.protocols.remove(peer);
+    }
+
+    /// Get the number of peers currently stored.
+    pub fn len(&self) -> usize {
+        self.protocols.len()
+    }
+
+    /// Check if the store is empty.
+    pub fn is_empty(&self) -> bool {
+        self.protocols.is_empty()
     }
 }

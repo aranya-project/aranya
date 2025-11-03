@@ -363,7 +363,7 @@ impl QuicServer {
                 let expires_at = Instant::now() + Duration::from_millis(duration_milliseconds);
 
                 let subscription = HelloSubscription {
-                    delay_milliseconds,
+                    graph_change_delay,
                     last_notified: None,
                     expires_at,
                 };
@@ -467,7 +467,7 @@ impl QuicServer {
     }
 }
 
-fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<GraphId> {
+fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
     let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };
