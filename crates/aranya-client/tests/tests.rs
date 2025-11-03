@@ -332,7 +332,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
         .await
         .expect_err("expected label creation to fail");
 
-    // TODO: show operation fails after delete_role() (after it is added to the API).
+    // TODO: issue#575 show operation fails after delete_role() (after it is added to the API).
 
     Ok(())
 }
