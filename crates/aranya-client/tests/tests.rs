@@ -134,6 +134,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
     // create default roles
     let roles = devices.setup_default_roles(team_id).await?;
 
+    // add all sync peers with sync intervals.
     devices
         .add_all_sync_peers(team_id)
         .await
@@ -149,6 +150,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
         .await?;
 
     // Wait for syncing.
+    // We're sleeping here rather than syncing via `sync_now()` to test periodic sync functionality.
     sleep(SLEEP_INTERVAL).await;
 
     // Verify peers automatically sync command with sync peer.
