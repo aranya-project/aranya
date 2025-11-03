@@ -1192,8 +1192,8 @@ command RemoveRoleOwner {
         check team_exists()
 
         let author = get_author(envelope)
-        //check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagingRole)
-        //check device_owns_role(author.device_id, this.target_role_id)
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagingRole)
+        check device_owns_role(author.device_id, this.target_role_id)
 
         check exists OwnsRole[
             target_role_id: this.target_role_id,

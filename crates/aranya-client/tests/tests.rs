@@ -200,8 +200,8 @@ async fn test_add_remove_sync_peers() -> Result<()> {
     Ok(())
 }
 
-/// Tests creating/assigning/revoking/deleting a role.
-/// Verifies query indicate correct role assignment status.
+/// Tests creating/assigning/revoking a role.
+/// Verifies query indicates correct role assignment status.
 /// Verifies device is only allowed to perform operation when role with permission is assigned to it.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_role_create_assign_revoke() -> Result<()> {
@@ -341,7 +341,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_role_change() -> Result<()> {
     // Set up our team context so we can run the test.
-    let mut devices = DevicesCtx::new("test_sync_now").await?;
+    let mut devices = DevicesCtx::new("test_role_change").await?;
 
     // Create the initial team, and get our TeamId and seed.
     let team_id = devices.create_and_add_team().await?;
@@ -1198,9 +1198,6 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
     owner_team
         .add_device(devices.operator.pk.clone(), None)
         .await?;
-    owner_team
-        .add_device(devices.membera.pk.clone(), None)
-        .await?;
 
     // Sync admin with owner
     let admin_team = devices.admin.client.team(team_id);
@@ -1213,21 +1210,19 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
         .await
         .context("Admin should be able to assign operator role with CanAssignRole permission")?;
 
-    let operator_role_owners = owner_team.role_owners(roles.operator().id).await?;
-    info!("{:?}", operator_role_owners);
-
     // Add a new owner role to operator so we can remove the owner role.
-    // There must be at least one owning role.
+    // Note: this is because there must be at least one owning role.
     owner_team
         .add_role_owner(roles.operator().id, roles.member().id)
         .await?;
 
-    // Now remove the owner as a role owner of member.
+    // Now remove the owner as a role owner of operator.
     owner_team
         .remove_role_owner(roles.operator().id, roles.owner().id)
         .await
-        .context("Failed to remove operator as role owner from member")?;
+        .context("Failed to remove owner as role owner from operator")?;
 
+    // Verify owner can no longer change role management permissions of operator role.
     owner_team
         .assign_role_management_permission(
             roles.operator().id,
@@ -1391,8 +1386,6 @@ async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
 
     Ok(())
 }
-
-// TODO: add test to verify role owner can perform role permissions changes
 
 /// Removing a non-existent owning role should produce a policy failure, not a runtime error.
 #[test(tokio::test(flavor = "multi_thread"))]
