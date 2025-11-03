@@ -131,6 +131,13 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(memberb_team.labels().await?.iter().count(), 0);
 
+    // Verify deleted label can not be assigned to a device.
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label_id, op)
+        .await
+        .expect_err("expected label assignment to fail with deleted label");
+
     Ok(())
 }
 
