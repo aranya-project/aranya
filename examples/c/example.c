@@ -729,13 +729,11 @@ AranyaError run_afc_example(Team* t) {
 
     size_t roles_len = 0;
     roles = calloc(roles_len, sizeof(AranyaRole));
-    // size_t roles_len = 4;
-    // AranyaRole roles[roles_len];
 
     err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error. roles_len: %zu\n", roles_len);
-        roles = realloc(roles, roles_len);
+        roles = realloc(roles, roles_len * sizeof(AranyaRole));
         if (roles == NULL) {
             abort();
         }
