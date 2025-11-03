@@ -1619,7 +1619,7 @@ AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClie
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] roles_out returns a list of roles on the team [`AranyaRole`](@ref AranyaRole).
+ * @param[out] roles_out returns a list of roles on the team [`AranyaRole`](@ref AranyaRole).
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
  * @relates AranyaClient.
@@ -1638,7 +1638,7 @@ AranyaError aranya_roles(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] roles_out returns a list of roles on the team [`AranyaRole`](@ref AranyaRole).
+ * @param[out] roles_out returns a list of roles on the team [`AranyaRole`](@ref AranyaRole).
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
  * @relates AranyaClient.

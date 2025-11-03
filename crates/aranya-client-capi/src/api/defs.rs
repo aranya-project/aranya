@@ -1148,7 +1148,7 @@ pub fn revoke_role_management_permission(
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
-/// @param[in] roles_out returns a list of roles on the team [`Role`].
+/// @param[out] roles_out returns a list of roles on the team [`Role`].
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
