@@ -1532,7 +1532,7 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param[in] keybundle_len is the length of the serialized keybundle.
-/// @param[in] role_id the ID of the role to assign to the device.
+/// @param[in] role_id (optional) the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(

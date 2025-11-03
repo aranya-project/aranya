@@ -2196,7 +2196,7 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[in] keybundle_len is the length of the serialized keybundle.
- * @param[in] role_id the ID of the role to assign to the device.
+ * @param[in] role_id (optional) the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -2215,7 +2215,7 @@ AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[in] keybundle_len is the length of the serialized keybundle.
- * @param[in] role_id the ID of the role to assign to the device.
+ * @param[in] role_id (optional) the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
