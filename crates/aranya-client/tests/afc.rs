@@ -14,8 +14,8 @@ use {
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_afc_assign_revoke_label() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_afc_assign_revoke_label").await?;
+async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_create_assign_revoke_delete_label").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -121,6 +121,15 @@ async fn test_afc_assign_revoke_label() -> Result<()> {
             .count(),
         0
     );
+
+    // Delete the label.
+    owner_team.delete_label(label_id).await?;
+
+    // Query team labels to confirm the label has been deleted.
+    membera_team.sync_now(owner_addr, None).await?;
+    assert_eq!(membera_team.labels().await?.iter().count(), 0);
+    memberb_team.sync_now(owner_addr, None).await?;
+    assert_eq!(memberb_team.labels().await?.iter().count(), 0);
 
     Ok(())
 }
