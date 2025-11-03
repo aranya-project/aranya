@@ -337,6 +337,32 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     Ok(())
 }
 
+/// Tests that a role can be changed after it has been assigned to a device.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_role_change() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let mut devices = DevicesCtx::new("test_sync_now").await?;
+
+    // Create the initial team, and get our TeamId and seed.
+    let team_id = devices.create_and_add_team().await?;
+
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner = devices.owner.client.team(team_id);
+
+    // Assign operator role to membera.
+    owner
+        .change_role(devices.membera.id, roles.member().id, roles.operator().id)
+        .await
+        .expect("expected to change role from member to operator");
+
+    Ok(())
+}
+
 /// Tests that devices can be added to the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_devices() -> Result<()> {
