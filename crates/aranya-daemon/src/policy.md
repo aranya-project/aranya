@@ -3055,8 +3055,8 @@ function can_remove_self(device_id id) bool {
 
 Labels provide topic segmentation for AFC. Devices can only participate
 in a channel if they have been granted permission to use the channel's
-label, either directly or through their assigned role. Devices can be
-granted permission to use an arbitrary number of labels.
+label. Devices can be granted permission to use an arbitrary number of
+labels.
 
 ```policy
 // Records a label.
@@ -3476,22 +3476,10 @@ command DeleteLabel {
 
 #### Label Assignment
 
-Labels can be assigned to both roles and devices. Assigning
-a label to a role allows all devices who have been assigned that
-role to use the label. Assigning a label to a device allows that
-specific device to use the label.
-
-Each label can be assigned to zero or more roles and devices *at
-the same time*. For example, label `L` can be assigned to roles
-`R1` and `R2` at the same time that it is also assigned to device
-`D`. Similarly, roles and devices can be assigned zero or more
-labels.
-
-The labels assigned to a device and the labels assigned to the
-device's role need not be mutually exclusive. They are permitted
-to overlap, including having different `ChanOp`s. When
-determining whether a device is allowed to use a label, the more
-permissive `ChanOp` is used.
+Labels can be assigned to zero or more devices. The labels assigned to a
+device are permitted to have different `ChanOp`s. When determining
+whether a device is allowed to use a label, the more permissive `ChanOp`
+is used.
 
 ##### Label Assignment to Devices
 
@@ -3508,9 +3496,7 @@ permissive `ChanOp` is used.
 //
 // TODO: https://github.com/aranya-project/aranya-core/issues/229
 // We do not yet support prefix deletion, so this fact is NOT
-// deleted when the label or the role are deleted. Use TODO to
-// verify whether a role is allowed to use the label instead of
-// checking this fact directly.
+// deleted when the label is deleted.
 fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_gen int}
 
 // Grants the device permission to use the label.
@@ -3984,9 +3970,10 @@ ephemeral command QueryLabelsAssignedToDevice {
 
 #### Label Directionality
 
-AFC channels are either bidirectional or unidirectional.
-In a unidirectional channel one peer is permitted to send data
-and the other to receive data.
+AFC channels are always unidirectional, with a channel creator who is
+permitted to send data and the other peer who receives data. A label's
+`ChanOp` controls whether a device can operate as the channel creator
+(`SendOnly`), channel receiver (`RecvOnly`), or both (`SendRecv`).
 
 ```policy
 // Valid channel operations for a label assignment.
