@@ -152,6 +152,7 @@ typedef struct AranyaChannelIdent {
 AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
                                        const char* label_name,
                                        AranyaLabelId* label_id,
+                                       AranyaRoleId managing_role_id,
                                        AranyaChannelIdent* idents,
                                        int num_peers);
 
@@ -352,29 +353,64 @@ AranyaError init_team(Team* t) {
 
     // Team members are added to the team by first calling
     // `aranya_add_device_to_team`, passing in the submitter's client, the
-    // team ID and the public key of the device to be added. In a real world
+    // team ID ,the public key of the device to be added, and the role ID. In a real world
     // scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
+    size_t default_roles_len = 3;
+    AranyaRole default_roles[default_roles_len];
+
+    // setup default roles.
+    err = aranya_setup_default_roles(&owner->client, &t->id, default_roles, &default_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "unable to set up default roles\n");
+        return err;
+    }
+
+    // Get the ID of the admin role.
+    AranyaRoleId admin_role_id;
+    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "admin", &admin_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get 'admin' role from list of default roles\n");
+        return err;
+    }
+
     // add admin to team.
     err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
-                                    admin->pk_len);
+                                    admin->pk_len, &admin_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add admin to team\n");
         return err;
     }
 
+    // Get the ID of the operator role.
+    AranyaRoleId operator_role_id;
+    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "operator", &operator_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get 'operator' role from list of default roles\n");
+        return err;
+    }
+
     // add operator to team.
     err = aranya_add_device_to_team(&owner->client,
-                                    &t->id, operator->pk, operator->pk_len);
+                                    &t->id, operator->pk, operator->pk_len, &operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
     }
 
+    // Get the ID of the member role.
+    AranyaRoleId member_role_id;
+    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "member", &member_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get 'member' role from list of default roles\n");
+        return err;
+    }
+
     // add membera to team.
     err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
-                                    membera->pk_len);
+                                    membera->pk_len, &member_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add membera to team\n");
         return err;
@@ -382,7 +418,7 @@ AranyaError init_team(Team* t) {
 
     // add memberb to team.
     err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
-                                    memberb->pk_len);
+                                    memberb->pk_len, &member_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add memberb to team\n");
         return err;
@@ -557,8 +593,6 @@ AranyaError run(Team* t) {
     AranyaError err;
     AranyaDeviceId* devices = NULL;
 
-    Client* owner = &t->clients.owner;
-    Client* admin = &t->clients.admin;
     Client* operator= & t->clients.operator;
     Client* memberb = &t->clients.memberb;
 
@@ -571,29 +605,6 @@ AranyaError run(Team* t) {
     printf("initializing team\n");
     err = init_team(t);
     EXPECT("unable to initialize team", err);
-
-    // upgrade role to admin.
-    err = aranya_assign_role(&owner->client, &t->id, &admin->id,
-                             ARANYA_ROLE_ADMIN);
-    EXPECT("error assigning admin role", err);
-
-    // upgrade role to operator.
-    err = aranya_assign_role(&admin->client, &t->id, &operator->id,
-                             ARANYA_ROLE_OPERATOR);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "application failed: expected role assignment to fail\n");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
-    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
-    EXPECT("error calling `sync_now` to sync with peer", err);
-
-    sleep(1);
-    err = aranya_assign_role(&admin->client, &t->id, &operator->id,
-                             ARANYA_ROLE_OPERATOR);
-    EXPECT("error assigning operator role", err);
 
     // Initialize the builder
     struct AranyaSyncPeerConfigBuilder builder;
@@ -680,11 +691,12 @@ exit:
 AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
                                        const char* label_name,
                                        AranyaLabelId* label_id,
+                                       AranyaRoleId managing_role_id,
                                        AranyaChannelIdent* idents,
                                        int num_peers) {
     AranyaError err;
 
-    err = aranya_create_label(client, id, label_name, label_id);
+    err = aranya_create_label(client, id, label_name, &managing_role_id, label_id);
     EXPECT("error creating label", err);
 
     for (int i = 0; i < num_peers; i++) {
@@ -699,12 +711,13 @@ exit:
 
 // Run the AFC example.
 AranyaError run_afc_example(Team* t) {
-    Client* operator= & t->clients.operator;
+    Client* owner= & t->clients.owner;
     Client* membera = &t->clients.membera;
     Client* memberb = &t->clients.memberb;
 
     unsigned char* ciphertext = NULL;
     unsigned char* plaintext  = NULL;
+    // AranyaRole* roles = NULL;
 
     AranyaError err;
 
@@ -713,17 +726,48 @@ AranyaError run_afc_example(Team* t) {
     AranyaLabelId label_id;
     AranyaChannelIdent idents[] = {{&membera->id, ARANYA_CHAN_OP_SEND_ONLY},
                                    {&memberb->id, ARANYA_CHAN_OP_RECV_ONLY}};
-    err = aranya_create_assign_label(&operator->client, &t->id, "uni_label",
-                                     &label_id, idents, 2);
+
+    // size_t roles_len = 0;
+    // roles = calloc(roles_len, sizeof(AranyaRole));
+    size_t roles_len = 4;
+    AranyaRole roles[roles_len];
+
+    err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
+    // if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+    //     printf("handling buffer too small error. roles_len: %zu\n", roles_len);
+    //     roles = realloc(roles, roles_len);
+    //     if (roles == NULL) {
+    //         abort();
+    //     }
+
+    //     printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
+    //     err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
+    //     printf("Re tried fefching list of roles\n");
+    // }
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get list of roles\n");
+        return err;
+    }
+
+    AranyaRoleId owner_role_id;
+    err = aranya_get_role_id_by_name(roles, roles_len, "owner", &owner_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get 'owner' role from list of roles\n");
+        return err;
+    }
+
+
+    err = aranya_create_assign_label(&owner->client, &t->id, "uni_label",
+                                     &label_id, owner_role_id, idents, 2);
     if (err != ARANYA_ERROR_SUCCESS) {
         goto exit;
     }
 
-    // Tell them both to sync with the operator to see their new label.
-    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OPERATOR], NULL);
+    // Tell them both to sync with the owner to see their new label.
+    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OWNER], NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
 
-    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OPERATOR], NULL);
+    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OWNER], NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
 
     // Create a new uni send channel, which will give back an `AranyaAfcChannel`
