@@ -130,7 +130,7 @@ authorized to publish.
 
 ## Command Priorities
 
-Priorities can defined for commands by specifying the `priority`
+Priorities can be defined for commands by specifying the `priority`
 attribute in the command's `attributes` block:
 
 ```
@@ -1006,7 +1006,8 @@ command RemovePermFromRole {
         check can_change_role_perms(author.device_id, this.role_id)
 
 
-        // It is an error to remove a permission that does not exist.
+        // It is an error to remove a permission not assigned to
+        // the role.
         check role_has_simple_perm(this.role_id, this.perm)
 
         let perm_str = simple_perm_to_str(this.perm)
@@ -3505,9 +3506,10 @@ permissive `ChanOp` is used.
 //
 // # Caveats
 //
-// TODO(eric): We do not yet support prefix deletion, so this fact
-// is NOT deleted when the label or the role are deleted. Use TODO
-// to verify whether a role is allowed to use the label instead of
+// TODO: https://github.com/aranya-project/aranya-core/issues/229
+// We do not yet support prefix deletion, so this fact is NOT
+// deleted when the label or the role are deleted. Use TODO to
+// verify whether a role is allowed to use the label instead of
 // checking this fact directly.
 fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_gen int}
 
