@@ -1027,6 +1027,8 @@ pub fn setup_default_roles(
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role ID of the subject role [`RoleId`].
 /// @param[in] owning_role ID of the owning role [`RoleId`].
+///
+/// @relates AranyaClient.
 pub fn add_role_owner(
     client: &Client,
     team: &TeamId,
@@ -1049,6 +1051,8 @@ pub fn add_role_owner(
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role the ID of the subject role [`RoleId`].
 /// @param[in] owning_role ID of the owning role [`RoleId`].
+///
+/// @relates AranyaClient.
 pub fn remove_role_owner(
     client: &Client,
     team: &TeamId,
@@ -1065,7 +1069,7 @@ pub fn remove_role_owner(
     Ok(())
 }
 
-/// Returns the roles that own role.
+/// Returns the roles that own `role`.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
 /// Writes the number of roles that would have been returned to `roles_len`.
@@ -1073,9 +1077,11 @@ pub fn remove_role_owner(
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the ID of the subject role [`Role`].
+/// @param[in] role the ID of the subject role [`RoleId`].
 /// @param[in] roles_out returns a list of roles that own `role` [`Role`].
 /// @param[in,out] roles_len the number of roles written to the buffer.
+///
+/// @relates AranyaClient.
 pub fn role_owners(
     client: &Client,
     team: &TeamId,
@@ -1102,6 +1108,15 @@ pub fn role_owners(
     Ok(())
 }
 
+/// Assigns a role management permission to a managing role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] managing_role the ID of the managing role [`RoleId`].
+/// @param[in] perm the management permission to assign [`Permission`].
+///
+/// @relates AranyaClient.
 pub fn assign_role_management_permission(
     client: &Client,
     team: &TeamId,
@@ -1122,6 +1137,15 @@ pub fn assign_role_management_permission(
     Ok(())
 }
 
+/// Revokes a role management permission from a managing role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] managing_role the ID of the managing role [`RoleId`].
+/// @param[in] perm the management permission to assign [`Permission`].
+///
+/// @relates AranyaClient.
 pub fn revoke_role_management_permission(
     client: &Client,
     team: &TeamId,

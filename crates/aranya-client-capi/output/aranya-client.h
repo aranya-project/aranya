@@ -1498,6 +1498,8 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
  * @param[in] owning_role ID of the owning role [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_add_role_owner(const struct AranyaClient *client,
                                   const struct AranyaTeamId *team,
@@ -1511,6 +1513,8 @@ AranyaError aranya_add_role_owner(const struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
  * @param[in] owning_role ID of the owning role [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
@@ -1525,6 +1529,8 @@ AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
  * @param[in] owning_role ID of the owning role [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
@@ -1538,6 +1544,8 @@ AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
  * @param[in] owning_role ID of the owning role [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
@@ -1546,7 +1554,7 @@ AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
                                          struct AranyaExtError *__ext_err);
 
 /**
- * Returns the roles that own role.
+ * Returns the roles that own `role`.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
@@ -1554,9 +1562,11 @@ AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the ID of the subject role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
  * @param[in] roles_out returns a list of roles that own `role` [`AranyaRole`](@ref AranyaRole).
  * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_role_owners(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
@@ -1565,7 +1575,7 @@ AranyaError aranya_role_owners(const struct AranyaClient *client,
                                size_t *roles_len);
 
 /**
- * Returns the roles that own role.
+ * Returns the roles that own `role`.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
@@ -1573,9 +1583,11 @@ AranyaError aranya_role_owners(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the ID of the subject role [`AranyaRole`](@ref AranyaRole).
+ * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
  * @param[in] roles_out returns a list of roles that own `role` [`AranyaRole`](@ref AranyaRole).
  * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
  */
 AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
@@ -1584,12 +1596,34 @@ AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
                                    size_t *roles_len,
                                    struct AranyaExtError *__ext_err);
 
+/**
+ * Assigns a role management permission to a managing role.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role the ID of the managing role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] perm the management permission to assign [`AranyaPermission`](@ref AranyaPermission).
+ *
+ * @relates AranyaClient.
+ */
 AranyaError aranya_assign_role_management_permission(const struct AranyaClient *client,
                                                      const struct AranyaTeamId *team,
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
                                                      AranyaPermission perm);
 
+/**
+ * Assigns a role management permission to a managing role.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role the ID of the managing role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] perm the management permission to assign [`AranyaPermission`](@ref AranyaPermission).
+ *
+ * @relates AranyaClient.
+ */
 AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClient *client,
                                                          const struct AranyaTeamId *team,
                                                          const struct AranyaRoleId *role,
@@ -1597,12 +1631,34 @@ AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClie
                                                          AranyaPermission perm,
                                                          struct AranyaExtError *__ext_err);
 
+/**
+ * Revokes a role management permission from a managing role.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role the ID of the managing role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] perm the management permission to assign [`AranyaPermission`](@ref AranyaPermission).
+ *
+ * @relates AranyaClient.
+ */
 AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *client,
                                                      const struct AranyaTeamId *team,
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
                                                      AranyaPermission perm);
 
+/**
+ * Revokes a role management permission from a managing role.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the ID of the subject role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role the ID of the managing role [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] perm the management permission to assign [`AranyaPermission`](@ref AranyaPermission).
+ *
+ * @relates AranyaClient.
+ */
 AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClient *client,
                                                          const struct AranyaTeamId *team,
                                                          const struct AranyaRoleId *role,
