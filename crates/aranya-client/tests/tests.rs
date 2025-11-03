@@ -613,9 +613,8 @@ async fn test_query_functions() -> Result<()> {
     );
 
     // Query all the roles on the team.
-    // TODO: this is returning 1 role when it should return 4.
     let membera_team = devices.membera.client.team(team_id);
-    assert_eq!(membera_team.roles().await.iter().count(), 4);
+    assert_eq!(membera_team.roles().await?.iter().count(), 4);
 
     Ok(())
 }
