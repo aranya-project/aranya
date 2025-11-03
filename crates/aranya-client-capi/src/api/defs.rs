@@ -1011,6 +1011,7 @@ pub fn setup_default_roles(
         *roles_len = default_roles.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *roles_len = default_roles.len();
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(default_roles) {
@@ -1091,6 +1092,7 @@ pub fn role_owners(
         *roles_len = owning_roles.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *roles_len = owning_roles.len();
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(owning_roles) {
@@ -1167,6 +1169,7 @@ pub fn roles(
         *roles_len = all_roles.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *roles_len = all_roles.len();
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(all_roles) {
@@ -1419,11 +1422,11 @@ pub unsafe fn encrypt_psk_seed_for_peer(
         *seed_len = wrapped_seed.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *seed_len = wrapped_seed.len();
     let out = aranya_capi_core::try_as_mut_slice!(seed, *seed_len);
     for (dst, src) in out.iter_mut().zip(&wrapped_seed) {
         dst.write(*src);
     }
-    *seed_len = wrapped_seed.len();
 
     Ok(())
 }
@@ -1619,10 +1622,10 @@ pub unsafe fn query_devices_on_team(
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *devices_len = data.len();
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write((*src).into());
     }
-    *devices_len = data.len();
     Ok(())
 }
 
@@ -1718,15 +1721,15 @@ pub unsafe fn query_labels(
         .rt
         .block_on(client.inner.team(team.into()).labels())?;
     let data = data.__data();
-    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
-    }
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
     *labels_len = data.len();
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.id.into());
+    }
     Ok(())
 }
 
