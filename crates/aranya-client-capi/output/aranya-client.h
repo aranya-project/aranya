@@ -1667,6 +1667,49 @@ AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClie
                                                          struct AranyaExtError *__ext_err);
 
 /**
+ * Changes the `role` on a `device`
+ *
+ * This will change the device's current role to the new role assigned.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] old_role the ID of the role currently assigned to the device.
+ * @param[in] new_role the ID of the role to assign to the device.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_change_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaDeviceId *device,
+                               const struct AranyaRoleId *old_role,
+                               const struct AranyaRoleId *new_role);
+
+/**
+ * Changes the `role` on a `device`
+ *
+ * This will change the device's current role to the new role assigned.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] old_role the ID of the role currently assigned to the device.
+ * @param[in] new_role the ID of the role to assign to the device.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_change_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaDeviceId *device,
+                                   const struct AranyaRoleId *old_role,
+                                   const struct AranyaRoleId *new_role,
+                                   struct AranyaExtError *__ext_err);
+
+/**
  * Returns all of the roles for this team.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
@@ -1749,6 +1792,8 @@ AranyaError aranya_get_role_id_by_name_ext(const struct AranyaRole *role_list,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
+ * It is an error if the device has already been assigned a role.
+ *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
@@ -1767,6 +1812,8 @@ AranyaError aranya_assign_role(const struct AranyaClient *client,
  * This will change the device's current role to the new role assigned.
  *
  * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * It is an error if the device has already been assigned a role.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).

@@ -1166,6 +1166,37 @@ pub fn revoke_role_management_permission(
     Ok(())
 }
 
+/// Changes the `role` on a `device`
+///
+/// This will change the device's current role to the new role assigned.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] old_role the ID of the role currently assigned to the device.
+/// @param[in] new_role the ID of the role to assign to the device.
+///
+/// @relates AranyaClient.
+pub fn change_role(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+    old_role: &RoleId,
+    new_role: &RoleId,
+) -> Result<(), imp::Error> {
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).change_role(
+            device.into(),
+            old_role.into(),
+            new_role.into(),
+        ))?;
+
+    Ok(())
+}
+
 /// Returns all of the roles for this team.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
@@ -1230,6 +1261,8 @@ pub fn get_role_id_by_name(role_list: &[Role], name: RoleName) -> Result<RoleId,
 /// This will change the device's current role to the new role assigned.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
+///
+/// It is an error if the device has already been assigned a role.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
