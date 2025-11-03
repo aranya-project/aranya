@@ -1143,6 +1143,78 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
     Ok(())
 }
 
+/// Confirms that role can no longer manage another role after it is removed as a role owner.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_role_owner_removed_permissions_revoked").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    // Use setup without delegations so owner owns all roles without conflicts
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // First, assign the permission
+    owner_team
+        .assign_role_management_permission(
+            roles.operator().id,
+            roles.admin().id,
+            text!("CanAssignRole"),
+        )
+        .await
+        .context("Failed to assign role management permission")?;
+
+    // Add admin and operator devices
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+    owner_team
+        .add_device(devices.operator.pk.clone(), None)
+        .await?;
+    owner_team
+        .add_device(devices.membera.pk.clone(), None)
+        .await?;
+
+    // Sync admin with owner
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Try to assign operator role as admin - should succeed with the permission
+    admin_team
+        .assign_role(devices.operator.id, roles.operator().id)
+        .await
+        .context("Admin should be able to assign operator role with CanAssignRole permission")?;
+
+    let operator_role_owners = owner_team.role_owners(roles.operator().id).await?;
+    info!("{:?}", operator_role_owners);
+
+    // Add a new owner role to operator so we can remove the owner role.
+    // There must be at least one owning role.
+    owner_team
+        .add_role_owner(roles.operator().id, roles.member().id)
+        .await?;
+
+    // Now remove the owner as a role owner of member.
+    owner_team
+        .remove_role_owner(roles.operator().id, roles.owner().id)
+        .await
+        .context("Failed to remove operator as role owner from member")?;
+
+    owner_team
+        .assign_role_management_permission(
+            roles.operator().id,
+            roles.admin().id,
+            text!("CanRevokeRole"),
+        )
+        .await
+        .expect_err("expected owner role management to fail after owner role was removed");
+
+    Ok(())
+}
+
 /// Test that a role cannot be assigned if a role is already assigned.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_cannot_assign_role_twice() -> Result<()> {
@@ -1294,8 +1366,6 @@ async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
 
     Ok(())
 }
-
-// TODO: add test to verify role owner cannot perform role owner operations after `remove_role_owner()`
 
 // TODO: add test to verify role owner can perform role permissions changes
 
