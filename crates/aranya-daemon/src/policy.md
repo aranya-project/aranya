@@ -3176,12 +3176,12 @@ command AddLabelManagingRole {
 
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::ChangeLabelManagingRole)
-        check can_manage_label(author.device_id, this.label_id)
 
         // Make sure we uphold `CanManageLabel`'s foreign keys.
         check exists Label[label_id: this.label_id]
         check exists Role[role_id: this.managing_role_id]
 
+        check can_manage_label(author.device_id, this.label_id)
         check !exists CanManageLabel[
             label_id: this.label_id,
             managing_role_id: this.managing_role_id,
@@ -3553,12 +3553,13 @@ command AssignLabelToDevice {
         check author.device_id != this.device_id
 
         check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
-        check can_manage_label(author.device_id, this.label_id)
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
         check exists Device[device_id: this.device_id]
         check exists Label[label_id: this.label_id]
+
+        check can_manage_label(author.device_id, this.label_id)
 
         // The target device must be able to use AFC.
         check device_has_simple_perm(this.device_id, SimplePerm::CanUseAfc)
