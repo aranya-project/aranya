@@ -11,11 +11,11 @@ use {
     aranya_daemon_api::text,
 };
 
-/// Demonstrate assigning a label to a device requires `CanUseAfc` permission.
+/// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_afc_assign_label() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_afc_assign_label").await?;
+async fn test_afc_assign_revoke_label() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_afc_assign_revoke_label").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -28,11 +28,27 @@ async fn test_afc_assign_label() -> Result<()> {
         .add_all_device_roles(team_id, &default_roles)
         .await?;
 
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
     let owner_team = devices.owner.client.team(team_id);
+    let membera_team = devices.membera.client.team(team_id);
+    let memberb_team = devices.memberb.client.team(team_id);
+
+    // Query team labels to show label has not been created yet.
+    membera_team.sync_now(owner_addr, None).await?;
+    assert_eq!(membera_team.labels().await?.iter().count(), 0);
+    memberb_team.sync_now(owner_addr, None).await?;
+    assert_eq!(memberb_team.labels().await?.iter().count(), 0);
+
     let label_id = owner_team
         .create_label(text!("label1"), default_roles.owner().id)
         .await?;
     let op = ChanOp::SendRecv;
+
+    // Query team labels to confirm the label was created.
+    membera_team.sync_now(owner_addr, None).await?;
+    assert_eq!(membera_team.labels().await?.iter().count(), 1);
+    memberb_team.sync_now(owner_addr, None).await?;
+    assert_eq!(memberb_team.labels().await?.iter().count(), 1);
 
     // Assigning labels to devices with the "operator" role should fail since it does not have `CanUseAfc` permission.
     owner_team
@@ -51,6 +67,60 @@ async fn test_afc_assign_label() -> Result<()> {
         .device(devices.memberb.id)
         .assign_label(label_id, op)
         .await?;
+
+    // Query team labels to confirm they have been assigned to devices.
+    membera_team.sync_now(owner_addr, None).await?;
+    assert_eq!(
+        membera_team
+            .device(devices.membera.id)
+            .label_assignments()
+            .await?
+            .iter()
+            .count(),
+        1
+    );
+    memberb_team.sync_now(owner_addr, None).await?;
+    assert_eq!(
+        memberb_team
+            .device(devices.memberb.id)
+            .label_assignments()
+            .await?
+            .iter()
+            .count(),
+        1
+    );
+
+    // Revoke the labels.
+    owner_team
+        .device(devices.membera.id)
+        .revoke_label(label_id)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .revoke_label(label_id)
+        .await?;
+
+    // Query team labels to confirm they have been revoked from devices.
+    membera_team.sync_now(owner_addr, None).await?;
+    assert_eq!(
+        membera_team
+            .device(devices.membera.id)
+            .label_assignments()
+            .await?
+            .iter()
+            .count(),
+        0
+    );
+    memberb_team.sync_now(owner_addr, None).await?;
+    assert_eq!(
+        memberb_team
+            .device(devices.memberb.id)
+            .label_assignments()
+            .await?
+            .iter()
+            .count(),
+        0
+    );
 
     Ok(())
 }
