@@ -42,7 +42,7 @@ async fn test_afc_assign_label() -> Result<()> {
         .context("unable to assign label")
         .expect_err("expected label assignment to fail");
 
-    // Assigning labels to devices with the "member" role should succeed since it does not have `CanUseAfc` permission.
+    // Assigning labels to devices with the "member" role should succeed since the role has `CanUseAfc` permission.
     owner_team
         .device(devices.membera.id)
         .assign_label(label_id, op)

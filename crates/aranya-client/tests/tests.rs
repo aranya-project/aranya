@@ -198,6 +198,143 @@ async fn test_add_remove_sync_peers() -> Result<()> {
     Ok(())
 }
 
+/// Tests creating/assigning/revoking/deleting a role.
+/// Verifies query indicate correct role assignment status.
+/// Verifies device is only allowed to perform operation when role with permission is assigned to it.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_role_create_assign_revoke() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let devices = DevicesCtx::new("test_role_create_assign_revoke").await?;
+
+    // Grab the shorthand for our address.
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+
+    // Create the initial team, and get our TeamId.
+    let owner = devices
+        .owner
+        .client
+        .create_team({
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
+                .build()?
+        })
+        .await
+        .expect("expected to create team");
+    let team_id = owner.team_id();
+    info!(?team_id);
+
+    let roles = devices.setup_default_roles(team_id).await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    // Query to show admin role exists.
+    let roles_on_team = owner_team.roles().await?;
+    assert_eq!(roles_on_team.iter().count(), 4);
+    let _admin_role = roles_on_team
+        .iter()
+        .find(|r| r.name == "admin")
+        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
+        .clone();
+
+    // Show that admin cannot create a label.
+    admin_team
+        .create_label(text!("label1"), roles.admin().id)
+        .await
+        .expect_err("expected label creation to fail");
+
+    // Add the admin as a new device.
+    info!("adding admin to team");
+    owner.add_device(devices.admin.pk.clone(), None).await?;
+
+    // Add team to admin device.
+    let admin_seed = owner
+        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
+        .await?;
+    devices
+        .admin
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&admin_seed)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    // Admin sync with owner.
+    admin_team
+        .sync_now(owner_addr.into(), None)
+        .await
+        .context("admin unable to sync with owner")?;
+
+    // Show that admin cannot create a label.
+    admin_team
+        .create_label(text!("label1"), roles.admin().id)
+        .await
+        .expect_err("expected label creation to fail");
+
+    // Give the admin its role.
+    owner
+        .assign_role(devices.admin.id, roles.admin().id)
+        .await?;
+
+    // Admin sync with owner.
+    admin_team
+        .sync_now(owner_addr.into(), None)
+        .await
+        .context("admin unable to sync with owner")?;
+
+    // Query to show admin role is assigned to admin device.
+    let admin_role = admin_team
+        .device(devices.admin.id)
+        .role()
+        .await?
+        .expect("expected admin device to have role assigned to it");
+    assert_eq!(admin_role.name, text!("admin"));
+
+    // Create label.
+    let label1 = admin_team
+        .create_label(text!("label1"), roles.admin().id)
+        .await
+        .expect("expected admin to create label");
+
+    // Confirm there is 1 label on team.
+    assert_eq!(admin_team.labels().await?.iter().count(), 1);
+
+    // Confirm created label exists.
+    assert!(admin_team.label(label1).await?.is_some());
+
+    // Revoke role.
+    owner
+        .revoke_role(devices.admin.id, roles.admin().id)
+        .await?;
+
+    // Admin sync with owner.
+    admin_team
+        .sync_now(owner_addr.into(), None)
+        .await
+        .context("admin unable to sync with owner")?;
+
+    // Query to show admin role is no longer assigned to admin device.
+    if admin_team.device(devices.admin.id).role().await?.is_some() {
+        bail!("did not expect role to be assigned to admin device");
+    }
+
+    // Show that admin cannot create a label.
+    admin_team
+        .create_label(text!("label1"), roles.admin().id)
+        .await
+        .expect_err("expected label creation to fail");
+
+    // TODO: show operation fails after delete_role() (after it is added to the API).
+
+    Ok(())
+}
+
 /// Tests that devices can be added to the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_devices() -> Result<()> {
