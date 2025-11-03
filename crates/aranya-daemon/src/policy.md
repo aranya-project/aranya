@@ -1055,9 +1055,8 @@ function device_owns_role(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `target_role_id` refers to a role
     // that exists.
@@ -1268,9 +1267,8 @@ function can_assign_role(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `role_id` refers to a role that
     // exists.
@@ -1314,9 +1312,8 @@ function can_revoke_role(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `role_id` refers to a role that
     // exists.
@@ -1359,9 +1356,8 @@ function can_change_role_perms(device_id id, target_role_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `target_role_id` refers to a role that
     // exists.
@@ -3127,9 +3123,8 @@ function can_manage_label(device_id id, label_id id) bool {
     // - `device_role_id` refers to a role that exists
     // - `device_role_id` refers to the role assigned to
     //   `device_id`
-    //
-    // We do NOT know whether `device_id` refers to a device
-    // that exists.
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
     //
     // We do NOT know whether `label_id` refers to a label that
     // exists.
