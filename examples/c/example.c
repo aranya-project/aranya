@@ -730,7 +730,7 @@ AranyaError run_afc_example(Team* t) {
     size_t roles_len = 0;
     roles = calloc(roles_len, sizeof(AranyaRole));
 
-    err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
+    err = aranya_query_roles_on_team(&owner->client, &t->id, roles, &roles_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error. roles_len: %zu\n", roles_len);
         roles = realloc(roles, roles_len * sizeof(AranyaRole));
@@ -739,7 +739,7 @@ AranyaError run_afc_example(Team* t) {
         }
 
         printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
-        err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
+        err = aranya_query_roles_on_team(&owner->client, &t->id, roles, &roles_len);
         printf("Re tried fefching list of roles\n");
     }
     if (err != ARANYA_ERROR_SUCCESS) {

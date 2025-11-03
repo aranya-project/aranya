@@ -1723,10 +1723,10 @@ AranyaError aranya_change_role_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_roles(const struct AranyaClient *client,
-                         const struct AranyaTeamId *team,
-                         struct AranyaRole *roles_out,
-                         size_t *roles_len);
+AranyaError aranya_query_roles_on_team(const struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       struct AranyaRole *roles_out,
+                                       size_t *roles_len);
 
 /**
  * Returns all of the roles for this team.
@@ -1742,11 +1742,11 @@ AranyaError aranya_roles(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_roles_ext(const struct AranyaClient *client,
-                             const struct AranyaTeamId *team,
-                             struct AranyaRole *roles_out,
-                             size_t *roles_len,
-                             struct AranyaExtError *__ext_err);
+AranyaError aranya_query_roles_on_team_ext(const struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           struct AranyaRole *roles_out,
+                                           size_t *roles_len,
+                                           struct AranyaExtError *__ext_err);
 
 /**
  * Gets a role ID from a list using the given `name`.

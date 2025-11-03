@@ -1209,7 +1209,7 @@ pub fn change_role(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub unsafe fn roles(
+pub unsafe fn query_roles_on_team(
     client: &Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
