@@ -1215,19 +1215,19 @@ pub fn roles(
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let all_roles = client
+    let roles = client
         .rt
         .block_on(client.inner.team(team.into()).roles())?
         .__into_data();
 
-    if *roles_len < all_roles.len() {
-        *roles_len = all_roles.len();
+    if *roles_len < roles.len() {
+        *roles_len = roles.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    *roles_len = all_roles.len();
+    *roles_len = roles.len();
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
-    for (dst, src) in out.iter_mut().zip(all_roles) {
+    for (dst, src) in out.iter_mut().zip(roles) {
         Role::init(dst, imp::Role(src));
     }
 
