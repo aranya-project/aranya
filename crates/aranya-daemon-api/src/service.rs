@@ -304,6 +304,8 @@ pub trait DaemonApi {
 
     /// Create a new graph/team with the current device as the owner.
     async fn create_team(cfg: CreateTeamConfig) -> Result<TeamId>;
+    /// Close the team.
+    async fn close_team(team: TeamId) -> Result<()>;
 
     /// Encrypts the team's syncing PSK(s) for the peer.
     async fn encrypt_psk_seed_for_peer(
