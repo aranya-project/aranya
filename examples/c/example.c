@@ -717,7 +717,7 @@ AranyaError run_afc_example(Team* t) {
 
     unsigned char* ciphertext = NULL;
     unsigned char* plaintext  = NULL;
-    // AranyaRole* roles = NULL;
+    AranyaRole* roles = NULL;
 
     AranyaError err;
 
@@ -727,23 +727,23 @@ AranyaError run_afc_example(Team* t) {
     AranyaChannelIdent idents[] = {{&membera->id, ARANYA_CHAN_OP_SEND_ONLY},
                                    {&memberb->id, ARANYA_CHAN_OP_RECV_ONLY}};
 
-    // size_t roles_len = 0;
-    // roles = calloc(roles_len, sizeof(AranyaRole));
-    size_t roles_len = 4;
-    AranyaRole roles[roles_len];
+    size_t roles_len = 0;
+    roles = calloc(roles_len, sizeof(AranyaRole));
+    // size_t roles_len = 4;
+    // AranyaRole roles[roles_len];
 
     err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
-    // if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-    //     printf("handling buffer too small error. roles_len: %zu\n", roles_len);
-    //     roles = realloc(roles, roles_len);
-    //     if (roles == NULL) {
-    //         abort();
-    //     }
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        printf("handling buffer too small error. roles_len: %zu\n", roles_len);
+        roles = realloc(roles, roles_len);
+        if (roles == NULL) {
+            abort();
+        }
 
-    //     printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
-    //     err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
-    //     printf("Re tried fefching list of roles\n");
-    // }
+        printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
+        err = aranya_roles(&owner->client, &t->id, roles, &roles_len);
+        printf("Re tried fefching list of roles\n");
+    }
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get list of roles\n");
         return err;

@@ -978,7 +978,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn setup_default_roles(
+pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
@@ -1082,7 +1082,7 @@ pub fn remove_role_owner(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn role_owners(
+pub unsafe fn role_owners(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
@@ -1209,7 +1209,7 @@ pub fn change_role(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn roles(
+pub unsafe fn roles(
     client: &Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
