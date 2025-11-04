@@ -95,6 +95,11 @@
 #define ARANYA_ID_LEN 32
 
 /**
+ * The number of roles returned from `setup_default_roles`.
+ */
+#define DEFAULT_ROLES_LEN 3
+
+/**
  * The size in bytes of a PSK seed IKM.
  */
 #define ARANYA_SEED_IKM_LEN 32
@@ -2418,7 +2423,7 @@ AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[out] device the ID of the device [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] role_out the role assigned to the device. `role_out` will be NULL
+ * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
  * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
  *
  * @relates AranyaClient.
@@ -2434,7 +2439,7 @@ AranyaError aranya_team_device_role(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[out] device the ID of the device [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] role_out the role assigned to the device. `role_out` will be NULL
+ * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
  * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
  *
  * @relates AranyaClient.

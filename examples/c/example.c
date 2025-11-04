@@ -387,7 +387,7 @@ AranyaError init_team(Team* t) {
     // scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
-    size_t default_roles_len = 3;
+    size_t default_roles_len = DEFAULT_ROLES_LEN;
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.

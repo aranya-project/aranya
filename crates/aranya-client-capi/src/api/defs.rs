@@ -267,6 +267,9 @@ const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_id::BaseId>());
 };
 
+/// The number of roles returned from `setup_default_roles`.
+pub const DEFAULT_ROLES_LEN: usize = 3;
+
 /// Cryptographically secure Aranya ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -997,6 +1000,8 @@ pub unsafe fn setup_default_roles(
                 .setup_default_roles(owner_role.id),
         )?
         .__into_data();
+
+    debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
 
     if *roles_len < default_roles.len() {
         *roles_len = default_roles.len();
