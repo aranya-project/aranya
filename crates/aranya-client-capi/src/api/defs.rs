@@ -267,6 +267,8 @@ const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_id::BaseId>());
 };
 
+// N.B. Keep in sync with the `setup_default_roles` action in
+// crates/aranya-daemon/src/policy.md.
 /// The number of roles returned from `setup_default_roles`.
 pub const DEFAULT_ROLES_LEN: usize = 3;
 
