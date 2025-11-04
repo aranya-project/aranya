@@ -720,6 +720,8 @@ AranyaError aranya_role_cleanup(struct AranyaRole *ptr);
  * Get ID of role.
  *
  * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaRole
  */
 AranyaError aranya_role_get_id(const struct AranyaRole *role,
                                struct AranyaRoleId *__output);
@@ -728,6 +730,8 @@ AranyaError aranya_role_get_id(const struct AranyaRole *role,
  * Get ID of role.
  *
  * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaRole
  */
 AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
                                    struct AranyaRoleId *__output,
@@ -739,6 +743,8 @@ AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
  * The resulting string must not be freed.
  *
  * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaRole
  */
 AranyaError aranya_role_get_name(const struct AranyaRole *role,
                                  const char **__output);
@@ -747,6 +753,8 @@ AranyaError aranya_role_get_name(const struct AranyaRole *role,
  * Get the author of a role.
  *
  * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaRole
  */
 AranyaError aranya_role_get_author(const struct AranyaRole *role,
                                    struct AranyaDeviceId *__output);
@@ -755,6 +763,8 @@ AranyaError aranya_role_get_author(const struct AranyaRole *role,
  * Get the author of a role.
  *
  * @param[in] role the role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaRole
  */
 AranyaError aranya_role_get_author_ext(const struct AranyaRole *role,
                                        struct AranyaDeviceId *__output,
@@ -1667,8 +1677,8 @@ AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClie
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] old_role the ID of the role currently assigned to the device.
- * @param[in] new_role the ID of the role to assign to the device.
+ * @param[in] old_role the ID of the role currently assigned to the device [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] new_role the ID of the role to assign to the device [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
  */
@@ -1688,8 +1698,8 @@ AranyaError aranya_change_role(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] old_role the ID of the role currently assigned to the device.
- * @param[in] new_role the ID of the role to assign to the device.
+ * @param[in] old_role the ID of the role currently assigned to the device [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] new_role the ID of the role to assign to the device [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
  */
@@ -1717,7 +1727,7 @@ AranyaError aranya_change_role_ext(const struct AranyaClient *client,
 AranyaError aranya_team_roles(const struct AranyaClient *client,
                               const struct AranyaTeamId *team,
                               struct AranyaRole *roles_out,
-                              size_t *roles_len);
+                              size_t *roles_out_len);
 
 /**
  * Returns all of the roles for this team.
@@ -1736,22 +1746,24 @@ AranyaError aranya_team_roles(const struct AranyaClient *client,
 AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   const struct AranyaTeamId *team,
                                   struct AranyaRole *roles_out,
-                                  size_t *roles_len,
+                                  size_t *roles_out_len,
                                   struct AranyaExtError *__ext_err);
 
 /**
  * Assign a role to a device.
  *
- * This will change the device's current role to the new role assigned.
+ * This will change the device's currently assigned role to the new role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * It is an error if the device has already been assigned a role.
+ * If you want to assign a different role to a device that already
+ * has a role, use `change_role()` instead.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] role_id the ID of the role to assign to the device.
+ * @param[in] role_id the ID of the role to assign to the device [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
  */
@@ -1763,16 +1775,18 @@ AranyaError aranya_assign_role(const struct AranyaClient *client,
 /**
  * Assign a role to a device.
  *
- * This will change the device's current role to the new role assigned.
+ * This will change the device's currently assigned role to the new role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * It is an error if the device has already been assigned a role.
+ * If you want to assign a different role to a device that already
+ * has a role, use `change_role()` instead.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] role_id the ID of the role to assign to the device.
+ * @param[in] role_id the ID of the role to assign to the device [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
  */

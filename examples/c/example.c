@@ -461,6 +461,7 @@ AranyaError init_team(Team* t) {
     EXPECT("unable to get the owning roles for the 'member' role.", err);
     if (member_owning_roles_len != 1) {
         fprintf(stderr, "there should only be 1 owner for the 'member' role. Actual: %zu\n", member_owning_roles_len);
+        return ARANYA_ERROR_OTHER;
     }
 
     // Add a new owning role to the 'member' role.
@@ -477,6 +478,7 @@ AranyaError init_team(Team* t) {
     EXPECT("unable to get the owning roles for the 'member' role", err);
     if (member_owning_roles_len != 2) {
         fprintf(stderr, "there should only be 2 owners for the 'member' role. Actual:%zu\n", member_owning_roles_len);
+        return ARANYA_ERROR_OTHER;
     }
 
      // Remove an owning role from the 'member' role.
@@ -488,6 +490,7 @@ AranyaError init_team(Team* t) {
     EXPECT("unable to get the owning roles for the 'member' role.", err);
     if (member_owning_roles_len != 1) {
         fprintf(stderr, "there should only be 1 owner for the 'member' role. Actual: %zu\n", member_owning_roles_len);
+        return ARANYA_ERROR_OTHER;
     }
 
     // add_team() for each non-owner device

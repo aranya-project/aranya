@@ -369,6 +369,8 @@ impl From<&RoleId> for aranya_client::RoleId {
 /// Get ID of role.
 ///
 /// @param[in] role the role [`Role`].
+/// 
+/// @relates AranyaRole
 pub fn role_get_id(role: &Role) -> RoleId {
     role.deref().id.into()
 }
@@ -378,6 +380,8 @@ pub fn role_get_id(role: &Role) -> RoleId {
 /// The resulting string must not be freed.
 ///
 /// @param[in] role the role [`Role`].
+/// 
+/// @relates AranyaRole
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
     role.deref().name.as_ptr().cast()
@@ -386,6 +390,8 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 /// Get the author of a role.
 ///
 /// @param[in] role the role [`Role`].
+/// 
+/// @relates AranyaRole
 pub fn role_get_author(role: &Role) -> DeviceId {
     role.deref().author_id.into()
 }
@@ -1158,8 +1164,8 @@ pub fn revoke_role_management_permission(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] device the device's ID [`DeviceId`].
-/// @param[in] old_role the ID of the role currently assigned to the device.
-/// @param[in] new_role the ID of the role to assign to the device.
+/// @param[in] old_role the ID of the role currently assigned to the device [`RoleId`].
+/// @param[in] new_role the ID of the role to assign to the device [`RoleId`].
 ///
 /// @relates AranyaClient.
 pub fn change_role(
@@ -1196,19 +1202,19 @@ pub unsafe fn team_roles(
     client: &Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
-    roles_len: &mut usize,
+    roles_out_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let roles = client
         .rt
         .block_on(client.inner.team(team.into()).roles())?
         .__into_data();
 
-    if *roles_len < roles.len() {
-        *roles_len = roles.len();
+    if *roles_out_len < roles.len() {
+        *roles_out_len = roles.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    *roles_len = roles.len();
-    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+    *roles_out_len = roles.len();
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
 
     for (dst, src) in out.iter_mut().zip(roles) {
         Role::init(dst, imp::Role(src));
@@ -1219,16 +1225,18 @@ pub unsafe fn team_roles(
 
 /// Assign a role to a device.
 ///
-/// This will change the device's current role to the new role assigned.
+/// This will change the device's currently assigned role to the new role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// It is an error if the device has already been assigned a role.
+/// If you want to assign a different role to a device that already
+/// has a role, use `change_role()` instead.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] device the device's ID [`DeviceId`].
-/// @param[in] role_id the ID of the role to assign to the device.
+/// @param[in] role_id the ID of the role to assign to the device [`RoleId`].
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
