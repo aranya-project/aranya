@@ -269,7 +269,7 @@ impl SyncProtocol {
 ///
 /// This is designed so that a single buffer can be reused across multiple sync operations.
 #[derive(Debug, Clone)]
-struct ProtocolStore {
+pub(crate) struct ProtocolStore {
     protocols: Arc<DashMap<SyncPeer, Arc<Mutex<SyncProtocol>>>>,
     config: ProtocolConfig,
 }

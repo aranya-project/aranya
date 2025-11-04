@@ -4,19 +4,16 @@
 //! when graph heads change, allowing peers to stay synchronized.
 
 use std::{
-    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use anyhow::Context;
-use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{Address, GraphId, PeerCache, Storage, StorageProvider, SyncHelloType};
 use aranya_util::Addr;
 use dashmap::DashMap;
-use tokio::{io::AsyncReadExt, sync::Mutex};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument, trace, warn};
+use tracing::{debug, trace, warn};
 
 use crate::{
     sync::{
@@ -65,29 +62,29 @@ impl HelloService {
         }
     }
 
-    /// Broadcast hello notifications to all subscribers of a graph.
-    pub async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Result<()> {
+    /// Notify all subscribers when a graph head changes.
+    pub async fn notify_subscribers(&self, graph_id: GraphId, head: Address) -> Result<()> {
         let now = Instant::now();
-
         let subscribers = self.get_valid_subscribers(graph_id, now);
 
         trace!(
             ?graph_id,
             ?head,
-            subscriber_count = subscribers.len(),
-            "broadcasting hello notifications"
+            count = subscribers.len(),
+            "notifying subscribers"
         );
 
         for subscriber_addr in subscribers {
             let peer = SyncPeer::new(subscriber_addr, graph_id);
-            match self.send_hello_notification(peer, head).await {
+
+            match self.notify_peer(peer, head).await {
                 Ok(()) => {
                     self.subscriptions
                         .entry(peer)
                         .and_modify(|sub| sub.last_notified = Some(now));
                 }
                 Err(error) => {
-                    warn!(%error, ?subscriber_addr, ?head, "failed to send hello notification");
+                    warn!(%error, peer = %peer.addr, graph = %peer.graph_id, ?head, "failed to notify subscriber");
                 }
             }
         }
@@ -95,30 +92,120 @@ impl HelloService {
         Ok(())
     }
 
-    pub async fn handle_hello_message(
-        &self,
-        peer: SyncPeer,
-        hello_msg: SyncHelloType<Addr>,
-    ) -> Result<()> {
-        match hello_msg {
+    /// Handle an incoming message from a peer.
+    pub async fn handle_message(&self, peer: SyncPeer, msg: SyncHelloType<Addr>) -> Result<()> {
+        match msg {
             SyncHelloType::Subscribe {
                 delay_milliseconds,
                 duration_milliseconds,
                 address,
             } => {
-                let peer = SyncPeer::new(address, peer.graph_id);
-                self.handle_subscribe(peer, delay_milliseconds, duration_milliseconds)
-                    .await
+                let subscriber = SyncPeer::new(address, peer.graph_id);
+                let delay = Duration::from_millis(delay_milliseconds);
+                let duration = Duration::from_millis(duration_milliseconds);
+                self.subscribe(subscriber, delay, duration).await
             }
             SyncHelloType::Unsubscribe { address } => {
-                let peer = SyncPeer::new(address, peer.graph_id);
-                self.handle_unsubscribe(peer).await
+                let subscriber = SyncPeer::new(address, peer.graph_id);
+                self.unsubscribe(subscriber).await
             }
             SyncHelloType::Hello { head, address } => {
-                let peer = SyncPeer::new(address, peer.graph_id);
-                self.handle_notification(peer, head).await
+                let sender = SyncPeer::new(address, peer.graph_id);
+                self.receive_notification(sender, head).await
             }
         }
+    }
+
+    /// Handle a subscribe request.
+    async fn subscribe(&self, peer: SyncPeer, delay: Duration, duration: Duration) -> Result<()> {
+        let expires_at = Instant::now() + duration;
+        let cancel_token = CancellationToken::new();
+
+        // We're registering a new subscription for an existing peer, so let's cancel the current task driving it.
+        if let Some(old_sub) = self.subscriptions.get(&peer) {
+            old_sub.cancel_token.cancel();
+            debug!(peer = %peer.addr, graph = %peer.graph_id, "cancelled previous subscription");
+        }
+
+        let subscription = HelloSubscription {
+            graph_change_delay: delay,
+            last_notified: None,
+            expires_at,
+            cancel_token: cancel_token.clone(),
+        };
+
+        self.subscriptions.insert(peer, subscription);
+        debug!(peer = %peer.addr, graph = %peer.graph_id, graph_change_delay = ?delay, ?expires_at, "created subscription");
+
+        tokio::spawn(Self::periodic_notifier(
+            peer,
+            delay,
+            expires_at,
+            cancel_token,
+            self.client.clone(),
+            self.sync_handle.clone(),
+        ));
+
+        Ok(())
+    }
+
+    /// Handle an unsubscribe request.
+    async fn unsubscribe(&self, peer: SyncPeer) -> Result<()> {
+        match self.subscriptions.remove(&peer) {
+            Some((_, subscription)) => {
+                subscription.cancel_token.cancel();
+                debug!(peer = %peer.addr, graph = %peer.graph_id, "removed subscription");
+            }
+            None => {
+                debug!(peer = %peer.addr, graph = %peer.graph_id, "no subscription found to remove");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Handle a notification from a peer about their new head.
+    async fn receive_notification(&self, peer: SyncPeer, head: Address) -> Result<()> {
+        debug!(peer = %peer.addr, graph = %peer.graph_id, ?head, "received notification");
+
+        let needs_sync = {
+            let mut aranya = self.client.aranya.lock().await;
+            !aranya.command_exists(peer.graph_id, head)
+        };
+
+        if needs_sync {
+            debug!(peer = %peer.addr, graph = %peer.graph_id, ?head, "triggering sync");
+
+            if let Err(error) = self.sync_handle.sync_on_hello(peer).await {
+                warn!(%error, peer = %peer.addr, graph = %peer.graph_id, ?head, "failed to trigger sync");
+            }
+        }
+
+        let mut aranya = self.client.aranya.lock().await;
+        let mut cache = self.caches.entry(peer).or_insert_with(PeerCache::default);
+
+        match aranya.update_heads(peer.graph_id, [head], &mut cache) {
+            Ok(()) => {
+                trace!(peer = %peer.addr, graph = %peer.graph_id, ?head, "updated peer cache");
+            }
+            Err(error) => {
+                warn!(%error, peer = %peer.addr, graph = %peer.graph_id, ?head, "failed to update peer cache");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Send a notification to a specific peer.
+    async fn notify_peer(&self, peer: SyncPeer, head: Address) -> Result<()> {
+        self.sync_handle
+            .send_hello_notification(peer, head)
+            .await
+            .context("failed to send notification via manager")?;
+
+        trace!(peer = %peer.addr, graph = %peer.graph_id, ?head, "sent notification");
+
+        Ok(())
     }
 
     /// Get valid subscribers for a graph (non-expired, not rate-limited).
@@ -149,8 +236,57 @@ impl HelloService {
 
         subscribers
     }
+
+    async fn periodic_notifier(
+        peer: SyncPeer,
+        schedule_delay: Duration,
+        expires_at: Instant,
+        cancel_token: CancellationToken,
+        client: Client,
+        sync_handle: SyncHandle,
+    ) {
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep(schedule_delay) => {
+                    if Instant::now() >= expires_at {
+                        debug!(peer = %peer.addr, graph = %peer.graph_id, "subscription expired, exiting notifier");
+                        break;
+                    }
+
+                    let head = {
+                        let mut aranya = client.aranya.lock().await;
+                        let storage = match aranya.provider().get_storage(peer.graph_id) {
+                            Ok(storage) => storage,
+                            Err(error) => {
+                                warn!(%error, peer = %peer.addr, graph = %peer.graph_id, "failed to get storage for hello sync");
+                                continue;
+                            }
+                        };
+
+                        match storage.get_head_address() {
+                            Ok(addr) => addr,
+                            Err(error) => {
+                                warn!(%error, peer = %peer.addr, graph = %peer.graph_id, "failed to get head for hello sync");
+                                continue;
+                            }
+                        }
+                    };
+
+                    match sync_handle.send_hello_notification(peer, head).await {
+                        Ok(()) => trace!(peer = %peer.addr, graph = %peer.graph_id, ?head, "sent periodic notification"),
+                        Err(error) => warn!(%error, peer = %peer.addr, graph = %peer.graph_id, "failed to send periodic notification"),
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                    debug!(peer = %peer.addr, graph = %peer.graph_id, "subscription cancelled, exiting notifier");
+                    break;
+                }
+            }
+        }
+    }
 }
 
+/*
 impl Syncer<State> {
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
@@ -701,427 +837,6 @@ where
                 }
             }
         }
-    }
-}
-
-/*
-//! Hello notification functionality for Aranya QUIC sync.
-//!
-//! This module handles subscription management and broadcasting of hello notifications
-//! when graph heads change, allowing peers to stay synchronized.
-
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
-
-use anyhow::Context;
-use aranya_runtime::{Address, GraphId, PeerCache, SyncHelloType, SyncType};
-use dashmap::DashMap;
-use tokio::{io::AsyncReadExt, sync::Mutex};
-use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument, trace, warn};
-
-use crate::{
-    sync::{
-        manager::{SyncHandle, SyncManager},
-        transport::quic::{QuicError, QuicTransport},
-        PeerCacheMap, Result, SyncPeer,
-    },
-    Addr, Client,
-};
-
-/// A hello subscription from a peer.
-#[derive(Debug, Clone)]
-pub struct HelloSubscription {
-    /// Delay between notifications when graph changes (rate limiting).
-    pub(crate) graph_change_delay: Duration,
-    /// Last time we sent a notification.
-    pub(crate) last_notified: Option<Instant>,
-    /// When this subscription expires.
-    pub(crate) expires_at: Instant,
-    /// Token to cancel the scheduled sending task.
-    cancel_token: CancellationToken,
-}
-
-/// Maps from (team_id, subscriber_address) to subscription details
-pub type HelloSubscriptions = Arc<DashMap<SyncPeer, HelloSubscription>>;
-
-/// Hello-related information combining subscriptions and sync peers.
-#[derive(Debug, Clone)]
-pub struct HelloService {
-    client: Client,
-    caches: PeerCacheMap,
-    /// Storage for sync hello subscriptions
-    pub subscriptions: HelloSubscriptions,
-    server_addr: Addr,
-    /// Interface to trigger sync operations
-    handle: SyncHandle,
-}
-
-impl HelloService {
-    /// Creates a new hello service.
-    pub fn new(
-        client: Client,
-        caches: PeerCacheMap,
-        subscriptions: HelloSubscriptions,
-        server_addr: Addr,
-        sync_handle: SyncHandle,
-    ) -> Self {
-        Self {
-            client,
-            caches,
-            subscriptions,
-            server_addr,
-            handle: sync_handle,
-        }
-    }
-    /// Broadcast hello notifications to all subscribers of a graph.
-    pub async fn broadcast_hello(&mut self, graph_id: GraphId, head: Address) -> Result<()> {
-        let now = Instant::now();
-
-        let subscribers = self.get_valid_subscribers(graph_id, now);
-
-        trace!(
-            ?graph_id,
-            ?head,
-            subscriber_count = subscribers.len(),
-            "broadcasting hello notifications"
-        );
-
-        // Send hello notification to each subscriber
-        for subscriber_addr in subscribers {
-            let peer = SyncPeer::new(subscriber_addr, graph_id);
-            match self.send_hello_notification(peer, head).await {
-                Ok(()) => {
-                    self.subscriptions
-                        .entry(SyncPeer {
-                            addr: subscriber_addr,
-                            graph_id,
-                        })
-                        .and_modify(|sub| sub.last_notified = Some(now));
-                }
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        ?subscriber_addr,
-                        ?head,
-                        "Failed to send hello notification"
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Handle an incoming hello message from a peer.
-    pub async fn handle_hello_message(
-        &self,
-        peer: SyncPeer,
-        hello_msg: SyncHelloType<Addr>,
-    ) -> Result<()> {
-        match hello_msg {
-            SyncHelloType::Subscribe {
-                delay_milliseconds,
-                duration_milliseconds,
-                address,
-            } => {
-                self.handle_subscribe(
-                    peer.graph_id,
-                    address,
-                    delay_milliseconds,
-                    duration_milliseconds,
-                )
-                .await
-            }
-            SyncHelloType::Unsubscribe { address } => {
-                let peer = SyncPeer::new(address, peer.graph_id);
-                self.handle_unsubscribe(peer).await
-            }
-            SyncHelloType::Hello { head, address } => {
-                let peer = SyncPeer::new(address, peer.graph_id);
-                self.handle_hello_notification(peer, head).await
-            }
-        }
-    }
-
-    async fn handle_subscribe(
-        &self,
-        graph_id: GraphId,
-        subscriber_addr: Addr,
-        delay_milliseconds: u64,
-        duration_milliseconds: u64,
-    ) -> Result<()> {
-        let graph_change_delay = Duration::from_millis(delay_milliseconds);
-        let duration = Duration::from_millis(duration_milliseconds);
-        let expires_at = Instant::now() + duration;
-        let cancel_token = CancellationToken::new();
-
-        let key = SyncPeer {
-            addr: subscriber_addr,
-            graph_id,
-        };
-
-        if let Some(old_sub) = self.subscriptions.get(&key) {
-            old_sub.cancel_token.cancel();
-            debug!(
-                ?subscriber_addr,
-                ?graph_id,
-                "cancelled previous subscription"
-            );
-        }
-
-        let subscription = HelloSubscription {
-            graph_change_delay,
-            last_notified: None,
-            expires_at,
-            cancel_token,
-        };
-
-        self.subscriptions.insert(key, subscription);
-
-        debug!(
-            ?subscriber_addr,
-            ?graph_id,
-            ?graph_change_delay,
-            ?expires_at,
-            "created hello subscription"
-        );
-
-        self.spawn_scheduled_hello_sender(
-            graph_id,
-            subscriber_addr,
-            graph_change_delay,
-            expires_at,
-            cancel_token,
-        );
-
-        Ok(())
-    }
-
-    async fn handle_unsubscribe(&self, peer: SyncPeer) -> Result<()> {
-        match self.subscriptions.remove(&peer) {
-            Some((_, subscription)) => {
-                subscription.cancel_token.cancel();
-                debug!(?peer, "removed hello subscription");
-            }
-            None => debug!(?peer, "no subscription to remove"),
-        }
-
-        Ok(())
-    }
-
-    async fn handle_hello_notification(&self, peer: SyncPeer, head: Address) -> Result<()> {
-        trace!(?peer, ?head, "received hello notification");
-
-        let needs_sync = {
-            let mut aranya = self.client.aranya.lock().await;
-            !aranya.command_exists(peer.graph_id, head)
-        };
-
-        if needs_sync {
-            debug!(?peer, ?head, "triggering sync based on hello notification");
-
-            if let Err(e) = self.handle.sync_on_hello(peer).await {
-                warn!(error = %e, ?peer, ?head, "failed to trigger sync on hello");
-            }
-        }
-
-        let mut aranya = self.client.aranya.lock().await;
-        let mut cache = self.caches.entry(peer).or_insert_with(PeerCache::default);
-
-        match aranya.update_heads(peer.graph_id, [head], &mut cache) {
-            Ok(()) => debug!(?peer, ?head, "updated peer cache with hello head"),
-            Err(error) => warn!(%error, ?peer, ?head, "couldn't update peer cache with hello head"),
-        }
-
-        Ok(())
-    }
-
-    /*async fn send_hello_notification(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
-        // Serialize the message
-        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
-
-        // Connect to the peer
-        let stream = self.connect(peer, id).await?;
-        let (mut recv, mut send) = stream.split();
-
-        // Send the message
-        send.send(bytes::Bytes::from(data))
-            .await
-            .map_err(QuicError::from)?;
-        send.close().await.map_err(QuicError::from)?;
-
-        // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
-            .await
-            .with_context(|| format!("failed to read hello {} response", operation_name))?;
-        assert!(!response_buf.is_empty());
-        Ok(())
-    }
-
-    /// Sends a subscribe request to a peer for hello notifications.
-    ///
-    /// This method sends a [`SyncHelloType::Subscribe`] message to the specified peer,
-    /// requesting to be notified when the peer's graph head changes. The peer will
-    /// send hello notifications with the specified delay between them.
-    ///
-    /// # Arguments
-    /// * `peer` - The network address of the peer to send the subscribe request to
-    /// * `id` - The graph ID for the team/graph to subscribe to
-    /// * `delay_milliseconds` - Delay in milliseconds between notifications (0 = immediate)
-    /// * `subscriber_server_addr` - The address where this subscriber's QUIC sync server is listening
-    ///
-    /// # Returns
-    /// * `Ok(())` if the subscribe request was sent successfully
-    /// * `Err(SyncError)` if there was an error connecting or sending the message
-    #[instrument(skip_all)]
-    pub async fn send_sync_hello_subscribe_request(
-        &mut self,
-        peer: &Addr,
-        id: GraphId,
-        delay: Duration,
-        duration: Duration,
-        subscriber_server_addr: Addr,
-    ) -> SyncResult<()> {
-        // Create the subscribe message
-        let delay_milliseconds = delay.as_millis() as u64;
-        let duration_milliseconds = duration.as_millis() as u64;
-        let hello_msg = SyncHelloType::Subscribe {
-            delay_milliseconds,
-            duration_milliseconds,
-            address: subscriber_server_addr,
-        };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
-
-        self.send_hello_request(peer, id, sync_type, "subscribe")
-            .await
-    }
-
-    /// Sends an unsubscribe request to a peer to stop hello notifications.
-    ///
-    /// This method sends a `SyncHelloType::Unsubscribe` message to the specified peer,
-    /// requesting to stop receiving hello notifications when the peer's graph head changes.
-    ///
-    /// # Arguments
-    /// * `peer` - The network address of the peer to send the unsubscribe request to
-    /// * `id` - The graph ID for the team/graph to unsubscribe from
-    /// * `subscriber_server_addr` - The subscriber's server address to identify which subscription to remove
-    ///
-    /// # Returns
-    /// * `Ok(())` if the unsubscribe request was sent successfully
-    /// * `Err(SyncError)` if there was an error connecting or sending the message
-    #[instrument(skip_all)]
-    pub async fn send_hello_unsubscribe_request(
-        &mut self,
-        peer: &Addr,
-        id: GraphId,
-        subscriber_server_addr: Addr,
-    ) -> SyncResult<()> {
-        debug!("client sending unsubscribe request to QUIC sync server");
-
-        // Create the unsubscribe message
-        let sync_type: SyncType<Addr> = SyncType::Hello(SyncHelloType::Unsubscribe {
-            address: subscriber_server_addr,
-        });
-
-        self.send_hello_request(peer, id, sync_type, "unsubscribe")
-            .await
-    }
-
-    /// Sends a hello notification to a specific subscriber.
-    ///
-    /// This method sends a `SyncHelloType::Hello` message to the specified subscriber,
-    /// notifying them that the graph head has changed. Uses the existing connection
-    /// infrastructure to efficiently reuse connections.
-    ///
-    /// # Arguments
-    /// * `peer` - The network address of the subscriber to send the notification to
-    /// * `id` - The graph ID for the team/graph
-    /// * `head` - The new head address to include in the notification
-    ///
-    /// # Returns
-    /// * `Ok(())` if the notification was sent successfully
-    /// * `Err(SyncError)` if there was an error connecting or sending the message
-    #[instrument(skip_all)]*/
-    pub async fn send_hello_notification(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
-        let hello_msg = SyncHelloType::Hello {
-            head,
-            address: self.server_addr,
-        };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
-
-        let data =
-            postcard::to_allocvec(&sync_type).context("failed to serialize hello notification")?;
-
-        let stream = self.connect(peer, id).await.map_err(|e| {
-            warn!(
-                error = %e,
-                ?peer,
-                ?id,
-                "Failed to connect to peer"
-            );
-            e
-        })?;
-        let (mut recv, mut send) = stream.split();
-
-        send.send(bytes::Bytes::from(data)).await.map_err(|e| {
-            warn!(
-                error = %e,
-                ?peer,
-                "Failed to send hello message"
-            );
-            QuicError::from(e)
-        })?;
-
-        send.close().await.map_err(|e| {
-            warn!(
-                error = %e,
-                ?peer,
-                "Failed to close send stream"
-            );
-            QuicError::from(e)
-        })?;
-
-        // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
-            .await
-            .context("failed to read hello notification response")?;
-        debug!(
-            response_len = response_buf.len(),
-            "received hello notification response"
-        );
-
-        Ok(())
-    }
-
-    fn get_valid_subscribers(&self, graph_id: GraphId, now: Instant) -> Vec<Addr> {
-        let mut subscribers = Vec::new();
-
-        self.subscriptions.retain(|peer, subscription| {
-            if now >= subscription.expires_at {
-                debug!(?peer.addr, ?graph_id, "removed expired subscription");
-                return false;
-            }
-
-            if peer.graph_id == graph_id {
-                if let Some(last_notified) = subscription.last_notified {
-                    if now - last_notified < subscription.graph_change_delay {
-                        // Keep in our list of subscriptions, but don't notify yet.
-                        return true;
-                    }
-                }
-                subscribers.push(peer.addr);
-            }
-
-            true
-        });
-
-        subscribers
     }
 }
 */

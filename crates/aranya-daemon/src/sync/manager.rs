@@ -25,7 +25,7 @@ use super::{
     types::{SyncGuard, SyncType},
     PeerCacheMap, Result, SyncPeer, Transport,
 };
-use crate::{Client, InvalidGraphs, EF};
+use crate::{sync::protocol::ProtocolStore, Client, InvalidGraphs, EF};
 
 pub(crate) type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
@@ -124,16 +124,17 @@ pub struct SyncManager<T> {
 
 impl<T> SyncManager<T> {
     pub fn new(
-        transport: T,
+        transport: Arc<T>,
         config: ProtocolConfig,
         invalid: InvalidGraphs,
         max_concurrent: usize,
     ) -> (Self, SyncHandle) {
         let (send, recv) = mpsc::channel::<Request>(128);
         let handle = SyncHandle::new(send);
+        let protocols = ProtocolStore::new(config.clone());
 
         let manager = Self {
-            transport: Arc::new(transport),
+            transport,
             config,
             invalid,
             max_concurrent,
@@ -493,16 +494,15 @@ impl<T: Transport + Send + Sync + 'static> SyncManager<T> {
     }
 }*/
 
-/// Handles adding and removing sync peers.
+/// Handle for interacting with the [`SyncManager`].
 #[derive(Debug, Clone)]
-pub struct SyncHandle {
-    /// Send messages to add/remove peers.
+struct SyncHandle {
     sender: mpsc::Sender<Request>,
 }
 
 impl SyncHandle {
     /// Create a new peer manager.
-    pub(crate) fn new(sender: mpsc::Sender<Request>) -> Self {
+    fn new(sender: mpsc::Sender<Request>) -> Self {
         Self { sender }
     }
 
@@ -516,35 +516,24 @@ impl SyncHandle {
     }
 
     /// Add peer to [`Syncer`].
-    pub(crate) async fn add_peer(
-        &self,
-        addr: Addr,
-        graph_id: GraphId,
-        cfg: SyncPeerConfig,
-    ) -> Reply {
-        let peer = SyncPeer { addr, graph_id };
+    async fn add_peer(&self, peer: SyncPeer, cfg: SyncPeerConfig) -> Reply {
         self.send(ManagerMsg::AddPeer { peer, cfg }).await
     }
 
     /// Remove peer from [`Syncer`].
-    pub(crate) async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Reply {
+    async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(ManagerMsg::RemovePeer { peer }).await
     }
 
     /// Sync with a peer immediately.
-    pub(crate) async fn sync_now(
-        &self,
-        addr: Addr,
-        graph_id: GraphId,
-        cfg: Option<SyncPeerConfig>,
-    ) -> Reply {
+    async fn sync_now(&self, addr: Addr, graph_id: GraphId, cfg: Option<SyncPeerConfig>) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(ManagerMsg::SyncNow { peer, cfg }).await
     }
 
     /// Subscribe to hello notifications from a sync peer.
-    pub(crate) async fn sync_hello_subscribe(
+    async fn sync_hello_subscribe(
         &self,
         peer_addr: Addr,
         graph_id: GraphId,
@@ -564,22 +553,22 @@ impl SyncHandle {
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
-    pub(crate) async fn sync_hello_unsubscribe(&self, peer: SyncPeer) -> Reply {
+    async fn sync_hello_unsubscribe(&self, peer: SyncPeer) -> Reply {
         self.send(ManagerMsg::HelloUnsubscribe { peer }).await
     }
 
     /// Trigger sync with a peer based on hello message.
-    pub(crate) async fn sync_on_hello(&self, peer: SyncPeer) -> Reply {
+    async fn sync_on_hello(&self, peer: SyncPeer) -> Reply {
         self.send(ManagerMsg::SyncOnHello { peer }).await
     }
 
     /// Broadcast hello notifications to all subscribers of a graph.
-    pub(crate) async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Reply {
+    async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Reply {
         self.send(ManagerMsg::BroadcastHello { graph_id, head })
             .await
     }
 
-    pub(crate) async fn invalidate_graph(&self, graph_id: GraphId) -> Reply {
+    async fn invalidate_graph(&self, graph_id: GraphId) -> Reply {
         self.send(ManagerMsg::InvalidateGraph { graph_id }).await
     }
 }
