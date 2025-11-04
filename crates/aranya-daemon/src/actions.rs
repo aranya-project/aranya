@@ -562,9 +562,9 @@ where
 
     /// Invokes `terminate_team`.
     #[instrument(skip(self), fields(%team_id))]
-    fn terminate_team(&self, team_id: BaseId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn terminate_team(&self, team_id: GraphId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.terminate_team(team_id)?;
+            actor.terminate_team(team_id.into())?;
             Ok(())
         })
         .in_current_span()
