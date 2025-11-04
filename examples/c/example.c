@@ -144,6 +144,10 @@ AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
 AranyaError run(Team* t);
 AranyaError run_afc_example(Team* t);
 AranyaError cleanup_team(Team* t);
+AranyaError get_role_id_by_name(const struct AranyaRole *role_list,
+                                       size_t role_list_len,
+                                       const char* name,
+                                       struct AranyaRoleId *__output);
 
 typedef struct AranyaChannelIdent {
     AranyaDeviceId* device;
@@ -155,6 +159,31 @@ AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
                                        AranyaRoleId managing_role_id,
                                        AranyaChannelIdent* idents,
                                        int num_peers);
+
+AranyaError get_role_id_by_name(const struct AranyaRole *role_list,
+                                       size_t role_list_len,
+                                       const char*  name,
+                                       struct AranyaRoleId *__output) {
+    
+    AranyaError err;
+
+    for (size_t i = 0; i < role_list_len; i++) {
+        AranyaRole role = role_list[i];
+        const char* role_name = NULL;
+        err = aranya_role_get_name(&role, &role_name);
+
+        if (err != ARANYA_ERROR_SUCCESS) {
+            return err;
+        }
+
+        if (strcmp(name, role_name) == 0) {
+            err = aranya_role_get_id(&role, __output);
+            return err;
+        }
+    }
+
+    return ARANYA_ERROR_OTHER;
+}
 
 // Initialize an Aranya `Client` with the given parameters.
 AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
@@ -370,7 +399,7 @@ AranyaError init_team(Team* t) {
 
     // Get the ID of the admin role.
     AranyaRoleId admin_role_id;
-    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "admin", &admin_role_id);
+    err = get_role_id_by_name(default_roles, default_roles_len, "admin", &admin_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get 'admin' role from list of default roles\n");
         return err;
@@ -386,7 +415,7 @@ AranyaError init_team(Team* t) {
 
     // Get the ID of the operator role.
     AranyaRoleId operator_role_id;
-    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "operator", &operator_role_id);
+    err = get_role_id_by_name(default_roles, default_roles_len, "operator", &operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get 'operator' role from list of default roles\n");
         return err;
@@ -402,7 +431,7 @@ AranyaError init_team(Team* t) {
 
     // Get the ID of the member role.
     AranyaRoleId member_role_id;
-    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "member", &member_role_id);
+    err = get_role_id_by_name(default_roles, default_roles_len, "member", &member_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get 'member' role from list of default roles\n");
         return err;
@@ -704,7 +733,7 @@ AranyaError run(Team* t) {
     if (devices == NULL) {
         abort();
     }
-    err = aranya_query_devices_on_team(&operator->client, &t->id, devices,
+    err = aranya_team_devices(&operator->client, &t->id, devices,
                                        &devices_len);
     EXPECT("error querying devices on team", err);
 
@@ -732,7 +761,7 @@ AranyaError run(Team* t) {
 
     uint8_t memberb_keybundle[1024] = {0};
     size_t memberb_keybundle_len    = sizeof(memberb_keybundle);
-    err = aranya_query_device_keybundle(&operator->client, &t->id, &memberb->id,
+    err = aranya_team_device_keybundle(&operator->client, &t->id, &memberb->id,
                                         memberb_keybundle,
                                         &memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
@@ -791,7 +820,7 @@ AranyaError run_afc_example(Team* t) {
     size_t roles_len = 0;
     roles = calloc(roles_len, sizeof(AranyaRole));
 
-    err = aranya_query_roles_on_team(&owner->client, &t->id, roles, &roles_len);
+    err = aranya_team_roles(&owner->client, &t->id, roles, &roles_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error. roles_len: %zu\n", roles_len);
         roles = realloc(roles, roles_len * sizeof(AranyaRole));
@@ -800,7 +829,7 @@ AranyaError run_afc_example(Team* t) {
         }
 
         printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
-        err = aranya_query_roles_on_team(&owner->client, &t->id, roles, &roles_len);
+        err = aranya_team_roles(&owner->client, &t->id, roles, &roles_len);
         printf("Re tried fefching list of roles\n");
     }
     if (err != ARANYA_ERROR_SUCCESS) {
@@ -809,7 +838,7 @@ AranyaError run_afc_example(Team* t) {
     }
 
     AranyaRoleId owner_role_id;
-    err = aranya_get_role_id_by_name(roles, roles_len, "owner", &owner_role_id);
+    err = get_role_id_by_name(roles, roles_len, "owner", &owner_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get 'owner' role from list of roles\n");
         return err;
@@ -940,7 +969,7 @@ AranyaError run_afc_example(Team* t) {
 
     // Get the ID of the member role.
     AranyaRoleId member_role_id;
-    err = aranya_get_role_id_by_name(roles, roles_len, "member", &member_role_id);
+    err = get_role_id_by_name(roles, roles_len, "member", &member_role_id);
     EXPECT("unable to get 'member' role from list of default roles.", err);
 
     err = aranya_change_role(&owner->client, &t->id, &membera->id, &member_role_id, &owner_role_id);

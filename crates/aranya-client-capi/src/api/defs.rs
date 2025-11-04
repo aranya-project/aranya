@@ -485,23 +485,6 @@ impl Permission {
     }
 }
 
-/// The name of a Role.
-///
-/// E.g. "Owner"
-///
-/// Refer to the policy for an exhaustive list.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-pub struct RoleName(*const c_char);
-
-impl RoleName {
-    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(Text::try_from(cstr)?)
-    }
-}
-
 /// Channel ID for AFC channel.
 #[cfg(feature = "afc")]
 #[repr(C)]
@@ -1209,7 +1192,7 @@ pub fn change_role(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_roles_on_team(
+pub unsafe fn team_roles(
     client: &Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
@@ -1232,28 +1215,6 @@ pub unsafe fn query_roles_on_team(
     }
 
     Ok(())
-}
-
-/// Gets a role ID from a list using the given `name`.
-///
-/// `__output` will be a valid pointer if the value returned
-/// by this function is `ARANYA_ERROR_SUCCESS`.
-///
-/// @param[in] role_list the list of roles [`Role`].
-/// @param[in] role_list_len the length of the list of roles [`Role`].
-/// @param[in] name the name used to search for the role [`RoleName`].
-/// @param[out] __output an out pointer to the ID of the [`Role`] that was found.
-///
-/// @relates Role.
-pub fn get_role_id_by_name(role_list: &[Role], name: RoleName) -> Result<RoleId, imp::Error> {
-    // SAFETY: Caller must ensure `name` is a valid C String.
-    let name = unsafe { name.as_underlying()? };
-
-    role_list
-        .iter()
-        .find(|role| role.name == name)
-        .ok_or_else(|| anyhow::anyhow!("Missing role with the given name").into())
-        .map(|r| r.id.into())
 }
 
 /// Assign a role to a device.
@@ -1664,7 +1625,7 @@ pub unsafe fn sync_now(
 /// @param[in,out] devices_len returns the length of the devices list [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_devices_on_team(
+pub unsafe fn team_devices(
     client: &Client,
     team: &TeamId,
     devices: *mut MaybeUninit<DeviceId>,
@@ -1697,7 +1658,7 @@ pub unsafe fn query_devices_on_team(
 /// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_device_keybundle(
+pub unsafe fn team_device_keybundle(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1729,7 +1690,7 @@ pub unsafe fn query_device_keybundle(
 /// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_device_label_assignments(
+pub unsafe fn team_device_label_assignments(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1768,7 +1729,7 @@ pub unsafe fn query_device_label_assignments(
 /// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_labels(
+pub unsafe fn team_labels(
     client: &Client,
     team: &TeamId,
     labels: *mut MaybeUninit<LabelId>,
@@ -1799,7 +1760,7 @@ pub unsafe fn query_labels(
 /// @param[out] __output boolean indicating whether the label exists.
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_label_exists(
+pub unsafe fn team_label_exists(
     client: &Client,
     team: &TeamId,
     label: &LabelId,

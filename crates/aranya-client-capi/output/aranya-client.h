@@ -504,15 +504,6 @@ typedef uint64_t AranyaDuration;
 typedef const char *AranyaPermission;
 
 /**
- * The name of a Role.
- *
- * E.g. "Owner"
- *
- * Refer to the policy for an exhaustive list.
- */
-typedef const char *AranyaRoleName;
-
-/**
  * A label name.
  *
  * E.g. "TELEMETRY_LABEL"
@@ -1723,10 +1714,10 @@ AranyaError aranya_change_role_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_roles_on_team(const struct AranyaClient *client,
-                                       const struct AranyaTeamId *team,
-                                       struct AranyaRole *roles_out,
-                                       size_t *roles_len);
+AranyaError aranya_team_roles(const struct AranyaClient *client,
+                              const struct AranyaTeamId *team,
+                              struct AranyaRole *roles_out,
+                              size_t *roles_len);
 
 /**
  * Returns all of the roles for this team.
@@ -1742,48 +1733,11 @@ AranyaError aranya_query_roles_on_team(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_roles_on_team_ext(const struct AranyaClient *client,
-                                           const struct AranyaTeamId *team,
-                                           struct AranyaRole *roles_out,
-                                           size_t *roles_len,
-                                           struct AranyaExtError *__ext_err);
-
-/**
- * Gets a role ID from a list using the given `name`.
- *
- * `__output` will be a valid pointer if the value returned
- * by this function is `ARANYA_ERROR_SUCCESS`.
- *
- * @param[in] role_list the list of roles [`AranyaRole`](@ref AranyaRole).
- * @param[in] role_list_len the length of the list of roles [`AranyaRole`](@ref AranyaRole).
- * @param[in] name the name used to search for the role [`AranyaRoleName`](@ref AranyaRoleName).
- * @param[out] __output an out pointer to the ID of the [`AranyaRole`](@ref AranyaRole) that was found.
- *
- * @relates Role.
- */
-AranyaError aranya_get_role_id_by_name(const struct AranyaRole *role_list,
-                                       size_t role_list_len,
-                                       AranyaRoleName name,
-                                       struct AranyaRoleId *__output);
-
-/**
- * Gets a role ID from a list using the given `name`.
- *
- * `__output` will be a valid pointer if the value returned
- * by this function is `ARANYA_ERROR_SUCCESS`.
- *
- * @param[in] role_list the list of roles [`AranyaRole`](@ref AranyaRole).
- * @param[in] role_list_len the length of the list of roles [`AranyaRole`](@ref AranyaRole).
- * @param[in] name the name used to search for the role [`AranyaRoleName`](@ref AranyaRoleName).
- * @param[out] __output an out pointer to the ID of the [`AranyaRole`](@ref AranyaRole) that was found.
- *
- * @relates Role.
- */
-AranyaError aranya_get_role_id_by_name_ext(const struct AranyaRole *role_list,
-                                           size_t role_list_len,
-                                           AranyaRoleName name,
-                                           struct AranyaRoleId *__output,
-                                           struct AranyaExtError *__ext_err);
+AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
+                                  const struct AranyaTeamId *team,
+                                  struct AranyaRole *roles_out,
+                                  size_t *roles_len,
+                                  struct AranyaExtError *__ext_err);
 
 /**
  * Assign a role to a device.
@@ -2384,10 +2338,10 @@ AranyaError aranya_sync_now_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_devices_on_team(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         struct AranyaDeviceId *devices,
-                                         size_t *devices_len);
+AranyaError aranya_team_devices(const struct AranyaClient *client,
+                                const struct AranyaTeamId *team,
+                                struct AranyaDeviceId *devices,
+                                size_t *devices_len);
 
 /**
  * Query devices on team.
@@ -2399,144 +2353,128 @@ AranyaError aranya_query_devices_on_team(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_devices_on_team_ext(const struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             struct AranyaDeviceId *devices,
-                                             size_t *devices_len,
-                                             struct AranyaExtError *__ext_err);
-
-/**
- * Query device's keybundle.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] keybundle keybundle byte buffer `KeyBundle`.
- * @param[in,out] keybundle_len returns the length of the serialized keybundle.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_keybundle(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const struct AranyaDeviceId *device,
-                                          uint8_t *keybundle,
-                                          size_t *keybundle_len);
-
-/**
- * Query device's keybundle.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] keybundle keybundle byte buffer `KeyBundle`.
- * @param[in,out] keybundle_len returns the length of the serialized keybundle.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_keybundle_ext(const struct AranyaClient *client,
-                                              const struct AranyaTeamId *team,
-                                              const struct AranyaDeviceId *device,
-                                              uint8_t *keybundle,
-                                              size_t *keybundle_len,
-                                              struct AranyaExtError *__ext_err);
-
-/**
- * Query device label assignments.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_label_assignments(const struct AranyaClient *client,
-                                                  const struct AranyaTeamId *team,
-                                                  const struct AranyaDeviceId *device,
-                                                  struct AranyaLabelId *labels,
-                                                  size_t *labels_len);
-
-/**
- * Query device label assignments.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_label_assignments_ext(const struct AranyaClient *client,
-                                                      const struct AranyaTeamId *team,
-                                                      const struct AranyaDeviceId *device,
-                                                      struct AranyaLabelId *labels,
-                                                      size_t *labels_len,
-                                                      struct AranyaExtError *__ext_err);
-
-/**
- * Query for list of existing labels.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_labels(const struct AranyaClient *client,
-                                const struct AranyaTeamId *team,
-                                struct AranyaLabelId *labels,
-                                size_t *labels_len);
-
-/**
- * Query for list of existing labels.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_labels_ext(const struct AranyaClient *client,
+AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
-                                    struct AranyaLabelId *labels,
-                                    size_t *labels_len,
+                                    struct AranyaDeviceId *devices,
+                                    size_t *devices_len,
                                     struct AranyaExtError *__ext_err);
 
 /**
- * Query if a label exists.
+ * Query device's keybundle.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] label the label [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[out] __output boolean indicating whether the label exists.
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_label_exists(const struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      const struct AranyaLabelId *label,
-                                      bool *__output);
+AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaDeviceId *device,
+                                         uint8_t *keybundle,
+                                         size_t *keybundle_len);
+
+/**
+ * Query device's keybundle.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_keybundle_ext(const struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaDeviceId *device,
+                                             uint8_t *keybundle,
+                                             size_t *keybundle_len,
+                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Query device label assignments.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_label_assignments(const struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 struct AranyaLabelId *labels,
+                                                 size_t *labels_len);
+
+/**
+ * Query device label assignments.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_label_assignments_ext(const struct AranyaClient *client,
+                                                     const struct AranyaTeamId *team,
+                                                     const struct AranyaDeviceId *device,
+                                                     struct AranyaLabelId *labels,
+                                                     size_t *labels_len,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Query for list of existing labels.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_labels(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               struct AranyaLabelId *labels,
+                               size_t *labels_len);
+
+/**
+ * Query for list of existing labels.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_labels_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   struct AranyaLabelId *labels,
+                                   size_t *labels_len,
+                                   struct AranyaExtError *__ext_err);
 
 /**
  * Query if a label exists.
@@ -2549,11 +2487,27 @@ AranyaError aranya_query_label_exists(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_label_exists_ext(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const struct AranyaLabelId *label,
-                                          bool *__output,
-                                          struct AranyaExtError *__ext_err);
+AranyaError aranya_team_label_exists(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     const struct AranyaLabelId *label,
+                                     bool *__output);
+
+/**
+ * Query if a label exists.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[out] __output boolean indicating whether the label exists.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_label_exists_ext(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaLabelId *label,
+                                         bool *__output,
+                                         struct AranyaExtError *__ext_err);
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
