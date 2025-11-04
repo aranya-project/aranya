@@ -1811,11 +1811,6 @@ before any storage writes occur, and the managing role supplied to
 `setup_default_roles` must already exist on the team.
 
 ```policy
-// TODO: create these?
-fact RoleOwner[role_id id]=>{author_id id}
-fact RoleAdmin[role_id id]=>{author_id id}
-fact RoleOperator[role_id id]=>{author_id id}
-fact RoleMember[role_id id]=>{author_id id}
 fact DefaultRoleSeeded[name enum DefaultRoleName]=>{role_id id}
 
 enum DefaultRoleName {
