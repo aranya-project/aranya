@@ -1452,7 +1452,9 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
- * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * N.B. this function is meant to be called once to set up the default roles.
+ * Subsequent calls will result in an error if the default roles were already created.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1477,7 +1479,9 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
- * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * N.B. this function is meant to be called once to set up the default roles.
+ * Subsequent calls will result in an error if the default roles were already created.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -2372,6 +2376,39 @@ AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
                                     struct AranyaDeviceId *devices,
                                     size_t *devices_len,
                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Returns the role assigned to the device, if any.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] device the ID of the device [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] role_out the role assigned to the device. `role_out` will be NULL
+ * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_role(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaDeviceId *device,
+                                    struct AranyaRole *role_out);
+
+/**
+ * Returns the role assigned to the device, if any.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] device the ID of the device [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] role_out the role assigned to the device. `role_out` will be NULL
+ * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_role_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaDeviceId *device,
+                                        struct AranyaRole *role_out,
+                                        struct AranyaExtError *__ext_err);
 
 /**
  * Query device's keybundle.

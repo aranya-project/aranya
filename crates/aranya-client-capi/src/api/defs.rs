@@ -341,7 +341,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type Role = Safe<imp::Role>;
+pub type Role = Safe<aranya_client::Role>;
 
 /// Uniquely identifies a [`Role`].
 #[repr(C)]
@@ -959,7 +959,9 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
 /// Writes the number of roles that would have been returned to `roles_len`.
-/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// N.B. this function is meant to be called once to set up the default roles.
+/// Subsequent calls will result in an error if the default roles were already created.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
@@ -1004,7 +1006,7 @@ pub unsafe fn setup_default_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(default_roles) {
-        Role::init(dst, imp::Role(src));
+        Role::init(dst, src);
     }
 
     Ok(())
@@ -1091,7 +1093,7 @@ pub unsafe fn role_owners(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(owning_roles) {
-        Role::init(dst, imp::Role(src));
+        Role::init(dst, src);
     }
 
     Ok(())
@@ -1217,7 +1219,7 @@ pub unsafe fn team_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
 
     for (dst, src) in out.iter_mut().zip(roles) {
-        Role::init(dst, imp::Role(src));
+        Role::init(dst, src);
     }
 
     Ok(())
@@ -1655,7 +1657,37 @@ pub unsafe fn team_devices(
     Ok(())
 }
 
-// TODO: query_device_role
+/// Returns the role assigned to the device, if any.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[out] device the ID of the device [`DeviceId`].
+/// @param[out] role_out the role assigned to the device. `role_out` will be NULL
+/// if a role was not assigned to the device. [`Role`].
+///
+/// @relates AranyaClient.
+pub unsafe fn team_device_role(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+    role_out: *mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
+    let maybe_role = client
+        .rt
+        .block_on(client.inner.team(team.into()).device(device.into()).role())?;
+
+    match maybe_role {
+        Some(role) => {
+            // SAFETY: Assumes the caller provided a valid pointer to a `Role`.
+            let role_out = unsafe { &mut *(role_out) };
+            Role::init(role_out, role);
+        }
+        // SAFETY: Assumes the caller provided a valid pointer to a `Role`.
+        None => unsafe { role_out.write(MaybeUninit::zeroed()) },
+    }
+
+    Ok(())
+}
 
 /// Query device's keybundle.
 ///

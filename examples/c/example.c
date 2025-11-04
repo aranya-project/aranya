@@ -621,10 +621,8 @@ AranyaError init_team(Team* t) {
 
     err = aranya_revoke_role_management_permission(&owner->client, &t->id, &operator_role_id, &admin_role_id, "CanRevokeRole");
     EXPECT("unable to revoke role management permission", err);
-
-    return ARANYA_ERROR_SUCCESS;
-
 exit:
+    free(member_owning_roles);
     return err;
 }
 
@@ -833,7 +831,7 @@ AranyaError run_afc_example(Team* t) {
 
         printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
         err = aranya_team_roles(&owner->client, &t->id, roles, &roles_len);
-        printf("Re tried fefching list of roles\n");
+        printf("Re-tried fefching list of roles\n");
     }
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get list of roles\n");
@@ -977,9 +975,23 @@ AranyaError run_afc_example(Team* t) {
 
     err = aranya_change_role(&owner->client, &t->id, &membera->id, &member_role_id, &owner_role_id);
     EXPECT("unable to change role from 'member' to 'owner'.", err);
+
+    AranyaRole member_role;
+    err = aranya_team_device_role(&owner->client, &t->id, &membera->id, &member_role);
+    EXPECT("unable to get role assigned to the 'membera' device", err);
+
+    const char* role_name = NULL;
+    err = aranya_role_get_name(&member_role, &role_name);
+
+    EXPECT("unable to get name of the role assigned to 'membera'", err);
+
+    if (strcmp("owner", role_name) != 0) {
+        fprintf(stderr, "Mismatch in role name. Expected: 'owner', Actual:%s\n", role_name);
+    }
 exit:
     free(ciphertext);
     free(plaintext);
+    free(roles);
     return err;
 }
 
