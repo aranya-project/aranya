@@ -369,7 +369,7 @@ impl From<&RoleId> for aranya_client::RoleId {
 /// Get ID of role.
 ///
 /// @param[in] role the role [`Role`].
-/// 
+///
 /// @relates AranyaRole
 pub fn role_get_id(role: &Role) -> RoleId {
     role.deref().id.into()
@@ -380,7 +380,7 @@ pub fn role_get_id(role: &Role) -> RoleId {
 /// The resulting string must not be freed.
 ///
 /// @param[in] role the role [`Role`].
-/// 
+///
 /// @relates AranyaRole
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
@@ -390,7 +390,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 /// Get the author of a role.
 ///
 /// @param[in] role the role [`Role`].
-/// 
+///
 /// @relates AranyaRole
 pub fn role_get_author(role: &Role) -> DeviceId {
     role.deref().author_id.into()
