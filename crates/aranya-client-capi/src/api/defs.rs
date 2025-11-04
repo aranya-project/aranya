@@ -1378,6 +1378,31 @@ pub fn revoke_label(
     Ok(())
 }
 
+/// Add label managing role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] label_id the label ID [`LabelId`].
+/// @param[in] managing_role_id the ID of the managing role [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn add_label_managing_role(
+    client: &Client,
+    team: &TeamId,
+    label_id: &LabelId,
+    managing_role_id: &RoleId,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_label_managing_role(label_id.into(), managing_role_id.into()),
+    )?;
+    Ok(())
+}
+
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param[in] client the Aranya Client [`Client`].

@@ -1978,6 +1978,41 @@ AranyaError aranya_revoke_label_ext(const struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
+ * Add label managing role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] label_id the label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] managing_role_id the ID of the managing role [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_label_managing_role(const struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           const struct AranyaLabelId *label_id,
+                                           const struct AranyaRoleId *managing_role_id);
+
+/**
+ * Add label managing role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] label_id the label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] managing_role_id the ID of the managing role [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_label_managing_role_ext(const struct AranyaClient *client,
+                                               const struct AranyaTeamId *team,
+                                               const struct AranyaLabelId *label_id,
+                                               const struct AranyaRoleId *managing_role_id,
+                                               struct AranyaExtError *__ext_err);
+
+/**
  * Create a new graph/team with the current device as the owner.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
