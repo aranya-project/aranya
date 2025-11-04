@@ -144,10 +144,10 @@ AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
 AranyaError run(Team* t);
 AranyaError run_afc_example(Team* t);
 AranyaError cleanup_team(Team* t);
-AranyaError get_role_id_by_name(const struct AranyaRole *role_list,
-                                       size_t role_list_len,
+AranyaError get_role_id_by_name(const struct AranyaRole *roles,
+                                       size_t roles_len,
                                        const char* name,
-                                       struct AranyaRoleId *__output);
+                                       struct AranyaRoleId *role_id);
 
 typedef struct AranyaChannelIdent {
     AranyaDeviceId* device;
@@ -382,7 +382,7 @@ AranyaError init_team(Team* t) {
 
     // Team members are added to the team by first calling
     // `aranya_add_device_to_team`, passing in the submitter's client, the
-    // team ID ,the public key of the device to be added, and the role ID. In a real world
+    // team ID, the public key of the device to be added, and the role ID. In a real world
     // scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
