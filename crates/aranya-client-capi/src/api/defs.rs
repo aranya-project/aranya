@@ -1687,15 +1687,15 @@ pub unsafe fn team_devices(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[out] device the ID of the device [`DeviceId`].
-/// @param[out] role_out the role assigned to the device. `role_out` will be NULL
+/// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
 /// if a role was not assigned to the device. [`Role`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn team_device_role(
+pub fn team_device_role(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
-    role_out: *mut MaybeUninit<Role>,
+    role_out: &mut MaybeUninit<Role>,
 ) -> Result<(), imp::Error> {
     let maybe_role = client
         .rt
@@ -1703,12 +1703,9 @@ pub unsafe fn team_device_role(
 
     match maybe_role {
         Some(role) => {
-            // SAFETY: Assumes the caller provided a valid pointer to a `Role`.
-            let role_out = unsafe { &mut *(role_out) };
             Role::init(role_out, role);
         }
-        // SAFETY: Assumes the caller provided a valid pointer to a `Role`.
-        None => unsafe { role_out.write(MaybeUninit::zeroed()) },
+        None => *role_out = MaybeUninit::zeroed(),
     }
 
     Ok(())

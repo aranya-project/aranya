@@ -454,46 +454,6 @@ AranyaError init_team(Team* t) {
         return err;
     }
 
-    size_t member_owning_roles_len = 1;
-    AranyaRole *member_owning_roles = calloc(member_owning_roles_len, sizeof(AranyaRole));
-
-    // check that there is a single owner for the 'member' role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
-    EXPECT("unable to get the owning roles for the 'member' role.", err);
-    if (member_owning_roles_len != 1) {
-        fprintf(stderr, "there should only be 1 owner for the 'member' role. Actual: %zu\n", member_owning_roles_len);
-        return ARANYA_ERROR_OTHER;
-    }
-
-    // Add a new owning role to the 'member' role.
-    err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id, &admin_role_id);
-    EXPECT("unable to add a new owning role.", err);
-
-    // check that there are 2 owners for the 'member' role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
-    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-        printf("handling buffer too small error\n");
-        member_owning_roles = realloc(member_owning_roles, member_owning_roles_len * sizeof(AranyaRole));
-        err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
-    }
-    EXPECT("unable to get the owning roles for the 'member' role", err);
-    if (member_owning_roles_len != 2) {
-        fprintf(stderr, "there should only be 2 owners for the 'member' role. Actual:%zu\n", member_owning_roles_len);
-        return ARANYA_ERROR_OTHER;
-    }
-
-     // Remove an owning role from the 'member' role.
-    err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id, &admin_role_id);
-    EXPECT("unable to remove an owning role.", err);
-
-    // check that there is now just 1 owner for the 'member' role after removing an owning role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
-    EXPECT("unable to get the owning roles for the 'member' role.", err);
-    if (member_owning_roles_len != 1) {
-        fprintf(stderr, "there should only be 1 owner for the 'member' role. Actual: %zu\n", member_owning_roles_len);
-        return ARANYA_ERROR_OTHER;
-    }
-
     // add_team() for each non-owner device
     for (int i = 1; i < NUM_CLIENTS; i++) {
         printf("add_team() client: %s\n", client_names[i]);
@@ -623,7 +583,6 @@ AranyaError init_team(Team* t) {
     err = aranya_revoke_role_management_permission(&owner->client, &t->id, &operator_role_id, &admin_role_id, "CanRevokeRole");
     EXPECT("unable to revoke role management permission", err);
 exit:
-    free(member_owning_roles);
     return err;
 }
 
@@ -988,7 +947,11 @@ exit:
 // Run the custom roles example
 AranyaError run_custom_roles_example(Team* t) {
     Client* owner= & t->clients.owner;
+    Client* admin = &t->clients.admin;
     Client* membera = &t->clients.membera;
+
+    size_t member_owning_roles_len = 1;
+    AranyaRole *member_owning_roles = calloc(member_owning_roles_len, sizeof(AranyaRole));
 
     AranyaError err;
 
@@ -1000,7 +963,12 @@ AranyaError run_custom_roles_example(Team* t) {
     // Get the role assigned to 'owner'
     AranyaRole owner_role;
     err = aranya_team_device_role(&owner->client, &t->id, &owner->id, &owner_role);
-    EXPECT("unable to get role assigned to the 'ownera' device", err);
+    EXPECT("unable to get role assigned to the 'owner' device", err);
+
+    // Get the role assigned to 'admin'
+    AranyaRole admin_role;
+    err = aranya_team_device_role(&admin->client, &t->id, &admin->id, &admin_role);
+    EXPECT("unable to get role assigned to the 'admin' device", err);
 
     // Get the ID of the 'member' role.
     AranyaRoleId member_role_id;
@@ -1010,6 +978,11 @@ AranyaError run_custom_roles_example(Team* t) {
     // Get the ID of the 'owner' role.
     AranyaRoleId owner_role_id;
     err = aranya_role_get_id(&owner_role, &owner_role_id);
+    EXPECT("unable to get the role ID.", err);
+
+    // Get the ID of the 'admin' role.
+    AranyaRoleId admin_role_id;
+    err = aranya_role_get_id(&admin_role, &admin_role_id);
     EXPECT("unable to get the role ID.", err);
 
     // Change the role assigned to 'membera'.
@@ -1029,7 +1002,49 @@ AranyaError run_custom_roles_example(Team* t) {
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
+
+    // check that there is a single owner for the 'member' role.
+    err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
+    EXPECT("unable to get the owning roles for the 'member' role.", err);
+    if (member_owning_roles_len != 1) {
+        fprintf(stderr, "there should only be 1 owner for the 'member' role. Actual: %zu\n", member_owning_roles_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
+    // Add a new owning role to the 'member' role.
+    err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id, &admin_role_id);
+    EXPECT("unable to add a new owning role.", err);
+
+    // check that there are 2 owners for the 'member' role.
+    err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        printf("handling buffer too small error\n");
+        member_owning_roles = realloc(member_owning_roles, member_owning_roles_len * sizeof(AranyaRole));
+        err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
+    }
+    EXPECT("unable to get the owning roles for the 'member' role", err);
+    if (member_owning_roles_len != 2) {
+        fprintf(stderr, "there should only be 2 owners for the 'member' role. Actual:%zu\n", member_owning_roles_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
+     // Remove an owning role from the 'member' role.
+    err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id, &admin_role_id);
+    EXPECT("unable to remove an owning role.", err);
+
+    // check that there is now just 1 owner for the 'member' role after removing an owning role.
+    err = aranya_role_owners(&owner->client, &t->id, &member_role_id, member_owning_roles, &member_owning_roles_len);
+    EXPECT("unable to get the owning roles for the 'member' role.", err);
+    if (member_owning_roles_len != 1) {
+        fprintf(stderr, "there should only be 1 owner for the 'member' role. Actual: %zu\n", member_owning_roles_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
 exit:
+    free(member_owning_roles);
     if (err == ARANYA_ERROR_SUCCESS) {
         printf("completed the custom roles example.\n");
     }
