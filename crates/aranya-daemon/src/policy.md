@@ -937,12 +937,10 @@ command AddPermToRole {
     policy {
         check team_exists()
 
-        // TODO(eric): We have to make sure that the author is
-        // allowed to
-        // 1. update this role
-        // 2. add this *permission* to this role
         let author = get_author(envelope)
         check can_change_role_perms(author.device_id, this.role_id)
+        // We should not grant permissions we do not have
+        check device_has_simple_perm(author.device_id, this.perm)
 
         // The role must not already have the permission.
         check !role_has_simple_perm(this.role_id, this.perm)
