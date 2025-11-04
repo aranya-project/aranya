@@ -132,7 +132,6 @@ impl Team<'_> {
     }
 
     /// Returns the [`Device`] corresponding with `id`.
-    // TODO(eric): Should this return `Result<Device<'_>>?`
     pub fn device(&self, id: DeviceId) -> Device<'_> {
         Device {
             client: self.client,

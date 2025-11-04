@@ -1452,14 +1452,13 @@ async fn test_terminate_team_requires_matching_id() -> Result<()> {
 
     let owner = team.owner;
 
-    let team_id = TeamId::from(*owner.graph_id.as_array());
-    let mut bogus_team_bytes: [u8; 32] = team_id.into_id().into();
+    let mut bogus_team_bytes = *owner.graph_id.as_array();
     bogus_team_bytes[0] ^= 0x24;
-    let bogus_team = TeamId::from(bogus_team_bytes);
+    let bogus_team = GraphId::from(bogus_team_bytes);
 
     let err = owner
         .actions()
-        .terminate_team(bogus_team.into_id())
+        .terminate_team(bogus_team)
         .await
         .expect_err("expected terminate_team with mismatched id to fail");
     expect_not_authorized(err);

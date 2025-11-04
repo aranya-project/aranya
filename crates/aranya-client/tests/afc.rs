@@ -4,7 +4,7 @@ mod common;
 
 #[cfg(feature = "afc")]
 use {
-    crate::common::DevicesCtx,
+    crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL},
     anyhow::{Context, Result},
     aranya_client::afc::Channels,
     aranya_client::client::ChanOp,
@@ -462,6 +462,9 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .sync_now(owner_addr, None)
         .await?;
 
+    // Wait for channel to be deleted.
+    sleep(SLEEP_INTERVAL).await;
+
     // Try open/seal after channels are deleted.
     chan.seal(&mut ciphertext, afc_msg)
         .context("unable to seal afc message")
@@ -568,6 +571,9 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .team(team_id)
         .sync_now(owner_addr, None)
         .await?;
+
+    // Wait for channel to be deleted.
+    sleep(SLEEP_INTERVAL).await;
 
     // Try open/seal after channels are deleted.
     chan.seal(&mut ciphertext, afc_msg)
@@ -676,6 +682,9 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .team(team_id)
         .sync_now(owner_addr, None)
         .await?;
+
+    // Wait for channel to be deleted.
+    sleep(SLEEP_INTERVAL).await;
 
     // Try open/seal after channels are deleted.
     chan.seal(&mut ciphertext, afc_msg)
@@ -790,6 +799,9 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .team(team_id)
         .sync_now(owner_addr, None)
         .await?;
+
+    // Wait for channel to be deleted.
+    sleep(SLEEP_INTERVAL).await;
 
     // Try open/seal after channels are deleted.
     chan.seal(&mut ciphertext, afc_msg)
@@ -910,6 +922,9 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .team(team_id)
         .sync_now(owner_addr, None)
         .await?;
+
+    // Wait for channel to be deleted.
+    sleep(SLEEP_INTERVAL).await;
 
     // Try open/seal after channels are deleted.
     chan.seal(&mut ciphertext, afc_msg)

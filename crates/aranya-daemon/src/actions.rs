@@ -267,7 +267,7 @@ where
     }
 
     /// Invokes `assign_role_management_perm`.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), fields(%target_role_id, %managing_role_id, %perm))]
     fn assign_role_management_perm(
         &self,
         target_role_id: RoleId,
@@ -342,7 +342,7 @@ where
 
     /// Invokes `query_device_keybundle`.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
+    #[instrument(skip(self), fields(%device_id))]
     fn query_device_keybundle(
         &self,
         device_id: DeviceId,
@@ -357,7 +357,7 @@ where
 
     /// Invokes `query_device_role`.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
+    #[instrument(skip(self), fields(%device_id))]
     fn query_device_role(
         &self,
         device_id: DeviceId,
@@ -384,7 +384,7 @@ where
 
     /// Invokes `query_label`.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
+    #[instrument(skip(self), fields(%label_id))]
     fn query_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.session_action(move || VmAction {
             name: ident!("query_label"),
@@ -529,7 +529,7 @@ where
     }
 
     /// Invokes `revoke_role_management_perm`.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), fields(%target_role_id, %managing_role_id, %perm))]
     fn revoke_role_management_perm(
         &self,
         target_role_id: RoleId,
@@ -561,10 +561,10 @@ where
     }
 
     /// Invokes `terminate_team`.
-    #[instrument(skip(self))]
-    fn terminate_team(&self, team_id: BaseId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip(self), fields(%team_id))]
+    fn terminate_team(&self, team_id: GraphId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.terminate_team(team_id)?;
+            actor.terminate_team(team_id.into())?;
             Ok(())
         })
         .in_current_span()
