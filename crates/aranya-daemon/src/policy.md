@@ -1038,7 +1038,7 @@ Contextual permissions are generally stored in facts. Unlike
 simple permissions, they do have additional context. They're
 represented as non-empty tuples where the element(s) are the
 _context_. For example, the `CanManageLabel(label_id)` fact
-grants devices permission to manage a specific label.
+grants roles permission to manage a specific label.
 
 ### Role Ownership
 
@@ -1250,19 +1250,19 @@ command RemoveRoleOwner {
 
 ### Role Management
 
-The owning roles for a role are allowed to delegate the following
-permissions to other roles, including to themselves:
+The owning roles are allowed to delegate the following
+permissions to target roles, including to themselves:
 
-- `CanAssignRole(role_id)`: grants devices the ability to assign
-  the role to *any* device, except themselves.
-- `CanRevokeRole(role_id)`: grants devices the ability to
-  revoke the role from *any* device.
-- `CanChangeRolePerms(role_id)`: grants devices the ability
-  to change the permissions of the role.
+- `CanAssignRole(role_id)`: grants roles the ability to assign
+  a target role to *any* device, except themselves.
+- `CanRevokeRole(role_id)`: grants roles the ability to
+  revoke a target role from *any* device.
+- `CanChangeRolePerms(role_id)`: grants roles the ability
+  to change the permissions of a target role.
 
 ```policy
-// Grants devices who have been assigned the managing role
-// permission to assign the target role to other devices.
+// Grants a managing role permission to assign the target role
+// to other devices.
 //
 // # Foreign Keys
 //
@@ -1305,8 +1305,8 @@ function can_assign_role(device_id id, target_role_id id) bool {
     ]
 }
 
-// Grants devices who have been assigned the managing role
-// permission to revoke the target role from other devices.
+// Grants a managing role permission to revoke the target role
+// from other devices.
 //
 // # Foreign Keys
 //
@@ -1350,8 +1350,8 @@ function can_revoke_role(device_id id, target_role_id id) bool {
     ]
 }
 
-// Grants devices who have been assigned the managing role
-// permission to change the permissions of the target role.
+// Grants a managing role permission to change the (SimplePerm)
+// permissions of the target role.
 //
 // # Foreign Keys
 //
