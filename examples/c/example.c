@@ -614,7 +614,7 @@ AranyaError init_team(Team* t) {
     EXPECT("unable to assign 'operator' role to 'operator'\n", err);
     
     err = aranya_sync_now(&owner->client, &t->id, sync_addrs[ADMIN], NULL);
-    EXPECT("error calling `sync_now` to sync with pee: owner->adminr", err);
+    EXPECT("error calling `sync_now` to sync with pee: owner->admin", err);
 
     err = aranya_revoke_role_management_permission(&owner->client, &t->id, &operator_role_id, &admin_role_id, "CanRevokeRole");
     EXPECT("unable to revoke role management permission", err);
