@@ -472,7 +472,7 @@ function get_device_gen(device_id id) int {
 
 Device queries retrieve information about devices on the team.
 
-See [Query APIs][query-apis] for more information about the query
+See [Query APIs](#query-apis) for more information about the query
 APIs.
 
 #### `query_devices_on_team`
@@ -717,9 +717,10 @@ fact Role[role_id id]=>{name string, author_id id, default bool}
 
 Generating a role's ID from its originating command prevents
 devices from accidentally creating the same role on diverging
-branches, which could cause a fail-open security bug. See the
-[design][label-design] of labels for more information about a
-similar situation.
+branches, which could cause a fail-open security bug.
+<!-- TODO issues/581: See the
+[design][afc-label-design] of AFC labels for more information
+about this situation. -->
 
 ```policy
 // Returns the globally unique ID for a role created by the
@@ -3073,8 +3074,9 @@ fact Label[label_id id]=>{name string, author_id id}
 
 Generating a label's ID from its originating command prevents
 devices from accidentally creating the same label on diverging
-branches, which could cause a fail-open security bug. See the
-[design][afc-label-design] of AFC labels for more information.
+branches, which could cause a fail-open security bug.
+<!-- TODO issues/581: See the
+[design][afc-label-design] of AFC labels for more information. -->
 
 ```policy
 // Returns the globally unique ID for a label created by the
@@ -3792,7 +3794,7 @@ function label_assignment_matches_gen(
 
 Label queries retrieve information about labels on the team.
 
-See [Query APIs][query-apis] for more information about the query
+See [Query APIs](#query-apis) for more information about the query
 APIs.
 
 ##### `query_label`
@@ -4212,7 +4214,6 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
 [afc]: https://aranya-project.github.io/afc/
 [afc-ffi]: https://crates.io/crates/aranya-afc-util
 [all-the-way-down]: https://en.wikipedia.org/wiki/Turtles_all_the_way_down
-[aranya-core/229]: https://github.com/aranya-project/aranya-core/issues/229
 [commands]: https://aranya-project.github.io/policy-language-v1/#commands
 [crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi
 [device-ffi]: https://crates.io/crates/aranya-device-ffi
