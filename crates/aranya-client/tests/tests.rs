@@ -250,7 +250,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Add team to admin device.
     let admin_seed = owner
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -681,7 +681,7 @@ async fn test_add_team() -> Result<()> {
     }
 
     let admin_seed = owner
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -864,7 +864,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed1 = team1
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin
@@ -913,7 +913,7 @@ async fn test_multi_team_sync() -> Result<()> {
     }
 
     let admin_seed2 = team2
-        .encrypt_psk_seed_for_peer(&devices.admin.pk.encryption)
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
         .await?;
     devices
         .admin

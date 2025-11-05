@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, Role, TeamId},
+    client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
     text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
@@ -18,7 +18,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{KeyBundle, SEED_IKM_SIZE};
+use aranya_daemon_api::SEED_IKM_SIZE;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;

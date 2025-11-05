@@ -9,8 +9,6 @@ use std::{fmt::Debug, io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
-// TODO(eric): Wrap these.
-pub use aranya_daemon_api::KeyBundle;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
@@ -30,7 +28,7 @@ use {
 
 #[doc(inline)]
 pub use crate::client::{
-    device::{Device, DeviceId, Devices},
+    device::{Device, DeviceId, Devices, KeyBundle},
     label::{ChanOp, Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
@@ -203,6 +201,7 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+            .map(KeyBundle::from_api)
     }
 
     /// Gets the public device ID for this device.
