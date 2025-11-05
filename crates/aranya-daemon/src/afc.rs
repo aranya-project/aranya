@@ -15,7 +15,7 @@ use aranya_daemon_api::{self as api, AfcChannelId};
 pub use aranya_fast_channels::LocalChannelId as AfcLocalChannelId;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
-    AranyaState,
+    AranyaState, ChannelDirection,
 };
 use aranya_runtime::GraphId;
 use derive_where::derive_where;
@@ -221,31 +221,26 @@ where
 
         shm.write
             .remove_if(|chan| {
-                let e = match cache.entry((chan.peer_id, chan.label_id)) {
+                let e = match cache.entry((chan.peer_id, chan.label_id, chan.direction)) {
                     Entry::Occupied(e) => return *e.get(),
                     Entry::Vacant(e) => e,
                 };
 
-                // TODO: aranya-core#464 run a single query when channel direction is added to remove_if() params
-                let sender_valid = crate::actions::query_afc_channel_is_valid(
+                let (sender, receiver) = match chan.direction {
+                    ChannelDirection::Seal => (device_id, chan.peer_id),
+                    ChannelDirection::Open => (chan.peer_id, device_id),
+                };
+
+                let channel_invalid = !crate::actions::query_afc_channel_is_valid(
                     &mut client,
                     graph,
-                    device_id,
-                    chan.peer_id,
+                    sender,
+                    receiver,
                     chan.label_id,
                 )
                 .is_ok_and(|v| v);
 
-                let receiver_valid = crate::actions::query_afc_channel_is_valid(
-                    &mut client,
-                    graph,
-                    chan.peer_id,
-                    device_id,
-                    chan.label_id,
-                )
-                .is_ok_and(|v| v);
-
-                let channel_invalid = *e.insert(!sender_valid && !receiver_valid);
+                e.insert(channel_invalid);
                 channel_invalid
             })
             .context("unable to remove AFC channels matching criteria")
