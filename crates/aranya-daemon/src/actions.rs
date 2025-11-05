@@ -12,7 +12,7 @@ use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_text::Text;
 #[cfg(feature = "afc")]
 use aranya_runtime::NullSink;
-use aranya_runtime::{vm_action, ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
+use aranya_runtime::{ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument, warn, Instrument};
@@ -532,12 +532,12 @@ where
 {
     let mut session = aranya.session(graph_id)?;
     let mut sink = VecSink::new();
-    session.action(
-        aranya,
-        &mut sink,
-        &mut NullSink,
-        vm_action!(query_afc_channel_is_valid(sender_id, receiver_id, label_id)),
-    )?;
+    policy::query_afc_channel_is_valid(
+        sender_id.as_base(),
+        receiver_id.as_base(),
+        label_id.as_base(),
+    )
+    .with_action(|act| session.action(aranya, &mut sink, &mut NullSink, act))?;
     let effects = sink.collect()?;
     Ok(effects.iter().any(|e| {
         if let Effect::QueryAfcChannelIsValidResult(e) = e {
