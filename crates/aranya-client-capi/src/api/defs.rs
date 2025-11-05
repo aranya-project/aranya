@@ -267,6 +267,11 @@ const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_id::BaseId>());
 };
 
+// N.B. Keep in sync with the `setup_default_roles` action in
+// crates/aranya-daemon/src/policy.md.
+/// The number of roles returned from `setup_default_roles`.
+pub const DEFAULT_ROLES_LEN: usize = 3;
+
 /// Cryptographically secure Aranya ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -341,7 +346,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type Role = Safe<imp::Role>;
+pub type Role = Safe<aranya_client::Role>;
 
 /// Uniquely identifies a [`Role`].
 #[repr(C)]
@@ -369,6 +374,8 @@ impl From<&RoleId> for aranya_client::RoleId {
 /// Get ID of role.
 ///
 /// @param[in] role the role [`Role`].
+///
+/// @relates AranyaRole
 pub fn role_get_id(role: &Role) -> RoleId {
     role.deref().id.into()
 }
@@ -378,6 +385,8 @@ pub fn role_get_id(role: &Role) -> RoleId {
 /// The resulting string must not be freed.
 ///
 /// @param[in] role the role [`Role`].
+///
+/// @relates AranyaRole
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
     role.deref().name.as_ptr().cast()
@@ -386,6 +395,8 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 /// Get the author of a role.
 ///
 /// @param[in] role the role [`Role`].
+///
+/// @relates AranyaRole
 pub fn role_get_author(role: &Role) -> DeviceId {
     role.deref().author_id.into()
 }
@@ -465,6 +476,23 @@ impl Addr {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(cstr.to_str()?.parse()?)
+    }
+}
+
+/// The name of a permission.
+///
+/// E.g. "CanAssignRole"
+///
+/// Refer to the "Role Management" section of the policy for an exhaustive list.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct Permission(*const c_char);
+
+impl Permission {
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(Text::try_from(cstr)?)
     }
 }
 
@@ -934,11 +962,24 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// - operator
 /// - member
 ///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+///
+/// N.B. this function is meant to be called once to set up the default roles.
+/// Subsequent calls will result in an error if the default roles were already created.
+///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
+/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub unsafe fn setup_default_roles(
+    client: &mut Client,
+    team: &TeamId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
     // First get the owner role ID by looking at existing roles
     let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
 
@@ -952,16 +993,178 @@ pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp
             ))
         })?;
 
+    let default_roles = client
+        .rt
+        .block_on(
+            client
+                .inner
+                .team(team.into())
+                .setup_default_roles(owner_role.id),
+        )?
+        .__into_data();
+
+    debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
+
+    if *roles_len < default_roles.len() {
+        *roles_len = default_roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_len = default_roles.len();
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(default_roles) {
+        Role::init(dst, src);
+    }
+
+    Ok(())
+}
+
+/// Adds `owning_role` as an owner of role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role ID of the subject role [`RoleId`].
+/// @param[in] owning_role ID of the owning role [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn add_role_owner(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    owning_role: &RoleId,
+) -> Result<(), imp::Error> {
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .setup_default_roles(owner_role.id),
+            .add_role_owner(role.into(), owning_role.into()),
     )?;
+
     Ok(())
 }
 
-/// Assign a role to a device.
+/// Removes an owning_role as an owner of role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] owning_role ID of the owning role [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn remove_role_owner(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    owning_role: &RoleId,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_role_owner(role.into(), owning_role.into()),
+    )?;
+
+    Ok(())
+}
+
+/// Returns the roles that own `role`.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in,out] roles_len the number of roles written to the buffer.
+///
+/// @relates AranyaClient.
+pub unsafe fn role_owners(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let owning_roles = client
+        .rt
+        .block_on(client.inner.team(team.into()).role_owners(role.into()))?
+        .__into_data();
+
+    if *roles_len < owning_roles.len() {
+        *roles_len = owning_roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_len = owning_roles.len();
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(owning_roles) {
+        Role::init(dst, src);
+    }
+
+    Ok(())
+}
+
+/// Assigns a role management permission to a managing role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] managing_role the ID of the managing role [`RoleId`].
+/// @param[in] perm the management permission to assign [`Permission`].
+///
+/// @relates AranyaClient.
+pub fn assign_role_management_permission(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    managing_role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_role_management_permission(role.into(), managing_role.into(), perm),
+    )?;
+
+    Ok(())
+}
+
+/// Revokes a role management permission from a managing role.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the ID of the subject role [`RoleId`].
+/// @param[in] managing_role the ID of the managing role [`RoleId`].
+/// @param[in] perm the management permission to assign [`Permission`].
+///
+/// @relates AranyaClient.
+pub fn revoke_role_management_permission(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    managing_role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .revoke_role_management_permission(role.into(), managing_role.into(), perm),
+    )?;
+
+    Ok(())
+}
+
+/// Changes the `role` on a `device`
 ///
 /// This will change the device's current role to the new role assigned.
 ///
@@ -970,7 +1173,79 @@ pub fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] device the device's ID [`DeviceId`].
-/// @param[in] role_id the ID of the role to assign to the device.
+/// @param[in] old_role the ID of the role currently assigned to the device [`RoleId`].
+/// @param[in] new_role the ID of the role to assign to the device [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn change_role(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+    old_role: &RoleId,
+    new_role: &RoleId,
+) -> Result<(), imp::Error> {
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).change_role(
+            device.into(),
+            old_role.into(),
+            new_role.into(),
+        ))?;
+
+    Ok(())
+}
+
+/// Returns all of the roles for this team.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[out] roles_out returns a list of roles on the team [`Role`].
+/// @param[in,out] roles_len the number of roles written to the buffer.
+///
+/// @relates AranyaClient.
+pub unsafe fn team_roles(
+    client: &Client,
+    team: &TeamId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_out_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let roles = client
+        .rt
+        .block_on(client.inner.team(team.into()).roles())?
+        .__into_data();
+
+    if *roles_out_len < roles.len() {
+        *roles_out_len = roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_out_len = roles.len();
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
+
+    for (dst, src) in out.iter_mut().zip(roles) {
+        Role::init(dst, src);
+    }
+
+    Ok(())
+}
+
+/// Assign a role to a device.
+///
+/// This will change the device's currently assigned role to the new role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// It is an error if the device has already been assigned a role.
+/// If you want to assign a different role to a device that already
+/// has a role, use `change_role()` instead.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] role_id the ID of the role to assign to the device [`RoleId`].
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
@@ -1110,6 +1385,31 @@ pub fn revoke_label(
     Ok(())
 }
 
+/// Add label managing role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] label_id the label ID [`LabelId`].
+/// @param[in] managing_role_id the ID of the managing role [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn add_label_managing_role(
+    client: &Client,
+    team: &TeamId,
+    label_id: &LabelId,
+    managing_role_id: &RoleId,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_label_managing_role(label_id.into(), managing_role_id.into()),
+    )?;
+    Ok(())
+}
+
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param[in] client the Aranya Client [`Client`].
@@ -1182,11 +1482,11 @@ pub unsafe fn encrypt_psk_seed_for_peer(
         *seed_len = wrapped_seed.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *seed_len = wrapped_seed.len();
     let out = aranya_capi_core::try_as_mut_slice!(seed, *seed_len);
     for (dst, src) in out.iter_mut().zip(&wrapped_seed) {
         dst.write(*src);
     }
-    *seed_len = wrapped_seed.len();
 
     Ok(())
 }
@@ -1235,7 +1535,7 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param[in] keybundle_len is the length of the serialized keybundle.
-/// @param[in] role_id the ID of the role to assign to the device.
+/// @param[in] role_id (optional) the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
@@ -1367,7 +1667,7 @@ pub unsafe fn sync_now(
 /// @param[in,out] devices_len returns the length of the devices list [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_devices_on_team(
+pub unsafe fn team_devices(
     client: &Client,
     team: &TeamId,
     devices: *mut MaybeUninit<DeviceId>,
@@ -1382,14 +1682,41 @@ pub unsafe fn query_devices_on_team(
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    *devices_len = data.len();
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write((*src).into());
     }
-    *devices_len = data.len();
     Ok(())
 }
 
-// TODO: query_device_role
+/// Returns the role assigned to the device, if any.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[out] device the ID of the device [`DeviceId`].
+/// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
+/// if a role was not assigned to the device. [`Role`].
+///
+/// @relates AranyaClient.
+pub fn team_device_role(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+    role_out: &mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
+    let maybe_role = client
+        .rt
+        .block_on(client.inner.team(team.into()).device(device.into()).role())?;
+
+    match maybe_role {
+        Some(role) => {
+            Role::init(role_out, role);
+        }
+        None => *role_out = MaybeUninit::zeroed(),
+    }
+
+    Ok(())
+}
 
 /// Query device's keybundle.
 ///
@@ -1400,7 +1727,7 @@ pub unsafe fn query_devices_on_team(
 /// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_device_keybundle(
+pub unsafe fn team_device_keybundle(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1432,7 +1759,7 @@ pub unsafe fn query_device_keybundle(
 /// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_device_label_assignments(
+pub unsafe fn team_device_label_assignments(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1471,7 +1798,7 @@ pub unsafe fn query_device_label_assignments(
 /// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_labels(
+pub unsafe fn team_labels(
     client: &Client,
     team: &TeamId,
     labels: *mut MaybeUninit<LabelId>,
@@ -1481,15 +1808,15 @@ pub unsafe fn query_labels(
         .rt
         .block_on(client.inner.team(team.into()).labels())?;
     let data = data.__data();
-    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
-    }
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
     *labels_len = data.len();
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.id.into());
+    }
     Ok(())
 }
 
@@ -1502,7 +1829,7 @@ pub unsafe fn query_labels(
 /// @param[out] __output boolean indicating whether the label exists.
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_label_exists(
+pub unsafe fn team_label_exists(
     client: &Client,
     team: &TeamId,
     label: &LabelId,

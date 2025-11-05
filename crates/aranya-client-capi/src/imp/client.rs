@@ -1,4 +1,4 @@
-use core::{mem::MaybeUninit, ops::Deref};
+use core::mem::MaybeUninit;
 
 use aranya_client::KeyBundle;
 
@@ -36,16 +36,4 @@ pub unsafe fn key_bundle_serialize(
 /// Deserializes key bundle buffer into a [`KeyBundle`].
 pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
     Ok(postcard::from_bytes(buf)?)
-}
-
-/// An Aranya role.
-#[derive(Debug)]
-pub struct Role(aranya_client::Role);
-
-impl Deref for Role {
-    type Target = aranya_client::Role;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
 }
