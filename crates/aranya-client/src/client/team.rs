@@ -112,7 +112,7 @@ impl Team<'_> {
             .add_device_to_team(
                 context::current(),
                 self.id,
-                keys,
+                keys.into_api(),
                 initial_role.map(RoleId::into_api),
             )
             .await
