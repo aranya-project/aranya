@@ -13,9 +13,7 @@ pub mod defs;
 #[allow(clippy::undocumented_unsafe_blocks)]
 #[allow(rustdoc::broken_intra_doc_links)]
 #[rustfmt::skip]
-mod generated {
-    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
-}
+mod generated;
 pub use generated::*;
 
 // See <https://github.com/mozilla/cbindgen/issues/539>

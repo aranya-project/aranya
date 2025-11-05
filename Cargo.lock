@@ -198,8 +198,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b28671850a9f5064d0dcaa99a576f88e9f1af05b52a3e4c1a6fc7e1fb750a3"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=expand-opaque-in-codegen#57c36b312ebcf38f4a3ae40fb251af7349602067"
 dependencies = [
  "aho-corasick",
  "anyhow",
