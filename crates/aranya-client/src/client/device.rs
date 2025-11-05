@@ -1,14 +1,37 @@
 use std::{slice, vec};
 
 use aranya_daemon_api as api;
+use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tracing::instrument;
 
 use crate::{
-    client::{ChanOp, Client, KeyBundle, Label, LabelId, Labels, Role},
+    client::{ChanOp, Client, Label, LabelId, Labels, Role},
     error::{aranya_error, IpcError, Result},
     util::{custom_id, impl_slice_iter_wrapper, impl_vec_into_iter_wrapper},
 };
+
+/// A device's public key bundle.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(transparent)]
+pub struct KeyBundle(api::KeyBundle);
+
+impl KeyBundle {
+    #[doc(hidden)]
+    pub fn from_api(api: api::KeyBundle) -> Self {
+        Self(api)
+    }
+
+    #[doc(hidden)]
+    pub fn into_api(self) -> api::KeyBundle {
+        self.0
+    }
+
+    /// Return public encryption key bytes.
+    pub fn encryption(&self) -> &[u8] {
+        &self.0.encryption
+    }
+}
 
 custom_id! {
     /// Uniquely identifies a device.
@@ -67,6 +90,7 @@ impl Device<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+            .map(KeyBundle::from_api)
     }
 }
 
