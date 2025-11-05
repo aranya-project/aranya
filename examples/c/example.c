@@ -137,6 +137,9 @@ typedef struct {
     };
 } Team;
 
+// A zero-initialized struct for comparison
+static const AranyaRole ZERO_ROLE = {0};
+
 // Forward Declarations
 AranyaError init_client(Client* c, const char* name, const char* daemon_addr);
 AranyaError init_team(Team* t);
@@ -961,17 +964,35 @@ AranyaError run_custom_roles_example(Team* t) {
     err = aranya_team_device_role(&owner->client, &t->id, &membera->id, &member_role);
     EXPECT("unable to get role assigned to the 'membera' device", err);
 
+    if (memcmp(&member_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+        printf("no role assigned to 'membera'.\n");
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
     // Get the role assigned to 'owner'
     AranyaRole owner_role;
     printf("getting the role assigned to 'owner'.\n");
     err = aranya_team_device_role(&owner->client, &t->id, &owner->id, &owner_role);
     EXPECT("unable to get role assigned to the 'owner' device", err);
 
+    if (memcmp(&owner_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+        printf("no role assigned to 'owner'.\n");
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
     // Get the role assigned to 'admin'
     AranyaRole admin_role;
     printf("getting the role assigned to 'admin'.\n");
     err = aranya_team_device_role(&admin->client, &t->id, &admin->id, &admin_role);
     EXPECT("unable to get role assigned to the 'admin' device", err);
+
+    if (memcmp(&admin_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+        printf("no role assigned to 'admin'.\n");
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
 
     // Get the ID of the 'member' role.
     AranyaRoleId member_role_id;
@@ -995,6 +1016,12 @@ AranyaError run_custom_roles_example(Team* t) {
 
     err = aranya_team_device_role(&owner->client, &t->id, &membera->id, &member_role);
     EXPECT("unable to get role assigned to the 'membera' device", err);
+
+    if (memcmp(&member_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+        printf("no role assigned to 'membera'.\n");
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
 
     const char* role_name = NULL;
     err = aranya_role_get_name(&member_role, &role_name);
