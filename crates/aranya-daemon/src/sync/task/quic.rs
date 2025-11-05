@@ -127,7 +127,7 @@ impl SyncState for State {
         S: Sink<<EN as Engine>::Effect> + Send,
     {
         // Sets the active team before starting a QUIC connection
-        syncer.state.store.set_team(id.into_id().into());
+        syncer.state.store.set_team(TeamId::transmute(id));
 
         let stream = syncer
             .connect(peer, id)
@@ -505,7 +505,7 @@ where
                 .context("unable to keep connection alive")?;
             let key = ConnectionKey {
                 addr: peer,
-                id: active_team.into_id().into(),
+                id: GraphId::transmute(active_team),
             };
             self.conns.insert(key, conn).await;
             anyhow::Ok(())
@@ -521,7 +521,7 @@ where
         key: ConnectionKey,
         mut acceptor: StreamAcceptor,
     ) -> impl Future<Output = ()> {
-        let active_team = key.id.into_id().into();
+        let active_team = TeamId::transmute(key.id);
         let peer = key.addr;
         let client = self.aranya.clone();
         let caches = self.caches.clone();

@@ -346,9 +346,9 @@ impl TestCtx {
             .filter_map(|e| {
                 if let Effect::QueryTeamRolesResult(result) = e {
                     Some(aranya_daemon_api::Role {
-                        id: result.role_id.into(),
+                        id: aranya_daemon_api::RoleId::from_base(result.role_id),
                         name: result.name,
-                        author_id: result.author_id.into(),
+                        author_id: aranya_daemon_api::DeviceId::from_base(result.author_id),
                         default: result.default,
                     })
                 } else {
@@ -364,7 +364,7 @@ impl TestCtx {
         // Setup default roles (admin, operator, member)
         owner
             .actions()
-            .setup_default_roles(owner_role.id.into_id().into())
+            .setup_default_roles(RoleId::transmute(owner_role.id))
             .await
             .context("unable to setup default roles")?;
 
@@ -375,9 +375,9 @@ impl TestCtx {
             .filter_map(|e| {
                 if let Effect::QueryTeamRolesResult(result) = e {
                     Some(aranya_daemon_api::Role {
-                        id: result.role_id.into(),
+                        id: aranya_daemon_api::RoleId::from_base(result.role_id),
                         name: result.name,
-                        author_id: result.author_id.into(),
+                        author_id: aranya_daemon_api::DeviceId::from_base(result.author_id),
                         default: result.default,
                     })
                 } else {
@@ -401,7 +401,7 @@ impl TestCtx {
             .context("unable to add admin member")?;
         owner
             .actions()
-            .assign_role(admin.pk.ident_pk.id()?, admin_role.id.into_id().into())
+            .assign_role(admin.pk.ident_pk.id()?, RoleId::transmute(admin_role.id))
             .await
             .context("unable to elevate admin role")?;
         admin.sync_expect(owner, None).await?;
@@ -429,7 +429,7 @@ impl TestCtx {
             .actions()
             .assign_role(
                 operator.pk.ident_pk.id()?,
-                operator_role.id.into_id().into(),
+                RoleId::transmute(operator_role.id),
             )
             .await
             .context("unable to elevate operator role")?;
@@ -593,7 +593,7 @@ async fn load_default_roles(owner: &mut TestDevice) -> Result<HashMap<String, Ro
     let mut roles = HashMap::new();
     for effect in effects {
         if let Effect::QueryTeamRolesResult(result) = effect {
-            roles.insert(result.name.to_string(), result.role_id.into());
+            roles.insert(result.name.to_string(), RoleId::from_base(result.role_id));
         }
     }
     Ok(roles)
@@ -770,7 +770,7 @@ async fn test_assign_role_rejects_unknown_role() -> Result<()> {
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
 
-    let mut bogus_role_bytes: [u8; 32] = member_role.into_id().into();
+    let mut bogus_role_bytes: [u8; 32] = member_role.into();
     bogus_role_bytes[0] ^= 0xFF;
     let bogus_role = RoleId::from(bogus_role_bytes);
 
@@ -912,7 +912,7 @@ async fn test_create_label_requires_existing_managing_role() -> Result<()> {
     let roles = load_default_roles(owner).await?;
     let owner_role = role_id_by_name(&roles, "owner");
 
-    let mut bogus_role_bytes: [u8; 32] = owner_role.into_id().into();
+    let mut bogus_role_bytes: [u8; 32] = owner_role.into();
     bogus_role_bytes[0] ^= 0x55;
     let bogus_role = RoleId::from(bogus_role_bytes);
 
@@ -944,14 +944,13 @@ async fn test_add_label_managing_role_is_unique() -> Result<()> {
         .create_label(text!("TEST_LABEL"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
-        .expect("expected label created effect")
-        .into();
+        .expect("expected label created effect");
 
     owner
         .actions()
@@ -988,10 +987,10 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
         .create_label(text!("DELETE_LABEL_GUARD"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
         .expect("expected label created effect");
@@ -1037,10 +1036,10 @@ async fn test_add_label_managing_role_requires_delegation() -> Result<()> {
         .create_label(text!("LABEL_DELEGATION"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
         .expect("expected label created effect");
@@ -1079,17 +1078,17 @@ async fn test_add_label_managing_role_requires_existing_ids() -> Result<()> {
         .create_label(text!("LABEL_FOREIGN_KEY"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
         .expect("expected label created effect");
 
     let bogus_label = LabelId::from([0x33; 32]);
 
-    let mut bogus_role_bytes: [u8; 32] = admin_role.into_id().into();
+    let mut bogus_role_bytes: [u8; 32] = admin_role.into();
     bogus_role_bytes[0] ^= 0x77;
     let bogus_role = RoleId::from(bogus_role_bytes);
 
@@ -1258,14 +1257,13 @@ async fn test_revoke_label_managing_role_requires_existing_fact() -> Result<()> 
         .create_label(text!("TEST_LABEL_REVOKE"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
-        .expect("expected label created effect")
-        .into();
+        .expect("expected label created effect");
 
     owner
         .actions()
@@ -1512,10 +1510,10 @@ async fn test_add_label_managing_role_requires_change_perm() -> Result<()> {
         .create_label(text!("PRIVILEGE_TEST"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
         .expect("expected label created effect");
@@ -1588,10 +1586,10 @@ async fn test_revoke_label_managing_role_requires_change_perm() -> Result<()> {
         .create_label(text!("REVOKE_PRIVILEGE_TEST"), owner_role)
         .await
         .context("label creation should succeed")?;
-    let label_id: LabelId = effects
+    let label_id = effects
         .into_iter()
         .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(e.label_id.into()),
+            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
             _ => None,
         })
         .expect("expected label created effect");

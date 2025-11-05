@@ -20,21 +20,13 @@ macro_rules! custom_id {
             #[doc(hidden)]
             #[allow(dead_code, reason = "Depends on the type.")]
             pub fn into_api(self) -> aranya_daemon_api::$api {
-                self.0.into_id().into()
+                self.0
             }
 
             #[doc(hidden)]
             #[allow(dead_code, reason = "Depends on the type.")]
             pub fn from_api(id: aranya_daemon_api::$api) -> Self {
-                Self(id.into_id().into())
-            }
-        }
-
-        #[doc(hidden)]
-        impl From<aranya_crypto::BaseId> for $name {
-            #[inline]
-            fn from(id: aranya_crypto::BaseId) -> Self {
-                Self(id.into())
+                Self(id)
             }
         }
 

@@ -323,7 +323,7 @@ impl ReceiveChannel {
             .open(self.local_channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.into_api().into_id());
+        debug_assert_eq!(label_id.as_base(), self.label_id.into_api().as_base());
         Ok(Seq(seq))
     }
 
