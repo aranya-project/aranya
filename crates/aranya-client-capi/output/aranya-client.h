@@ -119,44 +119,6 @@
 #define ARANYA_AFC_CHANNEL_OVERHEAD 24
 #endif
 
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * The overhead needed for a channel message.
- *
- * Note that the ciphertext buffer must be at least `plaintext_len` +
- * `aranya_afc_channel_overhead()` long.
- */
-#define ARANYA_AFC_CHANNEL_OVERHEAD 24
-#endif
-
-/**
- * Valid channel operations for a label assignment.
- */
-enum AranyaChanOp
-#ifdef __cplusplus
-  : uint8_t
-#endif // __cplusplus
- {
-    /**
-     * The device can only receive data in channels with this
-     * label.
-     */
-    ARANYA_CHAN_OP_RECV_ONLY,
-    /**
-     * The device can only send data in channels with this
-     * label.
-     */
-    ARANYA_CHAN_OP_SEND_ONLY,
-    /**
-     * The device can send or receive data in channels with this
-     * label.
-     */
-    ARANYA_CHAN_OP_SEND_RECV,
-};
-#ifndef __cplusplus
-typedef uint8_t AranyaChanOp;
-#endif // __cplusplus
-
 /**
  * An error code.
  *
@@ -233,6 +195,34 @@ enum AranyaError
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
+#endif // __cplusplus
+
+/**
+ * Valid channel operations for a label assignment.
+ */
+enum AranyaChanOp
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * The device can only receive data in channels with this
+     * label.
+     */
+    ARANYA_CHAN_OP_RECV_ONLY,
+    /**
+     * The device can only send data in channels with this
+     * label.
+     */
+    ARANYA_CHAN_OP_SEND_ONLY,
+    /**
+     * The device can send or receive data in channels with this
+     * label.
+     */
+    ARANYA_CHAN_OP_SEND_RECV,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaChanOp;
 #endif // __cplusplus
 
 /**

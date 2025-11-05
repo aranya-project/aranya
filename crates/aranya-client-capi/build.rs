@@ -1,6 +1,6 @@
 use std::{env, fs, path::Path};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use aranya_capi_codegen::Config;
 use quote::format_ident;
 use syn::parse_quote;
@@ -25,5 +25,12 @@ fn main() -> anyhow::Result<()> {
         .inspect_err(|err| err.display(in_path, &source))?;
     let data = aranya_capi_codegen::format(&tokens);
     fs::write(out_path, &data)?;
+
+    cbindgen::Builder::new()
+        .with_config(cbindgen::Config::from_file("cbindgen.toml").map_err(|e| anyhow!("{e}"))?)
+        .with_src(out_path)
+        .generate()?
+        .write_to_file("output/aranya-client.h");
+
     Ok(())
 }
