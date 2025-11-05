@@ -36,7 +36,6 @@ pub mod afc;
 pub mod client;
 pub mod config;
 pub mod error;
-// pub mod sync; // Temporarily disabled due to API changes
 mod util;
 
 pub use aranya_policy_text::{text, Text};
