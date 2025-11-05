@@ -75,7 +75,6 @@ jobs:
 
       - name: Build Aranya Shared Library
         run: |
-          cargo make build-capi-header
           cargo make build-capi-lib-${{ matrix.features }}
           cargo make tgz-capi
           cargo make git-unchanged

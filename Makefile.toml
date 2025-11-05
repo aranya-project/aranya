@@ -274,7 +274,7 @@ category = "examples"
 description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["build-capi-header", "build-capi-lib-experimental"]
+dependencies = ["build-capi-lib-experimental"]
 
 # Rust Example
 [tasks.run-rust-example]
