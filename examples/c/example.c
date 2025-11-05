@@ -957,16 +957,19 @@ AranyaError run_custom_roles_example(Team* t) {
 
     // Get the role assigned to 'membera'
     AranyaRole member_role;
+    printf("getting the role assigned to 'membera'.\n");
     err = aranya_team_device_role(&owner->client, &t->id, &membera->id, &member_role);
     EXPECT("unable to get role assigned to the 'membera' device", err);
 
     // Get the role assigned to 'owner'
     AranyaRole owner_role;
+    printf("getting the role assigned to 'owner'.\n");
     err = aranya_team_device_role(&owner->client, &t->id, &owner->id, &owner_role);
     EXPECT("unable to get role assigned to the 'owner' device", err);
 
     // Get the role assigned to 'admin'
     AranyaRole admin_role;
+    printf("getting the role assigned to 'admin'.\n");
     err = aranya_team_device_role(&admin->client, &t->id, &admin->id, &admin_role);
     EXPECT("unable to get role assigned to the 'admin' device", err);
 
@@ -986,6 +989,7 @@ AranyaError run_custom_roles_example(Team* t) {
     EXPECT("unable to get the role ID.", err);
 
     // Change the role assigned to 'membera'.
+    printf("changing the role assigned to 'membera'.\n");
     err = aranya_change_role(&owner->client, &t->id, &membera->id, &member_role_id, &owner_role_id);
     EXPECT("unable to change role from 'member' to 'owner'.", err);
 
@@ -1013,6 +1017,7 @@ AranyaError run_custom_roles_example(Team* t) {
     }
 
     // Add a new owning role to the 'member' role.
+    printf("adding a new owning role to the 'member' role.\n");
     err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id, &admin_role_id);
     EXPECT("unable to add a new owning role.", err);
 
@@ -1029,8 +1034,10 @@ AranyaError run_custom_roles_example(Team* t) {
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
+    printf("the 'member' role has %zu owning roles now.\n", member_owning_roles_len);
 
      // Remove an owning role from the 'member' role.
+     printf("removing an owning role to the 'member' role.\n");
     err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id, &admin_role_id);
     EXPECT("unable to remove an owning role.", err);
 
@@ -1042,6 +1049,7 @@ AranyaError run_custom_roles_example(Team* t) {
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
+    printf("the 'member' role has %zu owning roles now.\n", member_owning_roles_len);
 
 exit:
     free(member_owning_roles);
