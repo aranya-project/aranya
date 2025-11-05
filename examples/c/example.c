@@ -137,9 +137,6 @@ typedef struct {
     };
 } Team;
 
-// A zero-initialized struct for comparison
-static const AranyaRole ZERO_ROLE = {0};
-
 // Forward Declarations
 AranyaError init_client(Client* c, const char* name, const char* daemon_addr);
 AranyaError init_team(Team* t);
@@ -973,12 +970,13 @@ AranyaError run_custom_roles_example(Team* t) {
 
     // Get the role assigned to 'membera'
     AranyaRole member_role;
+    bool has_role;
     printf("getting the role assigned to 'membera'.\n");
     err = aranya_team_device_role(&owner->client, &t->id, &membera->id,
-                                  &member_role);
+                                  &member_role, &has_role);
     EXPECT("unable to get role assigned to the 'membera' device", err);
 
-    if (memcmp(&member_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+    if (!has_role) {
         printf("no role assigned to 'membera'.\n");
         err = ARANYA_ERROR_OTHER;
         goto exit;
@@ -988,10 +986,10 @@ AranyaError run_custom_roles_example(Team* t) {
     AranyaRole owner_role;
     printf("getting the role assigned to 'owner'.\n");
     err = aranya_team_device_role(&owner->client, &t->id, &owner->id,
-                                  &owner_role);
+                                  &owner_role, &has_role);
     EXPECT("unable to get role assigned to the 'owner' device", err);
 
-    if (memcmp(&owner_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+    if (!has_role) {
         printf("no role assigned to 'owner'.\n");
         err = ARANYA_ERROR_OTHER;
         goto exit;
@@ -1001,10 +999,10 @@ AranyaError run_custom_roles_example(Team* t) {
     AranyaRole admin_role;
     printf("getting the role assigned to 'admin'.\n");
     err = aranya_team_device_role(&admin->client, &t->id, &admin->id,
-                                  &admin_role);
+                                  &admin_role, &has_role);
     EXPECT("unable to get role assigned to the 'admin' device", err);
 
-    if (memcmp(&admin_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+    if (!has_role) {
         printf("no role assigned to 'admin'.\n");
         err = ARANYA_ERROR_OTHER;
         goto exit;
@@ -1032,10 +1030,10 @@ AranyaError run_custom_roles_example(Team* t) {
     EXPECT("unable to change role from 'member' to 'owner'.", err);
 
     err = aranya_team_device_role(&owner->client, &t->id, &membera->id,
-                                  &member_role);
+                                  &member_role, &has_role);
     EXPECT("unable to get role assigned to the 'membera' device", err);
 
-    if (memcmp(&member_role, &ZERO_ROLE, sizeof(AranyaRole)) == 0) {
+    if (!has_role) {
         printf("no role assigned to 'membera'.\n");
         err = ARANYA_ERROR_OTHER;
         goto exit;

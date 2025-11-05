@@ -2425,13 +2425,15 @@ AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
  * @param[out] device the ID of the device [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
  * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
+ * @param[out] has_role whether a role is assigned to the device.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_team_device_role(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaDeviceId *device,
-                                    struct AranyaRole *role_out);
+                                    struct AranyaRole *role_out,
+                                    bool *has_role);
 
 /**
  * Returns the role assigned to the device, if any.
@@ -2441,6 +2443,7 @@ AranyaError aranya_team_device_role(const struct AranyaClient *client,
  * @param[out] device the ID of the device [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
  * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
+ * @param[out] has_role whether a role is assigned to the device.
  *
  * @relates AranyaClient.
  */
@@ -2448,6 +2451,7 @@ AranyaError aranya_team_device_role_ext(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         const struct AranyaDeviceId *device,
                                         struct AranyaRole *role_out,
+                                        bool *has_role,
                                         struct AranyaExtError *__ext_err);
 
 /**
