@@ -7,7 +7,7 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::HashMap, convert::Infallible, future::Future, net::Ipv4Addr, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -43,11 +43,12 @@ use s2n_quic::{
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tokio_util::time::DelayQueue;
-use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
+use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
 use super::{Request, SyncPeers, SyncResponse};
 use crate::{
     aranya::Client as AranyaClient,
+    daemon::EN,
     sync::{
         task::{PeerCacheKey, PeerCacheMap, SyncState, Syncer},
         Result as SyncResult, SyncError,
@@ -96,6 +97,7 @@ pub(crate) struct SyncParams {
     pub(crate) psk_store: Arc<PskStore>,
     pub(crate) caches: PeerCacheMap,
     pub(crate) server_addr: Addr,
+    pub(crate) client_addr: Addr,
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -122,7 +124,7 @@ impl SyncState for State {
         peer: &Addr,
     ) -> SyncResult<usize>
     where
-        S: Sink<<crate::EN as Engine>::Effect> + Send,
+        S: Sink<<EN as Engine>::Effect> + Send,
     {
         // Sets the active team before starting a QUIC connection
         syncer.state.store.set_team(id.into_id().into());
@@ -154,7 +156,11 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    fn new(psk_store: Arc<PskStore>, conns: SharedConnectionMap) -> SyncResult<Self> {
+    fn new(
+        psk_store: Arc<PskStore>,
+        conns: SharedConnectionMap,
+        client_addr: Addr,
+    ) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -169,7 +175,7 @@ impl State {
 
         let client = QuicClient::builder()
             .with_tls(provider)?
-            .with_io((Ipv4Addr::UNSPECIFIED, 0))
+            .with_io((client_addr.host(), client_addr.port()))
             .assume("can set quic client address")?
             .start()
             .map_err(Error::ClientStart)?;
@@ -189,6 +195,7 @@ impl Syncer<State> {
         send_effects: super::EffectSender,
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
+        client_addr: Addr,
         server_addr: Addr,
         caches: PeerCacheMap,
     ) -> SyncResult<(
@@ -201,7 +208,7 @@ impl Syncer<State> {
         let peers = SyncPeers::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
-        let state = State::new(psk_store, conns.clone())?;
+        let state = State::new(psk_store, conns.clone(), client_addr)?;
 
         Ok((
             Self {
@@ -223,7 +230,7 @@ impl Syncer<State> {
 
     #[instrument(skip_all)]
     async fn connect(&mut self, peer: &Addr, id: GraphId) -> SyncResult<BidirectionalStream> {
-        debug!("client connecting to QUIC sync server");
+        trace!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
 
@@ -248,7 +255,7 @@ impl Syncer<State> {
             })
             .await?;
 
-        debug!("client connected to QUIC sync server");
+        trace!("client connected to QUIC sync server");
 
         let open_stream_res = handle
             .open_bidirectional_stream()
@@ -269,7 +276,7 @@ impl Syncer<State> {
             }
         };
 
-        debug!("client opened bidi stream with QUIC sync server");
+        trace!("client opened bidi stream with QUIC sync server");
         Ok(stream)
     }
 
@@ -284,7 +291,7 @@ impl Syncer<State> {
     where
         A: Serialize + DeserializeOwned + Clone,
     {
-        debug!("client sending sync request to QUIC sync server");
+        trace!("client sending sync request to QUIC sync server");
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let len = {
@@ -296,7 +303,7 @@ impl Syncer<State> {
             let (len, _) = syncer
                 .poll(&mut send_buf, aranya.provider(), cache)
                 .context("sync poll failed")?;
-            debug!(?len, "sync poll finished");
+            trace!(?len, "sync poll finished");
             len
         };
         send_buf.truncate(len);
@@ -305,7 +312,7 @@ impl Syncer<State> {
             .await
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
-        debug!("sent sync request");
+        trace!("sent sync request");
 
         Ok(())
     }
@@ -323,16 +330,16 @@ impl Syncer<State> {
         peer: &Addr,
     ) -> SyncResult<usize>
     where
-        S: Sink<<crate::EN as Engine>::Effect>,
+        S: Sink<<EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
-        debug!("client receiving sync response from QUIC sync server");
+        trace!("client receiving sync response from QUIC sync server");
 
         let mut recv_buf = Vec::new();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
-        debug!(n = recv_buf.len(), "received sync response");
+        trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.
         let resp = postcard::from_bytes(&recv_buf)
@@ -342,11 +349,11 @@ impl Syncer<State> {
             SyncResponse::Err(msg) => return Err(anyhow::anyhow!("sync error: {msg}").into()),
         };
         if data.is_empty() {
-            debug!("nothing to sync");
+            trace!("nothing to sync");
             return Ok(0);
         }
         if let Some(cmds) = syncer.receive(&data)? {
-            debug!(num = cmds.len(), "received commands");
+            trace!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
                 let mut aranya = self.client.aranya.lock().await;
                 let mut trx = aranya.transaction(id);
@@ -354,7 +361,7 @@ impl Syncer<State> {
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 aranya.commit(&mut trx, sink).context("commit failed")?;
-                debug!("committed");
+                trace!("committed");
                 let key = PeerCacheKey::new(*peer, id);
                 let mut caches = self.caches.lock().await;
                 let cache = caches.entry(key).or_default();
@@ -485,7 +492,7 @@ where
     ) -> impl Future<Output = ()> + use<'_, EN, SP> {
         let handle = conn.handle();
         async {
-            debug!("received incoming QUIC connection");
+            trace!("received incoming QUIC connection");
             let identity = get_conn_identity(&mut conn)?;
             let active_team = self
                 .server_keys
@@ -525,7 +532,7 @@ where
                 .await
                 .context("could not receive QUIC stream")?
             {
-                debug!("received incoming QUIC stream");
+                trace!("received incoming QUIC stream");
                 Self::sync(
                     client.clone(),
                     caches.clone(),
@@ -553,14 +560,14 @@ where
         stream: BidirectionalStream,
         active_team: TeamId,
     ) -> SyncResult<()> {
-        debug!("server received a sync request");
+        trace!("server received a sync request");
 
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
-        debug!(n = recv_buf.len(), "received sync request");
+        trace!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
         let sync_response_res =
@@ -583,7 +590,7 @@ where
             data_len
         };
         send.close().await.map_err(Error::from)?;
-        debug!(n = data_len, "server sent sync response");
+        trace!(n = data_len, "server sent sync response");
 
         Ok(())
     }
@@ -597,7 +604,7 @@ where
         request_data: &[u8],
         active_team: TeamId,
     ) -> SyncResult<Box<[u8]>> {
-        debug!("server responding to sync request");
+        trace!("server responding to sync request");
 
         let mut resp = SyncResponder::new(addr);
 
@@ -635,7 +642,7 @@ where
                 })
                 .context("sync resp poll failed")?
         };
-        debug!(len = len, "sync poll finished");
+        trace!(len = len, "sync poll finished");
         buf.truncate(len);
         Ok(buf.into())
     }

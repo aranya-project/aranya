@@ -41,10 +41,14 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("memberb: initializing client");
-    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to initialize client");
+    let client = (|| {
+        Client::builder()
+            .with_daemon_uds_path(&args.uds_sock)
+            .connect()
+    })
+    .retry(ExponentialBuilder::default())
+    .await
+    .expect("expected to initialize client");
     info!("memberb: initialized client");
 
     // Get team info from owner.
@@ -95,9 +99,8 @@ async fn main() -> Result<()> {
 
     // Wait for admin to create label.
     info!("memberb: waiting for admin to create label");
-    let queries = team.queries();
     loop {
-        if let Ok(labels) = queries.labels().await {
+        if let Ok(labels) = team.labels().await {
             if labels.iter().next().is_some() {
                 break;
             }
@@ -107,9 +110,8 @@ async fn main() -> Result<()> {
 
     // Loop until all devices have been added to the team.
     info!("memberb: waiting for all devices to be added to team");
-    let queries = team.queries();
     loop {
-        if let Ok(devices) = queries.devices_on_team().await {
+        if let Ok(devices) = team.devices().await {
             if devices.iter().count() == 5 {
                 break;
             }
@@ -137,9 +139,8 @@ async fn main() -> Result<()> {
     sleep(SLEEP_INTERVAL).await;
 
     // Check that label has been assigned to memberb.
-    let queries = team.queries();
     loop {
-        if let Ok(labels) = queries.device_label_assignments(device_id).await {
+        if let Ok(labels) = team.device(device_id).label_assignments().await {
             if labels.iter().count() == 1 {
                 break;
             }

@@ -10,7 +10,7 @@ pub mod team;
 pub use team::*;
 
 /// Configuration info for syncing with a peer.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SyncPeerConfig {
     interval: Duration,
     sync_now: bool,
