@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{client::Role, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::text;
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -40,10 +40,14 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("admin: initializing client");
-    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to initialize client");
+    let client = (|| {
+        Client::builder()
+            .with_daemon_uds_path(&args.uds_sock)
+            .connect()
+    })
+    .retry(ExponentialBuilder::default())
+    .await
+    .expect("expected to initialize client");
     info!("admin: initialized client");
 
     // Get team info from owner.
@@ -86,11 +90,21 @@ async fn main() -> Result<()> {
         .await?;
 
     // Loop until this device has the `Admin` role assigned to it.
+    info!("admin: finding admin role");
+    let admin_role = loop {
+        if let Ok(roles) = team.roles().await {
+            if let Some(role) = roles.into_iter().find(|role| role.name == "admin") {
+                break role;
+            }
+        }
+        sleep(SLEEP_INTERVAL).await;
+    };
     info!("admin: waiting for owner to assign admin role");
-    let queries = team.queries();
     loop {
-        if let Ok(Role::Admin) = queries.device_role(device_id).await {
-            break;
+        if let Ok(Some(r)) = team.device(device_id).role().await {
+            if r == admin_role {
+                break;
+            }
         }
         sleep(SLEEP_INTERVAL).await;
     }
@@ -98,8 +112,22 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let _label1 = team.create_label(text!("label1")).await?;
+    let label1 = team.create_label(text!("label1"), admin_role.id).await?;
     info!("admin: created label");
+
+    info!("admin: finding operator role");
+    let operator_role = loop {
+        if let Ok(roles) = team.roles().await {
+            if let Some(role) = roles.into_iter().find(|role| role.name == "operator") {
+                break role;
+            }
+        }
+        sleep(SLEEP_INTERVAL).await;
+    };
+
+    info!("admin: assigning operator role to manage label1");
+    team.add_label_managing_role(label1, operator_role.id)
+        .await?;
 
     info!("admin: complete");
 
