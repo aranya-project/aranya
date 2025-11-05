@@ -1696,6 +1696,7 @@ pub unsafe fn team_devices(
 /// @param[out] device the ID of the device [`DeviceId`].
 /// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
 /// if a role was not assigned to the device. [`Role`].
+/// @param[out] has_role whether a role is assigned to the device.
 ///
 /// @relates AranyaClient.
 pub fn team_device_role(
@@ -1703,6 +1704,7 @@ pub fn team_device_role(
     team: &TeamId,
     device: &DeviceId,
     role_out: &mut MaybeUninit<Role>,
+    has_role: &mut MaybeUninit<bool>,
 ) -> Result<(), imp::Error> {
     let maybe_role = client
         .rt
@@ -1711,8 +1713,12 @@ pub fn team_device_role(
     match maybe_role {
         Some(role) => {
             Role::init(role_out, role);
+            has_role.write(true);
         }
-        None => *role_out = MaybeUninit::zeroed(),
+        None => {
+            *role_out = MaybeUninit::zeroed();
+            has_role.write(false);
+        }
     }
 
     Ok(())
