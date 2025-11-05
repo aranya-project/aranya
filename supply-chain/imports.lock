@@ -37,8 +37,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.aranya-afc-util]]
-version = "0.15.0"
-when = "2025-10-17"
+version = "0.16.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -61,44 +61,44 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.11.0"
-when = "2025-10-17"
+version = "0.12.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-id]]
-version = "0.1.0"
-when = "2025-10-17"
+version = "0.2.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -127,56 +127,56 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ast]]
-version = "0.8.1"
-when = "2025-10-17"
+version = "0.9.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.9.0"
-when = "2025-10-17"
+version = "0.10.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.15.0"
-when = "2025-10-17"
+version = "0.16.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.8.0"
-when = "2025-10-17"
+version = "0.9.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-macro]]
-version = "0.4.2"
-when = "2025-10-17"
+version = "0.5.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.8.1"
-when = "2025-10-17"
+version = "0.9.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -193,14 +193,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.14.0"
-when = "2025-10-17"
+version = "0.15.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.15.0"
-when = "2025-10-17"
+version = "0.16.0"
+when = "2025-11-05"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -616,6 +616,16 @@ Otherwise no major changes and nothing dealing with `unsafe`.
 who = "Benjamin Bouvier <public@benj.me>"
 criteria = "safe-to-deploy"
 delta = "0.9.0 -> 0.10.2"
+
+[[audits.bytecode-alliance.audits.ciborium-io]]
+who = "Pat Hickey <phickey@fastly.com>"
+criteria = "safe-to-deploy"
+version = "0.2.0"
+
+[[audits.bytecode-alliance.audits.ciborium-ll]]
+who = "Pat Hickey <phickey@fastly.com>"
+criteria = "safe-to-deploy"
+version = "0.2.0"
 
 [[audits.bytecode-alliance.audits.cipher]]
 who = "Andrew Brown <andrew.brown@intel.com>"
@@ -2898,6 +2908,18 @@ criteria = "safe-to-deploy"
 delta = "0.9.1 -> 0.10.1"
 notes = "This mainly adapts to API changes between aead 0.4 and aead 0.5."
 aggregated-from = "https://raw.githubusercontent.com/zcash/zcash/master/qa/supply-chain/audits.toml"
+
+[[audits.zcash.audits.ciborium-io]]
+who = "Jack Grigg <jack@electriccoin.co>"
+criteria = "safe-to-deploy"
+delta = "0.2.0 -> 0.2.2"
+aggregated-from = "https://raw.githubusercontent.com/zcash/librustzcash/main/supply-chain/audits.toml"
+
+[[audits.zcash.audits.ciborium-ll]]
+who = "Jack Grigg <jack@electriccoin.co>"
+criteria = "safe-to-deploy"
+delta = "0.2.0 -> 0.2.2"
+aggregated-from = "https://raw.githubusercontent.com/zcash/librustzcash/main/supply-chain/audits.toml"
 
 [[audits.zcash.audits.crossbeam-epoch]]
 who = "Jack Grigg <jack@electriccoin.co>"

@@ -2969,7 +2969,7 @@ command RemoveDevice {
         // exist.
         let assigned_role = query AssignedRole[device_id: this.device_id]
         let device_gen = check_unwrap query DeviceGeneration[device_id: this.device_id]
-        let next_gen = device_gen.generation + 1
+        let next_gen = check_unwrap add(device_gen.generation, 1)
 
         if assigned_role is Some {
             let role_id = (unwrap assigned_role).role_id

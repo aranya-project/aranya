@@ -2,14 +2,19 @@
 #![allow(clippy::duplicated_attributes)]
 #![allow(clippy::enum_variant_names)]
 #![allow(missing_docs)]
+#![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::vec::Vec;
 use aranya_policy_ifgen::{
-    macros::{actions, effect, effects, value},
+    macros::{action, actions, effect, effects, value},
     BaseId, ClientError, Value, Text,
 };
+#[derive(Debug)]
+pub enum Persistent {}
+#[derive(Debug)]
+pub enum Ephemeral {}
 /// KeyBundle policy struct.
 #[value]
 pub struct KeyBundle {
@@ -293,117 +298,206 @@ pub struct TeamTerminated {
     pub team_id: BaseId,
     pub owner_id: BaseId,
 }
-/// Implements all supported policy actions.
-#[actions]
-pub trait ActorExt {
-    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_afc_channel_is_valid(
-        &mut self,
-        sender_id: BaseId,
-        receiver_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn query_device_role(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn query_device_keybundle(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn add_perm_to_role(
-        &mut self,
-        role_id: BaseId,
-        perm_str: Text,
-    ) -> Result<(), ClientError>;
-    fn remove_perm_from_role(
-        &mut self,
-        role_id: BaseId,
-        perm_str: Text,
-    ) -> Result<(), ClientError>;
-    fn add_role_owner(
-        &mut self,
-        target_role_id: BaseId,
-        new_owning_role: BaseId,
-    ) -> Result<(), ClientError>;
-    fn remove_role_owner(
-        &mut self,
-        target_role_id: BaseId,
-        owning_role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn assign_role_management_perm(
-        &mut self,
-        target_role_id: BaseId,
-        managing_role_id: BaseId,
-        perm: Text,
-    ) -> Result<(), ClientError>;
-    fn revoke_role_management_perm(
-        &mut self,
-        target_role_id: BaseId,
-        managing_role_id: BaseId,
-        perm: Text,
-    ) -> Result<(), ClientError>;
-    fn setup_default_roles(&mut self, owning_role_id: BaseId) -> Result<(), ClientError>;
-    fn assign_role(
-        &mut self,
-        device_id: BaseId,
-        role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn change_role(
-        &mut self,
-        device_id: BaseId,
-        old_role_id: BaseId,
-        new_role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn revoke_role(
-        &mut self,
-        device_id: BaseId,
-        role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn query_team_roles(&mut self) -> Result<(), ClientError>;
-    fn query_role_owners(&mut self, role_id: BaseId) -> Result<(), ClientError>;
-    fn create_team(
-        &mut self,
-        owner_keys: KeyBundle,
-        nonce: Vec<u8>,
-    ) -> Result<(), ClientError>;
-    fn terminate_team(&mut self, team_id: BaseId) -> Result<(), ClientError>;
-    fn add_device(
-        &mut self,
-        device_keys: KeyBundle,
-        initial_role_id: Option<BaseId>,
-    ) -> Result<(), ClientError>;
-    fn remove_device(&mut self, device_id: BaseId) -> Result<(), ClientError>;
-    fn add_label_managing_role(
-        &mut self,
-        label_id: BaseId,
-        managing_role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn revoke_label_managing_role(
-        &mut self,
-        label_id: BaseId,
-        managing_role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn create_label(
-        &mut self,
-        name: Text,
-        managing_role_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn delete_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn assign_label_to_device(
-        &mut self,
-        device_id: BaseId,
-        label_id: BaseId,
-        op: ChanOp,
-    ) -> Result<(), ClientError>;
-    fn revoke_label_from_device(
-        &mut self,
-        device_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn query_label(&mut self, label_id: BaseId) -> Result<(), ClientError>;
-    fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn query_labels_assigned_to_device(
-        &mut self,
-        device_id: BaseId,
-    ) -> Result<(), ClientError>;
-    fn create_afc_uni_channel(
-        &mut self,
-        receiver_id: BaseId,
-        label_id: BaseId,
-    ) -> Result<(), ClientError>;
+#[actions(interface = Persistent)]
+pub enum PersistentAction {
+    add_perm_to_role(add_perm_to_role),
+    remove_perm_from_role(remove_perm_from_role),
+    add_role_owner(add_role_owner),
+    remove_role_owner(remove_role_owner),
+    assign_role_management_perm(assign_role_management_perm),
+    revoke_role_management_perm(revoke_role_management_perm),
+    setup_default_roles(setup_default_roles),
+    assign_role(assign_role),
+    change_role(change_role),
+    revoke_role(revoke_role),
+    create_team(create_team),
+    terminate_team(terminate_team),
+    add_device(add_device),
+    remove_device(remove_device),
+    add_label_managing_role(add_label_managing_role),
+    revoke_label_managing_role(revoke_label_managing_role),
+    create_label(create_label),
+    delete_label(delete_label),
+    assign_label_to_device(assign_label_to_device),
+    revoke_label_from_device(revoke_label_from_device),
+}
+#[actions(interface = Ephemeral)]
+pub enum EphemeralAction {
+    query_devices_on_team(query_devices_on_team),
+    query_afc_channel_is_valid(query_afc_channel_is_valid),
+    query_device_role(query_device_role),
+    query_device_keybundle(query_device_keybundle),
+    query_team_roles(query_team_roles),
+    query_role_owners(query_role_owners),
+    query_label(query_label),
+    query_labels(query_labels),
+    query_labels_assigned_to_device(query_labels_assigned_to_device),
+    create_afc_uni_channel(create_afc_uni_channel),
+}
+/// query_devices_on_team policy action.
+#[action(interface = Ephemeral)]
+pub struct query_devices_on_team {}
+/// query_afc_channel_is_valid policy action.
+#[action(interface = Ephemeral)]
+pub struct query_afc_channel_is_valid {
+    pub sender_id: BaseId,
+    pub receiver_id: BaseId,
+    pub label_id: BaseId,
+}
+/// query_device_role policy action.
+#[action(interface = Ephemeral)]
+pub struct query_device_role {
+    pub device_id: BaseId,
+}
+/// query_device_keybundle policy action.
+#[action(interface = Ephemeral)]
+pub struct query_device_keybundle {
+    pub device_id: BaseId,
+}
+/// add_perm_to_role policy action.
+#[action(interface = Persistent)]
+pub struct add_perm_to_role {
+    pub role_id: BaseId,
+    pub perm_str: Text,
+}
+/// remove_perm_from_role policy action.
+#[action(interface = Persistent)]
+pub struct remove_perm_from_role {
+    pub role_id: BaseId,
+    pub perm_str: Text,
+}
+/// add_role_owner policy action.
+#[action(interface = Persistent)]
+pub struct add_role_owner {
+    pub target_role_id: BaseId,
+    pub new_owning_role: BaseId,
+}
+/// remove_role_owner policy action.
+#[action(interface = Persistent)]
+pub struct remove_role_owner {
+    pub target_role_id: BaseId,
+    pub owning_role_id: BaseId,
+}
+/// assign_role_management_perm policy action.
+#[action(interface = Persistent)]
+pub struct assign_role_management_perm {
+    pub target_role_id: BaseId,
+    pub managing_role_id: BaseId,
+    pub perm: Text,
+}
+/// revoke_role_management_perm policy action.
+#[action(interface = Persistent)]
+pub struct revoke_role_management_perm {
+    pub target_role_id: BaseId,
+    pub managing_role_id: BaseId,
+    pub perm: Text,
+}
+/// setup_default_roles policy action.
+#[action(interface = Persistent)]
+pub struct setup_default_roles {
+    pub owning_role_id: BaseId,
+}
+/// assign_role policy action.
+#[action(interface = Persistent)]
+pub struct assign_role {
+    pub device_id: BaseId,
+    pub role_id: BaseId,
+}
+/// change_role policy action.
+#[action(interface = Persistent)]
+pub struct change_role {
+    pub device_id: BaseId,
+    pub old_role_id: BaseId,
+    pub new_role_id: BaseId,
+}
+/// revoke_role policy action.
+#[action(interface = Persistent)]
+pub struct revoke_role {
+    pub device_id: BaseId,
+    pub role_id: BaseId,
+}
+/// query_team_roles policy action.
+#[action(interface = Ephemeral)]
+pub struct query_team_roles {}
+/// query_role_owners policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_owners {
+    pub role_id: BaseId,
+}
+/// create_team policy action.
+#[action(interface = Persistent)]
+pub struct create_team {
+    pub owner_keys: KeyBundle,
+    pub nonce: Vec<u8>,
+}
+/// terminate_team policy action.
+#[action(interface = Persistent)]
+pub struct terminate_team {
+    pub team_id: BaseId,
+}
+/// add_device policy action.
+#[action(interface = Persistent)]
+pub struct add_device {
+    pub device_keys: KeyBundle,
+    pub initial_role_id: Option<BaseId>,
+}
+/// remove_device policy action.
+#[action(interface = Persistent)]
+pub struct remove_device {
+    pub device_id: BaseId,
+}
+/// add_label_managing_role policy action.
+#[action(interface = Persistent)]
+pub struct add_label_managing_role {
+    pub label_id: BaseId,
+    pub managing_role_id: BaseId,
+}
+/// revoke_label_managing_role policy action.
+#[action(interface = Persistent)]
+pub struct revoke_label_managing_role {
+    pub label_id: BaseId,
+    pub managing_role_id: BaseId,
+}
+/// create_label policy action.
+#[action(interface = Persistent)]
+pub struct create_label {
+    pub name: Text,
+    pub managing_role_id: BaseId,
+}
+/// delete_label policy action.
+#[action(interface = Persistent)]
+pub struct delete_label {
+    pub label_id: BaseId,
+}
+/// assign_label_to_device policy action.
+#[action(interface = Persistent)]
+pub struct assign_label_to_device {
+    pub device_id: BaseId,
+    pub label_id: BaseId,
+    pub op: ChanOp,
+}
+/// revoke_label_from_device policy action.
+#[action(interface = Persistent)]
+pub struct revoke_label_from_device {
+    pub device_id: BaseId,
+    pub label_id: BaseId,
+}
+/// query_label policy action.
+#[action(interface = Ephemeral)]
+pub struct query_label {
+    pub label_id: BaseId,
+}
+/// query_labels policy action.
+#[action(interface = Ephemeral)]
+pub struct query_labels {}
+/// query_labels_assigned_to_device policy action.
+#[action(interface = Ephemeral)]
+pub struct query_labels_assigned_to_device {
+    pub device_id: BaseId,
+}
+/// create_afc_uni_channel policy action.
+#[action(interface = Ephemeral)]
+pub struct create_afc_uni_channel {
+    pub receiver_id: BaseId,
+    pub label_id: BaseId,
 }

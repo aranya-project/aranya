@@ -7,12 +7,15 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
-use aranya_crypto::{afc::UniPeerEncap, CipherSuite, DeviceId, Engine, KeyStore, Rng};
+use aranya_crypto::{
+    afc::UniPeerEncap, policy::LabelId, CipherSuite, CmdId, DeviceId, EncryptionKeyId, Engine,
+    KeyStore, Rng,
+};
 use aranya_daemon_api::{self as api, AfcChannelId};
-pub use aranya_fast_channels::ChannelId as AfcLocalChannelId;
+pub use aranya_fast_channels::LocalChannelId as AfcLocalChannelId;
 use aranya_fast_channels::{
     shm::{Flag, Mode, WriteState},
-    AranyaState,
+    AranyaState, ChannelDirection,
 };
 use aranya_runtime::GraphId;
 use derive_where::derive_where;
@@ -135,11 +138,11 @@ where
     {
         let info = UniChannelCreated {
             key_id: e.channel_key_id.into(),
-            parent_cmd_id: e.parent_cmd_id.into(),
-            author_enc_key_id: e.author_enc_key_id.into(),
-            open_id: e.receiver_id.into(),
+            parent_cmd_id: CmdId::from_base(e.parent_cmd_id),
+            author_enc_key_id: EncryptionKeyId::from_base(e.author_enc_key_id),
+            open_id: DeviceId::from_base(e.receiver_id),
             peer_enc_pk: &e.peer_enc_pk,
-            label_id: e.label_id.into(),
+            label_id: LabelId::from_base(e.label_id),
         };
         let key = self
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
@@ -153,7 +156,7 @@ where
             .context("unable to add AFC channel")?;
         debug!(?channel_id, "creating uni channel");
         let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
-        Ok((channel_id, encap.id().into_id().into()))
+        Ok((channel_id, AfcChannelId::transmute(encap.id())))
     }
 
     /// Handles the [`AfcUniChannelReceived`] effect, returning
@@ -167,11 +170,11 @@ where
         E: Engine<CS = C>,
     {
         let info = UniChannelReceived {
-            parent_cmd_id: e.parent_cmd_id.into(),
-            seal_id: e.sender_id.into(),
+            parent_cmd_id: CmdId::from_base(e.parent_cmd_id),
+            seal_id: DeviceId::from_base(e.sender_id),
             author_enc_pk: &e.author_enc_pk,
-            peer_enc_key_id: e.peer_enc_key_id.into(),
-            label_id: e.label_id.into(),
+            peer_enc_key_id: EncryptionKeyId::from_base(e.peer_enc_key_id),
+            label_id: LabelId::from_base(e.label_id),
             encap: &e.encap,
         };
         let key = self
@@ -187,7 +190,7 @@ where
         debug!(?channel_id, "receiving uni channel");
         let encap = UniPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
 
-        Ok((channel_id, encap.id().into_id().into()))
+        Ok((channel_id, AfcChannelId::transmute(encap.id())))
     }
 
     /// Delete a channel.
@@ -218,31 +221,26 @@ where
 
         shm.write
             .remove_if(|chan| {
-                let e = match cache.entry((chan.peer_id, chan.label_id)) {
+                let e = match cache.entry((chan.peer_id, chan.label_id, chan.direction)) {
                     Entry::Occupied(e) => return *e.get(),
                     Entry::Vacant(e) => e,
                 };
 
-                // TODO: aranya-core#464 run a single query when channel direction is added to remove_if() params
-                let sender_valid = crate::actions::query_afc_channel_is_valid(
+                let (sender, receiver) = match chan.direction {
+                    ChannelDirection::Seal => (device_id, chan.peer_id),
+                    ChannelDirection::Open => (chan.peer_id, device_id),
+                };
+
+                let channel_invalid = !crate::actions::query_afc_channel_is_valid(
                     &mut client,
                     graph,
-                    device_id,
-                    chan.peer_id,
+                    sender,
+                    receiver,
                     chan.label_id,
                 )
                 .is_ok_and(|v| v);
 
-                let receiver_valid = crate::actions::query_afc_channel_is_valid(
-                    &mut client,
-                    graph,
-                    chan.peer_id,
-                    device_id,
-                    chan.label_id,
-                )
-                .is_ok_and(|v| v);
-
-                let channel_invalid = *e.insert(!sender_valid && !receiver_valid);
+                e.insert(channel_invalid);
                 channel_invalid
             })
             .context("unable to remove AFC channels matching criteria")
