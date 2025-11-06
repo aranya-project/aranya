@@ -2694,20 +2694,21 @@ command CreateTeam {
             // the owner role.
             assign_perm_to_role(owner_role_id, SimplePerm::AddDevice)
             assign_perm_to_role(owner_role_id, SimplePerm::RemoveDevice)
-
-            assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
-            assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)
-
-            assign_perm_to_role(owner_role_id, SimplePerm::AssignLabel)
-            assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
 
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
-
             assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRole)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagingRole)
+
+            assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeLabelManagingRole)
-            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
+            assign_perm_to_role(owner_role_id, SimplePerm::AssignLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
+
+            assign_perm_to_role(owner_role_id, SimplePerm::CanUseAfc)
+            assign_perm_to_role(owner_role_id, SimplePerm::CreateAfcUniChannel)
 
             // And now make sure that the owner has the owner
             // role, of course.
