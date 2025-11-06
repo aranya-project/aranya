@@ -973,9 +973,9 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
     let bogus_role = RoleId::from([0x55; 32]);
 
     match owner_team.setup_default_roles(bogus_role).await {
-        Ok(_) => bail!("expected setup_default_roles to reject unknown owner role"),
+        Ok(_) => bail!("expected setup_default_roles to reject unknown managing role"),
         Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected error when using bogus owner role: {err:?}"),
+        Err(err) => bail!("unexpected error when using bogus managing role: {err:?}"),
     }
 
     Ok(())
@@ -1210,19 +1210,19 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
         .await
         .context("Admin should be able to assign operator role with CanAssignRole permission")?;
 
-    // Add a new owner role to operator so we can remove the owner role.
-    // Note: this is because there must be at least one owning role.
+    // Add a new managing role to operator so we can remove the owner role.
+    // Note: this is because there must be at least one managing role.
     owner_team
-        .add_role_owner(roles.operator().id, roles.member().id)
+        .add_role_manager(roles.operator().id, roles.member().id)
         .await?;
 
-    // Now remove the owner as a role owner of operator.
+    // Now remove the owner as a role manager of operator.
     owner_team
-        .remove_role_owner(roles.operator().id, roles.owner().id)
+        .remove_role_manager(roles.operator().id, roles.owner().id)
         .await
         .context("Failed to remove owner as role owner from operator")?;
 
-    // Verify owner can no longer change role management permissions of operator role.
+    // Verify owner role can no longer change role management permissions of operator role.
     owner_team
         .assign_role_management_permission(
             roles.operator().id,
@@ -1230,7 +1230,9 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
             text!("CanRevokeRole"),
         )
         .await
-        .expect_err("expected owner role management to fail after owner role was removed");
+        .expect_err(
+            "expected owner role management to fail after owner role was removed as a role manager",
+        );
 
     Ok(())
 }
@@ -1343,7 +1345,7 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
+        .add_role_manager(roles.member().id, roles.admin().id)
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?.into();
@@ -1351,12 +1353,12 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
     admin_team.sync_now(owner_addr, None).await?;
 
     match admin_team
-        .add_role_owner(roles.member().id, roles.operator().id)
+        .add_role_manager(roles.member().id, roles.operator().id)
         .await
     {
-        Ok(_) => bail!("expected add_role_owner to require additional permission"),
+        Ok(_) => bail!("expected add_role_manager to require additional permission"),
         Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected add_role_owner error: {err:?}"),
+        Err(err) => bail!("unexpected add_role_manager error: {err:?}"),
     }
 
     Ok(())
@@ -1364,54 +1366,54 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
 
 /// Duplicate role-owner entries must be rejected before attempting storage writes.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_add_role_owner_duplicate_rejected").await?;
+async fn test_add_role_manager_duplicate_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_role_manager_duplicate_rejected").await?;
 
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
+        .add_role_manager(roles.member().id, roles.admin().id)
         .await?;
 
     match owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
+        .add_role_manager(roles.member().id, roles.admin().id)
         .await
     {
         Ok(_) => bail!("expected duplicate role owner addition to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected add_role_owner duplicate error: {err:?}"),
+        Err(err) => bail!("unexpected add_role_manager duplicate error: {err:?}"),
     }
 
     Ok(())
 }
 
-/// Removing a non-existent owning role should produce a policy failure, not a runtime error.
+/// Removing a non-existent managing role should produce a policy failure, not a runtime error.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_remove_role_owner_missing_entry() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_remove_role_owner_missing_entry").await?;
+async fn test_remove_role_manager_missing_entry() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_remove_role_manager_missing_entry").await?;
 
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
-        .remove_role_owner(roles.member().id, roles.operator().id)
+        .remove_role_manager(roles.member().id, roles.operator().id)
         .await
     {
         Ok(_) => bail!("expected removing absent role owner to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected remove_role_owner error: {err:?}"),
+        Err(err) => bail!("unexpected remove_role_manager error: {err:?}"),
     }
 
     Ok(())
 }
 
-/// Tests that role_owners returns the correct owning roles.
+/// Tests that role_managers returns the correct managing roles.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_role_owners_query() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_role_owners_query").await?;
+async fn test_role_managers_query() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_role_managers_query").await?;
 
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
@@ -1419,8 +1421,8 @@ async fn test_role_owners_query() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
 
-    // Initially, member role should have owner role as its owner (from setup_default_roles)
-    let initial_owners = owner_team.role_owners(roles.member().id).await?;
+    // Initially, member role should have owner role as its role manager (from setup_default_roles)
+    let initial_owners = owner_team.role_managers(roles.member().id).await?;
     let initial_owners_vec: Vec<_> = initial_owners.iter().collect();
     assert_eq!(
         initial_owners_vec.len(),
@@ -1435,11 +1437,11 @@ async fn test_role_owners_query() -> Result<()> {
 
     // Add admin as owner of member role
     owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
+        .add_role_manager(roles.member().id, roles.admin().id)
         .await?;
 
     // Query owners again - should now show both owner and admin roles
-    let owners_after_add = owner_team.role_owners(roles.member().id).await?;
+    let owners_after_add = owner_team.role_managers(roles.member().id).await?;
     let owners_after_add_vec: Vec<_> = owners_after_add.iter().collect();
     assert_eq!(
         owners_after_add_vec.len(),
@@ -1460,11 +1462,11 @@ async fn test_role_owners_query() -> Result<()> {
 
     // Add operator as another owner of member role
     owner_team
-        .add_role_owner(roles.member().id, roles.operator().id)
+        .add_role_manager(roles.member().id, roles.operator().id)
         .await?;
 
     // Query owners again - should now show all three: owner, admin, and operator
-    let owners_after_second_add = owner_team.role_owners(roles.member().id).await?;
+    let owners_after_second_add = owner_team.role_managers(roles.member().id).await?;
     let owners_after_second_add_vec: Vec<_> = owners_after_second_add.iter().collect();
     assert_eq!(
         owners_after_second_add_vec.len(),
@@ -1489,11 +1491,11 @@ async fn test_role_owners_query() -> Result<()> {
 
     // Remove admin as owner
     owner_team
-        .remove_role_owner(roles.member().id, roles.admin().id)
+        .remove_role_manager(roles.member().id, roles.admin().id)
         .await?;
 
     // Query owners again - should now show owner and operator
-    let owners_after_remove = owner_team.role_owners(roles.member().id).await?;
+    let owners_after_remove = owner_team.role_managers(roles.member().id).await?;
     let owners_after_remove_vec: Vec<_> = owners_after_remove.iter().collect();
     assert_eq!(
         owners_after_remove_vec.len(),
@@ -1520,7 +1522,7 @@ async fn test_role_owners_query() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
-    let admin_view_owners = admin_team.role_owners(roles.member().id).await?;
+    let admin_view_owners = admin_team.role_managers(roles.member().id).await?;
     let admin_view_owners_vec: Vec<_> = admin_view_owners.iter().collect();
     assert_eq!(
         admin_view_owners_vec.len(),

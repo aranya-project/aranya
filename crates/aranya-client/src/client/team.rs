@@ -164,16 +164,16 @@ impl Team<'_> {
 impl Team<'_> {
     /// Sets up the default team roles.
     ///
-    /// `owning_role` will be the initial owner of the default
+    /// `managing_role` will be the initial managing role of the default
     /// roles.
     ///
     /// It returns the the roles that were created.
     #[instrument(skip(self))]
-    pub async fn setup_default_roles(&self, owning_role: RoleId) -> Result<Roles> {
+    pub async fn setup_default_roles(&self, managing_role: RoleId) -> Result<Roles> {
         let roles = self
             .client
             .daemon
-            .setup_default_roles(context::current(), self.id, owning_role.into_api())
+            .setup_default_roles(context::current(), self.id, managing_role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -187,41 +187,41 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
-    /// Adds `owning_role` as an owner of `role`.
+    /// Adds a `managing_role` as an manager of `role`.
     #[instrument(skip(self))]
-    pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+    pub async fn add_role_manager(&self, role: RoleId, managing_role: RoleId) -> Result<()> {
         self.client
             .daemon
             .add_role_owner(
                 context::current(),
                 self.id,
                 role.into_api(),
-                owning_role.into_api(),
+                managing_role.into_api(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
-    /// Removes an `owning_role` as an owner of `role`.
+    /// Removes a `managing_role` as a manager from `role`.
     #[instrument(skip(self))]
-    pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+    pub async fn remove_role_manager(&self, role: RoleId, managing_role: RoleId) -> Result<()> {
         self.client
             .daemon
             .remove_role_owner(
                 context::current(),
                 self.id,
                 role.into_api(),
-                owning_role.into_api(),
+                managing_role.into_api(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
-    /// Returns the roles that own `role`.
+    /// Returns the roles that manage `role`.
     #[instrument(skip(self))]
-    pub async fn role_owners(&self, role: RoleId) -> Result<Roles> {
+    pub async fn role_managers(&self, role: RoleId) -> Result<Roles> {
         let roles = self
             .client
             .daemon

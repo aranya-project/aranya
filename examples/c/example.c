@@ -962,9 +962,9 @@ AranyaError run_custom_roles_example(Team* t) {
     Client* admin   = &t->clients.admin;
     Client* membera = &t->clients.membera;
 
-    size_t member_owning_roles_len = 1;
-    AranyaRole* member_owning_roles =
-        calloc(member_owning_roles_len, sizeof(AranyaRole));
+    size_t member_managing_roles_len = 1;
+    AranyaRole* member_managing_roles =
+        calloc(member_managing_roles_len, sizeof(AranyaRole));
 
     AranyaError err;
 
@@ -1051,71 +1051,76 @@ AranyaError run_custom_roles_example(Team* t) {
         goto exit;
     }
 
-    // check that there is a single owner for the 'member' role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                             member_owning_roles, &member_owning_roles_len);
-    EXPECT("unable to get the owning roles for the 'member' role.", err);
-    if (member_owning_roles_len != 1) {
-        fprintf(
-            stderr,
-            "there should only be 1 owner for the 'member' role. Actual: %zu\n",
-            member_owning_roles_len);
+    // check that there is a single manager for the 'member' role.
+    err =
+        aranya_role_managers(&owner->client, &t->id, &member_role_id,
+                             member_managing_roles, &member_managing_roles_len);
+    EXPECT("unable to get the managing roles for the 'member' role.", err);
+    if (member_managing_roles_len != 1) {
+        fprintf(stderr,
+                "there should only be 1 manager for the 'member' role. Actual: "
+                "%zu\n",
+                member_managing_roles_len);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
 
-    // Add a new owning role to the 'member' role.
-    printf("adding a new owning role to the 'member' role.\n");
-    err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id,
-                                &admin_role_id);
-    EXPECT("unable to add a new owning role.", err);
+    // Add a new managing role to the 'member' role.
+    printf("adding a new managing role to the 'member' role.\n");
+    err = aranya_add_role_manager(&owner->client, &t->id, &member_role_id,
+                                  &admin_role_id);
+    EXPECT("unable to add a new managing role.", err);
 
     // check that there are 2 owners for the 'member' role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                             member_owning_roles, &member_owning_roles_len);
+    err =
+        aranya_role_managers(&owner->client, &t->id, &member_role_id,
+                             member_managing_roles, &member_managing_roles_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\n");
-        member_owning_roles = realloc(
-            member_owning_roles, member_owning_roles_len * sizeof(AranyaRole));
-        err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                                 member_owning_roles, &member_owning_roles_len);
+        member_managing_roles =
+            realloc(member_managing_roles,
+                    member_managing_roles_len * sizeof(AranyaRole));
+        err = aranya_role_managers(&owner->client, &t->id, &member_role_id,
+                                   member_managing_roles,
+                                   &member_managing_roles_len);
     }
-    EXPECT("unable to get the owning roles for the 'member' role", err);
-    if (member_owning_roles_len != 2) {
-        fprintf(
-            stderr,
-            "there should only be 2 owners for the 'member' role. Actual:%zu\n",
-            member_owning_roles_len);
+    EXPECT("unable to get the managing roles for the 'member' role", err);
+    if (member_managing_roles_len != 2) {
+        fprintf(stderr,
+                "there should only be 2 managers for the 'member' role. "
+                "Actual:%zu\n",
+                member_managing_roles_len);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
-    printf("the 'member' role has %zu owning roles now.\n",
-           member_owning_roles_len);
+    printf("the 'member' role has %zu managing roles now.\n",
+           member_managing_roles_len);
 
-    // Remove an owning role from the 'member' role.
-    printf("removing an owning role to the 'member' role.\n");
-    err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id,
-                                   &admin_role_id);
-    EXPECT("unable to remove an owning role.", err);
+    // Remove a managing role from the 'member' role.
+    printf("removing an managing role to the 'member' role.\n");
+    err = aranya_remove_role_manager(&owner->client, &t->id, &member_role_id,
+                                     &admin_role_id);
+    EXPECT("unable to remove a managing role.", err);
 
     // check that there is now just 1 owner for the 'member' role after removing
     // an owning role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                             member_owning_roles, &member_owning_roles_len);
-    EXPECT("unable to get the owning roles for the 'member' role.", err);
-    if (member_owning_roles_len != 1) {
-        fprintf(
-            stderr,
-            "there should only be 1 owner for the 'member' role. Actual: %zu\n",
-            member_owning_roles_len);
+    err =
+        aranya_role_managers(&owner->client, &t->id, &member_role_id,
+                             member_managing_roles, &member_managing_roles_len);
+    EXPECT("unable to get the managing roles for the 'member' role.", err);
+    if (member_managing_roles_len != 1) {
+        fprintf(stderr,
+                "there should only be 1 manager for the 'member' role. Actual: "
+                "%zu\n",
+                member_managing_roles_len);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
-    printf("the 'member' role has %zu owning roles now.\n",
-           member_owning_roles_len);
+    printf("the 'member' role has %zu managing roles now.\n",
+           member_managing_roles_len);
 
 exit:
-    free(member_owning_roles);
+    free(member_managing_roles);
     if (err == ARANYA_ERROR_SUCCESS) {
         printf("completed the custom roles example.\n");
     }

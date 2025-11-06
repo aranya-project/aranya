@@ -1019,55 +1019,55 @@ pub unsafe fn setup_default_roles(
     Ok(())
 }
 
-/// Adds `owning_role` as an owner of role.
+/// Adds `managing_role` as a manager of role.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role ID of the subject role [`RoleId`].
-/// @param[in] owning_role ID of the owning role [`RoleId`].
+/// @param[in] managing_role ID of the managing role [`RoleId`].
 ///
 /// @relates AranyaClient.
-pub fn add_role_owner(
+pub fn add_role_manager(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
-    owning_role: &RoleId,
+    managing_role: &RoleId,
 ) -> Result<(), imp::Error> {
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .add_role_owner(role.into(), owning_role.into()),
+            .add_role_manager(role.into(), managing_role.into()),
     )?;
 
     Ok(())
 }
 
-/// Removes an owning_role as an owner of role.
+/// Removes a managing_role from role.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role the ID of the subject role [`RoleId`].
-/// @param[in] owning_role ID of the owning role [`RoleId`].
+/// @param[in] managing_role ID of the managing role [`RoleId`].
 ///
 /// @relates AranyaClient.
-pub fn remove_role_owner(
+pub fn remove_role_manager(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
-    owning_role: &RoleId,
+    managing_role: &RoleId,
 ) -> Result<(), imp::Error> {
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .remove_role_owner(role.into(), owning_role.into()),
+            .remove_role_manager(role.into(), managing_role.into()),
     )?;
 
     Ok(())
 }
 
-/// Returns the roles that own `role`.
+/// Returns the roles that manage `role`.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
 /// Writes the number of roles that would have been returned to `roles_len`.
@@ -1076,30 +1076,30 @@ pub fn remove_role_owner(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role the ID of the subject role [`RoleId`].
-/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in] roles_out returns a list of roles that manage `role` [`Role`].
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub unsafe fn role_owners(
+pub unsafe fn role_managers(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let owning_roles = client
+    let managing_roles = client
         .rt
-        .block_on(client.inner.team(team.into()).role_owners(role.into()))?
+        .block_on(client.inner.team(team.into()).role_managers(role.into()))?
         .__into_data();
 
-    if *roles_len < owning_roles.len() {
-        *roles_len = owning_roles.len();
+    if *roles_len < managing_roles.len() {
+        *roles_len = managing_roles.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    *roles_len = owning_roles.len();
+    *roles_len = managing_roles.len();
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
-    for (dst, src) in out.iter_mut().zip(owning_roles) {
+    for (dst, src) in out.iter_mut().zip(managing_roles) {
         Role::init(dst, src);
     }
 
