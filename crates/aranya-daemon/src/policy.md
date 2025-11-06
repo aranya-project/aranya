@@ -791,7 +791,6 @@ enum SimplePerm {
     // AFC
     CanUseAfc,
     CreateAfcUniChannel,
-    CreateAfcBidiChannel,
 }
 
 // Converts `perm` to a string.
@@ -814,7 +813,6 @@ function simple_perm_to_str(perm enum SimplePerm) string {
 
         SimplePerm::CanUseAfc => { return "CanUseAfc" }
         SimplePerm::CreateAfcUniChannel => { return "CreateAfcUniChannel" }
-        SimplePerm::CreateAfcBidiChannel => { return "CreateAfcBidiChannel" }
     }
 }
 
@@ -850,7 +848,6 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         //
         "CanUseAfc" => { return Some(SimplePerm::CanUseAfc) }
         "CreateAfcUniChannel" => { return Some(SimplePerm::CreateAfcUniChannel) }
-        "CreateAfcBidiChannel" => { return Some(SimplePerm::CreateAfcBidiChannel) }
 
         _ => { return None }
     }
@@ -1937,7 +1934,6 @@ command SetupDefaultRole {
 
                     assign_perm_to_role(role_id, SimplePerm::CanUseAfc)
                     assign_perm_to_role(role_id, SimplePerm::CreateAfcUniChannel)
-                    assign_perm_to_role(role_id, SimplePerm::CreateAfcBidiChannel)
 
                     emit RoleCreated {
                         role_id: role_id,
