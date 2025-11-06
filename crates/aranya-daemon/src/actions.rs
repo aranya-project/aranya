@@ -210,16 +210,16 @@ where
             .in_current_span()
     }
 
-    /// Invokes `add_role_owner`.
-    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
-    fn add_role_owner(
+    /// Invokes `add_role_manager`.
+    #[instrument(skip(self), fields(%role_id, %new_managing_role_id))]
+    fn add_role_manager(
         &self,
         role_id: RoleId,
-        new_owning_role_id: RoleId,
+        new_managing_role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::add_role_owner(
             role_id.as_base(),
-            new_owning_role_id.as_base(),
+            new_managing_role_id.as_base(),
         ))
         .in_current_span()
     }
@@ -387,9 +387,9 @@ where
             .in_current_span()
     }
 
-    /// Invokes `query_role_owners`.
+    /// Invokes `query_role_managers`.
     #[instrument(skip(self), fields(%role_id))]
-    fn query_role_owners(
+    fn query_role_managers(
         &self,
         role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
@@ -419,16 +419,16 @@ where
             .in_current_span()
     }
 
-    /// Invokes `remove_role_owner`.
-    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
-    fn remove_role_owner(
+    /// Invokes `remove_role_manager`.
+    #[instrument(skip(self), fields(%role_id, %new_managing_role_id))]
+    fn remove_role_manager(
         &self,
         role_id: RoleId,
-        new_owning_role_id: RoleId,
+        new_managing_role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::remove_role_owner(
             role_id.as_base(),
-            new_owning_role_id.as_base(),
+            new_managing_role_id.as_base(),
         ))
         .in_current_span()
     }

@@ -1074,9 +1074,9 @@ impl DaemonApi for Api {
 
         self.client
             .actions(GraphId::transmute(team))
-            .add_role_owner(RoleId::transmute(role), RoleId::transmute(managing_role))
+            .add_role_manager(RoleId::transmute(role), RoleId::transmute(managing_role))
             .await
-            .context("unable to add role owner")?;
+            .context("unable to add role manager")?;
         Ok(())
     }
 
@@ -1092,9 +1092,9 @@ impl DaemonApi for Api {
 
         self.client
             .actions(GraphId::transmute(team))
-            .remove_role_owner(RoleId::transmute(role), RoleId::transmute(managing_role))
+            .remove_role_manager(RoleId::transmute(role), RoleId::transmute(managing_role))
             .await
-            .context("unable to remove role owner")?;
+            .context("unable to remove role manager")?;
         Ok(())
     }
 
@@ -1110,9 +1110,9 @@ impl DaemonApi for Api {
         let roles = self
             .client
             .actions(GraphId::transmute(team))
-            .query_role_owners(RoleId::transmute(role))
+            .query_role_managers(RoleId::transmute(role))
             .await
-            .context("unable to query role owners")?
+            .context("unable to query role managers")?
             .into_iter()
             .filter_map(|e| {
                 if let Effect::QueryRoleOwnersResult(e) = e {
