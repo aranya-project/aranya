@@ -169,9 +169,9 @@ impl Channels {
             .daemon
             .create_afc_uni_send_channel(
                 context::current(),
-                team_id.__id,
-                peer_id.__id,
-                label_id.__id,
+                team_id.into_api(),
+                peer_id.into_api(),
+                label_id.into_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -190,7 +190,7 @@ impl Channels {
     pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let (label_id, local_channel_id, channel_id) = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id.__id, ctrl.0)
+            .receive_afc_ctrl(context::current(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -199,7 +199,7 @@ impl Channels {
             keys: self.keys.clone(),
             channel_id: ChannelId { __id: channel_id },
             local_channel_id,
-            label_id: LabelId { __id: label_id },
+            label_id: LabelId::from_api(label_id),
         })
     }
 }
@@ -305,7 +305,7 @@ impl ReceiveChannel {
             .open(self.local_channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
+        debug_assert_eq!(label_id.as_base(), self.label_id.into_api().as_base());
         Ok(Seq(seq))
     }
 

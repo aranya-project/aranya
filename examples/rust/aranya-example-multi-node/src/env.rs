@@ -4,7 +4,6 @@ use std::{env, fmt::Write, net::Ipv4Addr, path::Path, str::FromStr};
 
 use age::secrecy::{ExposeSecret, SecretString};
 use anyhow::{Context, Result};
-use aranya_client::client::Role;
 use aranya_util::Addr;
 use tokio::fs;
 
@@ -15,12 +14,12 @@ const AFC_ADDR_ENV_VAR: &str = "ARANYA_AFC_ADDR";
 const TCP_ADDR_ENV_VAR: &str = "ARANYA_TCP_ADDR";
 const SYNC_ADDR_ENV_VAR: &str = "ARANYA_SYNC_ADDR";
 
-const DEVICE_LIST: [(&str, Role); 5] = [
-    ("owner", Role::Owner),
-    ("admin", Role::Admin),
-    ("operator", Role::Operator),
-    ("membera", Role::Member),
-    ("memberb", Role::Member),
+const DEVICE_LIST: [(&str, &str); 5] = [
+    ("owner", "owner"),
+    ("admin", "admin"),
+    ("operator", "operator"),
+    ("membera", "member"),
+    ("memberb", "member"),
 ];
 
 /// Environment variables.
@@ -54,7 +53,7 @@ impl EnvVars {
                 afc_addr: env_var(&format!("ARANYA_AFC_ADDR_{}", device.0.to_uppercase()))?,
                 tcp_addr: env_var(&format!("ARANYA_TCP_ADDR_{}", device.0.to_uppercase()))?,
                 sync_addr: env_var(&format!("ARANYA_SYNC_ADDR_{}", device.0.to_uppercase()))?,
-                role: device.1,
+                role: device.1.to_string(),
             };
             devices.push(device);
         }
@@ -159,35 +158,35 @@ impl Default for EnvVars {
                 afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10000)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10001)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10002)),
-                role: Role::Owner,
+                role: "owner".to_string(),
             },
             admin: Device {
                 name: "admin".into(),
                 afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
-                role: Role::Admin,
+                role: "admin".to_string(),
             },
             operator: Device {
                 name: "operator".into(),
                 afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
-                role: Role::Operator,
+                role: "operator".to_string(),
             },
             membera: Device {
                 name: "membera".into(),
                 afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10011)),
-                role: Role::Member,
+                role: "member".to_string(),
             },
             memberb: Device {
                 name: "memberb".into(),
                 afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10012)),
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10013)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10014)),
-                role: Role::Member,
+                role: "member".to_string(),
             },
         }
     }
@@ -205,7 +204,7 @@ pub struct Device {
     /// Sync address.
     pub sync_addr: Addr,
     /// Device's role.
-    pub role: Role,
+    pub role: String,
 }
 
 /// Parses an environment variable, including the name in the error.

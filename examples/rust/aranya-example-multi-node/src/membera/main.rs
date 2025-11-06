@@ -3,9 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{
-    afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, LabelId, SyncPeerConfig,
-};
+use aranya_client::{afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     get_member_peer,
@@ -43,10 +41,14 @@ async fn main() -> Result<()> {
 
     // Initialize client.
     info!("membera: initializing client");
-    let client = (|| Client::builder().daemon_uds_path(&args.uds_sock).connect())
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to initialize client");
+    let client = (|| {
+        Client::builder()
+            .with_daemon_uds_path(&args.uds_sock)
+            .connect()
+    })
+    .retry(ExponentialBuilder::default())
+    .await
+    .expect("expected to initialize client");
     info!("membera: initialized client");
 
     // Get team info from owner.
@@ -99,9 +101,8 @@ async fn main() -> Result<()> {
 
     // Wait for admin to create label.
     info!("membera: waiting for admin to create label");
-    let queries = team.queries();
     let label1 = loop {
-        if let Ok(labels) = queries.labels().await {
+        if let Ok(labels) = team.labels().await {
             if let Some(label) = labels.iter().next() {
                 break label.clone();
             }
@@ -111,9 +112,8 @@ async fn main() -> Result<()> {
 
     // Loop until all devices have been added to the team.
     info!("membera: waiting for all devices to be added to team");
-    let queries = team.queries();
     loop {
-        if let Ok(devices) = queries.devices_on_team().await {
+        if let Ok(devices) = team.devices().await {
             if devices.iter().count() == 5 {
                 break;
             }
@@ -140,9 +140,8 @@ async fn main() -> Result<()> {
     sleep(SLEEP_INTERVAL).await;
 
     // Check that label has been assigned to membera.
-    let queries = team.queries();
     loop {
-        if let Ok(labels) = queries.device_label_assignments(device_id).await {
+        if let Ok(labels) = team.device(device_id).label_assignments().await {
             if labels.iter().count() == 1 {
                 break;
             }
@@ -162,7 +161,7 @@ async fn main() -> Result<()> {
     info!("membera: creating send channel");
     let (sealer, ctrl) = client
         .afc()
-        .create_uni_send_channel(team_info.team_id, memberb, LabelId { __id: label1.id })
+        .create_uni_send_channel(team_info.team_id, memberb, label1.id)
         .await?;
     sender.send(env.memberb.afc_addr, ctrl.as_bytes()).await?;
 

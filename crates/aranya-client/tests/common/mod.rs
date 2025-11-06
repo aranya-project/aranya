@@ -1,10 +1,10 @@
-use std::{net::Ipv4Addr, path::PathBuf, time::Duration};
+use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -19,6 +19,12 @@ use spideroak_base58::ToBase58 as _;
 use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
+
+#[allow(dead_code)]
+const SYNC_INTERVAL: Duration = Duration::from_millis(100);
+// Allow for one missed sync and a misaligned sync rate, while keeping run times low.
+#[allow(dead_code)]
+pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
@@ -58,7 +64,11 @@ impl DevicesCtx {
         })
     }
 
-    pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
+    pub async fn add_all_device_roles(
+        &mut self,
+        team_id: TeamId,
+        roles: &DefaultRoles,
+    ) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let owner_team = self.owner.client.team(team_id);
         let admin_team = self.admin.client.team(team_id);
@@ -68,23 +78,19 @@ impl DevicesCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        owner_team.add_device_to_team(self.admin.pk.clone()).await?;
-        owner_team.assign_role(self.admin.id, Role::Admin).await?;
+        owner_team
+            .add_device(self.admin.pk.clone(), Some(roles.admin().id))
+            .await?;
 
         // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
-            .add_device_to_team(self.operator.pk.clone())
+            .add_device(self.operator.pk.clone(), Some(roles.operator().id))
             .await?;
 
         // Make sure it sees the configuration change.
         admin_team
             .sync_now(self.owner.aranya_local_addr().await?, None)
-            .await?;
-
-        // Assign the operator its role.
-        admin_team
-            .assign_role(self.operator.id, Role::Operator)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -94,21 +100,22 @@ impl DevicesCtx {
 
         // Add member A as a new device.
         info!("adding membera to team");
-        operator_team
-            .add_device_to_team(self.membera.pk.clone())
+        admin_team
+            .add_device(self.membera.pk.clone(), Some(roles.member().id))
             .await?;
 
-        // Add member A as a new device.
+        // Add member B as a new device.
         info!("adding memberb to team");
-        operator_team
-            .add_device_to_team(self.memberb.pk.clone())
+        admin_team
+            .add_device(self.memberb.pk.clone(), Some(roles.member().id))
             .await?;
 
         // Make sure all see the configuration change.
-        let operator_addr = self.operator.aranya_local_addr().await?;
-        for team in [owner_team, admin_team, membera_team, memberb_team] {
-            team.sync_now(operator_addr, None).await?;
-        }
+        let admin_addr = self.admin.aranya_local_addr().await?;
+        owner_team.sync_now(admin_addr, None).await?;
+        operator_team.sync_now(admin_addr, None).await?;
+        membera_team.sync_now(admin_addr, None).await?;
+        memberb_team.sync_now(admin_addr, None).await?;
 
         Ok(())
     }
@@ -155,6 +162,52 @@ impl DevicesCtx {
 
         Ok(team_id)
     }
+
+    pub(crate) fn devices(&self) -> [&DeviceCtx; 5] {
+        [
+            &self.owner,
+            &self.admin,
+            &self.operator,
+            &self.membera,
+            &self.memberb,
+        ]
+    }
+
+    #[instrument(skip(self))]
+    pub async fn add_all_sync_peers(&self, team_id: TeamId) -> Result<()> {
+        let config = SyncPeerConfig::builder()
+            .interval(Some(SYNC_INTERVAL))
+            .build()?;
+        for device in self.devices() {
+            for peer in self.devices() {
+                if ptr::eq(device, peer) {
+                    continue;
+                }
+                device
+                    .client
+                    .team(team_id)
+                    .add_sync_peer(peer.aranya_local_addr().await?, config.clone())
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// NB: This includes the owner role, which is not returned
+    /// by [`Client::setup_default_roles`].
+    #[instrument(skip(self))]
+    pub async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
+        self.owner.setup_default_roles(team_id, true).await
+    }
+
+    /// Sets up default roles without creating any management delegations.
+    #[instrument(skip(self))]
+    pub async fn setup_default_roles_without_delegation(
+        &self,
+        team_id: TeamId,
+    ) -> Result<DefaultRoles> {
+        self.owner.setup_default_roles(team_id, false).await
+    }
 }
 
 pub struct DeviceCtx {
@@ -195,7 +248,10 @@ impl DeviceCtx {
                 max_chans: 100,
             }),
             sync: daemon_cfg::SyncConfig {
-                quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
+                quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
+                    addr: addr_any,
+                    client_addr: None,
+                }),
             },
         };
 
@@ -221,14 +277,10 @@ impl DeviceCtx {
             .context("unable to start daemon")?;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
-        let client = (|| {
-            let mut builder = Client::builder();
-            builder = builder.daemon_uds_path(&uds_path);
-            builder.connect()
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to init client")?;
+        let client = (|| Client::builder().with_daemon_uds_path(&uds_path).connect())
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -254,5 +306,135 @@ impl DeviceCtx {
             return format!("/{}\0", t.to_base58());
         };
         path
+    }
+
+    #[instrument(skip(self, grant_delegations))]
+    async fn setup_default_roles(
+        &self,
+        team_id: TeamId,
+        grant_delegations: bool,
+    ) -> Result<DefaultRoles> {
+        let owner_role = self
+            .client
+            .team(team_id)
+            .roles()
+            .await?
+            .try_into_owner_role()?;
+        tracing::debug!(owner_role_id = %owner_role.id);
+
+        let setup_roles = self
+            .client
+            .team(team_id)
+            .setup_default_roles(owner_role.id)
+            .await?;
+
+        let roles = setup_roles
+            .into_iter()
+            .chain(iter::once(owner_role))
+            .try_into_default_roles()
+            .context("unable to parse `DefaultRoles`")?;
+        tracing::debug!(?roles, "default roles set up");
+
+        if grant_delegations {
+            let mappings = [
+                // admin -> operator
+                ("admin -> operator", roles.admin().id, roles.operator().id),
+                // admin -> member
+                ("admin -> member", roles.admin().id, roles.member().id),
+                // operator -> member
+                ("operator -> member", roles.operator().id, roles.member().id),
+            ];
+            for (name, manager, role) in mappings {
+                self.client
+                    .team(team_id)
+                    .assign_role_management_permission(role, manager, text!("CanAssignRole"))
+                    .await
+                    .with_context(|| format!("{name}: unable to change managing role"))?;
+            }
+        }
+
+        Ok(roles)
+    }
+}
+
+/// Converts operations on [`Roles`].
+pub trait RolesExt {
+    /// Converts [`Roles`] into [`DefaultRoles`].
+    fn try_into_default_roles(self) -> Result<DefaultRoles>;
+    // Retrieves the owner role.
+    fn try_into_owner_role(self) -> Result<Role>;
+}
+
+impl<I> RolesExt for I
+where
+    I: IntoIterator<Item = Role>,
+{
+    fn try_into_default_roles(self) -> Result<DefaultRoles> {
+        DefaultRoles::try_from(self)
+    }
+
+    fn try_into_owner_role(self) -> Result<Role> {
+        self.into_iter()
+            .find(|role| role.name == "owner" && role.default)
+            .context("unable to find owner role")
+    }
+}
+
+/// The default roles for a team.
+// NB: This assumes users cannot delete roles yet, which is true
+// as of MVP.
+#[derive(Clone, Debug)]
+pub struct DefaultRoles {
+    roles: HashMap<String, Role>,
+}
+
+impl DefaultRoles {
+    /// Returns the 'owner' role.
+    pub fn owner(&self) -> &Role {
+        self.roles.get("owner").expect("owner role should exist")
+    }
+
+    /// Returns the 'admin' role.
+    pub fn admin(&self) -> &Role {
+        self.roles.get("admin").expect("admin role should exist")
+    }
+
+    /// Returns the 'operator' role.
+    pub fn operator(&self) -> &Role {
+        self.roles
+            .get("operator")
+            .expect("operator role should exist")
+    }
+
+    /// Returns the 'member' role.
+    pub fn member(&self) -> &Role {
+        self.roles.get("member").expect("member role should exist")
+    }
+}
+
+impl DefaultRoles {
+    fn try_from(roles: impl IntoIterator<Item = Role>) -> Result<Self> {
+        let names = ["owner", "admin", "operator", "member"];
+        let roles = roles
+            .into_iter()
+            .filter(|role| {
+                // We only care about default roles.
+                role.default
+            })
+            .fold(HashMap::new(), |mut acc, role| {
+                if !names.contains(&role.name.as_str()) {
+                    panic!("unexpected role: {}", role.name);
+                }
+                if acc.insert(role.name.to_string(), role.clone()).is_some() {
+                    panic!("duplicate role: {}", role.name);
+                }
+                acc
+            });
+        for name in names {
+            if !roles.contains_key(name) {
+                return Err(anyhow!("missing default role: {name}"));
+            }
+        }
+        Ok(Self { roles })
     }
 }

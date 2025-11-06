@@ -16,7 +16,7 @@ pub use team::*;
 pub const MAX_SYNC_INTERVAL: Duration = Duration::from_secs(365 * 24 * 60 * 60);
 
 /// Configuration info for syncing with a peer.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SyncPeerConfig {
     interval: Option<Duration>,
     sync_now: bool,

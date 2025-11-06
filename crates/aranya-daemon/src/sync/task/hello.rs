@@ -279,7 +279,7 @@ impl Syncer<State> {
         head: Address,
     ) -> SyncResult<()> {
         // Set the team for this graph
-        let team_id = id.into_id().into();
+        let team_id = TeamId::transmute(id);
         self.state.store().set_team(team_id);
 
         // Create the hello message
@@ -447,7 +447,7 @@ where
         active_team: &TeamId,
         sync_peers: SyncPeers,
     ) {
-        let graph_id = active_team.into_id().into();
+        let graph_id = GraphId::transmute(*active_team);
 
         match hello_msg {
             SyncHelloType::Subscribe {

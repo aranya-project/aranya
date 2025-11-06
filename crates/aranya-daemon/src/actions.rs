@@ -1,25 +1,37 @@
 //! Aranya graph actions/effects API.
 
-use core::{future::Future, marker::PhantomData};
-use std::{borrow::Cow, sync::Arc};
+use std::{future::Future, marker::PhantomData, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_crypto::{policy::LabelId, Csprng, DeviceId, Rng};
-use aranya_keygen::PublicKeys;
-use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
-use aranya_policy_vm::{ident, Text, Value};
-use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
-    VmPolicy,
+use aranya_crypto::{
+    policy::{LabelId, RoleId},
+    Csprng, DeviceId, Rng,
 };
+use aranya_keygen::PublicKeys;
+use aranya_policy_ifgen::{Actionable, VmEffect};
+use aranya_policy_text::Text;
+#[cfg(feature = "afc")]
+use aranya_runtime::NullSink;
+use aranya_runtime::{ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
+use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument, warn, Instrument};
+use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{self, ChanOp, Effect, KeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
+
+/// Container for complex AQC channel creation results.
+#[derive(Debug)]
+pub(crate) struct SessionData {
+    /// The serialized messages
+    #[cfg(feature = "afc")]
+    pub ctrl: Vec<Box<[u8]>>,
+    /// The effects produced
+    pub effects: Vec<Effect>,
+}
 
 /// Functions related to Aranya actions
 impl<EN, SP, CE> Client<EN, SP>
@@ -38,19 +50,16 @@ where
         nonce: Option<&[u8]>,
     ) -> Result<(GraphId, Vec<Effect>)> {
         let mut sink = VecSink::new();
-        let id = self
-            .aranya
-            .lock()
-            .await
-            .new_graph(
-                &[0u8],
-                vm_action!(create_team(
-                    owner_keys,
-                    nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()),
-                )),
-                &mut sink,
-            )
-            .context("unable to create new team")?;
+        let policy_data = &[0u8];
+        let act = policy::create_team(
+            owner_keys,
+            nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()).to_vec(),
+        );
+        let id = {
+            let mut client = self.aranya.lock().await;
+            act.with_action(|act| client.new_graph(policy_data, act, &mut sink))
+                .context("unable to create new team")?
+        };
         Ok((id, sink.collect()?))
     }
 
@@ -104,17 +113,15 @@ where
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
-    #[instrument(skip_all)]
-    async fn with_actor<F>(&self, f: F) -> Result<Vec<Effect>>
-    where
-        F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()>,
-    {
+    async fn call_persistent_action(
+        &self,
+        act: impl Actionable<Interface = policy::Persistent> + Send,
+    ) -> Result<Vec<Effect>> {
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
         {
             let mut client = self.aranya.lock().await;
-            let mut actor = ActorImpl::new(&mut client, &mut sink, &self.graph_id);
-            f(&mut actor)?;
+            act.with_action(|act| client.action(self.graph_id, &mut sink, act))?;
         }
 
         let total = sink.effects.len();
@@ -125,21 +132,22 @@ where
         Ok(sink.collect()?)
     }
 
-    /// Creates a new ephemeral session and invokes an action on it.
-    /// Returns the [`MsgSink`] of serialized ephemeral commands added to the graph
-    /// and a vector of [`Effect`]s produced by the action.
-    #[instrument(skip_all)]
-    #[allow(clippy::type_complexity)] // 2advanced4u
-    async fn session_action<'a, F>(&self, f: F) -> Result<(Vec<Box<[u8]>>, Vec<Effect>)>
-    where
-        F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a>,
-    {
-        let mut client = self.aranya.lock().await;
-        let mut session = client.session(self.graph_id)?;
+    async fn call_session_action(
+        &self,
+        act: impl Actionable<Interface = policy::Ephemeral> + Send,
+    ) -> Result<SessionData> {
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();
-        session.action(&client, &mut sink, &mut msg_sink, f())?;
-        Ok((msg_sink.into_cmds(), sink.collect()?))
+        {
+            let mut client = self.aranya.lock().await;
+            let mut session = client.session(self.graph_id)?;
+            act.with_action(|act| session.action(&client, &mut sink, &mut msg_sink, act))?;
+        }
+        Ok(SessionData {
+            #[cfg(feature = "afc")]
+            ctrl: msg_sink.into_cmds(),
+            effects: sink.collect()?,
+        })
     }
 }
 
@@ -150,129 +158,140 @@ where
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
-    /// Invokes `f` with an [`ActorImpl`].
-    fn with_actor<F>(&self, f: F) -> impl Future<Output = Result<Vec<Effect>>> + Send
-    where
-        F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()> + Send;
+    /// Perform a persistent action.
+    fn call_persistent_action(
+        &self,
+        act: impl Actionable<Interface = policy::Persistent> + Send,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send;
 
     #[allow(clippy::type_complexity)]
     /// Performs a session action.
-    fn session_action<'a, F>(
+    fn call_session_action(
         &self,
-        f: F,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send
-    where
-        F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a> + Send;
+        act: impl Actionable<Interface = policy::Ephemeral> + Send,
+    ) -> impl Future<Output = Result<SessionData>> + Send;
 
-    /// Terminates the team.
+    /// Invokes `add_device`.
     #[instrument(skip_all)]
-    fn terminate_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(|actor| {
-            actor.terminate_team()?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Adds a Member instance to the team.
-    #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.add_member(keys)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Remove a Member instance from the team.
-    #[instrument(skip(self), fields(device_id = %device_id))]
-    fn remove_member(
+    fn add_device(
         &self,
-        device_id: DeviceId,
+        keys: KeyBundle,
+        initial_role_id: Option<RoleId>,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.remove_member(device_id.into())?;
-            Ok(())
-        })
+        self.call_persistent_action(policy::add_device(
+            keys,
+            initial_role_id.map(|id| id.as_base()),
+        ))
         .in_current_span()
     }
 
-    /// Assigns role to a team member.
-    #[instrument(skip_all)]
-    fn assign_role(
+    /// Invokes `add_label_managing_role`.
+    #[instrument(skip(self), fields(%label_id, %managing_role_id))]
+    fn add_label_managing_role(
         &self,
-        device_id: DeviceId,
-        role: Role,
+        label_id: LabelId,
+        managing_role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role)?;
-            Ok(())
-        })
+        self.call_persistent_action(policy::add_label_managing_role(
+            label_id.as_base(),
+            managing_role_id.as_base(),
+        ))
         .in_current_span()
     }
 
-    /// Revokes role from a team member.
-    #[instrument(skip_all)]
-    fn revoke_role(
+    /// Invokes `add_perm_to_role`.
+    #[instrument(skip(self), fields(%role_id, %perm))]
+    fn add_perm_to_role(
         &self,
-        device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
+        perm: Text,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role)?;
-            Ok(())
-        })
+        self.call_persistent_action(policy::add_perm_to_role(role_id.as_base(), perm))
+            .in_current_span()
+    }
+
+    /// Invokes `add_role_owner`.
+    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
+    fn add_role_owner(
+        &self,
+        role_id: RoleId,
+        new_owning_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::add_role_owner(
+            role_id.as_base(),
+            new_owning_role_id.as_base(),
+        ))
         .in_current_span()
     }
 
-    /// Create a label.
-    #[instrument(skip(self), fields(name = %name))]
-    fn create_label(&self, name: Text) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_label(name)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Delete a label.
-    #[instrument(skip(self), fields(label_id = %label_id))]
-    fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.delete_label(label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Assigns a label to a device.
-    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
-    fn assign_label(
+    /// Invokes `assign_label_to_device`.
+    #[instrument(skip(self), fields(%device_id, %label_id, %op))]
+    fn assign_label_to_device(
         &self,
         device_id: DeviceId,
         label_id: LabelId,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_label(device_id.into(), label_id.into(), op)?;
-            Ok(())
-        })
+        self.call_persistent_action(policy::assign_label_to_device(
+            device_id.as_base(),
+            label_id.as_base(),
+            op,
+        ))
         .in_current_span()
     }
 
-    /// Revokes a label.
-    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
-    fn revoke_label(
+    /// Invokes `assign_role`.
+    #[instrument(skip(self), fields(%device_id, %role_id))]
+    fn assign_role(
         &self,
         device_id: DeviceId,
-        label_id: LabelId,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %label_id, "revoking label");
-        self.with_actor(move |actor| {
-            actor.revoke_label(device_id.into(), label_id.into())?;
-            Ok(())
-        })
+        self.call_persistent_action(policy::assign_role(device_id.as_base(), role_id.as_base()))
+            .in_current_span()
+    }
+
+    /// Invokes `assign_role_management_perm`.
+    #[instrument(skip(self), fields(%target_role_id, %managing_role_id, %perm))]
+    fn assign_role_management_perm(
+        &self,
+        target_role_id: RoleId,
+        managing_role_id: RoleId,
+        perm: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::assign_role_management_perm(
+            target_role_id.as_base(),
+            managing_role_id.as_base(),
+            perm,
+        ))
         .in_current_span()
+    }
+
+    /// Invokes `change_role`.
+    #[instrument(skip(self), fields(%device_id, %old_role_id, %new_role_id))]
+    fn change_role(
+        &self,
+        device_id: DeviceId,
+        old_role_id: RoleId,
+        new_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::change_role(
+            device_id.as_base(),
+            old_role_id.as_base(),
+            new_role_id.as_base(),
+        ))
+        .in_current_span()
+    }
+
+    /// Invokes `create_label`.
+    #[instrument(skip(self), fields(%name, %managing_role_id))]
+    fn create_label(
+        &self,
+        name: Text,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::create_label(name, managing_role_id.as_base()))
+            .in_current_span()
     }
 
     /// Creates a unidirectional AFC channel.
@@ -283,137 +302,207 @@ where
         &self,
         open_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("create_afc_uni_channel"),
-            args: Cow::Owned(vec![Value::from(open_id), Value::from(label_id)]),
-        })
+    ) -> impl Future<Output = Result<SessionData>> + Send {
+        self.call_session_action(policy::create_afc_uni_channel(
+            open_id.as_base(),
+            label_id.as_base(),
+        ))
         .in_current_span()
     }
 
-    /// Query devices on team off-graph.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_devices_on_team_off_graph(
-        &self,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_devices_on_team"),
-            args: Cow::Owned(vec![]),
-        })
-        .in_current_span()
+    /// Invokes `delete_label`.
+    #[instrument(skip(self), fields(%label_id))]
+    fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::delete_label(label_id.as_base()))
+            .in_current_span()
     }
 
-    /// Query device role off-graph.
+    /// Invokes `query_device_keybundle`.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_device_role_off_graph(
+    #[instrument(skip(self), fields(%device_id))]
+    fn query_device_keybundle(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_device_role"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_device_keybundle(device_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
     }
 
-    /// Query device keybundle off-graph.
+    /// Invokes `query_device_role`.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_device_keybundle_off_graph(
+    #[instrument(skip(self), fields(%device_id))]
+    fn query_device_role(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_device_keybundle"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
-        .in_current_span()
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_device_role(device_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
     }
 
-    /// Query device label assignments off-graph.
+    /// Invokes `query_devices_on_team`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_label_assignments_off_graph(
+    fn query_devices_on_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_devices_on_team())
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_label`.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(%label_id))]
+    fn query_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_label(label_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_labels`.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_labels(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_labels())
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_labels_assigned_to_device`.
+    #[instrument(skip(self), fields(%device))]
+    fn query_labels_assigned_to_device(
+        &self,
+        device: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_labels_assigned_to_device(device.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_team_roles`.
+    #[instrument(skip(self))]
+    fn query_team_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_team_roles())
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_role_owners`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_owners(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_owners(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `remove_device`.
+    #[instrument(skip(self), fields(%device_id))]
+    fn remove_device(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_label_assignments"),
-            args: Cow::Owned(vec![Value::from(device_id)]),
-        })
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::remove_device(device_id.as_base()))
+            .in_current_span()
+    }
+
+    /// Invokes `remove_perm_from_role`.
+    #[instrument(skip(self), fields(%role_id, %perm))]
+    fn remove_perm_from_role(
+        &self,
+        role_id: RoleId,
+        perm: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::remove_perm_from_role(role_id.as_base(), perm))
+            .in_current_span()
+    }
+
+    /// Invokes `remove_role_owner`.
+    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
+    fn remove_role_owner(
+        &self,
+        role_id: RoleId,
+        new_owning_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::remove_role_owner(
+            role_id.as_base(),
+            new_owning_role_id.as_base(),
+        ))
         .in_current_span()
     }
 
-    /// Query label exists off-graph.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_label_exists_off_graph(
+    /// Invokes `revoke_label_from_device`.
+    #[instrument(skip(self), fields(%device_id, %label_id))]
+    fn revoke_label_from_device(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::revoke_label_from_device(
+            device_id.as_base(),
+            label_id.as_base(),
+        ))
+        .in_current_span()
+    }
+
+    /// Invokes `revoke_label_managing_role`.
+    #[instrument(skip(self), fields(%label_id, %managing_role_id))]
+    fn revoke_label_managing_role(
         &self,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_label_exists"),
-            args: Cow::Owned(vec![Value::from(label_id)]),
-        })
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::revoke_label_managing_role(
+            label_id.as_base(),
+            managing_role_id.as_base(),
+        ))
         .in_current_span()
     }
 
-    /// Query labels off-graph.
-    #[allow(clippy::type_complexity)]
-    #[instrument(skip(self))]
-    fn query_labels_off_graph(
+    /// Invokes `revoke_role`.
+    #[instrument(skip(self), fields(%device_id, %role_id))]
+    fn revoke_role(
         &self,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
-        self.session_action(move || VmAction {
-            name: ident!("query_labels"),
-            args: Cow::Owned(vec![]),
-        })
+        device_id: DeviceId,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::revoke_role(device_id.as_base(), role_id.as_base()))
+            .in_current_span()
+    }
+
+    /// Invokes `revoke_role_management_perm`.
+    #[instrument(skip(self), fields(%target_role_id, %managing_role_id, %perm))]
+    fn revoke_role_management_perm(
+        &self,
+        target_role_id: RoleId,
+        managing_role_id: RoleId,
+        perm: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::revoke_role_management_perm(
+            target_role_id.as_base(),
+            managing_role_id.as_base(),
+            perm,
+        ))
         .in_current_span()
     }
-}
 
-/// An implementation of [`Actor`].
-///
-/// Simplifies the process of calling an action on the Aranya graph.
-/// Enables more consistency and less repeated code for each action.
-#[derive(Debug)]
-pub struct ActorImpl<'a, EN, SP, CE, S> {
-    client: &'a mut ClientState<EN, SP>,
-    sink: &'a mut S,
-    graph_id: &'a GraphId,
-    _eng: PhantomData<CE>,
-}
-
-impl<'a, EN, SP, CE, S> ActorImpl<'a, EN, SP, CE, S>
-where
-    EN: Engine<Policy = VmPolicy<CE>> + Send + 'static,
-    SP: StorageProvider + Send + 'static,
-    S: Sink<<EN as Engine>::Effect>,
-{
-    /// Creates an [`ActorImpl`].
-    fn new(client: &'a mut ClientState<EN, SP>, sink: &'a mut S, graph_id: &'a GraphId) -> Self {
-        ActorImpl {
-            client,
-            sink,
-            graph_id,
-            _eng: PhantomData,
-        }
+    /// Invokes `setup_default_roles`.
+    #[instrument(skip(self), fields(%managing_role_id))]
+    fn setup_default_roles(
+        &self,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::setup_default_roles(managing_role_id.as_base()))
+            .in_current_span()
     }
-}
 
-impl<EN, SP, CE, S> Actor for ActorImpl<'_, EN, SP, CE, S>
-where
-    EN: Engine<Policy = VmPolicy<CE>> + Send + 'static,
-    SP: StorageProvider + Send + 'static,
-    CE: aranya_crypto::Engine + Send + Sync,
-    S: Sink<<EN as Engine>::Effect>,
-{
-    /// Calls action on Aranya graph.
-    #[instrument(skip_all)]
-    fn call_action(&mut self, action: VmAction<'_>) -> Result<(), ClientError> {
-        self.client.action(*self.graph_id, self.sink, action)
+    /// Invokes `terminate_team`.
+    #[instrument(skip(self), fields(%team_id))]
+    fn terminate_team(&self, team_id: GraphId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::terminate_team(team_id.as_base()))
+            .in_current_span()
     }
 }
 
@@ -426,4 +515,34 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
             sign_key: postcard::to_allocvec(&pk.sign_pk)?,
         })
     }
+}
+
+#[cfg(feature = "afc")]
+pub(crate) fn query_afc_channel_is_valid<EN, SP, CE>(
+    aranya: &mut ClientState<EN, SP>,
+    graph_id: GraphId,
+    sender_id: DeviceId,
+    receiver_id: DeviceId,
+    label_id: LabelId,
+) -> Result<bool>
+where
+    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect>,
+    SP: StorageProvider,
+    CE: aranya_crypto::Engine,
+{
+    let mut session = aranya.session(graph_id)?;
+    let mut sink = VecSink::new();
+    policy::query_afc_channel_is_valid(
+        sender_id.as_base(),
+        receiver_id.as_base(),
+        label_id.as_base(),
+    )
+    .with_action(|act| session.action(aranya, &mut sink, &mut NullSink, act))?;
+    let effects = sink.collect()?;
+    Ok(effects.iter().any(|e| {
+        if let Effect::QueryAfcChannelIsValidResult(e) = e {
+            return e.is_valid;
+        }
+        false
+    }))
 }

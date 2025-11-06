@@ -1,4 +1,10 @@
-use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    io,
+    net::{Ipv4Addr, SocketAddr},
+    path::Path,
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -12,7 +18,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
-use aranya_util::ready;
+use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
@@ -22,7 +28,7 @@ use tracing::{error, info, info_span, Instrument as _};
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
-    api::{ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
+    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
     aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
@@ -32,7 +38,7 @@ use crate::{
         SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
-    vm_policy::{PolicyEngine, TEST_POLICY_1},
+    vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
 // Use short names so that we can more easily add generics.
@@ -134,6 +140,10 @@ impl Daemon {
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
+            let qs_client_addr = match qs_config.client_addr {
+                None => Addr::from((Ipv4Addr::UNSPECIFIED, 0)),
+                Some(v) => v,
+            };
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
@@ -172,8 +182,9 @@ impl Daemon {
                     SyncParams {
                         psk_store: Arc::clone(&psk_store),
                         server_addr: qs_config.addr,
+                        caches: Arc::clone(&caches),
                     },
-                    caches,
+                    qs_client_addr,
                     invalid_graphs.clone(),
                 )
                 .await?;
@@ -186,6 +197,7 @@ impl Daemon {
                     )
                 };
                 Afc::new(
+                    client.clone(),
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store
@@ -197,7 +209,7 @@ impl Daemon {
 
             let data = QSData { psk_store };
 
-            let crypto = crate::api::Crypto {
+            let crypto = api::Crypto {
                 engine: eng,
                 local_store,
                 aranya_store,
@@ -304,8 +316,9 @@ impl Daemon {
         SyncParams {
             psk_store,
             server_addr,
+            caches,
         }: SyncParams,
-        caches: PeerCacheMap,
+        client_addr: Addr,
         invalid_graphs: InvalidGraphs,
     ) -> Result<(
         Client,
@@ -318,7 +331,7 @@ impl Daemon {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(POLICY_SOURCE, eng, store, device_id)?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
@@ -355,7 +368,7 @@ impl Daemon {
             send_effects,
             invalid_graphs,
             psk_store,
-            server_addr.into(),
+            (server_addr.into(), client_addr),
             syncer_recv,
             conns,
         )?;
@@ -504,7 +517,10 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync: SyncConfig {
-                quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
+                quic: Toggle::Enabled(QuicSyncConfig {
+                    addr: any,
+                    client_addr: None,
+                }),
             },
             #[cfg(feature = "afc")]
             afc: Toggle::Enabled(crate::config::AfcConfig {
