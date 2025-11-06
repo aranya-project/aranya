@@ -192,7 +192,7 @@ impl Team<'_> {
     pub async fn add_role_manager(&self, role: RoleId, managing_role: RoleId) -> Result<()> {
         self.client
             .daemon
-            .add_role_owner(
+            .add_role_manager(
                 context::current(),
                 self.id,
                 role.into_api(),
@@ -208,7 +208,7 @@ impl Team<'_> {
     pub async fn remove_role_manager(&self, role: RoleId, managing_role: RoleId) -> Result<()> {
         self.client
             .daemon
-            .remove_role_owner(
+            .remove_role_manager(
                 context::current(),
                 self.id,
                 role.into_api(),
@@ -225,7 +225,7 @@ impl Team<'_> {
         let roles = self
             .client
             .daemon
-            .role_owners(context::current(), self.id, role.into_api())
+            .role_managers(context::current(), self.id, role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?

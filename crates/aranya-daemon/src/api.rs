@@ -998,14 +998,14 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        owning_role: api::RoleId,
+        managing_role: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
         let roles = self
             .client
             .actions(GraphId::transmute(team))
-            .setup_default_roles(RoleId::transmute(owning_role))
+            .setup_default_roles(RoleId::transmute(managing_role))
             .await
             .context("unable to setup default roles")?
             .into_iter()
@@ -1063,43 +1063,43 @@ impl DaemonApi for Api {
     //
 
     #[instrument(skip(self), err)]
-    async fn add_role_owner(
+    async fn add_role_manager(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        owning_role: api::RoleId,
+        managing_role: api::RoleId,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         self.client
             .actions(GraphId::transmute(team))
-            .add_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
+            .add_role_owner(RoleId::transmute(role), RoleId::transmute(managing_role))
             .await
             .context("unable to add role owner")?;
         Ok(())
     }
 
     #[instrument(skip(self), err)]
-    async fn remove_role_owner(
+    async fn remove_role_manager(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        owning_role: api::RoleId,
+        managing_role: api::RoleId,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         self.client
             .actions(GraphId::transmute(team))
-            .remove_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
+            .remove_role_owner(RoleId::transmute(role), RoleId::transmute(managing_role))
             .await
             .context("unable to remove role owner")?;
         Ok(())
     }
 
     #[instrument(skip(self), err)]
-    async fn role_owners(
+    async fn role_managers(
         self,
         _: context::Context,
         team: api::TeamId,

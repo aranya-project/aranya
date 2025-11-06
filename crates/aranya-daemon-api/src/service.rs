@@ -337,7 +337,7 @@ pub trait DaemonApi {
     /// Configures the team with default roles from policy.
     ///
     /// It returns the default roles that were created.
-    async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
+    async fn setup_default_roles(team: TeamId, managing_role: RoleId) -> Result<Box<[Role]>>;
     /// Returns the current team roles.
     async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
 
@@ -345,12 +345,12 @@ pub trait DaemonApi {
     // Role management
     //
 
-    /// Adds an owning role to the target role.
-    async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
-    /// Removes an owning role from the target role.
-    async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
-    /// Returns the roles that own the target role.
-    async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Adds a managing role to the target role.
+    async fn add_role_manager(team: TeamId, role: RoleId, managing_role: RoleId) -> Result<()>;
+    /// Removes a managing role from the target role.
+    async fn remove_role_manager(team: TeamId, role: RoleId, managing_role: RoleId) -> Result<()>;
+    /// Returns the roles that manage the target role.
+    async fn role_managers(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.
     async fn assign_role_management_perm(
         team: TeamId,
