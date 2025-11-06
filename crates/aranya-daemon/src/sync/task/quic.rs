@@ -669,7 +669,7 @@ where
             data_len
         };
         debug!(n = data_len, "server sent sync response");
-        send.close().await.map_err(Error::from)?;
+        send.close().await.ok();
 
         Ok(())
     }

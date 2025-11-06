@@ -496,8 +496,13 @@ impl Team<'_> {
     /// Subscribe to hello notifications from a sync peer.
     ///
     /// This will request the peer to send hello notifications when their graph head changes.
-    /// The `delay` parameter specifies the minimum delay between notifications.
-    /// The `duration` parameter specifies how long the subscription should last.
+    ///
+    /// # Parameters
+    ///
+    /// * `peer` - The address of the sync peer to subscribe to.
+    /// * `graph_change_delay` - The minimum delay between notifications after a graph head change.
+    /// * `duration` - How long the subscription should last.
+    /// * `schedule_delay` - The delay between sending hello messages to the subscriber (rate limiting).
     ///
     /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
     /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.

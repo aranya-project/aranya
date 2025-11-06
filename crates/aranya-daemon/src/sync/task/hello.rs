@@ -364,19 +364,9 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
     tokio::spawn(async move {
         loop {
-            // Wait for either the schedule delay or cancellation
+            // Wait for either the schedule delay, expiration, or cancellation
             tokio::select! {
                 _ = tokio::time::sleep(schedule_delay) => {
-                    // Check if subscription has expired
-                    if Instant::now() >= expires_at {
-                        debug!(
-                            ?graph_id,
-                            ?subscriber_addr,
-                            "Scheduled hello sender exiting: subscription expired"
-                        );
-                        break;
-                    }
-
                     // Get the current head address
                     let head = {
                         let mut aranya = client.client().aranya.lock().await;
@@ -419,6 +409,14 @@ fn spawn_scheduled_hello_sender<EN, SP>(
                             "Sent scheduled hello notification"
                         );
                     }
+                }
+                _ = tokio::time::sleep_until(expires_at.into()) => {
+                    debug!(
+                        ?graph_id,
+                        ?subscriber_addr,
+                        "Scheduled hello sender exiting: subscription expired"
+                    );
+                    break;
                 }
                 _ = cancel_token.cancelled() => {
                     debug!(

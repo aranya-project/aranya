@@ -951,6 +951,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
+// TODO: Use bool instead of u32 once bool support is added. See https://github.com/aranya-project/aranya-core/issues/129
 pub fn sync_peer_config_builder_set_sync_on_hello(
     cfg: &mut SyncPeerConfigBuilder,
     sync_on_hello: u32,
