@@ -1,0 +1,56 @@
+[package]
+name = "aranya-example-onboarding"
+description = "Example of how onboarding is done within aranya"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+afc = ["aranya-client/afc", "aranya-client/preview"]
+
+# Enable debugging.
+debug = []
+
+[dependencies]
+aranya-client = { workspace = true }
+aranya-daemon-api = { workspace = true }
+aranya-util = { workspace = true }
+
+age = { version = "0.11.1" }
+anyhow = { workspace = true }
+backon = { workspace = true }
+clap = { workspace = true }
+postcard = { workspace = true }
+rustix = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "sync", "process"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+serial_test = { workspace = true }
+test-log = { workspace = true }
+
+[[bin]]
+name = "aranya-example-onboarding"
+path = "src/bin/main.rs"
+test = false
+
+[[bin]]
+name = "aranya-example-onboarding-owner"
+path = "src/owner/main.rs"
+test = false
+
+[[bin]]
+name = "aranya-example-onboarding-admin"
+path = "src/admin/main.rs"
+test = false
