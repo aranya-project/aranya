@@ -10,8 +10,9 @@ use aranya_daemon_api::{AfcChannelId, AfcLocalChannelId, AfcShmInfo, DaemonApiCl
 use aranya_fast_channels::{
     self as afc,
     shm::{Flag, Mode, ReadState},
-    Client as AfcClient,
+    AfcState, Client as AfcClient,
 };
+use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tracing::debug;
@@ -159,6 +160,10 @@ impl Channels {
     /// Returns:
     /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
     /// - A [`CtrlMsg`] message to send to the peer.
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
     pub async fn create_uni_send_channel(
         &self,
         team_id: TeamId,
@@ -176,12 +181,21 @@ impl Channels {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
+        let seal_ctx = self
+            .keys
+            .lock()
+            .expect("poisoned")
+            .0
+            .setup_seal_ctx(local_channel_id)
+            .map_err(AfcSealError)
+            .map_err(Error::Seal)?;
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
             channel_id: ChannelId { __id: channel_id },
             local_channel_id,
             label_id,
+            seal_ctx,
         };
         Ok((chan, CtrlMsg(ctrl)))
     }
@@ -205,13 +219,15 @@ impl Channels {
 }
 
 /// A unidirectional channel that can only send.
-#[derive(Clone, Debug)]
+#[derive_where(Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    #[derive_where(skip(Debug))]
+    seal_ctx: <ReadState<CS> as AfcState>::SealCtx,
 }
 
 impl SendChannel {
@@ -236,13 +252,13 @@ impl SendChannel {
     /// # Panics
     ///
     /// Will panic on poisoned internal mutexes.
-    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+    pub fn seal(&mut self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
             .expect("poisoned")
             .0
-            .seal(self.local_channel_id, dst, plaintext)
+            .seal(&mut self.seal_ctx, dst, plaintext)
             .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())

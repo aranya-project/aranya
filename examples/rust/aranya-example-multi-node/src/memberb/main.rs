@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
     info!("memberb: received AFC data");
 
     info!("memberb: creating send channel");
-    let (sealer, ctrl) = client
+    let (mut sealer, ctrl) = client
         .afc()
         .create_uni_send_channel(team_info.team_id, membera, opener.label_id())
         .await?;

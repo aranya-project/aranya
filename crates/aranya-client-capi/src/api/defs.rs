@@ -1850,7 +1850,7 @@ pub unsafe fn team_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 1200, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
@@ -2026,7 +2026,7 @@ pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
 /// @param[out] dst the output buffer the ciphertext is written to.
 #[cfg(feature = "afc")]
 pub unsafe fn afc_channel_seal(
-    channel: &AfcSendChannel,
+    channel: &mut AfcSendChannel,
     plaintext: &[u8],
     dst: *mut u8,
     dst_len: &mut usize,

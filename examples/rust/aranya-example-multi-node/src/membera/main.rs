@@ -157,7 +157,7 @@ async fn main() -> Result<()> {
     let mut sender = TcpClient::new();
 
     info!("membera: creating send channel");
-    let (sealer, ctrl) = client
+    let (mut sealer, ctrl) = client
         .afc()
         .create_uni_send_channel(team_info.team_id, memberb, label1.id)
         .await?;
