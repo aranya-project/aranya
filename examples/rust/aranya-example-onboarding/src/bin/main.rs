@@ -1,4 +1,4 @@
-//! Multi-node Aranya example written in Rust.
+//! Onboarding Aranya example written in Rust.
 
 use std::{
     env,
@@ -104,7 +104,7 @@ fn daemon(release: &Path, cfg: &Path) -> Result<Child> {
 
 // Spawn a client child process.
 fn client(device: String, uds_sock: &Path, release: &Path) -> Result<Child> {
-    let child = Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
+    let child = Command::new(release.join(format!("aranya-example-onboarding-{:}", device)))
         .kill_on_drop(true)
         .arg("--uds-sock")
         .arg(uds_sock)
