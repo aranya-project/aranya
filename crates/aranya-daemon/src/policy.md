@@ -771,25 +771,51 @@ cannot be created or deleted at runtime.
 ```policy
 enum SimplePerm {
     // Team management
+    // The role can add a device to the team.
     AddDevice,
+    // The role can remove a device from the team.
     RemoveDevice,
+    // The role can terminate the team. This causes all team
+    // commands to fail until a new team is created.
     TerminateTeam,
 
     // Roles
+    // The role can assign a role to other devices.
     AssignRole,
+    // The role can revoke a role from other devices.
     RevokeRole,
+    // The role can set up default roles. This can only be done
+    // once, so this permission can only effectively be used by
+    // the `owner` role.
     SetupDefaultRole,
+    // The role can add or remove an owning role to a target
+    // role.
     ChangeRoleManagingRole,
 
     // Labels
+    // The role can create a label.
     CreateLabel,
+    // The role can delete a label.
     DeleteLabel,
+    // The role can grant a target role the ability to manage a
+    // label. This management ability includes deleting a label
+    // and adding/revoking a label to a device.
     ChangeLabelManagingRole,
+    // The role can assign a label to a device. The role must
+    // also have label management permissions granted by a role
+    // with the `ChangeLabelManagingRole` permission above.
     AssignLabel,
+    // The role can revoke a label from a device. The role must
+    // also have label management permissions granted by a role
+    // with the `ChangeLabelManagingRole` permission above.
     RevokeLabel,
 
     // AFC
+    // The role can use AFC. This controls both the ability to
+    // receive a unidirectional AFC channels and the ability to
+    // assign a label to a device (but not revoke).
     CanUseAfc,
+    // The role can create a unidirectional AFC channel.
     CreateAfcUniChannel,
 }
 
@@ -3504,6 +3530,7 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 //
 // # Required Permissions
 //
+// - `CanUseAfc`
 // - `AssignLabel`
 // - `CanManageLabel(label_id)`
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
