@@ -130,36 +130,30 @@ impl QuicServer {
     #[instrument(skip_all, fields(addr = ?self.local_addr()))]
     #[allow(clippy::disallowed_macros, reason = "tokio::select! uses unreachable!")]
     pub async fn serve(mut self, ready: ready::Notifier) {
-        info!("QUIC sync server listening for incoming connections");
-
         ready.notify();
+        info!("QUIC server started");
 
-        scope(async |s| {
-            loop {
-                tokio::select! {
-                    // Accept incoming QUIC connections.
-                    Some(conn) = self.server.accept() => {
-                        self.accept_connection(conn).await;
-                    },
-                    // Handle new connections inserted in the map
-                    Some((key, acceptor)) = self.conn_rx.recv() => {
-                        s.spawn(self.serve_connection(key, acceptor));
-                    }
-                    else => break,
+        loop {
+            tokio::select! {
+                Some(conn) = self.server.accept() => {
+                    self.accept_connection(conn).await;
+                }
+                Some((peer, acceptor)) = self.conn_rx.recv() => {
+                    tokio::spawn(self.serve_connection(peer, acceptor));
+                }
+                else => {
+                    error!("all server channels closed");
+                    break;
                 }
             }
-        })
-        .await;
+        }
 
-        error!("server terminated");
+        error!("QUIC server terminated");
     }
 
-    fn accept_connection(
-        &mut self,
-        mut conn: s2n_quic::Connection,
-    ) -> impl Future<Output = ()> + use<'_, EN, SP> {
+    async fn accept_connection(&mut self, mut conn: s2n_quic::Connection) {
         let handle = conn.handle();
-        async {
+        let result: anyhow::Result<()> = async {
             debug!("received incoming QUIC connection");
             let identity = get_conn_identity(&mut conn)?;
             let active_team = self
@@ -178,10 +172,12 @@ impl QuicServer {
             self.conns.insert(key, conn).await;
             anyhow::Ok(())
         }
-        .unwrap_or_else(move |err| {
-            error!(error = ?err, "server unable to accept connection");
+        .await;
+
+        if let Err(error) = result {
+            error!(?error, "server unable to accept connection");
             handle.close(AppError::UNKNOWN);
-        })
+        }
     }
 
     fn serve_connection(
@@ -224,13 +220,13 @@ impl QuicServer {
     /// Responds to a sync.
     #[instrument(skip_all)]
     pub async fn sync(
-        client_with_caches: ClientWithCaches<EN, SP>,
+        client_with_caches: Client,
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncHandle,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
         recv.read_to_end(&mut recv_buf)
@@ -273,13 +269,13 @@ impl QuicServer {
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client_with_caches: ClientWithCaches<EN, SP>,
+        client_with_caches: Client,
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
         hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
         sync_peers: SyncHandle,
-    ) -> SyncResult<Box<[u8]>> {
+    ) -> Result<Box<[u8]>> {
         debug!(
             request_data_len = request_data.len(),
             ?addr,
