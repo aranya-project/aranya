@@ -69,17 +69,19 @@ async fn main() -> Result<()> {
     // Send device info to owner.
     info!("admin: sending device info to owner");
     let device_id = client.get_device_id().await?;
+    info!("\t device id: {}", device_id);
     let pk = client.get_key_bundle().await?;
     onboard
         .send(
             &DeviceInfo {
                 name: env.admin.name,
                 device_id,
-                pk,
+                pk: pk.clone(),
             },
             env.owner.tcp_addr,
         )
         .await?;
+    info!("\t{:?}", pk);
     info!("admin: sent device info to owner");
 
     // Setup sync peers.

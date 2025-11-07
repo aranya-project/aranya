@@ -112,7 +112,9 @@ async fn main() -> Result<()> {
 
         // Receive device info from device.
         let info: DeviceInfo = onboard.recv().await?;
-        info!("owner: received device ID from {}", device.name);
+        info!("owner: received device info from {}", device.name);
+
+        info!("\t{:?}", info);
 
         team.add_device(info.pk, None).await?;
         info!("owner: added device to team {}", device.name);
