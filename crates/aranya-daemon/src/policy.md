@@ -776,6 +776,7 @@ enum SimplePerm {
     TerminateTeam,
 
     // Roles
+    CreateRole,
     AssignRole,
     RevokeRole,
     SetupDefaultRole,
@@ -801,6 +802,7 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::RemoveDevice => { return "RemoveDevice" }
         SimplePerm::TerminateTeam => { return "TerminateTeam" }
 
+        SimplePerm::CreateRole => { return "CreateRole" }
         SimplePerm::AssignRole => { return "AssignRole" }
         SimplePerm::RevokeRole => { return "RevokeRole" }
         SimplePerm::SetupDefaultRole => { return "SetupDefaultRole" }
@@ -832,6 +834,7 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         //
         // Roles
         //
+        "CreateRole" => { return Some(SimplePerm::CreateRole) }
         "AssignRole" => { return Some(SimplePerm::AssignRole) }
         "RevokeRole" => { return Some(SimplePerm::RevokeRole) }
         "ChangeRoleManagingRole" => { return Some(SimplePerm::ChangeRoleManagingRole) }
@@ -1714,9 +1717,9 @@ Devices are notified about new roles via the `RoleCreated`
 effect.
 
 ```policy
-// The input to `create_default_role` since the policy language
+// The input to `create_role_facts` since the policy language
 // has neither named args nor good IDE support.
-struct DefaultRole {
+struct RoleInfo {
     // The ID of the role.
     role_id id,
     // The name of the role.
@@ -1725,6 +1728,8 @@ struct DefaultRole {
     author_id id,
     // The ID of the initial role owner.
     owning_role_id id,
+    // Is this a default role?
+    default bool,
 }
 
 // Creates the following facts for a default role
@@ -1734,14 +1739,14 @@ struct DefaultRole {
 // - CanAssignRole
 // - CanRevokeRole
 // - CanChangeRolePerms
-finish function create_default_role(role struct DefaultRole) {
+finish function create_role_facts(role struct RoleInfo) {
     // TODO(eric): check invariants like `managing_role_id` must
     // exist, author must exist, etc?
 
     create Role[role_id: role.role_id]=>{
         name: role.name,
         author_id: role.author_id,
-        default: true,
+        default: role.default,
     }
     create OwnsRole[
         target_role_id: role.role_id,
@@ -1778,8 +1783,51 @@ effect RoleCreated {
 
 #### Custom Roles
 
-> **Note**: Custom roles are under development and will be
-> generally available after MVP.
+```policy
+action create_role(role_name string, owning_role_id id) {
+    publish CreateRole {
+        role_name: role_name,
+        owning_role_id: owning_role_id,
+    }
+}
+
+command CreateRole {
+    fields {
+        role_name string,
+        owning_role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+        // The author must have the permission to create a role
+        check device_has_simple_perm(author.device_id, SimplePerm::CreateRole)
+
+        // The owning role must exist
+        check exists Role[role_id: this.owning_role_id]
+
+        let role_id = derive_role_id(envelope)
+
+        let role_info = RoleInfo {
+            role_id: role_id,
+            name: this.role_name,
+            author_id: author.device_id,
+            owning_role_id: this.owning_role_id,
+            default: false,
+        }
+        let role_created = role_info as RoleCreated
+
+        finish {
+            create_role_facts(role_info)
+            emit role_created
+        }
+    }
+}
+```
 
 #### Default Roles
 
@@ -1871,11 +1919,12 @@ command SetupDefaultRole {
         match this.name {
             DefaultRoleName::Admin => {
                 finish {
-                    create_default_role(DefaultRole {
+                    create_role_facts(RoleInfo {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
+                        default: true,
                     })
 
                     assign_perm_to_role(role_id, SimplePerm::AddDevice)
@@ -1883,6 +1932,7 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, SimplePerm::CreateLabel)
                     assign_perm_to_role(role_id, SimplePerm::DeleteLabel)
                     assign_perm_to_role(role_id, SimplePerm::ChangeLabelManagingRole)
+                    assign_perm_to_role(role_id, SimplePerm::CreateRole)
                     assign_perm_to_role(role_id, SimplePerm::AssignRole)
                     assign_perm_to_role(role_id, SimplePerm::RevokeRole)
 
@@ -1901,11 +1951,12 @@ command SetupDefaultRole {
             }
             DefaultRoleName::Operator => {
                 finish {
-                    create_default_role(DefaultRole {
+                    create_role_facts(RoleInfo {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
+                        default: true,
                     })
 
                     assign_perm_to_role(role_id, SimplePerm::AssignLabel)
@@ -1928,11 +1979,12 @@ command SetupDefaultRole {
             }
             DefaultRoleName::Member => {
                 finish {
-                    create_default_role(DefaultRole {
+                    create_role_facts(RoleInfo {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
+                        default: true,
                     })
 
                     assign_perm_to_role(role_id, SimplePerm::CanUseAfc)
@@ -2659,13 +2711,14 @@ command CreateTeam {
 
             add_new_device(this.owner_keys, owner_key_ids)
 
-            create_default_role(DefaultRole {
+            create_role_facts(RoleInfo {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
                 // Initially, only the owner role can manage the
                 // owner role.
                 owning_role_id: owner_role_id,
+                default: true,
             })
 
             // Assign all of the administrative permissions to
@@ -2679,6 +2732,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::AssignLabel)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
 
+            assign_perm_to_role(owner_role_id, SimplePerm::CreateRole)
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
 
