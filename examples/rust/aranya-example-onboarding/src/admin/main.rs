@@ -26,7 +26,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing(module_path!());
-    info!("starting aranya-example-onboarding-admin");
+    info!("\n--starting aranya-example-onboarding-admin--\n");
 
     // Parse input args.
     let args = Args::parse();
@@ -88,6 +88,7 @@ async fn main() -> Result<()> {
     team.add_sync_peer(env.owner.sync_addr, sync_cfg.clone())
         .await?;
 
+    sleep(SLEEP_INTERVAL * 3).await;
     // Loop until this device has the `Admin` role assigned to it.
     info!("admin: finding admin role");
     let admin_role = loop {

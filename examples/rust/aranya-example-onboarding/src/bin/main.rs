@@ -20,7 +20,7 @@ use tracing::info;
 async fn main() -> Result<()> {
     init_tracing(module_path!());
 
-    info!("starting aranya-example-onboarding example");
+    info!("\n--starting aranya-example-onboarding example--\n");
 
     let mut args = env::args();
     args.next(); // skip executable name
@@ -48,13 +48,13 @@ async fn main() -> Result<()> {
     let mut daemons = Vec::with_capacity(env.devices().count());
     for device in env.devices() {
         // Generate config file.
-        info!("generating daemon config file for {}", device.name);
+        info!("\n--generating daemon config file for {}--\n", device.name);
         let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path())
             .await
             .expect("expected to generate daemon config file");
 
         // Start daemon.
-        info!("starting {} daemon", device.name);
+        info!("\n--starting {} daemon--\n", device.name);
         let child = daemon(&release, &cfg).expect("expected to spawn daemon");
         daemons.push(child);
     }
@@ -64,14 +64,17 @@ async fn main() -> Result<()> {
     // Start device for each team member.
     let mut processes = JoinSet::new();
     for device in env.devices() {
-        info!("starting {} client", device.name);
+        info!("\n--starting {} client--\n", device.name);
         let uds_sock = tmp
             .path()
             .join(device.name.clone())
             .join("daemon")
             .join("run")
             .join("uds.sock");
-
+        info!(
+            "connect {} client to daemon process using uds.sock",
+            device.name
+        );
         let mut child =
             client(device.name.clone(), &uds_sock, &release).expect("expected to spawn client");
         // Spawn device process and collect exit status.
@@ -87,7 +90,7 @@ async fn main() -> Result<()> {
         let _ = d.kill().await;
     }
 
-    info!("completed aranya-example-onboarding example");
+    info!("\n--completed aranya-example-onboarding example--\n");
 
     Ok(())
 }

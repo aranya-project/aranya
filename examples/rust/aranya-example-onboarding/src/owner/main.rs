@@ -30,7 +30,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing(module_path!());
-    info!("starting aranya-example-onboarding-owner");
+    info!("\n--starting aranya-example-onboarding-owner--\n");
 
     // Parse input args.
     let args = Args::parse();
@@ -54,18 +54,23 @@ async fn main() -> Result<()> {
     info!("owner: initialized client");
 
     // Create team.
-    info!("owner: creating team");
+    info!("owner: init configuration before creating team");
+    info!("owner: create seed key for use with the quic syncer");
     let seed_ikm = {
         let mut buf = [0; 32];
         client.rand(&mut buf).await;
         buf
     };
+    info!("\tseed key: {:?}", seed_ikm);
+    info!("owner: create quic sync config");
     let cfg = {
         let qs_cfg = CreateTeamQuicSyncConfig::builder()
             .seed_ikm(seed_ikm)
             .build()?;
         CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
+    info!("\tsync config: {:?}", cfg);
+    info!("owner: create team");
     let team = client
         .create_team(cfg)
         .await
@@ -74,13 +79,16 @@ async fn main() -> Result<()> {
     info!("owner: created team: {}", team_id);
 
     {
+        info!("owner: get team roles");
         let roles = team.roles().await.expect("could not query roles");
+        info!("\troles: {:?}", roles);
         let mut roles = roles.iter();
         let owner_role = roles.next().expect("missing role");
         if roles.next().is_some() {
             panic!("unexpected roles");
         }
         assert_eq!(owner_role.name, "owner");
+        info!("owner: setup default roles");
         team.setup_default_roles(owner_role.id)
             .await
             .expect("could not set up default roles");

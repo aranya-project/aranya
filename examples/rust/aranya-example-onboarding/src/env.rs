@@ -126,7 +126,7 @@ impl EnvVars {
 impl Default for EnvVars {
     fn default() -> Self {
         Self {
-            level: "info".into(),
+            level: "off".into(),
             passphrase: "passphrase".into(),
             owner: Device {
                 name: "owner".into(),

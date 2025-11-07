@@ -49,8 +49,22 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
                 addr = {sync_addr:?}
                 "#
     );
+    print_neatly(&buf);
     fs::write(&cfg, buf).await?;
     info!("generated config file: {:?}", cfg);
 
     Ok(cfg)
+}
+
+fn print_neatly(data: &str) {
+    info!("\tconfig:{{");
+    // 1. Split the string into an iterator of lines.
+    data.lines()
+        // 2. Trim leading and trailing whitespace from each line.
+        .map(|line| line.trim())
+        // 3. Filter out any lines that become entirely empty after trimming (like the initial '\n' or empty lines).
+        .filter(|line| !line.is_empty())
+        // 4. Iterate over the cleaned lines and print them.
+        .for_each(|line| info!("\t{}", line));
+    info!("}}");
 }
