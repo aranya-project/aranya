@@ -147,6 +147,7 @@ exceptions = [
 
     { allow = ["AGPL-3.0"], crate = "aranya-example" },
     { allow = ["AGPL-3.0"], crate = "aranya-example-multi-node" },
+    { allow = ["AGPL-3.0"], crate = "aranya-example-onboarding" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
