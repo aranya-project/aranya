@@ -187,6 +187,28 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
+    /// Creates a new role.
+    ///
+    /// `owning_role` will be the initial owner of the new role.
+    ///
+    /// It returns the Role that was created.
+    #[instrument(skip(self))]
+    pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
+        let role = self
+            .client
+            .daemon
+            .create_role(
+                context::current(),
+                self.id,
+                role_name,
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(Role::from_api(role))
+    }
+
     /// Adds `owning_role` as an owner of `role`.
     #[instrument(skip(self))]
     pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {

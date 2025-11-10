@@ -981,6 +981,34 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
     Ok(())
 }
 
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_setup_default_roles_rejects_unknown_owner").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
+
+    owner_team
+        .create_role(text!("test_role"), owner_role.id)
+        .await?;
+
+    owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "test_role")
+        .ok_or_else(|| anyhow::anyhow!("no test role found"))?;
+
+    Ok(())
+}
+
 /// Prevents devices from assigning roles to themselves.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_self_rejected() -> Result<()> {

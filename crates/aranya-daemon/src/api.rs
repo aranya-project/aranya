@@ -678,6 +678,40 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn create_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role_name: Text,
+        owning_role: api::RoleId,
+    ) -> api::Result<api::Role> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(GraphId::transmute(team))
+            .create_role(
+                role_name,
+                RoleId::transmute(owning_role),
+            )
+            .await
+            .context("unable to create role")?;
+
+        if effects.len() != 1 {
+            return Err(anyhow!("no effects when creating role").into());
+        }
+        if let Effect::RoleCreated(e) = &effects[0] {
+            return Ok(api::Role {
+                id: api::RoleId::from_base(e.role_id),
+                name: e.name.clone(),
+                author_id: api::DeviceId::from_base(e.author_id),
+                default: e.default,
+            })
+        }
+        Err(anyhow!("wrong effect when creating role").into())
+    }
+
+    #[instrument(skip(self), err)]
     async fn assign_role(
         self,
         _: context::Context,

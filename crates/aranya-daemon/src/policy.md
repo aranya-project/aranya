@@ -1792,6 +1792,10 @@ action create_role(role_name string, owning_role_id id) {
 }
 
 command CreateRole {
+    attributes {
+        priority: 110
+    }
+
     fields {
         role_name string,
         owning_role_id id,
