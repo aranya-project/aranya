@@ -243,8 +243,6 @@ deny = [
 
 skip = [
     "base64@0.21.7",
-    "generic-array@0.14.7",
-    "getrandom@0.2.15",
     "heapless@0.7.17",
     "hash32@0.2.1",
     "linux-raw-sys@0.4.15",
@@ -257,18 +255,14 @@ skip = [
     "rustix@0.38.44",
     "rustc-hash@1.1.0",
     "self_cell@0.10.3",
-    "socket2@0.5.8",
     "spin@0.9.8",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
     "toml@0.5.11",
     "untrusted@0.7.1",
     "getrandom@0.1.16",
-    "getrandom@0.2.15",
     "hash32@0.2.1",
     "heapless@0.7.17",
-    "zerocopy@0.7.35",
-    "zerocopy-derive@0.7.35",
 ] # Certain crates/versions that will be skipped when doing duplicate detection.
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
