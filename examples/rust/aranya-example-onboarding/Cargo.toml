@@ -14,8 +14,6 @@ workspace = true
 [features]
 default = []
 
-afc = ["aranya-client/afc", "aranya-client/preview"]
-
 # Enable debugging.
 debug = []
 
@@ -42,17 +40,14 @@ test-log = { workspace = true }
 [[bin]]
 name = "aranya-example-onboarding"
 path = "src/bin/main.rs"
-required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-onboarding-owner"
 path = "src/owner/main.rs"
-required-features = ["afc"]
 test = false
 
 [[bin]]
 name = "aranya-example-onboarding-admin"
 path = "src/admin/main.rs"
-required-features = ["afc"]
 test = false

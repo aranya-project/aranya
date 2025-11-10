@@ -27,7 +27,6 @@ cargo build \
     --release \
     --package aranya-example-onboarding \
     --package aranya-daemon \
-    --features afc,preview \
     --locked
 
 workspace="${current_dir}/examples/rust/aranya-example-onboarding"
