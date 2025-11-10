@@ -370,8 +370,8 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .assign_label(label3, op)
         .await?;
 
-    membera.sync_now(owner_addr.into(), None).await?;
-    memberb.sync_now(owner_addr.into(), None).await?;
+    membera.sync_now(owner_addr, None).await?;
+    memberb.sync_now(owner_addr, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");
