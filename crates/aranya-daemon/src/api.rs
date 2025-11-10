@@ -690,10 +690,7 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(GraphId::transmute(team))
-            .create_role(
-                role_name,
-                RoleId::transmute(owning_role),
-            )
+            .create_role(role_name, RoleId::transmute(owning_role))
             .await
             .context("unable to create role")?;
 
@@ -706,7 +703,7 @@ impl DaemonApi for Api {
                 name: e.name.clone(),
                 author_id: api::DeviceId::from_base(e.author_id),
                 default: e.default,
-            })
+            });
         }
         Err(anyhow!("wrong effect when creating role").into())
     }
