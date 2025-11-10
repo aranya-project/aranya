@@ -40,7 +40,7 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
                 config_dir = {config_dir:?}
 
                 [afc]
-                enable = true
+                enable = false
                 shm_path = {shm:?}
                 max_chans = 100
 
