@@ -770,7 +770,8 @@ cannot be created or deleted at runtime.
 
 ```policy
 enum SimplePerm {
-    // Team management
+    // # Team management
+    //
     // The role can add a device to the team.
     AddDevice,
     // The role can remove a device from the team.
@@ -779,7 +780,8 @@ enum SimplePerm {
     // commands to fail until a new team is created.
     TerminateTeam,
 
-    // Roles
+    // # Roles
+    //
     // The role can assign a role to other devices.
     AssignRole,
     // The role can revoke a role from other devices.
@@ -788,11 +790,12 @@ enum SimplePerm {
     // once, so this permission can only effectively be used by
     // the `owner` role.
     SetupDefaultRole,
-    // The role can add or remove an owning role to a target
-    // role.
+    // The role can add a managing role to or remove a managing
+    // role from a target role.
     ChangeRoleManagingRole,
 
-    // Labels
+    // # Labels
+    //
     // The role can create a label.
     CreateLabel,
     // The role can delete a label.
@@ -810,10 +813,10 @@ enum SimplePerm {
     // with the `ChangeLabelManagingRole` permission above.
     RevokeLabel,
 
-    // AFC
-    // The role can use AFC. This controls both the ability to
-    // receive a unidirectional AFC channels and the ability to
-    // assign a label to a device (but not revoke).
+    // # AFC
+    // 
+    // The role can use AFC. This controls the ability to
+    // create or receive a unidirectional AFC channels.
     CanUseAfc,
     // The role can create a unidirectional AFC channel.
     CreateAfcUniChannel,
