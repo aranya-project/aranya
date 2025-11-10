@@ -547,7 +547,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
     devices
         .admin
         .client

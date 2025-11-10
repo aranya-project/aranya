@@ -656,6 +656,7 @@ AranyaError run(Team* t) {
     AranyaError err;
     AranyaDeviceId* devices = NULL;
 
+    Client* admin = &t->clients.admin;
     Client* operator= & t->clients.operator;
     Client* memberb = &t->clients.memberb;
 

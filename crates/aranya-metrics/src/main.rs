@@ -12,6 +12,7 @@ use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, ChanOp, Client, CreateTeamConfig,
     CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
 };
+use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::{
