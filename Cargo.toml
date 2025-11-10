@@ -55,6 +55,7 @@ aranya-policy-text = { version = "0.1.3" }
 aranya-policy-vm = { version = "0.15.0", features = ["std"] }
 aranya-runtime = { version = "0.16.0", features = ["std", "libc"] }
 
+age = { version = "0.11.1" }
 buggy = { version = "0.1.0" }
 spideroak-base58 = { version = "0.2.0" }
 
