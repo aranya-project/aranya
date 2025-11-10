@@ -243,8 +243,12 @@ deny = [
 
 skip = [
     "base64@0.21.7",
+    "generic-array@0.14.9",
+    "getrandom@0.2.16",
     "heapless@0.7.17",
     "hash32@0.2.1",
+    "hashbrown@0.15.5",
+    "itertools@0.13.0",
     "linux-raw-sys@0.4.15",
     "rand@0.7.3",
     "rand@0.8.5",
@@ -255,6 +259,7 @@ skip = [
     "rustix@0.38.44",
     "rustc-hash@1.1.0",
     "self_cell@0.10.3",
+    "socket2@0.5.10",
     "spin@0.9.8",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
