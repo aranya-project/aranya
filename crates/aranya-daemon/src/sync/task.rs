@@ -46,11 +46,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{
-    daemon::EF,
-    vm_policy::VecSink,
-    InvalidGraphs, EN,
-};
+use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs, EN};
 
 pub mod hello;
 pub mod quic;

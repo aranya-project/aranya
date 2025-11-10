@@ -8,7 +8,6 @@ mod team;
 use std::{fmt::Debug, io, path::Path};
 
 use anyhow::Context as _;
-use aranya_util::Addr;
 use aranya_crypto::{Csprng, Rng};
 use aranya_daemon_api::{
     crypto::{
@@ -17,7 +16,7 @@ use aranya_daemon_api::{
     },
     DaemonApiClient, Version, CS,
 };
-use aranya_util::error::ReportExt;
+use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info};
