@@ -952,7 +952,6 @@ async fn test_hello_subscription() -> Result<()> {
     // Create the initial team, and get our TeamId.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
     let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
@@ -1124,7 +1123,6 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
     // Create the initial team, and get our TeamId.
     let team_id = devices.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
     let roles = devices.setup_default_roles(team_id).await?;
     devices.add_all_device_roles(team_id, &roles).await?;
 
