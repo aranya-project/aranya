@@ -389,11 +389,11 @@ AranyaError init_team(Team* t) {
     AranyaRole team_roles[team_roles_len];
 
     err = aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
-    if (team_roles_len != 1) {
-        fprintf(stderr, "There should only be 1 role after creating a team but there are %zu roles.\n", team_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
-    if (err != ARANYA_ERROR_SUCCESS) {
+    if (team_roles_len != 1) {
+        fprintf(stderr, "There should only be 1 role after creating a team but there are %zu roles.\n", team_roles_len);
         return err;
     }
 
