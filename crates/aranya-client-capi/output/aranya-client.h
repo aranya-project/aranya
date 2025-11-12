@@ -1463,6 +1463,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
  * @param[in] roles_out returns a list of roles that own `role`
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
@@ -1470,6 +1471,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *owning_role,
                                        struct AranyaRole *roles_out,
                                        size_t *roles_len);
 
@@ -1490,6 +1492,7 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
  * @param[in] roles_out returns a list of roles that own `role`
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
@@ -1497,6 +1500,7 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
+                                           const struct AranyaRoleId *owning_role,
                                            struct AranyaRole *roles_out,
                                            size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
