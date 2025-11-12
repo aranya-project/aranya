@@ -260,15 +260,14 @@ pub enum ChanOp {
 
 // TODO(jdygert): tarpc does not cfg return types properly.
 #[cfg(not(feature = "afc"))]
-use afc_stub::{AfcChannelId, AfcCtrl, AfcLocalChannelId, AfcShmInfo};
+use afc_stub::{AfcReceiveChannelInfo, AfcSendChannelInfo, AfcShmInfo};
 #[cfg(not(feature = "afc"))]
 mod afc_stub {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub enum Never {}
-    pub type AfcCtrl = Never;
     pub type AfcShmInfo = Never;
-    pub type AfcChannelId = Never;
-    pub type AfcLocalChannelId = Never;
+    pub type AfcSendChannelInfo = Never;
+    pub type AfcReceiveChannelInfo = Never;
 }
 
 #[tarpc::service]
@@ -435,7 +434,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> Result<(AfcCtrl, AfcLocalChannelId, AfcChannelId)>;
+    ) -> Result<AfcSendChannelInfo>;
     /// Delete a AFC channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
@@ -443,8 +442,5 @@ pub trait DaemonApi {
     /// Receive AFC ctrl message.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn receive_afc_ctrl(
-        team: TeamId,
-        ctrl: AfcCtrl,
-    ) -> Result<(LabelId, AfcLocalChannelId, AfcChannelId)>;
+    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<AfcReceiveChannelInfo>;
 }
