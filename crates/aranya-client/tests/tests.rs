@@ -987,6 +987,10 @@ async fn test_create_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
     let owner_team = devices.owner.client.team(team_id);
     let owner_role = owner_team
         .roles()
@@ -995,7 +999,7 @@ async fn test_create_role() -> Result<()> {
         .find(|r| r.name == "owner")
         .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
 
-    owner_team
+    let test_role = owner_team
         .create_role(text!("test_role"), owner_role.id)
         .await
         .expect("expected to create role");
@@ -1005,7 +1009,24 @@ async fn test_create_role() -> Result<()> {
         .await?
         .into_iter()
         .find(|r| r.name == "test_role")
-        .ok_or_else(|| anyhow::anyhow!("no test role found"))?;
+        .expect("no test role found");
+
+    // Set up another device, sync it, and make sure they can see the
+    // role.
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    admin_team.sync_now(owner_addr, None).await?;
+
+    let test_role2 = admin_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "test_role")
+        .expect("no test role found");
+    assert_eq!(test_role, test_role2);
 
     Ok(())
 }
