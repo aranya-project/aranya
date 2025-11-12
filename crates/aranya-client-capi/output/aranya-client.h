@@ -533,13 +533,13 @@ typedef const char *AranyaAddr;
 /**
  * An AFC Sending Channel Object.
  */
-typedef struct ARANYA_ALIGNED(16) AranyaAfcSendChannel {
+typedef struct ARANYA_ALIGNED(8) AranyaAfcSendChannel {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[1264];
+    uint8_t __for_size_only[160];
 } AranyaAfcSendChannel;
 #endif
 
