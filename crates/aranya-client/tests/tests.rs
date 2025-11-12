@@ -997,7 +997,8 @@ async fn test_create_role() -> Result<()> {
 
     owner_team
         .create_role(text!("test_role"), owner_role.id)
-        .await?;
+        .await
+        .expect("expected to create role");
 
     owner_team
         .roles()
@@ -1020,7 +1021,10 @@ async fn test_delete_role() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    owner_team.delete_role(roles.member().id).await?;
+    owner_team
+        .delete_role(roles.member().id)
+        .await
+        .expect("expected to delete role");
 
     Ok(())
 }
