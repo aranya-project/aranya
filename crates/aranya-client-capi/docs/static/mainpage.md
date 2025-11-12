@@ -18,8 +18,8 @@ Before attempting to use this API, verify that you are using a matching version 
 - `aranya_add_sync_peer()` - Add peer to sync with
 - `aranya_create_label()` - Create a new label
 - `aranya_assign_label()` - Assign a label to a device
-- `aranya_afc_create_channel()` - Create a sending AFC channel
-- `aranya_afc_accept_channel()` - Receive an AFC channel
+- `aranya_afc_create_channel()` - Create a send-only AFC channel
+- `aranya_afc_accept_channel()` - Accept a receive-only AFC channel from a peer
 - `aranya_afc_channel_seal()` - Seal data with AFC channel
 - `aranya_afc_channel_open()` - Open data with AFC channel
 

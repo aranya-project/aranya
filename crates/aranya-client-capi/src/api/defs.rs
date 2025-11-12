@@ -1926,7 +1926,7 @@ pub fn afc_create_channel(
     Ok(())
 }
 
-/// Use an ephemeral command to create an AFC channel between this device and a peer.
+/// Accept a receive-only AFC channel from by a peer by processing a control message.
 ///
 /// @param[in]  client the Aranya Client [`Client`].
 /// @param[in]  team_id the team's identifier [`TeamId`].

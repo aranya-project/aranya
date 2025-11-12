@@ -193,7 +193,7 @@ impl Channels {
     pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let info = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id.into_api(), ctrl.0)
+            .accept_afc_channel(context::current(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

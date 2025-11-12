@@ -790,7 +790,7 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn receive_afc_ctrl(
+    async fn accept_afc_channel(
         self,
         _: context::Context,
         team: api::TeamId,
