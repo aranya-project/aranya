@@ -1034,7 +1034,7 @@ async fn test_create_role() -> Result<()> {
 /// Tests that role creation works.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_perm_to_created_role() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_create_role").await?;
+    let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
     let owner_team = devices.owner.client.team(team_id);
@@ -1142,6 +1142,43 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
         .add_perm_to_role(target_role.id, text!("CanUseAfc"))
         .await
         .expect_err("expected privilege escalation attempt to fail");
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_remove_perm_from_default_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+
+    // Add admin with admin role
+    owner_team
+        .add_device(devices.admin.pk, Some(roles.admin().id))
+        .await
+        .expect("expected to add admin with role");
+
+    owner_team
+        .remove_perm_from_role(roles.admin().id, text!("AddDevice"))
+        .await
+        .expect("expected to remove AddDevice from admin");
+
+    // Sync the admin
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Admin cannot add operator
+    admin_team
+        .add_device(devices.operator.pk, None)
+        .await
+        .expect_err("admin should not be able to add operator");
 
     Ok(())
 }

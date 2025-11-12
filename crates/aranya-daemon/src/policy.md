@@ -1834,6 +1834,10 @@ effect RoleCreated {
 // This action does not (and cannot usefully) check for name
 // overlap. Do not assume that role names are unique.
 //
+// The owning role is by default granted all role management
+// permissions (CanAssignRole, CanRevokeRole, and
+// CanChangeRolePerms) over the newly created role by default.
+//
 // # Required Permissions
 //
 // - `CreateRole`
