@@ -695,18 +695,16 @@ impl DaemonApi for Api {
             .await
             .context("unable to create role")?;
 
-        if effects.len() != 1 {
-            return Err(anyhow!("wrong number of effects when creating role").into());
-        }
-        if let Effect::RoleCreated(e) = &effects[0] {
-            return Ok(api::Role {
+        if let Some(Effect::RoleCreated(e)) = find_effect!(&effects, Effect::RoleCreated(_)) {
+            Ok(api::Role {
                 id: api::RoleId::from_base(e.role_id),
                 name: e.name.clone(),
                 author_id: api::DeviceId::from_base(e.author_id),
                 default: e.default,
-            });
+            })
+        } else {
+            Err(anyhow!("wrong effect when creating role").into())
         }
-        Err(anyhow!("wrong effect when creating role").into())
     }
 
     #[instrument(skip(self), err)]
@@ -725,14 +723,12 @@ impl DaemonApi for Api {
             .await
             .context("unable to delete role")?;
 
-        if effects.len() != 1 {
-            return Err(anyhow!("wrong number of effects when deleting role").into());
-        }
-        if let Effect::RoleDeleted(e) = &effects[0] {
+        if let Some(Effect::RoleDeleted(e)) = find_effect!(&effects, Effect::RoleDeleted(_)) {
             info!("Deleted role {role_id} ({})", e.name());
-            return Ok(());
+            Ok(())
+        } else {
+            Err(anyhow!("wrong effect when creating role").into())
         }
-        Err(anyhow!("wrong effect when creating role").into())
     }
 
     #[instrument(skip(self), err)]
