@@ -21,7 +21,7 @@ debug = []
 aranya-client = { workspace = true }
 aranya-util = { workspace = true }
 
-age = { workspace = true }
+age = { version = "0.11.1" }
 anyhow = { workspace = true }
 backon = { workspace = true }
 clap = { workspace = true }
