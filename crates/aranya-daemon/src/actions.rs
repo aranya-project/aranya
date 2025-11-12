@@ -196,6 +196,13 @@ where
             .in_current_span()
     }
 
+    /// Invokes `delete_role`
+    #[instrument(skip(self))]
+    fn delete_role(&self, role_id: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::delete_role(role_id.as_base()))
+            .in_current_span()
+    }
+
     /// Invokes `add_label_managing_role`.
     #[instrument(skip(self), fields(%label_id, %managing_role_id))]
     fn add_label_managing_role(

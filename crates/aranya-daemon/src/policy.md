@@ -777,6 +777,7 @@ enum SimplePerm {
 
     // Roles
     CreateRole,
+    DeleteRole,
     AssignRole,
     RevokeRole,
     SetupDefaultRole,
@@ -803,6 +804,7 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::TerminateTeam => { return "TerminateTeam" }
 
         SimplePerm::CreateRole => { return "CreateRole" }
+        SimplePerm::DeleteRole => { return "DeleteRole" }
         SimplePerm::AssignRole => { return "AssignRole" }
         SimplePerm::RevokeRole => { return "RevokeRole" }
         SimplePerm::SetupDefaultRole => { return "SetupDefaultRole" }
@@ -835,6 +837,7 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         // Roles
         //
         "CreateRole" => { return Some(SimplePerm::CreateRole) }
+        "DeleteRole" => { return Some(SimplePerm::DeleteRole) }
         "AssignRole" => { return Some(SimplePerm::AssignRole) }
         "RevokeRole" => { return Some(SimplePerm::RevokeRole) }
         "ChangeRoleManagingRole" => { return Some(SimplePerm::ChangeRoleManagingRole) }
@@ -1060,6 +1063,8 @@ other roles.
 // - `target_role_id` refers to the `Role` fact
 // - `owning_role_id` refers to the `Role` fact
 fact OwnsRole[target_role_id id, owning_role_id id]=>{}
+// Secondary index that tracks whether a role owns other roles
+fact RoleOwned[owner_role_id id, target_role_id id]=>{}
 
 // Reports whether the device's role confers ownership of the
 // target role.
@@ -1165,6 +1170,10 @@ command AddRoleOwner {
                 target_role_id: this.target_role_id,
                 owning_role_id: this.new_role_owner,
             ]=>{}
+            create RoleOwned[
+                owner_role_id: this.new_role_owner,
+                target_role_id: this.target_role_id,
+            ]=>{}
 
             emit RoleOwnerAdded {
                 target_role_id: this.target_role_id,
@@ -1239,6 +1248,10 @@ command RemoveRoleOwner {
             delete OwnsRole[
                 target_role_id: this.target_role_id,
                 owning_role_id: this.owning_role_id,
+            ]
+            delete RoleOwned[
+                owner_role_id: this.owning_role_id,
+                target_role_id: this.target_role_id,
             ]
 
             emit RoleOwnerRemoved {
@@ -1752,6 +1765,10 @@ finish function create_role_facts(role struct RoleInfo) {
         target_role_id: role.role_id,
         owning_role_id: role.owning_role_id,
     ]=>{}
+    create RoleOwned[
+        owner_role_id: role.owning_role_id,
+        target_role_id: role.role_id,
+    ]=>{}
     create CanAssignRole[
         target_role_id: role.role_id,
         managing_role_id: role.owning_role_id,
@@ -1784,6 +1801,14 @@ effect RoleCreated {
 #### Custom Roles
 
 ```policy
+// Creates a role
+//
+// This action does not (and cannot usefully) check for name
+// overlap. Do not assume that role names are unique.
+//
+// # Required Permissions
+//
+// - `CreateRole`
 action create_role(role_name string, owning_role_id id) {
     publish CreateRole {
         role_name: role_name,
@@ -1937,6 +1962,7 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, SimplePerm::DeleteLabel)
                     assign_perm_to_role(role_id, SimplePerm::ChangeLabelManagingRole)
                     assign_perm_to_role(role_id, SimplePerm::CreateRole)
+                    assign_perm_to_role(role_id, SimplePerm::DeleteRole)
                     assign_perm_to_role(role_id, SimplePerm::AssignRole)
                     assign_perm_to_role(role_id, SimplePerm::RevokeRole)
 
@@ -2015,8 +2041,72 @@ command SetupDefaultRole {
 
 ### Role Deletion
 
-Role deletion is waiting on prefix query deletion (see
-https://github.com/aranya-project/aranya-core/issues/229)
+```policy
+// Deletes a role
+//
+// The role being deleted must not be assigned to any devices,
+// and must not own any other roles. Doing so will fail.
+//
+// # Required Permissions
+//
+// - `DeleteRole`
+action delete_role(role_id id) {
+    publish DeleteRole {
+        role_id: role_id
+    }
+}
+
+effect RoleDeleted {
+    name string,
+    role_id id,
+}
+
+command DeleteRole {
+    attributes {
+        priority: 120,
+    }
+
+    fields {
+        role_id id
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+        // The author must have the permission to delete a role
+        check device_has_simple_perm(author.device_id, SimplePerm::DeleteRole)
+    
+        // The role must exists
+        check exists Role[role_id: this.role_id]
+        // The role must not be assigned to any devices
+        check !exists RoleAssignmentIndex[
+            role_id: this.role_id,
+            device_id: ?,
+        ]
+        // The role must not own any other roles
+        check !exists RoleOwned[
+            owner_role_id: this.role_id,
+            target_role_id: ?,
+        ]
+
+        // we already checked that this exists
+        let role = unwrap query Role[role_id: this.role_id]
+
+        finish {
+            delete Role[role_id: this.role_id]
+
+            emit RoleDeleted {
+                name: role.name,
+                role_id: this.role_id,
+            }
+        }
+    }
+}
+```
 
 ### Role Assignment
 
@@ -2737,6 +2827,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
 
             assign_perm_to_role(owner_role_id, SimplePerm::CreateRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::DeleteRole)
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
 

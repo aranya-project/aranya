@@ -209,6 +209,21 @@ impl Team<'_> {
         Ok(Role::from_api(role))
     }
 
+    /// Deletes a role.
+    ///
+    /// The role must not be assigned to any devices, nor should it own
+    /// any other roles.
+    #[instrument(skip(self))]
+    pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_role(context::current(), self.id, role_id.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
     /// Adds `owning_role` as an owner of `role`.
     #[instrument(skip(self))]
     pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {

@@ -984,7 +984,7 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
 /// Tests that role creation works.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_create_role() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_setup_default_roles_rejects_unknown_owner").await?;
+    let mut devices = DevicesCtx::new("test_create_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
     let owner_team = devices.owner.client.team(team_id);
@@ -1005,6 +1005,22 @@ async fn test_create_role() -> Result<()> {
         .into_iter()
         .find(|r| r.name == "test_role")
         .ok_or_else(|| anyhow::anyhow!("no test role found"))?;
+
+    Ok(())
+}
+
+/// Tests that role deletion works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_delete_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_delete_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team.delete_role(roles.member().id).await?;
 
     Ok(())
 }

@@ -253,6 +253,7 @@ impl EffectHandler {
                 QueryRoleOwnersResult(_) => {}
                 QueryAfcChannelIsValidResult(_) => {}
                 RoleCreated(_) => {}
+                RoleDeleted(_) => {}
                 CheckValidAfcChannels(_) => {
                     #[cfg(feature = "afc")]
                     self.afc
@@ -695,7 +696,7 @@ impl DaemonApi for Api {
             .context("unable to create role")?;
 
         if effects.len() != 1 {
-            return Err(anyhow!("no effects when creating role").into());
+            return Err(anyhow!("wrong number of effects when creating role").into());
         }
         if let Effect::RoleCreated(e) = &effects[0] {
             return Ok(api::Role {
@@ -704,6 +705,32 @@ impl DaemonApi for Api {
                 author_id: api::DeviceId::from_base(e.author_id),
                 default: e.default,
             });
+        }
+        Err(anyhow!("wrong effect when creating role").into())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn delete_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role_id: api::RoleId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(GraphId::transmute(team))
+            .delete_role(RoleId::transmute(role_id))
+            .await
+            .context("unable to delete role")?;
+
+        if effects.len() != 1 {
+            return Err(anyhow!("wrong number of effects when deleting role").into());
+        }
+        if let Effect::RoleDeleted(e) = &effects[0] {
+            info!("Deleted role {role_id} ({})", e.name());
+            return Ok(());
         }
         Err(anyhow!("wrong effect when creating role").into())
     }

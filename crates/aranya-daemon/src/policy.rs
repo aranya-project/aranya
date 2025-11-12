@@ -57,6 +57,7 @@ pub enum Effect {
     RoleAssigned(RoleAssigned),
     RoleChanged(RoleChanged),
     RoleCreated(RoleCreated),
+    RoleDeleted(RoleDeleted),
     RoleManagementPermAssigned(RoleManagementPermAssigned),
     RoleManagementPermRevoked(RoleManagementPermRevoked),
     RoleOwnerAdded(RoleOwnerAdded),
@@ -249,6 +250,12 @@ pub struct RoleCreated {
     pub owning_role_id: BaseId,
     pub default: bool,
 }
+/// RoleDeleted policy effect.
+#[effect]
+pub struct RoleDeleted {
+    pub name: Text,
+    pub role_id: BaseId,
+}
 /// RoleManagementPermAssigned policy effect.
 #[effect]
 pub struct RoleManagementPermAssigned {
@@ -308,6 +315,7 @@ pub enum PersistentAction {
     revoke_role_management_perm(revoke_role_management_perm),
     create_role(create_role),
     setup_default_roles(setup_default_roles),
+    delete_role(delete_role),
     assign_role(assign_role),
     change_role(change_role),
     revoke_role(revoke_role),
@@ -403,6 +411,11 @@ pub struct create_role {
 #[action(interface = Persistent)]
 pub struct setup_default_roles {
     pub owning_role_id: BaseId,
+}
+/// delete_role policy action.
+#[action(interface = Persistent)]
+pub struct delete_role {
+    pub role_id: BaseId,
 }
 /// assign_role policy action.
 #[action(interface = Persistent)]
