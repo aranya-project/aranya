@@ -23,7 +23,7 @@ use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
+use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -1069,6 +1069,79 @@ async fn test_add_perm_to_created_role() -> Result<()> {
         .add_device(devices.operator.pk, None)
         .await
         .expect("admin should be able to add operator");
+
+    Ok(())
+}
+
+/// Tests that privilege escalation attempt is rejected.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_privilege_escalation_rejected() -> Result<()> {
+    let team_name = "test_privilege_escalation_rejected";
+    let mut devices = DevicesCtx::new(team_name).await?;
+
+    // Owner creates the team.
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
+
+    // Initialize malicious device on team.
+    let work_dir = tempfile::tempdir()?;
+    let work_dir_path = work_dir.path();
+    let device = DeviceCtx::new(team_name, "malicious", work_dir_path.join("malicious")).await?;
+    owner_team.add_device(device.pk.clone(), None).await?;
+    let device_seed = owner_team
+        .encrypt_psk_seed_for_peer(device.pk.encryption())
+        .await?;
+    device
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&device_seed)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    // Owner creates malicious role on team:
+    let role = owner_team
+        .create_role(text!("malicious_role"), owner_role.id)
+        .await
+        .expect("expected to create malicious role");
+
+    // Owner only allows role to create new roles.
+    owner_team
+        .add_perm_to_role(role.id, text!("CreateRole"))
+        .await?;
+
+    // Owner assigns role to malicious device.
+    owner_team.assign_role(device.id, role.id).await?;
+
+    // Malicious device syncs with owner.
+    let device_team = device.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    device_team.sync_now(owner_addr, None).await?;
+
+    // Malicious device creates a new target role (which it maintains control of).
+    let target_role = device_team
+        .create_role(text!("target_role"), role.id)
+        .await
+        .expect("unable to create target role");
+
+    // Malicious device attempts to grant target role a permission it does not have: e.g. CanUseAfc
+    // This should be rejected, which indicates a privilege escalation attempt will be rejected.
+    device_team
+        .add_perm_to_role(target_role.id, text!("CanUseAfc"))
+        .await
+        .expect_err("expected privilege escalation attempt to fail");
 
     Ok(())
 }
