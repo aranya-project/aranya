@@ -185,7 +185,7 @@ where
         .in_current_span()
     }
 
-    /// Invokes `create_role`
+    /// Invokes `create_role`.
     #[instrument(skip(self))]
     fn create_role(
         &self,
@@ -196,7 +196,7 @@ where
             .in_current_span()
     }
 
-    /// Invokes `delete_role`
+    /// Invokes `delete_role`.
     #[instrument(skip(self))]
     fn delete_role(&self, role_id: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::delete_role(role_id.as_base()))
