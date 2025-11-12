@@ -1759,6 +1759,42 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
+ * Create a role.
+ */
+AranyaError aranya_create_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const uint8_t *role_name,
+                               size_t role_name_len,
+                               const struct AranyaRoleId *owning_role,
+                               struct AranyaRole *role_out);
+
+/**
+ * Create a role.
+ */
+AranyaError aranya_create_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const uint8_t *role_name,
+                                   size_t role_name_len,
+                                   const struct AranyaRoleId *owning_role,
+                                   struct AranyaRole *role_out,
+                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Delete a role.
+ */
+AranyaError aranya_delete_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaRoleId *role);
+
+/**
+ * Delete a role.
+ */
+AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role,
+                                   struct AranyaExtError *__ext_err);
+
+/**
  * Assign a role to a device.
  *
  * This will change the device's currently assigned role to the new role.

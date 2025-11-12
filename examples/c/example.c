@@ -1114,6 +1114,15 @@ AranyaError run_custom_roles_example(Team* t) {
     printf("the 'member' role has %zu owning roles now.\n",
            member_owning_roles_len);
 
+    // Create a custom role
+    AranyaRole buddy_role;
+    const char buddy_name[] = "buddy";
+    size_t buddy_name_len   = strlen(buddy_name) - 1;
+    err = aranya_create_role(&owner->client, &t->id, (const uint8_t*)buddy_name,
+                             buddy_name_len, &owner_role_id, &buddy_role);
+    EXPECT("unable to create role", err);
+    printf("Role 'buddy' created\n");
+
 exit:
     free(member_owning_roles);
     if (err == ARANYA_ERROR_SUCCESS) {

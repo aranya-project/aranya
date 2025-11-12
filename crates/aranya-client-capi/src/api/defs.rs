@@ -4,9 +4,9 @@ use core::{
     ops::Deref,
     ptr, slice,
 };
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr as _};
 
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
@@ -1229,6 +1229,34 @@ pub unsafe fn team_roles(
         Role::init(dst, src);
     }
 
+    Ok(())
+}
+
+/// Create a role.
+pub fn create_role(
+    client: &Client,
+    team: &TeamId,
+    role_name: &str,
+    owning_role: &RoleId,
+    role_out: &mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
+    let role_name = Text::from_str(role_name)
+        .map_err(|_| imp::Error::Other(anyhow!("bad role name string")))?;
+    let role = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_role(role_name, owning_role.into()),
+    )?;
+    Role::init(role_out, role);
+    Ok(())
+}
+
+/// Delete a role.
+pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).delete_role(role.into()))?;
     Ok(())
 }
 
