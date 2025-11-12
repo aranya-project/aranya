@@ -3534,9 +3534,10 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 //
 // # Required Permissions
 //
-// - `CanUseAfc`
 // - `AssignLabel`
 // - `CanManageLabel(label_id)`
+//
+// Additionally, the target device must have `CanUseAfc` permissions
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
     publish AssignLabelToDevice {
         device_id: device_id,
