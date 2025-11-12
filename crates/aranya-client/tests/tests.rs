@@ -997,7 +997,7 @@ async fn test_create_role() -> Result<()> {
         .await?
         .into_iter()
         .find(|r| r.name == "owner")
-        .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
+        .expect("no owner role!?");
 
     let test_role = owner_team
         .create_role(text!("test_role"), owner_role.id)
@@ -1027,6 +1027,48 @@ async fn test_create_role() -> Result<()> {
         .find(|r| r.name == "test_role")
         .expect("no test role found");
     assert_eq!(test_role, test_role2);
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_perm_to_created_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .expect("no owner role!?");
+
+    // Create a custom admin type role
+    let admin_role = owner_team
+        .create_role(text!("admin"), owner_role.id)
+        .await?;
+    owner_team
+        .add_perm_to_role(admin_role.id, text!("AddDevice"))
+        .await
+        .expect("expected to assign AddDevice to admin");
+
+    // Add our admin with this role
+    owner_team
+        .add_device(devices.admin.pk, Some(admin_role.id))
+        .await
+        .expect("expected to add admin with role");
+
+    // Sync the admin and test that they can add the operator
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    admin_team
+        .add_device(devices.operator.pk, None)
+        .await
+        .expect("admin should be able to add operator");
 
     Ok(())
 }

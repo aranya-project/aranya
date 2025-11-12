@@ -1122,6 +1122,38 @@ impl DaemonApi for Api {
     //
 
     #[instrument(skip(self), err)]
+    async fn add_perm_to_role(
+        self,
+        context: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        self.client
+            .actions(GraphId::transmute(team))
+            .add_perm_to_role(RoleId::transmute(role), perm)
+            .await
+            .context("unable to add permission to role")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn remove_perm_from_role(
+        self,
+        context: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        self.client
+            .actions(GraphId::transmute(team))
+            .remove_perm_from_role(RoleId::transmute(role), perm)
+            .await
+            .context("unable to add permission to role")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
     async fn add_role_owner(
         self,
         _: context::Context,
