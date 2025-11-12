@@ -1850,7 +1850,7 @@ pub unsafe fn team_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 1264, align = 16)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.

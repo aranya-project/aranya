@@ -198,7 +198,7 @@ impl Channels {
             local_channel_id: info.local_channel_id,
             label_id,
             peer_id,
-            seal_ctx,
+            seal_ctx: Box::new(seal_ctx),
         };
         Ok((chan, CtrlMsg(info.ctrl)))
     }
@@ -234,7 +234,7 @@ pub struct SendChannel {
     label_id: LabelId,
     peer_id: DeviceId,
     #[derive_where(skip(Debug))]
-    seal_ctx: <ReadState<CS> as AfcState>::SealCtx,
+    seal_ctx: Box<<ReadState<CS> as AfcState>::SealCtx>,
 }
 
 impl SendChannel {
