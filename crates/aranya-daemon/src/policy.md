@@ -1773,7 +1773,7 @@ struct RoleInfo {
     default bool,
 }
 
-// Creates the following facts for a default role
+// Creates the following facts for a role
 //
 // - Role
 // - OwnsRole
