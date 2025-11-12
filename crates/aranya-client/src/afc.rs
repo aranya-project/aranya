@@ -232,7 +232,7 @@ impl SendChannel {
         self.label_id
     }
 
-    /// The device ID of the user on the other side of the channel.
+    /// The device ID of the peer on the other side of the channel.
     pub fn peer_id(&self) -> DeviceId {
         self.peer_id
     }
@@ -293,7 +293,7 @@ impl ReceiveChannel {
         self.label_id
     }
 
-    /// The device ID of the user on the other side of the channel.
+    /// The device ID of the peer on the other side of the channel.
     pub fn peer_id(&self) -> DeviceId {
         self.peer_id
     }

@@ -1970,7 +1970,7 @@ pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
     channel.id().into()
 }
 
-/// Returns the [`DeviceId`] for the peer on the other end of the channel.
+/// Returns the device ID of the peer on the other side of the channel.
 ///
 /// @param[in]  channel the AFC channel object.
 /// @param[out] __output the peer's ID.
@@ -1997,7 +1997,7 @@ pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
     channel.id().into()
 }
 
-/// Returns the [`DeviceId`] for the peer on the other end of the channel.
+/// Returns the device ID of the peer on the other side of the channel.
 ///
 /// @param[in]  channel the AFC channel object.
 /// @param[out] __output the peer's ID.

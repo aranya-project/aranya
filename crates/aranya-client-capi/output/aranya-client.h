@@ -2792,7 +2792,7 @@ AranyaError aranya_afc_send_channel_get_id_ext(const struct AranyaAfcSendChannel
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Returns the [`AranyaDeviceId`](@ref AranyaDeviceId) for the peer on the other end of the channel.
+ * Returns the device ID of the peer on the other side of the channel.
  *
  * @param[in]  channel the AFC channel object.
  * @param[out] __output the peer's ID.
@@ -2803,7 +2803,7 @@ AranyaError aranya_afc_send_channel_get_peer_id(const struct AranyaAfcSendChanne
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Returns the [`AranyaDeviceId`](@ref AranyaDeviceId) for the peer on the other end of the channel.
+ * Returns the device ID of the peer on the other side of the channel.
  *
  * @param[in]  channel the AFC channel object.
  * @param[out] __output the peer's ID.
@@ -2861,7 +2861,7 @@ AranyaError aranya_afc_receive_channel_get_id_ext(const struct AranyaAfcReceiveC
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Returns the [`AranyaDeviceId`](@ref AranyaDeviceId) for the peer on the other end of the channel.
+ * Returns the device ID of the peer on the other side of the channel.
  *
  * @param[in]  channel the AFC channel object.
  * @param[out] __output the peer's ID.
@@ -2872,7 +2872,7 @@ AranyaError aranya_afc_receive_channel_get_peer_id(const struct AranyaAfcReceive
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Returns the [`AranyaDeviceId`](@ref AranyaDeviceId) for the peer on the other end of the channel.
+ * Returns the device ID of the peer on the other side of the channel.
  *
  * @param[in]  channel the AFC channel object.
  * @param[out] __output the peer's ID.
