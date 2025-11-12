@@ -431,7 +431,7 @@ pub trait DaemonApi {
     /// Create a unidirectional AFC send-only channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn create_afc_uni_send_channel(
+    async fn create_afc_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
