@@ -8,7 +8,7 @@ use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
 use aranya_daemon_api::text;

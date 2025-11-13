@@ -443,7 +443,6 @@ dependencies = [
  "age",
  "anyhow",
  "aranya-client",
- "aranya-daemon-api",
  "aranya-util",
  "backon",
  "clap",

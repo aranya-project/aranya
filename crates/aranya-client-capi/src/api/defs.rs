@@ -1935,13 +1935,13 @@ pub unsafe fn team_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AfcReceiveChannel = Safe<afc::ReceiveChannel>;
 
 /// An AFC Control Message, used to create the other end of a channel.
@@ -2055,6 +2055,15 @@ pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
     channel.id().into()
 }
 
+/// Returns the device ID of the peer on the other side of the channel.
+///
+/// @param[in]  channel the AFC channel object.
+/// @param[out] __output the peer's ID.
+#[cfg(feature = "afc")]
+pub fn afc_send_channel_get_peer_id(channel: &AfcSendChannel) -> DeviceId {
+    channel.peer_id().into()
+}
+
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
 ///
 /// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
@@ -2071,6 +2080,15 @@ pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId 
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
     channel.id().into()
+}
+
+/// Returns the device ID of the peer on the other side of the channel.
+///
+/// @param[in]  channel the AFC channel object.
+/// @param[out] __output the peer's ID.
+#[cfg(feature = "afc")]
+pub fn afc_receive_channel_get_peer_id(channel: &AfcReceiveChannel) -> DeviceId {
+    channel.peer_id().into()
 }
 
 /// Returns the raw data for a given [`AfcCtrlMsg`].

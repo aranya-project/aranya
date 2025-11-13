@@ -860,7 +860,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
-    ) -> api::Result<(api::AfcCtrl, api::AfcLocalChannelId, api::AfcChannelId)> {
+    ) -> api::Result<api::AfcSendChannelInfo> {
         self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
@@ -887,7 +887,11 @@ impl DaemonApi for Api {
 
         let ctrl = get_afc_ctrl(ctrl)?;
 
-        Ok((ctrl, local_channel_id, channel_id))
+        Ok(api::AfcSendChannelInfo {
+            ctrl,
+            local_channel_id,
+            channel_id,
+        })
     }
 
     #[cfg(feature = "afc")]
@@ -909,7 +913,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
-    ) -> api::Result<(api::LabelId, api::AfcLocalChannelId, api::AfcChannelId)> {
+    ) -> api::Result<api::AfcReceiveChannelInfo> {
         self.check_team_valid(team).await?;
 
         let graph = GraphId::transmute(team);
@@ -925,11 +929,12 @@ impl DaemonApi for Api {
 
         let (local_channel_id, channel_id) = self.afc.uni_channel_received(e).await?;
 
-        return Ok((
-            api::LabelId::from_base(e.label_id),
+        return Ok(api::AfcReceiveChannelInfo {
             local_channel_id,
             channel_id,
-        ));
+            label_id: api::LabelId::from_base(e.label_id),
+            peer_id: api::DeviceId::from_base(e.sender_id),
+        });
     }
 
     #[instrument(skip(self), err)]
