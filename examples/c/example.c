@@ -1127,7 +1127,7 @@ AranyaError run_custom_roles_example(Team* t) {
     // Add `CanUseAfc` permission to the custom role.
     err = aranya_add_perm_to_role(&owner->client, &t->id, &buddy_role_id,
                                   "CanUseAfc");
-    EXPECT("unable to assign 'CanUseAfc' to 'buddy'", err);
+    EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
     // Remove `CanUseAfc` permission from the custom role.
