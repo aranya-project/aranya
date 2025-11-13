@@ -970,6 +970,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
+/// @param[in] owning_role the ID of the owning role
 /// @param[in] roles_out returns a list of roles that own `role`
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
@@ -977,29 +978,17 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
+    owning_role: &RoleId,
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    // First get the owner role ID by looking at existing roles
-    let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
-
-    let owner_role = roles
-        .into_iter()
-        .find(|role| role.name == "owner" && role.default)
-        .ok_or_else(|| {
-            imp::Error::InvalidArg(InvalidArg::new(
-                "setup_default_roles",
-                "owner role not found",
-            ))
-        })?;
-
     let default_roles = client
         .rt
         .block_on(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles(owner_role.id),
+                .setup_default_roles(owning_role.into()),
         )?
         .__into_data();
 

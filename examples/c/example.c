@@ -384,11 +384,29 @@ AranyaError init_team(Team* t) {
     // real world scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
+    // Get list of existing roles
+    size_t team_roles_len = 1;
+    AranyaRole team_roles[team_roles_len];
+
+    err = aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+    if (team_roles_len != 1) {
+        fprintf(stderr, "There should only be 1 role after creating a team but there are %zu roles.\n", team_roles_len);
+        return err;
+    }
+
+    // Get the ID of the owner role.
+    AranyaRole owner_role = team_roles[0];
+    AranyaRoleId owner_role_id;
+    aranya_role_get_id(&owner_role, &owner_role_id);
+       
     size_t default_roles_len = DEFAULT_ROLES_LEN;
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.
-    err = aranya_setup_default_roles(&owner->client, &t->id, default_roles,
+    err = aranya_setup_default_roles(&owner->client, &t->id, &owner_role_id, default_roles,
                                      &default_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
