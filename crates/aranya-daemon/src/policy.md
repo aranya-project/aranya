@@ -1079,7 +1079,7 @@ grants roles permission to manage a specific label.
 As previously mentioned, each role is "owned" by zero or more
 other roles, called the _owning roles_. The owning roles are
 responsible for delegating management permissions of the role to
-other roles.
+other roles. They can also add and remove other owning roles.
 
 ```policy
 // Records that the target role is owned by the owning role.
@@ -1303,6 +1303,12 @@ permissions to target roles, including to themselves:
   revoke a target role from *any* device.
 - `CanChangeRolePerms(role_id)`: grants roles the ability
   to change the permissions of a target role.
+
+> NOTE: These facts are not deleted when a role is deleted. This is
+> operationally inconsequential as each role has a unique ID and the
+> existence of the role is checked first when the state of these are
+> queried through functions. But it is an opportunity for future
+> enhancement.
 
 ```policy
 // Grants a managing role permission to assign the target role
