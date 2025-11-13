@@ -17,8 +17,3 @@ mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
 pub use generated::*;
-
-// See <https://github.com/mozilla/cbindgen/issues/539>
-/// cbindgen:no-export=true
-#[allow(non_camel_case_types, unused)]
-struct sockaddr_storage;

@@ -7,10 +7,7 @@ To generate the Aranya client shared library, enter this command from the projec
 
 ## Generating the aranya-client.h header
 
-To generate the `aranya-client.h` header file, enter this command from the project root:
-`cargo make build-capi-header`.
-
-The `aranya-client.h` header file will be generated in the `./output/` folder.
+`./output/aranya-client.h` will be generated whenever aranya-client-capi is built.
 
 ## Generating Doxygen Docs
 
