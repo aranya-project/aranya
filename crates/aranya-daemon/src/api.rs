@@ -4,7 +4,11 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
+#[cfg(feature = "preview")]
+use std::collections::HashMap;
+#[cfg(feature = "preview")]
+use std::time::Duration;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
@@ -19,7 +23,9 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::{Address, GraphId, Storage, StorageProvider};
+use aranya_runtime::GraphId;
+#[cfg(feature = "preview")]
+use aranya_runtime::{Address, Storage, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 #[cfg(feature = "afc")]
 use buggy::bug;
@@ -128,8 +134,11 @@ impl DaemonApiServer {
             afc: afc.clone(),
             #[cfg(feature = "afc")]
             device_id: pk.ident_pk.id()?,
+            #[cfg(feature = "preview")]
             client: client.clone(),
+            #[cfg(feature = "preview")]
             peers: peers.clone(),
+            #[cfg(feature = "preview")]
             prev_head_addresses: Arc::default(),
         };
         let api = Api(Arc::new(ApiInner {
@@ -215,9 +224,12 @@ struct EffectHandler {
     afc: Arc<Afc<CE, CS, KS>>,
     #[cfg(feature = "afc")]
     device_id: DeviceId,
+    #[cfg(feature = "preview")]
     client: Client,
+    #[cfg(feature = "preview")]
     peers: SyncPeers,
     /// Stores the previous head address for each graph to detect changes
+    #[cfg(feature = "preview")]
     prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
 }
 
@@ -273,41 +285,45 @@ impl EffectHandler {
             }
         }
 
-        // Check if the graph head address has changed
-        let Some(current_head) = self.get_graph_head_address(graph).await else {
-            warn!(?graph, "unable to get current graph head address");
-            return Ok(());
-        };
+        #[cfg(feature = "preview")]
+        {
+            // Check if the graph head address has changed
+            let Some(current_head) = self.get_graph_head_address(graph).await else {
+                warn!(?graph, "unable to get current graph head address");
+                return Ok(());
+            };
 
-        let mut prev_addresses = self.prev_head_addresses.lock().await;
-        let has_graph_changes = match prev_addresses.get(&graph) {
-            Some(prev_head) => prev_head != &current_head,
-            None => true, // First time seeing this graph
-        };
+            let mut prev_addresses = self.prev_head_addresses.lock().await;
+            let has_graph_changes = match prev_addresses.get(&graph) {
+                Some(prev_head) => prev_head != &current_head,
+                None => true, // First time seeing this graph
+            };
 
-        if has_graph_changes {
-            trace!(
-                ?graph,
-                ?current_head,
-                "graph head address changed, triggering hello notification broadcast"
-            );
-            // Update stored head address
-            HashMap::insert(&mut prev_addresses, graph, current_head);
-            drop(prev_addresses); // Release the lock before async call
+            if has_graph_changes {
+                trace!(
+                    ?graph,
+                    ?current_head,
+                    "graph head address changed, triggering hello notification broadcast"
+                );
+                // Update stored head address
+                HashMap::insert(&mut prev_addresses, graph, current_head);
+                drop(prev_addresses); // Release the lock before async call
 
-            self.broadcast_hello_notifications(graph, current_head)
-                .await;
-        } else {
-            trace!(
-                ?graph,
-                "graph head address unchanged, no hello broadcast needed"
-            );
+                self.broadcast_hello_notifications(graph, current_head)
+                    .await;
+            } else {
+                trace!(
+                    ?graph,
+                    "graph head address unchanged, no hello broadcast needed"
+                );
+            }
         }
 
         Ok(())
     }
 
     /// Gets the current graph head address using the proper Location->Segment->Command->Address flow.
+    #[cfg(feature = "preview")]
     async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
         let client = &self.client;
 
@@ -318,6 +334,7 @@ impl EffectHandler {
     }
 
     /// Broadcasts hello notifications to subscribers when the graph changes.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     async fn broadcast_hello_notifications(&self, graph_id: GraphId, head: Address) {
         // TODO: Don't fire off a spawn here.

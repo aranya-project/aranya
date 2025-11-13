@@ -337,26 +337,33 @@ impl Daemon {
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
         // Create shared hello subscriptions for both server and syncer
+        #[cfg(feature = "preview")]
         let hello_subscriptions = Arc::default();
 
         // Create the sync server
         let client_with_state_for_server = ClientWithState::new(
             client.clone(),
             Arc::clone(&caches),
+            #[cfg(feature = "preview")]
             Arc::clone(&hello_subscriptions),
         );
         let (server, peers, conns, syncer_recv, server_addr) = SyncServer::new(
             client_with_state_for_server,
             &server_addr,
             Arc::clone(&psk_store),
+            #[cfg(feature = "preview")]
             hello_subscriptions,
         )
         .await
         .context("unable to initialize QUIC sync server")?;
 
         // Initialize the syncer
-        let client_with_state_for_syncer =
-            ClientWithState::new(client.clone(), caches, server.hello_subscriptions());
+        let client_with_state_for_syncer = ClientWithState::new(
+            client.clone(),
+            caches,
+            #[cfg(feature = "preview")]
+            server.hello_subscriptions(),
+        );
         let syncer = Syncer::new(
             client_with_state_for_syncer,
             send_effects,

@@ -28,22 +28,26 @@
 //!
 //! See the [`hello`] module for implementation details.
 
-use std::{collections::HashMap, future::Future, time::Duration};
+#[cfg(feature = "preview")]
+use std::time::Duration;
+use std::{collections::HashMap, future::Future};
 
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Address, Engine, Sink};
+#[cfg(feature = "preview")]
+use aranya_runtime::Address;
+use aranya_runtime::{storage::GraphId, Engine, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
-use derive_where::derive_where;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinSet,
-};
+use tokio::sync::{mpsc, oneshot};
+#[cfg(feature = "preview")]
+use tokio::task::JoinSet;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, info, instrument, trace, warn};
+#[cfg(feature = "preview")]
+use tracing::trace;
+use tracing::{error, info, instrument, warn};
 
 use super::Result as SyncResult;
 use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs, EN};
@@ -237,7 +241,7 @@ impl PeerCacheKey {
 ///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
-#[derive_where(Debug; ST)]
+#[derive(Debug)]
 pub struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(crate) client: crate::aranya::ClientWithState<EN, crate::SP>,
@@ -256,7 +260,7 @@ pub struct Syncer<ST> {
     /// Sync server address. Peers will make incoming connections to us on this address.
     server_addr: Addr,
     /// Tracks spawned hello notification tasks for lifecycle management.
-    #[derive_where(skip)]
+    #[cfg(feature = "preview")]
     hello_tasks: JoinSet<()>,
 }
 
@@ -276,6 +280,7 @@ pub trait SyncState: Sized {
         S: Sink<<EN as Engine>::Effect> + Send;
 
     /// Subscribe to hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     fn sync_hello_subscribe_impl(
         syncer: &mut Syncer<Self>,
         id: GraphId,
@@ -286,6 +291,7 @@ pub trait SyncState: Sized {
     ) -> impl Future<Output = SyncResult<()>> + Send;
 
     /// Unsubscribe from hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     fn sync_hello_unsubscribe_impl(
         syncer: &mut Syncer<Self>,
         id: GraphId,
@@ -293,6 +299,7 @@ pub trait SyncState: Sized {
     ) -> impl Future<Output = SyncResult<()>> + Send;
 
     /// Broadcast hello notifications to all subscribers of a graph.
+    #[cfg(feature = "preview")]
     fn broadcast_hello_notifications_impl(
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
@@ -474,6 +481,7 @@ impl<ST: SyncState> Syncer<ST> {
     }
 
     /// Subscribe to hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     async fn sync_hello_subscribe(
         &mut self,
@@ -495,6 +503,7 @@ impl<ST: SyncState> Syncer<ST> {
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     async fn sync_hello_unsubscribe(&mut self, peer: &SyncPeer) -> SyncResult<()> {
         trace!("unsubscribing from hello notifications from peer");

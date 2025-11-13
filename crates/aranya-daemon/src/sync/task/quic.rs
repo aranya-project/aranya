@@ -7,13 +7,17 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc, time::Duration};
+#[cfg(feature = "preview")]
+use std::time::Duration;
+use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
+#[cfg(feature = "preview")]
+use aranya_runtime::Address;
 use aranya_runtime::{
-    Address, Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -41,10 +45,9 @@ use s2n_quic::{
     Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    io::AsyncReadExt,
-    sync::{mpsc, Mutex},
-};
+#[cfg(feature = "preview")]
+use tokio::sync::Mutex;
+use tokio::{io::AsyncReadExt, sync::mpsc};
 use tokio_util::time::DelayQueue;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
@@ -269,6 +272,7 @@ impl Syncer<State> {
             invalid,
             state,
             server_addr,
+            #[cfg(feature = "preview")]
             hello_tasks: tokio::task::JoinSet::new(),
         })
     }
@@ -466,7 +470,7 @@ pub struct Server<EN, SP> {
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Interface to trigger sync operations
-    sync_peers: SyncPeers,
+    _sync_peers: SyncPeers,
 }
 
 impl<EN, SP> Server<EN, SP>
@@ -475,6 +479,7 @@ where
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
+    #[cfg(feature = "preview")]
     pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         Arc::clone(self.client.hello_subscriptions())
     }
@@ -492,7 +497,7 @@ where
         client: ClientWithState<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-        _hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        #[cfg(feature = "preview")] _hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
         SyncPeers,
@@ -541,7 +546,7 @@ where
             server_keys,
             conns: conns.clone(),
             conn_rx: server_conn_rx,
-            sync_peers: sync_peers.clone(),
+            _sync_peers: sync_peers.clone(),
         };
 
         Ok((server_instance, sync_peers, conns, syncer_recv, local_addr))
@@ -613,7 +618,7 @@ where
         let active_team = TeamId::transmute(key.id);
         let peer = key.addr;
         let client = self.client.clone();
-        let sync_peers = self.sync_peers.clone();
+        let sync_peers = self._sync_peers.clone();
         async move {
             // Accept incoming streams.
             while let Some(stream) = acceptor
@@ -691,7 +696,7 @@ where
         addr: Addr,
         request_data: &[u8],
         active_team: TeamId,
-        sync_peers: SyncPeers,
+        _sync_peers: SyncPeers,
     ) -> SyncResult<Box<[u8]>> {
         trace!("server responding to sync request");
 
@@ -729,13 +734,23 @@ where
             SyncType::Push { .. } => {
                 bug!("Push messages are not implemented")
             }
-            #[cfg(feature = "preview")]
-            SyncType::Hello(hello_msg) => {
-                Self::process_hello_message(hello_msg, client, addr, &active_team, sync_peers)
+            SyncType::Hello(_hello_msg) => {
+                #[cfg(feature = "preview")]
+                {
+                    Self::process_hello_message(
+                        _hello_msg,
+                        client,
+                        addr,
+                        &active_team,
+                        _sync_peers,
+                    )
                     .await;
-                // Hello messages are fire-and-forget, return empty response
-                // Note: returning empty response which will be ignored by client
-                Ok(Box::new([]))
+                    // Hello messages are fire-and-forget, return empty response
+                    // Note: returning empty response which will be ignored by client
+                    return Ok(Box::new([]));
+                }
+                #[cfg(not(feature = "preview"))]
+                bug!("sync hello not enabled")
             }
         }
     }

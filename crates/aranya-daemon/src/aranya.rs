@@ -8,7 +8,9 @@ use std::{collections::BTreeMap, fmt, ops::Deref, sync::Arc};
 use aranya_runtime::{ClientState, PeerCache};
 use tokio::sync::{Mutex, MutexGuard};
 
-use crate::sync::task::{quic::HelloSubscriptions, PeerCacheKey};
+#[cfg(feature = "preview")]
+use crate::sync::task::quic::HelloSubscriptions;
+use crate::sync::task::PeerCacheKey;
 
 /// Thread-safe wrapper for an Aranya client.
 pub struct Client<EN, SP> {
@@ -58,6 +60,7 @@ pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 pub(crate) struct ClientWithState<EN, SP> {
     client: Client<EN, SP>,
     caches: PeerCacheMap,
+    #[cfg(feature = "preview")]
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
 }
 
@@ -66,11 +69,12 @@ impl<EN, SP> ClientWithState<EN, SP> {
     pub fn new(
         client: Client<EN, SP>,
         caches: PeerCacheMap,
-        hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
+        #[cfg(feature = "preview")] hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> Self {
         Self {
             client,
             caches,
+            #[cfg(feature = "preview")]
             hello_subscriptions,
         }
     }
@@ -93,6 +97,7 @@ impl<EN, SP> ClientWithState<EN, SP> {
     /// Returns a reference to the underlying client.
     ///
     /// Use this when you need to access the client alone without locking the caches.
+    #[cfg(any(feature = "preview", test))]
     pub fn client(&self) -> &Client<EN, SP> {
         &self.client
     }
@@ -100,6 +105,7 @@ impl<EN, SP> ClientWithState<EN, SP> {
     /// Returns a reference to the hello subscriptions.
     ///
     /// Use this when you need to access or modify hello subscriptions.
+    #[cfg(feature = "preview")]
     pub fn hello_subscriptions(&self) -> &Arc<Mutex<HelloSubscriptions>> {
         &self.hello_subscriptions
     }
@@ -132,6 +138,7 @@ impl<EN, SP> Clone for ClientWithState<EN, SP> {
         Self {
             client: self.client.clone(),
             caches: Arc::clone(&self.caches),
+            #[cfg(feature = "preview")]
             hello_subscriptions: Arc::clone(&self.hello_subscriptions),
         }
     }
