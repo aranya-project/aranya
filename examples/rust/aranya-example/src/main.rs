@@ -387,6 +387,26 @@ async fn main() -> Result<()> {
         .remove_perm_from_role(custom_role.id, perm)
         .await?;
 
+    // Assign role management perm.
+    info!("assigning role management perm");
+    owner_team
+        .assign_role_management_permission(
+            custom_role.id,
+            admin_role.id,
+            text!("CanChangeRolePerms"),
+        )
+        .await?;
+
+    // Revoke role management perm.
+    info!("revoking role management perm");
+    owner_team
+        .revoke_role_management_permission(
+            custom_role.id,
+            admin_role.id,
+            text!("CanChangeRolePerms"),
+        )
+        .await?;
+
     // Delete the custom role.
     info!("deleting custom role from team");
     owner_team.delete_role(custom_role.id).await?;
