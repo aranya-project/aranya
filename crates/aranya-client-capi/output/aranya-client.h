@@ -539,7 +539,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAfcSendChannel;
 #endif
 
@@ -2955,7 +2955,7 @@ AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
+AranyaError aranya_afc_channel_seal(struct AranyaAfcSendChannel *channel,
                                     const uint8_t *plaintext,
                                     size_t plaintext_len,
                                     uint8_t *dst,
@@ -2973,7 +2973,7 @@ AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcSendChannel *channel,
+AranyaError aranya_afc_channel_seal_ext(struct AranyaAfcSendChannel *channel,
                                         const uint8_t *plaintext,
                                         size_t plaintext_len,
                                         uint8_t *dst,
