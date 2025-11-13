@@ -1287,7 +1287,7 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
     Ok(())
 }
 
-/// Assign a permission to a role.
+/// Add a permission to a role.
 ///
 /// It is an error to add a permission already assigned to the role.
 ///
