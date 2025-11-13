@@ -194,7 +194,7 @@ pub type ExtError = Safe<imp::ExtError>;
 /// updates `msg_len` with the length of the message and
 /// returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
 ///
-/// @param[in] err the error to get a message for [`ExtError`].
+/// @param[in] err the error to get a message for.
 /// @param[out] msg buffer to copy error message into.
 /// @param[in,out] msg_len length of the message buffer.
 ///
@@ -228,8 +228,8 @@ impl From<Duration> for std::time::Duration {
 
 /// Initializes a new client instance.
 ///
-/// @param[out] client the uninitialized Aranya Client [`Client`].
-/// @param[in] config the client's configuration [`ClientConfig`].
+/// @param[out] client the uninitialized Aranya Client
+/// @param[in] config the client's configuration
 ///
 /// @relates AranyaClient.
 pub unsafe fn client_init(
@@ -373,7 +373,7 @@ impl From<&RoleId> for aranya_client::RoleId {
 
 /// Get ID of role.
 ///
-/// @param[in] role the role [`Role`].
+/// @param[in] role the role
 ///
 /// @relates AranyaRole
 pub fn role_get_id(role: &Role) -> RoleId {
@@ -384,7 +384,7 @@ pub fn role_get_id(role: &Role) -> RoleId {
 ///
 /// The resulting string must not be freed.
 ///
-/// @param[in] role the role [`Role`].
+/// @param[in] role the role
 ///
 /// @relates AranyaRole
 #[aranya_capi_core::no_ext_error]
@@ -394,7 +394,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 
 /// Get the author of a role.
 ///
-/// @param[in] role the role [`Role`].
+/// @param[in] role the role
 ///
 /// @relates AranyaRole
 pub fn role_get_author(role: &Role) -> DeviceId {
@@ -556,7 +556,7 @@ pub fn init_logging() -> Result<(), imp::Error> {
 
 /// Gets the public key bundle for this device.
 ///
-/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] client the Aranya Client
 /// @param[out] keybundle keybundle byte buffer `KeyBundle`.
 /// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
@@ -580,8 +580,8 @@ pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 ///
 /// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
-/// @param[in] device ID [`Id`].
-/// @param[out] str ID string [`Id`].
+/// @param[in] device ID
+/// @param[out] str ID string
 /// @param[in,out] str_len returns the length of `str`
 ///
 /// @relates AranyaId.
@@ -613,8 +613,8 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 
 /// Gets the public device ID.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[out] __output the client's device ID [`DeviceId`].
+/// @param[in] client the Aranya Client
+/// @param[out] __output the client's device ID
 ///
 /// @relates AranyaClient.
 pub fn get_device_id(client: &Client) -> Result<DeviceId, imp::Error> {
@@ -729,8 +729,8 @@ pub struct SeedIkm {
 
 /// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateTeamQuicSyncConfigBuilder`].
 ///
-/// @param[in,out] cfg a pointer to the quic sync config builder [`CreateTeamQuicSyncConfigBuilder`]
-/// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+/// @param[in,out] cfg a pointer to the quic sync config builder
+/// @param[in] ikm a pointer the raw PSK seed IKM
 ///
 /// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
@@ -745,8 +745,8 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 
 /// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddTeamQuicSyncConfigBuilder`].
 ///
-/// @param[in,out] cfg a pointer to the quic sync config builder [`AddTeamQuicSyncConfigBuilder`]
-/// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+/// @param[in,out] cfg a pointer to the quic sync config builder
+/// @param[in] ikm a pointer the raw PSK seed IKM
 ///
 /// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
@@ -764,8 +764,8 @@ pub fn add_team_quic_sync_config_raw_seed_ikm(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`CreateTeamQuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`CreateTeamQuicSyncConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder
+/// @param[out] out a pointer to write the QUIC sync config to
 ///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
 pub fn create_team_quic_sync_config_build(
@@ -782,8 +782,8 @@ pub fn create_team_quic_sync_config_build(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`AddTeamQuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`AddTeamQuicSyncConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder
+/// @param[out] out a pointer to write the QUIC sync config to
 ///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 pub fn add_team_quic_sync_config_build(
@@ -821,8 +821,8 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 ///
 /// By default, the QUIC syncer config is not set.
 ///
-/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param[in] quic set the QUIC syncer config [`AddTeamQuicSyncConfig`]
+/// @param[in,out] cfg a pointer to the builder for a team config
+/// @param[in] quic set the QUIC syncer config
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_builder_set_quic_syncer(
@@ -838,8 +838,8 @@ pub fn add_team_config_builder_set_quic_syncer(
 ///
 /// By default, the team ID is not set.
 ///
-/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param[in] id a pointer to a [`TeamId`]
+/// @param[in,out] cfg a pointer to the builder for a team config
+/// @param[in] id a pointer to a
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &TeamId) {
@@ -851,8 +851,8 @@ pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
-/// @param[out] out a pointer to write the team config to [`AddTeamConfig`]
+/// @param[in] cfg a pointer to the team config builder
+/// @param[out] out a pointer to write the team config to
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_build(
@@ -868,8 +868,8 @@ pub fn add_team_config_build(
 ///
 /// By default, the QUIC syncer config is not set.
 ///
-/// @param[in,out] cfg a pointer to the builder for a team config [`CreateTeamConfigBuilder`]
-/// @param[in] quic set the QUIC syncer config [`CreateTeamQuicSyncConfig`]
+/// @param[in,out] cfg a pointer to the builder for a team config
+/// @param[in] quic set the QUIC syncer config
 ///
 /// @relates AranyaCreateTeamConfigBuilder.
 pub fn create_team_config_builder_set_quic_syncer(
@@ -886,8 +886,8 @@ pub fn create_team_config_builder_set_quic_syncer(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the team config builder [`CreateTeamConfigBuilder`]
-/// @param[out] out a pointer to write the team config to [`CreateTeamConfig`]
+/// @param[in] cfg a pointer to the team config builder
+/// @param[out] out a pointer to write the team config to
 ///
 /// @relates AranyaCreateTeamConfigBuilder.
 pub fn create_team_config_build(
@@ -915,8 +915,8 @@ pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the builder for a sync config [`SyncPeerConfigBuilder`]
-/// @param[out] out a pointer to write the sync config to [`SyncPeerConfig`]
+/// @param[in] cfg a pointer to the builder for a sync config
+/// @param[out] out a pointer to write the sync config to
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 pub fn sync_peer_config_build(
@@ -983,38 +983,27 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// N.B. this function is meant to be called once to set up the default roles.
 /// Subsequent calls will result in an error if the default roles were already created.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] owning_role the ID of the owning role
+/// @param[in] roles_out returns a list of roles that own `role`
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
+    owning_role: &RoleId,
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    // First get the owner role ID by looking at existing roles
-    let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
-
-    let owner_role = roles
-        .into_iter()
-        .find(|role| role.name == "owner" && role.default)
-        .ok_or_else(|| {
-            imp::Error::InvalidArg(InvalidArg::new(
-                "setup_default_roles",
-                "owner role not found",
-            ))
-        })?;
-
     let default_roles = client
         .rt
         .block_on(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles(owner_role.id),
+                .setup_default_roles(owning_role.into()),
         )?
         .__into_data();
 
@@ -1036,10 +1025,10 @@ pub unsafe fn setup_default_roles(
 
 /// Adds `owning_role` as an owner of role.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role ID of the subject role [`RoleId`].
-/// @param[in] owning_role ID of the owning role [`RoleId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role ID of the subject role
+/// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
 pub fn add_role_owner(
@@ -1060,10 +1049,10 @@ pub fn add_role_owner(
 
 /// Removes an owning_role as an owner of role.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the ID of the subject role [`RoleId`].
-/// @param[in] owning_role ID of the owning role [`RoleId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the subject role
+/// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
 pub fn remove_role_owner(
@@ -1088,10 +1077,10 @@ pub fn remove_role_owner(
 /// Writes the number of roles that would have been returned to `roles_len`.
 /// The application can use `roles_len` to allocate a larger buffer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the ID of the subject role [`RoleId`].
-/// @param[in] roles_out returns a list of roles that own `role` [`Role`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the subject role
+/// @param[in] roles_out returns a list of roles that own `role`
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
@@ -1123,11 +1112,11 @@ pub unsafe fn role_owners(
 
 /// Assigns a role management permission to a managing role.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the ID of the subject role [`RoleId`].
-/// @param[in] managing_role the ID of the managing role [`RoleId`].
-/// @param[in] perm the management permission to assign [`Permission`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the subject role
+/// @param[in] managing_role the ID of the managing role
+/// @param[in] perm the management permission to assign
 ///
 /// @relates AranyaClient.
 pub fn assign_role_management_permission(
@@ -1152,11 +1141,11 @@ pub fn assign_role_management_permission(
 
 /// Revokes a role management permission from a managing role.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the ID of the subject role [`RoleId`].
-/// @param[in] managing_role the ID of the managing role [`RoleId`].
-/// @param[in] perm the management permission to assign [`Permission`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the subject role
+/// @param[in] managing_role the ID of the managing role
+/// @param[in] perm the management permission to assign
 ///
 /// @relates AranyaClient.
 pub fn revoke_role_management_permission(
@@ -1185,11 +1174,11 @@ pub fn revoke_role_management_permission(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
-/// @param[in] old_role the ID of the role currently assigned to the device [`RoleId`].
-/// @param[in] new_role the ID of the role to assign to the device [`RoleId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
+/// @param[in] old_role the ID of the role currently assigned to the device
+/// @param[in] new_role the ID of the role to assign to the device
 ///
 /// @relates AranyaClient.
 pub fn change_role(
@@ -1216,9 +1205,9 @@ pub fn change_role(
 /// Writes the number of roles that would have been returned to `roles_len`.
 /// The application can use `roles_len` to allocate a larger buffer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[out] roles_out returns a list of roles on the team [`Role`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[out] roles_out returns a list of roles on the team
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
@@ -1364,10 +1353,10 @@ pub fn remove_perm_from_role(
 /// If you want to assign a different role to a device that already
 /// has a role, use `change_role()` instead.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
-/// @param[in] role_id the ID of the role to assign to the device [`RoleId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
+/// @param[in] role_id the ID of the role to assign to the device
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
@@ -1389,9 +1378,9 @@ pub fn assign_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
 /// @param[in] role_id the ID of the role to revoke from the device.
 ///
 /// @relates AranyaClient.
@@ -1414,9 +1403,9 @@ pub fn revoke_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] name label name string [`LabelName`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] name label name string
 /// @param[in] managing_role_id the ID of the role that manages this
 ///        label [`RoleId`].
 ///
@@ -1442,9 +1431,9 @@ pub fn create_label(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] label_id the channel label ID [`LabelId`] to delete.
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] label_id the channel label ID  to delete.
 ///
 /// @relates AranyaClient.
 pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Result<(), imp::Error> {
@@ -1458,10 +1447,10 @@ pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Resul
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device ID [`DeviceId`] of the device to assign the label to.
-/// @param[in] label_id the channel label ID [`LabelId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device ID  of the device to assign the label to.
+/// @param[in] label_id the channel label ID
 ///
 /// @relates AranyaClient.
 pub fn assign_label(
@@ -1485,10 +1474,10 @@ pub fn assign_label(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device ID [`DeviceId`] of the device to revoke the label from.
-/// @param[in] label_id the channel label ID [`LabelId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device ID  of the device to revoke the label from.
+/// @param[in] label_id the channel label ID
 ///
 /// @relates AranyaClient.
 pub fn revoke_label(
@@ -1511,10 +1500,10 @@ pub fn revoke_label(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] label_id the label ID [`LabelId`].
-/// @param[in] managing_role_id the ID of the managing role [`RoleId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] label_id the label ID
+/// @param[in] managing_role_id the ID of the managing role
 ///
 /// @relates AranyaClient.
 pub fn add_label_managing_role(
@@ -1534,9 +1523,9 @@ pub fn add_label_managing_role(
 
 /// Create a new graph/team with the current device as the owner.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] cfg the Team Configuration [`CreateTeamConfig`].
-/// @param[out] __output the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client
+/// @param[in] cfg the Team Configuration
+/// @param[out] __output the team's ID
 ///
 /// @relates AranyaClient.
 pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
@@ -1553,7 +1542,7 @@ pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, im
 ///
 /// This method can be used to generate a PSK seed IKM for the QUIC syncer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] client the Aranya Client
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
 ///
@@ -1574,8 +1563,8 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// Writes the number of bytes that would have been returned to `seed_len`.
 /// The application can use `seed_len` to allocate a larger buffer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team_id the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team_id the team's ID
 /// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param[in] keybundle_len the length of the keybundle
 /// @param[out] seed the serialized, encrypted PSK seed.
@@ -1615,8 +1604,8 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 
 /// Add a team to the local device store.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] cfg the Team Configuration [`AddTeamConfig`].
+/// @param[in] client the Aranya Client
+/// @param[in] cfg the Team Configuration
 ///
 /// @relates AranyaClient.
 pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
@@ -1627,8 +1616,8 @@ pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> 
 
 /// Remove a team from local device storage.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
 ///
 /// @relates AranyaClient.
 pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
@@ -1638,8 +1627,8 @@ pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 
 /// Close the team and stop all operations on the graph.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
 ///
 /// @relates AranyaClient.
 pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
@@ -1653,8 +1642,8 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
 /// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param[in] keybundle_len is the length of the serialized keybundle.
 /// @param[in] role_id (optional) the ID of the role to assign to the device.
@@ -1681,9 +1670,9 @@ pub unsafe fn add_device_to_team(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
 ///
 /// @relates AranyaClient.
 pub fn remove_device_from_team(
@@ -1703,9 +1692,9 @@ pub fn remove_device_from_team(
 /// will appear in the tracing logs and
 /// Aranya will be unable to sync state with that peer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] addr the peer's Aranya network address [`Addr`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] addr the peer's Aranya network address
 /// @param[in] config configuration values for syncing with a peer.
 ///
 /// @relates AranyaClient.
@@ -1728,9 +1717,9 @@ pub unsafe fn add_sync_peer(
 
 /// Remove the peer from automatic Aranya state syncing.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] addr the peer's Aranya network address [`Addr`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] addr the peer's Aranya network address
 ///
 /// @relates AranyaClient.
 pub unsafe fn remove_sync_peer(
@@ -1756,9 +1745,9 @@ pub unsafe fn remove_sync_peer(
 /// This function ignores [`sync_peer_config_builder_set_interval`] and
 /// [`sync_peer_config_builder_set_sync_later`], if set.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] addr the peer's Aranya network address [`Addr`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] addr the peer's Aranya network address
 /// @param[in] config configuration values for syncing with a peer.
 ///
 /// Default values for a sync config will be used if `config` is `NULL`
@@ -1783,10 +1772,10 @@ pub unsafe fn sync_now(
 
 /// Query devices on team.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[out] devices returns a list of device IDs on the team [`DeviceId`].
-/// @param[in,out] devices_len returns the length of the devices list [`DeviceId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[out] devices returns a list of device IDs on the team
+/// @param[in,out] devices_len returns the length of the devices list
 ///
 /// @relates AranyaClient.
 pub unsafe fn team_devices(
@@ -1813,9 +1802,9 @@ pub unsafe fn team_devices(
 
 /// Returns the role assigned to the device, if any.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[out] device the ID of the device [`DeviceId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[out] device the ID of the device
 /// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
 /// if a role was not assigned to the device. [`Role`].
 /// @param[out] has_role whether a role is assigned to the device.
@@ -1848,9 +1837,9 @@ pub fn team_device_role(
 
 /// Query device's keybundle.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
 /// @param[out] keybundle keybundle byte buffer `KeyBundle`.
 /// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
@@ -1880,11 +1869,11 @@ pub unsafe fn team_device_keybundle(
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
-/// @param[out] labels returns a list of labels assigned to the device [`LabelId`].
-/// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
+/// @param[out] labels returns a list of labels assigned to the device
+/// @param[in,out] labels_len returns the length of the labels list
 ///
 /// @relates AranyaClient.
 pub unsafe fn team_device_label_assignments(
@@ -1920,10 +1909,10 @@ pub unsafe fn team_device_label_assignments(
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[out] labels returns a list of labels [`LabelId`].
-/// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[out] labels returns a list of labels
+/// @param[in,out] labels_len returns the length of the labels list
 ///
 /// @relates AranyaClient.
 pub unsafe fn team_labels(
@@ -1950,10 +1939,10 @@ pub unsafe fn team_labels(
 
 /// Query if a label exists.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] device the device's ID [`DeviceId`].
-/// @param[in] label the label [`LabelId`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
+/// @param[in] label the label
 /// @param[out] __output boolean indicating whether the label exists.
 ///
 /// @relates AranyaClient.
@@ -1972,7 +1961,7 @@ pub unsafe fn team_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
@@ -2020,16 +2009,16 @@ const _: () = {
 /// Both the current node and its peer should have permission to use the label
 /// and have appropriate channel permissions.
 ///
-/// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  team_id the team's identifier [`TeamId`].
-/// @param[in]  peer_id the peer's identifier [`DeviceId`].
-/// @param[in]  label_id the label identifier [`LabelId`] to create the channel with.
-/// @param[out] channel the AFC channel object [`AfcSendChannel`].
-/// @param[out] control the AFC control message [`AfcCtrlMsg`]
+/// @param[in]  client the Aranya Client
+/// @param[in]  team_id the team's identifier
+/// @param[in]  peer_id the peer's identifier
+/// @param[in]  label_id the label identifier  to create the channel with.
+/// @param[out] channel the AFC channel object
+/// @param[out] control the AFC control message
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn afc_create_uni_send_channel(
+pub fn afc_create_channel(
     client: &Client,
     team_id: &TeamId,
     peer_id: &DeviceId,
@@ -2037,47 +2026,48 @@ pub fn afc_create_uni_send_channel(
     channel: &mut MaybeUninit<AfcSendChannel>,
     control: &mut MaybeUninit<AfcCtrlMsg>,
 ) -> Result<(), imp::Error> {
-    let (chan, ctrl) = client
-        .rt
-        .block_on(client.inner.afc().create_uni_send_channel(
-            team_id.into(),
-            peer_id.into(),
-            label_id.into(),
-        ))?;
+    let (chan, ctrl) = client.rt.block_on(client.inner.afc().create_channel(
+        team_id.into(),
+        peer_id.into(),
+        label_id.into(),
+    ))?;
 
     AfcSendChannel::init(channel, chan);
     AfcCtrlMsg::init(control, ctrl);
     Ok(())
 }
 
-/// Use an ephemeral command to create an AFC channel between this device and a peer.
+/// Accept a receive-only AFC channel from by a peer by processing a control message.
 ///
-/// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  team_id the team's identifier [`TeamId`].
+/// @param[in]  client the Aranya Client
+/// @param[in]  team_id the team's identifier
 /// @param[in]  control the AFC control message.
-/// @param[out] channel the AFC channel object [`AfcReceiveChannel`].
-/// @param[out] __output the corresponding AFC channel type [`AfcChannelType`].
+/// @param[out] channel the AFC channel object
+/// @param[out] __output the corresponding AFC channel type
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn afc_recv_ctrl(
+pub fn afc_accept_channel(
     client: &Client,
     team_id: &TeamId,
     control: &[u8],
     channel: &mut MaybeUninit<AfcReceiveChannel>,
 ) -> Result<(), imp::Error> {
     let ctrl = Vec::from(control).into_boxed_slice();
-    let chan = client
-        .rt
-        .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl.into()))?;
+    let chan = client.rt.block_on(
+        client
+            .inner
+            .afc()
+            .accept_channel(team_id.into(), ctrl.into()),
+    )?;
     AfcReceiveChannel::init(channel, chan);
     Ok(())
 }
 
 /// Returns the [`LabelId`] for the associated [`AfcSendChannel`].
 ///
-/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
-/// @param[out] __output the corresponding label ID [`LabelId`].
+/// @param[in]  channel the AFC channel object
+/// @param[out] __output the corresponding label ID
 #[cfg(feature = "afc")]
 pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
     channel.label_id().into()
@@ -2085,8 +2075,8 @@ pub fn afc_send_channel_get_label_id(channel: &AfcSendChannel) -> LabelId {
 
 /// Returns the [`AfcChannelId`] for the associated [`AfcSendChannel`].
 ///
-/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
-/// @param[out] __output the corresponding channel ID [`AfcChannelId`].
+/// @param[in]  channel the AFC channel object
+/// @param[out] __output the corresponding channel ID
 #[cfg(feature = "afc")]
 pub fn afc_send_channel_get_id(channel: &AfcSendChannel) -> AfcChannelId {
     channel.id().into()
@@ -2103,8 +2093,8 @@ pub fn afc_send_channel_get_peer_id(channel: &AfcSendChannel) -> DeviceId {
 
 /// Returns the [`LabelId`] for the associated [`AfcReceiveChannel`].
 ///
-/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
-/// @param[out] __output the corresponding label ID [`LabelId`].
+/// @param[in]  channel the AFC channel object
+/// @param[out] __output the corresponding label ID
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId {
     channel.label_id().into()
@@ -2112,8 +2102,8 @@ pub fn afc_receive_channel_get_label_id(channel: &AfcReceiveChannel) -> LabelId 
 
 /// Returns the [`AfcChannelId`] for the associated [`AfcReceiveChannel`].
 ///
-/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
-/// @param[out] __output the corresponding channel ID [`AfcChannelId`].
+/// @param[in]  channel the AFC channel object
+/// @param[out] __output the corresponding channel ID
 #[cfg(feature = "afc")]
 pub fn afc_receive_channel_get_id(channel: &AfcReceiveChannel) -> AfcChannelId {
     channel.id().into()
@@ -2161,12 +2151,12 @@ pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
 /// Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
 /// or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
 ///
-/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
+/// @param[in]  channel the AFC channel object
 /// @param[in]  plaintext the message being encrypted.
 /// @param[out] dst the output buffer the ciphertext is written to.
 #[cfg(feature = "afc")]
 pub unsafe fn afc_channel_seal(
-    channel: &AfcSendChannel,
+    channel: &mut AfcSendChannel,
     plaintext: &[u8],
     dst: *mut u8,
     dst_len: &mut usize,
@@ -2194,7 +2184,7 @@ pub unsafe fn afc_channel_seal(
 /// Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
 /// or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
 ///
-/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
+/// @param[in]  channel the AFC channel object
 /// @param[in]  ciphertext the message being decrypted.
 /// @param[out] dst the output buffer the message is written to.
 /// @param[out] seq the sequence number for the opened message, for reordering.
@@ -2232,8 +2222,8 @@ pub unsafe fn afc_channel_open(
 /// Note that this function takes ownership of the [`AfcSendChannel`] and invalidates
 /// any further use (i.e. calling seal).
 ///
-/// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  channel the AFC channel object [`AfcSendChannel`].
+/// @param[in]  client the Aranya Client
+/// @param[in]  channel the AFC channel object
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
@@ -2252,8 +2242,8 @@ pub fn afc_send_channel_delete(
 /// Note that this function takes ownership of the [`AfcReceiveChannel`] and invalidates
 /// any further use (i.e. calling seal).
 ///
-/// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  channel the AFC channel object [`AfcReceiveChannel`].
+/// @param[in]  client the Aranya Client
+/// @param[in]  channel the AFC channel object
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]

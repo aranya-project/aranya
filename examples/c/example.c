@@ -384,11 +384,29 @@ AranyaError init_team(Team* t) {
     // real world scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
+    // Get list of existing roles
+    size_t team_roles_len = 1;
+    AranyaRole team_roles[team_roles_len];
+
+    err = aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+    if (team_roles_len != 1) {
+        fprintf(stderr, "There should only be 1 role after creating a team but there are %zu roles.\n", team_roles_len);
+        return err;
+    }
+
+    // Get the ID of the owner role.
+    AranyaRole owner_role = team_roles[0];
+    AranyaRoleId owner_role_id;
+    aranya_role_get_id(&owner_role, &owner_role_id);
+       
     size_t default_roles_len = DEFAULT_ROLES_LEN;
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.
-    err = aranya_setup_default_roles(&owner->client, &t->id, default_roles,
+    err = aranya_setup_default_roles(&owner->client, &t->id, &owner_role_id, default_roles,
                                      &default_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
@@ -847,9 +865,9 @@ AranyaError run_afc_example(Team* t) {
     printf("membera: Creating an afc send channel\n");
     AranyaAfcSendChannel afc_send_channel;
     AranyaAfcCtrlMsg recv_message;
-    err = aranya_afc_create_uni_send_channel(&membera->client, &t->id,
-                                             &memberb->id, &label_id,
-                                             &afc_send_channel, &recv_message);
+    err =
+        aranya_afc_create_channel(&membera->client, &t->id, &memberb->id,
+                                  &label_id, &afc_send_channel, &recv_message);
     EXPECT("error creating a uni send channel for membera", err);
 
     AranyaAfcChannelId send_id;
@@ -877,8 +895,8 @@ AranyaError run_afc_example(Team* t) {
     // Member B here will get a uni receive channel.
     printf("memberb: Receiving ctrl message for afc recv channel\n");
     AranyaAfcReceiveChannel afc_recv_channel;
-    err = aranya_afc_recv_ctrl(&memberb->client, &t->id, bytes_ptr, bytes_len,
-                               &afc_recv_channel);
+    err = aranya_afc_accept_channel(&memberb->client, &t->id, bytes_ptr,
+                                    bytes_len, &afc_recv_channel);
     EXPECT("error creating a channel from control message", err);
 
     printf("membera: Getting afc receive channel id\n");

@@ -37,6 +37,7 @@ aranya-util = { workspace = true }
 anyhow = { workspace = true }
 aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
+derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -10,8 +10,9 @@ use aranya_daemon_api::{AfcChannelId, AfcLocalChannelId, AfcShmInfo, DaemonApiCl
 use aranya_fast_channels::{
     self as afc,
     shm::{Flag, Mode, ReadState},
-    Client as AfcClient,
+    AfcState, Client as AfcClient,
 };
+use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tracing::debug;
@@ -148,7 +149,7 @@ impl Channels {
     ///
     /// The creator of the channel will have a unidirectional channel [`SendChannel`] that can only `seal()` data.
     ///
-    /// Once the peer processes the [`CtrlMsg`] message with `recv_ctrl()`,
+    /// Once the peer processes the [`CtrlMsg`] message with `accept_channel()`,
     /// it will have a corresponding unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
     ///
     /// To send data from the creator of the channel to the peer:
@@ -159,7 +160,11 @@ impl Channels {
     /// Returns:
     /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
     /// - A [`CtrlMsg`] message to send to the peer.
-    pub async fn create_uni_send_channel(
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub async fn create_channel(
         &self,
         team_id: TeamId,
         peer_id: DeviceId,
@@ -167,7 +172,7 @@ impl Channels {
     ) -> Result<(SendChannel, CtrlMsg)> {
         let info = self
             .daemon
-            .create_afc_uni_send_channel(
+            .create_afc_channel(
                 context::current(),
                 team_id.into_api(),
                 peer_id.into_api(),
@@ -176,6 +181,14 @@ impl Channels {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
+        let seal_ctx = self
+            .keys
+            .lock()
+            .expect("poisoned")
+            .0
+            .setup_seal_ctx(info.local_channel_id)
+            .map_err(AfcSealError)
+            .map_err(Error::Seal)?;
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
@@ -185,15 +198,16 @@ impl Channels {
             local_channel_id: info.local_channel_id,
             label_id,
             peer_id,
+            seal_ctx: Box::new(seal_ctx),
         };
         Ok((chan, CtrlMsg(info.ctrl)))
     }
 
     /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
+    pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let info = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id.into_api(), ctrl.0)
+            .accept_afc_channel(context::current(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -211,7 +225,7 @@ impl Channels {
 }
 
 /// A unidirectional channel that can only send.
-#[derive(Clone, Debug)]
+#[derive_where(Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
@@ -219,6 +233,8 @@ pub struct SendChannel {
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
     peer_id: DeviceId,
+    #[derive_where(skip(Debug))]
+    seal_ctx: Box<<ReadState<CS> as AfcState>::SealCtx>,
 }
 
 impl SendChannel {
@@ -248,13 +264,13 @@ impl SendChannel {
     /// # Panics
     ///
     /// Will panic on poisoned internal mutexes.
-    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+    pub fn seal(&mut self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
             .expect("poisoned")
             .0
-            .seal(self.local_channel_id, dst, plaintext)
+            .seal(&mut self.seal_ctx, dst, plaintext)
             .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())
