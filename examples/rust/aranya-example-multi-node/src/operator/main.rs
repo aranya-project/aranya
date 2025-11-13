@@ -83,9 +83,7 @@ async fn main() -> Result<()> {
     info!("operator: sent device info to owner");
 
     // Setup sync peers.
-    let sync_cfg = SyncPeerConfig::builder()
-        .interval(SYNC_INTERVAL)
-        .build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
     info!("operator: adding admin sync peer");
     team.add_sync_peer(env.admin.sync_addr, sync_cfg.clone())
         .await?;

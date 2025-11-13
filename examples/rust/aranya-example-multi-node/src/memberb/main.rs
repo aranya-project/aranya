@@ -88,9 +88,7 @@ async fn main() -> Result<()> {
     info!("memberb: sent device info to owner");
 
     // Setup sync peers.
-    let sync_cfg = SyncPeerConfig::builder()
-        .interval(SYNC_INTERVAL)
-        .build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
     info!("memberb: adding operator sync peer");
     team.add_sync_peer(env.operator.sync_addr, sync_cfg.clone())
         .await
