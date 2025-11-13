@@ -266,8 +266,6 @@ impl TestCtx {
                     client_with_state_for_server,
                     &any_local_addr,
                     psk_store.clone(),
-                    #[cfg(feature = "preview")]
-                    hello_subscriptions.clone(),
                 )
                 .await?;
 
