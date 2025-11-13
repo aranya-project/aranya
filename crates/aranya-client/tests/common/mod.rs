@@ -224,7 +224,7 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // TODO: only compile when 'afc' feature is enabled

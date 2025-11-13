@@ -253,6 +253,7 @@ impl EffectHandler {
                 QueryRoleOwnersResult(_) => {}
                 QueryAfcChannelIsValidResult(_) => {}
                 RoleCreated(_) => {}
+                RoleDeleted(_) => {}
                 CheckValidAfcChannels(_) => {
                     #[cfg(feature = "afc")]
                     self.afc
@@ -678,6 +679,59 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn create_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role_name: Text,
+        owning_role: api::RoleId,
+    ) -> api::Result<api::Role> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(GraphId::transmute(team))
+            .create_role(role_name, RoleId::transmute(owning_role))
+            .await
+            .context("unable to create role")?;
+
+        if let Some(Effect::RoleCreated(e)) = find_effect!(&effects, Effect::RoleCreated(_)) {
+            Ok(api::Role {
+                id: api::RoleId::from_base(e.role_id),
+                name: e.name.clone(),
+                author_id: api::DeviceId::from_base(e.author_id),
+                default: e.default,
+            })
+        } else {
+            Err(anyhow!("wrong effect when creating role").into())
+        }
+    }
+
+    #[instrument(skip(self), err)]
+    async fn delete_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role_id: api::RoleId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(GraphId::transmute(team))
+            .delete_role(RoleId::transmute(role_id))
+            .await
+            .context("unable to delete role")?;
+
+        if let Some(Effect::RoleDeleted(e)) = find_effect!(&effects, Effect::RoleDeleted(_)) {
+            info!("Deleted role {role_id} ({})", e.name());
+            Ok(())
+        } else {
+            Err(anyhow!("wrong effect when creating role").into())
+        }
+    }
+
+    #[instrument(skip(self), err)]
     async fn assign_role(
         self,
         _: context::Context,
@@ -1066,6 +1120,38 @@ impl DaemonApi for Api {
     //
     // Role management
     //
+
+    #[instrument(skip(self), err)]
+    async fn add_perm_to_role(
+        self,
+        context: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        self.client
+            .actions(GraphId::transmute(team))
+            .add_perm_to_role(RoleId::transmute(role), perm)
+            .await
+            .context("unable to add permission to role")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn remove_perm_from_role(
+        self,
+        context: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        self.client
+            .actions(GraphId::transmute(team))
+            .remove_perm_from_role(RoleId::transmute(role), perm)
+            .await
+            .context("unable to add permission to role")?;
+        Ok(())
+    }
 
     #[instrument(skip(self), err)]
     async fn add_role_owner(

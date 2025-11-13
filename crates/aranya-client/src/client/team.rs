@@ -187,6 +187,67 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
+    /// Creates a new role.
+    ///
+    /// `owning_role` will be the initial owner of the new role.
+    ///
+    /// It returns the Role that was created.
+    #[instrument(skip(self))]
+    pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
+        let role = self
+            .client
+            .daemon
+            .create_role(
+                context::current(),
+                self.id,
+                role_name,
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(Role::from_api(role))
+    }
+
+    /// Deletes a role.
+    ///
+    /// The role must not be assigned to any devices, nor should it own
+    /// any other roles.
+    #[instrument(skip(self))]
+    pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_role(context::current(), self.id, role_id.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
+    /// Adds a permission to a role.
+    #[instrument(skip(self))]
+    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+        self.client
+            .daemon
+            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
+    /// Removes a permission from a role.
+    #[instrument(skip(self))]
+    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+        self.client
+            .daemon
+            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
     /// Adds `owning_role` as an owner of `role`.
     #[instrument(skip(self))]
     pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
