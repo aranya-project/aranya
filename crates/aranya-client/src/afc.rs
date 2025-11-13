@@ -185,7 +185,7 @@ impl Channels {
             .map_err(Error::Seal)?;
         let chan = SendChannel {
             daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
+            keys: Box::new(self.keys.clone()),
             channel_id: ChannelId {
                 __id: info.channel_id,
             },
@@ -207,7 +207,7 @@ impl Channels {
             .map_err(aranya_error)?;
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
+            keys: Box::new(self.keys.clone()),
             channel_id: ChannelId {
                 __id: info.channel_id,
             },
@@ -222,7 +222,7 @@ impl Channels {
 #[derive_where(Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
-    keys: ChannelKeys,
+    keys: Box<ChannelKeys>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
@@ -283,7 +283,7 @@ impl SendChannel {
 #[derive(Clone, Debug)]
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
-    keys: ChannelKeys,
+    keys: Box<ChannelKeys>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
