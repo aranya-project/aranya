@@ -148,7 +148,7 @@ impl Channels {
     ///
     /// The creator of the channel will have a unidirectional channel [`SendChannel`] that can only `seal()` data.
     ///
-    /// Once the peer processes the [`CtrlMsg`] message with `recv_ctrl()`,
+    /// Once the peer processes the [`CtrlMsg`] message with `accept_channel()`,
     /// it will have a corresponding unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
     ///
     /// To send data from the creator of the channel to the peer:
@@ -159,7 +159,7 @@ impl Channels {
     /// Returns:
     /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
     /// - A [`CtrlMsg`] message to send to the peer.
-    pub async fn create_uni_send_channel(
+    pub async fn create_channel(
         &self,
         team_id: TeamId,
         peer_id: DeviceId,
@@ -167,7 +167,7 @@ impl Channels {
     ) -> Result<(SendChannel, CtrlMsg)> {
         let info = self
             .daemon
-            .create_afc_uni_send_channel(
+            .create_afc_channel(
                 context::current(),
                 team_id.into_api(),
                 peer_id.into_api(),
@@ -190,10 +190,10 @@ impl Channels {
     }
 
     /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
+    pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let info = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id.into_api(), ctrl.0)
+            .accept_afc_channel(context::current(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

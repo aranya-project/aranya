@@ -1909,7 +1909,7 @@ const _: () = {
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn afc_create_uni_send_channel(
+pub fn afc_create_channel(
     client: &Client,
     team_id: &TeamId,
     peer_id: &DeviceId,
@@ -1917,20 +1917,18 @@ pub fn afc_create_uni_send_channel(
     channel: &mut MaybeUninit<AfcSendChannel>,
     control: &mut MaybeUninit<AfcCtrlMsg>,
 ) -> Result<(), imp::Error> {
-    let (chan, ctrl) = client
-        .rt
-        .block_on(client.inner.afc().create_uni_send_channel(
-            team_id.into(),
-            peer_id.into(),
-            label_id.into(),
-        ))?;
+    let (chan, ctrl) = client.rt.block_on(client.inner.afc().create_channel(
+        team_id.into(),
+        peer_id.into(),
+        label_id.into(),
+    ))?;
 
     AfcSendChannel::init(channel, chan);
     AfcCtrlMsg::init(control, ctrl);
     Ok(())
 }
 
-/// Use an ephemeral command to create an AFC channel between this device and a peer.
+/// Accept a receive-only AFC channel from by a peer by processing a control message.
 ///
 /// @param[in]  client the Aranya Client
 /// @param[in]  team_id the team's identifier
@@ -1940,16 +1938,19 @@ pub fn afc_create_uni_send_channel(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn afc_recv_ctrl(
+pub fn afc_accept_channel(
     client: &Client,
     team_id: &TeamId,
     control: &[u8],
     channel: &mut MaybeUninit<AfcReceiveChannel>,
 ) -> Result<(), imp::Error> {
     let ctrl = Vec::from(control).into_boxed_slice();
-    let chan = client
-        .rt
-        .block_on(client.inner.afc().recv_ctrl(team_id.into(), ctrl.into()))?;
+    let chan = client.rt.block_on(
+        client
+            .inner
+            .afc()
+            .accept_channel(team_id.into(), ctrl.into()),
+    )?;
     AfcReceiveChannel::init(channel, chan);
     Ok(())
 }

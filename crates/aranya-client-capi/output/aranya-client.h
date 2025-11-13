@@ -2687,12 +2687,12 @@ AranyaError aranya_afc_seq_cleanup(struct AranyaAfcSeq *ptr);
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client,
-                                               const struct AranyaTeamId *team_id,
-                                               const struct AranyaDeviceId *peer_id,
-                                               const struct AranyaLabelId *label_id,
-                                               struct AranyaAfcSendChannel *channel,
-                                               struct AranyaAfcCtrlMsg *control);
+AranyaError aranya_afc_create_channel(const struct AranyaClient *client,
+                                      const struct AranyaTeamId *team_id,
+                                      const struct AranyaDeviceId *peer_id,
+                                      const struct AranyaLabelId *label_id,
+                                      struct AranyaAfcSendChannel *channel,
+                                      struct AranyaAfcCtrlMsg *control);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
@@ -2715,18 +2715,18 @@ AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *client,
-                                                   const struct AranyaTeamId *team_id,
-                                                   const struct AranyaDeviceId *peer_id,
-                                                   const struct AranyaLabelId *label_id,
-                                                   struct AranyaAfcSendChannel *channel,
-                                                   struct AranyaAfcCtrlMsg *control,
-                                                   struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_create_channel_ext(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team_id,
+                                          const struct AranyaDeviceId *peer_id,
+                                          const struct AranyaLabelId *label_id,
+                                          struct AranyaAfcSendChannel *channel,
+                                          struct AranyaAfcCtrlMsg *control,
+                                          struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Use an ephemeral command to create an AFC channel between this device and a peer.
+ * Accept a receive-only AFC channel from by a peer by processing a control message.
  *
  * @param[in]  client the Aranya Client
  * @param[in]  team_id the team's identifier
@@ -2736,16 +2736,16 @@ AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *cl
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_recv_ctrl(const struct AranyaClient *client,
-                                 const struct AranyaTeamId *team_id,
-                                 const uint8_t *control,
-                                 size_t control_len,
-                                 struct AranyaAfcReceiveChannel *channel);
+AranyaError aranya_afc_accept_channel(const struct AranyaClient *client,
+                                      const struct AranyaTeamId *team_id,
+                                      const uint8_t *control,
+                                      size_t control_len,
+                                      struct AranyaAfcReceiveChannel *channel);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Use an ephemeral command to create an AFC channel between this device and a peer.
+ * Accept a receive-only AFC channel from by a peer by processing a control message.
  *
  * @param[in]  client the Aranya Client
  * @param[in]  team_id the team's identifier
@@ -2755,12 +2755,12 @@ AranyaError aranya_afc_recv_ctrl(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_recv_ctrl_ext(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team_id,
-                                     const uint8_t *control,
-                                     size_t control_len,
-                                     struct AranyaAfcReceiveChannel *channel,
-                                     struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_accept_channel_ext(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team_id,
+                                          const uint8_t *control,
+                                          size_t control_len,
+                                          struct AranyaAfcReceiveChannel *channel,
+                                          struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)

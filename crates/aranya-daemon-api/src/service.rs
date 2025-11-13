@@ -427,10 +427,10 @@ pub trait DaemonApi {
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn afc_shm_info() -> Result<AfcShmInfo>;
-    /// Create a unidirectional AFC send-only channel.
+    /// Create a send-only AFC channel.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn create_afc_uni_send_channel(
+    async fn create_afc_channel(
         team: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
@@ -439,8 +439,8 @@ pub trait DaemonApi {
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     async fn delete_afc_channel(chan: AfcLocalChannelId) -> Result<()>;
-    /// Receive AFC ctrl message.
+    /// Accept a receive-only AFC channel by processing a peer's ctrl message.
     #[cfg(feature = "afc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
-    async fn receive_afc_ctrl(team: TeamId, ctrl: AfcCtrl) -> Result<AfcReceiveChannelInfo>;
+    async fn accept_afc_channel(team: TeamId, ctrl: AfcCtrl) -> Result<AfcReceiveChannelInfo>;
 }
