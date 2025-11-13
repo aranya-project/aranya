@@ -236,6 +236,34 @@ typedef uint32_t AranyaError;
 #endif // __cplusplus
 
 /**
+ * Role management permission.
+ */
+enum AranyaRoleManagementPermission
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * Grants a managing role the ability to assign the target role
+     * to any device except itself.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE,
+    /**
+     * Grants a managing role the ability to revoke the target role
+     * from any device.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE,
+    /**
+     * Grants a managing role the ability to change the permissions
+     * assigned to the target role.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_CHANGE_ROLE_PERMS,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaRoleManagementPermission;
+#endif // __cplusplus
+
+/**
  * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
  * *
  * * Functions suffixed with `_ext` accept an extra
@@ -498,15 +526,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
  * A type to represent a span of time in nanoseconds.
  */
 typedef uint64_t AranyaDuration;
-
-/**
- * The name of a permission.
- *
- * E.g. "CanAssignRole"
- *
- * Refer to the "Role Management" section of the policy for an exhaustive list.
- */
-typedef const char *AranyaPermission;
 
 /**
  * A label name.
@@ -1621,7 +1640,7 @@ AranyaError aranya_assign_role_management_permission(const struct AranyaClient *
                                                      const struct AranyaTeamId *team,
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
-                                                     AranyaPermission perm);
+                                                     AranyaRoleManagementPermission perm);
 
 /**
  * Assigns a role management permission to a managing role.
@@ -1638,7 +1657,7 @@ AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClie
                                                          const struct AranyaTeamId *team,
                                                          const struct AranyaRoleId *role,
                                                          const struct AranyaRoleId *managing_role,
-                                                         AranyaPermission perm,
+                                                         AranyaRoleManagementPermission perm,
                                                          struct AranyaExtError *__ext_err);
 
 /**
@@ -1656,7 +1675,7 @@ AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *
                                                      const struct AranyaTeamId *team,
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
-                                                     AranyaPermission perm);
+                                                     AranyaRoleManagementPermission perm);
 
 /**
  * Revokes a role management permission from a managing role.
@@ -1673,7 +1692,7 @@ AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClie
                                                          const struct AranyaTeamId *team,
                                                          const struct AranyaRoleId *role,
                                                          const struct AranyaRoleId *managing_role,
-                                                         AranyaPermission perm,
+                                                         AranyaRoleManagementPermission perm,
                                                          struct AranyaExtError *__ext_err);
 
 /**

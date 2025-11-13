@@ -9,7 +9,8 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
+        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,
+        RoleManagementPermission, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -245,7 +246,7 @@ impl Team<'_> {
         &self,
         role: RoleId,
         managing_role: RoleId,
-        perm: Text,
+        perm: RoleManagementPermission,
     ) -> Result<()> {
         self.client
             .daemon
@@ -254,7 +255,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm,
+                perm.as_text(),
             )
             .await
             .map_err(IpcError::new)?
@@ -268,7 +269,7 @@ impl Team<'_> {
         &self,
         role: RoleId,
         managing_role: RoleId,
-        perm: Text,
+        perm: RoleManagementPermission,
     ) -> Result<()> {
         self.client
             .daemon
@@ -277,7 +278,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm,
+                perm.as_text(),
             )
             .await
             .map_err(IpcError::new)?

@@ -479,20 +479,28 @@ impl Addr {
     }
 }
 
-/// The name of a permission.
-///
-/// E.g. "CanAssignRole"
-///
-/// Refer to the "Role Management" section of the policy for an exhaustive list.
-#[repr(transparent)]
+/// Role management permission.
+#[repr(u8)]
 #[derive(Copy, Clone, Debug)]
-pub struct Permission(*const c_char);
+pub enum RoleManagementPermission {
+    /// Grants a managing role the ability to assign the target role
+    /// to any device except itself.
+    CanAssignRole,
+    /// Grants a managing role the ability to revoke the target role
+    /// from any device.
+    CanRevokeRole,
+    /// Grants a managing role the ability to change the permissions
+    /// assigned to the target role.
+    CanChangeRolePerms,
+}
 
-impl Permission {
-    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(Text::try_from(cstr)?)
+impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPermission {
+    fn from(perm: RoleManagementPermission) -> Self {
+        match perm {
+            RoleManagementPermission::CanAssignRole => Self::CanAssignRole,
+            RoleManagementPermission::CanRevokeRole => Self::CanRevokeRole,
+            RoleManagementPermission::CanChangeRolePerms => Self::CanChangeRolePerms,
+        }
     }
 }
 
@@ -1120,16 +1128,13 @@ pub fn assign_role_management_permission(
     team: &TeamId,
     role: &RoleId,
     managing_role: &RoleId,
-    perm: Permission,
+    perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role_management_permission(role.into(), managing_role.into(), perm),
+            .assign_role_management_permission(role.into(), managing_role.into(), perm.into()),
     )?;
 
     Ok(())
@@ -1149,16 +1154,13 @@ pub fn revoke_role_management_permission(
     team: &TeamId,
     role: &RoleId,
     managing_role: &RoleId,
-    perm: Permission,
+    perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role_management_permission(role.into(), managing_role.into(), perm),
+            .revoke_role_management_permission(role.into(), managing_role.into(), perm.into()),
     )?;
 
     Ok(())

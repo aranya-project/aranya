@@ -2,6 +2,7 @@
 
 mod device;
 mod label;
+mod perm;
 mod role;
 mod team;
 
@@ -30,6 +31,7 @@ use {
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},
     label::{ChanOp, Label, LabelId, Labels},
+    perm::RoleManagementPermission,
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };

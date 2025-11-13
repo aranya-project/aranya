@@ -15,7 +15,7 @@ use std::ptr;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{ChanOp, RoleId},
+    client::{ChanOp, RoleId, RoleManagementPermission},
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
@@ -1085,7 +1085,7 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
         .assign_role_management_permission(
             roles.member().id,
             roles.operator().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
     {
@@ -1115,7 +1115,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
         .assign_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
         .context("Failed to assign role management permission")?;
@@ -1147,7 +1147,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
         .revoke_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
         .context("Failed to revoke role management permission")?;
@@ -1186,7 +1186,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
         .assign_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
         .context("Failed to assign role management permission")?;
@@ -1227,7 +1227,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
         .assign_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanRevokeRole"),
+            RoleManagementPermission::CanRevokeRole,
         )
         .await
         .expect_err("expected owner role management to fail after owner role was removed");
