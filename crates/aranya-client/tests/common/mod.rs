@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -12,7 +12,6 @@ use aranya_daemon::{
     Daemon, DaemonHandle,
 };
 use aranya_daemon_api::SEED_IKM_SIZE;
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -175,9 +174,7 @@ impl DevicesCtx {
 
     #[instrument(skip(self))]
     pub async fn add_all_sync_peers(&self, team_id: TeamId) -> Result<()> {
-        let config = SyncPeerConfig::builder()
-            .interval(Some(SYNC_INTERVAL))
-            .build()?;
+        let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         for device in self.devices() {
             for peer in self.devices() {
                 if ptr::eq(device, peer) {

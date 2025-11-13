@@ -426,7 +426,6 @@ version = "3.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
- "aranya-util",
  "backon",
  "rustix 1.1.2",
  "tempfile",
@@ -442,7 +441,6 @@ dependencies = [
  "age",
  "anyhow",
  "aranya-client",
- "aranya-util",
  "backon",
  "clap",
  "postcard",
@@ -585,7 +583,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
- "aranya-util",
  "backon",
  "http",
  "libc",

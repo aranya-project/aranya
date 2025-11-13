@@ -936,7 +936,7 @@ pub fn sync_peer_config_builder_set_interval(
         );
     }
 
-    cfg.interval(Some(interval));
+    cfg.interval(interval);
     Ok(())
 }
 

@@ -128,8 +128,8 @@ impl DaemonApiServer {
             afc: afc.clone(),
             #[cfg(feature = "afc")]
             device_id: pk.ident_pk.id()?,
-            client: Some(client.clone()),
-            peers: Some(peers.clone()),
+            client: client.clone(),
+            peers: peers.clone(),
             prev_head_addresses: Arc::default(),
         };
         let api = Api(Arc::new(ApiInner {
@@ -215,8 +215,8 @@ struct EffectHandler {
     afc: Arc<Afc<CE, CS, KS>>,
     #[cfg(feature = "afc")]
     device_id: DeviceId,
-    client: Option<Client>,
-    peers: Option<SyncPeers>,
+    client: Client,
+    peers: SyncPeers,
     /// Stores the previous head address for each graph to detect changes
     prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
 }
@@ -308,7 +308,7 @@ impl EffectHandler {
 
     /// Gets the current graph head address using the proper Location->Segment->Command->Address flow.
     async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
-        let client = self.client.as_ref()?;
+        let client = &self.client;
 
         let mut aranya = client.aranya.lock().await;
         let storage = aranya.provider().get_storage(graph_id).ok()?;
@@ -317,28 +317,20 @@ impl EffectHandler {
     }
 
     /// Broadcasts hello notifications to subscribers when the graph changes.
-    #[instrument(skip(self), err, fields(has_peers = self.peers.is_some()))]
+    #[instrument(skip(self), err)]
     async fn broadcast_hello_notifications(
         &self,
         graph_id: GraphId,
         head: Address,
     ) -> anyhow::Result<()> {
-        if let Some(peers) = &self.peers {
-            if let Err(e) = peers.broadcast_hello(graph_id, head).await {
-                debug!(
-                    error = %e,
-                    ?graph_id,
-                    ?head,
-                    "peers.broadcast_hello failed"
-                );
-                return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
-            }
-        } else {
+        if let Err(e) = self.peers.broadcast_hello(graph_id, head).await {
             debug!(
+                error = %e,
                 ?graph_id,
                 ?head,
-                "No peers interface available for hello broadcasting"
+                "peers.broadcast_hello failed"
             );
+            return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
         }
         Ok(())
     }

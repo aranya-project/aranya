@@ -1,10 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    io,
-    net::{Ipv4Addr, SocketAddr},
-    path::Path,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -141,7 +135,7 @@ impl Daemon {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
             let qs_client_addr = match qs_config.client_addr {
-                None => Addr::from((Ipv4Addr::UNSPECIFIED, 0)),
+                None => Addr::new(qs_config.addr.host(), 0)?,
                 Some(v) => v,
             };
 

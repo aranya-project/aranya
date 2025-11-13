@@ -73,8 +73,11 @@ pub struct SyncPeerConfig {
 
 impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
-        Self::builder()
-            .interval(value.interval.map(|d| d.into()))
+        let mut builder = Self::builder();
+        if let Some(interval) = value.interval {
+            builder = builder.interval(interval.into());
+        }
+        builder
             .sync_now(value.sync_now)
             .sync_on_hello(value.sync_on_hello)
             .build()
@@ -98,8 +101,8 @@ pub struct SyncPeerConfigBuilder {
 
 impl SyncPeerConfigBuilder {
     /// Set the interval at which syncing occurs
-    pub fn interval(&mut self, duration: Option<Duration>) {
-        self.interval = duration;
+    pub fn interval(&mut self, duration: Duration) {
+        self.interval = Some(duration);
     }
 
     /// Configures whether the peer will be immediately synced with after being added.

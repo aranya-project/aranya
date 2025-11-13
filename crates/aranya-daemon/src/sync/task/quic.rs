@@ -759,18 +759,18 @@ where
             let cache = caches.entry(key).or_default();
 
             resp.poll(&mut buf, aranya.provider(), cache)
-                        .or_else(|err| {
-                            if matches!(
-                                err,
-                                aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
-                            ) {
-                                warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
-                                Ok(0)
-                            } else {
-                                Err(err)
-                            }
-                        })
-                        .context("sync resp poll failed")?
+                .or_else(|err| {
+                    if matches!(
+                        err,
+                        aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                    ) {
+                        warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
+                        Ok(0)
+                    } else {
+                        Err(err)
+                    }
+                })
+                .context("sync resp poll failed")?
         };
         trace!(len = len, "sync poll finished");
         buf.truncate(len);

@@ -80,8 +80,8 @@ impl SyncPeerConfigBuilder {
     /// The interval must be less than 1 year to prevent overflow when calculating deadlines.
     ///
     /// By default, the interval is not set (None), which means the peer will not be periodically synced.
-    pub fn interval(mut self, duration: Option<Duration>) -> Self {
-        self.interval = duration;
+    pub fn interval(mut self, duration: Duration) -> Self {
+        self.interval = Some(duration);
         self
     }
 

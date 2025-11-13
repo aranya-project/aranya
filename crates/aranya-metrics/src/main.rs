@@ -9,10 +9,9 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    afc, text, AddTeamConfig, AddTeamQuicSyncConfig, ChanOp, Client, CreateTeamConfig,
+    afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
     CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
 };
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::{

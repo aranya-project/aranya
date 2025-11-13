@@ -24,7 +24,6 @@ tcp = ["dep:metrics-exporter-tcp"]
 
 [dependencies]
 aranya-client = { workspace = true }
-aranya-util = { workspace = true }
 
 # Required Dependencies
 anyhow = { workspace = true }

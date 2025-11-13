@@ -2,7 +2,7 @@
 //! It is the user's responsibility to send data in the order each application expects.
 
 use anyhow::{Context, Result};
-use aranya_util::Addr;
+use aranya_client::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tokio::{
     io::{AsyncReadExt as _, AsyncWriteExt as _},

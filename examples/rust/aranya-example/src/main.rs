@@ -8,10 +8,9 @@ use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{
@@ -188,7 +187,7 @@ async fn main() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder()
-        .interval(Some(sync_interval))
+        .interval(sync_interval)
         .sync_on_hello(true)
         .build()?;
 

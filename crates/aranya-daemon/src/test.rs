@@ -273,7 +273,7 @@ impl TestCtx {
                 send_effects,
                 InvalidGraphs::default(),
                 psk_store.clone(),
-                (local_addr.into(), Addr::from((Ipv4Addr::UNSPECIFIED, 0))),
+                (local_addr.into(), any_local_addr),
                 syncer_recv,
                 conn_map,
             )?;

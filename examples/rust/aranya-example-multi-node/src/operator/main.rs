@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
 
     // Setup sync peers.
     let sync_cfg = SyncPeerConfig::builder()
-        .interval(Some(SYNC_INTERVAL))
+        .interval(SYNC_INTERVAL)
         .build()?;
     info!("operator: adding admin sync peer");
     team.add_sync_peer(env.admin.sync_addr, sync_cfg.clone())
