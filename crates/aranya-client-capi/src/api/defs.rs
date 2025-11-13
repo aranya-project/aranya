@@ -1296,7 +1296,7 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role the [`RoleId`] the permission is being added to.
-/// @param[in] perm A [`Permission`] to add to the role.
+/// @param[in] perm a [`Permission`] to add to the role.
 pub fn add_perm_to_role(
     client: &Client,
     team: &TeamId,
