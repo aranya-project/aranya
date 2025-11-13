@@ -380,7 +380,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("creating afc send channel");
     let membera_afc = ctx.membera.client.afc();
     let (send, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, ctx.memberb.id, label3)
+        .create_channel(team_id, ctx.memberb.id, label3)
         .await
         .expect("expected to create afc send channel");
     info!("created afc channel: {}", send.id());
@@ -389,7 +389,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("receiving afc recv channel");
     let memberb_afc = ctx.memberb.client.afc();
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .expect("expected to receive afc channel");
     info!("received afc channel: {}", recv.id());

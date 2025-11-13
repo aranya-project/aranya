@@ -865,9 +865,9 @@ AranyaError run_afc_example(Team* t) {
     printf("membera: Creating an afc send channel\n");
     AranyaAfcSendChannel afc_send_channel;
     AranyaAfcCtrlMsg recv_message;
-    err = aranya_afc_create_uni_send_channel(&membera->client, &t->id,
-                                             &memberb->id, &label_id,
-                                             &afc_send_channel, &recv_message);
+    err =
+        aranya_afc_create_channel(&membera->client, &t->id, &memberb->id,
+                                  &label_id, &afc_send_channel, &recv_message);
     EXPECT("error creating a uni send channel for membera", err);
 
     AranyaAfcChannelId send_id;
@@ -895,8 +895,8 @@ AranyaError run_afc_example(Team* t) {
     // Member B here will get a uni receive channel.
     printf("memberb: Receiving ctrl message for afc recv channel\n");
     AranyaAfcReceiveChannel afc_recv_channel;
-    err = aranya_afc_recv_ctrl(&memberb->client, &t->id, bytes_ptr, bytes_len,
-                               &afc_recv_channel);
+    err = aranya_afc_accept_channel(&memberb->client, &t->id, bytes_ptr,
+                                    bytes_len, &afc_recv_channel);
     EXPECT("error creating a channel from control message", err);
 
     printf("membera: Getting afc receive channel id\n");
