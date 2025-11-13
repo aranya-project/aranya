@@ -426,7 +426,6 @@ version = "3.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
- "aranya-daemon-api",
  "aranya-util",
  "backon",
  "rustix 1.1.2",
