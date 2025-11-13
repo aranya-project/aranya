@@ -1324,7 +1324,7 @@ pub fn add_perm_to_role(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] role the [`RoleId`] the permission is being removed from.
-/// @param[in] perm A [`Permission`] to remove from the role.
+/// @param[in] perm a [`Permission`] to remove from the role.
 pub fn remove_perm_from_role(
     client: &Client,
     team: &TeamId,
