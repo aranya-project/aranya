@@ -351,8 +351,6 @@ impl Daemon {
             client_with_state_for_server,
             &server_addr,
             Arc::clone(&psk_store),
-            #[cfg(feature = "preview")]
-            hello_subscriptions,
         )
         .await
         .context("unable to initialize QUIC sync server")?;

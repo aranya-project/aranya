@@ -497,7 +497,6 @@ where
         client: ClientWithState<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-        #[cfg(feature = "preview")] _hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> SyncResult<(
         Self,
         SyncPeers,
