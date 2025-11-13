@@ -1317,7 +1317,7 @@ pub fn add_perm_to_role(
 
 /// Remove a permission from a role.
 ///
-/// It is an error to remove a permission not assigned to the role.
+/// It is an error to remove a permission not added to the role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
