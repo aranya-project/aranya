@@ -357,6 +357,10 @@ pub trait DaemonApi {
     ///
     /// It returns the default roles that were created.
     async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
+    /// Creates a new role.
+    async fn create_role(team: TeamId, role_name: Text, owning_role: RoleId) -> Result<Role>;
+    /// Deletes a role.
+    async fn delete_role(team: TeamId, role_id: RoleId) -> Result<()>;
     /// Returns the current team roles.
     async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
 
@@ -364,6 +368,10 @@ pub trait DaemonApi {
     // Role management
     //
 
+    /// Adds a permission to a role.
+    async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Text) -> Result<()>;
+    /// Removes a permission from a role.
+    async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Text) -> Result<()>;
     /// Adds an owning role to the target role.
     async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Removes an owning role from the target role.

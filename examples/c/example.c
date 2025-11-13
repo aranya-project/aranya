@@ -1170,6 +1170,33 @@ AranyaError run_custom_roles_example(Team* t) {
     printf("the 'member' role has %zu owning roles now.\n",
            member_owning_roles_len);
 
+    // Create a custom role.
+    AranyaRole buddy_role;
+    err = aranya_create_role(&owner->client, &t->id, "buddy", &owner_role_id,
+                             &buddy_role);
+    EXPECT("unable to create role", err);
+    AranyaRoleId buddy_role_id;
+    err = aranya_role_get_id(&buddy_role, &buddy_role_id);
+    EXPECT("unable to get role id", err);
+    printf("Role 'buddy' created\n");
+
+    // Add `CanUseAfc` permission to the custom role.
+    err = aranya_add_perm_to_role(&owner->client, &t->id, &buddy_role_id,
+                                  "CanUseAfc");
+    EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
+    printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
+
+    // Remove `CanUseAfc` permission from the custom role.
+    err = aranya_remove_perm_from_role(&owner->client, &t->id, &buddy_role_id,
+                                       "CanUseAfc");
+    EXPECT("unable to remove 'CanUseAfc' permission from 'buddy' role", err);
+    printf("Removed 'CanUseAfc' permission from 'buddy' role\n");
+
+    // Delete the custom role.
+    err = aranya_delete_role(&owner->client, &t->id, &buddy_role_id);
+    EXPECT("unable to remove 'buddy' role", err);
+    printf("Removed 'buddy' role\n");
+
 exit:
     free(member_owning_roles);
     if (err == ARANYA_ERROR_SUCCESS) {

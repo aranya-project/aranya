@@ -465,6 +465,21 @@ impl LabelName {
     }
 }
 
+/// A role name.
+///
+/// E.g. "owner"
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleName(*const c_char);
+
+impl RoleName {
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(Text::try_from(cstr)?)
+    }
+}
+
 /// A network socket address for an Aranya client.
 ///
 /// E.g. "localhost:8080", "127.0.0.1:8080"
@@ -1252,6 +1267,113 @@ pub unsafe fn team_roles(
     Ok(())
 }
 
+/// Create a role.
+///
+/// The `owning_role` is the initial owner of the new role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role_name the name of the new role
+/// @param[in] owning_role the role ID of the role that will own the new role
+/// @param[out] role_out the newly created role
+///
+/// @relates AranyaClient
+pub fn create_role(
+    client: &Client,
+    team: &TeamId,
+    role_name: RoleName,
+    owning_role: &RoleId,
+    role_out: &mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let role_name = unsafe { role_name.as_underlying() }?;
+    let role = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_role(role_name, owning_role.into()),
+    )?;
+    Role::init(role_out, role);
+    Ok(())
+}
+
+/// Delete a role.
+///
+/// The role must not be assigned to any devices, nor should it own any
+/// other roles.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the role to delete
+///
+/// @relates AranyaClient
+pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).delete_role(role.into()))?;
+    Ok(())
+}
+
+/// Add a permission to a role.
+///
+/// It is an error to add a permission already added to the role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID of the role the permission is being added to
+/// @param[in] perm a permission to add to the role
+pub fn add_perm_to_role(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_perm_to_role(role.into(), perm),
+    )?;
+    Ok(())
+}
+
+/// Remove a permission from a role.
+///
+/// It is an error to remove a permission not added to the role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID of the role the permission is being removed from
+/// @param[in] perm a permission to remove from the role
+pub fn remove_perm_from_role(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_perm_from_role(role.into(), perm),
+    )?;
+    Ok(())
+}
+
 /// Assign a role to a device.
 ///
 /// This will change the device's currently assigned role to the new role.
@@ -1315,8 +1437,7 @@ pub fn revoke_role(
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] name label name string
-/// @param[in] managing_role_id the ID of the role that manages this
-///        label [`RoleId`].
+/// @param[in] managing_role_id the ID of the role that manages this label
 ///
 /// @relates AranyaClient.
 pub fn create_label(
@@ -1772,8 +1893,8 @@ pub unsafe fn team_devices(
 /// @param[in] team the team's ID
 /// @param[out] device the ID of the device
 /// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
-/// if a role was not assigned to the device. [`Role`].
-/// @param[out] has_role whether a role is assigned to the device.
+/// if a role was not assigned to the device
+/// @param[out] has_role whether a role is assigned to the device
 ///
 /// @relates AranyaClient.
 pub fn team_device_role(
