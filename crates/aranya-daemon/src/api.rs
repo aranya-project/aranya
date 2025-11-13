@@ -790,14 +790,15 @@ impl DaemonApi for Api {
         role_name: Text,
         owning_role: api::RoleId,
     ) -> api::Result<api::Role> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .create_role(role_name, RoleId::transmute(owning_role))
             .await
             .context("unable to create role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleCreated(e)) = find_effect!(&effects, Effect::RoleCreated(_)) {
             Ok(api::Role {
@@ -818,14 +819,15 @@ impl DaemonApi for Api {
         team: api::TeamId,
         role_id: api::RoleId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .delete_role(RoleId::transmute(role_id))
             .await
             .context("unable to delete role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleDeleted(e)) = find_effect!(&effects, Effect::RoleDeleted(_)) {
             info!("Deleted role {role_id} ({})", e.name());
@@ -1267,11 +1269,16 @@ impl DaemonApi for Api {
         role: api::RoleId,
         perm: Text,
     ) -> api::Result<()> {
-        self.client
-            .actions(GraphId::transmute(team))
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
             .add_perm_to_role(RoleId::transmute(role), perm)
             .await
             .context("unable to add permission to role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 
@@ -1283,11 +1290,16 @@ impl DaemonApi for Api {
         role: api::RoleId,
         perm: Text,
     ) -> api::Result<()> {
-        self.client
-            .actions(GraphId::transmute(team))
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
             .remove_perm_from_role(RoleId::transmute(role), perm)
             .await
             .context("unable to add permission to role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 

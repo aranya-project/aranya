@@ -1393,7 +1393,7 @@ async fn test_create_role() -> Result<()> {
         .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
         .await?;
     let admin_team = devices.admin.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
     let test_role2 = admin_team
@@ -1414,7 +1414,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
 
     let team_id = devices.create_and_add_team().await?;
     let owner_team = devices.owner.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     let owner_role = owner_team
         .roles()
         .await?
@@ -1503,7 +1503,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 
     // Malicious device syncs with owner.
     let device_team = device.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     device_team.sync_now(owner_addr, None).await?;
 
     // Malicious device creates a new target role (which it maintains control of).
@@ -1533,7 +1533,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
 
     // Add admin with admin role
     owner_team
