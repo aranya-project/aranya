@@ -378,7 +378,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // membera creates AFC channel.
     info!("creating afc send channel");
     let membera_afc = ctx.membera.client.afc();
-    let (send, ctrl) = membera_afc
+    let (mut send, ctrl) = membera_afc
         .create_channel(team_id, ctx.memberb.id, label3)
         .await
         .expect("expected to create afc send channel");

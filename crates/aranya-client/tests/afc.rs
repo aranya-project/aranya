@@ -258,7 +258,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -335,7 +335,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -420,7 +420,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -524,7 +524,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -634,7 +634,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -747,7 +747,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -862,7 +862,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -1002,13 +1002,13 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create first channel.
-    let (chan1, ctrl1) = membera_afc
+    let (mut chan1, ctrl1) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id1)
         .await
         .context("unable to create afc uni channel")?;
 
     // Create second channel.
-    let (chan2, ctrl2) = memberb_afc
+    let (mut chan2, ctrl2) = memberb_afc
         .create_channel(team_id, devices.membera.id, label_id2)
         .await
         .context("unable to create afc uni channel")?;

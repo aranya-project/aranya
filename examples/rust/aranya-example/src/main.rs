@@ -415,7 +415,7 @@ async fn main() -> Result<()> {
     // membera creates AFC channel.
     info!("creating afc send channel");
     let membera_afc = membera.client.afc();
-    let (send, ctrl) = membera_afc
+    let (mut send, ctrl) = membera_afc
         .create_channel(team_id, memberb.id, label3)
         .await
         .expect("expected to create afc send channel");

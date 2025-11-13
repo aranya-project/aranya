@@ -1000,6 +1000,7 @@ pub fn sync_peer_config_builder_set_sync_on_hello(
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
+/// @param[in] owning_role the ID of the owning role
 /// @param[in] roles_out returns a list of roles that own `role`
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
@@ -1007,29 +1008,17 @@ pub fn sync_peer_config_builder_set_sync_on_hello(
 pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
+    owning_role: &RoleId,
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    // First get the owner role ID by looking at existing roles
-    let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
-
-    let owner_role = roles
-        .into_iter()
-        .find(|role| role.name == "owner" && role.default)
-        .ok_or_else(|| {
-            imp::Error::InvalidArg(InvalidArg::new(
-                "setup_default_roles",
-                "owner role not found",
-            ))
-        })?;
-
     let default_roles = client
         .rt
         .block_on(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles(owner_role.id),
+                .setup_default_roles(owning_role.into()),
         )?
         .__into_data();
 
@@ -1935,7 +1924,7 @@ pub unsafe fn team_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
@@ -2130,7 +2119,7 @@ pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
 /// @param[out] dst the output buffer the ciphertext is written to.
 #[cfg(feature = "afc")]
 pub unsafe fn afc_channel_seal(
-    channel: &AfcSendChannel,
+    channel: &mut AfcSendChannel,
     plaintext: &[u8],
     dst: *mut u8,
     dst_len: &mut usize,
