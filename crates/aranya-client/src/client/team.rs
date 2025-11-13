@@ -120,17 +120,6 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Removes `device` from the team.
-    #[instrument(skip(self))]
-    pub async fn remove_device(&self, device: DeviceId) -> Result<()> {
-        self.client
-            .daemon
-            .remove_device_from_team(context::current(), self.id, device.into_api())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Returns the [`Device`] corresponding with `id`.
     pub fn device(&self, id: DeviceId) -> Device<'_> {
         Device {
@@ -278,60 +267,6 @@ impl Team<'_> {
                 role.into_api(),
                 managing_role.into_api(),
                 perm,
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Assigns `role` to `device`.
-    #[instrument(skip(self))]
-    pub async fn assign_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .assign_role(
-                context::current(),
-                self.id,
-                device.into_api(),
-                role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Revokes `role` from `device`.
-    #[instrument(skip(self))]
-    pub async fn revoke_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .revoke_role(
-                context::current(),
-                self.id,
-                device.into_api(),
-                role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Changes the `role` on a `device`
-    #[instrument(skip(self))]
-    pub async fn change_role(
-        &self,
-        device: DeviceId,
-        old_role: RoleId,
-        new_role: RoleId,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .change_role(
-                context::current(),
-                self.id,
-                device.into_api(),
-                old_role.into_api(),
-                new_role.into_api(),
             )
             .await
             .map_err(IpcError::new)?

@@ -93,13 +93,15 @@ async fn test_sync_now() -> Result<()> {
 
     // Finally, let's give the admin its role, but don't sync with peers.
     owner
-        .assign_role(devices.admin.id, roles.admin().id)
+        .device(devices.admin.id)
+        .assign_role(roles.admin().id)
         .await
         .context("owner unable to assign admin role")?;
 
     // Now, we try to assign a role using the admin, which is expected to fail.
     match admin
-        .assign_role(devices.operator.id, roles.operator().id)
+        .device(devices.operator.id)
+        .assign_role(roles.operator().id)
         .await
     {
         Ok(_) => bail!("Expected role assignment to fail"),
@@ -115,7 +117,8 @@ async fn test_sync_now() -> Result<()> {
 
     // Now we should be able to successfully assign a role.
     admin
-        .assign_role(devices.operator.id, roles.operator().id)
+        .device(devices.operator.id)
+        .assign_role(roles.operator().id)
         .await
         .context("admin unable to assign role to operator")?;
 
@@ -281,7 +284,8 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Give the admin its role.
     owner
-        .assign_role(devices.admin.id, roles.admin().id)
+        .device(devices.admin.id)
+        .assign_role(roles.admin().id)
         .await?;
 
     // Admin sync with owner.
@@ -312,7 +316,8 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Revoke role.
     owner
-        .revoke_role(devices.admin.id, roles.admin().id)
+        .device(devices.admin.id)
+        .revoke_role(roles.admin().id)
         .await?;
 
     // Admin sync with owner.
@@ -356,7 +361,8 @@ async fn test_role_change() -> Result<()> {
 
     // Assign operator role to membera.
     owner
-        .change_role(devices.membera.id, roles.member().id, roles.operator().id)
+        .device(devices.membera.id)
+        .change_role(roles.member().id, roles.operator().id)
         .await
         .expect("expected to change role from member to operator");
 
@@ -424,7 +430,8 @@ async fn test_add_devices() -> Result<()> {
             .await
             .context("operator unable to sync with admin")?;
         operator
-            .assign_role(device_id, roles.member().id)
+            .device(device_id)
+            .assign_role(roles.member().id)
             .await
             .with_context(|| {
                 format!("operator should be able to assign member role to `{name}`")
@@ -498,20 +505,21 @@ async fn test_remove_devices() -> Result<()> {
 
     assert_eq!(owner.devices().await?.iter().count(), 5);
 
-    owner.remove_device(devices.membera.id).await?;
+    owner.device(devices.membera.id).remove_from_team().await?;
     assert_eq!(owner.devices().await?.iter().count(), 4);
 
-    owner.remove_device(devices.memberb.id).await?;
+    owner.device(devices.memberb.id).remove_from_team().await?;
     assert_eq!(owner.devices().await?.iter().count(), 3);
 
-    owner.remove_device(devices.operator.id).await?;
+    owner.device(devices.operator.id).remove_from_team().await?;
     assert_eq!(owner.devices().await?.iter().count(), 2);
 
-    owner.remove_device(devices.admin.id).await?;
+    owner.device(devices.admin.id).remove_from_team().await?;
     assert_eq!(owner.devices().await?.iter().count(), 1);
 
     owner
-        .remove_device(devices.owner.id)
+        .device(devices.owner.id)
+        .remove_from_team()
         .await
         .expect_err("owner should not be able to remove itself from team");
 
@@ -655,7 +663,8 @@ async fn test_add_team() -> Result<()> {
 
     // Give the admin its role.
     owner
-        .assign_role(devices.admin.id, roles.admin().id)
+        .device(devices.admin.id)
+        .assign_role(roles.admin().id)
         .await?;
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
@@ -671,7 +680,8 @@ async fn test_add_team() -> Result<()> {
 
         // Now, we try to assign a role using the admin, which is expected to fail.
         match admin
-            .assign_role(devices.operator.id, roles.operator().id)
+            .device(devices.operator.id)
+            .assign_role(roles.operator().id)
             .await
         {
             Ok(()) => bail!("Expected role assignment to fail"),
@@ -703,7 +713,8 @@ async fn test_add_team() -> Result<()> {
 
         // Now we should be able to successfully assign a role.
         admin
-            .assign_role(devices.operator.id, roles.operator().id)
+            .device(devices.operator.id)
+            .assign_role(roles.operator().id)
             .await
             .context("Assigning a role should not fail here!")?;
     }
@@ -739,7 +750,8 @@ async fn test_remove_team() -> Result<()> {
 
         // Give the admin its role.
         owner
-            .assign_role(devices.admin.id, roles.admin().id)
+            .device(devices.admin.id)
+            .assign_role(roles.admin().id)
             .await?;
 
         admin
@@ -748,7 +760,8 @@ async fn test_remove_team() -> Result<()> {
 
         // We should be able to successfully assign a role.
         admin
-            .assign_role(devices.operator.id, roles.operator().id)
+            .device(devices.operator.id)
+            .assign_role(roles.operator().id)
             .await?;
     }
 
@@ -760,7 +773,8 @@ async fn test_remove_team() -> Result<()> {
 
         // Role assignment should fail
         match admin
-            .assign_role(devices.operator.id, roles.member().id)
+            .device(devices.operator.id)
+            .assign_role(roles.member().id)
             .await
         {
             Ok(_) => bail!("Expected role assignment to fail"),
@@ -825,7 +839,8 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Give the admin its role.
     team1
-        .assign_role(devices.admin.id, roles1.admin().id)
+        .device(devices.admin.id)
+        .assign_role(roles1.admin().id)
         .await?;
 
     // Add the admin as a new device.
@@ -838,7 +853,8 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Give the admin its role.
     team2
-        .assign_role(devices.admin.id, roles2.admin().id)
+        .device(devices.admin.id)
+        .assign_role(roles2.admin().id)
         .await?;
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
@@ -854,7 +870,8 @@ async fn test_multi_team_sync() -> Result<()> {
 
         // Now, we try to assign a role using the admin, which is expected to fail.
         match admin
-            .assign_role(devices.operator.id, roles1.operator().id)
+            .device(devices.operator.id)
+            .assign_role(roles1.operator().id)
             .await
         {
             Ok(()) => bail!("Expected role assignment to fail"),
@@ -886,7 +903,8 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Now we should be able to successfully assign a role.
     admin1
-        .assign_role(devices.operator.id, roles1.operator().id)
+        .device(devices.operator.id)
+        .assign_role(roles1.operator().id)
         .await
         .context("Assigning a role should not fail here!")?;
 
@@ -903,7 +921,8 @@ async fn test_multi_team_sync() -> Result<()> {
 
         // Now, we try to assign a role using the admin, which is expected to fail.
         match admin
-            .assign_role(devices.operator.id, roles2.operator().id)
+            .device(devices.operator.id)
+            .assign_role(roles2.operator().id)
             .await
         {
             Ok(()) => bail!("Expected role assignment to fail"),
@@ -935,7 +954,8 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Now we should be able to successfully assign a role.
     admin2
-        .assign_role(devices.operator.id, roles2.operator().id)
+        .device(devices.operator.id)
+        .assign_role(roles2.operator().id)
         .await
         .context("Assigning a role should not fail here!")?;
 
@@ -993,7 +1013,8 @@ async fn test_assign_role_self_rejected() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
-        .assign_role(devices.owner.id, roles.owner().id)
+        .device(devices.owner.id)
+        .assign_role(roles.owner().id)
         .await
     {
         Ok(_) => bail!("expected assigning role to self to fail"),
@@ -1016,7 +1037,8 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
-        .revoke_role(devices.owner.id, roles.owner().id)
+        .device(devices.owner.id)
+        .revoke_role(roles.owner().id)
         .await
     {
         Ok(_) => bail!("expected revoking owner role from self to fail"),
@@ -1051,7 +1073,8 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
     admin_team.sync_now(owner_addr, None).await?;
 
     match admin_team
-        .assign_role(devices.membera.id, roles.member().id)
+        .device(devices.membera.id)
+        .assign_role(roles.member().id)
         .await
     {
         Ok(_) => bail!("expected assigning role without delegation to fail"),
@@ -1138,7 +1161,8 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
 
     // Try to assign operator role as admin - should succeed with the permission
     admin_team
-        .assign_role(devices.operator.id, roles.operator().id)
+        .device(devices.operator.id)
+        .assign_role(roles.operator().id)
         .await
         .context("Admin should be able to assign operator role with CanAssignRole permission")?;
 
@@ -1157,7 +1181,8 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
 
     // Try to assign operator role again as admin - should fail now
     match admin_team
-        .assign_role(devices.membera.id, roles.operator().id)
+        .device(devices.membera.id)
+        .assign_role(roles.operator().id)
         .await
     {
         Ok(_) => bail!("Admin should NOT be able to assign operator role after revocation"),
@@ -1206,7 +1231,8 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
 
     // Try to assign operator role as admin - should succeed with the permission
     admin_team
-        .assign_role(devices.operator.id, roles.operator().id)
+        .device(devices.operator.id)
+        .assign_role(roles.operator().id)
         .await
         .context("Admin should be able to assign operator role with CanAssignRole permission")?;
 
@@ -1247,7 +1273,8 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
 
     let r = owner_team
-        .assign_role(devices.membera.id, roles.operator().id)
+        .device(devices.membera.id)
+        .assign_role(roles.operator().id)
         .await;
 
     assert!(matches!(r, Err(aranya_client::Error::Aranya(_))));
@@ -1323,7 +1350,7 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let admin_team = devices.admin.client.team(team_id);
-    match admin_team.remove_device(devices.owner.id).await {
+    match admin_team.device(devices.owner.id).remove_from_team().await {
         Ok(_) => bail!("expected removing the final owner to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected remove_device error: {err:?}"),

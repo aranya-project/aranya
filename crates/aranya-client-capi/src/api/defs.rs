@@ -1173,13 +1173,13 @@ pub fn change_role(
     old_role: &RoleId,
     new_role: &RoleId,
 ) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).change_role(
-            device.into(),
-            old_role.into(),
-            new_role.into(),
-        ))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .device(device.into())
+            .change_role(old_role.into(), new_role.into()),
+    )?;
 
     Ok(())
 }
@@ -1247,7 +1247,8 @@ pub fn assign_role(
         client
             .inner
             .team(team.into())
-            .assign_role(device.into(), role_id.into()),
+            .device(device.into())
+            .assign_role(role_id.into()),
     )?;
     Ok(())
 }
@@ -1272,7 +1273,8 @@ pub fn revoke_role(
         client
             .inner
             .team(team.into())
-            .revoke_role(device.into(), role_id.into()),
+            .device(device.into())
+            .revoke_role(role_id.into()),
     )?;
     Ok(())
 }
@@ -1558,9 +1560,13 @@ pub fn remove_device_from_team(
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).remove_device(device.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .device(device.into())
+            .remove_from_team(),
+    )?;
     Ok(())
 }
 

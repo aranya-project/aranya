@@ -6,7 +6,7 @@ use tarpc::context;
 use tracing::instrument;
 
 use crate::{
-    client::{ChanOp, Client, Label, LabelId, Labels, Role},
+    client::{ChanOp, Client, Label, LabelId, Labels, Role, RoleId},
     error::{aranya_error, IpcError, Result},
     util::{custom_id, impl_slice_iter_wrapper, impl_vec_into_iter_wrapper},
 };
@@ -92,9 +92,57 @@ impl Device<'_> {
             .map_err(aranya_error)
             .map(KeyBundle::from_api)
     }
-}
 
-impl Device<'_> {
+    /// Removes `device` from the team.
+    #[instrument(skip(self))]
+    pub async fn remove_from_team(&self) -> Result<()> {
+        self.client
+            .daemon
+            .remove_device_from_team(context::current(), self.team_id, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Assigns `role` to `device`.
+    #[instrument(skip(self))]
+    pub async fn assign_role(&self, role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .assign_role(context::current(), self.team_id, self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Revokes `role` from `device`.
+    #[instrument(skip(self))]
+    pub async fn revoke_role(&self, role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .revoke_role(context::current(), self.team_id, self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Changes the `role` on a `device`
+    #[instrument(skip(self))]
+    pub async fn change_role(&self, old_role: RoleId, new_role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .change_role(
+                context::current(),
+                self.team_id,
+                self.id,
+                old_role.into_api(),
+                new_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Returns the role assigned to the device, if any.
     pub async fn role(&self) -> Result<Option<Role>> {
         let role = self
@@ -107,9 +155,7 @@ impl Device<'_> {
             .map(Role::from_api);
         Ok(role)
     }
-}
 
-impl Device<'_> {
     /// Returns a list of labels assiged to the device.
     pub async fn label_assignments(&self) -> Result<Labels> {
         let data = self
@@ -128,9 +174,7 @@ impl Device<'_> {
             .collect();
         Ok(Labels { labels: data })
     }
-}
 
-impl Device<'_> {
     /// Assigns `label` to the device.
     #[instrument(skip(self))]
     pub async fn assign_label(&self, label: LabelId, op: ChanOp) -> Result<()> {
