@@ -510,6 +510,8 @@ typedef const char *AranyaPermission;
 
 /**
  * A role name.
+ *
+ * E.g. "owner"
  */
 typedef const char *AranyaRoleName;
 
@@ -1769,6 +1771,18 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
 
 /**
  * Create a role.
+ *
+ * The `owning_role` is the initial owner of the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role_name the name of the new role.
+ * @param[in] owning_role the [`AranyaRoleId`](@ref AranyaRoleId) that will own the new role.
+ * @param[out] role_out the newly created [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaClient
  */
 AranyaError aranya_create_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
@@ -1778,6 +1792,18 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
 
 /**
  * Create a role.
+ *
+ * The `owning_role` is the initial owner of the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role_name the name of the new role.
+ * @param[in] owning_role the [`AranyaRoleId`](@ref AranyaRoleId) that will own the new role.
+ * @param[out] role_out the newly created [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaClient
  */
 AranyaError aranya_create_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
@@ -1788,6 +1814,17 @@ AranyaError aranya_create_role_ext(const struct AranyaClient *client,
 
 /**
  * Delete a role.
+ *
+ * The role must not be assigned to any devices, nor should it own any
+ * other roles.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) of the role to delete.
+ *
+ * @relates AranyaClient
  */
 AranyaError aranya_delete_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
@@ -1795,6 +1832,17 @@ AranyaError aranya_delete_role(const struct AranyaClient *client,
 
 /**
  * Delete a role.
+ *
+ * The role must not be assigned to any devices, nor should it own any
+ * other roles.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) of the role to delete.
+ *
+ * @relates AranyaClient
  */
 AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
@@ -1803,6 +1851,15 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
 
 /**
  * Assign a permission to a role.
+ *
+ * It is an error to add a permission already assigned to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being added to.
+ * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to add to the role.
  */
 AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
@@ -1811,6 +1868,15 @@ AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
 
 /**
  * Assign a permission to a role.
+ *
+ * It is an error to add a permission already assigned to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being added to.
+ * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to add to the role.
  */
 AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
@@ -1820,6 +1886,15 @@ AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
 
 /**
  * Remove a permission from a role.
+ *
+ * It is an error to remove a permission not assigned to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being removed from.
+ * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
  */
 AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
@@ -1828,6 +1903,15 @@ AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
 
 /**
  * Remove a permission from a role.
+ *
+ * It is an error to remove a permission not assigned to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being removed from.
+ * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
  */
 AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
