@@ -569,11 +569,11 @@ AranyaError init_team(Team* t) {
     // assign role management permissions.
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanAssignRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE);
     EXPECT("unable to assign role management permission", err);
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanRevokeRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to assign role management permission", err);
 
     err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
@@ -592,7 +592,7 @@ AranyaError init_team(Team* t) {
 
     err = aranya_revoke_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanRevokeRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to revoke role management permission", err);
 exit:
     return err;
