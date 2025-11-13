@@ -558,7 +558,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAfcSendChannel;
 #endif
 
@@ -1482,6 +1482,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
  * @param[in] roles_out returns a list of roles that own `role`
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
@@ -1489,6 +1490,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *owning_role,
                                        struct AranyaRole *roles_out,
                                        size_t *roles_len);
 
@@ -1509,6 +1511,7 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
  * @param[in] roles_out returns a list of roles that own `role`
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
@@ -1516,6 +1519,7 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
+                                           const struct AranyaRoleId *owning_role,
                                            struct AranyaRole *roles_out,
                                            size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
@@ -2970,7 +2974,7 @@ AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
+AranyaError aranya_afc_channel_seal(struct AranyaAfcSendChannel *channel,
                                     const uint8_t *plaintext,
                                     size_t plaintext_len,
                                     uint8_t *dst,
@@ -2988,7 +2992,7 @@ AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcSendChannel *channel,
+AranyaError aranya_afc_channel_seal_ext(struct AranyaAfcSendChannel *channel,
                                         const uint8_t *plaintext,
                                         size_t plaintext_len,
                                         uint8_t *dst,
