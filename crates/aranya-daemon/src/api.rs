@@ -295,7 +295,7 @@ impl EffectHandler {
             drop(prev_addresses); // Release the lock before async call
 
             self.broadcast_hello_notifications(graph, current_head)
-                .await?;
+                .await;
         } else {
             trace!(
                 ?graph,
@@ -317,22 +317,20 @@ impl EffectHandler {
     }
 
     /// Broadcasts hello notifications to subscribers when the graph changes.
-    #[instrument(skip(self), err)]
-    async fn broadcast_hello_notifications(
-        &self,
-        graph_id: GraphId,
-        head: Address,
-    ) -> anyhow::Result<()> {
-        if let Err(e) = self.peers.broadcast_hello(graph_id, head).await {
-            debug!(
-                error = %e,
-                ?graph_id,
-                ?head,
-                "peers.broadcast_hello failed"
-            );
-            return Err(anyhow::anyhow!("failed to broadcast hello: {:?}", e));
-        }
-        Ok(())
+    #[instrument(skip(self))]
+    async fn broadcast_hello_notifications(&self, graph_id: GraphId, head: Address) {
+        // TODO: Don't fire off a spawn here.
+        let peers = self.peers.clone();
+        drop(tokio::spawn(async move {
+            if let Err(e) = peers.broadcast_hello(graph_id, head).await {
+                warn!(
+                    error = %e,
+                    ?graph_id,
+                    ?head,
+                    "peers.broadcast_hello failed"
+                );
+            }
+        }));
     }
 }
 
