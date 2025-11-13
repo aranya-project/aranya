@@ -1289,7 +1289,7 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 
 /// Add a permission to a role.
 ///
-/// It is an error to add a permission already assigned to the role.
+/// It is an error to add a permission already added to the role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
