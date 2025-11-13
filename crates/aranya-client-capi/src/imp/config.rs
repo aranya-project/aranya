@@ -83,9 +83,7 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
         {
             builder = builder.sync_on_hello(value.sync_on_hello);
         }
-        builder
-            .build()
-            .expect("All values are set")
+        builder.build().expect("All values are set")
     }
 }
 
