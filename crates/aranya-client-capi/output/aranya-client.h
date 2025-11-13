@@ -2707,7 +2707,7 @@ AranyaError aranya_afc_create_channel_ext(const struct AranyaClient *client,
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Use an ephemeral command to create an AFC channel between this device and a peer.
+ * Accept a receive-only AFC channel from by a peer by processing a control message.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
@@ -2726,7 +2726,7 @@ AranyaError aranya_afc_accept_channel(const struct AranyaClient *client,
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Use an ephemeral command to create an AFC channel between this device and a peer.
+ * Accept a receive-only AFC channel from by a peer by processing a control message.
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
