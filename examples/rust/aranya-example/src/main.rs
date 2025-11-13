@@ -11,7 +11,6 @@ use aranya_client::{
     text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
-use aranya_daemon_api::text;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
