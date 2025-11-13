@@ -196,6 +196,7 @@ async fn main() -> Result<()> {
     let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
     let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
     let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let custom = ClientCtx::new(team_name, "custom", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -352,6 +353,63 @@ async fn main() -> Result<()> {
 
     // wait for syncing.
     sleep(sleep_interval).await;
+
+    // Demo custom roles.
+    info!("demo custom roles functionality");
+
+    // Create a custom role.
+    info!("creating a custom role");
+    let custom_role = owner_team
+        .create_role(text!("custom_role"), owner_role.id)
+        .await?;
+
+    // Add device to team to assign custom role to.
+    info!("adding device to team to assign custom role to");
+    owner_team.add_device(custom.pk.clone(), None).await?;
+
+    // Add `CanUseAfc` permission to the custom role.
+    let perm = text!("CanUseAfc");
+    owner_team
+        .add_perm_to_role(custom_role.id, perm.clone())
+        .await?;
+
+    // Assign custom role to a device.
+    info!("assigning custom role to a device");
+    owner_team.assign_role(custom.id, custom_role.id).await?;
+
+    // Revoke custom role from a device.
+    info!("revoking custom role from a device");
+    owner_team.revoke_role(custom.id, custom_role.id).await?;
+
+    // Remove `CanUseAfc` permission from the custom role.
+    info!("removing CanUseAfc permission from custom role");
+    owner_team
+        .remove_perm_from_role(custom_role.id, perm)
+        .await?;
+
+    // Assign role management perm.
+    info!("assigning role management perm");
+    owner_team
+        .assign_role_management_permission(
+            custom_role.id,
+            admin_role.id,
+            text!("CanChangeRolePerms"),
+        )
+        .await?;
+
+    // Revoke role management perm.
+    info!("revoking role management perm");
+    owner_team
+        .revoke_role_management_permission(
+            custom_role.id,
+            admin_role.id,
+            text!("CanChangeRolePerms"),
+        )
+        .await?;
+
+    // Delete the custom role.
+    info!("deleting custom role from team");
+    owner_team.delete_role(custom_role.id).await?;
 
     // fact database queries
     let devices = membera_team.devices().await?;
