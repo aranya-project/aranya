@@ -20,12 +20,9 @@ use aranya_util::error::ReportExt;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info};
-#[cfg(feature = "afc")]
-use {
-    crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
-    std::sync::{Arc, Mutex},
-};
 
+#[cfg(feature = "afc")]
+use crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels};
 #[doc(inline)]
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},
@@ -135,7 +132,7 @@ impl ClientBuilder<'_> {
                     .map_err(IpcError::new)?
                     .context("unable to retrieve afc shm info")
                     .map_err(error::other)?;
-                Arc::new(Mutex::new(AfcChannelKeys::new(&afc_shm_info)?))
+                AfcChannelKeys::new(&afc_shm_info)?
             };
 
             let client = Client {
@@ -176,7 +173,7 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// AFC channel keys.
     #[cfg(feature = "afc")]
-    afc_keys: Arc<Mutex<AfcChannelKeys>>,
+    afc_keys: AfcChannelKeys,
 }
 
 impl Client {

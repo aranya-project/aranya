@@ -1,9 +1,6 @@
 //! AFC support.
 use core::fmt;
-use std::{
-    fmt::{Debug, Display},
-    sync::{Arc, Mutex},
-};
+use std::fmt::{Debug, Display};
 
 use anyhow::Context;
 use aranya_daemon_api::{AfcChannelId, AfcLocalChannelId, AfcShmInfo, DaemonApiClient, CS};
@@ -123,8 +120,7 @@ pub enum Error {
 /// Aranya Fast Channels handler for managing channels which allow encrypting/decrypting application data buffers.
 pub struct Channels {
     daemon: DaemonApiClient,
-    // TODO: don't use mutex for shm reader aranya-core#399
-    keys: Arc<Mutex<ChannelKeys>>,
+    keys: ChannelKeys,
 }
 
 // TODO: derive Debug on [`keys`] when [`AfcClient`] implements it.
@@ -141,7 +137,7 @@ impl Channels {
     /// plaintext data.
     pub const OVERHEAD: usize = AfcClient::<ReadState<CS>>::OVERHEAD;
 
-    pub(crate) fn new(daemon: DaemonApiClient, keys: Arc<Mutex<ChannelKeys>>) -> Self {
+    pub(crate) fn new(daemon: DaemonApiClient, keys: ChannelKeys) -> Self {
         Self { daemon, keys }
     }
 
@@ -183,15 +179,13 @@ impl Channels {
             .map_err(aranya_error)?;
         let seal_ctx = self
             .keys
-            .lock()
-            .expect("poisoned")
             .0
             .setup_seal_ctx(info.local_channel_id)
             .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         let chan = SendChannel {
             daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
+            keys: Box::new(self.keys.clone()),
             channel_id: ChannelId {
                 __id: info.channel_id,
             },
@@ -213,7 +207,7 @@ impl Channels {
             .map_err(aranya_error)?;
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
+            keys: Box::new(self.keys.clone()),
             channel_id: ChannelId {
                 __id: info.channel_id,
             },
@@ -228,7 +222,7 @@ impl Channels {
 #[derive_where(Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
-    keys: Arc<Mutex<ChannelKeys>>,
+    keys: Box<ChannelKeys>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
@@ -267,8 +261,6 @@ impl SendChannel {
     pub fn seal(&mut self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
-            .lock()
-            .expect("poisoned")
             .0
             .seal(&mut self.seal_ctx, dst, plaintext)
             .map_err(AfcSealError)
@@ -291,7 +283,7 @@ impl SendChannel {
 #[derive(Clone, Debug)]
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
-    keys: Arc<Mutex<ChannelKeys>>,
+    keys: Box<ChannelKeys>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
@@ -333,8 +325,6 @@ impl ReceiveChannel {
         debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
-            .lock()
-            .expect("poisoned")
             .0
             .open(self.local_channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
@@ -355,6 +345,7 @@ impl ReceiveChannel {
 }
 
 /// Channel Keys.
+#[derive(Clone)]
 pub(crate) struct ChannelKeys(AfcClient<ReadState<CS>>);
 
 impl ChannelKeys {
