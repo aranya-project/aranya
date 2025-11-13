@@ -244,6 +244,7 @@ pub struct SyncPeerConfig {
     pub sync_now: bool,
     /// Determines if the peer should be synced with when a hello message is received
     /// indicating they have a head that we don't have
+    #[cfg(feature = "preview")]
     pub sync_on_hello: bool,
 }
 
@@ -299,6 +300,7 @@ pub trait DaemonApi {
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
 
     /// Subscribe to hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     async fn sync_hello_subscribe(
         peer: Addr,
         team: TeamId,
@@ -308,6 +310,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     /// Unsubscribe from hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     async fn sync_hello_unsubscribe(peer: Addr, team: TeamId) -> Result<()>;
 
     /// Removes the peer from automatic syncing.

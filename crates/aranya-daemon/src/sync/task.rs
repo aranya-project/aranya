@@ -48,6 +48,7 @@ use tracing::{error, info, instrument, trace, warn};
 use super::Result as SyncResult;
 use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs, EN};
 
+#[cfg(feature = "preview")]
 pub mod hello;
 pub mod quic;
 
@@ -65,18 +66,22 @@ pub(crate) enum Msg {
     RemovePeer {
         peer: SyncPeer,
     },
+    #[cfg(feature = "preview")]
     HelloSubscribe {
         peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
     },
+    #[cfg(feature = "preview")]
     HelloUnsubscribe {
         peer: SyncPeer,
     },
+    #[cfg(feature = "preview")]
     SyncOnHello {
         peer: SyncPeer,
     },
+    #[cfg(feature = "preview")]
     BroadcastHello {
         graph_id: GraphId,
         head: Address,
@@ -164,6 +169,7 @@ impl SyncPeers {
     }
 
     /// Subscribe to hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     pub(crate) async fn sync_hello_subscribe(
         &self,
         peer_addr: Addr,
@@ -186,6 +192,7 @@ impl SyncPeers {
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     pub(crate) async fn sync_hello_unsubscribe(&self, peer_addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer {
             addr: peer_addr,
@@ -196,12 +203,14 @@ impl SyncPeers {
 
     /// Trigger sync with a peer based on hello message.
     /// Will be ignored if `SyncPeerConfig::sync_on_hello` is false.
+    #[cfg(feature = "preview")]
     pub(crate) async fn sync_on_hello(&self, addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::SyncOnHello { peer }).await
     }
 
     /// Broadcast hello notifications to all subscribers of a graph.
+    #[cfg(feature = "preview")]
     pub(crate) async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Reply {
         self.send(Msg::BroadcastHello { graph_id, head }).await
     }
@@ -345,6 +354,7 @@ impl<ST: SyncState> Syncer<ST> {
                         self.remove_peer(peer);
                         Ok(())
                     }
+                    #[cfg(feature = "preview")]
                     Msg::HelloSubscribe {
                         peer,
                         graph_change_delay,
@@ -354,9 +364,11 @@ impl<ST: SyncState> Syncer<ST> {
                         self.sync_hello_subscribe(&peer, graph_change_delay, duration, schedule_delay)
                             .await
                     }
+                    #[cfg(feature = "preview")]
                     Msg::HelloUnsubscribe { peer } => {
                         self.sync_hello_unsubscribe(&peer).await
                     }
+                    #[cfg(feature = "preview")]
                     Msg::SyncOnHello { peer } => {
                         // Check if sync_on_hello is enabled for this peer
                         if let Some((cfg, _)) = self.peers.get(&peer) {
@@ -385,6 +397,7 @@ impl<ST: SyncState> Syncer<ST> {
                             Ok(())
                         }
                     }
+                    #[cfg(feature = "preview")]
                     Msg::BroadcastHello { graph_id, head } => {
                         ST::broadcast_hello_notifications_impl(self, graph_id, head).await
                     }

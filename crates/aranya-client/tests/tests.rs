@@ -945,6 +945,7 @@ async fn test_multi_team_sync() -> Result<()> {
 /// Tests hello subscription functionality by demonstrating that devices can subscribe
 /// to hello notifications from peers and automatically sync when receiving notifications.
 #[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "preview")]
 async fn test_hello_subscription() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_hello_subscription").await?;
@@ -1116,6 +1117,7 @@ async fn test_hello_subscription() -> Result<()> {
 /// Verifies that with high schedule_delay, only graph-change-triggered notifications occur,
 /// while with low schedule_delay, scheduled periodic sends pick up all pending changes.
 #[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "preview")]
 async fn test_hello_subscription_schedule_delay() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_hello_subscription_schedule_delay").await?;

@@ -20,6 +20,7 @@ pub const MAX_SYNC_INTERVAL: Duration = Duration::from_secs(365 * 24 * 60 * 60);
 pub struct SyncPeerConfig {
     interval: Option<Duration>,
     sync_now: bool,
+    #[cfg(feature = "preview")]
     sync_on_hello: bool,
 }
 
@@ -35,6 +36,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
         Self {
             interval: value.interval,
             sync_now: value.sync_now,
+            #[cfg(feature = "preview")]
             sync_on_hello: value.sync_on_hello,
         }
     }
@@ -45,6 +47,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
+    #[cfg(feature = "preview")]
     sync_on_hello: bool,
 }
 
@@ -97,6 +100,7 @@ impl SyncPeerConfigBuilder {
     /// indicating they have a head that we don't have.
     ///
     /// By default, sync on hello is disabled.
+    #[cfg(feature = "preview")]
     pub fn sync_on_hello(mut self, sync_on_hello: bool) -> Self {
         self.sync_on_hello = sync_on_hello;
         self
@@ -108,6 +112,7 @@ impl Default for SyncPeerConfigBuilder {
         Self {
             interval: None,
             sync_now: true,
+            #[cfg(feature = "preview")]
             sync_on_hello: false,
         }
     }

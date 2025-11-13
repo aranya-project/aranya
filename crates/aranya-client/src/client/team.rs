@@ -175,6 +175,7 @@ impl Team<'_> {
     ///
     /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
     /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.
+    #[cfg(feature = "preview")]
     pub async fn sync_hello_subscribe(
         &self,
         peer: Addr,
@@ -200,6 +201,7 @@ impl Team<'_> {
     /// Unsubscribe from hello notifications from a sync peer.
     ///
     /// This will stop receiving hello notifications from the specified peer.
+    #[cfg(feature = "preview")]
     pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
         self.client
             .daemon

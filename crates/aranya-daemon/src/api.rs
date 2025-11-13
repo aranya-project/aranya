@@ -472,6 +472,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn sync_hello_subscribe(
         self,
@@ -496,6 +497,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn sync_hello_unsubscribe(
         self,

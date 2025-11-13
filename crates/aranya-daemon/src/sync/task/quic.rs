@@ -66,6 +66,7 @@ pub(crate) use connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMa
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 
+#[cfg(feature = "preview")]
 pub(crate) use super::hello::HelloSubscriptions;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
@@ -158,6 +159,7 @@ impl SyncState for State {
     }
 
     /// Subscribe to hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_subscribe_impl(
         syncer: &mut Syncer<Self>,
@@ -181,6 +183,7 @@ impl SyncState for State {
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_unsubscribe_impl(
         syncer: &mut Syncer<Self>,
@@ -194,6 +197,7 @@ impl SyncState for State {
     }
 
     /// Broadcast hello notifications to all subscribers of a graph.
+    #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn broadcast_hello_notifications_impl(
         syncer: &mut Syncer<Self>,
@@ -725,6 +729,7 @@ where
             SyncType::Push { .. } => {
                 bug!("Push messages are not implemented")
             }
+            #[cfg(feature = "preview")]
             SyncType::Hello(hello_msg) => {
                 Self::process_hello_message(hello_msg, client, addr, &active_team, sync_peers)
                     .await;

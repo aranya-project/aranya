@@ -68,6 +68,7 @@ impl Default for ClientConfigBuilder {
 pub struct SyncPeerConfig {
     interval: Option<Duration>,
     sync_now: bool,
+    #[cfg(feature = "preview")]
     sync_on_hello: bool,
 }
 
@@ -77,9 +78,12 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
         if let Some(interval) = value.interval {
             builder = builder.interval(interval.into());
         }
+        builder = builder.sync_now(value.sync_now);
+        #[cfg(feature = "preview")]
+        {
+            builder = builder.sync_on_hello(value.sync_on_hello);
+        }
         builder
-            .sync_now(value.sync_now)
-            .sync_on_hello(value.sync_on_hello)
             .build()
             .expect("All values are set")
     }
@@ -96,6 +100,7 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
+    #[cfg(feature = "preview")]
     sync_on_hello: bool,
 }
 
@@ -116,6 +121,7 @@ impl SyncPeerConfigBuilder {
     /// indicating they have a head that we don't have.
     ///
     /// By default, sync on hello is disabled.
+    #[cfg(feature = "preview")]
     pub fn sync_on_hello(&mut self, sync_on_hello: bool) {
         self.sync_on_hello = sync_on_hello;
     }
@@ -132,6 +138,7 @@ impl Builder for SyncPeerConfigBuilder {
         let cfg = SyncPeerConfig {
             interval: self.interval,
             sync_now: self.sync_now,
+            #[cfg(feature = "preview")]
             sync_on_hello: self.sync_on_hello,
         };
         Self::Output::init(out, cfg);
@@ -144,6 +151,7 @@ impl Default for SyncPeerConfigBuilder {
         Self {
             interval: None,
             sync_now: true,
+            #[cfg(feature = "preview")]
             sync_on_hello: false,
         }
     }

@@ -976,6 +976,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 // TODO: Use bool instead of u32 once bool support is added. See https://github.com/aranya-project/aranya-core/issues/129
+#[cfg(feature = "preview")]
 pub fn sync_peer_config_builder_set_sync_on_hello(
     cfg: &mut SyncPeerConfigBuilder,
     sync_on_hello: u32,
@@ -1655,6 +1656,7 @@ pub unsafe fn remove_sync_peer(
 /// @param[in] schedule_delay interval for periodic scheduled hello sends.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub unsafe fn sync_hello_subscribe(
     client: &Client,
     team: &TeamId,
@@ -1685,6 +1687,7 @@ pub unsafe fn sync_hello_subscribe(
 /// @param[in] addr the peer's Aranya network address [`Addr`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub unsafe fn sync_hello_unsubscribe(
     client: &Client,
     team: &TeamId,
