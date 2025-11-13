@@ -6,7 +6,7 @@
  * @brief External header file containing C function definitions
  * for the Aranya client library.
  */
-
+ 
 
 #ifndef ARANYA_CLIENT_H
 #define ARANYA_CLIENT_H
@@ -233,6 +233,94 @@ enum AranyaError
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
+#endif // __cplusplus
+
+/**
+ * Simple permission.
+ */
+enum AranyaPermission
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * The role can add a device to the team.
+     */
+    ARANYA_PERMISSION_ADD_DEVICE,
+    /**
+     * The role can remove a device from the team.
+     */
+    ARANYA_PERMISSION_REMOVE_DEVICE,
+    /**
+     * The role can terminate the team. This causes all team
+     * commands to fail until a new team is created.
+     */
+    ARANYA_PERMISSION_TERMINATE_TEAM,
+    /**
+     * The role can create a role.
+     */
+    ARANYA_PERMISSION_CREATE_ROLE,
+    /**
+     * The role can delete a role.
+     */
+    ARANYA_PERMISSION_DELETE_ROLE,
+    /**
+     * The role can assign a role to other devices.
+     */
+    ARANYA_PERMISSION_ASSIGN_ROLE,
+    /**
+     * The role can revoke a role from other devices.
+     */
+    ARANYA_PERMISSION_REVOKE_ROLE,
+    /**
+     * The role can set up default roles. This can only be done
+     * once, so this permission can only effectively be used by
+     * the `owner` role.
+     */
+    ARANYA_PERMISSION_SETUP_DEFAULT_ROLE,
+    /**
+     * The role can add a managing role to or remove a managing
+     * role from a target role.
+     */
+    ARANYA_PERMISSION_CHANGE_ROLE_MANAGING_ROLE,
+    /**
+     * The role can create a label.
+     */
+    ARANYA_PERMISSION_CREATE_LABEL,
+    /**
+     * The role can delete a label.
+     */
+    ARANYA_PERMISSION_DELETE_LABEL,
+    /**
+     * The role can grant a target role the ability to manage a
+     * label. This management ability includes deleting a label
+     * and adding/revoking a label to a device.
+     */
+    ARANYA_PERMISSION_CHANGE_LABEL_MANAGING_ROLE,
+    /**
+     * The role can assign a label to a device. The role must
+     * also have label management permissions granted by a role
+     * with the `ChangeLabelManagingRole` permission above.
+     */
+    ARANYA_PERMISSION_ASSIGN_LABEL,
+    /**
+     * The role can revoke a label from a device. The role must
+     * also have label management permissions granted by a role
+     * with the `ChangeLabelManagingRole` permission above.
+     */
+    ARANYA_PERMISSION_REVOKE_LABEL,
+    /**
+     * The role can use AFC. This controls the ability to
+     * create or receive a unidirectional AFC channels.
+     */
+    ARANYA_PERMISSION_CAN_USE_AFC,
+    /**
+     * The role can create a unidirectional AFC channel.
+     */
+    ARANYA_PERMISSION_CREATE_AFC_UNI_CHANNEL,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaPermission;
 #endif // __cplusplus
 
 /**

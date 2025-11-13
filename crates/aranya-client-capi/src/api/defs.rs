@@ -522,7 +522,7 @@ impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPer
 /// Simple permission.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
-enum Permission {
+pub enum Permission {
     // # Team management
     //
     /// The role can add a device to the team.
