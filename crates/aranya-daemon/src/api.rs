@@ -795,12 +795,20 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        self.client
+        let effects = self
+            .client
             .actions(GraphId::transmute(team))
             .assign_role(DeviceId::transmute(device), RoleId::transmute(role))
             .await
             .context("unable to assign role")?;
-        Ok(())
+        if let Some(Effect::RoleAssigned(_e)) = find_effect!(&effects, Effect::RoleAssigned(_e)) {
+            // Send effects to the effect handler for processing (including hello notifications)
+            let graph = GraphId::transmute(team);
+            self.effect_handler.handle_effects(graph, &effects).await?;
+            Ok(())
+        } else {
+            Err(anyhow!("unable to assign role").into())
+        }
     }
 
     #[instrument(skip(self), err)]
@@ -813,12 +821,20 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        self.client
+        let effects = self
+            .client
             .actions(GraphId::transmute(team))
             .revoke_role(DeviceId::transmute(device), RoleId::transmute(role))
             .await
             .context("unable to revoke device role")?;
-        Ok(())
+        if let Some(Effect::RoleRevoked(_e)) = find_effect!(&effects, Effect::RoleRevoked(_e)) {
+            // Send effects to the effect handler for processing (including hello notifications)
+            let graph = GraphId::transmute(team);
+            self.effect_handler.handle_effects(graph, &effects).await?;
+            Ok(())
+        } else {
+            Err(anyhow!("unable to revoke device role").into())
+        }
     }
 
     #[instrument(skip(self), err)]
@@ -830,7 +846,8 @@ impl DaemonApi for Api {
         old_role_id: api::RoleId,
         new_role_id: api::RoleId,
     ) -> api::Result<()> {
-        self.client
+        let effects = self
+            .client
             .actions(GraphId::transmute(team))
             .change_role(
                 DeviceId::transmute(device_id),
@@ -839,7 +856,14 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to change device role")?;
-        Ok(())
+        if let Some(Effect::RoleChanged(_e)) = find_effect!(&effects, Effect::RoleChanged(_e)) {
+            // Send effects to the effect handler for processing (including hello notifications)
+            let graph = GraphId::transmute(team);
+            self.effect_handler.handle_effects(graph, &effects).await?;
+            Ok(())
+        } else {
+            Err(anyhow!("unable to change device role").into())
+        }
     }
 
     #[cfg(feature = "afc")]
@@ -999,6 +1023,9 @@ impl DaemonApi for Api {
         if let Some(Effect::LabelManagingRoleAdded(_e)) =
             find_effect!(&effects, Effect::LabelManagingRoleAdded(_e))
         {
+            // Send effects to the effect handler for processing (including hello notifications)
+            let graph = GraphId::transmute(team);
+            self.effect_handler.handle_effects(graph, &effects).await?;
             Ok(())
         } else {
             Err(anyhow!("unable to add label managing role").into())
@@ -1029,6 +1056,9 @@ impl DaemonApi for Api {
         if let Some(Effect::AssignedLabelToDevice(_e)) =
             find_effect!(&effects, Effect::AssignedLabelToDevice(_e))
         {
+            // Send effects to the effect handler for processing (including hello notifications)
+            let graph = GraphId::transmute(team);
+            self.effect_handler.handle_effects(graph, &effects).await?;
             Ok(())
         } else {
             Err(anyhow!("unable to assign label").into())
@@ -1054,6 +1084,9 @@ impl DaemonApi for Api {
         if let Some(Effect::LabelRevokedFromDevice(_e)) =
             find_effect!(&effects, Effect::LabelRevokedFromDevice(_e))
         {
+            // Send effects to the effect handler for processing (including hello notifications)
+            let graph = GraphId::transmute(team);
+            self.effect_handler.handle_effects(graph, &effects).await?;
             Ok(())
         } else {
             Err(anyhow!("unable to revoke label").into())
