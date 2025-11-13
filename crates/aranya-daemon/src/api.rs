@@ -854,7 +854,7 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn create_afc_uni_send_channel(
+    async fn create_afc_channel(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -908,7 +908,7 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn receive_afc_ctrl(
+    async fn accept_afc_channel(
         self,
         _: context::Context,
         team: api::TeamId,

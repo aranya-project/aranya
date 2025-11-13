@@ -192,7 +192,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .membera
         .client
         .afc()
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
@@ -201,7 +201,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .memberb
         .client
         .afc()
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -259,13 +259,13 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -336,13 +336,13 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -421,13 +421,13 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -525,13 +525,13 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -635,13 +635,13 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -748,13 +748,13 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -863,13 +863,13 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 
     // Create uni channel.
     let (chan, ctrl) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id)
+        .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive uni channel.
     let recv = memberb_afc
-        .recv_ctrl(team_id, ctrl)
+        .accept_channel(team_id, ctrl)
         .await
         .context("unable to receive afc uni channel")?;
 
@@ -1003,25 +1003,25 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
 
     // Create first channel.
     let (chan1, ctrl1) = membera_afc
-        .create_uni_send_channel(team_id, devices.memberb.id, label_id1)
+        .create_channel(team_id, devices.memberb.id, label_id1)
         .await
         .context("unable to create afc uni channel")?;
 
     // Create second channel.
     let (chan2, ctrl2) = memberb_afc
-        .create_uni_send_channel(team_id, devices.membera.id, label_id2)
+        .create_channel(team_id, devices.membera.id, label_id2)
         .await
         .context("unable to create afc uni channel")?;
 
     // Receive first channel.
     let recv1 = memberb_afc
-        .recv_ctrl(team_id, ctrl1)
+        .accept_channel(team_id, ctrl1)
         .await
         .context("unable to receive afc uni channel")?;
 
     // Receive second channel.
     let recv2 = membera_afc
-        .recv_ctrl(team_id, ctrl2)
+        .accept_channel(team_id, ctrl2)
         .await
         .context("unable to receive afc uni channel")?;
 

@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
     info!("membera: creating send channel");
     let (sealer, ctrl) = client
         .afc()
-        .create_uni_send_channel(team_info.team_id, memberb, label1.id)
+        .create_channel(team_info.team_id, memberb, label1.id)
         .await?;
     sender.send(env.memberb.afc_addr, ctrl.as_bytes()).await?;
 
@@ -176,7 +176,7 @@ async fn main() -> Result<()> {
     let ctrl = receiver.recv().await?;
     let opener = client
         .afc()
-        .recv_ctrl(team_info.team_id, ctrl.into_boxed_slice().into())
+        .accept_channel(team_info.team_id, ctrl.into_boxed_slice().into())
         .await?;
 
     info!("membera: receiving AFC data");
