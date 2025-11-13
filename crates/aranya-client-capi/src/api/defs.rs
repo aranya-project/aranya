@@ -465,6 +465,8 @@ impl LabelName {
 }
 
 /// A role name.
+///
+/// E.g. "owner"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct RoleName(*const c_char);
@@ -1246,6 +1248,18 @@ pub unsafe fn team_roles(
 }
 
 /// Create a role.
+///
+/// The `owning_role` is the initial owner of the new role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role_name the name of the new role.
+/// @param[in] owning_role the [`RoleId`] that will own the new role.
+/// @param[out] role_out the newly created [`Role`].
+///
+/// @relates AranyaClient
 pub fn create_role(
     client: &Client,
     team: &TeamId,
@@ -1266,6 +1280,17 @@ pub fn create_role(
 }
 
 /// Delete a role.
+///
+/// The role must not be assigned to any devices, nor should it own any
+/// other roles.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the [`RoleId`] of the role to delete.
+///
+/// @relates AranyaClient
 pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
     client
         .rt
@@ -1274,6 +1299,15 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 }
 
 /// Assign a permission to a role.
+///
+/// It is an error to add a permission already assigned to the role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the [`RoleId`] the permission is being added to.
+/// @param[in] perm A [`Permission`] to add to the role.
 pub fn add_perm_to_role(
     client: &Client,
     team: &TeamId,
@@ -1293,6 +1327,15 @@ pub fn add_perm_to_role(
 }
 
 /// Remove a permission from a role.
+///
+/// It is an error to remove a permission not assigned to the role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] role the [`RoleId`] the permission is being removed from.
+/// @param[in] perm A [`Permission`] to remove from the role.
 pub fn remove_perm_from_role(
     client: &Client,
     team: &TeamId,
