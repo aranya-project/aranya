@@ -52,6 +52,9 @@ criteria = "safe-to-run"
 [policy.aranya-example-multi-node]
 criteria = "safe-to-run"
 
+[policy.aranya-example-onboarding]
+criteria = "safe-to-run"
+
 [policy.aranya-keygen]
 audit-as-crates-io = false
 
