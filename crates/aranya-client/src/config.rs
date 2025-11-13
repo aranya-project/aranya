@@ -74,6 +74,7 @@ impl SyncPeerConfigBuilder {
         Ok(SyncPeerConfig {
             interval: self.interval,
             sync_now: self.sync_now,
+            #[cfg(feature = "preview")]
             sync_on_hello: self.sync_on_hello,
         })
     }

@@ -1,3 +1,4 @@
+#[cfg(feature = "preview")]
 use std::time::Duration;
 
 use anyhow::Context as _;
