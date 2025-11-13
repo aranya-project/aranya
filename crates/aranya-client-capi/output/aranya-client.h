@@ -1778,7 +1778,7 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role_name the name of the new role.
+ * @param[in] role_name the name of the new role [`AranyaRoleName`](@ref AranyaRoleName).
  * @param[in] owning_role the [`AranyaRoleId`](@ref AranyaRoleId) that will own the new role.
  * @param[out] role_out the newly created [`AranyaRole`](@ref AranyaRole).
  *
@@ -1799,7 +1799,7 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role_name the name of the new role.
+ * @param[in] role_name the name of the new role [`AranyaRoleName`](@ref AranyaRoleName).
  * @param[in] owning_role the [`AranyaRoleId`](@ref AranyaRoleId) that will own the new role.
  * @param[out] role_out the newly created [`AranyaRole`](@ref AranyaRole).
  *
@@ -1850,16 +1850,16 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Assign a permission to a role.
+ * Add a permission to a role.
  *
- * It is an error to add a permission already assigned to the role.
+ * It is an error to add a permission already added to the role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being added to.
- * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to add to the role.
+ * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to add to the role.
  */
 AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
@@ -1867,16 +1867,16 @@ AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
                                     AranyaPermission perm);
 
 /**
- * Assign a permission to a role.
+ * Add a permission to a role.
  *
- * It is an error to add a permission already assigned to the role.
+ * It is an error to add a permission already added to the role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being added to.
- * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to add to the role.
+ * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to add to the role.
  */
 AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
@@ -1887,14 +1887,14 @@ AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
 /**
  * Remove a permission from a role.
  *
- * It is an error to remove a permission not assigned to the role.
+ * It is an error to remove a permission not added to the role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being removed from.
- * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
+ * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
  */
 AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
@@ -1904,14 +1904,14 @@ AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
 /**
  * Remove a permission from a role.
  *
- * It is an error to remove a permission not assigned to the role.
+ * It is an error to remove a permission not added to the role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being removed from.
- * @param[in] perm A [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
+ * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
  */
 AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
