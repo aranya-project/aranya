@@ -770,28 +770,56 @@ cannot be created or deleted at runtime.
 
 ```policy
 enum SimplePerm {
-    // Team management
+    // # Team management
+    //
+    // The role can add a device to the team.
     AddDevice,
+    // The role can remove a device from the team.
     RemoveDevice,
+    // The role can terminate the team. This causes all team
+    // commands to fail until a new team is created.
     TerminateTeam,
 
-    // Roles
+    // # Roles
+    //
+    // The role can assign a role to other devices.
     AssignRole,
+    // The role can revoke a role from other devices.
     RevokeRole,
+    // The role can set up default roles. This can only be done
+    // once, so this permission can only effectively be used by
+    // the `owner` role.
     SetupDefaultRole,
+    // The role can add a managing role to or remove a managing
+    // role from a target role.
     ChangeRoleManagingRole,
 
-    // Labels
+    // # Labels
+    //
+    // The role can create a label.
     CreateLabel,
+    // The role can delete a label.
     DeleteLabel,
+    // The role can grant a target role the ability to manage a
+    // label. This management ability includes deleting a label
+    // and adding/revoking a label to a device.
     ChangeLabelManagingRole,
+    // The role can assign a label to a device. The role must
+    // also have label management permissions granted by a role
+    // with the `ChangeLabelManagingRole` permission above.
     AssignLabel,
+    // The role can revoke a label from a device. The role must
+    // also have label management permissions granted by a role
+    // with the `ChangeLabelManagingRole` permission above.
     RevokeLabel,
 
-    // AFC
+    // # AFC
+    // 
+    // The role can use AFC. This controls the ability to
+    // create or receive a unidirectional AFC channels.
     CanUseAfc,
+    // The role can create a unidirectional AFC channel.
     CreateAfcUniChannel,
-    CreateAfcBidiChannel,
 }
 
 // Converts `perm` to a string.
@@ -814,7 +842,6 @@ function simple_perm_to_str(perm enum SimplePerm) string {
 
         SimplePerm::CanUseAfc => { return "CanUseAfc" }
         SimplePerm::CreateAfcUniChannel => { return "CreateAfcUniChannel" }
-        SimplePerm::CreateAfcBidiChannel => { return "CreateAfcBidiChannel" }
     }
 }
 
@@ -850,7 +877,6 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         //
         "CanUseAfc" => { return Some(SimplePerm::CanUseAfc) }
         "CreateAfcUniChannel" => { return Some(SimplePerm::CreateAfcUniChannel) }
-        "CreateAfcBidiChannel" => { return Some(SimplePerm::CreateAfcBidiChannel) }
 
         _ => { return None }
     }
@@ -1937,7 +1963,6 @@ command SetupDefaultRole {
 
                     assign_perm_to_role(role_id, SimplePerm::CanUseAfc)
                     assign_perm_to_role(role_id, SimplePerm::CreateAfcUniChannel)
-                    assign_perm_to_role(role_id, SimplePerm::CreateAfcBidiChannel)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -2672,20 +2697,21 @@ command CreateTeam {
             // the owner role.
             assign_perm_to_role(owner_role_id, SimplePerm::AddDevice)
             assign_perm_to_role(owner_role_id, SimplePerm::RemoveDevice)
-
-            assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
-            assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)
-
-            assign_perm_to_role(owner_role_id, SimplePerm::AssignLabel)
-            assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
 
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
-
             assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRole)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagingRole)
+
+            assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeLabelManagingRole)
-            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
+            assign_perm_to_role(owner_role_id, SimplePerm::AssignLabel)
+            assign_perm_to_role(owner_role_id, SimplePerm::RevokeLabel)
+
+            assign_perm_to_role(owner_role_id, SimplePerm::CanUseAfc)
+            assign_perm_to_role(owner_role_id, SimplePerm::CreateAfcUniChannel)
 
             // And now make sure that the owner has the owner
             // role, of course.
@@ -3510,6 +3536,8 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 //
 // - `AssignLabel`
 // - `CanManageLabel(label_id)`
+//
+// Additionally, the target device must have `CanUseAfc` permissions
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
     publish AssignLabelToDevice {
         device_id: device_id,

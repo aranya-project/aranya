@@ -148,7 +148,7 @@ impl Channels {
     ///
     /// The creator of the channel will have a unidirectional channel [`SendChannel`] that can only `seal()` data.
     ///
-    /// Once the peer processes the [`CtrlMsg`] message with `recv_ctrl()`,
+    /// Once the peer processes the [`CtrlMsg`] message with `accept_channel()`,
     /// it will have a corresponding unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
     ///
     /// To send data from the creator of the channel to the peer:
@@ -159,15 +159,15 @@ impl Channels {
     /// Returns:
     /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
     /// - A [`CtrlMsg`] message to send to the peer.
-    pub async fn create_uni_send_channel(
+    pub async fn create_channel(
         &self,
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(SendChannel, CtrlMsg)> {
-        let (ctrl, local_channel_id, channel_id) = self
+        let info = self
             .daemon
-            .create_afc_uni_send_channel(
+            .create_afc_channel(
                 context::current(),
                 team_id.into_api(),
                 peer_id.into_api(),
@@ -179,27 +179,33 @@ impl Channels {
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id: ChannelId { __id: channel_id },
-            local_channel_id,
+            channel_id: ChannelId {
+                __id: info.channel_id,
+            },
+            local_channel_id: info.local_channel_id,
             label_id,
+            peer_id,
         };
-        Ok((chan, CtrlMsg(ctrl)))
+        Ok((chan, CtrlMsg(info.ctrl)))
     }
 
     /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
-        let (label_id, local_channel_id, channel_id) = self
+    pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
+        let info = self
             .daemon
-            .receive_afc_ctrl(context::current(), team_id.into_api(), ctrl.0)
+            .accept_afc_channel(context::current(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id: ChannelId { __id: channel_id },
-            local_channel_id,
-            label_id: LabelId::from_api(label_id),
+            channel_id: ChannelId {
+                __id: info.channel_id,
+            },
+            local_channel_id: info.local_channel_id,
+            label_id: LabelId::from_api(info.label_id),
+            peer_id: DeviceId::from_api(info.peer_id),
         })
     }
 }
@@ -212,6 +218,7 @@ pub struct SendChannel {
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    peer_id: DeviceId,
 }
 
 impl SendChannel {
@@ -223,6 +230,11 @@ impl SendChannel {
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
         self.label_id
+    }
+
+    /// The device ID of the peer on the other side of the channel.
+    pub fn peer_id(&self) -> DeviceId {
+        self.peer_id
     }
 
     /// Encrypts and authenticates `plaintext` for a channel.
@@ -267,6 +279,7 @@ pub struct ReceiveChannel {
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    peer_id: DeviceId,
 }
 
 impl ReceiveChannel {
@@ -278,6 +291,11 @@ impl ReceiveChannel {
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
         self.label_id
+    }
+
+    /// The device ID of the peer on the other side of the channel.
+    pub fn peer_id(&self) -> DeviceId {
+        self.peer_id
     }
 
     /// Decrypts and authenticates `ciphertext` received from
