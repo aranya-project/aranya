@@ -15,7 +15,7 @@ use std::ptr;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{ChanOp, RoleId, RoleManagementPermission},
+    client::{ChanOp, Permission, RoleId, RoleManagementPermission},
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
@@ -1051,7 +1051,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
         .create_role(text!("admin"), owner_role.id)
         .await?;
     owner_team
-        .add_perm_to_role(admin_role.id, text!("AddDevice"))
+        .add_perm_to_role(admin_role.id, Permission::AddDevice)
         .await
         .expect("expected to assign AddDevice to admin");
 
@@ -1119,7 +1119,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 
     // Owner only allows role to create new roles.
     owner_team
-        .add_perm_to_role(role.id, text!("CreateRole"))
+        .add_perm_to_role(role.id, Permission::CreateRole)
         .await?;
 
     // Owner assigns role to malicious device.
@@ -1139,7 +1139,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Malicious device attempts to grant target role a permission it does not have: e.g. CanUseAfc
     // This should be rejected, which indicates a privilege escalation attempt will be rejected.
     device_team
-        .add_perm_to_role(target_role.id, text!("CanUseAfc"))
+        .add_perm_to_role(target_role.id, Permission::CanUseAfc)
         .await
         .expect_err("expected privilege escalation attempt to fail");
 
@@ -1166,7 +1166,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
         .expect("expected to add admin with role");
 
     owner_team
-        .remove_perm_from_role(roles.admin().id, text!("AddDevice"))
+        .remove_perm_from_role(roles.admin().id, Permission::AddDevice)
         .await
         .expect("expected to remove AddDevice from admin");
 

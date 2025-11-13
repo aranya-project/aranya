@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
-    client::{ChanOp, Client, DeviceId, KeyBundle},
+    client::{ChanOp, Client, DeviceId, KeyBundle, Permission, RoleManagementPermission},
     text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
@@ -367,9 +367,8 @@ async fn main() -> Result<()> {
     owner_team.add_device(custom.pk.clone(), None).await?;
 
     // Add `CanUseAfc` permission to the custom role.
-    let perm = text!("CanUseAfc");
     owner_team
-        .add_perm_to_role(custom_role.id, perm.clone())
+        .add_perm_to_role(custom_role.id, Permission::CanUseAfc)
         .await?;
 
     // Assign custom role to a device.
@@ -383,7 +382,7 @@ async fn main() -> Result<()> {
     // Remove `CanUseAfc` permission from the custom role.
     info!("removing CanUseAfc permission from custom role");
     owner_team
-        .remove_perm_from_role(custom_role.id, perm)
+        .remove_perm_from_role(custom_role.id, Permission::CanUseAfc)
         .await?;
 
     // Assign role management perm.
@@ -392,7 +391,7 @@ async fn main() -> Result<()> {
         .assign_role_management_permission(
             custom_role.id,
             admin_role.id,
-            text!("CanChangeRolePerms"),
+            RoleManagementPermission::CanChangeRolePerms,
         )
         .await?;
 
@@ -402,7 +401,7 @@ async fn main() -> Result<()> {
         .revoke_role_management_permission(
             custom_role.id,
             admin_role.id,
-            text!("CanChangeRolePerms"),
+            RoleManagementPermission::CanChangeRolePerms,
         )
         .await?;
 

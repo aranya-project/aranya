@@ -9,8 +9,8 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,
-        RoleManagementPermission, Roles,
+        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Permission, Role,
+        RoleId, RoleManagementPermission, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -227,10 +227,15 @@ impl Team<'_> {
 
     /// Adds a permission to a role.
     #[instrument(skip(self))]
-    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
+            .add_perm_to_role(
+                context::current(),
+                self.id,
+                role_id.into_api(),
+                perm.as_text(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -239,10 +244,15 @@ impl Team<'_> {
 
     /// Removes a permission from a role.
     #[instrument(skip(self))]
-    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
+            .remove_perm_from_role(
+                context::current(),
+                self.id,
+                role_id.into_api(),
+                perm.as_text(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

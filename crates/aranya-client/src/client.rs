@@ -31,6 +31,7 @@ use {
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},
     label::{ChanOp, Label, LabelId, Labels},
+    perm::Permission,
     perm::RoleManagementPermission,
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
