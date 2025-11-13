@@ -1076,7 +1076,7 @@ grants roles permission to manage a specific label.
 
 ### Role Ownership
 
-As previously mentioned, each role is "owned" by zero or more
+As previously mentioned, each role is "owned" by one or more
 other roles, called the _owning roles_. The owning roles are
 responsible for delegating management permissions of the role to
 other roles. They can also add and remove other owning roles.
@@ -1084,7 +1084,7 @@ other roles. They can also add and remove other owning roles.
 ```policy
 // Records that the target role is owned by the owning role.
 //
-// Remember that each role has zero or more owners.
+// Remember that each role has one or more owners.
 //
 // # Foreign Keys
 //
