@@ -1,3 +1,243 @@
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
+use aranya_daemon_api::SyncPeerConfig;
+use aranya_runtime::{Address, GraphId};
+use aranya_util::{error::ReportExt as _, ready};
+use dashmap::DashMap;
+use futures_util::StreamExt as _;
+use tokio::{
+    sync::mpsc,
+    task::{JoinError, JoinSet},
+};
+use tokio_util::{
+    sync::CancellationToken,
+    time::{delay_queue::Key, DelayQueue},
+};
+use tracing::{error, info, trace};
+
+use super::{Result, SyncPeer};
+
+struct ActiveSync {
+    cancel: CancellationToken,
+    started_at: Instant,
+}
+
+struct HelloConfig {
+    graph_change_delay: Duration,
+    duration: Duration,
+    schedule_delay: Duration,
+}
+
+enum ManagerMessage {
+    /// Add a peer to the sync schedule.
+    AddPeer {
+        peer: SyncPeer,
+        config: SyncPeerConfig,
+    },
+    /// Remove a peer from the sync schedule.
+    RemovePeer { peer: SyncPeer },
+    /// Request to sync with a peer now (bypasses `DelayQueue`).
+    SyncNow { peer: SyncPeer },
+    /// Request to cancel an active sync.
+    CancelSync { peer: SyncPeer },
+    /// Subscribe to sending hello notifications to this peer.
+    HelloSubscribe { peer: SyncPeer, config: HelloConfig },
+    /// Unsubscribe from sending hello notifications to this peer.
+    HelloUnsubscribe { peer: SyncPeer },
+    /// Received a hello notification from a peer.
+    HelloReceived { peer: SyncPeer, head: Address },
+    /// Our graph head changed, so notify all subscribed peers.
+    GraphHeadChanged { graph_id: GraphId, head: Address },
+}
+
+pub struct SyncManager<T, H> {
+    active: DashMap<SyncPeer, ActiveSync>,
+    tasks: JoinSet<SyncResult>,
+    messages: mpsc::Receiver<ManagerMessage>,
+    peers: DashMap<SyncPeer, (SyncPeerConfig, Key)>,
+    queue: DelayQueue<SyncPeer>,
+    hello_service: HelloService,
+    transport: T,
+    handler: H,
+}
+
+struct SyncResult {
+    peer: SyncPeer,
+    result: Result<()>,
+}
+
+impl<T, H> SyncManager<T, H> {
+    pub fn new<const BUFFER: usize>(transport: T, handler: H) -> (Self, Arc<SyncHandle>) {
+        let (tx, messages) = mpsc::channel(BUFFER);
+
+        let handle = Arc::new(SyncHandle::new(tx));
+        let hello_service = HelloService::new(Arc::clone(&handle));
+
+        let manager = Self {
+            active: DashMap::new(),
+            tasks: JoinSet::new(),
+            messages,
+            peers: DashMap::new(),
+            queue: DelayQueue::new(),
+            hello_service,
+            transport,
+            handler,
+        };
+
+        (manager, handle)
+    }
+
+    async fn add_peer(&mut self, peer: SyncPeer, config: SyncPeerConfig) {
+        let key = self.queue.insert(peer, config.interval);
+
+        let sync_now = config.sync_now;
+        let interval = config.interval;
+        if let Some((_, old_key)) = self.peers.insert(peer, (config, key)) {
+            self.queue.remove(&old_key);
+            info!("Updated peer {peer:?} with new interval {interval:?}");
+        } else {
+            info!("Added peer {peer:?} with interval {interval:?}");
+        }
+
+        if sync_now {
+            Box::pin(self.handle_message(ManagerMessage::SyncNow { peer })).await;
+        }
+    }
+
+    fn remove_peer(&mut self, peer: SyncPeer) {
+        if let Some(state) = self.active.get(&peer) {
+            state.cancel.cancel();
+            info!("Cancelled active sync when removing peer {peer:?}");
+        }
+
+        if let Some((_, (_, key))) = self.peers.remove(&peer) {
+            self.queue.remove(&key);
+            info!("Removed peer {peer:?} from the schedule");
+        }
+    }
+
+    pub async fn run(mut self, ready: ready::Notifier) {
+        ready.notify();
+
+        loop {
+            tokio::select! {
+                Some(msg) = self.messages.recv() => {
+                    self.handle_message(msg).await;
+                }
+
+                Some(result) = self.tasks.join_next() => {
+                    self.handle_sync_completion(result).await;
+                }
+
+                Some(expired) = self.queue.next() => {
+                    let peer = expired.into_inner();
+
+                    if !self.active.contains_key(&peer) {
+                        if let Err(e) = self.start_sync(peer).await {
+                            error!("Failed to start sync for {peer:?}: {e}");
+                        }
+                    }
+                }
+
+                // No tasks ready, sleep briefly.
+                else => {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            }
+        }
+    }
+
+    async fn handle_message(&mut self, msg: ManagerMessage) {
+        match msg {
+            ManagerMessage::AddPeer { peer, config } => {
+                self.add_peer(peer, config).await;
+            }
+            ManagerMessage::RemovePeer { peer } => {
+                self.remove_peer(peer);
+            }
+            ManagerMessage::SyncNow { peer } => {
+                if let Err(e) = self.start_sync(peer).await {
+                    error!("Failed to start sync for {peer:?}: {e}");
+                }
+            }
+            ManagerMessage::CancelSync { peer } => {
+                if let Some(state) = self.active.get(&peer) {
+                    state.cancel.cancel();
+                }
+            }
+            ManagerMessage::HelloSubscribe { peer, config } => {
+                self.hello_service.subscribe(peer, config);
+            }
+            ManagerMessage::HelloUnsubscribe { peer } => {
+                self.hello_service.unsubscribe(peer);
+            }
+            ManagerMessage::HelloReceived { peer, head } => {
+                // TODO(nikki): move this to hello_service? Just adds another layer of indirection.
+                self.handle_hello_received(peer, head).await;
+            }
+            ManagerMessage::GraphHeadChanged { graph_id, head } => {
+                self.hello_service.graph_head_changed(graph_id, head).await;
+            }
+        }
+    }
+
+    async fn handle_sync_completion(
+        &mut self,
+        result: core::result::Result<SyncResult, JoinError>,
+    ) {
+        match result {
+            Ok(sync_result) => {
+                let peer = sync_result.peer;
+                self.active.remove(&peer);
+
+                match sync_result.result {
+                    Ok(()) => trace!("Sync completed for {peer:?}"),
+                    Err(e) => trace!("Sync failed for {peer:?}: {e}"),
+                }
+
+                if let Some(mut entry) = self.peers.get_mut(&peer) {
+                    let (config, old_key) = entry.value_mut();
+                    let key = self.queue.insert(peer, config.interval);
+                    *old_key = key;
+                }
+            }
+            Err(err) => error!(error = %err.report(), "unable to sync with peer"),
+        }
+    }
+
+    async fn start_sync(&mut self, peer: SyncPeer) -> Result<()> {
+        Ok(())
+    }
+}
+
+struct SyncHandle {
+    tx: mpsc::Sender<ManagerMessage>,
+}
+
+impl SyncHandle {
+    fn new(tx: mpsc::Sender<ManagerMessage>) -> Self {
+        Self { tx }
+    }
+}
+
+struct HelloService {
+    handle: Arc<SyncHandle>,
+}
+
+impl HelloService {
+    fn new(handle: Arc<SyncHandle>) -> Self {
+        Self { handle }
+    }
+
+    fn check_periodic(&self) {
+        // TODO(nikki): run checks and add stuff via the handle.
+    }
+}
+
+/*
 //! TODO(nikki): docs
 
 use std::{
@@ -17,7 +257,10 @@ use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task::JoinSet,
 };
-use tokio_util::time::delay_queue::{DelayQueue, Key};
+use tokio_util::{
+    sync::CancellationToken,
+    time::delay_queue::{DelayQueue, Key},
+};
 use tracing::{debug, error, info, trace, warn};
 
 use super::{
@@ -97,6 +340,12 @@ struct PendingSync {
     peer: SyncPeer,
     sync_type: SyncType,
     queued_at: Instant,
+}
+
+struct ActiveSync {
+    started_at: Instant,
+    config: SyncPeerConfig,
+    cancel: CancellationToken,
 }
 
 /// Manages sync operations with peers.
@@ -493,3 +742,4 @@ impl SyncHandle {
         self.send(ManagerMsg::InvalidateGraph { graph_id }).await
     }
 }
+*/

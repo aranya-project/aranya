@@ -205,7 +205,7 @@ impl QuicServer {
     ) -> Result<()> {
         let (mut recv, mut send) = stream.split();
 
-        let protocol = self.protocols.get(&peer).lock().await;
+        let protocol = protocols.get(&peer).lock().await;
 
         Ok(())
     }

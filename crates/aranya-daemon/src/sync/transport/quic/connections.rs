@@ -9,17 +9,20 @@ use s2n_quic::{
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use crate::sync::SyncPeer;
+use super::{Result, SyncPeer};
 
-type ConnectionUpdate = (SyncPeer, StreamAcceptor);
+pub(super) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 
-struct SharedConnections {
+/// Handles mappings betweens [`SyncPeer`]s and their associated [`Handle`].
+#[derive(Debug)]
+pub(super) struct SharedConnections {
     tx: mpsc::Sender<ConnectionUpdate>,
     handles: Arc<DashMap<SyncPeer, Handle>>,
 }
 
 impl SharedConnections {
-    fn new<const Buffer: usize>() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
+    /// Create a new [`SharedConnections`].
+    pub(super) fn new<const Buffer: usize>() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
         let (tx, rx) = mpsc::channel(Buffer);
         (
             Self {
@@ -30,8 +33,10 @@ impl SharedConnections {
         )
     }
 
-    async fn insert(&mut self, peer: SyncPeer, conn: Connection) -> Handle {
-        if let Entry::Occupied(mut entry) = self.handles.entry(peer) {
+    /// Insert a new [`Connection`] into the map.
+    pub(super) async fn insert(&self, peer: SyncPeer, conn: Connection) -> Handle {
+        let mut entry = self.handles.entry(peer);
+        if let Entry::Occupied(ref mut entry) = entry {
             if entry.get_mut().ping().is_ok() {
                 debug!("reusing existing QUIC connection, closing new connection");
                 conn.close(Error::UNKNOWN);
@@ -40,20 +45,21 @@ impl SharedConnections {
         }
 
         let (handle, acceptor) = conn.split();
-        self.handles.entry(peer).insert(handle.clone());
-
+        entry.insert(handle.clone());
         debug!("created new QUIC connection");
-        self.tx.send((peer, acceptor)).await.ok();
 
+        self.tx.send((peer, acceptor)).await.ok();
         handle
     }
 
-    async fn try_get_or_insert_with(
-        &mut self,
+    /// Get an existing [`Handle`], or try to insert a new [`Connection`] into the map.
+    pub(super) async fn get_or_try_insert_with(
+        &self,
         peer: SyncPeer,
-        make_conn: impl AsyncFnOnce() -> Result<Connection, super::QuicError>,
-    ) -> Result<Handle, super::QuicError> {
-        if let Entry::Occupied(mut entry) = self.handles.entry(peer) {
+        make_conn: impl AsyncFnOnce() -> Result<Connection>,
+    ) -> Result<Handle> {
+        let mut entry = self.handles.entry(peer);
+        if let Entry::Occupied(ref mut entry) = entry {
             if entry.get_mut().ping().is_ok() {
                 debug!("reusing existing QUIC connection");
                 return Ok(entry.get().clone());
@@ -61,15 +67,15 @@ impl SharedConnections {
         }
 
         let (handle, acceptor) = make_conn().await?.split();
-        self.handles.entry(peer).insert(handle.clone());
-
+        entry.insert(handle.clone());
         debug!("created new QUIC connection");
-        self.tx.send((peer, acceptor)).await.ok();
 
+        self.tx.send((peer, acceptor)).await.ok();
         Ok(handle)
     }
 
-    fn remove(&mut self, peer: SyncPeer, handle: Handle) {
+    /// Remove a [`Connection`] from the map.
+    pub(super) async fn remove(&self, peer: SyncPeer, handle: Handle) {
         if let Entry::Occupied(entry) = self.handles.entry(peer) {
             if entry.get().id() == handle.id() {
                 entry.remove();
