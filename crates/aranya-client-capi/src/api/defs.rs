@@ -1242,11 +1242,11 @@ pub unsafe fn team_roles(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role_name the name of the new role [`RoleName`].
-/// @param[in] owning_role the [`RoleId`] that will own the new role.
-/// @param[out] role_out the newly created [`Role`].
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role_name the name of the new role
+/// @param[in] owning_role the role ID of the role that will own the new role
+/// @param[out] role_out the newly created role
 ///
 /// @relates AranyaClient
 pub fn create_role(
@@ -1275,9 +1275,9 @@ pub fn create_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the [`RoleId`] of the role to delete.
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the role to delete
 ///
 /// @relates AranyaClient
 pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
@@ -1293,10 +1293,10 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the [`RoleId`] the permission is being added to.
-/// @param[in] perm a [`Permission`] to add to the role.
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID of the role the permission is being added to
+/// @param[in] perm a permission to add to the role
 pub fn add_perm_to_role(
     client: &Client,
     team: &TeamId,
@@ -1321,10 +1321,10 @@ pub fn add_perm_to_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role the [`RoleId`] the permission is being removed from.
-/// @param[in] perm a [`Permission`] to remove from the role.
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID of the role the permission is being removed from
+/// @param[in] perm a permission to remove from the role
 pub fn remove_perm_from_role(
     client: &Client,
     team: &TeamId,
@@ -1406,8 +1406,7 @@ pub fn revoke_role(
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] name label name string
-/// @param[in] managing_role_id the ID of the role that manages this
-///        label [`RoleId`].
+/// @param[in] managing_role_id the ID of the role that manages this label
 ///
 /// @relates AranyaClient.
 pub fn create_label(
@@ -1806,8 +1805,8 @@ pub unsafe fn team_devices(
 /// @param[in] team the team's ID
 /// @param[out] device the ID of the device
 /// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
-/// if a role was not assigned to the device. [`Role`].
-/// @param[out] has_role whether a role is assigned to the device.
+/// if a role was not assigned to the device
+/// @param[out] has_role whether a role is assigned to the device
 ///
 /// @relates AranyaClient.
 pub fn team_device_role(

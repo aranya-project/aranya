@@ -1776,11 +1776,11 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role_name the name of the new role [`AranyaRoleName`](@ref AranyaRoleName).
- * @param[in] owning_role the [`AranyaRoleId`](@ref AranyaRoleId) that will own the new role.
- * @param[out] role_out the newly created [`AranyaRole`](@ref AranyaRole).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role_name the name of the new role
+ * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[out] role_out the newly created role
  *
  * @relates AranyaClient
  */
@@ -1797,11 +1797,11 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role_name the name of the new role [`AranyaRoleName`](@ref AranyaRoleName).
- * @param[in] owning_role the [`AranyaRoleId`](@ref AranyaRoleId) that will own the new role.
- * @param[out] role_out the newly created [`AranyaRole`](@ref AranyaRole).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role_name the name of the new role
+ * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[out] role_out the newly created role
  *
  * @relates AranyaClient
  */
@@ -1820,9 +1820,9 @@ AranyaError aranya_create_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) of the role to delete.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the role to delete
  *
  * @relates AranyaClient
  */
@@ -1838,9 +1838,9 @@ AranyaError aranya_delete_role(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) of the role to delete.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the role to delete
  *
  * @relates AranyaClient
  */
@@ -1856,10 +1856,10 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being added to.
- * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to add to the role.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being added to
+ * @param[in] perm a permission to add to the role
  */
 AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
@@ -1873,10 +1873,10 @@ AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being added to.
- * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to add to the role.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being added to
+ * @param[in] perm a permission to add to the role
  */
 AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
@@ -1891,10 +1891,10 @@ AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being removed from.
- * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being removed from
+ * @param[in] perm a permission to remove from the role
  */
 AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
@@ -1908,10 +1908,10 @@ AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] role the [`AranyaRoleId`](@ref AranyaRoleId) the permission is being removed from.
- * @param[in] perm a [`AranyaPermission`](@ref AranyaPermission) to remove from the role.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being removed from
+ * @param[in] perm a permission to remove from the role
  */
 AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
@@ -2009,8 +2009,7 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id the ID of the role that manages this
- *        label [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role_id the ID of the role that manages this label
  *
  * @relates AranyaClient.
  */
@@ -2028,8 +2027,7 @@ AranyaError aranya_create_label(const struct AranyaClient *client,
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id the ID of the role that manages this
- *        label [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role_id the ID of the role that manages this label
  *
  * @relates AranyaClient.
  */
@@ -2585,8 +2583,8 @@ AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
  * @param[in] team the team's ID
  * @param[out] device the ID of the device
  * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
- * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
- * @param[out] has_role whether a role is assigned to the device.
+ * if a role was not assigned to the device
+ * @param[out] has_role whether a role is assigned to the device
  *
  * @relates AranyaClient.
  */
@@ -2603,8 +2601,8 @@ AranyaError aranya_team_device_role(const struct AranyaClient *client,
  * @param[in] team the team's ID
  * @param[out] device the ID of the device
  * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
- * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
- * @param[out] has_role whether a role is assigned to the device.
+ * if a role was not assigned to the device
+ * @param[out] has_role whether a role is assigned to the device
  *
  * @relates AranyaClient.
  */
