@@ -4,9 +4,9 @@ use core::{
     ops::Deref,
     ptr, slice,
 };
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr as _};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
@@ -457,6 +457,19 @@ impl From<&LabelId> for aranya_client::LabelId {
 pub struct LabelName(*const c_char);
 
 impl LabelName {
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(Text::try_from(cstr)?)
+    }
+}
+
+/// A role name.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleName(*const c_char);
+
+impl RoleName {
     unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
@@ -1236,12 +1249,12 @@ pub unsafe fn team_roles(
 pub fn create_role(
     client: &Client,
     team: &TeamId,
-    role_name: &str,
+    role_name: RoleName,
     owning_role: &RoleId,
     role_out: &mut MaybeUninit<Role>,
 ) -> Result<(), imp::Error> {
-    let role_name = Text::from_str(role_name)
-        .map_err(|_| imp::Error::Other(anyhow!("bad role name string")))?;
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let role_name = unsafe { role_name.as_underlying() }?;
     let role = client.rt.block_on(
         client
             .inner
@@ -1257,6 +1270,44 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
     client
         .rt
         .block_on(client.inner.team(team.into()).delete_role(role.into()))?;
+    Ok(())
+}
+
+/// Assign a permission to a role.
+pub fn add_perm_to_role(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_perm_to_role(role.into(), perm),
+    )?;
+    Ok(())
+}
+
+/// Remove a permission from a role.
+pub fn remove_perm_from_role(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_perm_from_role(role.into(), perm),
+    )?;
     Ok(())
 }
 

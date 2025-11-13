@@ -509,6 +509,11 @@ typedef uint64_t AranyaDuration;
 typedef const char *AranyaPermission;
 
 /**
+ * A role name.
+ */
+typedef const char *AranyaRoleName;
+
+/**
  * A label name.
  *
  * E.g. "TELEMETRY_LABEL"
@@ -1763,8 +1768,7 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
  */
 AranyaError aranya_create_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
-                               const uint8_t *role_name,
-                               size_t role_name_len,
+                               AranyaRoleName role_name,
                                const struct AranyaRoleId *owning_role,
                                struct AranyaRole *role_out);
 
@@ -1773,8 +1777,7 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
  */
 AranyaError aranya_create_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
-                                   const uint8_t *role_name,
-                                   size_t role_name_len,
+                                   AranyaRoleName role_name,
                                    const struct AranyaRoleId *owning_role,
                                    struct AranyaRole *role_out,
                                    struct AranyaExtError *__ext_err);
@@ -1793,6 +1796,40 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaRoleId *role,
                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Assign a permission to a role.
+ */
+AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaRoleId *role,
+                                    AranyaPermission perm);
+
+/**
+ * Assign a permission to a role.
+ */
+AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaRoleId *role,
+                                        AranyaPermission perm,
+                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Remove a permission from a role.
+ */
+AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaRoleId *role,
+                                         AranyaPermission perm);
+
+/**
+ * Remove a permission from a role.
+ */
+AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaRoleId *role,
+                                             AranyaPermission perm,
+                                             struct AranyaExtError *__ext_err);
 
 /**
  * Assign a role to a device.
