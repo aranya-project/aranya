@@ -23,7 +23,7 @@ use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
+use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -977,6 +977,227 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected error when using bogus owner role: {err:?}"),
     }
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .expect("no owner role!?");
+
+    let test_role = owner_team
+        .create_role(text!("test_role"), owner_role.id)
+        .await
+        .expect("expected to create role");
+
+    owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "test_role")
+        .expect("no test role found");
+
+    // Set up another device, sync it, and make sure they can see the
+    // role.
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    admin_team.sync_now(owner_addr, None).await?;
+
+    let test_role2 = admin_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "test_role")
+        .expect("no test role found");
+    assert_eq!(test_role, test_role2);
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_perm_to_created_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .expect("no owner role!?");
+
+    // Create a custom admin type role
+    let admin_role = owner_team
+        .create_role(text!("admin"), owner_role.id)
+        .await?;
+    owner_team
+        .add_perm_to_role(admin_role.id, text!("AddDevice"))
+        .await
+        .expect("expected to assign AddDevice to admin");
+
+    // Add our admin with this role
+    owner_team
+        .add_device(devices.admin.pk, Some(admin_role.id))
+        .await
+        .expect("expected to add admin with role");
+
+    // Sync the admin and test that they can add the operator
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    admin_team
+        .add_device(devices.operator.pk, None)
+        .await
+        .expect("admin should be able to add operator");
+
+    Ok(())
+}
+
+/// Tests that privilege escalation attempt is rejected.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_privilege_escalation_rejected() -> Result<()> {
+    let team_name = "test_privilege_escalation_rejected";
+    let mut devices = DevicesCtx::new(team_name).await?;
+
+    // Owner creates the team.
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
+
+    // Initialize malicious device on team.
+    let work_dir = tempfile::tempdir()?;
+    let work_dir_path = work_dir.path();
+    let device = DeviceCtx::new(team_name, "malicious", work_dir_path.join("malicious")).await?;
+    owner_team.add_device(device.pk.clone(), None).await?;
+    let device_seed = owner_team
+        .encrypt_psk_seed_for_peer(device.pk.encryption())
+        .await?;
+    device
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&device_seed)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    // Owner creates malicious role on team:
+    let role = owner_team
+        .create_role(text!("malicious_role"), owner_role.id)
+        .await
+        .expect("expected to create malicious role");
+
+    // Owner only allows role to create new roles.
+    owner_team
+        .add_perm_to_role(role.id, text!("CreateRole"))
+        .await?;
+
+    // Owner assigns role to malicious device.
+    owner_team.assign_role(device.id, role.id).await?;
+
+    // Malicious device syncs with owner.
+    let device_team = device.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    device_team.sync_now(owner_addr, None).await?;
+
+    // Malicious device creates a new target role (which it maintains control of).
+    let target_role = device_team
+        .create_role(text!("target_role"), role.id)
+        .await
+        .expect("unable to create target role");
+
+    // Malicious device attempts to grant target role a permission it does not have: e.g. CanUseAfc
+    // This should be rejected, which indicates a privilege escalation attempt will be rejected.
+    device_team
+        .add_perm_to_role(target_role.id, text!("CanUseAfc"))
+        .await
+        .expect_err("expected privilege escalation attempt to fail");
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_remove_perm_from_default_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+
+    // Add admin with admin role
+    owner_team
+        .add_device(devices.admin.pk, Some(roles.admin().id))
+        .await
+        .expect("expected to add admin with role");
+
+    owner_team
+        .remove_perm_from_role(roles.admin().id, text!("AddDevice"))
+        .await
+        .expect("expected to remove AddDevice from admin");
+
+    // Sync the admin
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Admin cannot add operator
+    admin_team
+        .add_device(devices.operator.pk, None)
+        .await
+        .expect_err("admin should not be able to add operator");
+
+    Ok(())
+}
+
+/// Tests that role deletion works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_delete_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_delete_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .delete_role(roles.member().id)
+        .await
+        .expect("expected to delete role");
 
     Ok(())
 }
