@@ -1244,7 +1244,7 @@ pub unsafe fn team_roles(
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
-/// @param[in] role_name the name of the new role.
+/// @param[in] role_name the name of the new role [`RoleName`].
 /// @param[in] owning_role the [`RoleId`] that will own the new role.
 /// @param[out] role_out the newly created [`Role`].
 ///
