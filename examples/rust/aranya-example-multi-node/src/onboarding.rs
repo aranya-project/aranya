@@ -4,8 +4,10 @@ use std::time::Duration;
 
 use age::secrecy::SecretString;
 use anyhow::Result;
-use aranya_client::client::{DeviceId, KeyBundle, TeamId};
-use aranya_util::Addr;
+use aranya_client::{
+    client::{DeviceId, KeyBundle, TeamId},
+    Addr,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{

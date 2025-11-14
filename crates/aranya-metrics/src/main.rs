@@ -3,14 +3,13 @@
 
 use std::{
     env,
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Instant,
 };
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    afc, text, AddTeamConfig, AddTeamQuicSyncConfig, ChanOp, Client, CreateTeamConfig,
+    afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
     CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
 };
 use backon::{ExponentialBuilder, Retryable as _};
@@ -198,7 +197,7 @@ impl ClientCtx {
         })
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 }
@@ -338,14 +337,14 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     owner
         .add_device(ctx.membera.pk.clone(), Some(member_role.id))
         .await?;
-    membera.sync_now(owner_addr.into(), None).await?;
+    membera.sync_now(owner_addr, None).await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     owner
         .add_device(ctx.memberb.pk.clone(), Some(member_role.id))
         .await?;
-    memberb.sync_now(owner_addr.into(), None).await?;
+    memberb.sync_now(owner_addr, None).await?;
 
     // fact database queries
     let devices = membera.devices().await?;
@@ -370,8 +369,8 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .assign_label(label3, op)
         .await?;
 
-    membera.sync_now(owner_addr.into(), None).await?;
-    memberb.sync_now(owner_addr.into(), None).await?;
+    membera.sync_now(owner_addr, None).await?;
+    memberb.sync_now(owner_addr, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");

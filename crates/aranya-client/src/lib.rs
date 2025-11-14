@@ -34,6 +34,7 @@ pub mod error;
 mod util;
 
 pub use aranya_policy_text::{text, Text};
+pub use aranya_util::Addr;
 
 #[doc(inline)]
 pub use crate::{
