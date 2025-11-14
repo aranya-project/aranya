@@ -39,13 +39,13 @@ dependencies = ["build"]
 category = "build"
 description = "Build Code with experimental features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc,experimental", "${@}"]
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,experimental", "${@}"]
 
 [tasks.build-preview]
 category = "build"
 description = "Build Code with preview features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,afc", "${@}"]
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview", "${@}"]
 
 [tasks.tgz-daemon]
 category = "build"
@@ -104,14 +104,14 @@ category = "build"
 description = "Build C API shared library with experimental features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release", "--features=preview,afc,experimental"]
+args = ["build", "--release", "--features=preview,experimental"]
 
 [tasks.build-capi-lib-preview]
 category = "build"
 description = "Build C API shared library with preview features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release", "--features=preview,afc"]
+args = ["build", "--release", "--features=preview"]
 
 [tasks.tgz-capi]
 category = "build"
@@ -318,8 +318,8 @@ description = "Run Metrics Crate"
 script = '''
 #!/usr/bin/env bash
 set -e
-cargo build --bin aranya-daemon --release --features=preview,afc
-cargo build --bin aranya-metrics --release --features=afc
+cargo build --bin aranya-daemon --release --features=preview
+cargo build --bin aranya-metrics --release
 CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
 '''
 

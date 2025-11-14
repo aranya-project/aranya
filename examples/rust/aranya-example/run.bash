@@ -15,10 +15,9 @@ current_dir="$(pwd)"
 echo "Building aranya-example..."
 cargo build \
     --release \
-    --manifest-path Cargo.toml \
+    --package aranya-example \
     --bin aranya-example \
-    --features afc \
-    --locked
+    --features preview
 
 echo "Building aranya-daemon..."
 cargo build \
@@ -26,7 +25,7 @@ cargo build \
     --manifest-path Cargo.toml \
     --package aranya-daemon \
     --bin aranya-daemon \
-    --features experimental,preview,afc
+    --features experimental,preview
 
 daemon="${current_dir}/target/release/aranya-daemon"
 example="${current_dir}/target/release/aranya-example"
