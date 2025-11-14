@@ -666,8 +666,14 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .await?;
 
     // Remove channel devices from team.
-    owner_team.remove_device(devices.membera.id).await?;
-    owner_team.remove_device(devices.memberb.id).await?;
+    owner_team
+        .device(devices.membera.id)
+        .remove_from_team()
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .remove_from_team()
+        .await?;
 
     // wait for syncing.
     devices
@@ -780,10 +786,12 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
 
     // Revoke roles from channel devices.
     owner_team
-        .revoke_role(devices.membera.id, default_roles.member().id)
+        .device(devices.membera.id)
+        .revoke_role(default_roles.member().id)
         .await?;
     owner_team
-        .revoke_role(devices.memberb.id, default_roles.member().id)
+        .device(devices.memberb.id)
+        .revoke_role(default_roles.member().id)
         .await?;
 
     // wait for syncing.
@@ -895,18 +903,12 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 
     // Assign roles without `CanUseAfc` permission.
     owner_team
-        .change_role(
-            devices.membera.id,
-            default_roles.member().id,
-            default_roles.operator().id,
-        )
+        .device(devices.membera.id)
+        .change_role(default_roles.member().id, default_roles.operator().id)
         .await?;
     owner_team
-        .change_role(
-            devices.memberb.id,
-            default_roles.member().id,
-            default_roles.operator().id,
-        )
+        .device(devices.memberb.id)
+        .change_role(default_roles.member().id, default_roles.operator().id)
         .await?;
 
     // wait for syncing.
