@@ -371,16 +371,21 @@ pub trait DaemonApi {
     //
 
     /// Adds a permission to a role.
+    #[cfg(feature = "preview")]
     async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Text) -> Result<()>;
     /// Removes a permission from a role.
+    #[cfg(feature = "preview")]
     async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Text) -> Result<()>;
     /// Adds an owning role to the target role.
+    #[cfg(feature = "preview")]
     async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Removes an owning role from the target role.
+    #[cfg(feature = "preview")]
     async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Returns the roles that own the target role.
     async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.
+    #[cfg(feature = "preview")]
     async fn assign_role_management_perm(
         team: TeamId,
         role: RoleId,
@@ -388,6 +393,7 @@ pub trait DaemonApi {
         perm: Text,
     ) -> Result<()>;
     /// Revokes a role management permission from a role.
+    #[cfg(feature = "preview")]
     async fn revoke_role_management_perm(
         team: TeamId,
         role: RoleId,
@@ -404,6 +410,7 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Changes the assigned role of a device.
+    #[cfg(feature = "preview")]
     async fn change_role(
         team: TeamId,
         device: DeviceId,

@@ -127,6 +127,7 @@ impl Device<'_> {
     }
 
     /// Changes the `role` on a `device`
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn change_role(&self, old_role: RoleId, new_role: RoleId) -> Result<()> {
         self.client
