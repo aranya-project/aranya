@@ -4,26 +4,30 @@ use std::{
 };
 
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{Address, GraphId};
-use aranya_util::{error::ReportExt as _, ready};
+use aranya_runtime::{Address, GraphId, SyncHelloType, SyncType, MAX_SYNC_MESSAGE_SIZE};
+use aranya_util::ready;
 use dashmap::DashMap;
 use futures_util::StreamExt as _;
 use tokio::{
     sync::mpsc,
     task::{JoinError, JoinSet},
 };
-use tokio_util::{
-    sync::CancellationToken,
-    time::{delay_queue::Key, DelayQueue},
-};
-use tracing::{error, info, trace};
+use tokio_util::time::{delay_queue::Key, DelayQueue};
 
-use super::{Result, SyncPeer};
+use super::SyncPeer;
 
-struct ActiveSync {
-    cancel: CancellationToken,
-    started_at: Instant,
+#[derive(Debug, thiserror::Error)]
+enum SyncError {
+    #[error("This peer hasn't been registered yet")]
+    PeerNotRegistered,
+    #[error("There's already an active sync for this peer")]
+    AlreadyActive,
+    #[error("Unable to send manager a message")]
+    ManagerShutdown,
+    #[error(transparent)]
+    Postcard(#[from] postcard::Error),
 }
+type Result<T> = core::result::Result<T, SyncError>;
 
 struct HelloConfig {
     graph_change_delay: Duration,
@@ -41,39 +45,51 @@ enum ManagerMessage {
     RemovePeer { peer: SyncPeer },
     /// Request to sync with a peer now (bypasses `DelayQueue`).
     SyncNow { peer: SyncPeer },
-    /// Request to cancel an active sync.
-    CancelSync { peer: SyncPeer },
     /// Subscribe to sending hello notifications to this peer.
     HelloSubscribe { peer: SyncPeer, config: HelloConfig },
     /// Unsubscribe from sending hello notifications to this peer.
     HelloUnsubscribe { peer: SyncPeer },
+
+    /// Send a hello notification to this peer.
+    SendHello { peer: SyncPeer, head: Address },
     /// Received a hello notification from a peer.
     HelloReceived { peer: SyncPeer, head: Address },
     /// Our graph head changed, so notify all subscribed peers.
     GraphHeadChanged { graph_id: GraphId, head: Address },
 }
 
+enum ActiveSync {
+    PullSync { started_at: Instant },
+    HelloSend { started_at: Instant },
+}
+
+enum TaskResult {
+    PullSync { peer: SyncPeer, result: Result<()> },
+    HelloSend { peer: SyncPeer, result: Result<()> },
+}
+
+struct PeerEntry {
+    config: SyncPeerConfig,
+    queue_key: Key,
+    buffer: Vec<u8>,
+}
+
 pub struct SyncManager<T, H> {
     active: DashMap<SyncPeer, ActiveSync>,
-    tasks: JoinSet<SyncResult>,
+    tasks: JoinSet<TaskResult>,
     messages: mpsc::Receiver<ManagerMessage>,
-    peers: DashMap<SyncPeer, (SyncPeerConfig, Key)>,
+    peers: DashMap<SyncPeer, PeerEntry>,
     queue: DelayQueue<SyncPeer>,
     hello_service: HelloService,
     transport: T,
     handler: H,
 }
 
-struct SyncResult {
-    peer: SyncPeer,
-    result: Result<()>,
-}
-
 impl<T, H> SyncManager<T, H> {
     pub fn new<const BUFFER: usize>(transport: T, handler: H) -> (Self, Arc<SyncHandle>) {
         let (tx, messages) = mpsc::channel(BUFFER);
 
-        let handle = Arc::new(SyncHandle::new(tx));
+        let handle = Arc::new(SyncHandle { tx });
         let hello_service = HelloService::new(Arc::clone(&handle));
 
         let manager = Self {
@@ -89,62 +105,53 @@ impl<T, H> SyncManager<T, H> {
 
         (manager, handle)
     }
+}
 
-    async fn add_peer(&mut self, peer: SyncPeer, config: SyncPeerConfig) {
-        let key = self.queue.insert(peer, config.interval);
-
-        let sync_now = config.sync_now;
-        let interval = config.interval;
-        if let Some((_, old_key)) = self.peers.insert(peer, (config, key)) {
-            self.queue.remove(&old_key);
-            info!("Updated peer {peer:?} with new interval {interval:?}");
-        } else {
-            info!("Added peer {peer:?} with interval {interval:?}");
-        }
-
-        if sync_now {
-            Box::pin(self.handle_message(ManagerMessage::SyncNow { peer })).await;
-        }
-    }
-
-    fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some(state) = self.active.get(&peer) {
-            state.cancel.cancel();
-            info!("Cancelled active sync when removing peer {peer:?}");
-        }
-
-        if let Some((_, (_, key))) = self.peers.remove(&peer) {
-            self.queue.remove(&key);
-            info!("Removed peer {peer:?} from the schedule");
-        }
-    }
-
+impl<T: Transport, H: Handler> SyncManager<T, H> {
     pub async fn run(mut self, ready: ready::Notifier) {
         ready.notify();
 
         loop {
             tokio::select! {
-                Some(msg) = self.messages.recv() => {
-                    self.handle_message(msg).await;
+                Some(result) = self.tasks.join_next() => {
+                    self.handle_task_done(result).await;
                 }
 
-                Some(result) = self.tasks.join_next() => {
-                    self.handle_sync_completion(result).await;
+                Some(msg) = self.messages.recv() => {
+                    self.handle_message(msg).await;
                 }
 
                 Some(expired) = self.queue.next() => {
                     let peer = expired.into_inner();
 
                     if !self.active.contains_key(&peer) {
-                        if let Err(e) = self.start_sync(peer).await {
-                            error!("Failed to start sync for {peer:?}: {e}");
-                        }
+                        self.start_sync(peer).await;
                     }
+                }
+
+                Some(expired) = self.hello_service.queue.next() => {
+                    self.hello_service.handle_expired_subscription(expired.into_inner()).await;
                 }
 
                 // No tasks ready, sleep briefly.
                 else => {
                     tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            }
+        }
+    }
+
+    async fn handle_task_done(&mut self, result: core::result::Result<TaskResult, JoinError>) {
+        if let Ok(result) = result {
+            match result {
+                TaskResult::PullSync { peer, .. } => {
+                    self.active.remove(&peer);
+                    if let Some(mut entry) = self.peers.get_mut(&peer) {
+                        entry.queue_key = self.queue.insert(peer, entry.config.interval);
+                    }
+                }
+                TaskResult::HelloSend { peer, .. } => {
+                    self.active.remove(&peer);
                 }
             }
         }
@@ -159,20 +166,16 @@ impl<T, H> SyncManager<T, H> {
                 self.remove_peer(peer);
             }
             ManagerMessage::SyncNow { peer } => {
-                if let Err(e) = self.start_sync(peer).await {
-                    error!("Failed to start sync for {peer:?}: {e}");
-                }
-            }
-            ManagerMessage::CancelSync { peer } => {
-                if let Some(state) = self.active.get(&peer) {
-                    state.cancel.cancel();
-                }
+                self.start_sync(peer).await;
             }
             ManagerMessage::HelloSubscribe { peer, config } => {
                 self.hello_service.subscribe(peer, config);
             }
             ManagerMessage::HelloUnsubscribe { peer } => {
                 self.hello_service.unsubscribe(peer);
+            }
+            ManagerMessage::SendHello { peer, head } => {
+                self.send_hello(peer, head).await;
             }
             ManagerMessage::HelloReceived { peer, head } => {
                 // TODO(nikki): move this to hello_service? Just adds another layer of indirection.
@@ -184,56 +187,271 @@ impl<T, H> SyncManager<T, H> {
         }
     }
 
-    async fn handle_sync_completion(
-        &mut self,
-        result: core::result::Result<SyncResult, JoinError>,
-    ) {
-        match result {
-            Ok(sync_result) => {
-                let peer = sync_result.peer;
-                self.active.remove(&peer);
+    async fn add_peer(&mut self, peer: SyncPeer, config: SyncPeerConfig) {
+        let queue_key = self.queue.insert(peer, config.interval);
 
-                match sync_result.result {
-                    Ok(()) => trace!("Sync completed for {peer:?}"),
-                    Err(e) => trace!("Sync failed for {peer:?}: {e}"),
-                }
-
-                if let Some(mut entry) = self.peers.get_mut(&peer) {
-                    let (config, old_key) = entry.value_mut();
-                    let key = self.queue.insert(peer, config.interval);
-                    *old_key = key;
-                }
+        let buffer = match self.peers.remove(&peer) {
+            Some((_, old)) => {
+                self.queue.remove(&old.queue_key);
+                old.buffer
             }
-            Err(err) => error!(error = %err.report(), "unable to sync with peer"),
+            None => {
+                let mut buffer = Vec::with_capacity(MAX_SYNC_MESSAGE_SIZE);
+                buffer.resize(MAX_SYNC_MESSAGE_SIZE, 0);
+                buffer
+            }
+        };
+
+        self.peers.insert(
+            peer,
+            PeerEntry {
+                config: config.clone(),
+                queue_key,
+                buffer,
+            },
+        );
+
+        if config.sync_now {
+            Box::pin(self.handle_message(ManagerMessage::SyncNow { peer })).await;
+        }
+    }
+
+    fn remove_peer(&mut self, peer: SyncPeer) {
+        if let Some((_, entry)) = self.peers.remove(&peer) {
+            self.queue.remove(&entry.queue_key);
         }
     }
 
     async fn start_sync(&mut self, peer: SyncPeer) -> Result<()> {
+        if self.active.contains_key(&peer) {
+            return Err(SyncError::AlreadyActive);
+        }
+
+        // TODO(nikki): limit max concurrent syncs?
+
+        let buffer = self
+            .peers
+            .get(&peer)
+            .map(|entry| entry.buffer.clone())
+            .ok_or(SyncError::PeerNotRegistered)?;
+
+        self.active.insert(
+            peer,
+            ActiveSync::PullSync {
+                started_at: Instant::now(),
+            },
+        );
+
+        let transport = self.transport.clone();
+        let handler = self.handler.clone();
+        self.tasks.spawn(async move {
+            let result = Self::sync_task(peer, transport, handler, buffer).await;
+            TaskResult::PullSync { peer, result }
+        });
+
         Ok(())
+    }
+
+    async fn sync_task(peer: SyncPeer, mut t: T, mut h: H, mut buf: Vec<u8>) -> Result<()> {
+        t.run_sync(&mut buf, peer).await?;
+        h.handle_sync(&mut buf, peer).await?;
+        Ok(())
+    }
+
+    async fn send_hello(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
+        if self.active.contains_key(&peer) {
+            return Err(SyncError::AlreadyActive);
+        }
+
+        // TODO(nikki): distinguish between push, pull, and hello?
+        self.active.insert(
+            peer,
+            ActiveSync::HelloSend {
+                started_at: Instant::now(),
+            },
+        );
+
+        let msg = SyncType::Hello(SyncHelloType::Hello {
+            head,
+            address: peer.addr,
+        });
+
+        let mut transport = self.transport.clone();
+        let data = postcard::to_allocvec(&msg)?;
+        self.tasks.spawn(async move {
+            let result = transport.send_message(&data, peer).await;
+            TaskResult::HelloSend { peer, result }
+        });
+
+        Ok(())
+    }
+
+    async fn handle_hello_received(&mut self, peer: SyncPeer, _head: Address) {
+        // TODO(nikki): do stuff with the new head.
+        let sync_on_hello = {
+            if let Some(entry) = self.peers.get(&peer) {
+                entry.config.sync_on_hello
+            } else {
+                false
+            }
+        };
+
+        if sync_on_hello {
+            self.start_sync(peer).await;
+        }
     }
 }
 
-struct SyncHandle {
+pub struct SyncHandle {
     tx: mpsc::Sender<ManagerMessage>,
 }
 
 impl SyncHandle {
-    fn new(tx: mpsc::Sender<ManagerMessage>) -> Self {
-        Self { tx }
+    pub async fn add_peer(&self, peer: SyncPeer, config: SyncPeerConfig) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::AddPeer { peer, config })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    pub async fn remove_peer(&self, peer: SyncPeer) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::RemovePeer { peer })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    pub async fn sync_now(&self, peer: SyncPeer) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::SyncNow { peer })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    pub async fn hello_subscribe(&self, peer: SyncPeer, config: HelloConfig) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::HelloSubscribe { peer, config })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    pub async fn hello_unsubscribe(&self, peer: SyncPeer) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::HelloUnsubscribe { peer })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    async fn send_hello(&self, peer: SyncPeer, head: Address) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::SendHello { peer, head })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    async fn hello_received(&self, peer: SyncPeer, head: Address) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::HelloReceived { peer, head })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
+    }
+
+    async fn graph_head_changed(&self, graph_id: GraphId, head: Address) -> Result<()> {
+        self.tx
+            .send(ManagerMessage::GraphHeadChanged { graph_id, head })
+            .await
+            .map_err(|_| SyncError::ManagerShutdown)
     }
 }
 
+#[async_trait::async_trait]
+trait Transport: Send + Clone + 'static {
+    /// Sync with a peer.
+    async fn run_sync(&mut self, buffer: &mut Vec<u8>, peer: SyncPeer) -> Result<()>;
+
+    /// Send a one-way message to a peer.
+    async fn send_message(&mut self, data: &[u8], peer: SyncPeer) -> Result<()>;
+}
+
+#[async_trait::async_trait]
+trait Handler: Send + Clone + 'static {
+    async fn handle_sync(&mut self, buffer: &mut Vec<u8>, peer: SyncPeer) -> Result<()>;
+}
+
+struct HelloSubscription {
+    config: HelloConfig,
+    queue_key: Key,
+    last_sent: Option<Instant>,
+    current_head: Option<Address>,
+}
+
 struct HelloService {
+    subscriptions: DashMap<SyncPeer, HelloSubscription>,
+    queue: DelayQueue<SyncPeer>,
     handle: Arc<SyncHandle>,
 }
 
 impl HelloService {
     fn new(handle: Arc<SyncHandle>) -> Self {
-        Self { handle }
+        Self {
+            subscriptions: DashMap::new(),
+            queue: DelayQueue::new(),
+            handle,
+        }
     }
 
-    fn check_periodic(&self) {
-        // TODO(nikki): run checks and add stuff via the handle.
+    fn subscribe(&mut self, peer: SyncPeer, config: HelloConfig) {
+        let queue_key = self.queue.insert(peer, config.schedule_delay);
+        let state = HelloSubscription {
+            config,
+            queue_key,
+            last_sent: None,
+            current_head: None,
+        };
+        if let Some(state) = self.subscriptions.insert(peer, state) {
+            self.queue.remove(&state.queue_key);
+        }
+    }
+
+    fn unsubscribe(&mut self, peer: SyncPeer) {
+        if let Some((_, sub)) = self.subscriptions.remove(&peer) {
+            self.queue.remove(&sub.queue_key);
+        }
+    }
+
+    async fn handle_expired_subscription(&mut self, peer: SyncPeer) {
+        if let Some(mut entry) = self.subscriptions.get_mut(&peer) {
+            if let Some(head) = entry.current_head {
+                entry.last_sent = Some(Instant::now());
+                self.handle.send_hello(peer, head).await;
+                entry.queue_key = self.queue.insert(peer, entry.config.schedule_delay);
+            }
+        }
+    }
+
+    async fn graph_head_changed(&mut self, graph_id: GraphId, head: Address) {
+        for mut entry in self.subscriptions.iter_mut() {
+            let peer = *entry.key();
+
+            if peer.graph_id != graph_id {
+                continue;
+            }
+
+            let state = entry.value_mut();
+            state.current_head = Some(head);
+
+            let should_send = match state.last_sent {
+                Some(last) => last.elapsed() >= state.config.graph_change_delay,
+                None => true,
+            };
+
+            if should_send {
+                self.handle.send_hello(peer, head).await;
+                state.last_sent = Some(Instant::now());
+                self.queue.remove(&state.queue_key);
+                state.queue_key = self.queue.insert(peer, state.config.graph_change_delay);
+            }
+        }
     }
 }
 
