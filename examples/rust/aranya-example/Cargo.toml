@@ -12,9 +12,9 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
+default = ["afc"]
 
-afc = ["aranya-client/afc", "preview"]
+afc = ["aranya-client/afc"]
 preview = ["aranya-client/preview"]
 
 # Enable debugging.

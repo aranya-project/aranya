@@ -124,8 +124,7 @@ aligned_n = "ARANYA_ALIGNED"
 clean = true
 
 [parse.expand]
-default_features = false
-features = ["afc", "preview", "experimental"]
+features = ["preview", "experimental"]
 crates = ["aranya-client-capi"]
 
 [ptr]

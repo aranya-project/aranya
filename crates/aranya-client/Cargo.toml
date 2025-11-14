@@ -14,7 +14,7 @@ workspace = true
 
 
 [features]
-default = []
+default = ["afc"]
 
 # Enable debugging.
 debug = []
@@ -49,7 +49,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 aranya-client = { path = ".", features = ["preview"] }
-aranya-daemon = { path = "../aranya-daemon", features = ["afc", "experimental", "preview"] }
+aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview"] }
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }

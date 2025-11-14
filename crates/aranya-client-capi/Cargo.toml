@@ -19,7 +19,7 @@ doctest = false
 
 
 [features]
-default = []
+default = ["afc"]
 
 # Preview features
 preview = ["aranya-client/preview"]
