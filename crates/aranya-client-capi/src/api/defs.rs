@@ -10,6 +10,7 @@ use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
+use aranya_client::config::MAX_SYNC_INTERVAL;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 use tracing::{debug, error};
@@ -993,7 +994,7 @@ pub fn create_team_config_build(
 /// Sync Peer config.
 ///
 /// Use a [`SyncPeerConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 32, align = 8)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 
 /// Builder for a Sync Peer config [`SyncPeerConfig`].
@@ -1026,11 +1027,23 @@ pub fn sync_peer_config_build(
 /// this function
 ///
 /// @param[in,out] cfg a pointer to the builder for a sync config
-/// @param[in] interval Set the interval at which syncing occurs
+/// @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+pub fn sync_peer_config_builder_set_interval(
+    cfg: &mut SyncPeerConfigBuilder,
+    interval: Duration,
+) -> Result<(), imp::Error> {
+    // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
+    // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+    if std::time::Duration::from(interval) > MAX_SYNC_INTERVAL {
+        return Err(
+            InvalidArg::new("interval", "must not exceed 1 year to prevent overflow").into(),
+        );
+    }
+
     cfg.interval(interval);
+    Ok(())
 }
 
 /// Updates the config to enable immediate syncing with the peer.
@@ -1060,6 +1073,24 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
     cfg.sync_now(false);
 }
 
+/// Sets whether automatic syncing should occur when a hello message is received from this peer
+/// indicating they have a head that we don't have.
+///
+/// By default, sync on hello is disabled.
+/// @param[in,out] cfg a pointer to the builder for a sync config
+/// @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
+///
+/// @relates AranyaSyncPeerConfigBuilder.
+// TODO: Use bool instead of u32 once bool support is added. See https://github.com/aranya-project/aranya-core/issues/129
+#[cfg(feature = "preview")]
+pub fn sync_peer_config_builder_set_sync_on_hello(
+    cfg: &mut SyncPeerConfigBuilder,
+    sync_on_hello: u32,
+) {
+    cfg.sync_on_hello(sync_on_hello != 0);
+}
+
+/// Assign a role to a device.
 /// Setup default roles on team.
 ///
 /// This sets up the following roles with default permissions as
@@ -1810,6 +1841,63 @@ pub unsafe fn remove_sync_peer(
     client
         .rt
         .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
+    Ok(())
+}
+
+/// Subscribe to hello notifications from a sync peer.
+///
+/// This will request the peer to send hello notifications when their graph head changes.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] peer the peer's Aranya network address [`Addr`].
+/// @param[in] graph_change_delay minimum delay between notifications when graph changes.
+/// @param[in] duration how long the subscription should remain active.
+/// @param[in] schedule_delay interval for periodic scheduled hello sends.
+///
+/// @relates AranyaClient.
+#[cfg(feature = "preview")]
+pub unsafe fn sync_hello_subscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+    graph_change_delay: Duration,
+    duration: Duration,
+    schedule_delay: Duration,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_subscribe(
+            addr,
+            graph_change_delay.into(),
+            duration.into(),
+            schedule_delay.into(),
+        ))?;
+    Ok(())
+}
+
+/// Unsubscribe from hello notifications from a sync peer.
+///
+/// This will stop receiving hello notifications from the specified peer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "preview")]
+pub unsafe fn sync_hello_unsubscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
     Ok(())
 }
 

@@ -6,7 +6,7 @@ mod perm;
 mod role;
 mod team;
 
-use std::{fmt::Debug, io, net::SocketAddr, path::Path};
+use std::{fmt::Debug, io, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
@@ -17,7 +17,7 @@ use aranya_daemon_api::{
     },
     DaemonApiClient, Version, CS,
 };
-use aranya_util::error::ReportExt;
+use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info};
@@ -189,7 +189,7 @@ impl Client {
     }
 
     /// Returns the address that the Aranya sync server is bound to.
-    pub async fn local_addr(&self) -> Result<SocketAddr> {
+    pub async fn local_addr(&self) -> Result<Addr> {
         self.daemon
             .aranya_local_addr(context::current())
             .await

@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
-use aranya_util::Addr;
+use aranya_client::Addr;
 use tokio::fs;
 use tracing::info;
 

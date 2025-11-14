@@ -43,11 +43,12 @@ postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
 tracing = { workspace = true }
 
 
 [dev-dependencies]
+aranya-client = { path = ".", features = ["preview"] }
 aranya-daemon = { path = "../aranya-daemon", features = ["afc", "experimental", "preview"] }
 spideroak-base58 = { workspace = true }
 
