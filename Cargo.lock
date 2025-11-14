@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-afc-util",
@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-example"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-example-multi-node"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "age",
  "anyhow",
@@ -559,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -791,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",
