@@ -15,7 +15,7 @@ use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{ChanOp, RoleId},
+    client::{ChanOp, Permission, RoleId, RoleManagementPermission},
     config::{CreateTeamConfig, SyncPeerConfig},
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
@@ -1447,7 +1447,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
         .create_role(text!("admin"), owner_role.id)
         .await?;
     owner_team
-        .add_perm_to_role(admin_role.id, text!("AddDevice"))
+        .add_perm_to_role(admin_role.id, Permission::AddDevice)
         .await
         .expect("expected to assign AddDevice to admin");
 
@@ -1515,7 +1515,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 
     // Owner only allows role to create new roles.
     owner_team
-        .add_perm_to_role(role.id, text!("CreateRole"))
+        .add_perm_to_role(role.id, Permission::CreateRole)
         .await?;
 
     // Owner assigns role to malicious device.
@@ -1535,7 +1535,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Malicious device attempts to grant target role a permission it does not have: e.g. CanUseAfc
     // This should be rejected, which indicates a privilege escalation attempt will be rejected.
     device_team
-        .add_perm_to_role(target_role.id, text!("CanUseAfc"))
+        .add_perm_to_role(target_role.id, Permission::CanUseAfc)
         .await
         .expect_err("expected privilege escalation attempt to fail");
 
@@ -1562,7 +1562,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
         .expect("expected to add admin with role");
 
     owner_team
-        .remove_perm_from_role(roles.admin().id, text!("AddDevice"))
+        .remove_perm_from_role(roles.admin().id, Permission::AddDevice)
         .await
         .expect("expected to remove AddDevice from admin");
 
@@ -1705,7 +1705,7 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
         .assign_role_management_permission(
             roles.member().id,
             roles.operator().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
     {
@@ -1735,7 +1735,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
         .assign_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
         .context("Failed to assign role management permission")?;
@@ -1768,7 +1768,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
         .revoke_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
         .context("Failed to revoke role management permission")?;
@@ -1808,7 +1808,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
         .assign_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanAssignRole"),
+            RoleManagementPermission::CanAssignRole,
         )
         .await
         .context("Failed to assign role management permission")?;
@@ -1850,7 +1850,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
         .assign_role_management_permission(
             roles.operator().id,
             roles.admin().id,
-            text!("CanRevokeRole"),
+            RoleManagementPermission::CanRevokeRole,
         )
         .await
         .expect_err("expected owner role management to fail after owner role was removed");

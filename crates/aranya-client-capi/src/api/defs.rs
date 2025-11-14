@@ -496,21 +496,115 @@ impl Addr {
     }
 }
 
-/// The name of a permission.
-///
-/// E.g. "CanAssignRole"
-///
-/// Refer to the "Role Management" section of the policy for an exhaustive list.
-#[repr(transparent)]
+/// Role management permission.
+#[cfg(feature = "preview")]
+#[repr(u8)]
 #[derive(Copy, Clone, Debug)]
-pub struct Permission(*const c_char);
+pub enum RoleManagementPermission {
+    /// Grants a managing role the ability to assign the target role
+    /// to any device except itself.
+    CanAssignRole,
+    /// Grants a managing role the ability to revoke the target role
+    /// from any device.
+    CanRevokeRole,
+    /// Grants a managing role the ability to change the permissions
+    /// assigned to the target role.
+    CanChangeRolePerms,
+}
 
-impl Permission {
-    #[cfg(feature = "preview")]
-    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(Text::try_from(cstr)?)
+#[cfg(feature = "preview")]
+impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPermission {
+    fn from(perm: RoleManagementPermission) -> Self {
+        match perm {
+            RoleManagementPermission::CanAssignRole => Self::CanAssignRole,
+            RoleManagementPermission::CanRevokeRole => Self::CanRevokeRole,
+            RoleManagementPermission::CanChangeRolePerms => Self::CanChangeRolePerms,
+        }
+    }
+}
+
+/// Simple permission.
+#[cfg(feature = "preview")]
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum Permission {
+    // # Team management
+    //
+    /// The role can add a device to the team.
+    AddDevice,
+    /// The role can remove a device from the team.
+    RemoveDevice,
+    /// The role can terminate the team. This causes all team
+    /// commands to fail until a new team is created.
+    TerminateTeam,
+
+    // # Roles
+    //
+    /// The role can create a role.
+    CreateRole,
+    /// The role can delete a role.
+    DeleteRole,
+    /// The role can assign a role to other devices.
+    AssignRole,
+    /// The role can revoke a role from other devices.
+    RevokeRole,
+    /// The role can set up default roles. This can only be done
+    /// once, so this permission can only effectively be used by
+    /// the `owner` role.
+    SetupDefaultRole,
+    /// The role can add a managing role to or remove a managing
+    /// role from a target role.
+    ChangeRoleManagingRole,
+
+    // # Labels
+    //
+    /// The role can create a label.
+    CreateLabel,
+    /// The role can delete a label.
+    DeleteLabel,
+    /// The role can grant a target role the ability to manage a
+    /// label. This management ability includes deleting a label
+    /// and adding/revoking a label to a device.
+    ChangeLabelManagingRole,
+    /// The role can assign a label to a device. The role must
+    /// also have label management permissions granted by a role
+    /// with the `ChangeLabelManagingRole` permission above.
+    AssignLabel,
+    /// The role can revoke a label from a device. The role must
+    /// also have label management permissions granted by a role
+    /// with the `ChangeLabelManagingRole` permission above.
+    RevokeLabel,
+
+    // # AFC
+    //
+    /// The role can use AFC. This controls the ability to
+    /// create or receive a unidirectional AFC channels.
+    CanUseAfc,
+    /// The role can create a unidirectional AFC channel.
+    CreateAfcUniChannel,
+}
+
+#[cfg(feature = "preview")]
+impl From<Permission> for aranya_client::client::Permission {
+    fn from(perm: Permission) -> Self {
+        match perm {
+            Permission::AddDevice => Self::AddDevice,
+            Permission::RemoveDevice => Self::RemoveDevice,
+            Permission::TerminateTeam => Self::TerminateTeam,
+            Permission::CreateRole => Self::CreateRole,
+            Permission::DeleteRole => Self::DeleteRole,
+            Permission::AssignRole => Self::AssignRole,
+            Permission::RevokeRole => Self::RevokeRole,
+            Permission::SetupDefaultRole => Self::SetupDefaultRole,
+            Permission::ChangeRoleManagingRole => Self::ChangeRoleManagingRole,
+            Permission::CreateLabel => Self::CreateLabel,
+            Permission::DeleteLabel => Self::DeleteLabel,
+            Permission::ChangeLabelManagingRole => Self::ChangeLabelManagingRole,
+            Permission::AssignLabel => Self::AssignLabel,
+            Permission::RevokeLabel => Self::RevokeLabel,
+            Permission::CanUseAfc => Self::CanUseAfc,
+            Permission::CreateAfcUniChannel => Self::CreateAfcUniChannel,
+        }
     }
 }
 
@@ -1160,16 +1254,13 @@ pub fn assign_role_management_permission(
     team: &TeamId,
     role: &RoleId,
     managing_role: &RoleId,
-    perm: Permission,
+    perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role_management_permission(role.into(), managing_role.into(), perm),
+            .assign_role_management_permission(role.into(), managing_role.into(), perm.into()),
     )?;
 
     Ok(())
@@ -1190,16 +1281,13 @@ pub fn revoke_role_management_permission(
     team: &TeamId,
     role: &RoleId,
     managing_role: &RoleId,
-    perm: Permission,
+    perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role_management_permission(role.into(), managing_role.into(), perm),
+            .revoke_role_management_permission(role.into(), managing_role.into(), perm.into()),
     )?;
 
     Ok(())
@@ -1343,14 +1431,11 @@ pub fn add_perm_to_role(
     role: &RoleId,
     perm: Permission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .add_perm_to_role(role.into(), perm),
+            .add_perm_to_role(role.into(), perm.into()),
     )?;
     Ok(())
 }
@@ -1372,14 +1457,11 @@ pub fn remove_perm_from_role(
     role: &RoleId,
     perm: Permission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .remove_perm_from_role(role.into(), perm),
+            .remove_perm_from_role(role.into(), perm.into()),
     )?;
     Ok(())
 }

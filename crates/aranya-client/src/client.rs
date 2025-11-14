@@ -2,6 +2,7 @@
 
 mod device;
 mod label;
+mod perm;
 mod role;
 mod team;
 
@@ -26,6 +27,9 @@ use {
     std::sync::{Arc, Mutex},
 };
 
+#[cfg(feature = "preview")]
+#[doc(inline)]
+pub use crate::client::perm::{Permission, RoleManagementPermission};
 #[doc(inline)]
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},

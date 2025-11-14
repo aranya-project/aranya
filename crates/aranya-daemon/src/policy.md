@@ -769,6 +769,7 @@ permissions are statically defined in the policy file itself and
 cannot be created or deleted at runtime.
 
 ```policy
+// NB: Update `enum Permission` in client and client-capi on changes.
 enum SimplePerm {
     // # Team management
     //
@@ -818,7 +819,7 @@ enum SimplePerm {
     RevokeLabel,
 
     // # AFC
-    // 
+    //
     // The role can use AFC. This controls the ability to
     // create or receive a unidirectional AFC channels.
     CanUseAfc,
@@ -1444,6 +1445,7 @@ function can_change_role_perms(device_id id, target_role_id id) bool {
     ]
 }
 
+// NB: Update `enum RoleManagementPermission` in client and client-capi on changes.
 enum RoleManagementPerm {
     // Grants a managing role the ability to assign the target role
     // to any device except itself.
@@ -2116,7 +2118,7 @@ command DeleteRole {
         let author = get_author(envelope)
         // The author must have the permission to delete a role
         check device_has_simple_perm(author.device_id, SimplePerm::DeleteRole)
-    
+
         // The role must exists
         check exists Role[role_id: this.role_id]
         // The role must not be assigned to any devices
