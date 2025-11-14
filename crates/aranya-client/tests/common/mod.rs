@@ -2,9 +2,9 @@ use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::D
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, Role, TeamId},
+    client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
     config::CreateTeamConfig,
-    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -344,7 +344,11 @@ impl DeviceCtx {
             for (name, manager, role) in mappings {
                 self.client
                     .team(team_id)
-                    .assign_role_management_permission(role, manager, text!("CanAssignRole"))
+                    .assign_role_management_permission(
+                        role,
+                        manager,
+                        RoleManagementPermission::CanAssignRole,
+                    )
                     .await
                     .with_context(|| format!("{name}: unable to change managing role"))?;
             }

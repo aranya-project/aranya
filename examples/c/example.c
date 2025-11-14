@@ -591,11 +591,11 @@ AranyaError init_team(Team* t) {
     // assign role management permissions.
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanAssignRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE);
     EXPECT("unable to assign role management permission", err);
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanRevokeRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to assign role management permission", err);
 
     err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
@@ -614,7 +614,7 @@ AranyaError init_team(Team* t) {
 
     err = aranya_revoke_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanRevokeRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to revoke role management permission", err);
 exit:
     return err;
@@ -1188,13 +1188,13 @@ AranyaError run_custom_roles_example(Team* t) {
 
     // Add `CanUseAfc` permission to the custom role.
     err = aranya_add_perm_to_role(&owner->client, &t->id, &buddy_role_id,
-                                  "CanUseAfc");
+                                  ARANYA_PERMISSION_CAN_USE_AFC);
     EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
     // Remove `CanUseAfc` permission from the custom role.
     err = aranya_remove_perm_from_role(&owner->client, &t->id, &buddy_role_id,
-                                       "CanUseAfc");
+                                       ARANYA_PERMISSION_CAN_USE_AFC);
     EXPECT("unable to remove 'CanUseAfc' permission from 'buddy' role", err);
     printf("Removed 'CanUseAfc' permission from 'buddy' role\n");
 

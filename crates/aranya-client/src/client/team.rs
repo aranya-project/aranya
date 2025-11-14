@@ -10,6 +10,8 @@ use buggy::BugExt as _;
 use tarpc::context;
 use tracing::instrument;
 
+#[cfg(feature = "preview")]
+use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
         Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
@@ -270,10 +272,15 @@ impl Team<'_> {
     /// Adds a permission to a role.
     #[cfg(feature = "preview")]
     #[instrument(skip(self))]
-    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
+            .add_perm_to_role(
+                context::current(),
+                self.id,
+                role_id.into_api(),
+                perm.as_text(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -283,10 +290,15 @@ impl Team<'_> {
     /// Removes a permission from a role.
     #[cfg(feature = "preview")]
     #[instrument(skip(self))]
-    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
+            .remove_perm_from_role(
+                context::current(),
+                self.id,
+                role_id.into_api(),
+                perm.as_text(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -354,7 +366,7 @@ impl Team<'_> {
         &self,
         role: RoleId,
         managing_role: RoleId,
-        perm: Text,
+        perm: RoleManagementPermission,
     ) -> Result<()> {
         self.client
             .daemon
@@ -363,7 +375,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm,
+                perm.as_text(),
             )
             .await
             .map_err(IpcError::new)?
@@ -378,7 +390,7 @@ impl Team<'_> {
         &self,
         role: RoleId,
         managing_role: RoleId,
-        perm: Text,
+        perm: RoleManagementPermission,
     ) -> Result<()> {
         self.client
             .daemon
@@ -387,7 +399,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm,
+                perm.as_text(),
             )
             .await
             .map_err(IpcError::new)?
