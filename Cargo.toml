@@ -64,6 +64,7 @@ aranya-daemon-api = { version = "3.0.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "3.0.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "3.0.0", path = "crates/aranya-util" }
 
+# External dependencies
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
 bytes = { version = "1.10.0" }
@@ -72,7 +73,6 @@ clap = { version = "4", features = ["derive"] }
 derive-where = { version = "1" }
 divan = { version = "0.1", default-features = false }
 futures-util = { version = "0.3.30" }
-heapless = { version = "0.8", default-features = false }
 http = { version = "1" }
 libc = { version = "0.2" }
 metrics = { version = "0.24" }

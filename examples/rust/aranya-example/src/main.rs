@@ -1,6 +1,5 @@
 use std::{
     env,
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -9,7 +8,7 @@ use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -140,7 +139,7 @@ impl ClientCtx {
         })
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 }
@@ -187,7 +186,14 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = {
+        let mut builder = SyncPeerConfig::builder().interval(sync_interval);
+        #[cfg(feature = "preview")]
+        {
+            builder = builder.sync_on_hello(true);
+        }
+        builder.build()?
+    };
 
     let team_name = "rust_example";
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
@@ -195,6 +201,7 @@ async fn main() -> Result<()> {
     let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
     let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
     let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let custom = ClientCtx::new(team_name, "custom", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -277,62 +284,92 @@ async fn main() -> Result<()> {
         .add_device(operator.pk, Some(operator_role.id))
         .await?;
 
+    // Demo hello subscription functionality
+    #[cfg(feature = "preview")]
+    {
+        info!("demonstrating hello subscription");
+
+        // Admin subscribes to hello notifications from Owner with 2-second delay
+        info!("admin subscribing to hello notifications from owner");
+        let duration = Duration::from_secs(30);
+        let graph_change_delay = Duration::from_millis(1000);
+        let schedule_delay = Duration::from_secs(5);
+        admin_team
+            .sync_hello_subscribe(owner_addr, graph_change_delay * 2, duration, schedule_delay)
+            .await?;
+
+        // Operator subscribes to hello notifications from Admin with 1-second delay
+        info!("operator subscribing to hello notifications from admin");
+        operator_team
+            .sync_hello_subscribe(admin_addr, graph_change_delay, duration, schedule_delay)
+            .await?;
+
+        sleep(sleep_interval).await;
+
+        // Later, unsubscribe from hello notifications
+        info!("admin unsubscribing from hello notifications from owner");
+        admin_team.sync_hello_unsubscribe(owner_addr).await?;
+
+        info!("operator unsubscribing from hello notifications from admin");
+        operator_team.sync_hello_unsubscribe(admin_addr).await?;
+
+        sleep(sleep_interval).await;
+    }
+
     info!("adding sync peers");
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .add_sync_peer(membera_addr, sync_cfg.clone())
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .add_sync_peer(membera_addr, sync_cfg.clone())
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .add_sync_peer(membera_addr, sync_cfg.clone())
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_cfg.clone())
+        .add_sync_peer(memberb_addr, sync_cfg.clone())
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .add_sync_peer(owner_addr, sync_cfg.clone())
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .add_sync_peer(admin_addr, sync_cfg.clone())
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .add_sync_peer(operator_addr, sync_cfg.clone())
         .await?;
-    memberb_team
-        .add_sync_peer(membera_addr.into(), sync_cfg)
-        .await?;
+    memberb_team.add_sync_peer(membera_addr, sync_cfg).await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -351,6 +388,63 @@ async fn main() -> Result<()> {
 
     // wait for syncing.
     sleep(sleep_interval).await;
+
+    // Demo custom roles.
+    info!("demo custom roles functionality");
+
+    // Create a custom role.
+    info!("creating a custom role");
+    let custom_role = owner_team
+        .create_role(text!("custom_role"), owner_role.id)
+        .await?;
+
+    // Add device to team to assign custom role to.
+    info!("adding device to team to assign custom role to");
+    owner_team.add_device(custom.pk.clone(), None).await?;
+
+    // Add `CanUseAfc` permission to the custom role.
+    let perm = text!("CanUseAfc");
+    owner_team
+        .add_perm_to_role(custom_role.id, perm.clone())
+        .await?;
+
+    // Assign custom role to a device.
+    info!("assigning custom role to a device");
+    owner_team.assign_role(custom.id, custom_role.id).await?;
+
+    // Revoke custom role from a device.
+    info!("revoking custom role from a device");
+    owner_team.revoke_role(custom.id, custom_role.id).await?;
+
+    // Remove `CanUseAfc` permission from the custom role.
+    info!("removing CanUseAfc permission from custom role");
+    owner_team
+        .remove_perm_from_role(custom_role.id, perm)
+        .await?;
+
+    // Assign role management perm.
+    info!("assigning role management perm");
+    owner_team
+        .assign_role_management_permission(
+            custom_role.id,
+            admin_role.id,
+            text!("CanChangeRolePerms"),
+        )
+        .await?;
+
+    // Revoke role management perm.
+    info!("revoking role management perm");
+    owner_team
+        .revoke_role_management_permission(
+            custom_role.id,
+            admin_role.id,
+            text!("CanChangeRolePerms"),
+        )
+        .await?;
+
+    // Delete the custom role.
+    info!("deleting custom role from team");
+    owner_team.delete_role(custom_role.id).await?;
 
     // fact database queries
     let devices = membera_team.devices().await?;

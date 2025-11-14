@@ -28,7 +28,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
         .add_all_device_roles(team_id, &default_roles)
         .await?;
 
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     let owner_team = devices.owner.client.team(team_id);
     let membera_team = devices.membera.client.team(team_id);
     let memberb_team = devices.memberb.client.team(team_id);
@@ -173,7 +173,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -240,7 +240,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -317,7 +317,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -402,7 +402,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -506,7 +506,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -547,7 +547,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -616,7 +616,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -657,7 +657,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -735,7 +735,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -776,7 +776,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -852,7 +852,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -893,7 +893,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -986,7 +986,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client

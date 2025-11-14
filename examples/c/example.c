@@ -674,6 +674,7 @@ AranyaError run(Team* t) {
     AranyaError err;
     AranyaDeviceId* devices = NULL;
 
+    Client* admin = &t->clients.admin;
     Client* operator= & t->clients.operator;
     Client* memberb = &t->clients.memberb;
 
@@ -715,6 +716,30 @@ AranyaError run(Team* t) {
     EXPECT("error adding sync peers", err);
 
     sleep(1);
+
+    // Demo hello subscription functionality
+    #ifdef ENABLE_ARANYA_PREVIEW
+    printf("demonstrating hello subscription\n");
+
+    // Admin subscribes to hello notifications from Owner with 2-second delay
+    printf("admin subscribing to hello notifications from owner\n");
+    AranyaDuration graph_change_delay = ARANYA_DURATION_SECONDS * 1ULL;
+    AranyaDuration duration           = ARANYA_DURATION_SECONDS * 30ULL;
+    AranyaDuration schedule_delay     = ARANYA_DURATION_SECONDS * 5ULL;
+    err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
+                                      graph_change_delay * 2, duration,
+                                      schedule_delay);
+    EXPECT("error subscribing admin to owner hello notifications", err);
+
+    // Operator subscribes to hello notifications from Admin with 1-second delay
+    printf("operator subscribing to hello notifications from admin\n");
+    err = aranya_sync_hello_subscribe(&operator->client, &t->id,
+                                      sync_addrs[ADMIN], graph_change_delay,
+                                      duration, schedule_delay);
+    EXPECT("error subscribing operator to admin hello notifications", err);
+
+    sleep(1);
+    #endif
 
     // Queries
     printf("running factdb queries\n");
@@ -759,6 +784,19 @@ AranyaError run(Team* t) {
         "%s key bundle len: %zu"
         "\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle_len);
+
+    // Later, unsubscribe from hello notifications
+    #ifdef ENABLE_ARANYA_PREVIEW
+    printf("admin unsubscribing from hello notifications from owner\n");
+    err = aranya_sync_hello_unsubscribe(&admin->client, &t->id,
+                                        sync_addrs[OWNER]);
+    EXPECT("error unsubscribing admin from owner hello notifications", err);
+
+    printf("operator unsubscribing from hello notifications from admin\n");
+    err = aranya_sync_hello_unsubscribe(&operator->client, &t->id,
+                                        sync_addrs[ADMIN]);
+    EXPECT("error unsubscribing operator from admin hello notifications", err);
+    #endif
 
     err = run_afc_example(t);
     EXPECT("error running afc example", err);
@@ -1131,6 +1169,33 @@ AranyaError run_custom_roles_example(Team* t) {
     }
     printf("the 'member' role has %zu owning roles now.\n",
            member_owning_roles_len);
+
+    // Create a custom role.
+    AranyaRole buddy_role;
+    err = aranya_create_role(&owner->client, &t->id, "buddy", &owner_role_id,
+                             &buddy_role);
+    EXPECT("unable to create role", err);
+    AranyaRoleId buddy_role_id;
+    err = aranya_role_get_id(&buddy_role, &buddy_role_id);
+    EXPECT("unable to get role id", err);
+    printf("Role 'buddy' created\n");
+
+    // Add `CanUseAfc` permission to the custom role.
+    err = aranya_add_perm_to_role(&owner->client, &t->id, &buddy_role_id,
+                                  "CanUseAfc");
+    EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
+    printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
+
+    // Remove `CanUseAfc` permission from the custom role.
+    err = aranya_remove_perm_from_role(&owner->client, &t->id, &buddy_role_id,
+                                       "CanUseAfc");
+    EXPECT("unable to remove 'CanUseAfc' permission from 'buddy' role", err);
+    printf("Removed 'CanUseAfc' permission from 'buddy' role\n");
+
+    // Delete the custom role.
+    err = aranya_delete_role(&owner->client, &t->id, &buddy_role_id);
+    EXPECT("unable to remove 'buddy' role", err);
+    printf("Removed 'buddy' role\n");
 
 exit:
     free(member_owning_roles);

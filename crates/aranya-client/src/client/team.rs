@@ -1,3 +1,6 @@
+#[cfg(feature = "preview")]
+use std::time::Duration;
+
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
@@ -148,6 +151,55 @@ impl Team<'_> {
             .collect();
         Ok(Devices { data })
     }
+
+    /// Subscribe to hello notifications from a sync peer.
+    ///
+    /// This will request the peer to send hello notifications when their graph head changes.
+    ///
+    /// # Parameters
+    ///
+    /// * `peer` - The address of the sync peer to subscribe to.
+    /// * `graph_change_delay` - The minimum delay between notifications after a graph head change.
+    /// * `duration` - How long the subscription should last.
+    /// * `schedule_delay` - The delay between sending hello messages to the subscriber (rate limiting).
+    ///
+    /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
+    /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.
+    #[cfg(feature = "preview")]
+    pub async fn sync_hello_subscribe(
+        &self,
+        peer: Addr,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_subscribe(
+                context::current(),
+                peer,
+                self.id,
+                graph_change_delay,
+                duration,
+                schedule_delay,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    ///
+    /// This will stop receiving hello notifications from the specified peer.
+    #[cfg(feature = "preview")]
+    pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_unsubscribe(context::current(), peer, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
 }
 
 impl Team<'_> {
@@ -174,6 +226,67 @@ impl Team<'_> {
             .map(Role::from_api)
             .collect();
         Ok(Roles { roles })
+    }
+
+    /// Creates a new role.
+    ///
+    /// `owning_role` will be the initial owner of the new role.
+    ///
+    /// It returns the Role that was created.
+    #[instrument(skip(self))]
+    pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
+        let role = self
+            .client
+            .daemon
+            .create_role(
+                context::current(),
+                self.id,
+                role_name,
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(Role::from_api(role))
+    }
+
+    /// Deletes a role.
+    ///
+    /// The role must not be assigned to any devices, nor should it own
+    /// any other roles.
+    #[instrument(skip(self))]
+    pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_role(context::current(), self.id, role_id.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
+    /// Adds a permission to a role.
+    #[instrument(skip(self))]
+    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+        self.client
+            .daemon
+            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
+    /// Removes a permission from a role.
+    #[instrument(skip(self))]
+    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
+        self.client
+            .daemon
+            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
     }
 
     /// Adds `owning_role` as an owner of `role`.

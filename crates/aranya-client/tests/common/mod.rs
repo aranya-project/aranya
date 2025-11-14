@@ -1,17 +1,10 @@
-use std::{
-    collections::HashMap,
-    iter,
-    net::{Ipv4Addr, SocketAddr},
-    path::PathBuf,
-    ptr,
-    time::Duration,
-};
+use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -19,7 +12,6 @@ use aranya_daemon::{
     Daemon, DaemonHandle,
 };
 use aranya_daemon_api::SEED_IKM_SIZE;
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -97,12 +89,12 @@ impl DevicesCtx {
 
         // Make sure it sees the configuration change.
         admin_team
-            .sync_now(self.owner.aranya_local_addr().await?.into(), None)
+            .sync_now(self.owner.aranya_local_addr().await?, None)
             .await?;
 
         // Make sure it sees the configuration change.
         operator_team
-            .sync_now(self.admin.aranya_local_addr().await?.into(), None)
+            .sync_now(self.admin.aranya_local_addr().await?, None)
             .await?;
 
         // Add member A as a new device.
@@ -118,7 +110,7 @@ impl DevicesCtx {
             .await?;
 
         // Make sure all see the configuration change.
-        let admin_addr = self.admin.aranya_local_addr().await?.into();
+        let admin_addr = self.admin.aranya_local_addr().await?;
         owner_team.sync_now(admin_addr, None).await?;
         operator_team.sync_now(admin_addr, None).await?;
         membera_team.sync_now(admin_addr, None).await?;
@@ -191,7 +183,7 @@ impl DevicesCtx {
                 device
                     .client
                     .team(team_id)
-                    .add_sync_peer(peer.aranya_local_addr().await?.into(), config.clone())
+                    .add_sync_peer(peer.aranya_local_addr().await?, config.clone())
                     .await?;
             }
         }
@@ -224,7 +216,7 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // TODO: only compile when 'afc' feature is enabled
@@ -299,7 +291,7 @@ impl DeviceCtx {
         })
     }
 
-    pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    pub async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 

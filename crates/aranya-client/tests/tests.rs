@@ -11,19 +11,19 @@
 
 mod common;
 
-use std::ptr;
+use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::{ChanOp, RoleId},
-    config::CreateTeamConfig,
+    config::{CreateTeamConfig, SyncPeerConfig},
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
+use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -111,7 +111,7 @@ async fn test_sync_now() -> Result<()> {
 
     // Let's sync immediately, which will propagate the role change.
     admin
-        .sync_now(owner_addr.into(), None)
+        .sync_now(owner_addr, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -178,14 +178,14 @@ async fn test_add_remove_sync_peers() -> Result<()> {
             device
                 .client
                 .team(team_id)
-                .remove_sync_peer(peer.aranya_local_addr().await?.into())
+                .remove_sync_peer(peer.aranya_local_addr().await?)
                 .await?;
         }
     }
 
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     membera_team.remove_sync_peer(owner_addr).await?;
-    let membera_addr = devices.membera.aranya_local_addr().await?.into();
+    let membera_addr = devices.membera.aranya_local_addr().await?;
     owner_team.remove_sync_peer(membera_addr).await?;
 
     // Create another label.
@@ -272,7 +272,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Admin sync with owner.
     admin_team
-        .sync_now(owner_addr.into(), None)
+        .sync_now(owner_addr, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -290,7 +290,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Admin sync with owner.
     admin_team
-        .sync_now(owner_addr.into(), None)
+        .sync_now(owner_addr, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -322,7 +322,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Admin sync with owner.
     admin_team
-        .sync_now(owner_addr.into(), None)
+        .sync_now(owner_addr, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -403,7 +403,7 @@ async fn test_add_devices() -> Result<()> {
         .context("owner should be able to add admin to team")?;
 
     admin
-        .sync_now(team.owner.aranya_local_addr().await?.into(), None)
+        .sync_now(team.owner.aranya_local_addr().await?, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -413,7 +413,7 @@ async fn test_add_devices() -> Result<()> {
         .context("admin should be able to add operator to team")?;
 
     operator
-        .sync_now(team.admin.aranya_local_addr().await?.into(), None)
+        .sync_now(team.admin.aranya_local_addr().await?, None)
         .await
         .context("operator unable to sync with admin")?;
 
@@ -426,7 +426,7 @@ async fn test_add_devices() -> Result<()> {
             .await
             .with_context(|| format!("admin should be able to add `{name}` to team"))?;
         operator
-            .sync_now(team.admin.aranya_local_addr().await?.into(), None)
+            .sync_now(team.admin.aranya_local_addr().await?, None)
             .await
             .context("operator unable to sync with admin")?;
         operator
@@ -462,7 +462,7 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
         .context("owner should be able to add admin to team")?;
 
     admin_team
-        .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
+        .sync_now(devices.owner.aranya_local_addr().await?, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -561,7 +561,7 @@ async fn test_query_functions() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -670,7 +670,7 @@ async fn test_add_team() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id);
-        match admin.sync_now(owner_addr.into(), None).await {
+        match admin.sync_now(owner_addr, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -709,7 +709,7 @@ async fn test_add_team() -> Result<()> {
         .await?;
     {
         let admin = devices.admin.client.team(team_id);
-        admin.sync_now(owner_addr.into(), None).await?;
+        admin.sync_now(owner_addr, None).await?;
 
         // Now we should be able to successfully assign a role.
         admin
@@ -755,7 +755,7 @@ async fn test_remove_team() -> Result<()> {
             .await?;
 
         admin
-            .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
+            .sync_now(devices.owner.aranya_local_addr().await?, None)
             .await?;
 
         // We should be able to successfully assign a role.
@@ -860,7 +860,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id1);
-        match admin.sync_now(owner_addr.into(), None).await {
+        match admin.sync_now(owner_addr, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -899,7 +899,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await?;
 
     let admin1 = devices.admin.client.team(team_id1);
-    admin1.sync_now(owner_addr.into(), None).await?;
+    admin1.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin1
@@ -911,7 +911,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id2);
-        match admin.sync_now(owner_addr.into(), None).await {
+        match admin.sync_now(owner_addr, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -950,7 +950,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await?;
 
     let admin2 = devices.admin.client.team(team_id2);
-    admin2.sync_now(owner_addr.into(), None).await?;
+    admin2.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin2
@@ -958,6 +958,382 @@ async fn test_multi_team_sync() -> Result<()> {
         .assign_role(roles2.operator().id)
         .await
         .context("Assigning a role should not fail here!")?;
+
+    Ok(())
+}
+
+/// Tests hello subscription functionality by demonstrating that devices can subscribe
+/// to hello notifications from peers and automatically sync when receiving notifications.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "preview")]
+async fn test_hello_subscription() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let mut devices = DevicesCtx::new("test_hello_subscription").await?;
+
+    // Create the initial team, and get our TeamId.
+    let team_id = devices.create_and_add_team().await?;
+
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    // Grab addresses for testing
+    let admin_addr = devices.admin.aranya_local_addr().await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_team = devices.membera.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    let sync_config = SyncPeerConfig::builder()
+        .sync_now(false)
+        .sync_on_hello(true)
+        .build()?;
+
+    membera_team.add_sync_peer(admin_addr, sync_config).await?;
+    info!("membera added admin as sync peer with sync_on_hello=true");
+
+    // MemberA subscribes to hello notifications from Admin
+    membera_team
+        .sync_hello_subscribe(
+            admin_addr,
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            Duration::from_secs(60), // Schedule delay for periodic sends
+        ) // Short delay for faster testing
+        .await?;
+    info!("membera subscribed to hello notifications from admin");
+
+    // Before the action, verify that MemberA doesn't know about any labels created by admin
+    // (This will be our way to test if sync worked)
+    info!("verifying initial state - membera should not see any labels created by admin");
+    let initial_labels = membera_team.labels().await?;
+    let initial_label_count = initial_labels.iter().count();
+    info!(
+        "initial label count as seen by membera: {}",
+        initial_label_count
+    );
+
+    // Admin performs an action that will update their graph - create a label
+    // (admin has permission to create labels)
+    info!("admin creating a test label");
+    let test_label = admin_team
+        .create_label(
+            aranya_daemon_api::text!("sync_hello_test_label"),
+            roles.admin().id,
+        )
+        .await?;
+    info!("admin created test label: {:?}", test_label);
+
+    // Wait for hello message to be sent and sync to be triggered
+    // The hello message should be sent, membera should receive it,
+    // check that the command doesn't exist locally, and trigger a sync
+    info!("waiting for hello message and automatic sync...");
+
+    // Poll every 100ms for up to 10 seconds for the label count to increase
+    let poll_start = std::time::Instant::now();
+    let poll_timeout = Duration::from_millis(10_000);
+    let poll_interval = Duration::from_millis(100);
+
+    let final_labels = loop {
+        let current_labels = membera_team.labels().await?;
+        let current_count = current_labels.iter().count();
+
+        if current_count > initial_label_count {
+            info!(
+                "sync detected - label count increased from {} to {} after {:?}",
+                initial_label_count,
+                current_count,
+                poll_start.elapsed()
+            );
+            break current_labels;
+        }
+
+        if poll_start.elapsed() >= poll_timeout {
+            bail!(
+                "Sync on hello failed: timeout after {:?} - expected label count to increase from {} but it remained at {}",
+                poll_timeout,
+                initial_label_count,
+                current_count
+            );
+        }
+
+        sleep(poll_interval).await;
+    };
+
+    // Verify that the specific label created by admin is visible
+    let label_exists = final_labels
+        .iter()
+        .any(|label| label.name.as_str() == "sync_hello_test_label");
+
+    if !label_exists {
+        bail!("Sync on hello failed: the test label created by admin is not visible to membera");
+    }
+
+    info!("sync_on_hello test succeeded - membera automatically synced after receiving hello notification");
+
+    // Test basic subscription/unsubscription functionality for completeness
+    info!("testing basic subscription functionality");
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let operator_team = devices.operator.client.team(team_id);
+
+    // Admin subscribes to hello notifications from Owner
+    admin_team
+        .sync_hello_subscribe(
+            owner_addr,
+            Duration::from_millis(1000),
+            Duration::from_millis(1000),
+            Duration::from_secs(60), // Schedule delay for periodic sends
+        )
+        .await?;
+    info!("admin subscribed to hello notifications from owner");
+
+    // Test multiple subscriptions
+    operator_team
+        .sync_hello_subscribe(
+            owner_addr,
+            Duration::from_millis(2000),
+            Duration::from_millis(1000),
+            Duration::from_secs(60), // Schedule delay for periodic sends
+        )
+        .await?;
+    operator_team
+        .sync_hello_subscribe(
+            admin_addr,
+            Duration::from_millis(1500),
+            Duration::from_millis(1000),
+            Duration::from_secs(60), // Schedule delay for periodic sends
+        )
+        .await?;
+    info!("operator subscribed to both owner and admin");
+
+    // Test unsubscribing
+    admin_team.sync_hello_unsubscribe(owner_addr).await?;
+    operator_team.sync_hello_unsubscribe(owner_addr).await?;
+    operator_team.sync_hello_unsubscribe(admin_addr).await?;
+    membera_team.sync_hello_unsubscribe(admin_addr).await?;
+    info!("all devices unsubscribed");
+
+    // Test edge cases
+    admin_team
+        .sync_hello_subscribe(
+            owner_addr,
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            Duration::from_secs(60), // Schedule delay for periodic sends
+        )
+        .await?;
+    admin_team.sync_hello_unsubscribe(owner_addr).await?;
+    info!("tested immediate subscribe/unsubscribe");
+
+    // Test unsubscribing from non-subscribed peer
+    let memberb_addr = devices.memberb.aranya_local_addr().await?;
+    admin_team.sync_hello_unsubscribe(memberb_addr).await?;
+    info!("tested unsubscribing from non-subscribed peer");
+
+    Ok(())
+}
+
+/// Tests that schedule_delay parameter in sync_hello_subscribe works correctly.
+/// Verifies that with high schedule_delay, only graph-change-triggered notifications occur,
+/// while with low schedule_delay, scheduled periodic sends pick up all pending changes.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "preview")]
+async fn test_hello_subscription_schedule_delay() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let mut devices = DevicesCtx::new("test_hello_subscription_schedule_delay").await?;
+
+    // Create the initial team, and get our TeamId.
+    let team_id = devices.create_and_add_team().await?;
+
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    // Grab addresses for testing
+    let admin_addr = devices.admin.aranya_local_addr().await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_team = devices.membera.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    let sync_config = SyncPeerConfig::builder()
+        .sync_now(false)
+        .sync_on_hello(true)
+        .build()?;
+
+    membera_team.add_sync_peer(admin_addr, sync_config).await?;
+    info!("membera added admin as sync peer with sync_on_hello=true");
+
+    // Phase 1: Test with high schedule_delay (60s) - should only see first graph change
+    info!("Phase 1: Testing with high schedule_delay (60s) and high graph_change_delay (60s)");
+    membera_team
+        .sync_hello_subscribe(
+            admin_addr,
+            Duration::from_secs(60),  // graph_change_delay
+            Duration::from_secs(120), // duration
+            Duration::from_secs(60),  // schedule_delay - high
+        )
+        .await?;
+    info!("membera subscribed to hello notifications from admin with high schedule_delay");
+
+    // Before the action, verify that MemberA doesn't know about any labels created by admin
+    info!("verifying initial state - membera should not see any labels created by admin");
+    let initial_labels = membera_team.labels().await?;
+    let initial_label_count = initial_labels.iter().count();
+    info!(
+        "initial label count as seen by membera: {}",
+        initial_label_count
+    );
+
+    // Admin creates first label
+    info!("admin creating first test label");
+    let test_label_1 = admin_team
+        .create_label(
+            aranya_daemon_api::text!("schedule_test_label_1"),
+            roles.admin().id,
+        )
+        .await?;
+    info!("admin created first test label: {:?}", test_label_1);
+
+    // Wait for first label to be seen (should be sent via graph change notification)
+    info!("waiting for first label to be seen via graph change notification...");
+    let poll_start = std::time::Instant::now();
+    let poll_timeout = Duration::from_secs(10);
+    let poll_interval = Duration::from_millis(100);
+
+    let first_label_seen = loop {
+        let current_labels = membera_team.labels().await?;
+        let current_count = current_labels.iter().count();
+
+        if current_count > initial_label_count {
+            let label_exists = current_labels
+                .iter()
+                .any(|label| label.name.as_str() == "schedule_test_label_1");
+            if label_exists {
+                info!(
+                    "first label seen after {:?} - label count increased from {} to {}",
+                    poll_start.elapsed(),
+                    initial_label_count,
+                    current_count
+                );
+                break true;
+            }
+        }
+
+        if poll_start.elapsed() >= poll_timeout {
+            bail!(
+                "First label not seen: timeout after {:?} - expected label count to increase from {} but it remained at {}",
+                poll_timeout,
+                initial_label_count,
+                current_count
+            );
+        }
+
+        sleep(poll_interval).await;
+    };
+
+    assert!(first_label_seen, "First label should have been seen");
+
+    // Admin creates second label
+    info!("admin creating second test label");
+    let test_label_2 = admin_team
+        .create_label(
+            aranya_daemon_api::text!("schedule_test_label_2"),
+            roles.admin().id,
+        )
+        .await?;
+    info!("admin created second test label: {:?}", test_label_2);
+
+    // Wait a short time and verify second label is NOT seen (rate-limited and schedule hasn't fired)
+    info!("waiting briefly to confirm second label is not seen (rate-limited)...");
+    sleep(Duration::from_secs(2)).await;
+
+    let current_labels = membera_team.labels().await?;
+    let current_count = current_labels.iter().count();
+    let second_label_exists = current_labels
+        .iter()
+        .any(|label| label.name.as_str() == "schedule_test_label_2");
+
+    if second_label_exists {
+        bail!(
+            "Second label should not have been seen yet (rate-limited) - found {} labels, expected {}",
+            current_count,
+            initial_label_count + 1
+        );
+    }
+
+    info!("confirmed second label not seen - rate limiting working");
+
+    // Phase 2: Test with low schedule_delay (10ms) - should see all labels
+    info!("Phase 2: Testing with low schedule_delay (10ms)");
+    membera_team.sync_hello_unsubscribe(admin_addr).await?;
+    info!("membera unsubscribed from admin");
+
+    membera_team
+        .sync_hello_subscribe(
+            admin_addr,
+            Duration::from_secs(60),   // graph_change_delay
+            Duration::from_secs(120),  // duration
+            Duration::from_millis(10), // schedule_delay - low
+        )
+        .await?;
+    info!("membera subscribed to hello notifications from admin with low schedule_delay");
+
+    // Wait for both labels to be seen (scheduled send should pick up pending changes)
+    info!("waiting for both labels to be seen via scheduled periodic send...");
+    let poll_start = std::time::Instant::now();
+    let poll_timeout = Duration::from_secs(10);
+    let poll_interval = Duration::from_millis(100);
+
+    let both_labels_seen = loop {
+        let current_labels = membera_team.labels().await?;
+        let current_count = current_labels.iter().count();
+
+        if current_count >= initial_label_count + 2 {
+            let label1_exists = current_labels
+                .iter()
+                .any(|label| label.name.as_str() == "schedule_test_label_1");
+            let label2_exists = current_labels
+                .iter()
+                .any(|label| label.name.as_str() == "schedule_test_label_2");
+
+            if label1_exists && label2_exists {
+                info!(
+                    "both labels seen after {:?} - label count: {} (expected at least {})",
+                    poll_start.elapsed(),
+                    current_count,
+                    initial_label_count + 2
+                );
+                break true;
+            }
+        }
+
+        if poll_start.elapsed() >= poll_timeout {
+            let current_labels = membera_team.labels().await?;
+            let label1_exists = current_labels
+                .iter()
+                .any(|label| label.name.as_str() == "schedule_test_label_1");
+            let label2_exists = current_labels
+                .iter()
+                .any(|label| label.name.as_str() == "schedule_test_label_2");
+
+            bail!(
+                "Both labels not seen: timeout after {:?} - label1: {}, label2: {}, count: {} (expected at least {})",
+                poll_timeout,
+                label1_exists,
+                label2_exists,
+                current_labels.iter().count(),
+                initial_label_count + 2
+            );
+        }
+
+        sleep(poll_interval).await;
+    };
+
+    assert!(both_labels_seen, "Both labels should have been seen");
+
+    // Cleanup
+    membera_team.sync_hello_unsubscribe(admin_addr).await?;
+    info!("cleanup: unsubscribed membera from admin");
 
     Ok(())
 }
@@ -997,6 +1373,227 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected error when using bogus owner role: {err:?}"),
     }
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .expect("no owner role!?");
+
+    let test_role = owner_team
+        .create_role(text!("test_role"), owner_role.id)
+        .await
+        .expect("expected to create role");
+
+    owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "test_role")
+        .expect("no test role found");
+
+    // Set up another device, sync it, and make sure they can see the
+    // role.
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+
+    let test_role2 = admin_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "test_role")
+        .expect("no test role found");
+    assert_eq!(test_role, test_role2);
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_perm_to_created_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .expect("no owner role!?");
+
+    // Create a custom admin type role
+    let admin_role = owner_team
+        .create_role(text!("admin"), owner_role.id)
+        .await?;
+    owner_team
+        .add_perm_to_role(admin_role.id, text!("AddDevice"))
+        .await
+        .expect("expected to assign AddDevice to admin");
+
+    // Add our admin with this role
+    owner_team
+        .add_device(devices.admin.pk, Some(admin_role.id))
+        .await
+        .expect("expected to add admin with role");
+
+    // Sync the admin and test that they can add the operator
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    admin_team
+        .add_device(devices.operator.pk, None)
+        .await
+        .expect("admin should be able to add operator");
+
+    Ok(())
+}
+
+/// Tests that privilege escalation attempt is rejected.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_privilege_escalation_rejected() -> Result<()> {
+    let team_name = "test_privilege_escalation_rejected";
+    let mut devices = DevicesCtx::new(team_name).await?;
+
+    // Owner creates the team.
+    let team_id = devices.create_and_add_team().await?;
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_role = owner_team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r| r.name == "owner")
+        .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
+
+    // Initialize malicious device on team.
+    let work_dir = tempfile::tempdir()?;
+    let work_dir_path = work_dir.path();
+    let device = DeviceCtx::new(team_name, "malicious", work_dir_path.join("malicious")).await?;
+    owner_team.add_device(device.pk.clone(), None).await?;
+    let device_seed = owner_team
+        .encrypt_psk_seed_for_peer(device.pk.encryption())
+        .await?;
+    device
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&device_seed)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    // Owner creates malicious role on team:
+    let role = owner_team
+        .create_role(text!("malicious_role"), owner_role.id)
+        .await
+        .expect("expected to create malicious role");
+
+    // Owner only allows role to create new roles.
+    owner_team
+        .add_perm_to_role(role.id, text!("CreateRole"))
+        .await?;
+
+    // Owner assigns role to malicious device.
+    owner_team.assign_role(device.id, role.id).await?;
+
+    // Malicious device syncs with owner.
+    let device_team = device.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    device_team.sync_now(owner_addr, None).await?;
+
+    // Malicious device creates a new target role (which it maintains control of).
+    let target_role = device_team
+        .create_role(text!("target_role"), role.id)
+        .await
+        .expect("unable to create target role");
+
+    // Malicious device attempts to grant target role a permission it does not have: e.g. CanUseAfc
+    // This should be rejected, which indicates a privilege escalation attempt will be rejected.
+    device_team
+        .add_perm_to_role(target_role.id, text!("CanUseAfc"))
+        .await
+        .expect_err("expected privilege escalation attempt to fail");
+
+    Ok(())
+}
+
+/// Tests that role creation works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_remove_perm_from_default_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+
+    // Add admin with admin role
+    owner_team
+        .add_device(devices.admin.pk, Some(roles.admin().id))
+        .await
+        .expect("expected to add admin with role");
+
+    owner_team
+        .remove_perm_from_role(roles.admin().id, text!("AddDevice"))
+        .await
+        .expect("expected to remove AddDevice from admin");
+
+    // Sync the admin
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Admin cannot add operator
+    admin_team
+        .add_device(devices.operator.pk, None)
+        .await
+        .expect_err("admin should not be able to add operator");
+
+    Ok(())
+}
+
+/// Tests that role deletion works.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_delete_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_delete_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles_without_delegation(team_id)
+        .await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .delete_role(roles.member().id)
+        .await
+        .expect("expected to delete role");
 
     Ok(())
 }
@@ -1069,7 +1666,7 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
         .add_device(devices.membera.pk.clone(), None)
         .await?;
 
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
     match admin_team
@@ -1101,7 +1698,7 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
         .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
         .await?;
 
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
     match admin_team
@@ -1156,7 +1753,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
 
     // Sync admin with owner
     let admin_team = devices.admin.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
     // Try to assign operator role as admin - should succeed with the permission
@@ -1226,7 +1823,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
 
     // Sync admin with owner
     let admin_team = devices.admin.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
     // Try to assign operator role as admin - should succeed with the permission
@@ -1299,7 +1896,7 @@ async fn test_delete_label_requires_permission() -> Result<()> {
         .await?;
 
     operator_team
-        .sync_now(devices.owner.aranya_local_addr().await?.into(), None)
+        .sync_now(devices.owner.aranya_local_addr().await?, None)
         .await
         .context("operator unable to sync owner state")?;
 
@@ -1373,7 +1970,7 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
         .add_role_owner(roles.member().id, roles.admin().id)
         .await?;
 
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
@@ -1543,7 +2140,7 @@ async fn test_role_owners_query() -> Result<()> {
     );
 
     // Verify other clients can also query role owners after sync
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
