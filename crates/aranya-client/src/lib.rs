@@ -26,7 +26,6 @@
 #[cfg(not(feature = "default"))]
 compile_error!("'default' feature must be enabled!");
 
-#[cfg(feature = "afc")]
 pub mod afc;
 pub mod client;
 pub mod config;
@@ -37,6 +36,7 @@ pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
 #[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
 pub use crate::client::{Permission, RoleManagementPermission};
 #[doc(inline)]
