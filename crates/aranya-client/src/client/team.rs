@@ -233,6 +233,7 @@ impl Team<'_> {
     /// `owning_role` will be the initial owner of the new role.
     ///
     /// It returns the Role that was created.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
         let role = self
@@ -254,6 +255,7 @@ impl Team<'_> {
     ///
     /// The role must not be assigned to any devices, nor should it own
     /// any other roles.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
         self.client
@@ -266,6 +268,7 @@ impl Team<'_> {
     }
 
     /// Adds a permission to a role.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
         self.client
@@ -278,6 +281,7 @@ impl Team<'_> {
     }
 
     /// Removes a permission from a role.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Text) -> Result<()> {
         self.client
@@ -290,6 +294,7 @@ impl Team<'_> {
     }
 
     /// Adds `owning_role` as an owner of `role`.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
         self.client
@@ -306,6 +311,7 @@ impl Team<'_> {
     }
 
     /// Removes an `owning_role` as an owner of `role`.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
         self.client
@@ -342,6 +348,7 @@ impl Team<'_> {
     }
 
     /// Assigns a role management permission to a managing role.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn assign_role_management_permission(
         &self,
@@ -365,6 +372,7 @@ impl Team<'_> {
 
     /// Revokes a role management permission from a managing
     /// role.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn revoke_role_management_permission(
         &self,
