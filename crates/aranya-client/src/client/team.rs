@@ -429,24 +429,18 @@ impl Team<'_> {
 
 impl Team<'_> {
     /// Create a label.
-    #[instrument(skip(self, label_name))]
-    pub async fn create_label<T>(&self, label_name: T, managing_role_id: RoleId) -> Result<LabelId>
-    where
-        T: TryInto<Text>,
-    {
+    #[instrument(skip(self))]
+    pub async fn create_label(
+        &self,
+        label_name: Text,
+        managing_role_id: RoleId,
+    ) -> Result<LabelId> {
         self.client
             .daemon
             .create_label(
                 context::current(),
                 self.id,
-                label_name
-                    .try_into()
-                    // TODO(chip): Use a more specific error?
-                    .map_err(|_| {
-                        error::OtherError::from(anyhow::anyhow!(
-                            "cannot convert label_name to Text"
-                        ))
-                    })?,
+                label_name,
                 managing_role_id.into_api(),
             )
             .await
