@@ -1,3 +1,6 @@
+#[cfg(feature = "preview")]
+use std::time::Duration;
+
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
@@ -158,6 +161,55 @@ impl Team<'_> {
             .map(DeviceId::from_api)
             .collect();
         Ok(Devices { data })
+    }
+
+    /// Subscribe to hello notifications from a sync peer.
+    ///
+    /// This will request the peer to send hello notifications when their graph head changes.
+    ///
+    /// # Parameters
+    ///
+    /// * `peer` - The address of the sync peer to subscribe to.
+    /// * `graph_change_delay` - The minimum delay between notifications after a graph head change.
+    /// * `duration` - How long the subscription should last.
+    /// * `schedule_delay` - The delay between sending hello messages to the subscriber (rate limiting).
+    ///
+    /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
+    /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.
+    #[cfg(feature = "preview")]
+    pub async fn sync_hello_subscribe(
+        &self,
+        peer: Addr,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_subscribe(
+                context::current(),
+                peer,
+                self.id,
+                graph_change_delay,
+                duration,
+                schedule_delay,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    ///
+    /// This will stop receiving hello notifications from the specified peer.
+    #[cfg(feature = "preview")]
+    pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_unsubscribe(context::current(), peer, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 }
 
