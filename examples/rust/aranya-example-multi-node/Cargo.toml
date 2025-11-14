@@ -18,6 +18,7 @@ default = [
 ]
 
 afc = ["aranya-client/afc"]
+preview = ["aranya-client/preview"]
 
 # Enable debugging.
 debug = []
