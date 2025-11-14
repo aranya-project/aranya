@@ -36,6 +36,9 @@ mod util;
 pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
+#[cfg(feature = "preview")]
+#[doc(inline)]
+pub use crate::client::{Permission, RoleManagementPermission};
 #[doc(inline)]
 pub use crate::{
     client::{

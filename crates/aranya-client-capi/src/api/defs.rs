@@ -473,6 +473,7 @@ impl LabelName {
 pub struct RoleName(*const c_char);
 
 impl RoleName {
+    #[cfg(feature = "preview")]
     unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
@@ -496,6 +497,7 @@ impl Addr {
 }
 
 /// Role management permission.
+#[cfg(feature = "preview")]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum RoleManagementPermission {
@@ -510,6 +512,7 @@ pub enum RoleManagementPermission {
     CanChangeRolePerms,
 }
 
+#[cfg(feature = "preview")]
 impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPermission {
     fn from(perm: RoleManagementPermission) -> Self {
         match perm {
@@ -521,6 +524,7 @@ impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPer
 }
 
 /// Simple permission.
+#[cfg(feature = "preview")]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum Permission {
@@ -580,6 +584,7 @@ pub enum Permission {
     CreateAfcUniChannel,
 }
 
+#[cfg(feature = "preview")]
 impl From<Permission> for aranya_client::client::Permission {
     fn from(perm: Permission) -> Self {
         match perm {
@@ -1153,6 +1158,7 @@ pub unsafe fn setup_default_roles(
 /// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn add_role_owner(
     client: &Client,
     team: &TeamId,
@@ -1177,6 +1183,7 @@ pub fn add_role_owner(
 /// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn remove_role_owner(
     client: &Client,
     team: &TeamId,
@@ -1241,6 +1248,7 @@ pub unsafe fn role_owners(
 /// @param[in] perm the management permission to assign
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn assign_role_management_permission(
     client: &Client,
     team: &TeamId,
@@ -1267,6 +1275,7 @@ pub fn assign_role_management_permission(
 /// @param[in] perm the management permission to assign
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn revoke_role_management_permission(
     client: &Client,
     team: &TeamId,
@@ -1365,6 +1374,7 @@ pub unsafe fn team_roles(
 /// @param[out] role_out the newly created role
 ///
 /// @relates AranyaClient
+#[cfg(feature = "preview")]
 pub fn create_role(
     client: &Client,
     team: &TeamId,
@@ -1396,6 +1406,7 @@ pub fn create_role(
 /// @param[in] role the ID of the role to delete
 ///
 /// @relates AranyaClient
+#[cfg(feature = "preview")]
 pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
     client
         .rt
@@ -1413,6 +1424,7 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 /// @param[in] team the team's ID
 /// @param[in] role the role ID of the role the permission is being added to
 /// @param[in] perm a permission to add to the role
+#[cfg(feature = "preview")]
 pub fn add_perm_to_role(
     client: &Client,
     team: &TeamId,
@@ -1438,6 +1450,7 @@ pub fn add_perm_to_role(
 /// @param[in] team the team's ID
 /// @param[in] role the role ID of the role the permission is being removed from
 /// @param[in] perm a permission to remove from the role
+#[cfg(feature = "preview")]
 pub fn remove_perm_from_role(
     client: &Client,
     team: &TeamId,
@@ -1617,6 +1630,7 @@ pub fn revoke_label(
 /// @param[in] managing_role_id the ID of the managing role
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn add_label_managing_role(
     client: &Client,
     team: &TeamId,

@@ -1,3 +1,5 @@
+#![cfg(feature = "preview")]
+
 use crate::{text, Text};
 
 /// Role management permission.

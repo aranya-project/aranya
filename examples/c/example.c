@@ -721,8 +721,8 @@ AranyaError run(Team* t) {
 
     sleep(1);
 
-    // Demo hello subscription functionality
-    #ifdef ENABLE_ARANYA_PREVIEW
+// Demo hello subscription functionality
+#ifdef ENABLE_ARANYA_PREVIEW
     printf("demonstrating hello subscription\n");
 
     // Admin subscribes to hello notifications from Owner with 2-second delay
@@ -743,7 +743,7 @@ AranyaError run(Team* t) {
     EXPECT("error subscribing operator to admin hello notifications", err);
 
     sleep(1);
-    #endif
+#endif
 
     // Queries
     printf("running factdb queries\n");
@@ -789,8 +789,8 @@ AranyaError run(Team* t) {
         "\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle_len);
 
-    // Later, unsubscribe from hello notifications
-    #ifdef ENABLE_ARANYA_PREVIEW
+// Later, unsubscribe from hello notifications
+#ifdef ENABLE_ARANYA_PREVIEW
     printf("admin unsubscribing from hello notifications from owner\n");
     err = aranya_sync_hello_unsubscribe(&admin->client, &t->id,
                                         sync_addrs[OWNER]);
@@ -800,13 +800,15 @@ AranyaError run(Team* t) {
     err = aranya_sync_hello_unsubscribe(&operator->client, &t->id,
                                         sync_addrs[ADMIN]);
     EXPECT("error unsubscribing operator from admin hello notifications", err);
-    #endif
+#endif
 
     err = run_afc_example(t);
     EXPECT("error running afc example", err);
 
+#ifdef ENABLE_ARANYA_PREVIEW
     err = run_custom_roles_example(t);
     EXPECT("error running custom roles example", err);
+#endif
 
 exit:
     free(devices);
