@@ -1,4 +1,8 @@
 //! AFC support.
+
+#![cfg(feature = "afc")]
+#![cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+
 use core::fmt;
 use std::{
     fmt::{Debug, Display},

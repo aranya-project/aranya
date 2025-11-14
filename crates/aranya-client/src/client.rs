@@ -274,6 +274,7 @@ impl Client {
 
     /// Get access to Aranya Fast Channels.
     #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     pub fn afc(&self) -> AfcChannels {
         AfcChannels::new(self.daemon.clone(), self.afc_keys.clone())
     }

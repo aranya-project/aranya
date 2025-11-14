@@ -102,6 +102,7 @@ impl SyncPeerConfigBuilder {
     ///
     /// By default, sync on hello is disabled.
     #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     pub fn sync_on_hello(mut self, sync_on_hello: bool) -> Self {
         self.sync_on_hello = sync_on_hello;
         self
