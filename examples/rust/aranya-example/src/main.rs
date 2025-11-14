@@ -411,11 +411,17 @@ async fn main() -> Result<()> {
 
     // Assign custom role to a device.
     info!("assigning custom role to a device");
-    owner_team.assign_role(custom.id, custom_role.id).await?;
+    owner_team
+        .device(custom.id)
+        .assign_role(custom_role.id)
+        .await?;
 
     // Revoke custom role from a device.
     info!("revoking custom role from a device");
-    owner_team.revoke_role(custom.id, custom_role.id).await?;
+    owner_team
+        .device(custom.id)
+        .revoke_role(custom_role.id)
+        .await?;
 
     // Remove `CanUseAfc` permission from the custom role.
     info!("removing CanUseAfc permission from custom role");
