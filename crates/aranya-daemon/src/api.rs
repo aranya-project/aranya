@@ -906,7 +906,6 @@ impl DaemonApi for Api {
         }
     }
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn change_role(
         self,

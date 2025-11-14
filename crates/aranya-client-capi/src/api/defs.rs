@@ -1218,7 +1218,6 @@ pub fn revoke_role_management_permission(
 /// @param[in] new_role the ID of the role to assign to the device
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "preview")]
 pub fn change_role(
     client: &Client,
     team: &TeamId,
