@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
+use std::{io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -16,14 +16,14 @@ use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, sync::Mutex, task::JoinSet};
+use tokio::{fs, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
     api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
-    aranya::{self, ClientWithState, PeerCacheMap},
+    aranya,
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
@@ -51,40 +51,6 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
-
-mod invalid_graphs {
-    use std::{
-        collections::HashSet,
-        sync::{Arc, RwLock},
-    };
-
-    use aranya_runtime::GraphId;
-
-    /// Keeps track of which graphs have had a finalization error.
-    ///
-    /// Once a finalization error has occurred for a graph,
-    /// the graph error is permanent.
-    /// The API will prevent subsequent operations on the invalid graph.
-    #[derive(Clone, Debug, Default)]
-    pub(crate) struct InvalidGraphs {
-        // NB: Since the locking is short and not held over await points,
-        // we use a standard rwlock instead of tokio's.
-        map: Arc<RwLock<HashSet<GraphId>>>,
-    }
-
-    impl InvalidGraphs {
-        pub fn insert(&self, graph_id: GraphId) {
-            #[allow(clippy::expect_used)]
-            self.map.write().expect("poisoned").insert(graph_id);
-        }
-
-        pub fn contains(&self, graph_id: GraphId) -> bool {
-            #[allow(clippy::expect_used)]
-            self.map.read().expect("poisoned").contains(&graph_id)
-        }
-    }
-}
-pub(crate) use invalid_graphs::InvalidGraphs;
 
 /// Handle for the spawned daemon.
 ///
@@ -159,11 +125,6 @@ impl Daemon {
                 load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
             let psk_store = Arc::new(PskStore::new(initial_keys));
 
-            let invalid_graphs = InvalidGraphs::default();
-
-            // Create a shared PeerCacheMap
-            let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
-
             // Initialize Aranya client, sync client,and sync server.
             let (client, sync_server, syncer, peers, recv_effects, local_addr) =
                 Self::setup_aranya(
@@ -176,10 +137,8 @@ impl Daemon {
                     SyncParams {
                         psk_store: Arc::clone(&psk_store),
                         server_addr: qs_config.addr,
-                        caches: Arc::clone(&caches),
                     },
                     qs_client_addr,
-                    invalid_graphs.clone(),
                 )
                 .await?;
 
@@ -217,7 +176,6 @@ impl Daemon {
                 pk: pks,
                 peers,
                 recv_effects,
-                invalid: invalid_graphs,
                 #[cfg(feature = "afc")]
                 afc,
                 crypto,
@@ -310,10 +268,8 @@ impl Daemon {
         SyncParams {
             psk_store,
             server_addr,
-            caches,
         }: SyncParams,
         client_addr: Addr,
-        invalid_graphs: InvalidGraphs,
     ) -> Result<(
         Client,
         SyncServer,
@@ -324,48 +280,26 @@ impl Daemon {
     )> {
         let device_id = pk.ident_pk.id()?;
 
-        let aranya = Arc::new(Mutex::new(ClientState::new(
+        let client = Client::new(ClientState::new(
             EN::new(POLICY_SOURCE, eng, store, device_id)?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
-        )));
-
-        let client = Client::new(Arc::clone(&aranya));
+        ));
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
-        // Create shared hello subscriptions for both server and syncer
-        #[cfg(feature = "preview")]
-        let hello_subscriptions = Arc::default();
-
         // Create the sync server
-        let client_with_state_for_server = ClientWithState::new(
-            client.clone(),
-            Arc::clone(&caches),
-            #[cfg(feature = "preview")]
-            Arc::clone(&hello_subscriptions),
-        );
-        let (server, peers, conns, syncer_recv, server_addr) = SyncServer::new(
-            client_with_state_for_server,
-            &server_addr,
-            Arc::clone(&psk_store),
-        )
-        .await
-        .context("unable to initialize QUIC sync server")?;
+        let (server, peers, conns, syncer_recv, server_addr) =
+            SyncServer::new(client.clone(), &server_addr, Arc::clone(&psk_store))
+                .await
+                .context("unable to initialize QUIC sync server")?;
 
         // Initialize the syncer
-        let client_with_state_for_syncer = ClientWithState::new(
-            client.clone(),
-            caches,
-            #[cfg(feature = "preview")]
-            server.hello_subscriptions(),
-        );
         let syncer = Syncer::new(
-            client_with_state_for_syncer,
+            client.clone(),
             send_effects,
-            invalid_graphs,
             psk_store,
             (server_addr.into(), client_addr),
             syncer_recv,

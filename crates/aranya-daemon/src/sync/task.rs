@@ -50,7 +50,7 @@ use tracing::trace;
 use tracing::{error, info, instrument, warn};
 
 use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs, EN};
+use crate::{daemon::EF, vm_policy::VecSink, EN, SP};
 
 #[cfg(feature = "preview")]
 pub mod hello;
@@ -244,7 +244,7 @@ impl PeerCacheKey {
 #[derive(Debug)]
 pub struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(crate) client: crate::aranya::ClientWithState<EN, crate::SP>,
+    pub(crate) client: crate::aranya::Client<EN, SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Option<Key>)>,
     /// Receives added/removed peers.
@@ -253,8 +253,6 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
-    /// Keeps track of invalid graphs due to finalization errors.
-    invalid: InvalidGraphs,
     /// Additional state used by the syncer.
     state: ST,
     /// Sync server address. Peers will make incoming connections to us on this address.
@@ -456,7 +454,7 @@ impl<ST: SyncState> Syncer<ST> {
                         }
                         keep
                     });
-                    self.invalid.insert(peer.graph_id);
+                    self.client.invalid_graphs().insert(peer.graph_id);
                 }
             })
             .with_context(|| format!("peer addr: {}", peer.addr))?;
@@ -518,13 +516,13 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub fn client(&self) -> &crate::aranya::Client<EN, crate::SP> {
-        self.client.client()
+    pub fn client(&self) -> &crate::aranya::Client<EN, SP> {
+        &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, crate::SP> {
-        self.client.client_mut()
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, SP> {
+        &mut self.client
     }
 }

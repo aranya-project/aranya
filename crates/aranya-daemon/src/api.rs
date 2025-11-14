@@ -53,7 +53,7 @@ use crate::{
     policy::{ChanOp, Effect, KeyBundle, RoleCreated},
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
-    AranyaStore, Client, InvalidGraphs, EF,
+    AranyaStore, Client, EF,
 };
 
 mod quic_sync;
@@ -95,7 +95,6 @@ pub(crate) struct DaemonApiServerArgs {
     pub(crate) pk: PublicKeys<CS>,
     pub(crate) peers: SyncPeers,
     pub(crate) recv_effects: EffectReceiver,
-    pub(crate) invalid: InvalidGraphs,
     #[cfg(feature = "afc")]
     pub(crate) afc: Afc<CE, CS, KS>,
     pub(crate) crypto: Crypto,
@@ -115,7 +114,6 @@ impl DaemonApiServer {
             pk,
             peers,
             recv_effects,
-            invalid,
             #[cfg(feature = "afc")]
             afc,
             crypto,
@@ -147,7 +145,6 @@ impl DaemonApiServer {
             pk: std::sync::Mutex::new(pk),
             peers,
             effect_handler,
-            invalid,
             #[cfg(feature = "afc")]
             afc,
             crypto: Mutex::new(crypto),
@@ -327,7 +324,7 @@ impl EffectHandler {
     async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
         let client = &self.client;
 
-        let mut aranya = client.aranya.lock().await;
+        let mut aranya = client.lock_aranya().await;
         let storage = aranya.provider().get_storage(graph_id).ok()?;
 
         storage.get_head_address().ok()
@@ -367,8 +364,6 @@ struct ApiInner {
     peers: SyncPeers,
     /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
-    /// Keeps track of which graphs are invalid due to a finalization error.
-    invalid: InvalidGraphs,
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
@@ -412,7 +407,11 @@ impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<GraphId> {
-        if self.invalid.contains(GraphId::transmute(team)) {
+        if self
+            .client
+            .invalid_graphs()
+            .contains(GraphId::transmute(team))
+        {
             // TODO: return custom daemon error type
             anyhow::bail!("team {team} invalid due to graph finalization error")
         }
@@ -559,8 +558,7 @@ impl DaemonApi for Api {
         self.seed_id_dir.remove(team).await?;
 
         self.client
-            .aranya
-            .lock()
+            .lock_aranya()
             .await
             .remove_graph(GraphId::transmute(team))
             .context("unable to remove graph from storage")?;
