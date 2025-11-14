@@ -1519,7 +1519,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
         .await?;
 
     // Owner assigns role to malicious device.
-    owner_team.assign_role(device.id, role.id).await?;
+    owner_team.device(device.id).assign_role(role.id).await?;
 
     // Malicious device syncs with owner.
     let device_team = device.client.team(team_id);
