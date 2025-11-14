@@ -187,7 +187,8 @@ async fn main() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = {
-        let mut builder = SyncPeerConfig::builder().interval(sync_interval);
+        let mut builder = SyncPeerConfig::builder();
+        builder = builder.interval(sync_interval);
         #[cfg(feature = "preview")]
         {
             builder = builder.sync_on_hello(true);
