@@ -48,9 +48,11 @@ audit-as-crates-io = false
 
 [policy.aranya-example]
 audit-as-crates-io = false
+criteria = "safe-to-run"
 
 [policy.aranya-example-multi-node]
 audit-as-crates-io = false
+criteria = "safe-to-run"
 
 [policy.aranya-keygen]
 audit-as-crates-io = false
