@@ -20,10 +20,6 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#if defined(ENABLE_ARANYA_AFC) && !defined(ENABLE_ARANYA_PREVIEW)
-    #error "AFC is currently in preview. Set `ENABLE_ARANYA_PREVIEW` to opt into preview APIs."
-#endif
-
 #ifndef __has_attribute
     #define __has_attribute(x) 0
 #endif /* __has_attribute */

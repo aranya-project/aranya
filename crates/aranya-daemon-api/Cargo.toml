@@ -14,7 +14,7 @@ workspace = true
 
 
 [features]
-default = []
+default = ["afc"]
 
 # Preview features
 preview = []

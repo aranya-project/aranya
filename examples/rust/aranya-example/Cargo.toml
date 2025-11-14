@@ -12,16 +12,19 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
+default = [
+    "afc",
+    "aranya-client/default",
+]
 
-afc = ["aranya-client/afc", "preview"]
+afc = ["aranya-client/afc"]
 preview = ["aranya-client/preview"]
 
 # Enable debugging.
 debug = []
 
 [dependencies]
-aranya-client = { workspace = true }
+aranya-client = { workspace = true, default-features = false }
 
 anyhow = { workspace = true }
 backon = { workspace = true }
@@ -36,3 +39,9 @@ name = "aranya-example"
 path = "src/main.rs"
 required-features = ["afc"]
 test = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = [
+    "default", # TODO: remove in #448
+]

@@ -19,7 +19,11 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+    "afc",
+    "aranya-client/default",
+    "aranya-daemon-api/default",
+]
 
 # Preview features
 preview = ["aranya-client/preview"]
@@ -31,8 +35,8 @@ experimental = ["aranya-client/experimental"]
 
 
 [dependencies]
-aranya-client = { workspace = true }
-aranya-daemon-api = { workspace = true }
+aranya-client = { workspace = true, default-features = false }
+aranya-daemon-api = { workspace = true, default-features = false }
 aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }
@@ -56,4 +60,8 @@ syn = "2"
 
 
 [package.metadata.cargo-all-features]
-always_include_features = ["experimental", "preview"]
+always_include_features = [
+    "default", # TODO: remove in #448
+    "experimental",
+    "preview",
+]
