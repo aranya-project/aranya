@@ -13,7 +13,10 @@ workspace = true
 
 
 [features]
-default = ["afc"]
+default = [
+    "afc",
+    "aranya-client/default",
+]
 
 afc = ["aranya-client/afc"]
 
@@ -23,7 +26,7 @@ tcp = ["dep:metrics-exporter-tcp"]
 
 
 [dependencies]
-aranya-client = { workspace = true }
+aranya-client = { workspace = true, default-features = false }
 
 # Required Dependencies
 anyhow = { workspace = true }
@@ -52,3 +55,9 @@ path = "src/main.rs"
 required-features = ["afc"]
 test = false
 bench = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = [
+    "default", # TODO: remove in #448
+]

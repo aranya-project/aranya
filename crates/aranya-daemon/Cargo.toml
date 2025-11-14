@@ -14,7 +14,10 @@ workspace = true
 
 
 [features]
-default = ["afc"]
+default = [
+    "afc",
+    "aranya-daemon-api/default",
+]
 
 # Preview features
 preview = ["aranya-daemon-api/preview"]
@@ -26,7 +29,7 @@ experimental = ["aranya-daemon-api/experimental"]
 
 
 [dependencies]
-aranya-daemon-api = { workspace = true }
+aranya-daemon-api = { workspace = true, default-features = false }
 aranya-keygen = { workspace = true }
 
 aranya-afc-util = { workspace = true }
