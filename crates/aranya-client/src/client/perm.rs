@@ -1,4 +1,5 @@
 #![cfg(feature = "preview")]
+#![cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 
 use crate::{text, Text};
 

@@ -29,6 +29,7 @@ pub enum Error {
 
     /// An Aranya Fast Channel error happened.
     #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     #[error("AFC error")]
     Afc(#[from] AfcError),
 
