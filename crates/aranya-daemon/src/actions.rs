@@ -1,6 +1,6 @@
 //! Aranya graph actions/effects API.
 
-use std::{future::Future, marker::PhantomData, sync::Arc};
+use std::{future::Future, marker::PhantomData};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -12,9 +12,8 @@ use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_text::Text;
 #[cfg(feature = "afc")]
 use aranya_runtime::NullSink;
-use aranya_runtime::{ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
+use aranya_runtime::{Engine, GraphId, Session, StorageProvider, VmPolicy};
 use futures_util::TryFutureExt as _;
-use tokio::sync::Mutex;
 use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
@@ -56,7 +55,7 @@ where
             nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()).to_vec(),
         );
         let id = {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.lock_aranya().await;
             act.with_action(|act| client.new_graph(policy_data, act, &mut sink))
                 .context("unable to create new team")?
         };
@@ -68,7 +67,7 @@ where
     #[instrument(skip_all, fields(%graph_id))]
     pub fn actions(&self, graph_id: GraphId) -> impl Actions<EN, SP, CE> {
         ActionsImpl {
-            aranya: Arc::clone(&self.aranya),
+            client: self.clone(),
             graph_id,
             _eng: PhantomData,
         }
@@ -78,7 +77,7 @@ where
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
     #[instrument(skip_all, fields(%graph_id))]
     pub(crate) async fn session_new(&self, graph_id: GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(graph_id)?;
+        let session = self.lock_aranya().await.session(graph_id)?;
         Ok(session)
     }
 
@@ -90,7 +89,7 @@ where
         session: &mut Session<SP, EN>,
         command: &[u8],
     ) -> Result<Vec<Effect>> {
-        let client = self.aranya.lock().await;
+        let client = self.lock_aranya().await;
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
         Ok(sink.collect()?)
@@ -100,7 +99,7 @@ where
 /// Implements [`Actions`] for a particular storage.
 struct ActionsImpl<EN, SP, CE> {
     /// Aranya client graph state.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    client: Client<EN, SP>,
     /// Aranya graph ID.
     graph_id: GraphId,
     /// Crypto engine.
@@ -120,7 +119,7 @@ where
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
         {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.client.lock_aranya().await;
             act.with_action(|act| client.action(self.graph_id, &mut sink, act))?;
         }
 
@@ -139,7 +138,7 @@ where
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();
         {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.client.lock_aranya().await;
             let mut session = client.session(self.graph_id)?;
             act.with_action(|act| session.action(&client, &mut sink, &mut msg_sink, act))?;
         }
@@ -537,7 +536,7 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
 
 #[cfg(feature = "afc")]
 pub(crate) fn query_afc_channel_is_valid<EN, SP, CE>(
-    aranya: &mut ClientState<EN, SP>,
+    aranya: &mut aranya_runtime::ClientState<EN, SP>,
     graph_id: GraphId,
     sender_id: DeviceId,
     receiver_id: DeviceId,

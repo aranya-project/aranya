@@ -214,7 +214,7 @@ where
         device_id: DeviceId,
     ) -> Result<()> {
         let shm = self.shm.lock().await;
-        let mut client = self.client.aranya.lock().await;
+        let mut client = self.client.lock_aranya().await;
 
         // TODO: aranya-core#467 use cache since remove_if callback currently must always produce same result.
         let mut cache = HashMap::new();
