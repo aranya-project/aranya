@@ -799,6 +799,7 @@ impl DaemonApi for Api {
         }
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn create_role(
         self,
@@ -829,6 +830,7 @@ impl DaemonApi for Api {
         }
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn delete_role(
         self,

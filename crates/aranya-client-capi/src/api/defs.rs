@@ -473,6 +473,7 @@ impl LabelName {
 pub struct RoleName(*const c_char);
 
 impl RoleName {
+    #[cfg(feature = "preview")]
     unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
@@ -1280,6 +1281,7 @@ pub unsafe fn team_roles(
 /// @param[out] role_out the newly created role
 ///
 /// @relates AranyaClient
+#[cfg(feature = "preview")]
 pub fn create_role(
     client: &Client,
     team: &TeamId,
@@ -1311,6 +1313,7 @@ pub fn create_role(
 /// @param[in] role the ID of the role to delete
 ///
 /// @relates AranyaClient
+#[cfg(feature = "preview")]
 pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
     client
         .rt

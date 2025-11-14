@@ -186,6 +186,7 @@ where
     }
 
     /// Invokes `create_role`.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     fn create_role(
         &self,
@@ -197,6 +198,7 @@ where
     }
 
     /// Invokes `delete_role`.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     fn delete_role(&self, role_id: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::delete_role(role_id.as_base()))

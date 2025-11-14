@@ -358,8 +358,10 @@ pub trait DaemonApi {
     /// It returns the default roles that were created.
     async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
     /// Creates a new role.
+    #[cfg(feature = "preview")]
     async fn create_role(team: TeamId, role_name: Text, owning_role: RoleId) -> Result<Role>;
     /// Deletes a role.
+    #[cfg(feature = "preview")]
     async fn delete_role(team: TeamId, role_id: RoleId) -> Result<()>;
     /// Returns the current team roles.
     async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;

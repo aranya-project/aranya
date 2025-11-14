@@ -233,6 +233,7 @@ impl Team<'_> {
     /// `owning_role` will be the initial owner of the new role.
     ///
     /// It returns the Role that was created.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
         let role = self
@@ -254,6 +255,7 @@ impl Team<'_> {
     ///
     /// The role must not be assigned to any devices, nor should it own
     /// any other roles.
+    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
         self.client
