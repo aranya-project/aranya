@@ -1944,21 +1944,21 @@ function default_role_name_to_str(name enum DefaultRoleName) string {
 
 // Setup default roles on a team.
 action setup_default_roles(owning_role_id id) {
-    publish SetupDefaultRoles {
+    publish SetupDefaultRole {
         name: DefaultRoleName::Admin,
         owning_role_id: owning_role_id,
     }
-    publish SetupDefaultRoles {
+    publish SetupDefaultRole {
         name: DefaultRoleName::Operator,
         owning_role_id: owning_role_id,
     }
-    publish SetupDefaultRoles {
+    publish SetupDefaultRole {
         name: DefaultRoleName::Member,
         owning_role_id: owning_role_id,
     }
 }
 
-command SetupDefaultRoles {
+command SetupDefaultRole {
     attributes {
         priority: 100
     }
