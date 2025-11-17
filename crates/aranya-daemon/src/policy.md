@@ -794,7 +794,7 @@ enum SimplePerm {
     // The role can set up default roles. This can only be done
     // once, so this permission can only effectively be used by
     // the `owner` role.
-    SetupDefaultRole,
+    SetupDefaultRoles,
     // The role can add a managing role to or remove a managing
     // role from a target role.
     ChangeRoleManagingRole,
@@ -838,7 +838,7 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::DeleteRole => { return "DeleteRole" }
         SimplePerm::AssignRole => { return "AssignRole" }
         SimplePerm::RevokeRole => { return "RevokeRole" }
-        SimplePerm::SetupDefaultRole => { return "SetupDefaultRole" }
+        SimplePerm::SetupDefaultRoles => { return "SetupDefaultRoles" }
         SimplePerm::ChangeRoleManagingRole => { return "ChangeRoleManagingRole" }
 
         SimplePerm::CreateLabel => { return "CreateLabel" }
@@ -1944,21 +1944,21 @@ function default_role_name_to_str(name enum DefaultRoleName) string {
 
 // Setup default roles on a team.
 action setup_default_roles(owning_role_id id) {
-    publish SetupDefaultRole {
+    publish SetupDefaultRoles {
         name: DefaultRoleName::Admin,
         owning_role_id: owning_role_id,
     }
-    publish SetupDefaultRole {
+    publish SetupDefaultRoles {
         name: DefaultRoleName::Operator,
         owning_role_id: owning_role_id,
     }
-    publish SetupDefaultRole {
+    publish SetupDefaultRoles {
         name: DefaultRoleName::Member,
         owning_role_id: owning_role_id,
     }
 }
 
-command SetupDefaultRole {
+command SetupDefaultRoles {
     attributes {
         priority: 100
     }
@@ -1977,7 +1977,7 @@ command SetupDefaultRole {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::SetupDefaultRole)
+        check device_has_simple_perm(author.device_id, SimplePerm::SetupDefaultRoles)
 
         check exists Role[role_id: this.owning_role_id]
         check !exists DefaultRoleSeeded[name: this.name]
@@ -2856,6 +2856,7 @@ command CreateTeam {
 
             // Assign all of the administrative permissions to
             // the owner role.
+            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
             assign_perm_to_role(owner_role_id, SimplePerm::AddDevice)
             assign_perm_to_role(owner_role_id, SimplePerm::RemoveDevice)
 
@@ -2868,7 +2869,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::DeleteRole)
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
-            assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRoles)
             assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagingRole)
 
             assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
