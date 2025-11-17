@@ -1,6 +1,7 @@
 [package]
 name = "aranya-example-multi-node"
 description = "Example of how to run each Aranya device on a different machine in a network"
+publish = false
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

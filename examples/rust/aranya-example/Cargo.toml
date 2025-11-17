@@ -1,6 +1,7 @@
 [package]
 name = "aranya-example"
 description = "Example Rust program using the Aranya client library"
+publish = false
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
