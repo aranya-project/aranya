@@ -329,19 +329,14 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Removes an `owning_role` as an owner of `role`.
+    /// Removes device's role as an owner of `role`.
     #[cfg(feature = "preview")]
     #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
-    pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+    pub async fn remove_role_owner(&self, role: RoleId) -> Result<()> {
         self.client
             .daemon
-            .remove_role_owner(
-                context::current(),
-                self.id,
-                role.into_api(),
-                owning_role.into_api(),
-            )
+            .remove_role_owner(context::current(), self.id, role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

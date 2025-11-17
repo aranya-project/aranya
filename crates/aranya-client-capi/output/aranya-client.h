@@ -273,7 +273,7 @@ enum AranyaPermission
      * once, so this permission can only effectively be used by
      * the `owner` role.
      */
-    ARANYA_PERMISSION_SETUP_DEFAULT_ROLE,
+    ARANYA_PERMISSION_SETUP_DEFAULT_ROLES,
     /**
      * The role can add a managing role to or remove a managing
      * role from a target role.
@@ -1687,8 +1687,7 @@ AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
  */
 AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
-                                     const struct AranyaRoleId *role,
-                                     const struct AranyaRoleId *owning_role);
+                                     const struct AranyaRoleId *role);
 
 /**
  * Removes an owning_role as an owner of role.
@@ -1703,7 +1702,6 @@ AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
 AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role,
-                                         const struct AranyaRoleId *owning_role,
                                          struct AranyaExtError *__ext_err);
 
 /**

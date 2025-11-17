@@ -285,7 +285,6 @@ pub struct RoleOwnerAdded {
 pub struct RoleOwnerRemoved {
     pub target_role_id: BaseId,
     pub owning_role_id: BaseId,
-    pub author_id: BaseId,
 }
 /// RoleRevoked policy effect.
 #[effect]
@@ -386,7 +385,6 @@ pub struct add_role_owner {
 #[action(interface = Persistent)]
 pub struct remove_role_owner {
     pub target_role_id: BaseId,
-    pub owning_role_id: BaseId,
 }
 /// assign_role_management_perm policy action.
 #[action(interface = Persistent)]

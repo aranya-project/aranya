@@ -1488,12 +1488,11 @@ async fn test_remove_role_owner_requires_remaining_owner() -> Result<()> {
     let owner = team.owner;
 
     let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
     let admin_role = role_id_by_name(&roles, "admin");
 
     let err = owner
         .actions()
-        .remove_role_owner(admin_role, owner_role)
+        .remove_role_owner(admin_role)
         .await
         .expect_err("expected removing final role owner to fail");
     expect_not_authorized(err);

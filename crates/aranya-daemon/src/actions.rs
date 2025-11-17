@@ -440,17 +440,13 @@ where
     }
 
     /// Invokes `remove_role_owner`.
-    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
+    #[instrument(skip(self), fields(%role_id))]
     fn remove_role_owner(
         &self,
         role_id: RoleId,
-        new_owning_role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::remove_role_owner(
-            role_id.as_base(),
-            new_owning_role_id.as_base(),
-        ))
-        .in_current_span()
+        self.call_persistent_action(policy::remove_role_owner(role_id.as_base()))
+            .in_current_span()
     }
 
     /// Invokes `revoke_label_from_device`.

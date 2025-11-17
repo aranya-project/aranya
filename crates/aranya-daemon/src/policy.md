@@ -1213,19 +1213,17 @@ command AddRoleOwner {
     }
 }
 
-// Removes an owning role from the target role.
+// Removes device's role as an owner of the target role.
 //
 // # Required Permissions
 //
-// - `OwnsRole(target_role_id)`
+// - `OwnsRole(author.role_id, target_role_id)`
 // - `ChangeRoleManagingRole`
 action remove_role_owner(
     target_role_id id,
-    owning_role_id id,
 ) {
     publish RemoveRoleOwner {
         target_role_id: target_role_id,
-        owning_role_id: owning_role_id,
     }
 }
 
@@ -1236,8 +1234,6 @@ effect RoleOwnerRemoved {
     target_role_id id,
     // The ID of the owning role that was removed.
     owning_role_id id,
-    // The ID of the device that changed the owning role.
-    author_id id,
 }
 
 command RemoveRoleOwner {
@@ -1249,8 +1245,6 @@ command RemoveRoleOwner {
         // The ID of the role whose owning role is being
         // changed.
         target_role_id id,
-        // The ID of the owning role that is being removed.
-        owning_role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1260,12 +1254,14 @@ command RemoveRoleOwner {
         check team_exists()
 
         let author = get_author(envelope)
+        let owning_role_id = get_assigned_role_id(author.device_id)
+
         check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagingRole)
         check device_owns_role(author.device_id, this.target_role_id)
 
         check exists OwnsRole[
             target_role_id: this.target_role_id,
-            owning_role_id: this.owning_role_id,
+            owning_role_id: owning_role_id,
         ]
 
         check at_least 2 OwnsRole[
@@ -1276,17 +1272,16 @@ command RemoveRoleOwner {
         finish {
             delete OwnsRole[
                 target_role_id: this.target_role_id,
-                owning_role_id: this.owning_role_id,
+                owning_role_id: owning_role_id,
             ]
             delete RoleOwned[
-                owner_role_id: this.owning_role_id,
+                owner_role_id: owning_role_id,
                 target_role_id: this.target_role_id,
             ]
 
             emit RoleOwnerRemoved {
                 target_role_id: this.target_role_id,
-                owning_role_id: this.owning_role_id,
-                author_id: author.device_id,
+                owning_role_id: owning_role_id,
             }
         }
     }
