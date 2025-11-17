@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-example"
-version = "4.0.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-example-multi-node"
-version = "4.0.0"
+version = "0.0.0"
 dependencies = [
  "age",
  "anyhow",
