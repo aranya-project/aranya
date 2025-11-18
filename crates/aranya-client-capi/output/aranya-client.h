@@ -342,6 +342,10 @@ enum AranyaRoleManagementPermission
      * assigned to the target role.
      */
     ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_CHANGE_ROLE_PERMS,
+    /**
+     * Grants a managing role the ability to delete the target role.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_DELETE_ROLE,
 };
 #ifndef __cplusplus
 typedef uint8_t AranyaRoleManagementPermission;

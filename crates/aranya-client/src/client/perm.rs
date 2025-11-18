@@ -16,6 +16,8 @@ pub enum RoleManagementPermission {
     /// Grants a managing role the ability to change the permissions
     /// assigned to the target role.
     CanChangeRolePerms,
+    /// Grants a managing role the ability to delete the target role.
+    CanDeleteRole,
 }
 
 impl RoleManagementPermission {
@@ -24,6 +26,7 @@ impl RoleManagementPermission {
             RoleManagementPermission::CanAssignRole => text!("CanAssignRole"),
             RoleManagementPermission::CanRevokeRole => text!("CanRevokeRole"),
             RoleManagementPermission::CanChangeRolePerms => text!("CanChangeRolePerms"),
+            RoleManagementPermission::CanDeleteRole => text!("CanDeleteRole"),
         }
     }
 }

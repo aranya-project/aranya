@@ -1445,6 +1445,48 @@ function can_change_role_perms(device_id id, target_role_id id) bool {
     ]
 }
 
+// Grants a managing role permission to delete the target role.
+//
+// # Foreign Keys
+//
+// - `target_role_id` refers to the `Role` fact
+// - `managing_role_id` refers to the `Role` fact
+fact CanDeleteRole[target_role_id id, managing_role_id id]=>{}
+
+// Reports whether the device is allowed to delete the target role.
+//
+// # Errors
+//
+// This function raises a check error if the device has not been
+// assigned a role.
+//
+// # Caveats
+//
+// - This function does NOT check whether the device exists.
+// - This function does NOT check whether the role exists.
+//
+// # Ensures
+//
+// If true, `CanDeleteRole(target_role_id, device_role_id)` holds.
+function can_delete_role(device_id id, target_role_id id) bool {
+    let device_role_id = get_assigned_role_id(device_id)
+
+    // At this point we believe the following to be true:
+    //
+    // - `device_role_id` refers to a role that exists
+    // - `device_role_id` refers to the role assigned to
+    //   `device_id`
+    // - `device_id` refers to a device that exists (because
+    //    AssignedRole is only created for a device that exists)
+    //
+    // We do NOT know whether `role_id` refers to a role that
+    // exists.
+    return exists CanDeleteRole[
+        target_role_id: target_role_id,
+        managing_role_id: device_role_id,
+    ]
+}
+
 // NB: Update `enum RoleManagementPermission` in client and client-capi on changes.
 enum RoleManagementPerm {
     // Grants a managing role the ability to assign the target role
@@ -1456,6 +1498,8 @@ enum RoleManagementPerm {
     // Grants a managing role the ability to change the permissions
     // assigned to the target role.
     CanChangeRolePerms,
+    // Grants a managing role the ability to delete the target role.
+    CanDeleteRole,
 }
 
 // Converts `RoleManagementPerm` to a string.
@@ -1464,6 +1508,7 @@ function role_management_perm_to_str(perm enum RoleManagementPerm) string {
         RoleManagementPerm::CanAssignRole => { return "CanAssignRole" }
         RoleManagementPerm::CanRevokeRole => { return "CanRevokeRole" }
         RoleManagementPerm::CanChangeRolePerms => { return "CanChangeRolePerms" }
+        RoleManagementPerm::CanDeleteRole => { return "CanDeleteRole" }
     }
 }
 
@@ -1474,6 +1519,7 @@ function try_parse_role_management_perm(perm string) optional enum RoleManagemen
         "CanAssignRole" => { return Some(RoleManagementPerm::CanAssignRole) }
         "CanRevokeRole" => { return Some(RoleManagementPerm::CanRevokeRole) }
         "CanChangeRolePerms" => { return Some(RoleManagementPerm::CanChangeRolePerms) }
+        "CanDeleteRole" => { return Some(RoleManagementPerm::CanDeleteRole) }
         _ => { return None }
     }
 }
@@ -1604,6 +1650,25 @@ command AssignRoleManagementPerm {
                 ]
                 finish {
                     create CanChangeRolePerms[
+                        target_role_id: this.target_role_id,
+                        managing_role_id: this.managing_role_id,
+                    ]=>{}
+
+                    emit RoleManagementPermAssigned {
+                        target_role_id: this.target_role_id,
+                        managing_role_id: this.managing_role_id,
+                        perm: perm,
+                        author_id: author.device_id,
+                    }
+                }
+            }
+            RoleManagementPerm::CanDeleteRole => {
+                check !exists CanDeleteRole[
+                    target_role_id: this.target_role_id,
+                    managing_role_id: this.managing_role_id,
+                ]
+                finish {
+                    create CanDeleteRole[
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
                     ]=>{}
@@ -1751,6 +1816,25 @@ command RevokeRoleManagementPerm {
                     }
                 }
             }
+            RoleManagementPerm::CanDeleteRole => {
+                check exists CanDeleteRole[
+                    target_role_id: this.target_role_id,
+                    managing_role_id: this.managing_role_id,
+                ]
+                finish {
+                    delete CanDeleteRole[
+                        target_role_id: this.target_role_id,
+                        managing_role_id: this.managing_role_id,
+                    ]
+
+                    emit RoleManagementPermRevoked {
+                        target_role_id: this.target_role_id,
+                        managing_role_id: this.managing_role_id,
+                        perm: perm,
+                        author_id: author.device_id,
+                    }
+                }
+            }
         }
     }
 }
@@ -1814,6 +1898,10 @@ finish function create_role_facts(role struct RoleInfo) {
         managing_role_id: role.owning_role_id,
     ]=>{}
     create CanChangeRolePerms[
+        target_role_id: role.role_id,
+        managing_role_id: role.owning_role_id,
+    ]=>{}
+    create CanDeleteRole[
         target_role_id: role.role_id,
         managing_role_id: role.owning_role_id,
     ]=>{}
@@ -2116,10 +2204,11 @@ command DeleteRole {
         check team_exists()
 
         let author = get_author(envelope)
-        // The author must have the permission to delete a role
-        check device_has_simple_perm(author.device_id, SimplePerm::DeleteRole)
 
-        // The role must exists
+        // The author must have the permission to delete a role
+        check can_delete_role(author.device_id, this.role_id)
+
+        // The role must exist
         check exists Role[role_id: this.role_id]
         // The role must not be assigned to any devices
         check !exists RoleAssignmentIndex[
