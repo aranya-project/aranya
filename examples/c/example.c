@@ -1154,10 +1154,18 @@ AranyaError run_custom_roles_example(Team* t) {
     printf("the 'member' role has %zu owning roles now.\n",
            member_owning_roles_len);
 
+    // Admin syncs with owner.
+    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
+    EXPECT("error calling `sync_now` to sync with peer: admin->owner", err);
+
     // Remove an owning role from the 'member' role.
     printf("removing an owning role to the 'member' role.\n");
     err = aranya_remove_role_owner(&admin->client, &t->id, &member_role_id);
     EXPECT("unable to remove an owning role.", err);
+
+    // Owner syncs with admin.
+    err = aranya_sync_now(&owner->client, &t->id, sync_addrs[ADMIN], NULL);
+    EXPECT("error calling `sync_now` to sync with peer: owner->admin", err);
 
     // check that there is now just 1 owner for the 'member' role after removing
     // an owning role.
