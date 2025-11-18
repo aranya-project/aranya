@@ -1598,7 +1598,7 @@ async fn test_delete_role() -> Result<()> {
     Ok(())
 }
 
-/// Tests that role deletion with `CanDeleteRole` management permission works.
+/// Tests role deletion with `CanDeleteRole` management permission.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_can_delete_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_can_delete_role").await?;
@@ -1627,8 +1627,7 @@ async fn test_can_delete_role() -> Result<()> {
         .await
         .expect_err("expected delete_role() to fail without CanDeleteRole perm");
 
-    // Assign `CanDeleteRole` to `Admin` for so it can delete the `Member` role.
-    let owner_team = devices.owner.client.team(team_id);
+    // Assign `CanDeleteRole` to `Admin` so it can delete the `Member` role.
     owner_team
         .assign_role_management_permission(
             roles.member().id,
@@ -1638,9 +1637,7 @@ async fn test_can_delete_role() -> Result<()> {
         .await
         .expect("expected to assign CanDeleteRole perm to admin role");
 
-    // `Admin`` should now be able to delete the `Member` role.
-    let admin_team = devices.admin.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?;
+    // `Admin` should now be able to delete the `Member` role.
     admin_team.sync_now(owner_addr, None).await?;
     admin_team
         .delete_role(roles.member().id)

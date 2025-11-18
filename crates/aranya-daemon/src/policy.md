@@ -2205,7 +2205,7 @@ command DeleteRole {
 
         let author = get_author(envelope)
 
-        // The author must have the permission to delete a role
+        // The author must have the permission to delete the role
         check can_delete_role(author.device_id, this.role_id)
 
         // The role must exist
