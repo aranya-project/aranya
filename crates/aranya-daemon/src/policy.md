@@ -1469,6 +1469,7 @@ fact CanDeleteRole[target_role_id id, managing_role_id id]=>{}
 //
 // If true, `CanDeleteRole(target_role_id, device_role_id)` holds.
 function can_delete_role(device_id id, target_role_id id) bool {
+    check device_has_simple_perm(device_id, SimplePerm::DeleteRole)
     let device_role_id = get_assigned_role_id(device_id)
 
     // At this point we believe the following to be true:
