@@ -2110,7 +2110,11 @@ async fn test_role_owners_query() -> Result<()> {
 
     // Remove admin as owner
     let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let admin_addr = devices.admin.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
     admin_team.remove_role_owner(roles.member().id).await?;
+    owner_team.sync_now(admin_addr, None).await?;
 
     // Query owners again - should now show owner and operator
     let owners_after_remove = owner_team.role_owners(roles.member().id).await?;

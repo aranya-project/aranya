@@ -329,7 +329,7 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Removes device's role as an owner of `role`.
+    /// Removes device's role as an owner of the target `role`.
     #[cfg(feature = "preview")]
     #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
