@@ -1,3 +1,5 @@
+//! Sync Manager that handles scheduling all sync tasks.
+
 use core::error;
 use std::{
     sync::Arc,
