@@ -89,9 +89,9 @@ impl SyncPeerConfigBuilder {
         self
     }
 
-    /// Configures whether the peer will be immediately synced with after being added.
+    /// Configures whether the peer will be scheduled for an immediate sync when added.
     ///
-    /// By default, the peer is immediately synced with.
+    /// By default, the peer is scheduled for an immediate sync.
     pub fn sync_now(mut self, sync_now: bool) -> Self {
         self.sync_now = sync_now;
         self
