@@ -1077,10 +1077,10 @@ grants roles permission to manage a specific label.
 
 ### Role Ownership
 
-As previously mentioned, each role is "owned" by one or more
+Each role is "owned" by one or more
 other roles, called the _owning roles_. The owning roles are
 responsible for delegating management permissions of the role to
-other roles. They can also add and remove other owning roles.
+other roles. An owning role can add other owning roles, but can only remove itself.
 
 ```policy
 // Records that the target role is owned by the owning role.
@@ -1131,8 +1131,7 @@ function device_owns_role(device_id id, target_role_id id) bool {
 }
 ```
 
-The owning roles are allowed to add new owning roles or remove
-existing owning roles, provided the device also holds the
+The owning roles are allowed to add new owning roles or remove themselves as a role owner, provided the device also holds the
 `ChangeRoleManagingRole` simple permission.
 
 ```policy
