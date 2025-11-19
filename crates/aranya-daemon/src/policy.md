@@ -1304,6 +1304,8 @@ permissions to target roles, including to themselves:
   revoke a target role from *any* device.
 - `CanChangeRolePerms(role_id)`: grants roles the ability
   to change the permissions of a target role.
+- `CanDeleteRole(role_id)`: grants roles the ability
+  to delete a target role.
 
 > NOTE: These facts are not deleted when a role is deleted. This is
 > operationally inconsequential as each role has a unique ID and the
