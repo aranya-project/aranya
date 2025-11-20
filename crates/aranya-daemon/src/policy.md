@@ -3014,8 +3014,6 @@ ephemeral command QueryRolePermissionManagers {
 }
 ```
 
-TODO: query_role_deleters
-
 ## Teams
 <!-- Section contains: Team creation/termination, device management -->
 
