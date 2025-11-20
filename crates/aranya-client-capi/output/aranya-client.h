@@ -1771,7 +1771,6 @@ AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
                                    size_t *roles_len,
                                    struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Returns the roles that can assign `role`.
  *
@@ -1944,6 +1943,7 @@ AranyaError aranya_role_permission_managers_ext(const struct AranyaClient *clien
                                                 size_t *roles_len,
                                                 struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Assigns a role management permission to a managing role.
  *
