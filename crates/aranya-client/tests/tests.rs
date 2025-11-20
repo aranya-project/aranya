@@ -2111,6 +2111,8 @@ async fn test_role_owners_query() -> Result<()> {
     assert_eq!(role_assigners.iter().len(), 3);
     let role_revokers = owner_team.role_revokers(roles.member().id).await?;
     assert_eq!(role_revokers.iter().len(), 1);
+    let role_deleters = owner_team.role_deleters(roles.member().id).await?;
+    assert_eq!(role_deleters.iter().len(), 1);
     let role_perm_managers = owner_team
         .role_permission_managers(roles.member().id)
         .await?;
