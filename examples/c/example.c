@@ -1125,6 +1125,52 @@ AranyaError run_custom_roles_example(Team* t) {
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
+    size_t member_role_assigners_len = 1;
+    AranyaRole* member_role_assigners =
+        calloc(member_role_assigners_len, sizeof(AranyaRole));
+    err = aranya_role_assigners(&owner->client, &t->id, &member_role_id,
+                                member_role_assigners,
+                                &member_role_assigners_len);
+    EXPECT("unable to get role assigners for the 'member' role.", err);
+    if (member_role_assigners_len != 1) {
+        fprintf(stderr,
+                "there should only be 1 role assigner for the 'member' role. "
+                "Actual: %zu\n",
+                member_role_assigners_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+    size_t member_role_revokers_len = 1;
+    AranyaRole* member_role_revokers =
+        calloc(member_role_revokers_len, sizeof(AranyaRole));
+    err = aranya_role_revokers(&owner->client, &t->id, &member_role_id,
+                               member_role_revokers, &member_role_revokers_len);
+    EXPECT("unable to get role revokers for the 'member' role.", err);
+    if (member_role_revokers_len != 1) {
+        fprintf(stderr,
+                "there should only be 1 role revoker for the 'member' role. "
+                "Actual: %zu\n",
+                member_role_revokers_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+    size_t member_role_permission_managers_len = 1;
+    AranyaRole* member_role_permission_managers =
+        calloc(member_role_permission_managers_len, sizeof(AranyaRole));
+    err = aranya_role_permission_managers(
+        &owner->client, &t->id, &member_role_id,
+        member_role_permission_managers, &member_role_permission_managers_len);
+    EXPECT("unable to get role permission managers for the 'member' role.",
+           err);
+    if (member_role_permission_managers_len != 1) {
+        fprintf(stderr,
+                "there should only be 1 role permission manager for the "
+                "'member' role. "
+                "Actual: %zu\n",
+                member_role_permission_managers_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
 
     // Add a new owning role to the 'member' role.
     printf("adding a new owning role to the 'member' role.\n");
