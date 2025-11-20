@@ -240,7 +240,7 @@ impl fmt::Debug for Secret {
 pub struct SyncPeerConfig {
     /// The interval at which syncing occurs. If None, the peer will not be periodically synced.
     pub interval: Option<Duration>,
-    /// Determines if a peer should be synced with immediately after they're added
+    /// Determines whether the peer will be scheduled for an immediate sync when added.
     pub sync_now: bool,
     /// Determines if the peer should be synced with when a hello message is received
     /// indicating they have a head that we don't have
