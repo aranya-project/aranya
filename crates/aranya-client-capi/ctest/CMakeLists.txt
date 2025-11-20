@@ -1,6 +1,80 @@
 cmake_minimum_required(VERSION 3.11)
 project(capi-ctest LANGUAGES C)
 
+# --- Custom: Copy Rust build artifacts and header for C API tests ---
+set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug")
+set(RUST_HEADER_GLOB "${RUST_TARGET_DIR}/build/aranya-client-capi-*/out/aranya-client.h")
+file(GLOB ARANYA_HEADER_PATH RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" ${RUST_HEADER_GLOB})
+set(CTEST_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+set(CTEST_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
+set(CTEST_EXEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/exec")
+
+# --- Custom: Build Rust C API and Daemon ---
+add_custom_target(build_aranya_client_capi ALL
+    COMMAND cargo build -p aranya-client-capi --features afc,aqc,experimental,preview
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    COMMENT "Building aranya-client-capi with cargo"
+)
+add_custom_target(build_aranya_daemon ALL
+    COMMAND cargo build -p aranya-daemon --features afc,aqc,experimental,preview
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    COMMENT "Building aranya-daemon with cargo"
+)
+
+# Copy aranya-client.h header
+add_custom_command(
+    OUTPUT ${CTEST_INCLUDE_DIR}/aranya-client.h
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_INCLUDE_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RUST_HEADER_GLOB} ${CTEST_INCLUDE_DIR}/aranya-client.h
+    DEPENDS build_aranya_client_capi
+    COMMENT "Copying aranya-client.h to ctest/include/"
+)
+
+# Copy libaranya_client_capi.dylib (macOS) or .so (Linux)
+set(ARANYA_LIB_DYLIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
+set(ARANYA_LIB_SO "${RUST_TARGET_DIR}/libaranya_client_capi.so")
+add_custom_command(
+    OUTPUT ${CTEST_LIB_DIR}/libaranya_client_capi.dylib
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_LIB_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ARANYA_LIB_DYLIB} ${CTEST_LIB_DIR}/libaranya_client_capi.dylib
+    DEPENDS build_aranya_client_capi
+    COMMENT "Copying libaranya_client_capi.dylib to ctest/lib/"
+)
+add_custom_command(
+    OUTPUT ${CTEST_LIB_DIR}/libaranya_client_capi.so
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_LIB_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ARANYA_LIB_SO} ${CTEST_LIB_DIR}/libaranya_client_capi.so
+    DEPENDS build_aranya_client_capi
+    COMMENT "Copying libaranya_client_capi.so to ctest/lib/"
+)
+
+# Copy aranya-daemon binary
+set(ARANYA_DAEMON_BIN "${RUST_TARGET_DIR}/aranya-daemon")
+add_custom_command(
+    OUTPUT ${CTEST_EXEC_DIR}/aranya-daemon
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_EXEC_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ARANYA_DAEMON_BIN} ${CTEST_EXEC_DIR}/aranya-daemon
+    DEPENDS build_aranya_daemon
+    COMMENT "Copying aranya-daemon to ctest/exec/"
+)
+
+# Add a custom target to perform all copies
+add_custom_target(copy_aranya_artifacts ALL
+    DEPENDS
+        ${CTEST_INCLUDE_DIR}/aranya-client.h
+        ${CTEST_LIB_DIR}/libaranya_client_capi.dylib
+        ${CTEST_LIB_DIR}/libaranya_client_capi.so
+        ${CTEST_EXEC_DIR}/aranya-daemon
+)
+
+# Enforce building only under ctest/build
+get_filename_component(_build_dir "${CMAKE_BINARY_DIR}" REALPATH)
+get_filename_component(_ctest_dir "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
+string(FIND "${_build_dir}" "${_ctest_dir}/build" _found_build)
+if(NOT (_found_build EQUAL 0 OR _found_build GREATER 0))
+    message(FATAL_ERROR "\n\nERROR: You must run cmake from a build directory under: ${_ctest_dir}/build\n\nCurrent build dir: ${_build_dir}\n\nPlease create and use a build directory inside ctest/build.\n\nExample:\n  mkdir -p ${_ctest_dir}/build && cd ${_ctest_dir}/build && cmake ..\n")
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
