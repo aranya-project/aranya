@@ -6,10 +6,10 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use aranya_client::{
-    afc,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    SyncPeerConfig, afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
-    SyncPeerConfig,
+    text,
 };
 #[cfg(feature = "preview")]
 use aranya_client::{Permission, RoleManagementPermission};
@@ -20,11 +20,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{debug, info, Metadata};
+use tracing::{Metadata, debug, info};
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
-    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -465,6 +465,16 @@ async fn main() -> Result<()> {
     info!("owner role: {:?}", owner_role);
     let keybundle = owner_device.keybundle().await?;
     info!("owner keybundle: {:?}", keybundle);
+
+    info!("role management queries");
+    let role_owners = owner_team.role_owners(admin_role.id).await?;
+    assert_eq!(role_owners.iter().len(), 1);
+    let role_assigners = owner_team.role_assigners(admin_role.id).await?;
+    assert_eq!(role_assigners.iter().len(), 1);
+    let role_revokers = owner_team.role_revokers(admin_role.id).await?;
+    assert_eq!(role_revokers.iter().len(), 1);
+    let role_permission_managers = owner_team.role_permission_managers(admin_role.id).await?;
+    assert_eq!(role_permission_managers.iter().len(), 1);
 
     info!("creating label");
     let label3 = owner_team
