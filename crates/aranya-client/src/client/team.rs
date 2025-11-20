@@ -367,6 +367,66 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
+    /// Returns the roles that can assign `role`.
+    #[instrument(skip(self))]
+    pub async fn role_assigners(&self, role: RoleId) -> Result<Roles> {
+        let roles = self
+            .client
+            .daemon
+            .role_assigners(context::current(), self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
+    }
+
+    /// Returns the roles that can revoke `role`.
+    #[instrument(skip(self))]
+    pub async fn role_revokers(&self, role: RoleId) -> Result<Roles> {
+        let roles = self
+            .client
+            .daemon
+            .role_revokers(context::current(), self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
+    }
+
+    /// Returns the roles that can manage permissions of `role`.
+    #[instrument(skip(self))]
+    pub async fn role_permission_managers(&self, role: RoleId) -> Result<Roles> {
+        let roles = self
+            .client
+            .daemon
+            .role_permission_managers(context::current(), self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
+    }
+
     /// Assigns a role management permission to a managing role.
     #[cfg(feature = "preview")]
     #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]

@@ -384,6 +384,12 @@ pub trait DaemonApi {
     async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Returns the roles that own the target role.
     async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the roles that can assign the target role.
+    async fn role_assigners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the roles that can revoke the target role.
+    async fn role_revokers(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the roles that can manage permissions of the target role.
+    async fn role_permission_managers(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.
     #[cfg(feature = "preview")]
     async fn assign_role_management_perm(

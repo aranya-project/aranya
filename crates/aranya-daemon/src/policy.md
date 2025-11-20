@@ -2706,6 +2706,170 @@ ephemeral command QueryRoleOwners {
 }
 ```
 
+#### `query_role_assigners`
+
+```policy
+// Emits `QueryRoleAssignersResult` for each role that can assign the specified role.
+ephemeral action query_role_assigners(role_id id) {
+    map CanAssignRole[target_role_id: role_id, managing_role_id: ?] as f {
+        let maybe_role = query Role[role_id: f.managing_role_id]
+        if maybe_role is Some {
+            let role = unwrap maybe_role
+            publish QueryRoleAssigners {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: role.author_id,
+                default: role.default,
+            }
+        }
+    }
+}
+
+// Emitted when a role is queried by `query_role_assigners`.
+effect QueryRoleAssignersResult {
+    // The ID of the managing role.
+    role_id id,
+    // The name of the managing role.
+    name string,
+    // The ID of the device that created the managing role.
+    author_id id,
+    // Is this a default role?
+    default bool,
+}
+
+// A trampoline command to forward data to `QueryRoleAssignersResult`.
+ephemeral command QueryRoleAssigners {
+    fields {
+        role_id id,
+        name string,
+        author_id id,
+        default bool,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let eff = this as QueryRoleAssignersResult
+        finish {
+            emit eff
+        }
+    }
+}
+```
+
+#### `query_role_revokers`
+
+```policy
+// Emits `QueryRoleRevokersResult` for each role that can revoke the specified role.
+ephemeral action query_role_revokers(role_id id) {
+    map CanRevokeRole[target_role_id: role_id, managing_role_id: ?] as f {
+        let maybe_role = query Role[role_id: f.managing_role_id]
+        if maybe_role is Some {
+            let role = unwrap maybe_role
+            publish QueryRoleRevokers {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: role.author_id,
+                default: role.default,
+            }
+        }
+    }
+}
+
+// Emitted when a role is queried by `query_role_revokers`.
+effect QueryRoleRevokersResult {
+    // The ID of the managing role.
+    role_id id,
+    // The name of the managing role.
+    name string,
+    // The ID of the device that created the managing role.
+    author_id id,
+    // Is this a default role?
+    default bool,
+}
+
+// A trampoline command to forward data to `QueryRoleRevokersResult`.
+ephemeral command QueryRoleRevokers {
+    fields {
+        role_id id,
+        name string,
+        author_id id,
+        default bool,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let eff = this as QueryRoleRevokersResult
+        finish {
+            emit eff
+        }
+    }
+}
+```
+
+#### `query_role_permission_managers`
+
+```policy
+// Emits `QueryRolePermissionManagersResult` for each role that can change permissions of the specified role.
+ephemeral action query_role_permission_managers(role_id id) {
+    map CanChangeRolePerms[target_role_id: role_id, managing_role_id: ?] as f {
+        let maybe_role = query Role[role_id: f.managing_role_id]
+        if maybe_role is Some {
+            let role = unwrap maybe_role
+            publish QueryRolePermissionManagers {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: role.author_id,
+                default: role.default,
+            }
+        }
+    }
+}
+
+// Emitted when a role is queried by `query_role_permission_managers`.
+effect QueryRolePermissionManagersResult {
+    // The ID of the managing role.
+    role_id id,
+    // The name of the managing role.
+    name string,
+    // The ID of the device that created the managing role.
+    author_id id,
+    // Is this a default role?
+    default bool,
+}
+
+// A trampoline command to forward data to `QueryRolePermissionManagersResult`.
+ephemeral command QueryRolePermissionManagers {
+    fields {
+        role_id id,
+        name string,
+        author_id id,
+        default bool,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let eff = this as QueryRolePermissionManagersResult
+        finish {
+            emit eff
+        }
+    }
+}
+```
+
+TODO: query_role_deleters
+
 ## Teams
 <!-- Section contains: Team creation/termination, device management -->
 

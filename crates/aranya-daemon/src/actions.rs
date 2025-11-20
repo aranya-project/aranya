@@ -418,6 +418,39 @@ where
             .in_current_span()
     }
 
+    /// Invokes `query_role_assigners`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_assigners(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_assigners(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_role_revokers`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_revokers(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_revokers(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `query_role_permission_managers`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_permission_managers(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_permission_managers(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
     /// Invokes `remove_device`.
     #[instrument(skip(self), fields(%device_id))]
     fn remove_device(

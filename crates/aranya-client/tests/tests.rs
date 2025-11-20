@@ -2033,6 +2033,7 @@ async fn test_remove_role_owner_missing_entry() -> Result<()> {
 }
 
 /// Tests that role_owners returns the correct owning roles.
+/// Also tests that role management queries return correct number of roles.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_role_owners_query() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_owners_query").await?;
@@ -2056,6 +2057,14 @@ async fn test_role_owners_query() -> Result<()> {
         roles.owner().id,
         "owner role should initially own member role"
     );
+    let role_assigners = owner_team.role_assigners(roles.member().id).await?;
+    assert_eq!(role_assigners.iter().len(), 3);
+    let role_revokers = owner_team.role_revokers(roles.member().id).await?;
+    assert_eq!(role_revokers.iter().len(), 1);
+    let role_perm_managers = owner_team
+        .role_permission_managers(roles.member().id)
+        .await?;
+    assert_eq!(role_perm_managers.iter().len(), 1);
 
     // Add admin as owner of member role
     owner_team

@@ -53,7 +53,10 @@ pub enum Effect {
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsResult(QueryLabelsResult),
+    QueryRoleAssignersResult(QueryRoleAssignersResult),
     QueryRoleOwnersResult(QueryRoleOwnersResult),
+    QueryRolePermissionManagersResult(QueryRolePermissionManagersResult),
+    QueryRoleRevokersResult(QueryRoleRevokersResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
     RoleAssigned(RoleAssigned),
     RoleChanged(RoleChanged),
@@ -211,9 +214,33 @@ pub struct QueryLabelsResult {
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
+/// QueryRoleAssignersResult policy effect.
+#[effect]
+pub struct QueryRoleAssignersResult {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
+}
 /// QueryRoleOwnersResult policy effect.
 #[effect]
 pub struct QueryRoleOwnersResult {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
+}
+/// QueryRolePermissionManagersResult policy effect.
+#[effect]
+pub struct QueryRolePermissionManagersResult {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
+}
+/// QueryRoleRevokersResult policy effect.
+#[effect]
+pub struct QueryRoleRevokersResult {
     pub role_id: BaseId,
     pub name: Text,
     pub author_id: BaseId,
@@ -339,6 +366,9 @@ pub enum EphemeralAction {
     query_device_keybundle(query_device_keybundle),
     query_team_roles(query_team_roles),
     query_role_owners(query_role_owners),
+    query_role_assigners(query_role_assigners),
+    query_role_revokers(query_role_revokers),
+    query_role_permission_managers(query_role_permission_managers),
     query_label(query_label),
     query_labels(query_labels),
     query_labels_assigned_to_device(query_labels_assigned_to_device),
@@ -443,6 +473,21 @@ pub struct query_team_roles {}
 /// query_role_owners policy action.
 #[action(interface = Ephemeral)]
 pub struct query_role_owners {
+    pub role_id: BaseId,
+}
+/// query_role_assigners policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_assigners {
+    pub role_id: BaseId,
+}
+/// query_role_revokers policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_revokers {
+    pub role_id: BaseId,
+}
+/// query_role_permission_managers policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_permission_managers {
     pub role_id: BaseId,
 }
 /// create_team policy action.
