@@ -97,6 +97,7 @@ style = "both"
 "target_os = vxworks" = "__VXWORKS__"
 "target_arch = x86_64" = "__x86_64__"
 "feature = afc" = "ENABLE_ARANYA_AFC"
+"feature = preview" = "ENABLE_ARANYA_PREVIEW"
 
 [export]
 renaming_overrides_prefixing = true
