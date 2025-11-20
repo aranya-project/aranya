@@ -6,6 +6,10 @@ members = [
     "examples/rust/*",
 ]
 
+exclude = [
+    "crates/build",
+]
+
 
 [workspace.package]
 version = "4.0.0"
