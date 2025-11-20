@@ -494,12 +494,9 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let _graph = self.check_team_valid(team).await?;
 
-        // For now, return success without actually implementing close functionality
-        // This prevents daemon crashes in tests
-        tracing::warn!("close_team is not fully implemented, returning success");
-        Ok(())
+        todo!();
     }
 
     #[instrument(skip(self), err)]

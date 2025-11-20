@@ -692,37 +692,6 @@ static int test_add_remove_team(void) {
     return 1;
 }
 
-/* Test: close_team operation */
-static int test_close_team(void) {
-    printf("\n=== TEST: close_team ===\n");
-    
-    Team team = {0};
-    AranyaError err = init_team(&team);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create team: %s\n", aranya_error_to_str(err));
-        return 0;
-    }
-    
-    printf("  ✓ Team created\n");
-    
-    /* Close the team */
-    err = aranya_close_team(&team.owner.client, &team.id);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to close team: %s\n", aranya_error_to_str(err));
-        if (team.owner.pk) free(team.owner.pk);
-        aranya_client_cleanup(&team.owner.client);
-        return 0;
-    }
-    
-    printf("  ✓ Team closed\n");
-    
-    /* Cleanup */
-    if (team.owner.pk) free(team.owner.pk);
-    aranya_client_cleanup(&team.owner.client);
-    
-    return 1;
-}
-
 /* Test: add_device_to_team and remove_device_from_team */
 static int test_add_remove_device(void) {
     printf("\n=== TEST: add_device_to_team and remove_device_from_team ===\n");
