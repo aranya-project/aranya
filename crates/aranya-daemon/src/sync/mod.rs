@@ -1,56 +1,14 @@
-//! Aranya syncer for syncing Aranya graph commands.
-pub mod task;
-
-use error::SyncError;
-
-/// Possible sync related errors
-pub type Result<T> = core::result::Result<T, SyncError>;
-
-mod error {
-    use std::convert::Infallible;
-
-    use thiserror::Error;
-
-    use super::task::quic::Error as QSError;
-
-    #[derive(Error, Debug)]
-    #[non_exhaustive]
-    pub enum SyncError {
-        #[error(transparent)]
-        QuicSync(#[from] QSError),
-        #[error(transparent)]
-        Runtime(#[from] aranya_runtime::SyncError),
-        #[error("Could not send sync request: {0}")]
-        SendSyncRequest(Box<SyncError>),
-        #[error("Could not receive sync response: {0}")]
-        ReceiveSyncResponse(Box<SyncError>),
-        #[error(transparent)]
-        Bug(#[from] buggy::Bug),
-        #[error(transparent)]
-        Other(#[from] anyhow::Error),
-    }
-
-    impl From<SyncError> for aranya_daemon_api::Error {
-        fn from(err: SyncError) -> Self {
-            Self::from_err(err)
-        }
-    }
-
-    impl From<Infallible> for SyncError {
-        fn from(err: Infallible) -> Self {
-            match err {}
-        }
-    }
-
-    impl SyncError {
-        pub fn is_parallel_finalize(&self) -> bool {
-            use aranya_runtime::ClientError;
-            match self {
-                Self::Other(err) => err
-                    .downcast_ref::<ClientError>()
-                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
-                _ => false,
-            }
-        }
-    }
-}
+//! Aranya Daemon Syncer, meant for relaying graph information to other peers.
+//!
+//! # Architecture
+//! The syncer is designed around several main types. The [`SyncManager`] does the heavy lifting of
+//! managing all services, scheduling concurrent sync tasks, and cleaning up any side effects of
+//! those tasks. It's designed to talk to a [`SyncServer`] on the other end which will respond to
+//! all requests and messages. It returns a [`SyncHandle`] that is used to tell the manager to do
+//! things such as add or remove a peer. All protocol knowledge is handed off to [`SyncProtocol`],
+//! which is responsible for filling buffers with serialized data to send. Once a sync task is
+//! scheduled, it calls a transport layer defined by [`Transport`] and [`Handler`] which is
+//! responsible for sending a request to a given peer, and receiving either a response, or an empty
+//! acknowledgement. There's also several "services" for more complex features, such as
+//! [`HelloService`] and [`PushService`], which have their own internal loops that then schedule
+//! additional sync tasks with the manager.
