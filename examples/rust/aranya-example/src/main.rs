@@ -466,6 +466,18 @@ async fn main() -> Result<()> {
     let keybundle = owner_device.keybundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
+    info!("role management queries");
+    let role_owners = owner_team.role_owners(admin_role.id).await?;
+    assert_eq!(role_owners.iter().len(), 1);
+    let role_assigners = owner_team.role_assigners(admin_role.id).await?;
+    assert_eq!(role_assigners.iter().len(), 1);
+    let role_revokers = owner_team.role_revokers(admin_role.id).await?;
+    assert_eq!(role_revokers.iter().len(), 1);
+    let role_deleters = owner_team.role_deleters(admin_role.id).await?;
+    assert_eq!(role_deleters.iter().len(), 1);
+    let role_permission_managers = owner_team.role_permission_managers(admin_role.id).await?;
+    assert_eq!(role_permission_managers.iter().len(), 1);
+
     info!("creating label");
     let label3 = owner_team
         .create_label(text!("label3"), owner_role.id)
