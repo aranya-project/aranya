@@ -275,6 +275,7 @@ impl EffectHandler {
                 QueryRoleOwnersResult(_) => {}
                 QueryRoleAssignersResult(_) => {}
                 QueryRoleRevokersResult(_) => {}
+                QueryRoleDeletersResult(_) => {}
                 QueryRolePermissionManagersResult(_) => {}
                 QueryAfcChannelIsValidResult(_) => {}
                 RoleCreated(_) => {}
@@ -1453,6 +1454,38 @@ impl DaemonApi for Api {
             .into_iter()
             .filter_map(|e| {
                 if let Effect::QueryRoleRevokersResult(e) = e {
+                    Some(api::Role {
+                        id: api::RoleId::from_base(e.role_id),
+                        name: e.name,
+                        author_id: api::DeviceId::from_base(e.author_id),
+                        default: e.default,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(roles)
+    }
+
+    #[instrument(skip(self), err)]
+    async fn role_deleters(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+    ) -> api::Result<Box<[api::Role]>> {
+        let graph = self.check_team_valid(team).await?;
+
+        let roles = self
+            .client
+            .actions(graph)
+            .query_role_deleters(RoleId::transmute(role))
+            .await
+            .context("unable to query role owners")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryRoleDeletersResult(e) = e {
                     Some(api::Role {
                         id: api::RoleId::from_base(e.role_id),
                         name: e.name,

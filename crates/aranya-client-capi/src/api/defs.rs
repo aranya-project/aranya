@@ -1320,6 +1320,45 @@ pub unsafe fn role_revokers(
     Ok(())
 }
 
+/// Returns the roles that can delete `role`.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the subject role
+/// @param[in] roles_out returns a list of roles that can delete `role`
+/// @param[in,out] roles_len the number of roles written to the buffer.
+///
+/// @relates AranyaClient.
+pub unsafe fn role_deleters(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let roles = client
+        .rt
+        .block_on(client.inner.team(team.into()).role_deleters(role.into()))?
+        .__into_data();
+
+    if *roles_len < roles.len() {
+        *roles_len = roles.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_len = roles.len();
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(roles) {
+        Role::init(dst, src);
+    }
+
+    Ok(())
+}
+
 /// Returns the roles that can change permissions of `role`.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.

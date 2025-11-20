@@ -440,6 +440,17 @@ where
             .in_current_span()
     }
 
+    /// Invokes `query_role_deleters`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_deleters(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_deleters(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
     /// Invokes `query_role_permission_managers`.
     #[instrument(skip(self), fields(%role_id))]
     fn query_role_permission_managers(

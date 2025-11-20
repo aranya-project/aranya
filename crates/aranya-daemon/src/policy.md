@@ -2906,6 +2906,60 @@ ephemeral command QueryRoleRevokers {
 }
 ```
 
+#### `query_role_deleters`
+
+```policy
+// Emits `QueryRoleDeletersResult` for each role that can revoke the specified role.
+ephemeral action query_role_deleters(role_id id) {
+    map CanDeleteRole[target_role_id: role_id, managing_role_id: ?] as f {
+        let maybe_role = query Role[role_id: f.managing_role_id]
+        if maybe_role is Some {
+            let role = unwrap maybe_role
+            publish QueryRoleDeleters {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: role.author_id,
+                default: role.default,
+            }
+        }
+    }
+}
+
+// Emitted when a role is queried by `query_role_deleters`.
+effect QueryRoleDeletersResult {
+    // The ID of the managing role.
+    role_id id,
+    // The name of the managing role.
+    name string,
+    // The ID of the device that created the managing role.
+    author_id id,
+    // Is this a default role?
+    default bool,
+}
+
+// A trampoline command to forward data to `QueryRoleDeletersResult`.
+ephemeral command QueryRoleDeleters {
+    fields {
+        role_id id,
+        name string,
+        author_id id,
+        default bool,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let eff = this as QueryRoleDeletersResult
+        finish {
+            emit eff
+        }
+    }
+}
+```
+
 #### `query_role_permission_managers`
 
 ```policy

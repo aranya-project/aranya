@@ -388,6 +388,8 @@ pub trait DaemonApi {
     async fn role_assigners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Returns the roles that can revoke the target role.
     async fn role_revokers(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the roles that can delete the target role.
+    async fn role_deleters(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Returns the roles that can manage permissions of the target role.
     async fn role_permission_managers(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.

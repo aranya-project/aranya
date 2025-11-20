@@ -407,6 +407,26 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
+    /// Returns the roles that can delete `role`.
+    #[instrument(skip(self))]
+    pub async fn role_deleters(&self, role: RoleId) -> Result<Roles> {
+        let roles = self
+            .client
+            .daemon
+            .role_deleters(context::current(), self.id, role.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
+    }
+
     /// Returns the roles that can manage permissions of `role`.
     #[instrument(skip(self))]
     pub async fn role_permission_managers(&self, role: RoleId) -> Result<Roles> {

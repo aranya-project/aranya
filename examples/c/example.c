@@ -1154,6 +1154,20 @@ AranyaError run_custom_roles_example(Team* t) {
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
+    size_t member_role_deleters_len = 1;
+    AranyaRole* member_role_deleters =
+        calloc(member_role_deleters_len, sizeof(AranyaRole));
+    err = aranya_role_deleters(&owner->client, &t->id, &member_role_id,
+                               member_role_deleters, &member_role_deleters_len);
+    EXPECT("unable to get role deleters for the 'member' role.", err);
+    if (member_role_deleters_len != 1) {
+        fprintf(stderr,
+                "there should only be 1 role deleter for the 'member' role. "
+                "Actual: %zu\n",
+                member_role_deleters_len);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
     size_t member_role_permission_managers_len = 1;
     AranyaRole* member_role_permission_managers =
         calloc(member_role_permission_managers_len, sizeof(AranyaRole));

@@ -1840,6 +1840,49 @@ AranyaError aranya_role_revokers_ext(const struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Returns the roles that can delete `role`.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] roles_out returns a list of roles that can delete `role`
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_role_deleters(const struct AranyaClient *client,
+                                 const struct AranyaTeamId *team,
+                                 const struct AranyaRoleId *role,
+                                 struct AranyaRole *roles_out,
+                                 size_t *roles_len);
+
+/**
+ * Returns the roles that can delete `role`.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] roles_out returns a list of roles that can delete `role`
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_role_deleters_ext(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     const struct AranyaRoleId *role,
+                                     struct AranyaRole *roles_out,
+                                     size_t *roles_len,
+                                     struct AranyaExtError *__ext_err);
+
+/**
  * Returns the roles that can change permissions of `role`.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.

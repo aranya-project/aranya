@@ -54,6 +54,7 @@ pub enum Effect {
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsResult(QueryLabelsResult),
     QueryRoleAssignersResult(QueryRoleAssignersResult),
+    QueryRoleDeletersResult(QueryRoleDeletersResult),
     QueryRoleOwnersResult(QueryRoleOwnersResult),
     QueryRolePermissionManagersResult(QueryRolePermissionManagersResult),
     QueryRoleRevokersResult(QueryRoleRevokersResult),
@@ -222,6 +223,14 @@ pub struct QueryRoleAssignersResult {
     pub author_id: BaseId,
     pub default: bool,
 }
+/// QueryRoleDeletersResult policy effect.
+#[effect]
+pub struct QueryRoleDeletersResult {
+    pub role_id: BaseId,
+    pub name: Text,
+    pub author_id: BaseId,
+    pub default: bool,
+}
 /// QueryRoleOwnersResult policy effect.
 #[effect]
 pub struct QueryRoleOwnersResult {
@@ -368,6 +377,7 @@ pub enum EphemeralAction {
     query_role_owners(query_role_owners),
     query_role_assigners(query_role_assigners),
     query_role_revokers(query_role_revokers),
+    query_role_deleters(query_role_deleters),
     query_role_permission_managers(query_role_permission_managers),
     query_label(query_label),
     query_labels(query_labels),
@@ -483,6 +493,11 @@ pub struct query_role_assigners {
 /// query_role_revokers policy action.
 #[action(interface = Ephemeral)]
 pub struct query_role_revokers {
+    pub role_id: BaseId,
+}
+/// query_role_deleters policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_deleters {
     pub role_id: BaseId,
 }
 /// query_role_permission_managers policy action.
