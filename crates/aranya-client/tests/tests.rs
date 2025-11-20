@@ -1841,7 +1841,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
 
     // Now remove the owner as a role owner of operator.
     owner_team
-        .remove_role_owner(roles.operator().id)
+        .remove_role_ownership(roles.operator().id)
         .await
         .context("Failed to remove owner as role owner from operator")?;
 
@@ -2020,7 +2020,7 @@ async fn test_remove_role_owner_missing_entry() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let operator_team = devices.operator.client.team(team_id);
-    match operator_team.remove_role_owner(roles.member().id).await {
+    match operator_team.remove_role_ownership(roles.member().id).await {
         Ok(_) => bail!("expected removing absent role owner to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected remove_role_owner error: {err:?}"),
@@ -2113,7 +2113,7 @@ async fn test_role_owners_query() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     let admin_addr = devices.admin.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
-    admin_team.remove_role_owner(roles.member().id).await?;
+    admin_team.remove_role_ownership(roles.member().id).await?;
     owner_team.sync_now(admin_addr, None).await?;
 
     // Query owners again - should now show owner and operator

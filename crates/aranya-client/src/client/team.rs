@@ -333,10 +333,10 @@ impl Team<'_> {
     #[cfg(feature = "preview")]
     #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
-    pub async fn remove_role_owner(&self, role: RoleId) -> Result<()> {
+    pub async fn remove_role_ownership(&self, role: RoleId) -> Result<()> {
         self.client
             .daemon
-            .remove_role_owner(context::current(), self.id, role.into_api())
+            .remove_role_ownership(context::current(), self.id, role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

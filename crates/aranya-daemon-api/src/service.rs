@@ -381,7 +381,7 @@ pub trait DaemonApi {
     async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Removes device's role as an owner of the target `role`.
     #[cfg(feature = "preview")]
-    async fn remove_role_owner(team: TeamId, role: RoleId) -> Result<()>;
+    async fn remove_role_ownership(team: TeamId, role: RoleId) -> Result<()>;
     /// Returns the roles that own the target role.
     async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.

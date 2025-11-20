@@ -1185,12 +1185,16 @@ pub fn add_role_owner(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "preview")]
-pub fn remove_role_owner(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
+pub fn remove_role_ownership(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+) -> Result<(), imp::Error> {
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .remove_role_owner(role.into()),
+            .remove_role_ownership(role.into()),
     )?;
 
     Ok(())

@@ -1218,7 +1218,7 @@ command AddRoleOwner {
 //
 // - `OwnsRole(author.role_id, target_role_id)`
 // - `ChangeRoleManagingRole`
-action remove_role_owner(
+action remove_role_ownership(
     target_role_id id,
 ) {
     publish RemoveRoleOwner {

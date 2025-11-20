@@ -1160,7 +1160,7 @@ AranyaError run_custom_roles_example(Team* t) {
 
     // Remove an owning role from the 'member' role.
     printf("removing an owning role to the 'member' role.\n");
-    err = aranya_remove_role_owner(&admin->client, &t->id, &member_role_id);
+    err = aranya_remove_role_ownership(&admin->client, &t->id, &member_role_id);
     EXPECT("unable to remove an owning role.", err);
 
     // Owner syncs with admin.

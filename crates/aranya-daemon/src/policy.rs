@@ -310,7 +310,7 @@ pub enum PersistentAction {
     add_perm_to_role(add_perm_to_role),
     remove_perm_from_role(remove_perm_from_role),
     add_role_owner(add_role_owner),
-    remove_role_owner(remove_role_owner),
+    remove_role_ownership(remove_role_ownership),
     assign_role_management_perm(assign_role_management_perm),
     revoke_role_management_perm(revoke_role_management_perm),
     create_role(create_role),
@@ -381,9 +381,9 @@ pub struct add_role_owner {
     pub target_role_id: BaseId,
     pub new_owning_role: BaseId,
 }
-/// remove_role_owner policy action.
+/// remove_role_ownership policy action.
 #[action(interface = Persistent)]
-pub struct remove_role_owner {
+pub struct remove_role_ownership {
     pub target_role_id: BaseId,
 }
 /// assign_role_management_perm policy action.

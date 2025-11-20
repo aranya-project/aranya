@@ -1795,9 +1795,9 @@ AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team,
-                                     const struct AranyaRoleId *role);
+AranyaError aranya_remove_role_ownership(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaRoleId *role);
 #endif
 
 #if defined(ENABLE_ARANYA_PREVIEW)
