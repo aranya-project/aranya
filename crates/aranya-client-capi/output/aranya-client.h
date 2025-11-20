@@ -231,6 +231,7 @@ enum AranyaError
 typedef uint32_t AranyaError;
 #endif // __cplusplus
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Simple permission.
  */
@@ -318,7 +319,9 @@ enum AranyaPermission
 #ifndef __cplusplus
 typedef uint8_t AranyaPermission;
 #endif // __cplusplus
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Role management permission.
  */
@@ -346,6 +349,7 @@ enum AranyaRoleManagementPermission
 #ifndef __cplusplus
 typedef uint8_t AranyaRoleManagementPermission;
 #endif // __cplusplus
+#endif
 
 /**
  * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
@@ -1558,6 +1562,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeer
 AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                                struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Sets whether automatic syncing should occur when a hello message is received from this peer
  * indicating they have a head that we don't have.
@@ -1570,7 +1575,9 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncPeerConfigBuilder *cfg,
                                                               uint32_t sync_on_hello);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Sets whether automatic syncing should occur when a hello message is received from this peer
  * indicating they have a head that we don't have.
@@ -1584,6 +1591,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncP
 AranyaError aranya_sync_peer_config_builder_set_sync_on_hello_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                                   uint32_t sync_on_hello,
                                                                   struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Assign a role to a device.
@@ -1646,6 +1654,7 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Adds `owning_role` as an owner of role.
  *
@@ -1660,7 +1669,9 @@ AranyaError aranya_add_role_owner(const struct AranyaClient *client,
                                   const struct AranyaTeamId *team,
                                   const struct AranyaRoleId *role,
                                   const struct AranyaRoleId *owning_role);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Adds `owning_role` as an owner of role.
  *
@@ -1676,7 +1687,9 @@ AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
                                       const struct AranyaRoleId *role,
                                       const struct AranyaRoleId *owning_role,
                                       struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Removes an owning_role as an owner of role.
  *
@@ -1691,7 +1704,9 @@ AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
                                      const struct AranyaRoleId *role,
                                      const struct AranyaRoleId *owning_role);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Removes an owning_role as an owner of role.
  *
@@ -1707,6 +1722,7 @@ AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
                                          const struct AranyaRoleId *role,
                                          const struct AranyaRoleId *owning_role,
                                          struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Returns the roles that own `role`.
@@ -1751,6 +1767,7 @@ AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
                                    size_t *roles_len,
                                    struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Assigns a role management permission to a managing role.
  *
@@ -1767,7 +1784,9 @@ AranyaError aranya_assign_role_management_permission(const struct AranyaClient *
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
                                                      AranyaRoleManagementPermission perm);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Assigns a role management permission to a managing role.
  *
@@ -1785,7 +1804,9 @@ AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClie
                                                          const struct AranyaRoleId *managing_role,
                                                          AranyaRoleManagementPermission perm,
                                                          struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Revokes a role management permission from a managing role.
  *
@@ -1802,7 +1823,9 @@ AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
                                                      AranyaRoleManagementPermission perm);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Revokes a role management permission from a managing role.
  *
@@ -1820,6 +1843,7 @@ AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClie
                                                          const struct AranyaRoleId *managing_role,
                                                          AranyaRoleManagementPermission perm,
                                                          struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Changes the `role` on a `device`
@@ -1903,6 +1927,7 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   size_t *roles_out_len,
                                   struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Create a role.
  *
@@ -1923,7 +1948,9 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
                                AranyaRoleName role_name,
                                const struct AranyaRoleId *owning_role,
                                struct AranyaRole *role_out);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Create a role.
  *
@@ -1945,7 +1972,9 @@ AranyaError aranya_create_role_ext(const struct AranyaClient *client,
                                    const struct AranyaRoleId *owning_role,
                                    struct AranyaRole *role_out,
                                    struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Delete a role.
  *
@@ -1963,7 +1992,9 @@ AranyaError aranya_create_role_ext(const struct AranyaClient *client,
 AranyaError aranya_delete_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaRoleId *role);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Delete a role.
  *
@@ -1982,7 +2013,9 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaRoleId *role,
                                    struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add a permission to a role.
  *
@@ -1999,7 +2032,9 @@ AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaRoleId *role,
                                     AranyaPermission perm);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add a permission to a role.
  *
@@ -2017,7 +2052,9 @@ AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
                                         const struct AranyaRoleId *role,
                                         AranyaPermission perm,
                                         struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Remove a permission from a role.
  *
@@ -2034,7 +2071,9 @@ AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role,
                                          AranyaPermission perm);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Remove a permission from a role.
  *
@@ -2052,6 +2091,7 @@ AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
                                              const struct AranyaRoleId *role,
                                              AranyaPermission perm,
                                              struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Assign a role to a device.
@@ -2275,6 +2315,7 @@ AranyaError aranya_revoke_label_ext(const struct AranyaClient *client,
                                     const struct AranyaLabelId *label_id,
                                     struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add label managing role.
  *
@@ -2291,7 +2332,9 @@ AranyaError aranya_add_label_managing_role(const struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            const struct AranyaLabelId *label_id,
                                            const struct AranyaRoleId *managing_role_id);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add label managing role.
  *
@@ -2309,6 +2352,7 @@ AranyaError aranya_add_label_managing_role_ext(const struct AranyaClient *client
                                                const struct AranyaLabelId *label_id,
                                                const struct AranyaRoleId *managing_role_id,
                                                struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Create a new graph/team with the current device as the owner.
@@ -2628,6 +2672,7 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
                                         AranyaAddr addr,
                                         struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Subscribe to hello notifications from a sync peer.
  *
@@ -2648,7 +2693,9 @@ AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
                                         AranyaDuration graph_change_delay,
                                         AranyaDuration duration,
                                         AranyaDuration schedule_delay);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Subscribe to hello notifications from a sync peer.
  *
@@ -2670,7 +2717,9 @@ AranyaError aranya_sync_hello_subscribe_ext(const struct AranyaClient *client,
                                             AranyaDuration duration,
                                             AranyaDuration schedule_delay,
                                             struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Unsubscribe from hello notifications from a sync peer.
  *
@@ -2685,7 +2734,9 @@ AranyaError aranya_sync_hello_subscribe_ext(const struct AranyaClient *client,
 AranyaError aranya_sync_hello_unsubscribe(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           AranyaAddr peer);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Unsubscribe from hello notifications from a sync peer.
  *
@@ -2701,6 +2752,7 @@ AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               AranyaAddr peer,
                                               struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Sync with peer immediately.
