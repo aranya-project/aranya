@@ -387,7 +387,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // memberb receives AFC channel.
     info!("receiving afc recv channel");
     let memberb_afc = ctx.memberb.client.afc();
-    let recv = memberb_afc
+    let mut recv = memberb_afc
         .accept_channel(team_id, ctrl)
         .await
         .expect("expected to receive afc channel");
