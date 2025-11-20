@@ -510,6 +510,8 @@ pub enum RoleManagementPermission {
     /// Grants a managing role the ability to change the permissions
     /// assigned to the target role.
     CanChangeRolePerms,
+    /// Grants a managing role the ability to delete the target role.
+    CanDeleteRole,
 }
 
 #[cfg(feature = "preview")]
@@ -519,6 +521,7 @@ impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPer
             RoleManagementPermission::CanAssignRole => Self::CanAssignRole,
             RoleManagementPermission::CanRevokeRole => Self::CanRevokeRole,
             RoleManagementPermission::CanChangeRolePerms => Self::CanChangeRolePerms,
+            RoleManagementPermission::CanDeleteRole => Self::CanDeleteRole,
         }
     }
 }

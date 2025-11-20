@@ -337,7 +337,8 @@ async fn test_role_create_assign_revoke() -> Result<()> {
         .await
         .expect_err("expected label creation to fail");
 
-    // TODO: issue#575 show operation fails after delete_role() (after it is added to the API).
+    // Delete role.
+    owner.delete_role(roles.admin().id).await?;
 
     Ok(())
 }
@@ -1591,6 +1592,55 @@ async fn test_delete_role() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     owner_team
+        .delete_role(roles.member().id)
+        .await
+        .expect("expected to delete role");
+
+    Ok(())
+}
+
+/// Tests role deletion with `CanDeleteRole` management permission.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_can_delete_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_can_delete_role").await?;
+
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    // Unassign role from devices before deleting it.
+    let owner_team = devices.owner.client.team(team_id);
+    owner_team
+        .device(devices.membera.id)
+        .revoke_role(roles.member().id)
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .revoke_role(roles.member().id)
+        .await?;
+
+    // Deleting role should fail without `CanDeleteRole` permission.
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+    admin_team
+        .delete_role(roles.member().id)
+        .await
+        .expect_err("expected delete_role() to fail without CanDeleteRole perm");
+
+    // Assign `CanDeleteRole` to `Admin` so it can delete the `Member` role.
+    owner_team
+        .assign_role_management_permission(
+            roles.member().id,
+            roles.admin().id,
+            RoleManagementPermission::CanDeleteRole,
+        )
+        .await
+        .expect("expected to assign CanDeleteRole perm to admin role");
+
+    // `Admin` should now be able to delete the `Member` role.
+    admin_team.sync_now(owner_addr, None).await?;
+    admin_team
         .delete_role(roles.member().id)
         .await
         .expect("expected to delete role");
