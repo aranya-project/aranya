@@ -796,7 +796,7 @@ enum SimplePerm {
     // the `owner` role.
     SetupDefaultRoles,
     // The role can add an owning role to a target role.
-    AddOwnerRole,
+    AddRoleOwner,
 
     // # Labels
     //
@@ -838,7 +838,7 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::AssignRole => { return "AssignRole" }
         SimplePerm::RevokeRole => { return "RevokeRole" }
         SimplePerm::SetupDefaultRoles => { return "SetupDefaultRoles" }
-        SimplePerm::AddOwnerRole => { return "AddOwnerRole" }
+        SimplePerm::AddRoleOwner => { return "AddRoleOwner" }
 
         SimplePerm::CreateLabel => { return "CreateLabel" }
         SimplePerm::DeleteLabel => { return "DeleteLabel" }
@@ -869,7 +869,7 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         "DeleteRole" => { return Some(SimplePerm::DeleteRole) }
         "AssignRole" => { return Some(SimplePerm::AssignRole) }
         "RevokeRole" => { return Some(SimplePerm::RevokeRole) }
-        "AddOwnerRole" => { return Some(SimplePerm::AddOwnerRole) }
+        "AddRoleOwner" => { return Some(SimplePerm::AddRoleOwner) }
 
         //
         // Labels
@@ -1130,7 +1130,7 @@ function device_owns_role(device_id id, target_role_id id) bool {
 }
 ```
 
-The owning roles are allowed to add new owning roles provided they have the `AddOwnerRole` simple permission.
+The owning roles are allowed to add new owning roles provided they have the `AddRoleOwner` simple permission.
 
 ```policy
 // Adds a new owning role to the target role.
@@ -1138,7 +1138,7 @@ The owning roles are allowed to add new owning roles provided they have the `Add
 // # Required Permissions
 //
 // - `OwnsRole(target_role_id)`
-// - `AddOwnerRole`
+// - `AddRoleOwner`
 action add_role_owner(
     target_role_id id,
     new_owning_role id,
@@ -2861,7 +2861,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
             assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRoles)
-            assign_perm_to_role(owner_role_id, SimplePerm::AddOwnerRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::AddRoleOwner)
 
             assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
             assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)

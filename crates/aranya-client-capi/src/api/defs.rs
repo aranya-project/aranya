@@ -553,7 +553,7 @@ pub enum Permission {
     /// the `owner` role.
     SetupDefaultRoles,
     /// The role can add a an owning role to a target role.
-    AddOwnerRole,
+    AddRoleOwner,
 
     // # Labels
     //
@@ -595,7 +595,7 @@ impl From<Permission> for aranya_client::client::Permission {
             Permission::AssignRole => Self::AssignRole,
             Permission::RevokeRole => Self::RevokeRole,
             Permission::SetupDefaultRoles => Self::SetupDefaultRoles,
-            Permission::AddOwnerRole => Self::AddOwnerRole,
+            Permission::AddRoleOwner => Self::AddRoleOwner,
             Permission::CreateLabel => Self::CreateLabel,
             Permission::DeleteLabel => Self::DeleteLabel,
             Permission::ChangeLabelManagingRole => Self::ChangeLabelManagingRole,
