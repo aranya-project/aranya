@@ -270,6 +270,10 @@ enum AranyaPermission
      */
     ARANYA_PERMISSION_REVOKE_ROLE,
     /**
+     * The role can change role management permissions for roles.
+     */
+    ARANYA_PERMISSION_CHANGE_ROLE_MANAGEMENT_PERMS,
+    /**
      * The role can set up default roles. This can only be done
      * once, so this permission can only effectively be used by
      * the `owner` role.
