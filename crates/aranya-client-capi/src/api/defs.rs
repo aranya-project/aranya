@@ -1181,7 +1181,6 @@ pub fn add_role_owner(
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] role the ID of the subject role
-/// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "preview")]
