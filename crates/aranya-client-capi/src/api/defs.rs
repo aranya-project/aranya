@@ -1176,7 +1176,7 @@ pub fn add_role_owner(
     Ok(())
 }
 
-/// Removes an owning_role as an owner of role.
+/// Removes device's role as an owner of role.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
