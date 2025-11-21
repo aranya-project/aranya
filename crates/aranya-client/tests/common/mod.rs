@@ -40,6 +40,7 @@ pub struct DevicesCtx {
     _work_dir: TempDir,
 }
 
+#[allow(dead_code)]
 impl DevicesCtx {
     pub async fn new(name: &str) -> Result<Self> {
         let work_dir = tempfile::tempdir()?;
@@ -215,6 +216,7 @@ pub struct DeviceCtx {
     pub daemon: DaemonHandle,
 }
 
+#[allow(dead_code)]
 impl DeviceCtx {
     pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
