@@ -795,9 +795,8 @@ enum SimplePerm {
     // once, so this permission can only effectively be used by
     // the `owner` role.
     SetupDefaultRoles,
-    // The role can add a managing role to or remove a managing
-    // role from a target role.
-    ChangeRoleManagingRole,
+    // The role can add an owning role to a target role.
+    AddOwnerRole,
 
     // # Labels
     //
@@ -839,7 +838,7 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::AssignRole => { return "AssignRole" }
         SimplePerm::RevokeRole => { return "RevokeRole" }
         SimplePerm::SetupDefaultRoles => { return "SetupDefaultRoles" }
-        SimplePerm::ChangeRoleManagingRole => { return "ChangeRoleManagingRole" }
+        SimplePerm::AddOwnerRole => { return "AddOwnerRole" }
 
         SimplePerm::CreateLabel => { return "CreateLabel" }
         SimplePerm::DeleteLabel => { return "DeleteLabel" }
@@ -870,7 +869,7 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         "DeleteRole" => { return Some(SimplePerm::DeleteRole) }
         "AssignRole" => { return Some(SimplePerm::AssignRole) }
         "RevokeRole" => { return Some(SimplePerm::RevokeRole) }
-        "ChangeRoleManagingRole" => { return Some(SimplePerm::ChangeRoleManagingRole) }
+        "AddOwnerRole" => { return Some(SimplePerm::AddOwnerRole) }
 
         //
         // Labels
@@ -1131,8 +1130,7 @@ function device_owns_role(device_id id, target_role_id id) bool {
 }
 ```
 
-The owning roles are allowed to add new owning roles or remove themselves as a role owner, provided the device also holds the
-`ChangeRoleManagingRole` simple permission.
+The owning roles are allowed to add new owning roles provided they have the `AddOwnerRole` simple permission.
 
 ```policy
 // Adds a new owning role to the target role.
@@ -1140,7 +1138,7 @@ The owning roles are allowed to add new owning roles or remove themselves as a r
 // # Required Permissions
 //
 // - `OwnsRole(target_role_id)`
-// - `ChangeRoleManagingRole`
+// - `AddOwnerRole`
 action add_role_owner(
     target_role_id id,
     new_owning_role id,
@@ -1182,7 +1180,7 @@ command AddRoleOwner {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagingRole)
+        check device_has_simple_perm(author.device_id, SimplePerm::AddRoleOwner)
         check device_owns_role(author.device_id, this.target_role_id)
 
         // Make sure we uphold the invariants for `OwnsRole`.
@@ -1213,11 +1211,11 @@ command AddRoleOwner {
 }
 
 // Removes device's role as an owner of the target role.
+// Role owners can only remove themselves as an owner of a role.
 //
 // # Required Permissions
 //
 // - `OwnsRole(author.role_id, target_role_id)`
-// - `ChangeRoleManagingRole`
 action remove_role_ownership(
     target_role_id id,
 ) {
@@ -2863,7 +2861,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
             assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRoles)
-            assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagingRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::AddOwnerRole)
 
             assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
             assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)

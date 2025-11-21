@@ -552,9 +552,8 @@ pub enum Permission {
     /// once, so this permission can only effectively be used by
     /// the `owner` role.
     SetupDefaultRoles,
-    /// The role can add a managing role to or remove a managing
-    /// role from a target role.
-    ChangeRoleManagingRole,
+    /// The role can add a an owning role to a target role.
+    AddOwnerRole,
 
     // # Labels
     //
@@ -596,7 +595,7 @@ impl From<Permission> for aranya_client::client::Permission {
             Permission::AssignRole => Self::AssignRole,
             Permission::RevokeRole => Self::RevokeRole,
             Permission::SetupDefaultRoles => Self::SetupDefaultRoles,
-            Permission::ChangeRoleManagingRole => Self::ChangeRoleManagingRole,
+            Permission::AddOwnerRole => Self::AddOwnerRole,
             Permission::CreateLabel => Self::CreateLabel,
             Permission::DeleteLabel => Self::DeleteLabel,
             Permission::ChangeLabelManagingRole => Self::ChangeLabelManagingRole,
