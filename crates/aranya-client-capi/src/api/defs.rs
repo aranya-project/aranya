@@ -2154,7 +2154,7 @@ pub type AfcSendChannel = Safe<afc::SendChannel>;
 /// An AFC Receiving Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AfcReceiveChannel = Safe<afc::ReceiveChannel>;
 
 /// An AFC Control Message, used to create the other end of a channel.
@@ -2377,7 +2377,7 @@ pub unsafe fn afc_channel_seal(
 /// @param[out] seq the sequence number for the opened message, for reordering.
 #[cfg(feature = "afc")]
 pub unsafe fn afc_channel_open(
-    channel: &AfcReceiveChannel,
+    channel: &mut AfcReceiveChannel,
     ciphertext: &[u8],
     dst: *mut u8,
     dst_len: &mut usize,

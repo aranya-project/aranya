@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
 
     info!("memberb: creating recv channel");
     let ctrl = receiver.recv().await?;
-    let opener = client
+    let mut opener = client
         .afc()
         .accept_channel(team_info.team_id, ctrl.into_boxed_slice().into())
         .await?;
