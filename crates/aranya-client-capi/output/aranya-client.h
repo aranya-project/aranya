@@ -20,10 +20,6 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#if defined(ENABLE_ARANYA_AFC) && !defined(ENABLE_ARANYA_PREVIEW)
-    #error "AFC is currently in preview. Set `ENABLE_ARANYA_PREVIEW` to opt into preview APIs."
-#endif
-
 #ifndef __has_attribute
     #define __has_attribute(x) 0
 #endif /* __has_attribute */
@@ -234,6 +230,126 @@ enum AranyaError
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
 #endif // __cplusplus
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Simple permission.
+ */
+enum AranyaPermission
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * The role can add a device to the team.
+     */
+    ARANYA_PERMISSION_ADD_DEVICE,
+    /**
+     * The role can remove a device from the team.
+     */
+    ARANYA_PERMISSION_REMOVE_DEVICE,
+    /**
+     * The role can terminate the team. This causes all team
+     * commands to fail until a new team is created.
+     */
+    ARANYA_PERMISSION_TERMINATE_TEAM,
+    /**
+     * The role can create a role.
+     */
+    ARANYA_PERMISSION_CREATE_ROLE,
+    /**
+     * The role can delete a role.
+     */
+    ARANYA_PERMISSION_DELETE_ROLE,
+    /**
+     * The role can assign a role to other devices.
+     */
+    ARANYA_PERMISSION_ASSIGN_ROLE,
+    /**
+     * The role can revoke a role from other devices.
+     */
+    ARANYA_PERMISSION_REVOKE_ROLE,
+    /**
+     * The role can set up default roles. This can only be done
+     * once, so this permission can only effectively be used by
+     * the `owner` role.
+     */
+    ARANYA_PERMISSION_SETUP_DEFAULT_ROLE,
+    /**
+     * The role can add a managing role to or remove a managing
+     * role from a target role.
+     */
+    ARANYA_PERMISSION_CHANGE_ROLE_MANAGING_ROLE,
+    /**
+     * The role can create a label.
+     */
+    ARANYA_PERMISSION_CREATE_LABEL,
+    /**
+     * The role can delete a label.
+     */
+    ARANYA_PERMISSION_DELETE_LABEL,
+    /**
+     * The role can grant a target role the ability to manage a
+     * label. This management ability includes deleting a label
+     * and adding/revoking a label to a device.
+     */
+    ARANYA_PERMISSION_CHANGE_LABEL_MANAGING_ROLE,
+    /**
+     * The role can assign a label to a device. The role must
+     * also have label management permissions granted by a role
+     * with the `ChangeLabelManagingRole` permission above.
+     */
+    ARANYA_PERMISSION_ASSIGN_LABEL,
+    /**
+     * The role can revoke a label from a device. The role must
+     * also have label management permissions granted by a role
+     * with the `ChangeLabelManagingRole` permission above.
+     */
+    ARANYA_PERMISSION_REVOKE_LABEL,
+    /**
+     * The role can use AFC. This controls the ability to
+     * create or receive a unidirectional AFC channels.
+     */
+    ARANYA_PERMISSION_CAN_USE_AFC,
+    /**
+     * The role can create a unidirectional AFC channel.
+     */
+    ARANYA_PERMISSION_CREATE_AFC_UNI_CHANNEL,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaPermission;
+#endif // __cplusplus
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Role management permission.
+ */
+enum AranyaRoleManagementPermission
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * Grants a managing role the ability to assign the target role
+     * to any device except itself.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE,
+    /**
+     * Grants a managing role the ability to revoke the target role
+     * from any device.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE,
+    /**
+     * Grants a managing role the ability to change the permissions
+     * assigned to the target role.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_CHANGE_ROLE_PERMS,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaRoleManagementPermission;
+#endif // __cplusplus
+#endif
 
 /**
  * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
@@ -491,7 +607,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[32];
+    uint8_t __for_size_only[40];
 } AranyaSyncPeerConfig;
 
 /**
@@ -500,13 +616,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
 typedef uint64_t AranyaDuration;
 
 /**
- * The name of a permission.
+ * A role name.
  *
- * E.g. "CanAssignRole"
- *
- * Refer to the "Role Management" section of the policy for an exhaustive list.
+ * E.g. "owner"
  */
-typedef const char *AranyaPermission;
+typedef const char *AranyaRoleName;
 
 /**
  * A label name.
@@ -539,7 +653,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAfcSendChannel;
 #endif
 
@@ -1371,7 +1485,7 @@ AranyaError aranya_sync_peer_config_build_ext(struct AranyaSyncPeerConfigBuilder
  * this function
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
- * @param[in] interval Set the interval at which syncing occurs
+ * @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1386,7 +1500,7 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
  * this function
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
- * @param[in] interval Set the interval at which syncing occurs
+ * @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1395,11 +1509,11 @@ AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPe
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Updates the config to enable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
@@ -1408,11 +1522,11 @@ AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPe
 AranyaError aranya_sync_peer_config_builder_set_sync_now(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Updates the config to enable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
@@ -1422,11 +1536,12 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Updates the config to disable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
+ *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
@@ -1434,11 +1549,12 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
 AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Updates the config to disable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
+ *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
@@ -1446,7 +1562,39 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeer
 AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                                struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
+ * Sets whether automatic syncing should occur when a hello message is received from this peer
+ * indicating they have a head that we don't have.
+ *
+ * By default, sync on hello is disabled.
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                              uint32_t sync_on_hello);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Sets whether automatic syncing should occur when a hello message is received from this peer
+ * indicating they have a head that we don't have.
+ *
+ * By default, sync on hello is disabled.
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                                  uint32_t sync_on_hello,
+                                                                  struct AranyaExtError *__ext_err);
+#endif
+
+/**
+ * Assign a role to a device.
  * Setup default roles on team.
  *
  * This sets up the following roles with default permissions as
@@ -1463,6 +1611,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
  * @param[in] roles_out returns a list of roles that own `role`
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
@@ -1470,10 +1619,12 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *owning_role,
                                        struct AranyaRole *roles_out,
                                        size_t *roles_len);
 
 /**
+ * Assign a role to a device.
  * Setup default roles on team.
  *
  * This sets up the following roles with default permissions as
@@ -1490,6 +1641,7 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
  * @param[in] roles_out returns a list of roles that own `role`
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
@@ -1497,10 +1649,12 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
+                                           const struct AranyaRoleId *owning_role,
                                            struct AranyaRole *roles_out,
                                            size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Adds `owning_role` as an owner of role.
  *
@@ -1515,7 +1669,9 @@ AranyaError aranya_add_role_owner(const struct AranyaClient *client,
                                   const struct AranyaTeamId *team,
                                   const struct AranyaRoleId *role,
                                   const struct AranyaRoleId *owning_role);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Adds `owning_role` as an owner of role.
  *
@@ -1531,7 +1687,9 @@ AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
                                       const struct AranyaRoleId *role,
                                       const struct AranyaRoleId *owning_role,
                                       struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Removes an owning_role as an owner of role.
  *
@@ -1546,7 +1704,9 @@ AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
                                      const struct AranyaRoleId *role,
                                      const struct AranyaRoleId *owning_role);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Removes an owning_role as an owner of role.
  *
@@ -1562,6 +1722,7 @@ AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
                                          const struct AranyaRoleId *role,
                                          const struct AranyaRoleId *owning_role,
                                          struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Returns the roles that own `role`.
@@ -1606,6 +1767,7 @@ AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
                                    size_t *roles_len,
                                    struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Assigns a role management permission to a managing role.
  *
@@ -1621,8 +1783,10 @@ AranyaError aranya_assign_role_management_permission(const struct AranyaClient *
                                                      const struct AranyaTeamId *team,
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
-                                                     AranyaPermission perm);
+                                                     AranyaRoleManagementPermission perm);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Assigns a role management permission to a managing role.
  *
@@ -1638,9 +1802,11 @@ AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClie
                                                          const struct AranyaTeamId *team,
                                                          const struct AranyaRoleId *role,
                                                          const struct AranyaRoleId *managing_role,
-                                                         AranyaPermission perm,
+                                                         AranyaRoleManagementPermission perm,
                                                          struct AranyaExtError *__ext_err);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Revokes a role management permission from a managing role.
  *
@@ -1656,8 +1822,10 @@ AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *
                                                      const struct AranyaTeamId *team,
                                                      const struct AranyaRoleId *role,
                                                      const struct AranyaRoleId *managing_role,
-                                                     AranyaPermission perm);
+                                                     AranyaRoleManagementPermission perm);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Revokes a role management permission from a managing role.
  *
@@ -1673,8 +1841,9 @@ AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClie
                                                          const struct AranyaTeamId *team,
                                                          const struct AranyaRoleId *role,
                                                          const struct AranyaRoleId *managing_role,
-                                                         AranyaPermission perm,
+                                                         AranyaRoleManagementPermission perm,
                                                          struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Changes the `role` on a `device`
@@ -1757,6 +1926,172 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   struct AranyaRole *roles_out,
                                   size_t *roles_out_len,
                                   struct AranyaExtError *__ext_err);
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Create a role.
+ *
+ * The `owning_role` is the initial owner of the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role_name the name of the new role
+ * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[out] role_out the newly created role
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_create_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               AranyaRoleName role_name,
+                               const struct AranyaRoleId *owning_role,
+                               struct AranyaRole *role_out);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Create a role.
+ *
+ * The `owning_role` is the initial owner of the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role_name the name of the new role
+ * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[out] role_out the newly created role
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_create_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   AranyaRoleName role_name,
+                                   const struct AranyaRoleId *owning_role,
+                                   struct AranyaRole *role_out,
+                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Delete a role.
+ *
+ * The role must not be assigned to any devices, nor should it own any
+ * other roles.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the role to delete
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_delete_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaRoleId *role);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Delete a role.
+ *
+ * The role must not be assigned to any devices, nor should it own any
+ * other roles.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the role to delete
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role,
+                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Add a permission to a role.
+ *
+ * It is an error to add a permission already added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being added to
+ * @param[in] perm a permission to add to the role
+ */
+AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaRoleId *role,
+                                    AranyaPermission perm);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Add a permission to a role.
+ *
+ * It is an error to add a permission already added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being added to
+ * @param[in] perm a permission to add to the role
+ */
+AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaRoleId *role,
+                                        AranyaPermission perm,
+                                        struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Remove a permission from a role.
+ *
+ * It is an error to remove a permission not added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being removed from
+ * @param[in] perm a permission to remove from the role
+ */
+AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaRoleId *role,
+                                         AranyaPermission perm);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Remove a permission from a role.
+ *
+ * It is an error to remove a permission not added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being removed from
+ * @param[in] perm a permission to remove from the role
+ */
+AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaRoleId *role,
+                                             AranyaPermission perm,
+                                             struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Assign a role to a device.
@@ -1848,8 +2183,7 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id the ID of the role that manages this
- *        label [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role_id the ID of the role that manages this label
  *
  * @relates AranyaClient.
  */
@@ -1867,8 +2201,7 @@ AranyaError aranya_create_label(const struct AranyaClient *client,
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id the ID of the role that manages this
- *        label [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param[in] managing_role_id the ID of the role that manages this label
  *
  * @relates AranyaClient.
  */
@@ -1982,6 +2315,7 @@ AranyaError aranya_revoke_label_ext(const struct AranyaClient *client,
                                     const struct AranyaLabelId *label_id,
                                     struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add label managing role.
  *
@@ -1998,7 +2332,9 @@ AranyaError aranya_add_label_managing_role(const struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            const struct AranyaLabelId *label_id,
                                            const struct AranyaRoleId *managing_role_id);
+#endif
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add label managing role.
  *
@@ -2016,6 +2352,7 @@ AranyaError aranya_add_label_managing_role_ext(const struct AranyaClient *client
                                                const struct AranyaLabelId *label_id,
                                                const struct AranyaRoleId *managing_role_id,
                                                struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Create a new graph/team with the current device as the owner.
@@ -2335,6 +2672,88 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
                                         AranyaAddr addr,
                                         struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Subscribe to hello notifications from a sync peer.
+ *
+ * This will request the peer to send hello notifications when their graph head changes.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] graph_change_delay minimum delay between notifications when graph changes.
+ * @param[in] duration how long the subscription should remain active.
+ * @param[in] schedule_delay interval for periodic scheduled hello sends.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        AranyaAddr peer,
+                                        AranyaDuration graph_change_delay,
+                                        AranyaDuration duration,
+                                        AranyaDuration schedule_delay);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Subscribe to hello notifications from a sync peer.
+ *
+ * This will request the peer to send hello notifications when their graph head changes.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] graph_change_delay minimum delay between notifications when graph changes.
+ * @param[in] duration how long the subscription should remain active.
+ * @param[in] schedule_delay interval for periodic scheduled hello sends.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_subscribe_ext(const struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            AranyaAddr peer,
+                                            AranyaDuration graph_change_delay,
+                                            AranyaDuration duration,
+                                            AranyaDuration schedule_delay,
+                                            struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Unsubscribe from hello notifications from a sync peer.
+ *
+ * This will stop receiving hello notifications from the specified peer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_unsubscribe(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team,
+                                          AranyaAddr peer);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Unsubscribe from hello notifications from a sync peer.
+ *
+ * This will stop receiving hello notifications from the specified peer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
+                                              const struct AranyaTeamId *team,
+                                              AranyaAddr peer,
+                                              struct AranyaExtError *__ext_err);
+#endif
+
 /**
  * Sync with peer immediately.
  *
@@ -2424,8 +2843,8 @@ AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
  * @param[in] team the team's ID
  * @param[out] device the ID of the device
  * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
- * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
- * @param[out] has_role whether a role is assigned to the device.
+ * if a role was not assigned to the device
+ * @param[out] has_role whether a role is assigned to the device
  *
  * @relates AranyaClient.
  */
@@ -2442,8 +2861,8 @@ AranyaError aranya_team_device_role(const struct AranyaClient *client,
  * @param[in] team the team's ID
  * @param[out] device the ID of the device
  * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
- * if a role was not assigned to the device. [`AranyaRole`](@ref AranyaRole).
- * @param[out] has_role whether a role is assigned to the device.
+ * if a role was not assigned to the device
+ * @param[out] has_role whether a role is assigned to the device
  *
  * @relates AranyaClient.
  */
@@ -2951,7 +3370,7 @@ AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
+AranyaError aranya_afc_channel_seal(struct AranyaAfcSendChannel *channel,
                                     const uint8_t *plaintext,
                                     size_t plaintext_len,
                                     uint8_t *dst,
@@ -2969,7 +3388,7 @@ AranyaError aranya_afc_channel_seal(const struct AranyaAfcSendChannel *channel,
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcSendChannel *channel,
+AranyaError aranya_afc_channel_seal_ext(struct AranyaAfcSendChannel *channel,
                                         const uint8_t *plaintext,
                                         size_t plaintext_len,
                                         uint8_t *dst,

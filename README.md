@@ -46,7 +46,7 @@ There are currently three classifications of feature sets we can build:
 - Preview - production ready features with plans for long-term support. May introduce breaking changes but are designed with API stability in mind. Release artifacts are appended with *-preview.
 - Experimental - experimental features with no backward compatibility or long-term support guarantees. These features may be unstable or introduce breaking changes in the future. Release artifacts are appended with *-experimental.
 
-AFC is a preview feature that can be enabled with the `afc` and `preview` feature flags.
+AFC is enabled by default.
 
 Rather than requiring feature flags to be manually specified with `cargo build --features ...`, `cargo make` commands are provided in [Makefile.toml](Makefile.toml) for each feature set.
 

@@ -1,3 +1,6 @@
+#[cfg(feature = "preview")]
+use std::time::Duration;
+
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
@@ -7,6 +10,8 @@ use buggy::BugExt as _;
 use tarpc::context;
 use tracing::instrument;
 
+#[cfg(feature = "preview")]
+use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
         Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
@@ -120,17 +125,6 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Removes `device` from the team.
-    #[instrument(skip(self))]
-    pub async fn remove_device(&self, device: DeviceId) -> Result<()> {
-        self.client
-            .daemon
-            .remove_device_from_team(context::current(), self.id, device.into_api())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Returns the [`Device`] corresponding with `id`.
     pub fn device(&self, id: DeviceId) -> Device<'_> {
         Device {
@@ -158,6 +152,57 @@ impl Team<'_> {
             .map(DeviceId::from_api)
             .collect();
         Ok(Devices { data })
+    }
+
+    /// Subscribe to hello notifications from a sync peer.
+    ///
+    /// This will request the peer to send hello notifications when their graph head changes.
+    ///
+    /// # Parameters
+    ///
+    /// * `peer` - The address of the sync peer to subscribe to.
+    /// * `graph_change_delay` - The minimum delay between notifications after a graph head change.
+    /// * `duration` - How long the subscription should last.
+    /// * `schedule_delay` - The delay between sending hello messages to the subscriber (rate limiting).
+    ///
+    /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
+    /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    pub async fn sync_hello_subscribe(
+        &self,
+        peer: Addr,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_subscribe(
+                context::current(),
+                peer,
+                self.id,
+                graph_change_delay,
+                duration,
+                schedule_delay,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    ///
+    /// This will stop receiving hello notifications from the specified peer.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
+        self.client
+            .daemon
+            .sync_hello_unsubscribe(context::current(), peer, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 }
 
@@ -187,7 +232,88 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
+    /// Creates a new role.
+    ///
+    /// `owning_role` will be the initial owner of the new role.
+    ///
+    /// It returns the Role that was created.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    #[instrument(skip(self))]
+    pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
+        let role = self
+            .client
+            .daemon
+            .create_role(
+                context::current(),
+                self.id,
+                role_name,
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(Role::from_api(role))
+    }
+
+    /// Deletes a role.
+    ///
+    /// The role must not be assigned to any devices, nor should it own
+    /// any other roles.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    #[instrument(skip(self))]
+    pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_role(context::current(), self.id, role_id.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
+    /// Adds a permission to a role.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    #[instrument(skip(self))]
+    pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
+        self.client
+            .daemon
+            .add_perm_to_role(
+                context::current(),
+                self.id,
+                role_id.into_api(),
+                perm.as_text(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
+    /// Removes a permission from a role.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    #[instrument(skip(self))]
+    pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
+        self.client
+            .daemon
+            .remove_perm_from_role(
+                context::current(),
+                self.id,
+                role_id.into_api(),
+                perm.as_text(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(())
+    }
+
     /// Adds `owning_role` as an owner of `role`.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
     pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
         self.client
@@ -204,6 +330,8 @@ impl Team<'_> {
     }
 
     /// Removes an `owning_role` as an owner of `role`.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
     pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
         self.client
@@ -240,12 +368,14 @@ impl Team<'_> {
     }
 
     /// Assigns a role management permission to a managing role.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
     pub async fn assign_role_management_permission(
         &self,
         role: RoleId,
         managing_role: RoleId,
-        perm: Text,
+        perm: RoleManagementPermission,
     ) -> Result<()> {
         self.client
             .daemon
@@ -254,7 +384,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm,
+                perm.as_text(),
             )
             .await
             .map_err(IpcError::new)?
@@ -263,12 +393,14 @@ impl Team<'_> {
 
     /// Revokes a role management permission from a managing
     /// role.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
     pub async fn revoke_role_management_permission(
         &self,
         role: RoleId,
         managing_role: RoleId,
-        perm: Text,
+        perm: RoleManagementPermission,
     ) -> Result<()> {
         self.client
             .daemon
@@ -277,61 +409,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm,
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Assigns `role` to `device`.
-    #[instrument(skip(self))]
-    pub async fn assign_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .assign_role(
-                context::current(),
-                self.id,
-                device.into_api(),
-                role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Revokes `role` from `device`.
-    #[instrument(skip(self))]
-    pub async fn revoke_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .revoke_role(
-                context::current(),
-                self.id,
-                device.into_api(),
-                role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Changes the `role` on a `device`
-    #[instrument(skip(self))]
-    pub async fn change_role(
-        &self,
-        device: DeviceId,
-        old_role: RoleId,
-        new_role: RoleId,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .change_role(
-                context::current(),
-                self.id,
-                device.into_api(),
-                old_role.into_api(),
-                new_role.into_api(),
+                perm.as_text(),
             )
             .await
             .map_err(IpcError::new)?
@@ -361,24 +439,18 @@ impl Team<'_> {
 
 impl Team<'_> {
     /// Create a label.
-    #[instrument(skip(self, label_name))]
-    pub async fn create_label<T>(&self, label_name: T, managing_role_id: RoleId) -> Result<LabelId>
-    where
-        T: TryInto<Text>,
-    {
+    #[instrument(skip(self))]
+    pub async fn create_label(
+        &self,
+        label_name: Text,
+        managing_role_id: RoleId,
+    ) -> Result<LabelId> {
         self.client
             .daemon
             .create_label(
                 context::current(),
                 self.id,
-                label_name
-                    .try_into()
-                    // TODO(chip): Use a more specific error?
-                    .map_err(|_| {
-                        error::OtherError::from(anyhow::anyhow!(
-                            "cannot convert label_name to Text"
-                        ))
-                    })?,
+                label_name,
                 managing_role_id.into_api(),
             )
             .await

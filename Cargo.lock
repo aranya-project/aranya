@@ -165,9 +165,9 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "aranya-afc-util"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f09103fccf3eac1a04c41e78615433d821d8cf389d256d51e723fca68e5eb60"
+checksum = "6805b355ba4e4192db9bd62fc409bc8fe1c5ffe555ba7f3c0907f90c36cfb032"
 dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
@@ -230,9 +230,10 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
+ "aranya-client",
  "aranya-crypto",
  "aranya-daemon",
  "aranya-daemon-api",
@@ -241,6 +242,7 @@ dependencies = [
  "aranya-util",
  "backon",
  "buggy",
+ "derive-where",
  "futures-util",
  "postcard",
  "serde",
@@ -300,9 +302,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto-ffi"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9937b09674306f50bd61e3e86e5ad1d404d93c1e32a226d1c869da89c2ece8fb"
+checksum = "689304d0e9f34d3c4268cfd002db4a620271f95abb1b6c54d3c34bb482f82b9e"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -313,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-afc-util",
@@ -359,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -385,9 +387,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-device-ffi"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "238859c3704755a5e34e08202f80c1d599b948260376b26f5e6d51bb13009389"
+checksum = "c2e67aba0a5893c58d2bd731983b4d0e6697f12f69edcf7cf3f975723735183f"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -395,9 +397,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-envelope-ffi"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef33a8e91b97e315638b671dc6958e15d96593e1f8af6bfbc5925e3f318f2c2"
+checksum = "2f94fa86dc44a27ba812e222e567b6fbe02626bdf6a341e4c6361547cd531a59"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -407,7 +409,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-example"
-version = "3.0.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
@@ -421,12 +423,11 @@ dependencies = [
 
 [[package]]
 name = "aranya-example-multi-node"
-version = "3.0.0"
+version = "0.0.0"
 dependencies = [
  "age",
  "anyhow",
  "aranya-client",
- "aranya-util",
  "backon",
  "clap",
  "postcard",
@@ -463,9 +464,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-fast-channels"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865ae6ee3ff1114582d1253833449d7c434c52d223090e618e2a21a0f7fa4a11"
+checksum = "4622d785c56cd2bbf71b98e5cc334ebf8b9db0b463f90d5397c62518057e79a1"
 dependencies = [
  "aranya-crypto",
  "buggy",
@@ -497,9 +498,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-idam-ffi"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a9e7537cfc79ea8e9c3cb83b79359fc973fb754933258bfb3f522667a21394c"
+checksum = "8c77783cd3f8bf0d0c255d37f6d5c08b092faf3bb1e0e016c457d8ba48fc9d5a"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -564,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -609,9 +610,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-perspective-ffi"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dd5b54ce02c2d45df70b959f22551173bc5e0bcaa14034e43e0f26e504cf520"
+checksum = "a902c0a5aa147a3d045187e233485f03f1a1c263dd456b69c08e6139a12ef3dc"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -632,9 +633,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-compiler"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41919124ad2310a3fd512d94e2e3c7af5b5f1fe38737f6d23f7a500addd03a0f"
+checksum = "00836a477f9a77a7074f7f4a530da39aba483f763c608c70176f4fce1c0e2271"
 dependencies = [
  "aranya-policy-ast",
  "aranya-policy-lang",
@@ -662,9 +663,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-ifgen"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19f6b7af76ddca835de0287903540a2f13e4b50ba96310670359e7012657e1d9"
+checksum = "7f98d57594790d978a10f7438a79492203c0f019c1f65d4e319110a00e79b455"
 dependencies = [
  "aranya-policy-ifgen-macro",
  "aranya-policy-vm",
@@ -675,9 +676,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-ifgen-build"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84ad97e5508f4fa67c3554cbfc6d9fd068ed2eee0b758282917ff7226f6a7eef"
+checksum = "2fe6bad38bf67c7614988f4c4235469d0e2c99e0a590a852f530636f298fb7d6"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -759,9 +760,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-vm"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc782966bf7d031607c16c859a5097cbd7b559a496eae56e36c966c08ffae3ac"
+checksum = "cd2398f020ceb28279500e46c6c2e0d7eb838e17bd4864a9b4382baa3b6b7d75"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -775,9 +776,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-runtime"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d70f4cb1ab0b183283ea20a9dbf2bebd83af0ec7c0d8a67507ee67a54728a9ea"
+checksum = "0ca2898aa0d12d7a9a91cc868ef47990579d0d90152934ec63683795af7a11a3"
 dependencies = [
  "aranya-crypto",
  "aranya-libc",
@@ -796,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",

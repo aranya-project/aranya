@@ -2,10 +2,11 @@
 
 mod device;
 mod label;
+mod perm;
 mod role;
 mod team;
 
-use std::{fmt::Debug, io, net::SocketAddr, path::Path};
+use std::{fmt::Debug, io, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
@@ -16,7 +17,7 @@ use aranya_daemon_api::{
     },
     DaemonApiClient, Version, CS,
 };
-use aranya_util::error::ReportExt;
+use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info};
@@ -26,6 +27,9 @@ use {
     std::sync::{Arc, Mutex},
 };
 
+#[cfg(feature = "preview")]
+#[doc(inline)]
+pub use crate::client::perm::{Permission, RoleManagementPermission};
 #[doc(inline)]
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},
@@ -186,7 +190,7 @@ impl Client {
     }
 
     /// Returns the address that the Aranya sync server is bound to.
-    pub async fn local_addr(&self) -> Result<SocketAddr> {
+    pub async fn local_addr(&self) -> Result<Addr> {
         self.daemon
             .aranya_local_addr(context::current())
             .await
@@ -270,6 +274,7 @@ impl Client {
 
     /// Get access to Aranya Fast Channels.
     #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     pub fn afc(&self) -> AfcChannels {
         AfcChannels::new(self.daemon.clone(), self.afc_keys.clone())
     }

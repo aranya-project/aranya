@@ -28,7 +28,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
         .add_all_device_roles(team_id, &default_roles)
         .await?;
 
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     let owner_team = devices.owner.client.team(team_id);
     let membera_team = devices.membera.client.team(team_id);
     let memberb_team = devices.memberb.client.team(team_id);
@@ -173,7 +173,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -240,7 +240,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -258,7 +258,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -317,7 +317,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -335,7 +335,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -402,7 +402,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -420,7 +420,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -506,7 +506,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -524,7 +524,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -547,7 +547,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -616,7 +616,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -634,7 +634,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -657,7 +657,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -666,8 +666,14 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .await?;
 
     // Remove channel devices from team.
-    owner_team.remove_device(devices.membera.id).await?;
-    owner_team.remove_device(devices.memberb.id).await?;
+    owner_team
+        .device(devices.membera.id)
+        .remove_from_team()
+        .await?;
+    owner_team
+        .device(devices.memberb.id)
+        .remove_from_team()
+        .await?;
 
     // wait for syncing.
     devices
@@ -729,7 +735,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -747,7 +753,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -770,7 +776,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -780,10 +786,12 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
 
     // Revoke roles from channel devices.
     owner_team
-        .revoke_role(devices.membera.id, default_roles.member().id)
+        .device(devices.membera.id)
+        .revoke_role(default_roles.member().id)
         .await?;
     owner_team
-        .revoke_role(devices.memberb.id, default_roles.member().id)
+        .device(devices.memberb.id)
+        .revoke_role(default_roles.member().id)
         .await?;
 
     // wait for syncing.
@@ -844,7 +852,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -862,7 +870,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create uni channel.
-    let (chan, ctrl) = membera_afc
+    let (mut chan, ctrl) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id)
         .await
         .context("unable to create afc uni channel")?;
@@ -885,7 +893,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .context("unable to open afc message")?;
 
     // wait for syncing.
-    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    let operator_addr = devices.operator.aranya_local_addr().await?;
     devices
         .admin
         .client
@@ -895,18 +903,12 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 
     // Assign roles without `CanUseAfc` permission.
     owner_team
-        .change_role(
-            devices.membera.id,
-            default_roles.member().id,
-            default_roles.operator().id,
-        )
+        .device(devices.membera.id)
+        .change_role(default_roles.member().id, default_roles.operator().id)
         .await?;
     owner_team
-        .change_role(
-            devices.memberb.id,
-            default_roles.member().id,
-            default_roles.operator().id,
-        )
+        .device(devices.memberb.id)
+        .change_role(default_roles.member().id, default_roles.operator().id)
         .await?;
 
     // wait for syncing.
@@ -984,7 +986,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    let owner_addr = devices.owner.aranya_local_addr().await?.into();
+    let owner_addr = devices.owner.aranya_local_addr().await?;
     devices
         .membera
         .client
@@ -1002,13 +1004,13 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let memberb_afc = devices.memberb.client.afc();
 
     // Create first channel.
-    let (chan1, ctrl1) = membera_afc
+    let (mut chan1, ctrl1) = membera_afc
         .create_channel(team_id, devices.memberb.id, label_id1)
         .await
         .context("unable to create afc uni channel")?;
 
     // Create second channel.
-    let (chan2, ctrl2) = memberb_afc
+    let (mut chan2, ctrl2) = memberb_afc
         .create_channel(team_id, devices.membera.id, label_id2)
         .await
         .context("unable to create afc uni channel")?;

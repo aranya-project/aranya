@@ -10,6 +10,7 @@ use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
+use aranya_client::config::MAX_SYNC_INTERVAL;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 use tracing::{debug, error};
@@ -464,6 +465,22 @@ impl LabelName {
     }
 }
 
+/// A role name.
+///
+/// E.g. "owner"
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleName(*const c_char);
+
+impl RoleName {
+    #[cfg(feature = "preview")]
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(Text::try_from(cstr)?)
+    }
+}
+
 /// A network socket address for an Aranya client.
 ///
 /// E.g. "localhost:8080", "127.0.0.1:8080"
@@ -479,20 +496,115 @@ impl Addr {
     }
 }
 
-/// The name of a permission.
-///
-/// E.g. "CanAssignRole"
-///
-/// Refer to the "Role Management" section of the policy for an exhaustive list.
-#[repr(transparent)]
+/// Role management permission.
+#[cfg(feature = "preview")]
+#[repr(u8)]
 #[derive(Copy, Clone, Debug)]
-pub struct Permission(*const c_char);
+pub enum RoleManagementPermission {
+    /// Grants a managing role the ability to assign the target role
+    /// to any device except itself.
+    CanAssignRole,
+    /// Grants a managing role the ability to revoke the target role
+    /// from any device.
+    CanRevokeRole,
+    /// Grants a managing role the ability to change the permissions
+    /// assigned to the target role.
+    CanChangeRolePerms,
+}
 
-impl Permission {
-    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(Text::try_from(cstr)?)
+#[cfg(feature = "preview")]
+impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPermission {
+    fn from(perm: RoleManagementPermission) -> Self {
+        match perm {
+            RoleManagementPermission::CanAssignRole => Self::CanAssignRole,
+            RoleManagementPermission::CanRevokeRole => Self::CanRevokeRole,
+            RoleManagementPermission::CanChangeRolePerms => Self::CanChangeRolePerms,
+        }
+    }
+}
+
+/// Simple permission.
+#[cfg(feature = "preview")]
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum Permission {
+    // # Team management
+    //
+    /// The role can add a device to the team.
+    AddDevice,
+    /// The role can remove a device from the team.
+    RemoveDevice,
+    /// The role can terminate the team. This causes all team
+    /// commands to fail until a new team is created.
+    TerminateTeam,
+
+    // # Roles
+    //
+    /// The role can create a role.
+    CreateRole,
+    /// The role can delete a role.
+    DeleteRole,
+    /// The role can assign a role to other devices.
+    AssignRole,
+    /// The role can revoke a role from other devices.
+    RevokeRole,
+    /// The role can set up default roles. This can only be done
+    /// once, so this permission can only effectively be used by
+    /// the `owner` role.
+    SetupDefaultRole,
+    /// The role can add a managing role to or remove a managing
+    /// role from a target role.
+    ChangeRoleManagingRole,
+
+    // # Labels
+    //
+    /// The role can create a label.
+    CreateLabel,
+    /// The role can delete a label.
+    DeleteLabel,
+    /// The role can grant a target role the ability to manage a
+    /// label. This management ability includes deleting a label
+    /// and adding/revoking a label to a device.
+    ChangeLabelManagingRole,
+    /// The role can assign a label to a device. The role must
+    /// also have label management permissions granted by a role
+    /// with the `ChangeLabelManagingRole` permission above.
+    AssignLabel,
+    /// The role can revoke a label from a device. The role must
+    /// also have label management permissions granted by a role
+    /// with the `ChangeLabelManagingRole` permission above.
+    RevokeLabel,
+
+    // # AFC
+    //
+    /// The role can use AFC. This controls the ability to
+    /// create or receive a unidirectional AFC channels.
+    CanUseAfc,
+    /// The role can create a unidirectional AFC channel.
+    CreateAfcUniChannel,
+}
+
+#[cfg(feature = "preview")]
+impl From<Permission> for aranya_client::client::Permission {
+    fn from(perm: Permission) -> Self {
+        match perm {
+            Permission::AddDevice => Self::AddDevice,
+            Permission::RemoveDevice => Self::RemoveDevice,
+            Permission::TerminateTeam => Self::TerminateTeam,
+            Permission::CreateRole => Self::CreateRole,
+            Permission::DeleteRole => Self::DeleteRole,
+            Permission::AssignRole => Self::AssignRole,
+            Permission::RevokeRole => Self::RevokeRole,
+            Permission::SetupDefaultRole => Self::SetupDefaultRole,
+            Permission::ChangeRoleManagingRole => Self::ChangeRoleManagingRole,
+            Permission::CreateLabel => Self::CreateLabel,
+            Permission::DeleteLabel => Self::DeleteLabel,
+            Permission::ChangeLabelManagingRole => Self::ChangeLabelManagingRole,
+            Permission::AssignLabel => Self::AssignLabel,
+            Permission::RevokeLabel => Self::RevokeLabel,
+            Permission::CanUseAfc => Self::CanUseAfc,
+            Permission::CreateAfcUniChannel => Self::CreateAfcUniChannel,
+        }
     }
 }
 
@@ -887,7 +999,7 @@ pub fn create_team_config_build(
 /// Sync Peer config.
 ///
 /// Use a [`SyncPeerConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 32, align = 8)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 
 /// Builder for a Sync Peer config [`SyncPeerConfig`].
@@ -920,18 +1032,30 @@ pub fn sync_peer_config_build(
 /// this function
 ///
 /// @param[in,out] cfg a pointer to the builder for a sync config
-/// @param[in] interval Set the interval at which syncing occurs
+/// @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+pub fn sync_peer_config_builder_set_interval(
+    cfg: &mut SyncPeerConfigBuilder,
+    interval: Duration,
+) -> Result<(), imp::Error> {
+    // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
+    // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+    if std::time::Duration::from(interval) > MAX_SYNC_INTERVAL {
+        return Err(
+            InvalidArg::new("interval", "must not exceed 1 year to prevent overflow").into(),
+        );
+    }
+
     cfg.interval(interval);
+    Ok(())
 }
 
-/// Updates the config to enable immediate syncing with the peer.
+/// Updates the config so the peer will be scheduled for an immediate sync when added.
 ///
 /// Overrides [`sync_peer_config_builder_set_sync_later`] if invoked afterward.
 ///
-/// By default, the peer is synced with immediately.
+/// By default, the peer is scheduled for an immediate sync.
 ///
 /// @param[in,out] cfg a pointer to the builder for a sync config
 ///
@@ -941,11 +1065,12 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
     cfg.sync_now(true);
 }
 
-/// Updates the config to disable immediate syncing with the peer.
+/// Updates the config so the peer will be scheduled for an immediate sync when added.
 ///
 /// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
 ///
-/// By default, the peer is synced with immediately.
+/// By default, the peer is scheduled for an immediate sync.
+///
 /// @param[in,out] cfg a pointer to the builder for a sync config
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
@@ -954,6 +1079,24 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
     cfg.sync_now(false);
 }
 
+/// Sets whether automatic syncing should occur when a hello message is received from this peer
+/// indicating they have a head that we don't have.
+///
+/// By default, sync on hello is disabled.
+/// @param[in,out] cfg a pointer to the builder for a sync config
+/// @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
+///
+/// @relates AranyaSyncPeerConfigBuilder.
+// TODO: Use bool instead of u32 once bool support is added. See https://github.com/aranya-project/aranya-core/issues/129
+#[cfg(feature = "preview")]
+pub fn sync_peer_config_builder_set_sync_on_hello(
+    cfg: &mut SyncPeerConfigBuilder,
+    sync_on_hello: u32,
+) {
+    cfg.sync_on_hello(sync_on_hello != 0);
+}
+
+/// Assign a role to a device.
 /// Setup default roles on team.
 ///
 /// This sets up the following roles with default permissions as
@@ -970,6 +1113,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
+/// @param[in] owning_role the ID of the owning role
 /// @param[in] roles_out returns a list of roles that own `role`
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
@@ -977,29 +1121,17 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
+    owning_role: &RoleId,
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    // First get the owner role ID by looking at existing roles
-    let roles = client.rt.block_on(client.inner.team(team.into()).roles())?;
-
-    let owner_role = roles
-        .into_iter()
-        .find(|role| role.name == "owner" && role.default)
-        .ok_or_else(|| {
-            imp::Error::InvalidArg(InvalidArg::new(
-                "setup_default_roles",
-                "owner role not found",
-            ))
-        })?;
-
     let default_roles = client
         .rt
         .block_on(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles(owner_role.id),
+                .setup_default_roles(owning_role.into()),
         )?
         .__into_data();
 
@@ -1027,6 +1159,7 @@ pub unsafe fn setup_default_roles(
 /// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn add_role_owner(
     client: &Client,
     team: &TeamId,
@@ -1051,6 +1184,7 @@ pub fn add_role_owner(
 /// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn remove_role_owner(
     client: &Client,
     team: &TeamId,
@@ -1115,21 +1249,19 @@ pub unsafe fn role_owners(
 /// @param[in] perm the management permission to assign
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn assign_role_management_permission(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
     managing_role: &RoleId,
-    perm: Permission,
+    perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role_management_permission(role.into(), managing_role.into(), perm),
+            .assign_role_management_permission(role.into(), managing_role.into(), perm.into()),
     )?;
 
     Ok(())
@@ -1144,21 +1276,19 @@ pub fn assign_role_management_permission(
 /// @param[in] perm the management permission to assign
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn revoke_role_management_permission(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
     managing_role: &RoleId,
-    perm: Permission,
+    perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
-
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role_management_permission(role.into(), managing_role.into(), perm),
+            .revoke_role_management_permission(role.into(), managing_role.into(), perm.into()),
     )?;
 
     Ok(())
@@ -1184,13 +1314,13 @@ pub fn change_role(
     old_role: &RoleId,
     new_role: &RoleId,
 ) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).change_role(
-            device.into(),
-            old_role.into(),
-            new_role.into(),
-        ))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .device(device.into())
+            .change_role(old_role.into(), new_role.into()),
+    )?;
 
     Ok(())
 }
@@ -1232,6 +1362,111 @@ pub unsafe fn team_roles(
     Ok(())
 }
 
+/// Create a role.
+///
+/// The `owning_role` is the initial owner of the new role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role_name the name of the new role
+/// @param[in] owning_role the role ID of the role that will own the new role
+/// @param[out] role_out the newly created role
+///
+/// @relates AranyaClient
+#[cfg(feature = "preview")]
+pub fn create_role(
+    client: &Client,
+    team: &TeamId,
+    role_name: RoleName,
+    owning_role: &RoleId,
+    role_out: &mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let role_name = unsafe { role_name.as_underlying() }?;
+    let role = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_role(role_name, owning_role.into()),
+    )?;
+    Role::init(role_out, role);
+    Ok(())
+}
+
+/// Delete a role.
+///
+/// The role must not be assigned to any devices, nor should it own any
+/// other roles.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the role to delete
+///
+/// @relates AranyaClient
+#[cfg(feature = "preview")]
+pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).delete_role(role.into()))?;
+    Ok(())
+}
+
+/// Add a permission to a role.
+///
+/// It is an error to add a permission already added to the role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID of the role the permission is being added to
+/// @param[in] perm a permission to add to the role
+#[cfg(feature = "preview")]
+pub fn add_perm_to_role(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_perm_to_role(role.into(), perm.into()),
+    )?;
+    Ok(())
+}
+
+/// Remove a permission from a role.
+///
+/// It is an error to remove a permission not added to the role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID of the role the permission is being removed from
+/// @param[in] perm a permission to remove from the role
+#[cfg(feature = "preview")]
+pub fn remove_perm_from_role(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    perm: Permission,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_perm_from_role(role.into(), perm.into()),
+    )?;
+    Ok(())
+}
+
 /// Assign a role to a device.
 ///
 /// This will change the device's currently assigned role to the new role.
@@ -1258,7 +1493,8 @@ pub fn assign_role(
         client
             .inner
             .team(team.into())
-            .assign_role(device.into(), role_id.into()),
+            .device(device.into())
+            .assign_role(role_id.into()),
     )?;
     Ok(())
 }
@@ -1283,7 +1519,8 @@ pub fn revoke_role(
         client
             .inner
             .team(team.into())
-            .revoke_role(device.into(), role_id.into()),
+            .device(device.into())
+            .revoke_role(role_id.into()),
     )?;
     Ok(())
 }
@@ -1295,8 +1532,7 @@ pub fn revoke_role(
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] name label name string
-/// @param[in] managing_role_id the ID of the role that manages this
-///        label [`RoleId`].
+/// @param[in] managing_role_id the ID of the role that manages this label
 ///
 /// @relates AranyaClient.
 pub fn create_label(
@@ -1395,6 +1631,7 @@ pub fn revoke_label(
 /// @param[in] managing_role_id the ID of the managing role
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "preview")]
 pub fn add_label_managing_role(
     client: &Client,
     team: &TeamId,
@@ -1569,9 +1806,13 @@ pub fn remove_device_from_team(
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).remove_device(device.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .device(device.into())
+            .remove_from_team(),
+    )?;
     Ok(())
 }
 
@@ -1621,6 +1862,63 @@ pub unsafe fn remove_sync_peer(
     client
         .rt
         .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
+    Ok(())
+}
+
+/// Subscribe to hello notifications from a sync peer.
+///
+/// This will request the peer to send hello notifications when their graph head changes.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] peer the peer's Aranya network address [`Addr`].
+/// @param[in] graph_change_delay minimum delay between notifications when graph changes.
+/// @param[in] duration how long the subscription should remain active.
+/// @param[in] schedule_delay interval for periodic scheduled hello sends.
+///
+/// @relates AranyaClient.
+#[cfg(feature = "preview")]
+pub unsafe fn sync_hello_subscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+    graph_change_delay: Duration,
+    duration: Duration,
+    schedule_delay: Duration,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_subscribe(
+            addr,
+            graph_change_delay.into(),
+            duration.into(),
+            schedule_delay.into(),
+        ))?;
+    Ok(())
+}
+
+/// Unsubscribe from hello notifications from a sync peer.
+///
+/// This will stop receiving hello notifications from the specified peer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "preview")]
+pub unsafe fn sync_hello_unsubscribe(
+    client: &Client,
+    team: &TeamId,
+    peer: Addr,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { peer.as_underlying() }?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
     Ok(())
 }
 
@@ -1695,8 +1993,8 @@ pub unsafe fn team_devices(
 /// @param[in] team the team's ID
 /// @param[out] device the ID of the device
 /// @param[out] role_out the role assigned to the device. `role_out` will be zeroed
-/// if a role was not assigned to the device. [`Role`].
-/// @param[out] has_role whether a role is assigned to the device.
+/// if a role was not assigned to the device
+/// @param[out] has_role whether a role is assigned to the device
 ///
 /// @relates AranyaClient.
 pub fn team_device_role(
@@ -1850,7 +2148,7 @@ pub unsafe fn team_label_exists(
 /// An AFC Sending Channel Object.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AfcSendChannel = Safe<afc::SendChannel>;
 
 /// An AFC Receiving Channel Object.
@@ -2045,7 +2343,7 @@ pub fn afc_seq_cmp(seq1: &AfcSeq, seq2: &AfcSeq) -> core::ffi::c_int {
 /// @param[out] dst the output buffer the ciphertext is written to.
 #[cfg(feature = "afc")]
 pub unsafe fn afc_channel_seal(
-    channel: &AfcSendChannel,
+    channel: &mut AfcSendChannel,
     plaintext: &[u8],
     dst: *mut u8,
     dst_len: &mut usize,

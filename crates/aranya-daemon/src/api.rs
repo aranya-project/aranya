@@ -4,6 +4,10 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
+#[cfg(feature = "preview")]
+use std::collections::HashMap;
+#[cfg(feature = "preview")]
+use std::time::Duration;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
@@ -20,6 +24,8 @@ use aranya_daemon_api::{
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
+#[cfg(feature = "preview")]
+use aranya_runtime::{Address, Storage, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 #[cfg(feature = "afc")]
 use buggy::bug;
@@ -30,7 +36,10 @@ use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::{net::UnixListener, sync::mpsc};
+use tokio::{
+    net::UnixListener,
+    sync::{mpsc, Mutex},
+};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
@@ -125,6 +134,12 @@ impl DaemonApiServer {
             afc: afc.clone(),
             #[cfg(feature = "afc")]
             device_id: pk.ident_pk.id()?,
+            #[cfg(feature = "preview")]
+            client: client.clone(),
+            #[cfg(feature = "preview")]
+            peers: peers.clone(),
+            #[cfg(feature = "preview")]
+            prev_head_addresses: Arc::default(),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -135,7 +150,7 @@ impl DaemonApiServer {
             invalid,
             #[cfg(feature = "afc")]
             afc,
-            crypto: tokio::sync::Mutex::new(crypto),
+            crypto: Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
@@ -209,6 +224,13 @@ struct EffectHandler {
     afc: Arc<Afc<CE, CS, KS>>,
     #[cfg(feature = "afc")]
     device_id: DeviceId,
+    #[cfg(feature = "preview")]
+    client: Client,
+    #[cfg(feature = "preview")]
+    peers: SyncPeers,
+    /// Stores the previous head address for each graph to detect changes
+    #[cfg(feature = "preview")]
+    prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
 }
 
 impl EffectHandler {
@@ -253,6 +275,7 @@ impl EffectHandler {
                 QueryRoleOwnersResult(_) => {}
                 QueryAfcChannelIsValidResult(_) => {}
                 RoleCreated(_) => {}
+                RoleDeleted(_) => {}
                 CheckValidAfcChannels(_) => {
                     #[cfg(feature = "afc")]
                     self.afc
@@ -261,7 +284,71 @@ impl EffectHandler {
                 }
             }
         }
+
+        #[cfg(feature = "preview")]
+        {
+            // Check if the graph head address has changed
+            let Some(current_head) = self.get_graph_head_address(graph).await else {
+                warn!(?graph, "unable to get current graph head address");
+                return Ok(());
+            };
+
+            let mut prev_addresses = self.prev_head_addresses.lock().await;
+            let has_graph_changes = match prev_addresses.get(&graph) {
+                Some(prev_head) => prev_head != &current_head,
+                None => true, // First time seeing this graph
+            };
+
+            if has_graph_changes {
+                trace!(
+                    ?graph,
+                    ?current_head,
+                    "graph head address changed, triggering hello notification broadcast"
+                );
+                // Update stored head address
+                HashMap::insert(&mut prev_addresses, graph, current_head);
+                drop(prev_addresses); // Release the lock before async call
+
+                self.broadcast_hello_notifications(graph, current_head)
+                    .await;
+            } else {
+                trace!(
+                    ?graph,
+                    "graph head address unchanged, no hello broadcast needed"
+                );
+            }
+        }
+
         Ok(())
+    }
+
+    /// Gets the current graph head address using the proper Location->Segment->Command->Address flow.
+    #[cfg(feature = "preview")]
+    async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
+        let client = &self.client;
+
+        let mut aranya = client.aranya.lock().await;
+        let storage = aranya.provider().get_storage(graph_id).ok()?;
+
+        storage.get_head_address().ok()
+    }
+
+    /// Broadcasts hello notifications to subscribers when the graph changes.
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self))]
+    async fn broadcast_hello_notifications(&self, graph_id: GraphId, head: Address) {
+        // TODO: Don't fire off a spawn here.
+        let peers = self.peers.clone();
+        drop(tokio::spawn(async move {
+            if let Err(e) = peers.broadcast_hello(graph_id, head).await {
+                warn!(
+                    error = %e,
+                    ?graph_id,
+                    ?head,
+                    "peers.broadcast_hello failed"
+                );
+            }
+        }));
     }
 }
 
@@ -285,7 +372,7 @@ struct ApiInner {
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
-    crypto: tokio::sync::Mutex<Crypto>,
+    crypto: Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
 }
@@ -324,12 +411,12 @@ impl Deref for Api {
 impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
-    async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<()> {
+    async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<GraphId> {
         if self.invalid.contains(GraphId::transmute(team)) {
             // TODO: return custom daemon error type
             anyhow::bail!("team {team} invalid due to graph finalization error")
         }
-        Ok(())
+        Ok(GraphId::transmute(team))
     }
 }
 
@@ -344,8 +431,8 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn aranya_local_addr(self, context: context::Context) -> api::Result<SocketAddr> {
-        Ok(self.local_addr)
+    async fn aranya_local_addr(self, context: context::Context) -> api::Result<Addr> {
+        Ok(self.local_addr.into())
     }
 
     #[instrument(skip(self), err)]
@@ -379,11 +466,9 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.peers
-            .add_peer(peer, GraphId::transmute(team), cfg)
-            .await?;
+        self.peers.add_peer(peer, graph, cfg).await?;
         Ok(())
     }
 
@@ -395,11 +480,42 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
+
+        self.peers.sync_now(peer, graph, cfg).await?;
+        Ok(())
+    }
+
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn sync_hello_subscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
 
         self.peers
-            .sync_now(peer, GraphId::transmute(team), cfg)
+            .sync_hello_subscribe(peer, graph, graph_change_delay, duration, schedule_delay)
             .await?;
+        Ok(())
+    }
+
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn sync_hello_unsubscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
+
+        self.peers.sync_hello_unsubscribe(peer, graph).await?;
         Ok(())
     }
 
@@ -410,10 +526,10 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         self.peers
-            .remove_peer(peer, GraphId::transmute(team))
+            .remove_peer(peer, graph)
             .await
             .context("unable to remove sync peer")?;
         Ok(())
@@ -488,7 +604,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let _graph = self.check_team_valid(team).await?;
 
         todo!();
     }
@@ -541,13 +657,15 @@ impl DaemonApi for Api {
         keys: api::KeyBundle,
         initial_role: Option<api::RoleId>,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .add_device(keys.into(), initial_role.map(RoleId::transmute))
             .await
             .context("unable to add device to team")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
         Ok(())
     }
 
@@ -558,13 +676,16 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .remove_device(DeviceId::transmute(device))
             .await
             .context("unable to remove device from team")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 
@@ -574,11 +695,11 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Box<[api::DeviceId]>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let devices = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_devices_on_team()
             .await
             .context("unable to query devices on team")?
@@ -592,6 +713,7 @@ impl DaemonApi for Api {
                 }
             })
             .collect();
+
         Ok(devices)
     }
 
@@ -602,11 +724,11 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::KeyBundle> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_device_keybundle(DeviceId::transmute(device))
             .await
             .context("unable to query device keybundle")?;
@@ -626,11 +748,11 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Box<[api::Label]>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_labels_assigned_to_device(DeviceId::transmute(device))
             .await
             .context("unable to query device label assignments")?;
@@ -655,11 +777,11 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Option<api::Role>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_device_role(DeviceId::transmute(device))
             .await
             .context("unable to query device role")?;
@@ -677,6 +799,63 @@ impl DaemonApi for Api {
         }
     }
 
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn create_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role_name: Text,
+        owning_role: api::RoleId,
+    ) -> api::Result<api::Role> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .create_role(role_name, RoleId::transmute(owning_role))
+            .await
+            .context("unable to create role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        if let Some(Effect::RoleCreated(e)) = find_effect!(&effects, Effect::RoleCreated(_)) {
+            Ok(api::Role {
+                id: api::RoleId::from_base(e.role_id),
+                name: e.name.clone(),
+                author_id: api::DeviceId::from_base(e.author_id),
+                default: e.default,
+            })
+        } else {
+            Err(anyhow!("wrong effect when creating role").into())
+        }
+    }
+
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn delete_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role_id: api::RoleId,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .delete_role(RoleId::transmute(role_id))
+            .await
+            .context("unable to delete role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        if let Some(Effect::RoleDeleted(e)) = find_effect!(&effects, Effect::RoleDeleted(_)) {
+            info!("Deleted role {role_id} ({})", e.name());
+            Ok(())
+        } else {
+            Err(anyhow!("wrong effect when creating role").into())
+        }
+    }
+
     #[instrument(skip(self), err)]
     async fn assign_role(
         self,
@@ -685,14 +864,21 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::RoleId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .assign_role(DeviceId::transmute(device), RoleId::transmute(role))
             .await
             .context("unable to assign role")?;
-        Ok(())
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        if let Some(Effect::RoleAssigned(_e)) = find_effect!(&effects, Effect::RoleAssigned(_e)) {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to assign role").into())
+        }
     }
 
     #[instrument(skip(self), err)]
@@ -703,14 +889,21 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::RoleId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .revoke_role(DeviceId::transmute(device), RoleId::transmute(role))
             .await
             .context("unable to revoke device role")?;
-        Ok(())
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        if let Some(Effect::RoleRevoked(_e)) = find_effect!(&effects, Effect::RoleRevoked(_e)) {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to revoke device role").into())
+        }
     }
 
     #[instrument(skip(self), err)]
@@ -722,8 +915,11 @@ impl DaemonApi for Api {
         old_role_id: api::RoleId,
         new_role_id: api::RoleId,
     ) -> api::Result<()> {
-        self.client
-            .actions(GraphId::transmute(team))
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
             .change_role(
                 DeviceId::transmute(device_id),
                 RoleId::transmute(old_role_id),
@@ -731,7 +927,13 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to change device role")?;
-        Ok(())
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        if let Some(Effect::RoleChanged(_e)) = find_effect!(&effects, Effect::RoleChanged(_e)) {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to change device role").into())
+        }
     }
 
     #[cfg(feature = "afc")]
@@ -743,11 +945,9 @@ impl DaemonApi for Api {
         peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<api::AfcSendChannelInfo> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
-
-        let graph = GraphId::transmute(team);
 
         let SessionData { ctrl, effects } = self
             .client
@@ -796,9 +996,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         ctrl: api::AfcCtrl,
     ) -> api::Result<api::AfcReceiveChannelInfo> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        let graph = GraphId::transmute(team);
         let mut session = self.client.session_new(graph).await?;
 
         let effects = self.client.session_receive(&mut session, &ctrl).await?;
@@ -827,14 +1026,16 @@ impl DaemonApi for Api {
         label_name: Text,
         managing_role_id: api::RoleId,
     ) -> api::Result<api::LabelId> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .create_label(label_name, RoleId::transmute(managing_role_id))
             .await
             .context("unable to create label")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
             Ok(api::LabelId::from_base(e.label_id))
         } else {
@@ -849,14 +1050,16 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .delete_label(LabelId::transmute(label_id))
             .await
             .context("unable to delete label")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
             Ok(())
         } else {
@@ -871,17 +1074,19 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         managing_role_id: api::RoleId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .add_label_managing_role(
                 LabelId::transmute(label_id),
                 RoleId::transmute(managing_role_id),
             )
             .await
             .context("unable to add label managing role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         if let Some(Effect::LabelManagingRoleAdded(_e)) =
             find_effect!(&effects, Effect::LabelManagingRoleAdded(_e))
         {
@@ -900,11 +1105,11 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         op: api::ChanOp,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .assign_label_to_device(
                 DeviceId::transmute(device),
                 LabelId::transmute(label_id),
@@ -912,6 +1117,8 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to assign label")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         if let Some(Effect::AssignedLabelToDevice(_e)) =
             find_effect!(&effects, Effect::AssignedLabelToDevice(_e))
         {
@@ -929,14 +1136,16 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .revoke_label_from_device(DeviceId::transmute(device), LabelId::transmute(label_id))
             .await
             .context("unable to revoke label")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         if let Some(Effect::LabelRevokedFromDevice(_e)) =
             find_effect!(&effects, Effect::LabelRevokedFromDevice(_e))
         {
@@ -953,11 +1162,11 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<Option<api::Label>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_label(LabelId::transmute(label_id))
             .await
             .context("unable to query label")?;
@@ -976,11 +1185,11 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn labels(self, _: context::Context, team: api::TeamId) -> api::Result<Vec<api::Label>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_labels()
             .await
             .context("unable to query labels")?;
@@ -1005,14 +1214,17 @@ impl DaemonApi for Api {
         team: api::TeamId,
         owning_role: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        let roles = self
+        let effects = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .setup_default_roles(RoleId::transmute(owning_role))
             .await
-            .context("unable to setup default roles")?
+            .context("unable to setup default roles")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        let roles = effects
             .into_iter()
             .filter_map(|e| {
                 if let Effect::RoleCreated(e @ RoleCreated { default: true, .. }) = e {
@@ -1028,6 +1240,7 @@ impl DaemonApi for Api {
                 }
             })
             .collect();
+
         Ok(roles)
     }
 
@@ -1037,11 +1250,11 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Box<[api::Role]>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let roles = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_team_roles()
             .await
             .context("unable to query team roles")?
@@ -1067,6 +1280,51 @@ impl DaemonApi for Api {
     // Role management
     //
 
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn add_perm_to_role(
+        self,
+        context: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .add_perm_to_role(RoleId::transmute(role), perm)
+            .await
+            .context("unable to add permission to role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn remove_perm_from_role(
+        self,
+        context: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .remove_perm_from_role(RoleId::transmute(role), perm)
+            .await
+            .context("unable to add permission to role")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn add_role_owner(
         self,
@@ -1075,16 +1333,20 @@ impl DaemonApi for Api {
         role: api::RoleId,
         owning_role: api::RoleId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .add_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
             .await
             .context("unable to add role owner")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn remove_role_owner(
         self,
@@ -1093,13 +1355,16 @@ impl DaemonApi for Api {
         role: api::RoleId,
         owning_role: api::RoleId,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .remove_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
             .await
             .context("unable to remove role owner")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 
@@ -1110,11 +1375,11 @@ impl DaemonApi for Api {
         team: api::TeamId,
         role: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
         let roles = self
             .client
-            .actions(GraphId::transmute(team))
+            .actions(graph)
             .query_role_owners(RoleId::transmute(role))
             .await
             .context("unable to query role owners")?
@@ -1135,6 +1400,7 @@ impl DaemonApi for Api {
         Ok(roles)
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn assign_role_management_perm(
         self,
@@ -1144,10 +1410,11 @@ impl DaemonApi for Api {
         managing_role: api::RoleId,
         perm: Text,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .assign_role_management_perm(
                 RoleId::transmute(role),
                 RoleId::transmute(managing_role),
@@ -1155,9 +1422,12 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to assign role management permission")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn revoke_role_management_perm(
         self,
@@ -1167,10 +1437,11 @@ impl DaemonApi for Api {
         managing_role: api::RoleId,
         perm: Text,
     ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
+        let graph = self.check_team_valid(team).await?;
 
-        self.client
-            .actions(GraphId::transmute(team))
+        let effects = self
+            .client
+            .actions(graph)
             .revoke_role_management_perm(
                 RoleId::transmute(role),
                 RoleId::transmute(managing_role),
@@ -1178,6 +1449,8 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to revoke role management permission")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
         Ok(())
     }
 }
