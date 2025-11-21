@@ -388,12 +388,16 @@ AranyaError init_team(Team* t) {
     size_t team_roles_len = 1;
     AranyaRole team_roles[team_roles_len];
 
-    err = aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
+    err =
+        aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
     if (team_roles_len != 1) {
-        fprintf(stderr, "There should only be 1 role after creating a team but there are %zu roles.\n", team_roles_len);
+        fprintf(stderr,
+                "There should only be 1 role after creating a team but there "
+                "are %zu roles.\n",
+                team_roles_len);
         return err;
     }
 
@@ -401,13 +405,13 @@ AranyaError init_team(Team* t) {
     AranyaRole owner_role = team_roles[0];
     AranyaRoleId owner_role_id;
     aranya_role_get_id(&owner_role, &owner_role_id);
-       
+
     size_t default_roles_len = DEFAULT_ROLES_LEN;
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.
-    err = aranya_setup_default_roles(&owner->client, &t->id, &owner_role_id, default_roles,
-                                     &default_roles_len);
+    err = aranya_setup_default_roles(&owner->client, &t->id, &owner_role_id,
+                                     default_roles, &default_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
         return err;
@@ -587,11 +591,11 @@ AranyaError init_team(Team* t) {
     // assign role management permissions.
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanAssignRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE);
     EXPECT("unable to assign role management permission", err);
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanRevokeRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to assign role management permission", err);
 
     err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
@@ -610,7 +614,7 @@ AranyaError init_team(Team* t) {
 
     err = aranya_revoke_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        "CanRevokeRole");
+        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to revoke role management permission", err);
 exit:
     return err;
@@ -717,8 +721,8 @@ AranyaError run(Team* t) {
 
     sleep(1);
 
-    // Demo hello subscription functionality
-    #ifdef ENABLE_ARANYA_PREVIEW
+// Demo hello subscription functionality
+#ifdef ENABLE_ARANYA_PREVIEW
     printf("demonstrating hello subscription\n");
 
     // Admin subscribes to hello notifications from Owner with 2-second delay
@@ -739,7 +743,7 @@ AranyaError run(Team* t) {
     EXPECT("error subscribing operator to admin hello notifications", err);
 
     sleep(1);
-    #endif
+#endif
 
     // Queries
     printf("running factdb queries\n");
@@ -785,8 +789,8 @@ AranyaError run(Team* t) {
         "\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle_len);
 
-    // Later, unsubscribe from hello notifications
-    #ifdef ENABLE_ARANYA_PREVIEW
+// Later, unsubscribe from hello notifications
+#ifdef ENABLE_ARANYA_PREVIEW
     printf("admin unsubscribing from hello notifications from owner\n");
     err = aranya_sync_hello_unsubscribe(&admin->client, &t->id,
                                         sync_addrs[OWNER]);
@@ -796,13 +800,15 @@ AranyaError run(Team* t) {
     err = aranya_sync_hello_unsubscribe(&operator->client, &t->id,
                                         sync_addrs[ADMIN]);
     EXPECT("error unsubscribing operator from admin hello notifications", err);
-    #endif
+#endif
 
     err = run_afc_example(t);
     EXPECT("error running afc example", err);
 
+#ifdef ENABLE_ARANYA_PREVIEW
     err = run_custom_roles_example(t);
     EXPECT("error running custom roles example", err);
+#endif
 
 exit:
     free(devices);
@@ -1182,13 +1188,13 @@ AranyaError run_custom_roles_example(Team* t) {
 
     // Add `CanUseAfc` permission to the custom role.
     err = aranya_add_perm_to_role(&owner->client, &t->id, &buddy_role_id,
-                                  "CanUseAfc");
+                                  ARANYA_PERMISSION_CAN_USE_AFC);
     EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
     // Remove `CanUseAfc` permission from the custom role.
     err = aranya_remove_perm_from_role(&owner->client, &t->id, &buddy_role_id,
-                                       "CanUseAfc");
+                                       ARANYA_PERMISSION_CAN_USE_AFC);
     EXPECT("unable to remove 'CanUseAfc' permission from 'buddy' role", err);
     printf("Removed 'CanUseAfc' permission from 'buddy' role\n");
 

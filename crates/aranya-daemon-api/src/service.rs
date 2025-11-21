@@ -240,7 +240,7 @@ impl fmt::Debug for Secret {
 pub struct SyncPeerConfig {
     /// The interval at which syncing occurs. If None, the peer will not be periodically synced.
     pub interval: Option<Duration>,
-    /// Determines if a peer should be synced with immediately after they're added
+    /// Determines whether the peer will be scheduled for an immediate sync when added.
     pub sync_now: bool,
     /// Determines if the peer should be synced with when a hello message is received
     /// indicating they have a head that we don't have
@@ -358,8 +358,10 @@ pub trait DaemonApi {
     /// It returns the default roles that were created.
     async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
     /// Creates a new role.
+    #[cfg(feature = "preview")]
     async fn create_role(team: TeamId, role_name: Text, owning_role: RoleId) -> Result<Role>;
     /// Deletes a role.
+    #[cfg(feature = "preview")]
     async fn delete_role(team: TeamId, role_id: RoleId) -> Result<()>;
     /// Returns the current team roles.
     async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
@@ -369,16 +371,21 @@ pub trait DaemonApi {
     //
 
     /// Adds a permission to a role.
+    #[cfg(feature = "preview")]
     async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Text) -> Result<()>;
     /// Removes a permission from a role.
+    #[cfg(feature = "preview")]
     async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Text) -> Result<()>;
     /// Adds an owning role to the target role.
+    #[cfg(feature = "preview")]
     async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Removes an owning role from the target role.
+    #[cfg(feature = "preview")]
     async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Returns the roles that own the target role.
     async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.
+    #[cfg(feature = "preview")]
     async fn assign_role_management_perm(
         team: TeamId,
         role: RoleId,
@@ -386,6 +393,7 @@ pub trait DaemonApi {
         perm: Text,
     ) -> Result<()>;
     /// Revokes a role management permission from a role.
+    #[cfg(feature = "preview")]
     async fn revoke_role_management_perm(
         team: TeamId,
         role: RoleId,

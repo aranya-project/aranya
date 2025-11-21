@@ -797,6 +797,7 @@ impl DaemonApi for Api {
         }
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn create_role(
         self,
@@ -827,6 +828,7 @@ impl DaemonApi for Api {
         }
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn delete_role(
         self,
@@ -1276,6 +1278,7 @@ impl DaemonApi for Api {
     // Role management
     //
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn add_perm_to_role(
         self,
@@ -1297,6 +1300,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn remove_perm_from_role(
         self,
@@ -1318,6 +1322,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn add_role_owner(
         self,
@@ -1339,6 +1344,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn remove_role_owner(
         self,
@@ -1392,6 +1398,7 @@ impl DaemonApi for Api {
         Ok(roles)
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn assign_role_management_perm(
         self,
@@ -1418,6 +1425,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn revoke_role_management_perm(
         self,

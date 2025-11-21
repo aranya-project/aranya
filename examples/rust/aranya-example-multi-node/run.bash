@@ -27,7 +27,7 @@ cargo build \
     --release \
     --package aranya-example-multi-node \
     --package aranya-daemon \
-    --features afc,preview \
+    --features preview \
     --locked
 
 workspace="${current_dir}/examples/rust/aranya-example-multi-node"

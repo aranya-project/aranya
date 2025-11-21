@@ -41,9 +41,12 @@ use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
 #[cfg(feature = "preview")]
 use tokio::task::JoinSet;
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::Instant,
+};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 #[cfg(feature = "preview")]
 use tracing::trace;
@@ -308,10 +311,12 @@ pub trait SyncState: Sized {
 impl<ST> Syncer<ST> {
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
-        // Only insert into delay queue if interval is configured
-        let new_key = cfg
-            .interval
-            .map(|interval| self.queue.insert(peer.clone(), interval));
+        // Only insert into delay queue if interval is configured or `sync_now == true`
+        let new_key = match cfg.interval {
+            _ if cfg.sync_now => Some(self.queue.insert_at(peer.clone(), Instant::now())),
+            Some(interval) => Some(self.queue.insert(peer.clone(), interval)),
+            None => None,
+        };
         if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
             self.queue.remove(&key);
         }
@@ -348,12 +353,8 @@ impl<ST: SyncState> Syncer<ST> {
                         self.sync(&peer).await.map(|_| ())
                     },
                     Msg::AddPeer { peer, cfg } => {
-                        let mut result = Ok(());
-                        if cfg.sync_now {
-                            result = self.sync(&peer).await.map(|_| ());
-                        }
                         self.add_peer(peer, cfg);
-                        result
+                        Ok(())
                     }
                     Msg::RemovePeer { peer } => {
                         self.remove_peer(peer);
