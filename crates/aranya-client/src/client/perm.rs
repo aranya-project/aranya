@@ -55,10 +55,9 @@ pub enum Permission {
     /// The role can set up default roles. This can only be done
     /// once, so this permission can only effectively be used by
     /// the `owner` role.
-    SetupDefaultRole,
-    /// The role can add a managing role to or remove a managing
-    /// role from a target role.
-    ChangeRoleManagingRole,
+    SetupDefaultRoles,
+    /// The role can add an owning role to a target role.
+    AddRoleOwner,
 
     // # Labels
     //
@@ -98,8 +97,8 @@ impl Permission {
             Permission::DeleteRole => text!("DeleteRole"),
             Permission::AssignRole => text!("AssignRole"),
             Permission::RevokeRole => text!("RevokeRole"),
-            Permission::SetupDefaultRole => text!("SetupDefaultRole"),
-            Permission::ChangeRoleManagingRole => text!("ChangeRoleManagingRole"),
+            Permission::SetupDefaultRoles => text!("SetupDefaultRoles"),
+            Permission::AddRoleOwner => text!("AddRoleOwner"),
             Permission::CreateLabel => text!("CreateLabel"),
             Permission::DeleteLabel => text!("DeleteLabel"),
             Permission::ChangeLabelManagingRole => text!("ChangeLabelManagingRole"),

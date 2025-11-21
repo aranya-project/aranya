@@ -551,10 +551,9 @@ pub enum Permission {
     /// The role can set up default roles. This can only be done
     /// once, so this permission can only effectively be used by
     /// the `owner` role.
-    SetupDefaultRole,
-    /// The role can add a managing role to or remove a managing
-    /// role from a target role.
-    ChangeRoleManagingRole,
+    SetupDefaultRoles,
+    /// The role can add a an owning role to a target role.
+    AddRoleOwner,
 
     // # Labels
     //
@@ -595,8 +594,8 @@ impl From<Permission> for aranya_client::client::Permission {
             Permission::DeleteRole => Self::DeleteRole,
             Permission::AssignRole => Self::AssignRole,
             Permission::RevokeRole => Self::RevokeRole,
-            Permission::SetupDefaultRole => Self::SetupDefaultRole,
-            Permission::ChangeRoleManagingRole => Self::ChangeRoleManagingRole,
+            Permission::SetupDefaultRoles => Self::SetupDefaultRoles,
+            Permission::AddRoleOwner => Self::AddRoleOwner,
             Permission::CreateLabel => Self::CreateLabel,
             Permission::DeleteLabel => Self::DeleteLabel,
             Permission::ChangeLabelManagingRole => Self::ChangeLabelManagingRole,
@@ -1176,26 +1175,24 @@ pub fn add_role_owner(
     Ok(())
 }
 
-/// Removes an owning_role as an owner of role.
+/// Removes device's role as an owner of role.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] role the ID of the subject role
-/// @param[in] owning_role ID of the owning role
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "preview")]
-pub fn remove_role_owner(
+pub fn remove_role_ownership(
     client: &Client,
     team: &TeamId,
     role: &RoleId,
-    owning_role: &RoleId,
 ) -> Result<(), imp::Error> {
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .remove_role_owner(role.into(), owning_role.into()),
+            .remove_role_ownership(role.into()),
     )?;
 
     Ok(())

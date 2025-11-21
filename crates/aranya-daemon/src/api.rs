@@ -1348,19 +1348,18 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
-    async fn remove_role_owner(
+    async fn remove_role_ownership(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        owning_role: api::RoleId,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .remove_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
+            .remove_role_ownership(RoleId::transmute(role))
             .await
             .context("unable to remove role owner")?;
         self.effect_handler.handle_effects(graph, &effects).await?;

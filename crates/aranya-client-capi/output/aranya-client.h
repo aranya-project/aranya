@@ -274,12 +274,11 @@ enum AranyaPermission
      * once, so this permission can only effectively be used by
      * the `owner` role.
      */
-    ARANYA_PERMISSION_SETUP_DEFAULT_ROLE,
+    ARANYA_PERMISSION_SETUP_DEFAULT_ROLES,
     /**
-     * The role can add a managing role to or remove a managing
-     * role from a target role.
+     * The role can add a an owning role to a target role.
      */
-    ARANYA_PERMISSION_CHANGE_ROLE_MANAGING_ROLE,
+    ARANYA_PERMISSION_ADD_ROLE_OWNER,
     /**
      * The role can create a label.
      */
@@ -1691,37 +1690,33 @@ AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
 
 #if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Removes an owning_role as an owner of role.
+ * Removes device's role as an owner of role.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
- * @param[in] owning_role ID of the owning role
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team,
-                                     const struct AranyaRoleId *role,
-                                     const struct AranyaRoleId *owning_role);
+AranyaError aranya_remove_role_ownership(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaRoleId *role);
 #endif
 
 #if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Removes an owning_role as an owner of role.
+ * Removes device's role as an owner of role.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
- * @param[in] owning_role ID of the owning role
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaRoleId *role,
-                                         const struct AranyaRoleId *owning_role,
-                                         struct AranyaExtError *__ext_err);
+AranyaError aranya_remove_role_ownership_ext(const struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaRoleId *role,
+                                             struct AranyaExtError *__ext_err);
 #endif
 
 /**
