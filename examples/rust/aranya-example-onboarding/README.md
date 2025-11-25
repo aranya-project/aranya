@@ -55,13 +55,15 @@ Step 12. Owner creates seed key for quic syncer. [Create Sync Seed Key](src/owne
 
 Step 13. Owner creates sync configuration. [Create Sync Config](src/owner/main.rs)
 
-Step 14. Owner creates team and sets up default team roles. [Team Initialization](src/owner/main.rs)
+Step 14. Owner creates team with create_team()* and sets up default team roles. [Team Initialization](src/owner/main.rs)
+*This creates the team, returns the team_id, and adds the team to the owner client.
 
 Step 15. Owner sends team id and seed key to the Admin user and waits for a response containing user information. [Team Id Transmission](src/owner/main.rs)
 
 Step 16. Admin creates sync config using seed key from Owner [Create Team Config](src/admin/main.rs)
 
-Step 17. Admin adds team using the team id received from Owner [Add Team](src/admin/main.rs)
+Step 17. Admin adds team with add_team()* using the team id received from Owner [Add Team](src/admin/main.rs)
+*This adds the team to the admin client.
 
 Step 18. Admin sends user information (device id and key bundle) to the Owner. [User Information Transmission](src/admin/main.rs)
 
