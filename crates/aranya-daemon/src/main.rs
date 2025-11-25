@@ -32,7 +32,7 @@ fn main() -> Result<()> {
         )
         .init();
 
-    info!("\n--starting Aranya daemon--");
+    info!("starting Aranya daemon");
 
     let pid = PidFile::create(cfg.pid_path()).context("unable to create PID file")?;
     info!(name = cfg.name, "wrote PID file to {pid}");
