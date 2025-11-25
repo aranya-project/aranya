@@ -12,7 +12,8 @@ In this workspace, run:
 Copy the following artifacts onto each node:
 - `example.env` - an environment file for loading shared configuration info such as IP addresses into executables
 - `aranya-daemon` - the Aranya daemon executable
-- `aranya-example-onboarding-<node variant>` - the team member's Aranya client executable
+- `aranya-example-onboarding-owner` - the owner's Aranya client executable
+- `aranya-example-onboarding-admin` - the admin's Aranya client executable
 
 For example, the `owner` device would copy the `aranya-example-onboarding-owner` executable from the `target/release/` folder onto the corresponding machine acting as the owner on the team.
 
@@ -28,44 +29,44 @@ Start the Aranya daemon `aranya-daemon` executable and Aranya client executable 
 Each node's executable will load information such as IP addresses from the environment file and perform operations via the Aranya client such as setting up the team and AFC channels.
 
 # Onboarding Process Steps
-Step 1. Create Daemon config for Owner. [Create Daemon Config](src/bin/main.rs#L52)
+Step 1. Create Daemon config for Owner.
 
-Step 2. Start Owner Daemon. [Daemon Start](src/bin/main.rs#L58)
+Step 2. Start Owner Daemon. [Daemon Start](src/bin/main.rs)
 
-Step 3. Create Daemon config for Admin. [Create Daemon Config](src/bin/main.rs#L52)
+Step 3. Create Daemon config for Admin. [Create Daemon Config](src/bin/main.rs)
 
-Step 4. Starting Admin Daemon. [Daemon Start](src/bin/main.rs#L58)
+Step 4. Starting Admin Daemon. [Daemon Start](src/bin/main.rs)
 
-Step 5. Starting Owner Client. [Client Process Spawn](src/bin/main.rs#L81)
+Step 5. Starting Owner Client. [Client Process Spawn](src/bin/main.rs)
 
-Step 6. Owner starts onboarding server (for transferring data to/from onboarding users) [Onboarding Server Start](src/owner/main.rs#L41)
+Step 6. Owner starts onboarding server (for transferring data to/from onboarding users) [Onboarding Server Start](src/owner/main.rs)
 
-Step 7. Owner initializes client. [Client Init](src/owner/main.rs#L46)
+Step 7. Owner initializes client. [Client Init](src/owner/main.rs)
 
-Step 8. Starting Admin Client. [Client Process Spawn](src/bin/main.rs#L81)
+Step 8. Starting Admin Client. [Client Process Spawn](src/bin/main.rs)
 
-Step 9. Admin starts onboarding server (for transferring data to/from owner) [Client Init](src/admin/main.rs#L37)
+Step 9. Admin starts onboarding server (for transferring data to/from owner) [Client Init](src/admin/main.rs)
 
-Step 10. Admin initializes client. [Client Init](src/admin/main.rs#L42)
+Step 10. Admin initializes client. [Client Init](src/admin/main.rs)
 
-Step 11. Admin awaits information of the team id from Owner. [Data Receive](src/admin/main.rs#L53)
+Step 11. Admin awaits information of the team id from Owner. [Data Receive](src/admin/main.rs)
 
-Step 12. Owner creates seed key for quic syncer. [Create Sync Seed Key](src/owner/main.rs#L59)
+Step 12. Owner creates seed key for quic syncer. [Create Sync Seed Key](src/owner/main.rs)
 
-Step 13. Owner creates sync configuration. [Create Sync Config](src/owner/main.rs#L67)
+Step 13. Owner creates sync configuration. [Create Sync Config](src/owner/main.rs)
 
-Step 14. Owner creates team and sets up default team roles. [Team Initialization](src/owner/main.rs#L74)
+Step 14. Owner creates team and sets up default team roles. [Team Initialization](src/owner/main.rs)
 
-Step 15. Owner sends team id and seed key to the Admin user and waits for a response containing user information. [Team Id Transmission](src/owner/main.rs#L108)
+Step 15. Owner sends team id and seed key to the Admin user and waits for a response containing user information. [Team Id Transmission](src/owner/main.rs)
 
-Step 16. Admin creates sync config using seed key from Owner [Create Team Config](src/admin/main.rs#L57)
+Step 16. Admin creates sync config using seed key from Owner [Create Team Config](src/admin/main.rs)
 
-Step 17. Admin adds team using the team id received from Owner [Add Team](src/admin/main.rs#L66)
+Step 17. Admin adds team using the team id received from Owner [Add Team](src/admin/main.rs)
 
-Step 18. Admin sends user information (device id and key bundle) to the Owner. [User Information Transmission](src/admin/main.rs#L74)
+Step 18. Admin sends user information (device id and key bundle) to the Owner. [User Information Transmission](src/admin/main.rs)
 
-Step 19. Owner receives the user information and adds Admin to the team. [Add User to Team](src/owner/main.rs#L119)
+Step 19. Owner receives the user information and adds Admin to the team. [Add User to Team](src/owner/main.rs)
 
-Step 20. Owner assigns `Admin` role to Admin user. [Assign Admin Role](src/owner/main.rs#L134)
+Step 20. Owner assigns `Admin` role to Admin user. [Assign Admin Role](src/owner/main.rs)
 
-Step 21. Admin checks for assigned admin role [Check for assigned role](src/admin/main.rs#L105)
+Step 21. Admin checks for assigned admin role [Check for assigned role](src/admin/main.rs)
