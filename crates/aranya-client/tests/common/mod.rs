@@ -40,7 +40,6 @@ pub struct DevicesCtx {
     _work_dir: TempDir,
 }
 
-#[allow(dead_code)]
 impl DevicesCtx {
     pub async fn new(name: &str) -> Result<Self> {
         let work_dir = tempfile::tempdir()?;
