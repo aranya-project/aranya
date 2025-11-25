@@ -8,3 +8,4 @@
 
 # CMake
 build/
+out/

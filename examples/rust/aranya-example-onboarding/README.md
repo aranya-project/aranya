@@ -14,13 +14,14 @@ Copy the following artifacts onto each node:
 - `aranya-daemon` - the Aranya daemon executable
 - `aranya-example-onboarding-owner` - the owner's Aranya client executable
 - `aranya-example-onboarding-admin` - the admin's Aranya client executable
+- `/out/daemon/owner/daemon/config.toml` - the owner's daemon configuration
+- `/out/daemon/admin/daemon/config.toml` - the admin's daemon configuration
 
 For example, the `owner` device would copy the `aranya-example-onboarding-owner` executable from the `target/release/` folder onto the corresponding machine acting as the owner on the team.
 
 Once the artifacts have been copied onto each machine, source the environment file into the current environment on each machine: `. example.env`
 
-Create a `config.toml` configuration file for each daemon before starting them:
-[example daemon config file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/src/example.toml)
+Slight modification will need to be done to the configuration to match the directory locations on the machine, and the ip address to use for sync.
 
 Start the Aranya daemon `aranya-daemon` executable and Aranya client executable on each machine on the network at the same time. E.g. on the owner machine run:
 `aranya-daemon --config <path to daemon config file>`

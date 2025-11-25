@@ -131,7 +131,8 @@ async fn main() -> Result<()> {
             .find(|r| *r.name == *device.role)
             .ok_or_else(|| anyhow::anyhow!("role not found"))?
             .clone();
-        team.assign_role(info.device_id, role.id)
+        team.device(info.device_id)
+            .assign_role(role.id)
             .await
             .expect("expected to assign role");
         info!(

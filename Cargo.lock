@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-example-onboarding"
-version = "3.0.0"
+version = "0.0.0"
 dependencies = [
  "age",
  "anyhow",
