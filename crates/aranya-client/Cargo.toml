@@ -56,6 +56,7 @@ aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "previe
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
+pcap = "1"
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

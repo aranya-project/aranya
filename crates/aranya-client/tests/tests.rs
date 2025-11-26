@@ -23,7 +23,7 @@ use aranya_daemon_api::text;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
+use crate::common::{sleep, DeviceCtx, DevicesCtx, MultiDevicesCtx, NetworkLogger, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -2160,6 +2160,111 @@ async fn test_role_owners_query() -> Result<()> {
     assert!(
         admin_view_owner_ids.contains(&roles.operator().id),
         "admin client should see operator as owner"
+    );
+
+    Ok(())
+}
+
+/// Number of devices for multi-node sync test (1 owner + N-1 members).
+/// Change this value to adjust the number of devices in the test.
+const NUM_DEVICES: usize = 16;
+
+/// Tests that multiple nodes can sync with the owner.
+/// This test creates NUM_DEVICES nodes (1 owner + NUM_DEVICES-1 members),
+/// has the owner add all members to the team, and then each member syncs with the owner.
+/// Network traffic is logged in pcap/tcpdump format showing which peer uses which port.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_multi_node_sync_with_logging() -> Result<()> {
+    // Create devices context with configurable number of devices
+    let mut devices =
+        MultiDevicesCtx::new_with_count("test_multi_node_sync_with_logging", NUM_DEVICES).await?;
+
+    info!(
+        "Created {} devices (1 owner + {} members)",
+        NUM_DEVICES,
+        NUM_DEVICES - 1
+    );
+
+    // Build address-to-name mapping for logging
+    let addr_to_name = devices.build_addr_to_name_map().await?;
+
+    // Log device addresses
+    info!("Device addresses:");
+    for (addr, name) in &addr_to_name {
+        info!("  {}: {}", name, addr);
+    }
+
+    // Create network logger - writes to file to keep logs separate from test output
+    // Default to workspace root (two directories up from test directory: crates/aranya-client/tests -> workspace root)
+    let log_file_path = std::env::var("ARANYA_NETWORK_LOG_FILE").unwrap_or_else(|_| {
+        // Use relative path to workspace root: ../../
+        // Tests run from crates/aranya-client/tests, so ../../ goes to workspace root
+        "../../network_logs.txt".to_string()
+    });
+    // Optionally save raw packets to pcap file (like tcpdump -w)
+    let pcap_file_path = std::env::var("ARANYA_PCAP_FILE").ok().or_else(|| {
+        // Default to network_logs.pcap in same directory as text log
+        if log_file_path.ends_with(".txt") {
+            Some(log_file_path.replace(".txt", ".pcap"))
+        } else {
+            Some(format!("{}.pcap", log_file_path))
+        }
+    });
+
+    let logger = NetworkLogger::new_with_file(
+        addr_to_name.clone(),
+        Some(&log_file_path),
+        pcap_file_path.as_deref(),
+    )?;
+    info!("Network traffic logs will be written to: {}", log_file_path);
+
+    // Create team with owner
+    let team_id = devices.create_and_add_team().await?;
+    info!(?team_id, "Team created");
+
+    // Setup default roles
+    let roles = devices.setup_default_roles(team_id).await?;
+    info!("Default roles set up");
+
+    // Owner adds all member devices to the team
+    let owner_team = devices.owner().client.team(team_id);
+    for (i, member) in devices.members().iter().enumerate() {
+        info!("Adding member{} to team", i + 1);
+        owner_team
+            .add_device(member.pk.clone(), Some(roles.member().id))
+            .await
+            .with_context(|| format!("owner unable to add member{} to team", i + 1))?;
+    }
+
+    // Get owner address for syncing
+    let owner_addr = devices.owner().aranya_local_addr().await?;
+
+    // Each member device syncs with the owner
+    // Packet capture is running in the background and will automatically log all UDP packets
+    info!("Starting sync operations...");
+    logger.log_action("Starting sync operations...")?;
+    for (i, member) in devices.members().iter().enumerate() {
+        let action_msg = format!("member{} syncing with owner", i + 1);
+        info!("{}", action_msg);
+        logger.log_action(&action_msg)?;
+        let member_team = member.client.team(team_id);
+        member_team
+            .sync_now(owner_addr, None)
+            .await
+            .with_context(|| format!("member{} unable to sync with owner", i + 1))?;
+    }
+
+    // Give a moment for all packets to be captured before stopping the logger
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Stop packet capture (logger will be dropped, but explicitly stop to ensure cleanup)
+    // Give extra time for file writes to complete
+    drop(logger);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    info!(
+        "All {} members successfully synced with owner",
+        NUM_DEVICES - 1
     );
 
     Ok(())
