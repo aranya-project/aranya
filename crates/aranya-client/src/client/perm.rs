@@ -52,6 +52,8 @@ pub enum Permission {
     AssignRole,
     /// The role can revoke a role from other devices.
     RevokeRole,
+    /// The role can change role management permissions for roles.
+    ChangeRoleManagementPerms,
     /// The role can set up default roles. This can only be done
     /// once, so this permission can only effectively be used by
     /// the `owner` role.
@@ -97,6 +99,7 @@ impl Permission {
             Permission::DeleteRole => text!("DeleteRole"),
             Permission::AssignRole => text!("AssignRole"),
             Permission::RevokeRole => text!("RevokeRole"),
+            Permission::ChangeRoleManagementPerms => text!("ChangeRoleManagementPerms"),
             Permission::SetupDefaultRoles => text!("SetupDefaultRoles"),
             Permission::AddRoleOwner => text!("AddRoleOwner"),
             Permission::CreateLabel => text!("CreateLabel"),

@@ -791,6 +791,8 @@ enum SimplePerm {
     AssignRole,
     // The role can revoke a role from other devices.
     RevokeRole,
+    // The role can change role management permissions for roles.
+    ChangeRoleManagementPerms,
     // The role can set up default roles. This can only be done
     // once, so this permission can only effectively be used by
     // the `owner` role.
@@ -839,6 +841,7 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::RevokeRole => { return "RevokeRole" }
         SimplePerm::SetupDefaultRoles => { return "SetupDefaultRoles" }
         SimplePerm::AddRoleOwner => { return "AddRoleOwner" }
+        SimplePerm::ChangeRoleManagementPerms => { return "ChangeRoleManagementPerms" }
 
         SimplePerm::CreateLabel => { return "CreateLabel" }
         SimplePerm::DeleteLabel => { return "DeleteLabel" }
@@ -870,6 +873,7 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         "AssignRole" => { return Some(SimplePerm::AssignRole) }
         "RevokeRole" => { return Some(SimplePerm::RevokeRole) }
         "AddRoleOwner" => { return Some(SimplePerm::AddRoleOwner) }
+        "ChangeRoleManagementPerms" => { return Some(SimplePerm::ChangeRoleManagementPerms) }
 
         //
         // Labels
@@ -1531,6 +1535,8 @@ command AssignRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
+
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagementPerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         // Make sure we uphold the invariants for
@@ -1674,6 +1680,7 @@ command RevokeRoleManagementPerm {
         check team_exists()
 
         let author = get_author(envelope)
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagementPerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
         let perm = role_management_perm_to_str(this.perm)
@@ -1996,6 +2003,7 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, SimplePerm::DeleteRole)
                     assign_perm_to_role(role_id, SimplePerm::AssignRole)
                     assign_perm_to_role(role_id, SimplePerm::RevokeRole)
+                    assign_perm_to_role(role_id, SimplePerm::ChangeRoleManagementPerms)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -2860,6 +2868,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::DeleteRole)
             assign_perm_to_role(owner_role_id, SimplePerm::AssignRole)
             assign_perm_to_role(owner_role_id, SimplePerm::RevokeRole)
+            assign_perm_to_role(owner_role_id, SimplePerm::ChangeRoleManagementPerms)
             assign_perm_to_role(owner_role_id, SimplePerm::SetupDefaultRoles)
             assign_perm_to_role(owner_role_id, SimplePerm::AddRoleOwner)
 

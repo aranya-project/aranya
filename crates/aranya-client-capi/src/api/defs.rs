@@ -548,6 +548,8 @@ pub enum Permission {
     AssignRole,
     /// The role can revoke a role from other devices.
     RevokeRole,
+    /// The role can change role management permissions for roles.
+    ChangeRoleManagementPerms,
     /// The role can set up default roles. This can only be done
     /// once, so this permission can only effectively be used by
     /// the `owner` role.
@@ -594,6 +596,7 @@ impl From<Permission> for aranya_client::client::Permission {
             Permission::DeleteRole => Self::DeleteRole,
             Permission::AssignRole => Self::AssignRole,
             Permission::RevokeRole => Self::RevokeRole,
+            Permission::ChangeRoleManagementPerms => Self::ChangeRoleManagementPerms,
             Permission::SetupDefaultRoles => Self::SetupDefaultRoles,
             Permission::AddRoleOwner => Self::AddRoleOwner,
             Permission::CreateLabel => Self::CreateLabel,
