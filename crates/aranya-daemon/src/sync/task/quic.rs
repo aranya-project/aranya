@@ -450,21 +450,42 @@ impl Syncer<State> {
 
         let len = {
             // Lock both aranya and caches in the correct order.
+            let lock_start = Instant::now();
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+            let lock_duration = lock_start.elapsed();
+            info!(
+                peer = %peer,
+                "client lock time: {:.2}ms",
+                lock_duration.as_secs_f64() * 1000.0
+            );
             let key = PeerCacheKey::new(*peer, id);
             let cache = caches.entry(key).or_default();
+            let poll_start = Instant::now();
             let (len, _) = syncer
                 .poll(&mut send_buf, aranya.provider(), cache)
                 .context("sync poll failed")?;
+            let poll_duration = poll_start.elapsed();
+            info!(
+                peer = %peer,
+                "client poll time: {:.2}ms",
+                poll_duration.as_secs_f64() * 1000.0
+            );
             trace!(?len, "sync poll finished");
             len
         };
         send_buf.truncate(len);
 
+        let send_start = Instant::now();
         send.send(Bytes::from(send_buf))
             .await
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
+        let send_duration = send_start.elapsed();
+        info!(
+            peer = %peer,
+            "client send time: {:.2}ms",
+            send_duration.as_secs_f64() * 1000.0
+        );
         trace!("sent sync request");
         log_network_action(&format!("Sync request sent to {}", peer));
 
@@ -491,9 +512,16 @@ impl Syncer<State> {
         log_network_action(&format!("Receiving sync response from {}", peer));
 
         let mut recv_buf = Vec::new();
+        let receive_start = Instant::now();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
+        let receive_duration = receive_start.elapsed();
+        info!(
+            peer = %peer,
+            "client receive time: {:.2}ms",
+            receive_duration.as_secs_f64() * 1000.0
+        );
         trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.
@@ -512,18 +540,39 @@ impl Syncer<State> {
             trace!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
                 // Lock both aranya and caches in the correct order.
+                let lock_start = Instant::now();
                 let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+                let lock_duration = lock_start.elapsed();
+                info!(
+                    peer = %peer,
+                    "client lock time (process): {:.2}ms",
+                    lock_duration.as_secs_f64() * 1000.0
+                );
                 let mut trx = aranya.transaction(id);
+                let process_start = Instant::now();
                 aranya
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 aranya.commit(&mut trx, sink).context("commit failed")?;
+                let process_duration = process_start.elapsed();
+                info!(
+                    peer = %peer,
+                    "client process time (add_commands+commit): {:.2}ms",
+                    process_duration.as_secs_f64() * 1000.0
+                );
                 trace!("committed");
                 let key = PeerCacheKey::new(*peer, id);
                 let cache = caches.entry(key).or_default();
+                let update_start = Instant::now();
                 aranya
                     .update_heads(id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
                     .context("failed to update cache heads")?;
+                let update_duration = update_start.elapsed();
+                info!(
+                    peer = %peer,
+                    "client update_heads time: {:.2}ms",
+                    update_duration.as_secs_f64() * 1000.0
+                );
                 log_network_action(&format!(
                     "Sync response received from {}, {} commands",
                     peer,
@@ -737,12 +786,20 @@ where
         sync_peers: SyncPeers,
     ) -> SyncResult<()> {
         trace!("server received a sync request");
+        let sync_start = Instant::now();
 
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
+        let read_start = Instant::now();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
+        let read_duration = read_start.elapsed();
+        info!(
+            peer = %peer,
+            "server read request time: {:.2}ms",
+            read_duration.as_secs_f64() * 1000.0
+        );
         trace!(n = recv_buf.len(), "received sync request");
         log_network_action(&format!("Received sync request from {}", peer));
 
@@ -763,6 +820,7 @@ where
         };
 
         log_network_action(&format!("Sending sync response to {}", peer));
+        let send_start = Instant::now();
         let data_len = {
             let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
             let data_len = data.len();
@@ -772,6 +830,12 @@ where
             data_len
         };
         send.close().await.ok();
+        let send_duration = send_start.elapsed();
+        info!(
+            peer = %peer,
+            "server send response time: {:.2}ms",
+            send_duration.as_secs_f64() * 1000.0
+        );
         trace!(n = data_len, "server sent sync response");
         log_network_action(&format!(
             "Sync response sent to {}, {} bytes",
@@ -784,6 +848,13 @@ where
             "Sync stream closed with {}, connection may remain open for reuse",
             peer
         ));
+
+        let sync_duration = sync_start.elapsed();
+        info!(
+            peer = %peer,
+            "server sync total time: {:.2}ms",
+            sync_duration.as_secs_f64() * 1000.0
+        );
 
         Ok(())
     }
@@ -873,11 +944,19 @@ where
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         let len = {
             // Lock both aranya and caches in the correct order.
+            let lock_start = Instant::now();
             let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
+            let lock_duration = lock_start.elapsed();
+            info!(
+                peer = %peer_server_addr,
+                "server lock time: {:.2}ms",
+                lock_duration.as_secs_f64() * 1000.0
+            );
             let key = PeerCacheKey::new(peer_server_addr, storage_id);
             let cache = caches.entry(key).or_default();
 
-            resp.poll(&mut buf, aranya.provider(), cache)
+            let poll_start = Instant::now();
+            let result = resp.poll(&mut buf, aranya.provider(), cache)
                 .or_else(|err| {
                     if matches!(
                         err,
@@ -889,7 +968,14 @@ where
                         Err(err)
                     }
                 })
-                .context("sync resp poll failed")?
+                .context("sync resp poll failed")?;
+            let poll_duration = poll_start.elapsed();
+            info!(
+                peer = %peer_server_addr,
+                "server poll time: {:.2}ms",
+                poll_duration.as_secs_f64() * 1000.0
+            );
+            result
         };
         trace!(len = len, "sync poll finished");
         buf.truncate(len);
