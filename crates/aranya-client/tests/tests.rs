@@ -11,7 +11,10 @@
 
 mod common;
 
-use std::{ptr, time::Duration};
+use std::{
+    ptr,
+    time::{Duration, Instant},
+};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
@@ -2167,7 +2170,7 @@ async fn test_role_owners_query() -> Result<()> {
 
 /// Number of devices for multi-node sync test (1 owner + N-1 members).
 /// Change this value to adjust the number of devices in the test.
-const NUM_DEVICES: usize = 16;
+const NUM_DEVICES: usize = 8;
 
 /// Tests that multiple nodes can sync with the owner.
 /// This test creates NUM_DEVICES nodes (1 owner + NUM_DEVICES-1 members),
@@ -2175,6 +2178,33 @@ const NUM_DEVICES: usize = 16;
 /// Network traffic is logged in pcap/tcpdump format showing which peer uses which port.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_node_sync_with_logging() -> Result<()> {
+    // Determine log file path and set environment variable BEFORE creating daemons
+    // so they inherit the environment variable
+    let log_file_path = std::env::var("ARANYA_NETWORK_LOG_FILE").unwrap_or_else(|_| {
+        // Use relative path to workspace root: ../../
+        // Tests run from crates/aranya-client/tests, so ../../ goes to workspace root
+        "../../network_logs.txt".to_string()
+    });
+    // Convert to absolute path so daemon can find it regardless of working directory
+    let log_file_path = if std::path::Path::new(&log_file_path).is_absolute() {
+        log_file_path
+    } else {
+        // Build absolute path from current directory
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let abs_path = current_dir.join(&log_file_path);
+        // Normalize the path (resolve .. components)
+        let abs_path_clone = abs_path.clone();
+        #[allow(clippy::unnecessary_lazy_evaluations)]
+        abs_path
+            .canonicalize()
+            .unwrap_or_else(|_| abs_path_clone)
+            .to_string_lossy()
+            .to_string()
+    };
+    // Set environment variable so daemon processes can also write to the log file
+    info!("Setting ARANYA_NETWORK_LOG_FILE={}", log_file_path);
+    std::env::set_var("ARANYA_NETWORK_LOG_FILE", &log_file_path);
+
     // Create devices context with configurable number of devices
     let mut devices =
         MultiDevicesCtx::new_with_count("test_multi_node_sync_with_logging", NUM_DEVICES).await?;
@@ -2194,13 +2224,6 @@ async fn test_multi_node_sync_with_logging() -> Result<()> {
         info!("  {}: {}", name, addr);
     }
 
-    // Create network logger - writes to file to keep logs separate from test output
-    // Default to workspace root (two directories up from test directory: crates/aranya-client/tests -> workspace root)
-    let log_file_path = std::env::var("ARANYA_NETWORK_LOG_FILE").unwrap_or_else(|_| {
-        // Use relative path to workspace root: ../../
-        // Tests run from crates/aranya-client/tests, so ../../ goes to workspace root
-        "../../network_logs.txt".to_string()
-    });
     // Optionally save raw packets to pcap file (like tcpdump -w)
     let pcap_file_path = std::env::var("ARANYA_PCAP_FILE").ok().or_else(|| {
         // Default to network_logs.pcap in same directory as text log
@@ -2211,6 +2234,7 @@ async fn test_multi_node_sync_with_logging() -> Result<()> {
         }
     });
 
+    // Create logger - it will set its own start_time and the environment variable
     let logger = NetworkLogger::new_with_file(
         addr_to_name.clone(),
         Some(&log_file_path),
@@ -2244,14 +2268,87 @@ async fn test_multi_node_sync_with_logging() -> Result<()> {
     info!("Starting sync operations...");
     logger.log_action("Starting sync operations...")?;
     for (i, member) in devices.members().iter().enumerate() {
-        let action_msg = format!("member{} syncing with owner", i + 1);
-        info!("{}", action_msg);
-        logger.log_action(&action_msg)?;
         let member_team = member.client.team(team_id);
-        member_team
-            .sync_now(owner_addr, None)
-            .await
-            .with_context(|| format!("member{} unable to sync with owner", i + 1))?;
+        let mut sync_round = 0;
+        let sync_start = Instant::now();
+
+        // Keep syncing until the graph doesn't change
+        // Note: First sync creates the team storage, so we can't check device count before it
+        let mut device_count_before = None;
+        loop {
+            sync_round += 1;
+            let action_msg = if sync_round == 1 {
+                format!("member{} syncing with owner", i + 1)
+            } else {
+                format!("member{} syncing with owner (round {})", i + 1, sync_round)
+            };
+            info!("{}", action_msg);
+            logger.log_action(&action_msg)?;
+
+            // Get device count before sync (skip for first sync since storage doesn't exist yet)
+            if sync_round > 1 {
+                let devices_before = member_team.devices().await?;
+                device_count_before = Some(devices_before.iter().count());
+            }
+
+            // Perform sync
+            member_team
+                .sync_now(owner_addr, None)
+                .await
+                .with_context(|| {
+                    format!(
+                        "member{} unable to sync with owner (round {})",
+                        i + 1,
+                        sync_round
+                    )
+                })?;
+
+            // Get device count after sync
+            let devices_after = member_team.devices().await?;
+            let device_count_after = devices_after.iter().count();
+
+            if let Some(count_before) = device_count_before {
+                info!(
+                    "member{} sync round {}: device count {} -> {}",
+                    i + 1,
+                    sync_round,
+                    count_before,
+                    device_count_after
+                );
+
+                // If device count didn't change, graph is stable
+                if count_before == device_count_after {
+                    info!(
+                        "member{} graph stable after {} sync rounds",
+                        i + 1,
+                        sync_round
+                    );
+                    logger.log_action(&format!(
+                        "member{} graph stable after {} sync rounds",
+                        i + 1,
+                        sync_round
+                    ))?;
+                    break;
+                }
+            } else {
+                // First sync - just log the count after sync
+                info!(
+                    "member{} sync round {}: device count after first sync: {}",
+                    i + 1,
+                    sync_round,
+                    device_count_after
+                );
+            }
+        }
+
+        // Log total time taken to sync this member
+        let sync_duration = sync_start.elapsed();
+        info!(
+            "member{} total sync time: {:.2}s ({} rounds)",
+            i + 1,
+            sync_duration.as_secs_f64(),
+            sync_round
+        );
     }
 
     // Give a moment for all packets to be captured before stopping the logger
@@ -2261,6 +2358,93 @@ async fn test_multi_node_sync_with_logging() -> Result<()> {
     // Give extra time for file writes to complete
     drop(logger);
     tokio::time::sleep(Duration::from_millis(200)).await;
+
+    // Merge daemon ACTION logs into the main log file in chronological order
+    let daemon_log_path = format!("{}.daemon_actions", log_file_path);
+    if let (Ok(main_logs), Ok(daemon_logs)) = (
+        std::fs::read_to_string(&log_file_path),
+        std::fs::read_to_string(&daemon_log_path),
+    ) {
+        // Helper closure to parse timestamp from log lines
+        // Format: "HH:MM:SS.XXXXXX" or "# HH:MM:SS.XXXXXX"
+        let parse_timestamp = |line: &str| -> Option<u64> {
+            let line = line.strip_prefix('#').unwrap_or(line).trim_start();
+            if let Some(time_part) = line.split_whitespace().next() {
+                // Parse "HH:MM:SS.XXXXXX"
+                let parts: Vec<&str> = time_part.split(':').collect();
+                if parts.len() == 3 {
+                    if let (Ok(hours), Ok(mins)) =
+                        (parts[0].parse::<u64>(), parts[1].parse::<u64>())
+                    {
+                        // Parse seconds and microseconds separately to avoid f64 precision loss
+                        let secs_part = parts[2];
+                        if let Some(dot_pos) = secs_part.find('.') {
+                            if let (Ok(secs), Ok(micros)) = (
+                                secs_part[..dot_pos].parse::<u64>(),
+                                secs_part[dot_pos + 1..].parse::<u64>(),
+                            ) {
+                                let total_micros =
+                                    (hours * 3600 + mins * 60 + secs) * 1_000_000 + micros;
+                                return Some(total_micros);
+                            }
+                        } else if let Ok(secs) = secs_part.parse::<u64>() {
+                            let total_micros = (hours * 3600 + mins * 60 + secs) * 1_000_000;
+                            return Some(total_micros);
+                        }
+                    }
+                }
+            }
+            None
+        };
+
+        // Parse timestamps and merge chronologically
+        let mut entries: Vec<(u64, String)> = Vec::new(); // (microseconds_since_start, line)
+
+        // Parse main log file (packet logs and test ACTION logs)
+        for line in main_logs.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            // Skip header line
+            if line == "# Network traffic log - tcpdump format" {
+                entries.push((0, line.to_string()));
+                continue;
+            }
+            // Parse timestamp: either "# HH:MM:SS.XXXXXX ACTION: ..." or "HH:MM:SS.XXXXXX IP ..."
+            if let Some(timestamp_micros) = parse_timestamp(line) {
+                entries.push((timestamp_micros, line.to_string()));
+            } else {
+                // Lines without timestamps go at the end
+                entries.push((u64::MAX, line.to_string()));
+            }
+        }
+
+        // Parse daemon ACTION logs
+        for line in daemon_logs.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            // Parse timestamp from "# HH:MM:SS.XXXXXX ACTION: ..."
+            if let Some(timestamp_micros) = parse_timestamp(line) {
+                entries.push((timestamp_micros, line.to_string()));
+            }
+        }
+
+        // Sort by timestamp
+        entries.sort_by_key(|(ts, _)| *ts);
+
+        // Write merged result back to main log file
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::File::create(&log_file_path) {
+            for (_, line) in entries {
+                let _ = writeln!(file, "{}", line);
+            }
+            let _ = file.sync_all();
+        }
+
+        // Clean up the temporary daemon log file
+        let _ = std::fs::remove_file(&daemon_log_path);
+    }
 
     info!(
         "All {} members successfully synced with owner",

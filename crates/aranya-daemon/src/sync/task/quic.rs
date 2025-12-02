@@ -7,9 +7,13 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-#[cfg(feature = "preview")]
-use std::time::Duration;
-use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
+use std::{
+    collections::HashMap,
+    convert::Infallible,
+    future::Future,
+    sync::{Arc, OnceLock},
+    time::{Duration, Instant},
+};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -74,6 +78,67 @@ pub(crate) use super::hello::HelloSubscriptions;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
+
+/// Static start time for network logging (initialized on first use).
+/// Uses the test's start time if provided via ARANYA_NETWORK_LOG_START_TIME env var,
+/// otherwise falls back to when the first log is written.
+static NETWORK_LOG_START_TIME: OnceLock<Instant> = OnceLock::new();
+
+/// Writes an action log message to the network log file if configured.
+/// This helps correlate network traffic with test actions.
+/// The log format matches `NetworkLogger::log_action()`:
+/// `# HH:MM:SS.XXXXXX ACTION: <message>`
+fn log_network_action(message: &str) {
+    // Write to a separate daemon actions file to avoid file handle conflicts
+    // The test will merge this into the main log file at the end
+    if let Ok(log_file_path) = std::env::var("ARANYA_NETWORK_LOG_FILE") {
+        // Initialize start time: use test's start time if provided, otherwise use now
+        let start_time = *NETWORK_LOG_START_TIME.get_or_init(|| {
+            if let Ok(start_time_micros) = std::env::var("ARANYA_NETWORK_LOG_START_TIME") {
+                if let Ok(start_micros) = start_time_micros.parse::<u64>() {
+                    // Calculate elapsed time from the test's start time
+                    let now_micros = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_else(|_| Duration::ZERO)
+                        .as_micros() as u64;
+                    let elapsed_micros = now_micros.saturating_sub(start_micros);
+                    // Create an Instant that represents "elapsed_micros ago"
+                    Instant::now() - Duration::from_micros(elapsed_micros)
+                } else {
+                    Instant::now()
+                }
+            } else {
+                Instant::now()
+            }
+        });
+        let elapsed = start_time.elapsed();
+        let secs = elapsed.as_secs();
+        let micros = elapsed.subsec_micros();
+
+        let log_line = format!(
+            "# {:02}:{:02}:{:02}.{:06} ACTION: {}",
+            (secs / 3600) % 24,
+            (secs / 60) % 60,
+            secs % 60,
+            micros,
+            message
+        );
+
+        // Write to a separate daemon actions file
+        let daemon_log_path = format!("{}.daemon_actions", log_file_path);
+        use std::io::Write;
+        let log_line_with_newline = format!("{}\n", log_line);
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&daemon_log_path)
+        {
+            let _ = file.write_all(log_line_with_newline.as_bytes());
+            let _ = file.sync_all();
+            // File handle is closed here when it goes out of scope
+        }
+    }
+}
 
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
@@ -157,6 +222,12 @@ impl SyncState for State {
             .receive_sync_response(&mut recv, &mut sync_requester, id, sink, peer)
             .await
             .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
+
+        // Stream is closed after sync completes, but connection may remain open for reuse
+        log_network_action(&format!(
+            "Sync completed with {}, {} commands received",
+            peer, cmd_count
+        ));
 
         Ok(cmd_count)
     }
@@ -297,6 +368,7 @@ impl Syncer<State> {
         id: GraphId,
     ) -> SyncResult<BidirectionalStream> {
         trace!("client connecting to QUIC sync server");
+        log_network_action(&format!("Setting up QUIC connection to {}", peer));
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
 
@@ -322,6 +394,7 @@ impl Syncer<State> {
             .await?;
 
         trace!("client connected to QUIC sync server");
+        log_network_action(&format!("QUIC connection established to {}", peer));
 
         let open_stream_res = handle
             .open_bidirectional_stream()
@@ -372,6 +445,7 @@ impl Syncer<State> {
         A: Serialize + DeserializeOwned + Clone,
     {
         trace!("client sending sync request to QUIC sync server");
+        log_network_action(&format!("Sending sync request to {}", peer));
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let len = {
@@ -392,6 +466,7 @@ impl Syncer<State> {
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
         trace!("sent sync request");
+        log_network_action(&format!("Sync request sent to {}", peer));
 
         Ok(())
     }
@@ -413,6 +488,7 @@ impl Syncer<State> {
         A: Serialize + DeserializeOwned + Clone,
     {
         trace!("client receiving sync response from QUIC sync server");
+        log_network_action(&format!("Receiving sync response from {}", peer));
 
         let mut recv_buf = Vec::new();
         recv.read_to_end(&mut recv_buf)
@@ -429,6 +505,7 @@ impl Syncer<State> {
         };
         if data.is_empty() {
             trace!("nothing to sync");
+            log_network_action(&format!("Sync response received from {}, 0 commands", peer));
             return Ok(0);
         }
         if let Some(cmds) = syncer.receive(&data)? {
@@ -447,10 +524,16 @@ impl Syncer<State> {
                 aranya
                     .update_heads(id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
                     .context("failed to update cache heads")?;
+                log_network_action(&format!(
+                    "Sync response received from {}, {} commands",
+                    peer,
+                    cmds.len()
+                ));
                 return Ok(cmds.len());
             }
         }
 
+        log_network_action(&format!("Sync response received from {}, 0 commands", peer));
         Ok(0)
     }
 }
@@ -661,6 +744,7 @@ where
             .await
             .context("failed to read sync request")?;
         trace!(n = recv_buf.len(), "received sync request");
+        log_network_action(&format!("Received sync request from {}", peer));
 
         // Generate a sync response for a sync request.
         let sync_response_res =
@@ -670,10 +754,15 @@ where
             Err(err) => {
                 let error = err.report().to_string();
                 error!(%error, "error responding to sync request");
+                log_network_action(&format!(
+                    "Error sending sync response to {}: {}",
+                    peer, error
+                ));
                 SyncResponse::Err(error)
             }
         };
 
+        log_network_action(&format!("Sending sync response to {}", peer));
         let data_len = {
             let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
             let data_len = data.len();
@@ -684,6 +773,17 @@ where
         };
         send.close().await.ok();
         trace!(n = data_len, "server sent sync response");
+        log_network_action(&format!(
+            "Sync response sent to {}, {} bytes",
+            peer, data_len
+        ));
+
+        // Stream is closed, but connection may remain open for reuse
+        // Any remaining QUIC traffic is likely ACKs, flow control, or connection maintenance
+        log_network_action(&format!(
+            "Sync stream closed with {}, connection may remain open for reuse",
+            peer
+        ));
 
         Ok(())
     }

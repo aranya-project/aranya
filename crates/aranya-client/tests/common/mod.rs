@@ -649,6 +649,17 @@ impl NetworkLogger {
         let running = Arc::new(AtomicBool::new(true));
         let start_time = std::time::Instant::now();
 
+        // Set environment variable so daemon can use the same time reference
+        // Convert Instant to SystemTime for serialization
+        let start_time_system = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_micros() as u64;
+        std::env::set_var(
+            "ARANYA_NETWORK_LOG_START_TIME",
+            start_time_system.to_string(),
+        );
+
         // Try to start packet capture
         let capture_handle = match Self::start_capture(
             Arc::clone(&addr_to_name),
@@ -1008,6 +1019,12 @@ impl NetworkLogger {
         let dst_port = u16::from_be_bytes([ip_data[ihl + 2], ip_data[ihl + 3]]);
         let udp_length = u16::from_be_bytes([ip_data[ihl + 4], ip_data[ihl + 5]]);
 
+        // Filter out mDNS/Bonjour traffic (port 53533)
+        const MDNS_PORT: u16 = 53533;
+        if src_port == MDNS_PORT || dst_port == MDNS_PORT {
+            return Ok(()); // Skip mDNS/Bonjour packets
+        }
+
         if count < 10 {
             eprintln!(
                 "[process_packet] Packet #{}: Parsed UDP - src_port={}, dst_port={}, udp_length={}",
@@ -1239,10 +1256,11 @@ impl NetworkLogger {
                                     "[process_packet] Packet #{}: Error syncing log file: {}",
                                     count, e
                                 );
-                            } else {
-                                if count < 10 {
-                                    eprintln!("[process_packet] Packet #{}: Sync succeeded, write complete!", count);
-                                }
+                            } else if count < 10 {
+                                eprintln!(
+                                    "[process_packet] Packet #{}: Sync succeeded, write complete!",
+                                    count
+                                );
                             }
                         }
                     }
