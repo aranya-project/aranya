@@ -2170,7 +2170,7 @@ async fn test_role_owners_query() -> Result<()> {
 
 /// Number of devices for multi-node sync test (1 owner + N-1 members).
 /// Change this value to adjust the number of devices in the test.
-const NUM_DEVICES: usize = 8;
+const NUM_DEVICES: usize = 64;
 
 /// Tests that multiple nodes can sync with the owner.
 /// This test creates NUM_DEVICES nodes (1 owner + NUM_DEVICES-1 members),

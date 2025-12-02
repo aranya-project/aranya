@@ -36,24 +36,24 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-fast-channels = { version = "0.16.0", features = ["alloc"] }
-aranya-afc-util = { version = "0.17.0", features = ["alloc"] }
-aranya-capi-core = { version = "0.6.0" }
-aranya-capi-codegen = { version = "0.5.0" }
-aranya-crypto = { version = "0.12.0", features = ["alloc", "fs-keystore", "clone-aead", "std", "tls"] }
-aranya-crypto-ffi = { version = "0.15.0" }
-aranya-device-ffi = { version = "0.15.0" }
-aranya-envelope-ffi = { version = "0.15.0" }
-aranya-id = { version = "0.2.0" }
-aranya-idam-ffi = { version = "0.15.0" }
-aranya-perspective-ffi = { version = "0.15.0" }
-aranya-policy-compiler = { version = "0.16.0" }
-aranya-policy-ifgen = { version = "0.16.0", features = ["serde"] }
-aranya-policy-ifgen-build = { version = "0.10.0" }
-aranya-policy-lang = { version = "0.9.0" }
-aranya-policy-text = { version = "0.1.3" }
-aranya-policy-vm = { version = "0.15.0", features = ["std"] }
-aranya-runtime = { version = "0.16.0", features = ["std", "libc"] }
+aranya-fast-channels = { path = "../aranya-core/crates/aranya-fast-channels", features = ["alloc"] }
+aranya-afc-util = { path = "../aranya-core/crates/aranya-afc-util", features = ["alloc"] }
+aranya-capi-core = { path = "../aranya-core/crates/aranya-capi-core" }
+aranya-capi-codegen = { path = "../aranya-core/crates/aranya-capi-codegen" }
+aranya-crypto = { path = "../aranya-core/crates/aranya-crypto", features = ["alloc", "fs-keystore", "clone-aead", "std", "tls"] }
+aranya-crypto-ffi = { path = "../aranya-core/crates/aranya-crypto-ffi" }
+aranya-device-ffi = { path = "../aranya-core/crates/aranya-device-ffi" }
+aranya-envelope-ffi = { path = "../aranya-core/crates/aranya-envelope-ffi" }
+aranya-id = { path = "../aranya-core/crates/aranya-id" }
+aranya-idam-ffi = { path = "../aranya-core/crates/aranya-idam-ffi" }
+aranya-perspective-ffi = { path = "../aranya-core/crates/aranya-perspective-ffi" }
+aranya-policy-compiler = { path = "../aranya-core/crates/aranya-policy-compiler" }
+aranya-policy-ifgen = { path = "../aranya-core/crates/aranya-policy-ifgen", features = ["serde"] }
+aranya-policy-ifgen-build = { path = "../aranya-core/crates/aranya-policy-ifgen-build" }
+aranya-policy-lang = { path = "../aranya-core/crates/aranya-policy-lang" }
+aranya-policy-text = { path = "../aranya-core/crates/aranya-policy-text" }
+aranya-policy-vm = { path = "../aranya-core/crates/aranya-policy-vm", features = ["std"] }
+aranya-runtime = { path = "../aranya-core/crates/aranya-runtime", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
 spideroak-base58 = { version = "0.2.0" }
