@@ -11,21 +11,7 @@
 #endif
 
 #include "aranya-client.h"
-
-/* Client structure for testing */
-typedef struct {
-    char name[64];
-    AranyaClient client;
-    AranyaDeviceId id;
-    uint8_t *pk;
-    size_t pk_len;
-} Client;
-
-/* Team structure for testing */
-typedef struct {
-    AranyaTeamId id;
-    Client owner;
-} Team;
+#include "utils.h"
 
 /* Utility: millisecond sleep */
 static void sleep_ms(unsigned int ms) {

@@ -11,54 +11,15 @@
 #endif
 
 #include "aranya-client.h"
+#include "utils.h"
 
-/* Client structure for testing */
-typedef struct {
-    char name[64];
-    AranyaClient client;
-    AranyaDeviceId id;
-    uint8_t *pk;
-    size_t pk_len;
-} Client;
-
-/* Team structure for testing */
-typedef struct {
-    AranyaTeamId id;
-    Client owner;
-    Client member1;
-    Client member2;
-    AranyaSeedIkm team_ikm;
-} Team;
-
-/* Utility: millisecond sleep */
-static void sleep_ms(unsigned int ms) {
-    usleep(ms * 1000);
-}
-
-/* Globals for per-daemon client connection and sync addresses */
-static char g_owner_uds[128] = {0};
-static char g_member1_uds[128] = {0};
-static char g_member2_uds[128] = {0};
-static char g_owner_sync_addr[64] = {0};
-static char g_member1_sync_addr[64] = {0};
-static char g_member2_sync_addr[64] = {0};
-
-/* Utility: spawn daemon process at run_dir with custom settings */
-static pid_t spawn_daemon_at(const char *daemon_path,
-                             const char *run_dir,
-                             const char *name,
-                             const char *shm_path,
-                             uint16_t sync_port) {
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s && mkdir -p %s/state %s/cache %s/logs %s/config", run_dir, run_dir, run_dir, run_dir, run_dir);
-    system(cmd);
-    
-    char cfg_path[256];
-    snprintf(cfg_path, sizeof(cfg_path), "%s/daemon.toml", run_dir);
+/* Helper: write daemon config to given FILE stream */
+static void print_daemon_info(const char *cfg_path, const char *name, const char *run_dir,
+                             const char *shm_path, uint16_t sync_port) {
     FILE *f = fopen(cfg_path, "w");
     if (!f) {
-        fprintf(stderr, "Failed to create daemon config\n");
-        return -1;
+        fprintf(stderr, "Failed to create daemon config: %s\n", cfg_path);
+        return;
     }
     fprintf(f, "name = \"%s\"\n", name);
     fprintf(f, "runtime_dir = \"%s\"\n", run_dir);
@@ -76,6 +37,35 @@ static pid_t spawn_daemon_at(const char *daemon_path,
     fprintf(f, "enable = true\n");
     fprintf(f, "addr = \"127.0.0.1:%u\"\n", (unsigned)sync_port);
     fclose(f);
+}
+
+/* Utility: millisecond sleep */
+static void sleep_ms(unsigned int ms) {
+    usleep(ms * 1000);
+}
+
+/* Globals for per-daemon client connection and sync addresses.
+    Use static defaults so tests run reproducibly without runtime snprintfs. */
+static const char g_owner_uds[128] = "/tmp/afc-run-owner/uds.sock";
+static const char g_member1_uds[128] = "/tmp/afc-run-member1/uds.sock";
+static const char g_member2_uds[128] = "/tmp/afc-run-member2/uds.sock";
+static const char g_owner_sync_addr[64] = "127.0.0.1:41001";
+static const char g_member1_sync_addr[64] = "127.0.0.1:41002";
+static const char g_member2_sync_addr[64] = "127.0.0.1:41003";
+
+/* Utility: spawn daemon process at run_dir with custom settings */
+static pid_t spawn_daemon_at(const char *daemon_path,
+                             const char *run_dir,
+                             const char *name,
+                             const char *shm_path,
+                             uint16_t sync_port) {
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "rm -rf %s && mkdir -p %s/state %s/cache %s/logs %s/config", run_dir, run_dir, run_dir, run_dir, run_dir);
+    system(cmd);
+    
+    char cfg_path[256];
+    snprintf(cfg_path, sizeof(cfg_path), "%s/daemon.toml", run_dir);
+    print_daemon_info(cfg_path, name, run_dir, shm_path, sync_port);
     
     pid_t pid = fork();
     if (pid == 0) {
@@ -776,24 +766,15 @@ int main(int argc, const char *argv[]) {
 
     if (argc == 2) {
         const char *daemon_path = argv[1];
-        /* Use /tmp for shorter paths to avoid UDS path length limits */
-        /* Prepare owner daemon */
-        snprintf(g_owner_uds, sizeof(g_owner_uds), "%s", "/tmp/afc-run-owner/uds.sock");
-        snprintf(g_owner_sync_addr, sizeof(g_owner_sync_addr), "%s", "127.0.0.1:41001");
+        /* Using static defaults for UDS and sync addresses; spawn daemons */
         printf("Spawning owner daemon: %s\n", daemon_path);
         owner_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-owner", "test-daemon-owner", "/afc-owner", 41001);
         printf("Owner Daemon PID: %d\n", owner_pid);
 
-        /* Prepare member1 daemon */
-        snprintf(g_member1_uds, sizeof(g_member1_uds), "%s", "/tmp/afc-run-member1/uds.sock");
-        snprintf(g_member1_sync_addr, sizeof(g_member1_sync_addr), "%s", "127.0.0.1:41002");
         printf("Spawning member1 daemon: %s\n", daemon_path);
         member1_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-member1", "test-daemon-member1", "/afc-member1", 41002);
         printf("Member1 Daemon PID: %d\n", member1_pid);
 
-        /* Prepare member2 daemon */
-        snprintf(g_member2_uds, sizeof(g_member2_uds), "%s", "/tmp/afc-run-member2/uds.sock");
-        snprintf(g_member2_sync_addr, sizeof(g_member2_sync_addr), "%s", "127.0.0.1:41003");
         printf("Spawning member2 daemon: %s\n", daemon_path);
         member2_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-member2", "test-daemon-member2", "/afc-member2", 41003);
         printf("Member2 Daemon PID: %d\n", member2_pid);

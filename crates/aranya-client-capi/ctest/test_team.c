@@ -14,6 +14,7 @@
 #endif
 
 #include "aranya-client.h"
+#include "utils.h"
 
 /* Report test result */
 static void report(const char *name, int ok, int *fails) {
@@ -22,9 +23,9 @@ static void report(const char *name, int ok, int *fails) {
 }
 
 /* Global daemon socket paths */
-static char g_owner_uds[256];
-static char g_member_uds[256];
-static char g_device_uds[256];
+static const char g_owner_uds[256] = "/tmp/team-run-owner/uds.sock";
+static const char g_member_uds[256] = "/tmp/team-run-member/uds.sock";
+static const char g_device_uds[256] = "/tmp/team-run-device/uds.sock";
 
 /* Spawn daemon process at specific location with unique configuration */
 static pid_t spawn_daemon_at(const char *daemon_path,
@@ -76,21 +77,6 @@ static void sleep_ms(long ms) {
     ts.tv_nsec = (ms % 1000) * 1000000;
     nanosleep(&ts, NULL);
 }
-
-/* Client data structure */
-typedef struct {
-    const char* name;
-    AranyaClient client;
-    uint8_t* pk;
-    size_t pk_len;
-    AranyaDeviceId id;
-} Client;
-
-/* Team data structure */
-typedef struct {
-    AranyaTeamId id;
-    Client owner;
-} Team;
 
 /* Initialize a client (following example.c pattern) */
 static AranyaError init_client(Client* c, const char* name, const char* daemon_addr, const char* aqc_addr) {
@@ -994,19 +980,16 @@ int main(int argc, const char *argv[]) {
         
         /* Use /tmp for shorter paths to avoid UDS path length limits */
         /* Prepare owner daemon */
-        snprintf(g_owner_uds, sizeof(g_owner_uds), "%s", "/tmp/team-run-owner/uds.sock");
         printf("Spawning owner daemon: %s\n", daemon_path);
         owner_pid = spawn_daemon_at(daemon_path, "/tmp/team-run-owner", "test-team-owner", "/team-owner", 41001);
         printf("Owner Daemon PID: %d\n", owner_pid);
 
         /* Prepare member daemon */
-        snprintf(g_member_uds, sizeof(g_member_uds), "%s", "/tmp/team-run-member/uds.sock");
         printf("Spawning member daemon: %s\n", daemon_path);
         member_pid = spawn_daemon_at(daemon_path, "/tmp/team-run-member", "test-team-member", "/team-member", 41002);
         printf("Member Daemon PID: %d\n", member_pid);
 
         /* Prepare device daemon */
-        snprintf(g_device_uds, sizeof(g_device_uds), "%s", "/tmp/team-run-device/uds.sock");
         printf("Spawning device daemon: %s\n", daemon_path);
         device_pid = spawn_daemon_at(daemon_path, "/tmp/team-run-device", "test-team-device", "/team-device", 41003);
         printf("Device Daemon PID: %d\n", device_pid);

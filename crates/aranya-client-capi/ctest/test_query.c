@@ -5,27 +5,14 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 #ifndef ENABLE_ARANYA_PREVIEW
 # define ENABLE_ARANYA_PREVIEW 1
 #endif
 
 #include "aranya-client.h"
-
-/* Client structure for testing */
-typedef struct {
-    char name[64];
-    AranyaClient client;
-    AranyaDeviceId id;
-    uint8_t *pk;
-    size_t pk_len;
-} Client;
-
-/* Team structure for testing */
-typedef struct {
-    AranyaTeamId id;
-    Client owner;
-} Team;
+#include "utils.h"
 
 /* Utility: millisecond sleep */
 static void sleep_ms(unsigned int ms) {
@@ -74,8 +61,9 @@ static pid_t spawn_daemon(const char *daemon_path) {
 }
 
 /* Initialize a client */
-static AranyaError init_client(Client *c, const char *daemon_addr) {
+static AranyaError init_client(Client *c, const char* name, const char *daemon_addr) {
     AranyaError err;
+    c->name = name;
     
     /* Build AQC config */
     AranyaAqcConfigBuilder aqc_builder;
@@ -155,9 +143,8 @@ static AranyaError init_client(Client *c, const char *daemon_addr) {
 static AranyaError init_team(Team *t) {
     Client *owner = &t->owner;
     memset(owner, 0, sizeof(Client));
-    strncpy(owner->name, "Owner", sizeof(owner->name) - 1);
     
-    AranyaError err = init_client(owner, "run/uds.sock");
+    AranyaError err = init_client(owner, "owner", "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
@@ -227,9 +214,8 @@ static int test_query_devices_on_team(void) {
     /* Create a second device and add it */
     Client device;
     memset(&device, 0, sizeof(Client));
-    strncpy(device.name, "Device", sizeof(device.name) - 1);
     
-    err = init_client(&device, "run/uds.sock");
+    err = init_client(&device, "Device", "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init device: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);
@@ -366,7 +352,7 @@ static int test_query_labels(void) {
     printf("  ✓ Found %zu label(s)\n", labels_len);
     
     /* Check if label exists */
-    int exists = 0;
+    bool exists = false;
     err = aranya_query_label_exists(&team.owner.client, &team.id, &label_id, &exists);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to query label exists: %s\n", aranya_error_to_str(err));
@@ -400,9 +386,8 @@ static int test_query_device_label_assignments(void) {
     /* Create a device */
     Client device;
     memset(&device, 0, sizeof(Client));
-    strncpy(device.name, "Device", sizeof(device.name) - 1);
     
-    err = init_client(&device, "run/uds.sock");
+    err = init_client(&device, "Device", "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init device: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);

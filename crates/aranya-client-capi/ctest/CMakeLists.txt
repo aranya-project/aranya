@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 project(capi-ctest LANGUAGES C)
 
 # --- Custom: Copy Rust build artifacts and header for C API tests ---
-set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug")
+set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../target/debug")
 set(RUST_HEADER_GLOB "${RUST_TARGET_DIR}/build/aranya-client-capi-*/out/aranya-client.h")
 file(GLOB ARANYA_HEADER_PATH RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" ${RUST_HEADER_GLOB})
 set(CTEST_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -21,50 +21,65 @@ add_custom_target(build_aranya_daemon ALL
     COMMENT "Building aranya-daemon with cargo"
 )
 
-# Copy aranya-client.h header
-add_custom_command(
-    OUTPUT ${CTEST_INCLUDE_DIR}/aranya-client.h
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_INCLUDE_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RUST_HEADER_GLOB} ${CTEST_INCLUDE_DIR}/aranya-client.h
-    DEPENDS build_aranya_client_capi
-    COMMENT "Copying aranya-client.h to ctest/include/"
-)
+# --- Header generation/copy ---
+# Prefer to generate the header with cbindgen if available; otherwise copy
+# the generated header from the Rust build output. Both variants depend on
+# the Rust crate build to ensure the generated file exists.
+find_program(CBINDGEN_EXECUTABLE cbindgen)
+if(NOT CBINDGEN_EXECUTABLE)
+    message(WARNING "cbindgen not found in PATH. Header generation target will fall back to copying the generated header from the Rust build output. Install cbindgen (https://github.com/cbindgen/cbindgen) for automatic header generation.")
+endif()
 
-# Copy libaranya_client_capi.dylib (macOS) or .so (Linux)
-set(ARANYA_LIB_DYLIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
-set(ARANYA_LIB_SO "${RUST_TARGET_DIR}/libaranya_client_capi.so")
-add_custom_command(
-    OUTPUT ${CTEST_LIB_DIR}/libaranya_client_capi.dylib
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_LIB_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ARANYA_LIB_DYLIB} ${CTEST_LIB_DIR}/libaranya_client_capi.dylib
-    DEPENDS build_aranya_client_capi
-    COMMENT "Copying libaranya_client_capi.dylib to ctest/lib/"
-)
-add_custom_command(
-    OUTPUT ${CTEST_LIB_DIR}/libaranya_client_capi.so
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_LIB_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ARANYA_LIB_SO} ${CTEST_LIB_DIR}/libaranya_client_capi.so
-    DEPENDS build_aranya_client_capi
-    COMMENT "Copying libaranya_client_capi.so to ctest/lib/"
-)
+if(CBINDGEN_EXECUTABLE)
+    add_custom_command(
+        OUTPUT ${CTEST_INCLUDE_DIR}/aranya-client.h
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_INCLUDE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env RUSTC_BOOTSTRAP=1 _CBINDGEN_IS_RUNNING=1 ${CBINDGEN_EXECUTABLE} --config ${CMAKE_CURRENT_SOURCE_DIR}/../cbindgen.toml --crate aranya-client-capi --output ${CTEST_INCLUDE_DIR}/aranya-client.h
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        COMMENT "Generating aranya-client.h with cbindgen (RUSTC_BOOTSTRAP=1, _CBINDGEN_IS_RUNNING=1)"
+        VERBATIM
+        DEPENDS build_aranya_client_capi
+    )
+else()
+    add_custom_command(
+        OUTPUT ${CTEST_INCLUDE_DIR}/aranya-client.h
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_INCLUDE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RUST_HEADER_GLOB} ${CTEST_INCLUDE_DIR}/aranya-client.h
+        COMMENT "Copying generated aranya-client.h from Rust build output"
+        DEPENDS build_aranya_client_capi
+    )
+endif()
 
-# Copy aranya-daemon binary
+# Logical target for header generation
+add_custom_target(generate_aranya_header
+    DEPENDS ${CTEST_INCLUDE_DIR}/aranya-client.h
+)
+add_dependencies(generate_aranya_header build_aranya_client_capi)
+
+# Copy library and daemon artifacts into ctest/ if they exist. Use guarded
+# shell-copy commands so missing files won't cause the build to fail. The
+# copy target depends on the Rust build targets and header generation so
+# those are executed first; the copy commands themselves check existence at
+# runtime and skip when the source is not present.
+set(ARANYA_LIB1 "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
+set(ARANYA_LIB_SO "${RUST_TARGET_DIR}/libaranya_client.so")
 set(ARANYA_DAEMON_BIN "${RUST_TARGET_DIR}/aranya-daemon")
-add_custom_command(
-    OUTPUT ${CTEST_EXEC_DIR}/aranya-daemon
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_EXEC_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ARANYA_DAEMON_BIN} ${CTEST_EXEC_DIR}/aranya-daemon
-    DEPENDS build_aranya_daemon
-    COMMENT "Copying aranya-daemon to ctest/exec/"
+
+add_custom_target(copy_aranya_artifacts ALL
+    DEPENDS generate_aranya_header build_aranya_client_capi build_aranya_daemon
+    COMMENT "Staging aranya C API header, libs and daemon into ctest/"
 )
 
-# Add a custom target to perform all copies
-add_custom_target(copy_aranya_artifacts ALL
-    DEPENDS
-        ${CTEST_INCLUDE_DIR}/aranya-client.h
-        ${CTEST_LIB_DIR}/libaranya_client_capi.dylib
-        ${CTEST_LIB_DIR}/libaranya_client_capi.so
-        ${CTEST_EXEC_DIR}/aranya-daemon
+add_custom_command(TARGET copy_aranya_artifacts POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_LIB_DIR}
+    # Try to copy header from crate output if present (fallback when cbindgen
+    # wrote to `crates/aranya-client-capi/output/aranya-client.h`).
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_INCLUDE_DIR}
+    COMMAND /bin/sh -c '[ -f "${CMAKE_CURRENT_SOURCE_DIR}/../output/aranya-client.h" ] && cp -p "${CMAKE_CURRENT_SOURCE_DIR}/../output/aranya-client.h" "${CTEST_INCLUDE_DIR}/aranya-client.h" || echo "Skipping header copy: output/aranya-client.h not found"'
+    COMMAND /bin/sh -c '[ -f "${ARANYA_LIB1}" ] && cp -p "${ARANYA_LIB1}" "${CTEST_LIB_DIR}/libaranya_client_capi.dylib" || echo "Skipping copy: ${ARANYA_LIB1} not found or copy failed"'
+    COMMAND /bin/sh -c '[ -f "${ARANYA_LIB_SO}" ] && cp -p "${ARANYA_LIB_SO}" "${CTEST_LIB_DIR}/libaranya_client.so" || echo "Skipping copy: ${ARANYA_LIB_SO} not found or copy failed"'
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_EXEC_DIR}
+    COMMAND /bin/sh -c '[ -f "${ARANYA_DAEMON_BIN}" ] && ( cp -p "${ARANYA_DAEMON_BIN}" "${CTEST_EXEC_DIR}/aranya-daemon" && chmod +x "${CTEST_EXEC_DIR}/aranya-daemon" ) || echo "Skipping copy: ${ARANYA_DAEMON_BIN} not found or copy failed"'
 )
 
 # Enforce building only under ctest/build
@@ -88,14 +103,17 @@ set(TEST_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# Ensure header exists (fail early with a clear message).
+# Ensure header exists. If missing, do NOT fail configure; warn and
+# rely on the build step to run `cargo build` and copy the header.
 set(EXPECTED_HEADER "${TEST_HEADER_DIR}/aranya-client.h")
 if(NOT EXISTS "${EXPECTED_HEADER}")
-    message(FATAL_ERROR "Expected C header not found: ${EXPECTED_HEADER}\nBuild the aranya-client-capi crate and copy the generated header to ${TEST_HEADER_DIR}/")
+    message(WARNING "Expected C header not found: ${EXPECTED_HEADER}\nThe header will be generated and copied when you run 'cmake --build .' (the build runs cargo and the copy targets).\nIf you prefer to generate it manually, run: 'cargo build -p aranya-client-capi --features afc,aqc,experimental,preview' and copy the generated header to ${TEST_HEADER_DIR}/")
 endif()
 
 # Path to Rust build artifacts (adjust to release if you prefer)
-set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug")
+# ctest lives at crates/aranya-client-capi/ctest, so go up three levels
+# to reach the workspace root `target/debug` directory.
+set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../target/debug")
 
 # Allow using a local lib copy under ctest/lib/ (useful when the generated
 # header and a copy of the dylib are placed inside the ctest dir for tests).
@@ -104,20 +122,21 @@ set(LOCAL_LIB_DYLIB2 "${CMAKE_CURRENT_SOURCE_DIR}/lib/libaranya_client_capi.dyli
 
 
 # Try common library names produced by the crate build.
+
 set(ARANYA_LIB_DYLIB1 "${RUST_TARGET_DIR}/libaranya_client.dylib")
 set(ARANYA_LIB_DYLIB2 "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
 set(ARANYA_LIB_A     "${RUST_TARGET_DIR}/libaranya_client.a")
 
 set(ARANYA_LIB "")
 # Prefer a local copy inside ctest/lib/ if present
-if(EXISTS "${LOCAL_LIB_DYLIB1}")
-    set(ARANYA_LIB "${LOCAL_LIB_DYLIB1}")
-elseif(EXISTS "${LOCAL_LIB_DYLIB2}")
+if(EXISTS "${LOCAL_LIB_DYLIB2}")
     set(ARANYA_LIB "${LOCAL_LIB_DYLIB2}")
-elseif(EXISTS "${ARANYA_LIB_DYLIB1}")
-    set(ARANYA_LIB "${ARANYA_LIB_DYLIB1}")
+elseif(EXISTS "${LOCAL_LIB_DYLIB1}")
+    set(ARANYA_LIB "${LOCAL_LIB_DYLIB1}")
 elseif(EXISTS "${ARANYA_LIB_DYLIB2}")
     set(ARANYA_LIB "${ARANYA_LIB_DYLIB2}")
+elseif(EXISTS "${ARANYA_LIB_DYLIB1}")
+    set(ARANYA_LIB "${ARANYA_LIB_DYLIB1}")
 elseif(EXISTS "${ARANYA_LIB_A}")
     set(ARANYA_LIB "${ARANYA_LIB_A}")
 else()
@@ -129,6 +148,9 @@ add_executable(TestSimple test_simple.c)
 target_include_directories(TestSimple PRIVATE ${TEST_INCLUDE_DIRS})
 # opt into preview APIs required by generated header
 target_compile_definitions(TestSimple PRIVATE ENABLE_ARANYA_PREVIEW=1)
+
+# Ensure test executables are built after artifacts (header/lib/daemon) are staged
+add_dependencies(TestSimple copy_aranya_artifacts)
 
 if(ARANYA_LIB)
     target_link_libraries(TestSimple PRIVATE "${ARANYA_LIB}")
@@ -154,9 +176,9 @@ endif()
 
 # Register TestSimple test only if daemon was found
 if(ARANYA_DAEMON)
-    add_test(NAME TestSimple COMMAND TestSimple)
+    add_test(NAME TestSimple COMMAND TestSimple "${ARANYA_DAEMON}")
     set_tests_properties(TestSimple PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
 else()
     message(STATUS "Skipping TestSimple registration (daemon not found)")
@@ -175,6 +197,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_afc.c")
         endif()
     endif()
 
+    add_dependencies(TestAfc copy_aranya_artifacts)
+
     # Register TestAfc test with daemon path if daemon is found
     if(ARANYA_DAEMON)
         add_test(NAME TestAfc COMMAND TestAfc "${ARANYA_DAEMON}")
@@ -183,7 +207,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_afc.c")
     endif()
     
     set_tests_properties(TestAfc PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
         TIMEOUT 60
     )
 endif()
@@ -209,8 +233,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_team.c")
     endif()
     
     set_tests_properties(TestTeam PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
+    add_dependencies(TestTeam copy_aranya_artifacts)
 endif()
 
 # Optional Sync test executable if the source exists
@@ -228,8 +253,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_sync.c")
 
     add_test(NAME TestSync COMMAND TestSync "${ARANYA_DAEMON}")
     set_tests_properties(TestSync PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
+    add_dependencies(TestSync copy_aranya_artifacts)
 endif()
 
 # Optional DataTypes test executable if the source exists
@@ -247,8 +273,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_datatypes.c")
 
     add_test(NAME TestDataTypes COMMAND TestDataTypes)
     set_tests_properties(TestDataTypes PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
+    add_dependencies(TestDataTypes copy_aranya_artifacts)
 endif()
 
 # Optional Client test executable if the source exists
@@ -272,8 +299,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_client.c")
     endif()
     
     set_tests_properties(TestClient PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
+    add_dependencies(TestClient copy_aranya_artifacts)
 endif()
 
 # Optional Query test executable if the source exists
@@ -297,6 +325,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_query.c")
     endif()
     
     set_tests_properties(TestQuery PROPERTIES
-        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
+    add_dependencies(TestQuery copy_aranya_artifacts)
 endif()
