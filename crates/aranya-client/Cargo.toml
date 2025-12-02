@@ -14,7 +14,10 @@ workspace = true
 
 
 [features]
-default = []
+default = [
+    "afc",
+    "aranya-daemon-api/default",
+]
 
 # Enable debugging.
 debug = []
@@ -26,32 +29,31 @@ afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 
 # Experimental features
 experimental = ["aranya-daemon-api/experimental"]
-# Aranya QUIC channels
-aqc = ["aranya-daemon-api/aqc"]
 
 
 [dependencies]
-aranya-daemon-api = { workspace = true }
+aranya-daemon-api = { workspace = true, default-features = false }
 aranya-fast-channels = { workspace = true, optional = true }
+aranya-policy-text = { workspace = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
 aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
-bytes = { workspace = true }
-futures-lite = { workspace = true }
+derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
-s2n-quic = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
 tracing = { workspace = true }
 
 
 [dev-dependencies]
-aranya-daemon = { path = "../aranya-daemon", features = ["aqc", "afc", "experimental", "preview"] }
+aranya-client = { path = ".", features = ["preview"] }
+aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview"] }
+spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
 serial_test = { workspace = true }

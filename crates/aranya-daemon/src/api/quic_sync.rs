@@ -64,7 +64,7 @@ impl Api {
                         .context("missing enc_sk in add_team")?
                 };
 
-                let group = GroupId::from(team.into_id());
+                let group = GroupId::transmute(team);
                 let seed = enc_sk
                     .open_psk_seed(
                         &wrapped.encap_key,

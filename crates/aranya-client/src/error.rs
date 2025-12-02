@@ -27,14 +27,9 @@ pub enum Error {
     #[error("configuration error")]
     Config(#[from] ConfigError),
 
-    /// An Aranya QUIC Channel error happened.
-    #[cfg(feature = "aqc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-    #[error("AQC error")]
-    Aqc(#[from] AqcError),
-
     /// An Aranya Fast Channel error happened.
     #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     #[error("AFC error")]
     Afc(#[from] AfcError),
 
@@ -45,6 +40,12 @@ pub enum Error {
     /// Some other error occurred.
     #[error(transparent)]
     Other(#[from] OtherError),
+}
+
+impl From<core::convert::Infallible> for Error {
+    fn from(value: core::convert::Infallible) -> Self {
+        match value {}
+    }
 }
 
 /// Some other error occurred.
@@ -118,65 +119,4 @@ pub(crate) enum IpcRepr {
     Io(#[from] io::Error),
     Tarpc(#[from] RpcError),
     Other(#[from] anyhow::Error),
-}
-
-/// Possible errors that could happen when using Aranya QUIC Channels.
-#[cfg(feature = "aqc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum AqcError {
-    /// The server connection was terminated.
-    #[error("the server connection was terminated")]
-    ServerConnectionTerminated,
-
-    /// No channel info found.
-    #[error("no channel info found")]
-    NoChannelInfoFound,
-
-    /// The connection was closed.
-    #[error("the connection was closed")]
-    ConnectionClosed,
-
-    /// A connection error.
-    #[error(transparent)]
-    ConnectionError(#[from] s2n_quic::connection::Error),
-
-    /// A stream error.
-    #[error(transparent)]
-    StreamError(#[from] s2n_quic::stream::Error),
-
-    /// Failed to resolve address.
-    #[error("failed to resolve address")]
-    AddrResolution(io::Error),
-
-    /// Endpoint start error.
-    #[error("failed to start the client or server endpoint")]
-    EndpointStart(#[from] s2n_quic::provider::StartError),
-
-    /// Error parsing control message.
-    #[error("failed to parse control message")]
-    InvalidCtrlMessage(postcard::Error),
-
-    /// Peer could not process control message.
-    #[error("peer could not process control message")]
-    PeerCtrl,
-
-    /// An internal bug was discovered.
-    #[error(transparent)]
-    Bug(#[from] buggy::Bug),
-}
-
-#[cfg(feature = "aqc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-impl From<core::convert::Infallible> for AqcError {
-    fn from(value: core::convert::Infallible) -> Self {
-        match value {}
-    }
-}
-
-#[cfg(feature = "aqc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "aqc")))]
-pub(crate) fn no_addr() -> AqcError {
-    AqcError::AddrResolution(io::Error::new(io::ErrorKind::NotFound, "no address found"))
 }
