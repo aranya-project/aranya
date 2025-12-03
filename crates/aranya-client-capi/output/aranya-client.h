@@ -374,7 +374,6 @@ typedef uint8_t AranyaChanOp;
  * *         // `buf` now holds the detailed error message
  * *     }
  * * ──────────────────────────────────────────────────────────────────────────────
- * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
     /**
