@@ -691,7 +691,7 @@ ephemeral command QueryDeviceKeyBundle {
 ### Overview
 
 Each object in Aranya's RBAC system has a rank associated with its Aranya ID.
-The highest rank is 0 while the lowest rank is MAX_U32.
+The highest rank is MAX_U32 while the lowest rank is 0.
 Objects with higher rank are allowed to operate on objects with a lower rank.
 For example, a command author with rank 10 would a be allowed to assign a label of rank 5 to a device of rank 4 because both of the objects it is operating on are lower rank than the author of the command.
 
@@ -722,6 +722,21 @@ function author_outranks_target(author_id id, target_id id) bool {
 
     return author_rank > target_rank
 }
+
+function get_object_rank(object_id id) int {
+    let rank = check_unwrap Rank[object_id: object_id]
+
+    return rank.rank
+}
+
+function set_object_rank(object_id id, rank int) {
+    if exists Rank[object_id: object_id] {
+        let old_rank = Rank[object_id: object_id]
+        update Rank[object_id: object_id]=>{rank: old_rank} to {rank: this.rank}
+    } else {
+        create Rank[object_id: object_id]=>{rank: this.rank}
+    }    
+}
 ```
 
 ### Setting Rank
@@ -729,17 +744,63 @@ function author_outranks_target(author_id id, target_id id) bool {
 An object may have zero or one rank associated with it.
 
 ```policy
-action set_rank(target_id id, rank int) {
-
+action set_rank(object_id id, rank int) {
+    publish SetRank {
+        object_id: object_id,
+        rank: rank,
+    }
 }
 
 effect RankSet {
-
+    // The ID of the object rank was set on.
+    object_id id,
+    // The rank set on the object.
+    rank int,
 }
 
 command SetRank {
+    attributes {
+        priority: 100
+    }
+
+    fields {
+        // The ID of the object to set the rank on.
+        object_id id,
+        // The rank to associate with the object.
+        rank int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+
+        // Devices cannot set rank on themselves.
+        check author.device_id != this.object_id
+
+        // The author device must outrank the target object.
+        // If this succeeds, it implies the target object exists.
+        check author_outranks_target(author.device_id, this.object_id)
+
+        // The author must have permission to set rank.
+        check device_has_simple_perm(author.device_id, SimplePerm::SetRank)
+
+        finish {
+            set_object_rank(this.object_id, this.rank)
+
+            emit RankSet {
+                object_id: this.object_id,
+                rank: this.rank,
+            }
+        }
+    }
 
 }
+
+// TODO: separate ChangeRank command?
 ```
 
 ## Roles and Permissions
@@ -1839,6 +1900,8 @@ struct RoleInfo {
     author_id id,
     // The ID of the initial role owner.
     owning_role_id id,
+    // The rank of the role object.
+    rank int,
     // Is this a default role?
     default bool,
 }
@@ -1879,6 +1942,7 @@ finish function create_role_facts(role struct RoleInfo) {
         target_role_id: role.role_id,
         managing_role_id: role.owning_role_id,
     ]=>{}
+    set_object_rank(role.role_id, role.rank)
 }
 
 // Emitted when a role is created.
@@ -1943,11 +2007,14 @@ command CreateRole {
 
         let role_id = derive_role_id(envelope)
 
+        let rank = get_object_rank(author.device_id) - 1
+
         let role_info = RoleInfo {
             role_id: role_id,
             name: this.role_name,
             author_id: author.device_id,
             owning_role_id: this.owning_role_id,
+            rank: rank,
             default: false,
         }
         let role_created = role_info as RoleCreated
@@ -2055,6 +2122,7 @@ command SetupDefaultRole {
                         name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
+                        rank: 800,
                         default: true,
                     })
 
@@ -2089,6 +2157,7 @@ command SetupDefaultRole {
                         name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
+                        rank: 700,
                         default: true,
                     })
 
@@ -2117,6 +2186,7 @@ command SetupDefaultRole {
                         name: name,
                         author_id: author.device_id,
                         owning_role_id: this.owning_role_id,
+                        rank: 600,
                         default: true,
                     })
 
@@ -2897,6 +2967,9 @@ command CreateTeam {
         // device keys.
         check author_id == owner_key_ids.device_id
 
+        // Set the object rank of the owner device.
+        set_object_rank(author_id, MAX_U32)
+
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
@@ -2914,6 +2987,7 @@ command CreateTeam {
                 // Initially, only the owner role can manage the
                 // owner role.
                 owning_role_id: owner_role_id,
+                rank: 900,
                 default: true,
             })
 
