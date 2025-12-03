@@ -3030,6 +3030,7 @@ command CreateTeam {
 
             // Assign all of the administrative permissions to
             // the owner role.
+            assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
             assign_perm_to_role(owner_role_id, SimplePerm::AddDevice)
             assign_perm_to_role(owner_role_id, SimplePerm::RemoveDevice)
 
