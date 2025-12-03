@@ -722,7 +722,13 @@ function author_outranks_target(author_id id, target_id id) bool {
 
     return author_rank > target_rank
 }
+```
 
+### Rank Getters/Setters
+
+Utility methods for getting/setting rank values on objects.
+
+```policy
 // Get the rank of an object.
 function get_object_rank(object_id id) int {
     let rank = check_unwrap Rank[object_id: object_id]
@@ -746,7 +752,7 @@ function unset_object_rank(object_id id) {
 }
 ```
 
-### Setting Rank
+### Setting Rank Command
 
 An object may have zero or one rank associated with it.
 
