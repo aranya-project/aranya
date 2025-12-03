@@ -715,7 +715,7 @@ Utility method for checking object ranks before allowing operations to be perfor
 // # Caveats
 //
 // - It does NOT check whether the command author has permission to perform the operation.
-// - A check failure will occur if either the author or target object do not have a rank assigned to them.
+// - A check failure will occur if either the author or target object do not have a rank associated with them.
 function author_outranks_target(author_id id, target_id id) bool {
     let author_rank = check_unwrap query Rank[author_id]
     let target_rank = check_unwrap query Rank[target_id]
@@ -795,7 +795,6 @@ command SetRank {
         check author.device_id != this.object_id
 
         // The author device must outrank the target object.
-        // If this succeeds, it implies the target object exists.
         check author_outranks_target(author.device_id, this.object_id)
 
         // The author must have permission to set rank.
@@ -1109,6 +1108,10 @@ command AddPermToRole {
 
         let author = get_author(envelope)
         check can_change_role_perms(author.device_id, this.role_id)
+
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.role_id)
+
         // We should not grant permissions we do not have
         check device_has_simple_perm(author.device_id, this.perm)
 
@@ -1174,6 +1177,8 @@ command RemovePermFromRole {
         // the author is allowed to change the role's permissions.
         check can_change_role_perms(author.device_id, this.role_id)
 
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.role_id)
 
         // It is an error to remove a permission not assigned to
         // the role.
@@ -2267,6 +2272,9 @@ command DeleteRole {
         // The author must have the permission to delete a role
         check device_has_simple_perm(author.device_id, SimplePerm::DeleteRole)
 
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.role_id)
+
         // The role must exists
         check exists Role[role_id: this.role_id]
         // The role must not be assigned to any devices
@@ -2496,6 +2504,10 @@ command AssignRole {
         check device_has_simple_perm(author.device_id, SimplePerm::AssignRole)
         check can_assign_role(author.device_id, this.role_id)
 
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.device_id)
+        check author_outranks_target(author.device_id, this.role_id)
+
         // Ensure the target role exists.
         check exists Role[role_id: this.role_id]
 
@@ -2606,6 +2618,11 @@ command ChangeRole {
         check can_assign_role(author.device_id, this.new_role_id)
         check device_has_simple_perm(author.device_id, SimplePerm::AssignRole)
 
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.device_id)
+        check author_outranks_target(author.device_id, this.new_role_id)
+        check author_outranks_target(author.device_id, this.old_role_id)
+
         // The target device must exist.
         check exists Device[device_id: this.device_id]
 
@@ -2703,6 +2720,10 @@ command RevokeRole {
 
         // The author must have permission to revoke the role.
         check can_revoke_role(author.device_id, this.role_id)
+
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.device_id)
+        check author_outranks_target(author.device_id, this.role_id)
 
         let role = check_unwrap query Role[role_id: this.role_id]
 
@@ -3146,6 +3167,8 @@ command TerminateTeam {
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::TerminateTeam)
 
+        // TODO: check author rank vs. team rank?
+
         let current_team_id = team_id()
         check this.team_id == current_team_id
 
@@ -3315,6 +3338,9 @@ command RemoveDevice {
 
         // The target device must exist.
         check exists Device[device_id: this.device_id]
+
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.device_id)
 
         // TODO(eric): check that author dominates target?
 
@@ -3793,6 +3819,9 @@ command DeleteLabel {
         check device_has_simple_perm(author.device_id, SimplePerm::DeleteLabel)
         check can_manage_label(author.device_id, this.label_id)
 
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.label_id)
+
         // We can't query the label after it's been deleted, so
         // make sure we pull all of its info out of the fact
         // database.
@@ -3920,6 +3949,10 @@ command AssignLabelToDevice {
         check author.device_id != this.device_id
 
         check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
+
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.device_id)
+        check author_outranks_target(author.device_id, this.label_id)
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
@@ -4055,6 +4088,10 @@ command RevokeLabelFromDevice {
         check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
         check can_manage_label(author.device_id, this.label_id)
         let target = get_device(this.device_id)
+
+        // The author device must outrank the target object(s).
+        check author_outranks_target(author.device_id, this.device_id)
+        check author_outranks_target(author.device_id, this.label_id)
 
         // We need to get label info before deleting
         let label = check_unwrap query Label[label_id: this.label_id]
@@ -4445,6 +4482,7 @@ ephemeral command AfcCreateUniChannel {
         let receiver_id = this.receiver_id
         let receiver = check_unwrap try_find_device(receiver_id)
 
+        // TODO: any ranks to check here?
 
         // Check that both devices have permission to create the AFC channel.
         check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id)
