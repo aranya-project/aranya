@@ -737,12 +737,18 @@ function get_object_rank(object_id id) int {
 }
 
 // Set the rank of an object.
-function set_object_rank(object_id id, rank int) {
+function set_object_rank(author_id id, object_id id, rank int) {
     if exists Rank[object_id: object_id] {
         let old_rank = Rank[object_id: object_id]
-        update Rank[object_id: object_id]=>{rank: old_rank} to {rank: this.rank}
+        let author_rank = get_object_rank(author_id)
+
+        // Author must outrank both the old and new rank.
+        check author_rank > old_rank
+        check author_rank > rank
+
+        update Rank[object_id: object_id]=>{rank: old_rank} to {rank: rank}
     } else {
-        create Rank[object_id: object_id]=>{rank: this.rank}
+        create Rank[object_id: object_id]=>{rank: rank}
     }    
 }
 
@@ -793,9 +799,6 @@ command SetRank {
 
         // Devices cannot set rank on themselves.
         check author.device_id != this.object_id
-
-        // The author device must outrank the target object.
-        check author_outranks_target(author.device_id, this.object_id)
 
         // The author must have permission to set rank.
         check device_has_simple_perm(author.device_id, SimplePerm::SetRank)
@@ -900,6 +903,7 @@ cannot be created or deleted at runtime.
 
 ```policy
 // NB: Update `enum Permission` in client and client-capi on changes.
+// TODO: rename to `Perm`?
 enum SimplePerm {
     // # Team management
     //
@@ -910,6 +914,11 @@ enum SimplePerm {
     // The role can terminate the team. This causes all team
     // commands to fail until a new team is created.
     TerminateTeam,
+
+    // # Rank
+    //
+    // The role can set the rank of an object.
+    SetRank,
 
     // # Roles
     //
