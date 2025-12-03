@@ -9,9 +9,9 @@ use quote::format_ident;
 use syn::parse_quote;
 
 fn main() -> anyhow::Result<()> {
-    println!("cargo::rustc-check-cfg=cfg(cbindgen)");
-
     let in_path = Path::new("src/api/defs.rs");
+    println!("cargo::rerun-if-changed={}", in_path.display());
+
     let out_path = PathBuf::from(env::var("OUT_DIR")?).join("generated.rs");
     let source = fs::read_to_string(in_path)
         .with_context(|| format!("unable to read file `{}`", in_path.display()))?;
