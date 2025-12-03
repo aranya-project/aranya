@@ -198,7 +198,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.5.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=expand-opaque-in-codegen#354f6f75bd07b30337e88a1cd815f21155ef8765"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=expand-opaque-in-codegen#a198e5b3256c03e480db00e58beda59fe92245a9"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -232,8 +232,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-macro"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cfec9ba5e7d601aa713c2251354cf25ce4b373611e1247baac8646233249456"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=expand-opaque-in-codegen#a198e5b3256c03e480db00e58beda59fe92245a9"
 dependencies = [
  "aranya-capi-codegen",
  "proc-macro2",
@@ -1612,7 +1611,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3452,7 +3451,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3465,7 +3464,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4134,7 +4133,7 @@ dependencies = [
  "getrandom 0.3.1",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4727,7 +4726,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
