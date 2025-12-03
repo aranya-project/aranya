@@ -667,7 +667,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAfcReceiveChannel;
 #endif
 
@@ -3408,7 +3408,7 @@ AranyaError aranya_afc_channel_seal_ext(struct AranyaAfcSendChannel *channel,
  * @param[out] dst the output buffer the message is written to.
  * @param[out] seq the sequence number for the opened message, for reordering.
  */
-AranyaError aranya_afc_channel_open(const struct AranyaAfcReceiveChannel *channel,
+AranyaError aranya_afc_channel_open(struct AranyaAfcReceiveChannel *channel,
                                     const uint8_t *ciphertext,
                                     size_t ciphertext_len,
                                     uint8_t *dst,
@@ -3428,7 +3428,7 @@ AranyaError aranya_afc_channel_open(const struct AranyaAfcReceiveChannel *channe
  * @param[out] dst the output buffer the message is written to.
  * @param[out] seq the sequence number for the opened message, for reordering.
  */
-AranyaError aranya_afc_channel_open_ext(const struct AranyaAfcReceiveChannel *channel,
+AranyaError aranya_afc_channel_open_ext(struct AranyaAfcReceiveChannel *channel,
                                         const uint8_t *ciphertext,
                                         size_t ciphertext_len,
                                         uint8_t *dst,
