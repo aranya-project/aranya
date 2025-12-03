@@ -4,7 +4,7 @@ policy-version: 2
 
 # Overview
 
-This Aranya's default policy. It provides the rules that underlie
+This is Aranya's default policy. It provides the rules that underlie
 Aranya's role-based access functionality. It also controls access
 to AFC through these RBAC mechanisms.
 
@@ -31,10 +31,9 @@ which commands devices can publish to Aranya's distributed graph:
 - **Roles** control command permissions. Currently we expose a set of
   "default roles" - `owner` (emergency access), `admin` (system
   administration), `operator` (user management), and `member` (basic
-  usage). This policy has the capability to define custom roles as well,
-  though that functionality is as yet unused.
-- **Authorization** uses two patterns: permission-based for most
-  commands, and managing-role-based for role/label assignment.
+  usage). This policy has the capability to define custom roles as well.
+- **Rank** determines whether a higher ranked object can operate on a lower ranked object.
+- **Authorization** is determined by whether an object has permission to perform the operation and outranks the target object(s).
 - **No Self-Administration**: Devices cannot assign roles or labels to
   themselves, enforcing separation of duties.
 
@@ -684,6 +683,62 @@ ephemeral command QueryDeviceKeyBundle {
             }
         }
     }
+}
+```
+
+## Object Rank
+
+### Overview
+
+Each object in Aranya's RBAC system has a rank associated with its Aranya ID.
+The highest rank is 0 while the lowest rank is MAX_U32.
+Objects with higher rank are allowed to operate on objects with a lower rank.
+For example, a command author with rank 10 would a be allowed to assign a label of rank 5 to a device of rank 4 because both of the objects it is operating on are lower rank than the author of the command.
+
+### Rank Fact
+
+Each object in Aranya's RBAC system has zero or one rank associated with its Aranya ID.
+
+```policy
+// An object rank.
+fact Rank[object_id id]=>{rank int}
+```
+
+### Rank Comparison
+
+Utility method for checking object ranks before allowing operations to be performed.
+
+```policy
+// Returns whether the command author object outranks the target object.
+// If the command author outranks the target, it is allowed to perform operations on the target object.
+//
+// # Caveats
+//
+// - It does NOT check whether the command author has permission to perform the operation.
+// - A check failure will occur if either the author or target object do not have a rank assigned to them.
+function author_outranks_target(author_id id, target_id id) bool {
+    let author_rank = check_unwrap query Rank[author_id]
+    let target_rank = check_unwrap query Rank[target_id]
+
+    return author_rank > target_rank
+}
+```
+
+### Setting Rank
+
+An object may have zero or one rank associated with it.
+
+```policy
+action set_rank(target_id id, rank int) {
+
+}
+
+effect RankSet {
+
+}
+
+command SetRank {
+
 }
 ```
 
