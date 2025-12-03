@@ -723,12 +723,14 @@ function author_outranks_target(author_id id, target_id id) bool {
     return author_rank > target_rank
 }
 
+// Get the rank of an object.
 function get_object_rank(object_id id) int {
     let rank = check_unwrap Rank[object_id: object_id]
 
     return rank.rank
 }
 
+// Set the rank of an object.
 function set_object_rank(object_id id, rank int) {
     if exists Rank[object_id: object_id] {
         let old_rank = Rank[object_id: object_id]
@@ -736,6 +738,11 @@ function set_object_rank(object_id id, rank int) {
     } else {
         create Rank[object_id: object_id]=>{rank: this.rank}
     }    
+}
+
+// Unset the rank of an object.
+function unset_object_rank(object_id id) {
+    delete Rank[object_id: object_id]
 }
 ```
 
@@ -801,6 +808,8 @@ command SetRank {
 }
 
 // TODO: separate ChangeRank command?
+
+// TODO: new `WithRank` commands
 ```
 
 ## Roles and Permissions
@@ -2270,6 +2279,7 @@ command DeleteRole {
 
         finish {
             delete Role[role_id: this.role_id]
+            unset_object_rank(this.role_id)
 
             emit RoleDeleted {
                 name: role.name,
@@ -2978,7 +2988,7 @@ command CreateTeam {
 
             create DeviceGeneration[device_id: owner_key_ids.device_id]=>{generation: 0}
 
-            add_new_device(this.owner_keys, owner_key_ids)
+            add_new_device(this.owner_keys, owner_key_ids, 1000)
 
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
@@ -3052,6 +3062,7 @@ command CreateTeam {
 finish function add_new_device(
     kb struct KeyBundle,
     keys struct DevKeyIds,
+    rank int,
 ) {
     // TODO(eric): check that `kb` matches `keys`.
 
@@ -3070,6 +3081,8 @@ finish function add_new_device(
         key_id: keys.enc_key_id,
         key: kb.enc_key,
     }
+
+    set_object_rank(keys.device_id, rank)
 }
 
 // Deletes the core device facts for `device_id`.
@@ -3217,6 +3230,7 @@ command AddDevice {
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
+        let rank = get_object_rank(author.device_id)
         if existing_gen is None {
             finish {
                 create DeviceGeneration[device_id: dev_key_ids.device_id]=>{generation: 0}
@@ -3224,6 +3238,7 @@ command AddDevice {
                 add_new_device(
                     this.device_keys,
                     dev_key_ids,
+                    rank - 1,
                 )
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
@@ -3235,6 +3250,7 @@ command AddDevice {
                 add_new_device(
                     this.device_keys,
                     dev_key_ids,
+                    rank - 1,
                 )
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
@@ -3328,6 +3344,7 @@ command RemoveDevice {
                 }
                 delete_role_assignment(this.device_id, role_id)
                 delete_device_core(this.device_id)
+                unset_object_rank(this.device_id)
 
                 emit DeviceRemoved {
                     device_id: this.device_id,
@@ -3344,6 +3361,7 @@ command RemoveDevice {
                     generation: next_gen
                 }
                 delete_device_core(this.device_id)
+                unset_object_rank(this.device_id)
 
                 emit DeviceRemoved {
                     device_id: this.device_id,
@@ -3699,6 +3717,8 @@ command CreateLabel {
                 name: this.label_name,
                 author_id: author.device_id,
             }
+            let rank = get_object_rank(author.device_id)
+            set_object_rank(label_id, rank - 1)
             create CanManageLabel[
                 label_id: label_id,
                 managing_role_id: this.managing_role_id,
@@ -3787,6 +3807,7 @@ command DeleteLabel {
             // delete CanManageLabel[label_id: label.label_id, managing_role_id: ?]
 
             delete Label[label_id: label.label_id]
+            unset_object_rank(label.label_id)
 
             emit LabelDeleted {
                 label_name: label.name,
