@@ -52,15 +52,16 @@ Functions suffixed with `_ext` accept an extra `struct AranyaExtError *ext_err` 
   `*ext_err` is populated with additional error details.
 - On success, the content of `ext_err` is unchanged.
 - To extract a human-readable message:
-      ```
+      \code{.c}
       AranyaError aranya_ext_error_msg(
           const struct AranyaExtError *err,
           char *msg,
           size_t *msg_len
-      );```
+      );
+      \endcode
 
  Example:
-    ```
+    \code{.c}
      struct AranyaExtError ext_err;
      AranyaError rc = aranya_get_device_id_ext(client, &id, &ext_err);
      if (rc != ARANYA_ERROR_SUCCESS) {
@@ -69,4 +70,5 @@ Functions suffixed with `_ext` accept an extra `struct AranyaExtError *ext_err` 
          char *buf = malloc(len);
          aranya_ext_error_msg(&ext_err, buf, &len);
          // `buf` now holds the detailed error message
-     }```
+     }
+     \endcode
