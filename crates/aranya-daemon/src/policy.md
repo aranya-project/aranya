@@ -717,14 +717,14 @@ Utility method for checking object ranks before allowing operations to be perfor
 // - It does NOT check whether the command author has permission to perform the operation.
 // - A check failure will occur if either the author or target object do not have a rank associated with them.
 function author_outranks_target(author_id id, target_id id) bool {
-    let author_rank = check_unwrap query Rank[object_id: author_id]
-    let target_rank = check_unwrap query Rank[object_id: target_id]
+    let author_rank = get_object_rank(author_id)
+    let target_rank = get_object_rank(target_id)
 
     return author_rank > target_rank
 }
 ```
 
-### Rank Getters/Setters
+### Rank Getter
 
 Utility methods for getting/setting rank values on objects.
 
@@ -735,38 +735,23 @@ function get_object_rank(object_id id) int {
 
     return rank.rank
 }
-
-// Set the rank of an object.
-function set_object_rank(author_id id, object_id id, rank int) bool {
-    if exists Rank[object_id: object_id] {
-        let old_rank = get_object_rank(object_id)
-        let author_rank = get_object_rank(author_id)
-
-        // Author must outrank both the old and new rank.
-        check author_rank > old_rank
-        check author_rank > rank
-
-        update Rank[object_id: object_id]=>{rank: old_rank} to {rank: rank}
-    } else {
-        create Rank[object_id: object_id]=>{rank: rank}
-    }
-
-    return true
-}
-
-// Unset the rank of an object.
-function unset_object_rank(object_id id) bool {
-    delete Rank[object_id: object_id]
-
-    return true
-}
 ```
 
-### Setting Rank Command
+### SetRank Command
 
-An object may have zero or one rank associated with it.
+Command for setting the rank of an object.
 
 ```policy
+// Set the rank of an object.
+//
+// Assumptions:
+// - Object rank must not exist yet.
+// - Author must have higher rank than rank it is setting.
+finish function set_object_rank(object_id id, rank int) {
+    // Create new rank fact.
+    create Rank[object_id: object_id]=>{rank: rank}
+}
+
 action set_rank(object_id id, rank int) {
     publish SetRank {
         object_id: object_id,
@@ -807,6 +792,13 @@ command SetRank {
         // The author must have permission to set rank.
         check device_has_simple_perm(author.device_id, SimplePerm::SetRank)
 
+        // Object must not already have a rank; use ChangeRank instead.
+        check !exists Rank[object_id: this.object_id]
+
+        // Author must outrank the rank it is setting.
+        let author_rank = get_object_rank(author.device_id)
+        check author_rank > this.rank
+
         finish {
             set_object_rank(this.object_id, this.rank)
 
@@ -819,9 +811,92 @@ command SetRank {
 
 }
 
-// TODO: separate ChangeRank command?
-
 // TODO: new `WithRank` commands
+```
+
+### ChangeRank Command
+
+Command for changing the rank of an object.
+
+```policy
+// Change the rank of an object.
+//
+// Assumptions:
+// - The object must already have a rank.
+// - The command author must have a higher rank than the old and new rank.
+// - The command author must know the correct old rank before setting the new rank.
+finish function change_object_rank(object_id id, old_rank int, new_rank int) {
+    update Rank[object_id: object_id]=>{rank: old_rank} to {rank: new_rank}
+}
+
+action change_rank(object_id id, old_rank int, new_rank int) {
+    publish ChangeRank {
+        object_id: object_id,
+        old_rank: old_rank,
+        new_rank: new_rank,
+    }
+}
+
+effect RankChanged {
+    // The ID of the object rank was set on.
+    object_id id,
+    // The old rank associated with the object.
+    old_rank int,
+    // The new rank associated with the object.
+    new_rank int,
+}
+
+command ChangeRank {
+    attributes {
+        priority: 100
+    }
+
+    fields {
+        // The ID of the object to set the rank on.
+        object_id id,
+        // The old rank associated with the object.
+        old_rank int,
+        // The new rank to associate with the object.
+        new_rank int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+
+        // Devices cannot set rank on themselves.
+        check author.device_id != this.object_id
+
+        // The author must have permission to set rank.
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRank)
+
+        // Author must outrank both the old and new rank.
+        let author_rank = get_object_rank(author.device_id)
+        check author_rank > this.old_rank
+        check author_rank > this.new_rank
+
+        // Object must already have a rank.
+        let rank = get_object_rank(this.object_id)
+
+        // Old rank must match current rank.
+        check rank == this.old_rank
+
+        finish {
+            change_object_rank(this.object_id, this.old_rank, this.new_rank)
+
+            emit RankChanged {
+                object_id: this.object_id,
+                old_rank: this.old_rank,
+                new_rank: this.new_rank,
+            }
+        }
+    }
+
+}
 ```
 
 ## Roles and Permissions
@@ -919,6 +994,8 @@ enum SimplePerm {
     //
     // The role can set the rank of an object.
     SetRank,
+    // The role can change to rank of an object.
+    ChangeRank,
 
     // # Roles
     //
@@ -964,6 +1041,9 @@ function simple_perm_to_str(perm enum SimplePerm) string {
         SimplePerm::RemoveDevice => { return "RemoveDevice" }
         SimplePerm::TerminateTeam => { return "TerminateTeam" }
 
+        SimplePerm::SetRank => { return "SetRank" }
+        SimplePerm::ChangeRank => { return "ChangeRank" }
+
         SimplePerm::CreateRole => { return "CreateRole" }
         SimplePerm::DeleteRole => { return "DeleteRole" }
         SimplePerm::AssignRole => { return "AssignRole" }
@@ -991,6 +1071,12 @@ function try_parse_simple_perm(perm string) optional enum SimplePerm {
         "AddDevice" => { return Some(SimplePerm::AddDevice) }
         "RemoveDevice" => { return Some(SimplePerm::RemoveDevice) }
         "TerminateTeam" => { return Some(SimplePerm::TerminateTeam) }
+
+        //
+        // Rank
+        //
+        "SetRank" => { return Some(SimplePerm::SetRank) }
+        "ChangeRank" => { return Some(SimplePerm::ChangeRank) }
 
         //
         // Roles
@@ -1291,7 +1377,7 @@ command CreateRole {
 
         let role_id = derive_role_id(envelope)
 
-        let rank = get_object_rank(author.device_id) - 1
+        let rank = saturating_sub(get_object_rank(author.device_id), 1)
 
         let role_info = RoleInfo {
             role_id: role_id,
@@ -2445,7 +2531,7 @@ command AddDevice {
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
-        let rank = get_object_rank(author.device_id)
+        let rank = saturating_sub(get_object_rank(author.device_id), 1)
         if existing_gen is None {
             finish {
                 create DeviceGeneration[device_id: dev_key_ids.device_id]=>{generation: 0}
@@ -2453,7 +2539,7 @@ command AddDevice {
                 add_new_device(
                     this.device_keys,
                     dev_key_ids,
-                    rank - 1,
+                    rank,
                 )
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
@@ -2465,7 +2551,7 @@ command AddDevice {
                 add_new_device(
                     this.device_keys,
                     dev_key_ids,
-                    rank - 1,
+                    rank,
                 )
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
@@ -2711,8 +2797,8 @@ command CreateLabel {
                 name: this.label_name,
                 author_id: author.device_id,
             }
-            let rank = get_object_rank(author.device_id)
-            set_object_rank(label_id, rank - 1)
+            let rank = saturating_sub(get_object_rank(author.device_id), 1)
+            set_object_rank(label_id, rank)
 
             emit LabelCreated {
                 label_id: label_id,
