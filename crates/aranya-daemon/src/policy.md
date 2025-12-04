@@ -735,6 +735,17 @@ function get_object_rank(object_id id) int {
 
     return rank.rank
 }
+
+// Unset the rank of an object.
+//
+// Assumptions:
+// - The object has a rank.
+// - The author has a higher rank than the object.
+// - The rank should only be unset if the object is being deleted.
+finish function unset_object_rank(object_id id) {
+    // Delete object rank fact.
+    delete Rank[object_id: object_id]
+}
 ```
 
 ### SetRank Command
@@ -1287,7 +1298,6 @@ command RemovePermFromRole {
     }
 }
 ```
-```
 
 ### Role Creation
 
@@ -1334,6 +1344,8 @@ effect RoleCreated {
     name string,
     // ID of device that created the role.
     author_id id,
+    // The rank of the role object.
+    rank int,
     // Is this a "default" role?
     default bool,
 }
@@ -1377,13 +1389,13 @@ command CreateRole {
 
         let role_id = derive_role_id(envelope)
 
-        let rank = saturating_sub(get_object_rank(author.device_id), 1)
+        let role_rank = saturating_sub(get_object_rank(author.device_id), 1)
 
         let role_info = RoleInfo {
             role_id: role_id,
             name: this.role_name,
             author_id: author.device_id,
-            rank: rank,
+            rank: role_rank,
             default: false,
         }
         let role_created = role_info as RoleCreated
@@ -1619,11 +1631,6 @@ command DeleteRole {
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: ?,
-        ]
-        // The role must not own any other roles
-        check !exists RoleOwned[
-            owner_role_id: this.role_id,
-            target_role_id: ?,
         ]
 
         // we already checked that this exists
@@ -1946,10 +1953,6 @@ command ChangeRole {
         // TODO(eric): Should this just be a no-op?
         check this.old_role_id != this.new_role_id
 
-        // The author must have permission to revoke the old role.
-        let old_role = check_unwrap query Role[role_id: this.old_role_id]
-        check can_revoke_role(author.device_id, this.old_role_id)
-
         // The author must have permission to assign the new role.
         check exists Role[role_id: this.new_role_id]
         check device_has_simple_perm(author.device_id, SimplePerm::AssignRole)
@@ -1971,6 +1974,7 @@ command ChangeRole {
             device_id: this.device_id,
         ]
 
+        let old_role = check_unwrap query Role[role_id: this.old_role_id]
         if is_owner(old_role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.old_role_id,
@@ -2284,9 +2288,6 @@ command CreateTeam {
         // device keys.
         check author_id == owner_key_ids.device_id
 
-        // Set the object rank of the owner device.
-        set_object_rank(author_id, MAX_U32)
-
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
@@ -2304,6 +2305,8 @@ command CreateTeam {
                 rank: 900,
                 default: true,
             })
+            // Set the object rank of the owner device.
+            set_object_rank(author_id, 10000)
 
             // Assign all of the administrative permissions to
             // the owner role.
@@ -2798,12 +2801,12 @@ command CreateLabel {
         //
         // - the team is active
         // - `author` has the `CreateLabel` permission
+        let rank = saturating_sub(get_object_rank(author.device_id), 1)
         finish {
             create Label[label_id: label_id]=>{
                 name: this.label_name,
                 author_id: author.device_id,
             }
-            let rank = saturating_sub(get_object_rank(author.device_id), 1)
             set_object_rank(label_id, rank)
 
             emit LabelCreated {
@@ -2865,7 +2868,6 @@ command DeleteLabel {
 
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::DeleteLabel)
-        check can_manage_label(author.device_id, this.label_id)
 
         // The author device must outrank the target object(s).
         check author_outranks_target(author.device_id, this.label_id)
@@ -3004,8 +3006,6 @@ command AssignLabelToDevice {
         // keys.
         check exists Device[device_id: this.device_id]
         check exists Label[label_id: this.label_id]
-
-        check can_manage_label(author.device_id, this.label_id)
 
         // The target device must be able to use AFC.
         check device_has_simple_perm(this.device_id, SimplePerm::CanUseAfc)
