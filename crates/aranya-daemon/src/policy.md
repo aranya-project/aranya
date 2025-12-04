@@ -1486,6 +1486,8 @@ command SetupDefaultRole {
                         default: true,
                     })
 
+                    assign_perm_to_role(role_id, SimplePerm::SetRank)
+                    assign_perm_to_role(role_id, SimplePerm::ChangeRank)
                     assign_perm_to_role(role_id, SimplePerm::AddDevice)
                     assign_perm_to_role(role_id, SimplePerm::RemoveDevice)
                     assign_perm_to_role(role_id, SimplePerm::CreateLabel)
@@ -1518,6 +1520,7 @@ command SetupDefaultRole {
                         default: true,
                     })
 
+                    assign_perm_to_role(role_id, SimplePerm::SetRank)
                     assign_perm_to_role(role_id, SimplePerm::AssignLabel)
                     assign_perm_to_role(role_id, SimplePerm::RevokeLabel)
                     assign_perm_to_role(role_id, SimplePerm::AssignRole)
@@ -2307,6 +2310,9 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, SimplePerm::TerminateTeam)
             assign_perm_to_role(owner_role_id, SimplePerm::AddDevice)
             assign_perm_to_role(owner_role_id, SimplePerm::RemoveDevice)
+
+            assign_perm_to_role(owner_role_id, SimplePerm::SetRank)
+            assign_perm_to_role(owner_role_id, SimplePerm::ChangeRank)
 
             assign_perm_to_role(owner_role_id, SimplePerm::CreateLabel)
             assign_perm_to_role(owner_role_id, SimplePerm::DeleteLabel)
