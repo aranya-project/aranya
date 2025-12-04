@@ -10,7 +10,10 @@ use core::net::SocketAddr;
 use std::{collections::HashMap, convert::Infallible, future::Future, net::Ipv4Addr, sync::Arc};
 
 use anyhow::Context;
-use aranya_crypto::Rng;
+use aranya_crypto::{
+    dangerous::spideroak_crypto::csprng::rand::{self, RngCore},
+    Rng,
+};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
@@ -36,14 +39,16 @@ use s2n_quic::{
     application::Error as AppError,
     client::Connect,
     connection::{Error as ConnErr, StreamAcceptor},
-    provider::{congestion_controller::Bbr, tls::rustls as rustls_provider, StartError},
+    provider::{
+        congestion_controller::Bbr, event::events, tls::rustls as rustls_provider, StartError,
+    },
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tokio_util::time::DelayQueue;
-use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
+use tracing::{debug, error, info, info_span, instrument, trace, warn, Instrument as _};
 
 use super::{Request, SyncPeers, SyncResponse};
 use crate::{
@@ -61,6 +66,30 @@ mod psk;
 pub(crate) use connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
+
+struct QuicSub {
+    user: u64,
+}
+
+impl s2n_quic::provider::event::Subscriber for QuicSub {
+    type ConnectionContext = u64;
+
+    fn create_connection_context(
+        &mut self,
+        _meta: &events::ConnectionMeta,
+        _info: &events::ConnectionInfo,
+    ) -> Self::ConnectionContext {
+        self.user
+    }
+
+    fn on_event<M: s2n_quic::provider::event::Meta, E: s2n_quic::provider::event::Event>(
+        &mut self,
+        meta: &M,
+        event: &E,
+    ) {
+        trace!("QUICEVENT|||{:?}|||{:?}|||{:?}", self.user, event, meta);
+    }
+}
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -167,10 +196,16 @@ impl State {
         #[allow(deprecated)]
         let provider = rustls_provider::Client::new(client_config);
 
+        let mut rng = rand::thread_rng();
+
         let client = QuicClient::builder()
             .with_tls(provider)?
             .with_io((Ipv4Addr::UNSPECIFIED, 0))
             .assume("can set quic client address")?
+            .with_event(QuicSub {
+                user: rand::Rng::gen(&mut rng),
+            })
+            .assume("should set event sub")?
             .start()
             .map_err(Error::ClientStart)?;
 
@@ -426,6 +461,7 @@ where
             PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
+        let mut rng = rand::thread_rng();
 
         let addr = tokio::net::lookup_host(addr.to_socket_addrs())
             .await
@@ -438,6 +474,10 @@ where
             .with_io(addr)
             .assume("can set sync server addr")?
             .with_congestion_controller(Bbr::default())?
+            .with_event(QuicSub {
+                user: rand::Rng::gen(&mut rng),
+            })
+            .assume("should set event sub")?
             .start()
             .map_err(Error::ServerStart)?;
 
