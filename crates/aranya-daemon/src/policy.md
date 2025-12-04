@@ -3547,19 +3547,19 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
 
 [//]: # (links)
 
-[actions]: https://aranya-project.github.io/policy-language-v1/#actions
+[actions]: https://aranya-project.github.io/policy-book/reference/top-level/actions.html
 [afc]: https://aranya-project.github.io/afc/
 [afc-ffi]: https://crates.io/crates/aranya-afc-util
 [all-the-way-down]: https://en.wikipedia.org/wiki/Turtles_all_the_way_down
-[commands]: https://aranya-project.github.io/policy-language-v1/#commands
+[commands]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html
 [crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi
 [device-ffi]: https://crates.io/crates/aranya-device-ffi
-[effects]: https://aranya-project.github.io/policy-language-v1/#effects
-[envelope]: https://aranya-project.github.io/policy-language-v1/#envelope-type
+[effects]: https://aranya-project.github.io/policy-book/reference/top-level/effects.html
+[envelope]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html#envelope-type
 [evp-ffi]: https://crates.io/crates/aranya-envelope-ffi
-[facts]: https://aranya-project.github.io/policy-language-v1/#facts
+[facts]: https://aranya-project.github.io/policy-book/reference/top-level/facts.html
 [idam-ffi]: https://crates.io/crates/aranya-idam-ffi
 [lp]: https://en.wikipedia.org/wiki/Literate_programming
 [perspective-ffi]: https://crates.io/crates/aranya-perspective-ffi
-[policy-lang]: https://aranya-project.github.io/policy-language-v2/
+[policy-lang]: https://aranya-project.github.io/policy-book/reference/introduction.html
 [rbac]: https://csrc.nist.gov/glossary/term/rbac
