@@ -717,8 +717,8 @@ Utility method for checking object ranks before allowing operations to be perfor
 // - It does NOT check whether the command author has permission to perform the operation.
 // - A check failure will occur if either the author or target object do not have a rank associated with them.
 function author_outranks_target(author_id id, target_id id) bool {
-    let author_rank = check_unwrap query Rank[author_id]
-    let target_rank = check_unwrap query Rank[target_id]
+    let author_rank = check_unwrap query Rank[object_id: author_id]
+    let target_rank = check_unwrap query Rank[object_id: target_id]
 
     return author_rank > target_rank
 }
@@ -731,15 +731,15 @@ Utility methods for getting/setting rank values on objects.
 ```policy
 // Get the rank of an object.
 function get_object_rank(object_id id) int {
-    let rank = check_unwrap Rank[object_id: object_id]
+    let rank = check_unwrap query Rank[object_id: object_id]
 
     return rank.rank
 }
 
 // Set the rank of an object.
-function set_object_rank(author_id id, object_id id, rank int) {
+function set_object_rank(author_id id, object_id id, rank int) bool {
     if exists Rank[object_id: object_id] {
-        let old_rank = Rank[object_id: object_id]
+        let old_rank = get_object_rank(object_id)
         let author_rank = get_object_rank(author_id)
 
         // Author must outrank both the old and new rank.
@@ -749,12 +749,16 @@ function set_object_rank(author_id id, object_id id, rank int) {
         update Rank[object_id: object_id]=>{rank: old_rank} to {rank: rank}
     } else {
         create Rank[object_id: object_id]=>{rank: rank}
-    }    
+    }
+
+    return true
 }
 
 // Unset the rank of an object.
-function unset_object_rank(object_id id) {
+function unset_object_rank(object_id id) bool {
     delete Rank[object_id: object_id]
+
+    return true
 }
 ```
 
@@ -1534,7 +1538,7 @@ command DeleteRole {
         ]
 
         // we already checked that this exists
-        let role = unwrap query Role[role_id: this.role_id]
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
             delete Role[role_id: this.role_id]
