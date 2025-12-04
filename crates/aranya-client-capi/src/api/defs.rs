@@ -177,7 +177,6 @@ pub fn error_to_str(err: u32) -> *const c_char {
 /// *         // `buf` now holds the detailed error message
 /// *     }
 /// * ──────────────────────────────────────────────────────────────────────────────
-/// Extended error information.
 #[allow(rustdoc::invalid_rust_codeblocks)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 96, align = 8)]

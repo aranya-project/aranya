@@ -55,6 +55,7 @@ tracing-subscriber = { workspace = true }
 aranya-capi-codegen = { workspace = true }
 
 anyhow = { workspace = true }
+cbindgen = "0.29"
 quote = "1"
 syn = "2"
 
