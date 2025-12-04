@@ -54,7 +54,7 @@ static pid_t spawn_daemon(const char *path) {
     pid_t pid = fork();
     if (pid == 0) {
         /* Child process */
-        setenv("ARANYA_DAEMON", "aranya_daemon::aqc=trace,aranya_daemon::api=debug", 1);
+        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
         execl(path, path, "--config", "run/daemon.toml", NULL);
         exit(1);
     }
@@ -111,56 +111,13 @@ static int test_client_init(void) {
         return 0;
     }
     printf("  ✓ Daemon UDS path set to: %s\n", daemon_path);
-
-#if defined(ENABLE_ARANYA_AQC)
-    /* Set up AQC config if required */
-    AranyaAqcConfigBuilder aqc_builder;
-    rc = aranya_aqc_config_builder_init(&aqc_builder);
-    
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to initialize AqcConfigBuilder: %s\n", 
-               aranya_error_to_str(rc));
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    const char *aqc_address = "127.0.0.1:0";
-    rc = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_address);
-    
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to set AQC address: %s\n", aranya_error_to_str(rc));
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    AranyaAqcConfig aqc_config;
-    rc = aranya_aqc_config_build(&aqc_builder, &aqc_config);
-    
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to build AqcConfig: %s\n", aranya_error_to_str(rc));
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    rc = aranya_client_config_builder_set_aqc_config(&builder, &aqc_config);
-    
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to set AQC config: %s\n", aranya_error_to_str(rc));
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    printf("  ✓ AQC config set up successfully\n");
-#endif
     
     /* Build client config */
     AranyaClientConfig config;
     rc = aranya_client_config_build(&builder, &config);
     
     if (rc == ARANYA_ERROR_INVALID_ARGUMENT) {
-        /* AQC required but not available */
-        printf("  ℹ AQC required but not available; skipping test\n");
+        printf("  ℹ invalid arguments to config build, skipping test\n");
         return 1;
     } else if (rc != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to build ClientConfig: %s\n", aranya_error_to_str(rc));
@@ -228,13 +185,12 @@ static int test_get_key_bundle(void) {
         return 0;
     }
     
-    /* Build client config - first try without AQC config */
+    /* Build client config */
     AranyaClientConfig config;
     rc = aranya_client_config_build(&builder, &config);
     
     if (rc == ARANYA_ERROR_INVALID_ARGUMENT) {
-        /* AQC config is required - need to set it up */
-        printf("  ℹ AQC config required; attempting to set it up...\n");
+        printf("  ℹ config required; attempting to set it up...\n");
         
         /* Re-initialize the builder since previous build attempt consumed it */
         rc = aranya_client_config_builder_init(&builder);
@@ -251,71 +207,11 @@ static int test_get_key_bundle(void) {
             aranya_client_config_builder_cleanup(&builder);
             return 0;
         }
-
-#if defined(ENABLE_ARANYA_AQC)
-        /* AQC is available at compile time, set it up */
-        AranyaAqcConfigBuilder aqc_builder;
-        rc = aranya_aqc_config_builder_init(&aqc_builder);
-        
-        if (rc != ARANYA_ERROR_SUCCESS) {
-            printf("  Failed to initialize AqcConfigBuilder: %s\n", 
-                   aranya_error_to_str(rc));
-            aranya_client_config_builder_cleanup(&builder);
-            return 0;
-        }
-        
-        /* Set AQC server address */
-        const char *aqc_address = "127.0.0.1:0";
-        rc = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_address);
-        
-        if (rc != ARANYA_ERROR_SUCCESS) {
-            printf("  Failed to set AQC address: %s\n", aranya_error_to_str(rc));
-            aranya_aqc_config_builder_cleanup(&aqc_builder);
-            aranya_client_config_builder_cleanup(&builder);
-            return 0;
-        }
-        
-        /* Build AQC config */
-        AranyaAqcConfig aqc_config;
-        rc = aranya_aqc_config_build(&aqc_builder, &aqc_config);
-        
-        if (rc != ARANYA_ERROR_SUCCESS) {
-            printf("  Failed to build AqcConfig: %s\n", aranya_error_to_str(rc));
-            aranya_client_config_builder_cleanup(&builder);
-            return 0;
-        }
-        
-        /* Set AQC config on client builder */
-        rc = aranya_client_config_builder_set_aqc_config(&builder, &aqc_config);
-        
-        if (rc != ARANYA_ERROR_SUCCESS) {
-            printf("  Failed to set AQC config: %s\n", aranya_error_to_str(rc));
-            aranya_client_config_builder_cleanup(&builder);
-            return 0;
-        }
-        
-        printf("  ✓ AQC config set up successfully\n");
-#else
-        /* AQC not available at compile time but required at runtime */
-        printf("  Note: AQC is required but not available in this build\n");
-        printf("  This is expected when library was compiled with AQC support\n");
-        aranya_client_config_builder_cleanup(&builder);
-        return 1;  /* Accept as passing since test environment limitation */
-#endif
-        
-        /* Try to build config again with AQC */
-        rc = aranya_client_config_build(&builder, &config);
-        if (rc != ARANYA_ERROR_SUCCESS) {
-            printf("  Failed to build ClientConfig with AQC: %s\n", aranya_error_to_str(rc));
-            return 0;
-        }
-        
-        printf("  ✓ ClientConfig built with AQC\n");
     } else if (rc != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to build ClientConfig: %s\n", aranya_error_to_str(rc));
         return 0;
     } else {
-        printf("  ✓ ClientConfig built without AQC\n");
+        printf("  ✓ ClientConfig built\n");
     }
     
     /* Initialize client */
@@ -463,39 +359,6 @@ int test_rand(void) {
     rc = aranya_client_config_builder_set_daemon_uds_path(&builder, "run/uds.sock");
     if (rc != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to set daemon path: %s\n", aranya_error_to_str(rc));
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    /* Set up AQC config - required for client config */
-    AranyaAqcConfigBuilder aqc_builder;
-    rc = aranya_aqc_config_builder_init(&aqc_builder);
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to init AQC builder: %s\n", aranya_error_to_str(rc));
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    const char *aqc_address = "127.0.0.1:0";
-    rc = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_address);
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to set AQC address: %s\n", aranya_error_to_str(rc));
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    AranyaAqcConfig aqc_config;
-    rc = aranya_aqc_config_build(&aqc_builder, &aqc_config);
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to build AQC config: %s\n", aranya_error_to_str(rc));
-        aranya_client_config_builder_cleanup(&builder);
-        return 0;
-    }
-    
-    rc = aranya_client_config_builder_set_aqc_config(&builder, &aqc_config);
-    if (rc != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to set AQC config: %s\n", aranya_error_to_str(rc));
         aranya_client_config_builder_cleanup(&builder);
         return 0;
     }

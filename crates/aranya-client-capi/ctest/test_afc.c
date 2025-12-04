@@ -31,7 +31,6 @@ static void print_daemon_info(const char *cfg_path, const char *name, const char
     fprintf(f, "enable = true\n");
     fprintf(f, "shm_path = \"%s\"\n", shm_path);
     fprintf(f, "max_chans = 100\n");
-    fprintf(f, "\n[aqc]\n");
     fprintf(f, "enable = true\n");
     fprintf(f, "\n[sync.quic]\n");
     fprintf(f, "enable = true\n");
@@ -69,7 +68,7 @@ static pid_t spawn_daemon_at(const char *daemon_path,
     
     pid_t pid = fork();
     if (pid == 0) {
-        setenv("ARANYA_DAEMON", "aranya_daemon::aqc=trace,aranya_daemon::api=debug", 1);
+        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
         execl(daemon_path, daemon_path, "--config", cfg_path, NULL);
         exit(1);
     }
@@ -77,30 +76,15 @@ static pid_t spawn_daemon_at(const char *daemon_path,
 }
 
 /* Initialize a client */
-static AranyaError init_client(Client *c, const char *name, const char *daemon_addr, const char *aqc_addr) {
+static AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
     AranyaError err;
     
-    strncpy(c->name, name, sizeof(c->name) - 1);
-    
-#ifdef ENABLE_ARANYA_AQC
-    AranyaAqcConfigBuilder aqc_builder;
-    err = aranya_aqc_config_builder_init(&aqc_builder);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
+    if (name) {
+        snprintf(c->name, sizeof(c->name), "%s", name);
+    } else {
+        c->name[0] = '\0';
     }
-    err = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-    
-    AranyaAqcConfig aqc_cfg;
-    err = aranya_aqc_config_build(&aqc_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        return err;
-    }
-#endif
+    c->name[sizeof(c->name) - 1] = '\0';
     
     AranyaClientConfigBuilder cli_builder;
     err = aranya_client_config_builder_init(&cli_builder);
@@ -113,14 +97,6 @@ static AranyaError init_client(Client *c, const char *name, const char *daemon_a
         aranya_client_config_builder_cleanup(&cli_builder);
         return err;
     }
-    
-#ifdef ENABLE_ARANYA_AQC
-    err = aranya_client_config_builder_set_aqc_config(&cli_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        aranya_client_config_builder_cleanup(&cli_builder);
-        return err;
-    }
-#endif
     
     AranyaClientConfig cli_cfg;
     err = aranya_client_config_build(&cli_builder, &cli_cfg);
@@ -160,7 +136,7 @@ static AranyaError init_team(Team *t, const char *owner_uds) {
     Client *owner = &t->owner;
     memset(owner, 0, sizeof(Client));
     
-    AranyaError err = init_client(owner, "Owner", owner_uds, "127.0.0.1:0");
+    AranyaError err = init_client(owner, "Owner", owner_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
@@ -218,7 +194,7 @@ static AranyaError add_member_to_team(Team *t, Client *member, const char *membe
     AranyaError err;
     
     /* Owner adds member device with default Member role (required for AFC channel creation) */
-    err = aranya_add_device_to_team(&t->owner.client, &t->id, member->pk, member->pk_len);
+    err = aranya_add_device_to_team(&t->owner.client, &t->id, member->pk, member->pk_len, NULL);
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
@@ -302,12 +278,12 @@ static AranyaError setup_team_with_members(Team *team) {
         return err;
     }
     
-    err = init_client(&team->member1, "Member1", g_member1_uds[0] ? g_member1_uds : "run/uds.sock", "127.0.0.1:0");
+    err = init_client(&team->member1, "Member1", g_member1_uds[0] ? g_member1_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
     
-    err = init_client(&team->member2, "Member2", g_member2_uds[0] ? g_member2_uds : "run/uds.sock", "127.0.0.1:0");
+    err = init_client(&team->member2, "Member2", g_member2_uds[0] ? g_member2_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
@@ -351,7 +327,7 @@ static int test_afc_create_bidi_channel(void) {
     }
     
     /* Initialize member1 and member2 */
-    err = init_client(&team.member1, "Member1", g_member1_uds[0] ? g_member1_uds : "run/uds.sock", "127.0.0.1:0");
+    err = init_client(&team.member1, "Member1", g_member1_uds[0] ? g_member1_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init member1: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);
@@ -359,7 +335,7 @@ static int test_afc_create_bidi_channel(void) {
         return 0;
     }
     
-    err = init_client(&team.member2, "Member2", g_member2_uds[0] ? g_member2_uds : "run/uds.sock", "127.0.0.1:0");
+    err = init_client(&team.member2, "Member2", g_member2_uds[0] ? g_member2_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init member2: %s\n", aranya_error_to_str(err));
         if (team.member1.pk) free(team.member1.pk);
@@ -386,7 +362,7 @@ static int test_afc_create_bidi_channel(void) {
     
     /* Create a label */
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "AFC_TEST_LABEL", &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "AFC_TEST_LABEL", NULL, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         goto cleanup;
@@ -493,7 +469,7 @@ static int test_afc_create_uni_send_channel(void) {
     }
     
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "SEND_LABEL", &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "SEND_LABEL", NULL, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
@@ -560,7 +536,7 @@ static int test_afc_create_uni_recv_channel(void) {
     }
     
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "RECV_LABEL", &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "RECV_LABEL", NULL, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
@@ -627,7 +603,7 @@ static int test_afc_seal_open(void) {
     }
     
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "SEAL_OPEN_LABEL", &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "SEAL_OPEN_LABEL", NULL, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);

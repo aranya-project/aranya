@@ -1,7 +1,6 @@
 option(ARANYA_ENABLE_PREVIEW "Enable preview Aranya features." ON)
 option(ARANYA_ENABLE_AFC "Enable Aranya Fast Channels." ON)
 option(ARANYA_ENABLE_EXPERIMENTAL "Enable experimental Aranya features." ON)
-option(ARANYA_ENABLE_AQC "Enable Aranya QUIC Channels." ON)
 
 # ==== Daemon executable ====
 
@@ -11,7 +10,6 @@ corrosion_import_crate(
         $<$<BOOL:${ARANYA_ENABLE_PREVIEW}>:preview>
         $<$<BOOL:${ARANYA_ENABLE_AFC}>:afc>
         $<$<BOOL:${ARANYA_ENABLE_EXPERIMENTAL}>:experimental>
-        $<$<BOOL:${ARANYA_ENABLE_AQC}>:aqc>
     CRATES aranya-daemon
     CRATE_TYPE bin
 )
@@ -28,7 +26,6 @@ corrosion_import_crate(
         $<$<BOOL:${ARANYA_ENABLE_PREVIEW}>:preview>
         $<$<BOOL:${ARANYA_ENABLE_AFC}>:afc>
         $<$<BOOL:${ARANYA_ENABLE_EXPERIMENTAL}>:experimental>
-        $<$<BOOL:${ARANYA_ENABLE_AQC}>:aqc>
 )
 
 add_custom_target(aranya_client_h
@@ -52,7 +49,6 @@ target_compile_definitions(aranya_client_capi
         $<$<BOOL:${ARANYA_ENABLE_PREVIEW}>:ENABLE_ARANYA_PREVIEW>
         $<$<BOOL:${ARANYA_ENABLE_AFC}>:ENABLE_ARANYA_AFC>
         $<$<BOOL:${ARANYA_ENABLE_EXPERIMENTAL}>:ENABLE_ARANYA_EXPERIMENTAL>
-        $<$<BOOL:${ARANYA_ENABLE_AQC}>:ENABLE_ARANYA_AQC>
 )
 
 add_library(Aranya::Client ALIAS aranya_client_capi)

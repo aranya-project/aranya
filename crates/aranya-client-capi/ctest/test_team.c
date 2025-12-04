@@ -54,7 +54,6 @@ static pid_t spawn_daemon_at(const char *daemon_path,
     fprintf(f, "enable = true\n");
     fprintf(f, "shm_path = \"%s\"\n", shm_path);
     fprintf(f, "max_chans = 100\n");
-    fprintf(f, "\n[aqc]\n");
     fprintf(f, "enable = true\n");
     fprintf(f, "\n[sync.quic]\n");
     fprintf(f, "enable = true\n");
@@ -63,7 +62,7 @@ static pid_t spawn_daemon_at(const char *daemon_path,
     
     pid_t pid = fork();
     if (pid == 0) {
-        setenv("ARANYA_DAEMON", "aranya_daemon::aqc=trace,aranya_daemon::api=debug", 1);
+        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
         execl(daemon_path, daemon_path, "--config", cfg_path, NULL);
         exit(1);
     }
@@ -79,31 +78,9 @@ static void sleep_ms(long ms) {
 }
 
 /* Initialize a client (following example.c pattern) */
-static AranyaError init_client(Client* c, const char* name, const char* daemon_addr, const char* aqc_addr) {
+static AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
     AranyaError err;
     c->name = name;
-
-    /* Initialize AQC config builder */
-    struct AranyaAqcConfigBuilder aqc_builder;
-    err = aranya_aqc_config_builder_init(&aqc_builder);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "Failed to initialize AqcConfigBuilder\n");
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-    err = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "Failed to set AQC server address\n");
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-
-    struct AranyaAqcConfig aqc_cfg;
-    err = aranya_aqc_config_build(&aqc_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "Failed to build AQC config\n");
-        return err;
-    }
 
     /* Initialize client config builder */
     struct AranyaClientConfigBuilder cli_builder;
@@ -116,13 +93,6 @@ static AranyaError init_client(Client* c, const char* name, const char* daemon_a
     err = aranya_client_config_builder_set_daemon_uds_path(&cli_builder, daemon_addr);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "Failed to set daemon UDS path\n");
-        aranya_client_config_builder_cleanup(&cli_builder);
-        return err;
-    }
-
-    err = aranya_client_config_builder_set_aqc_config(&cli_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "Failed to set AQC config\n");
         aranya_client_config_builder_cleanup(&cli_builder);
         return err;
     }
@@ -183,7 +153,7 @@ static AranyaError init_team(Team* t) {
 
     /* Initialize owner client */
     printf("initializing owner client\n");
-    err = init_client(owner, "owner", g_owner_uds, "127.0.0.1:0");
+    err = init_client(owner, "owner", g_owner_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "Failed to initialize owner: %s\n", aranya_error_to_str(err));
         return err;
@@ -300,20 +270,6 @@ static int test_device_id(void) {
     return sizeof(AranyaDeviceId) > 0;
 }
 
-/* Test: Role enum values */
-static int test_role_enum(void) {
-    printf("\n=== TEST: Role Enum ===\n");
-    
-    /* Verify all role variants are defined */
-    AranyaRole owner = ARANYA_ROLE_OWNER;
-    AranyaRole admin = ARANYA_ROLE_ADMIN;
-    AranyaRole operator = ARANYA_ROLE_OPERATOR;
-    AranyaRole member = ARANYA_ROLE_MEMBER;
-    
-    /* Simple check: roles should be different values */
-    return owner != admin && admin != operator && operator != member;
-}
-
 /* Test: ChanOp enum values */
 static int test_chan_op_enum(void) {
     printf("\n=== TEST: ChanOp Enum ===\n");
@@ -386,7 +342,7 @@ static int test_add_team(void) {
     Client member;
     memset(&member, 0, sizeof(Client));
     
-    err = init_client(&member, "Member", g_member_uds, "127.0.0.1:0");
+    err = init_client(&member, "Member", g_member_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init member client: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);
@@ -531,7 +487,7 @@ static int test_add_remove_team(void) {
     Client member;
     memset(&member, 0, sizeof(Client));
     
-    err = init_client(&member, "Member", g_member_uds, "127.0.0.1:0");
+    err = init_client(&member, "Member", g_member_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init member client: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);
@@ -693,7 +649,7 @@ static int test_add_remove_device(void) {
     Client new_device;
     memset(&new_device, 0, sizeof(Client));
     
-    err = init_client(&new_device, "NewDevice", g_device_uds, "127.0.0.1:0");
+    err = init_client(&new_device, "NewDevice", g_device_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init new device: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);
@@ -754,7 +710,7 @@ static int test_assign_revoke_role(void) {
     Client device;
     memset(&device, 0, sizeof(Client));
     
-    err = init_client(&device, "Device", g_device_uds, "127.0.0.1:0");
+    err = init_client(&device, "Device", g_device_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init device: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);
@@ -867,7 +823,7 @@ static int test_assign_revoke_label(void) {
     Client device;
     memset(&device, 0, sizeof(Client));
     
-    err = init_client(&device, "Device", g_device_uds, "127.0.0.1:0");
+    err = init_client(&device, "Device", g_device_uds);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to init device: %s\n", aranya_error_to_str(err));
         if (team.owner.pk) free(team.owner.pk);

@@ -53,7 +53,7 @@ static pid_t spawn_daemon(const char *daemon_path) {
     pid_t pid = fork();
     if (pid == 0) {
         /* Child process */
-        setenv("ARANYA_DAEMON", "aranya_daemon::aqc=trace,aranya_daemon::api=debug", 1);
+        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
         execl(daemon_path, daemon_path, "--config", "run/daemon.toml", NULL);
         exit(1);
     }
@@ -64,26 +64,7 @@ static pid_t spawn_daemon(const char *daemon_path) {
 static AranyaError init_client(Client *c, const char* name, const char *daemon_addr) {
     AranyaError err;
     c->name = name;
-    
-    /* Build AQC config */
-    AranyaAqcConfigBuilder aqc_builder;
-    err = aranya_aqc_config_builder_init(&aqc_builder);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-    const char *aqc_addr = "127.0.0.1:0";
-    err = aranya_aqc_config_builder_set_address(&aqc_builder, aqc_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        aranya_aqc_config_builder_cleanup(&aqc_builder);
-        return err;
-    }
-    
-    AranyaAqcConfig aqc_cfg;
-    err = aranya_aqc_config_build(&aqc_builder, &aqc_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        return err;
-    }
+
     
     /* Build client config */
     AranyaClientConfigBuilder cli_builder;
@@ -93,12 +74,6 @@ static AranyaError init_client(Client *c, const char* name, const char *daemon_a
         return err;
     }
     err = aranya_client_config_builder_set_daemon_uds_path(&cli_builder, daemon_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        aranya_client_config_builder_cleanup(&cli_builder);
-        return err;
-    }
-    
-    err = aranya_client_config_builder_set_aqc_config(&cli_builder, &aqc_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         aranya_client_config_builder_cleanup(&cli_builder);
         return err;

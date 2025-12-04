@@ -18,7 +18,7 @@ Ensure you have built all required libraries and executables:
 Run this from the workspace root:
 
 ```sh
-cargo build -p aranya-client-capi --features afc,aqc,experimental,preview
+cargo build -p aranya-client-capi --features afc,experimental,preview
 ```
 
 ### 2. Build the daemon
@@ -26,7 +26,7 @@ cargo build -p aranya-client-capi --features afc,aqc,experimental,preview
 Run this from the workspace root:
 
 ```sh
-cargo build -p aranya-daemon --features afc,aqc,experimental,preview
+cargo build -p aranya-daemon --features afc,experimental,preview
 ```
 
 ## Running Tests

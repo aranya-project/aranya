@@ -40,7 +40,7 @@ extern struct aranya_test_config g_aranya_test_config;
 // Client helper structure used by tests. Wraps the generated `AranyaClient`
 // instance plus metadata (device id and key bundle).
 typedef struct {
-    const char* name;
+    char name[64];
     AranyaClient client;
     AranyaDeviceId id;
     uint8_t *pk;
@@ -69,9 +69,11 @@ static inline void aranya_test_config_init(struct aranya_test_config *cfg) {
 // Helper to set daemon path safely
 static inline void aranya_test_set_daemon_path(struct aranya_test_config *cfg, const char *path) {
     if (!cfg || !path) return;
-    size_t i = 0;
-    while (i + 1 < ARANYA_PATH_MAX && path[i]) { cfg->daemon_path[i] = path[i]; ++i; }
-    cfg->daemon_path[i] = '\0';
+
+    size_t copy_len = ARANYA_PATH_MAX - 1;
+
+    strncpy(cfg->daemon_path, path, copy_len);
+    cfg->daemon_path[copy_len] = '\0';
 }
 
 // Small helper to optionally print diagnostics when verbose is enabled
