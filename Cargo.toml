@@ -109,3 +109,24 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-id = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-text = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
+aranya-policy-ast = { git = "https://github.com/aranya-project/aranya-core.git", branch = "399-v2-concurrent-shm-reader" }
