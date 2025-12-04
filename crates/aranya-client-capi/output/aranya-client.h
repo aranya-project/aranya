@@ -20,14 +20,6 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#if defined(ENABLE_ARANYA_AFC) && !defined(ENABLE_ARANYA_PREVIEW)
-    #error "AFC is currently in preview. Set `ENABLE_ARANYA_PREVIEW` to opt into preview APIs."
-#endif
-
-#if defined(ENABLE_ARANYA_AQC) && !defined(ENABLE_ARANYA_EXPERIMENTAL)
-    #error "AQC is currently experimental. Set 'ENABLE_ARANYA_EXPERIMENTAL' to opt into experimental APIs."
-#endif
-
 #ifndef __has_attribute
     #define __has_attribute(x) 0
 #endif /* __has_attribute */
@@ -99,6 +91,11 @@
 #define ARANYA_ID_LEN 32
 
 /**
+ * The number of roles returned from `setup_default_roles`.
+ */
+#define DEFAULT_ROLES_LEN 3
+
+/**
  * The size in bytes of a PSK seed IKM.
  */
 #define ARANYA_SEED_IKM_LEN 32
@@ -128,41 +125,6 @@
 #define ARANYA_AFC_CHANNEL_OVERHEAD 24
 #endif
 
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * An enum containing all [`AranyaAfcChannel`](@ref AranyaAfcChannel) variants.
- */
-enum AranyaAfcChannelType
-#ifdef __cplusplus
-  : uint8_t
-#endif // __cplusplus
- {
-    ARANYA_AFC_CHANNEL_TYPE_BIDIRECTIONAL,
-    ARANYA_AFC_CHANNEL_TYPE_SENDER,
-    ARANYA_AFC_CHANNEL_TYPE_RECEIVER,
-};
-#ifndef __cplusplus
-typedef uint8_t AranyaAfcChannelType;
-#endif // __cplusplus
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An enum containing all [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) variants.
- */
-enum AranyaAqcChannelType
-#ifdef __cplusplus
-  : uint8_t
-#endif // __cplusplus
- {
-    ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL,
-    ARANYA_AQC_CHANNEL_TYPE_RECEIVER,
-};
-#ifndef __cplusplus
-typedef uint8_t AranyaAqcChannelType;
-#endif // __cplusplus
-#endif
-
 /**
  * Valid channel operations for a label assignment.
  */
@@ -182,7 +144,7 @@ enum AranyaChanOp
      */
     ARANYA_CHAN_OP_SEND_ONLY,
     /**
-     * The device can send and receive data in channels with this
+     * The device can send or receive data in channels with this
      * label.
      */
     ARANYA_CHAN_OP_SEND_RECV,
@@ -244,12 +206,6 @@ enum AranyaError
 #if defined(ENABLE_ARANYA_AFC)
     ARANYA_ERROR_WRONG_CHANNEL_TYPE,
 #endif
-#if defined(ENABLE_ARANYA_AQC)
-    /**
-     * AQC library error.
-     */
-    ARANYA_ERROR_AQC,
-#endif
     /**
      * Tried to poll an endpoint but nothing received yet.
      */
@@ -275,34 +231,129 @@ enum AranyaError
 typedef uint32_t AranyaError;
 #endif // __cplusplus
 
+#if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * An enum containing team roles defined in the Aranya policy.
+ * Simple permission.
  */
-enum AranyaRole
+enum AranyaPermission
 #ifdef __cplusplus
   : uint8_t
 #endif // __cplusplus
  {
     /**
-     * Owner role.
+     * The role can add a device to the team.
      */
-    ARANYA_ROLE_OWNER,
+    ARANYA_PERMISSION_ADD_DEVICE,
     /**
-     * Admin role.
+     * The role can remove a device from the team.
      */
-    ARANYA_ROLE_ADMIN,
+    ARANYA_PERMISSION_REMOVE_DEVICE,
     /**
-     * Operator role.
+     * The role can terminate the team. This causes all team
+     * commands to fail until a new team is created.
      */
-    ARANYA_ROLE_OPERATOR,
+    ARANYA_PERMISSION_TERMINATE_TEAM,
     /**
-     * Member role.
+     * The role can create a role.
      */
-    ARANYA_ROLE_MEMBER,
+    ARANYA_PERMISSION_CREATE_ROLE,
+    /**
+     * The role can delete a role.
+     */
+    ARANYA_PERMISSION_DELETE_ROLE,
+    /**
+     * The role can assign a role to other devices.
+     */
+    ARANYA_PERMISSION_ASSIGN_ROLE,
+    /**
+     * The role can revoke a role from other devices.
+     */
+    ARANYA_PERMISSION_REVOKE_ROLE,
+    /**
+     * The role can change role management permissions for roles.
+     */
+    ARANYA_PERMISSION_CHANGE_ROLE_MANAGEMENT_PERMS,
+    /**
+     * The role can set up default roles. This can only be done
+     * once, so this permission can only effectively be used by
+     * the `owner` role.
+     */
+    ARANYA_PERMISSION_SETUP_DEFAULT_ROLE,
+    /**
+     * The role can add a managing role to or remove a managing
+     * role from a target role.
+     */
+    ARANYA_PERMISSION_CHANGE_ROLE_MANAGING_ROLE,
+    /**
+     * The role can create a label.
+     */
+    ARANYA_PERMISSION_CREATE_LABEL,
+    /**
+     * The role can delete a label.
+     */
+    ARANYA_PERMISSION_DELETE_LABEL,
+    /**
+     * The role can grant a target role the ability to manage a
+     * label. This management ability includes deleting a label
+     * and adding/revoking a label to a device.
+     */
+    ARANYA_PERMISSION_CHANGE_LABEL_MANAGING_ROLE,
+    /**
+     * The role can assign a label to a device. The role must
+     * also have label management permissions granted by a role
+     * with the `ChangeLabelManagingRole` permission above.
+     */
+    ARANYA_PERMISSION_ASSIGN_LABEL,
+    /**
+     * The role can revoke a label from a device. The role must
+     * also have label management permissions granted by a role
+     * with the `ChangeLabelManagingRole` permission above.
+     */
+    ARANYA_PERMISSION_REVOKE_LABEL,
+    /**
+     * The role can use AFC. This controls the ability to
+     * create or receive a unidirectional AFC channels.
+     */
+    ARANYA_PERMISSION_CAN_USE_AFC,
+    /**
+     * The role can create a unidirectional AFC channel.
+     */
+    ARANYA_PERMISSION_CREATE_AFC_UNI_CHANNEL,
 };
 #ifndef __cplusplus
-typedef uint8_t AranyaRole;
+typedef uint8_t AranyaPermission;
 #endif // __cplusplus
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Role management permission.
+ */
+enum AranyaRoleManagementPermission
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * Grants a managing role the ability to assign the target role
+     * to any device except itself.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE,
+    /**
+     * Grants a managing role the ability to revoke the target role
+     * from any device.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE,
+    /**
+     * Grants a managing role the ability to change the permissions
+     * assigned to the target role.
+     */
+    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_CHANGE_ROLE_PERMS,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaRoleManagementPermission;
+#endif // __cplusplus
+#endif
 
 /**
  * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
@@ -371,11 +422,30 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfig {
 } AranyaClientConfig;
 
 /**
+ * A role.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaRole {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[112];
+} AranyaRole;
+
+/**
  * Cryptographically secure Aranya ID.
  */
 typedef struct AranyaId {
     uint8_t bytes[ARANYA_ID_LEN];
 } AranyaId;
+
+/**
+ * Uniquely identifies a [`AranyaRole`](@ref AranyaRole).
+ */
+typedef struct AranyaRoleId {
+    struct AranyaId id;
+} AranyaRoleId;
 
 /**
  * Device ID.
@@ -395,36 +465,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
      */
     uint8_t __for_size_only[72];
 } AranyaClientConfigBuilder;
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Configuration info builder for Aranya QUIC Channels config [`AranyaAqcConfig`](@ref AranyaAqcConfig).
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[24];
-} AranyaAqcConfigBuilder;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Configuration info for Aranya QUIC Channels.
- *
- * Use a [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder) to construct this object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[40];
-} AranyaAqcConfig;
-#endif
 
 /**
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
@@ -571,7 +611,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[32];
+    uint8_t __for_size_only[40];
 } AranyaSyncPeerConfig;
 
 /**
@@ -580,7 +620,14 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
 typedef uint64_t AranyaDuration;
 
 /**
- * An AQC label name.
+ * A role name.
+ *
+ * E.g. "owner"
+ */
+typedef const char *AranyaRoleName;
+
+/**
+ * A label name.
  *
  * E.g. "TELEMETRY_LABEL"
  */
@@ -600,134 +647,32 @@ typedef struct AranyaLabelId {
  */
 typedef const char *AranyaAddr;
 
-#if defined(ENABLE_ARANYA_AQC)
+#if defined(ENABLE_ARANYA_AFC)
 /**
- * A network identifier for an Aranya client.
- *
- * E.g. "localhost:8080", "127.0.0.1:8080"
+ * An AFC Sending Channel Object.
  */
-typedef const char *AranyaNetIdentifier;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * A type containing the AQC channel variant.
- *
- * Note that this data is only valid after a successful call to
- * `try_receive_channel`, and is invalidated after calling
- * `get_bidi_channel`/`get_receive_channel`.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[168];
-} AranyaAqcPeerChannel;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An AQC Bidirectional Channel Object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
+typedef struct ARANYA_ALIGNED(8) AranyaAfcSendChannel {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[160];
-} AranyaAqcBidiChannel;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An AQC Sender Channel Object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcSendChannel {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[160];
-} AranyaAqcSendChannel;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An AQC Receiver Channel Object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveChannel {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[160];
-} AranyaAqcReceiveChannel;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An AQC Bidirectional Stream Object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiStream {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[208];
-} AranyaAqcBidiStream;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An AQC Sender Stream Object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcSendStream {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[176];
-} AranyaAqcSendStream;
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * An AQC Receiver Stream Object.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[208];
-} AranyaAqcReceiveStream;
+} AranyaAfcSendChannel;
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * An AFC Channel Object.
- *
- * This can contain a bidirectional, receiver, or sender channel.
- *
- * Note that only bidi and sender channels can call `aranya_afc_seal()`, and
- * only bidi and receiver channels can call `aranya_afc_open()`.
+ * An AFC Receiving Channel Object.
  */
-typedef struct ARANYA_ALIGNED(8) AranyaAfcChannel {
+typedef struct ARANYA_ALIGNED(8) AranyaAfcReceiveChannel {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[96];
-} AranyaAfcChannel;
+    uint8_t __for_size_only[152];
+} AranyaAfcReceiveChannel;
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
@@ -763,6 +708,15 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcSeq {
 } AranyaAfcSeq;
 #endif
 
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Channel ID for AFC channel.
+ */
+typedef struct AranyaAfcChannelId {
+    struct AranyaId id;
+} AranyaAfcChannelId;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -789,17 +743,6 @@ const char *aranya_error_to_str(uint32_t err);
 AranyaError aranya_ext_error_init(struct AranyaExtError *out);
 
 /**
- * Initializes `AranyaExtError`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaExtError
- */
-AranyaError aranya_ext_error_init_ext(struct AranyaExtError *out,
-                                      struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_ext_error_init`.
@@ -807,16 +750,6 @@ AranyaError aranya_ext_error_init_ext(struct AranyaExtError *out,
  * @relates AranyaExtError
  */
 AranyaError aranya_ext_error_cleanup(struct AranyaExtError *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_ext_error_init`.
- *
- * @relates AranyaExtError
- */
-AranyaError aranya_ext_error_cleanup_ext(struct AranyaExtError *ptr,
-                                         struct AranyaExtError *__ext_err);
 
 /**
  * Copies the extended error's message into `msg`.
@@ -831,7 +764,7 @@ AranyaError aranya_ext_error_cleanup_ext(struct AranyaExtError *ptr,
  * updates `msg_len` with the length of the message and
  * returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
  *
- * @param[in] err the error to get a message for [`AranyaExtError`](@ref AranyaExtError).
+ * @param[in] err the error to get a message for.
  * @param[out] msg buffer to copy error message into.
  * @param[in,out] msg_len length of the message buffer.
  *
@@ -854,7 +787,7 @@ AranyaError aranya_ext_error_msg(const struct AranyaExtError *err,
  * updates `msg_len` with the length of the message and
  * returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
  *
- * @param[in] err the error to get a message for [`AranyaExtError`](@ref AranyaExtError).
+ * @param[in] err the error to get a message for.
  * @param[out] msg buffer to copy error message into.
  * @param[in,out] msg_len length of the message buffer.
  *
@@ -868,8 +801,8 @@ AranyaError aranya_ext_error_msg_ext(const struct AranyaExtError *err,
 /**
  * Initializes a new client instance.
  *
- * @param[out] client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
+ * @param[out] client the uninitialized Aranya Client
+ * @param[in] config the client's configuration
  *
  * @relates AranyaClient.
  */
@@ -879,8 +812,8 @@ AranyaError aranya_client_init(struct AranyaClient *client,
 /**
  * Initializes a new client instance.
  *
- * @param[out] client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
+ * @param[out] client the uninitialized Aranya Client
+ * @param[in] config the client's configuration
  *
  * @relates AranyaClient.
  */
@@ -900,12 +833,65 @@ AranyaError aranya_client_cleanup(struct AranyaClient *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_client_init`.
+ * `ptr` must either be null or initialized by `::aranya_role_init`.
  *
- * @relates AranyaClient
+ * @relates AranyaRole
  */
-AranyaError aranya_client_cleanup_ext(struct AranyaClient *ptr,
-                                      struct AranyaExtError *__ext_err);
+AranyaError aranya_role_cleanup(struct AranyaRole *ptr);
+
+/**
+ * Get ID of role.
+ *
+ * @param[in] role the role
+ *
+ * @relates AranyaRole
+ */
+AranyaError aranya_role_get_id(const struct AranyaRole *role,
+                               struct AranyaRoleId *__output);
+
+/**
+ * Get ID of role.
+ *
+ * @param[in] role the role
+ *
+ * @relates AranyaRole
+ */
+AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
+                                   struct AranyaRoleId *__output,
+                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Get name of role.
+ *
+ * The resulting string must not be freed.
+ *
+ * @param[in] role the role
+ *
+ * @relates AranyaRole
+ */
+AranyaError aranya_role_get_name(const struct AranyaRole *role,
+                                 const char **__output);
+
+/**
+ * Get the author of a role.
+ *
+ * @param[in] role the role
+ *
+ * @relates AranyaRole
+ */
+AranyaError aranya_role_get_author(const struct AranyaRole *role,
+                                   struct AranyaDeviceId *__output);
+
+/**
+ * Get the author of a role.
+ *
+ * @param[in] role the role
+ *
+ * @relates AranyaRole
+ */
+AranyaError aranya_role_get_author_ext(const struct AranyaRole *role,
+                                       struct AranyaDeviceId *__output,
+                                       struct AranyaExtError *__ext_err);
 
 /**
  * Initializes logging.
@@ -926,7 +912,7 @@ AranyaError aranya_init_logging_ext(struct AranyaExtError *__ext_err);
 /**
  * Gets the public key bundle for this device.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] client the Aranya Client
  * @param[out] keybundle keybundle byte buffer `KeyBundle`.
  * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
@@ -939,7 +925,7 @@ AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
 /**
  * Gets the public key bundle for this device.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] client the Aranya Client
  * @param[out] keybundle keybundle byte buffer `KeyBundle`.
  * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
@@ -955,8 +941,8 @@ AranyaError aranya_get_key_bundle_ext(const struct AranyaClient *client,
  *
  * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
  *
- * @param[in] device ID [`AranyaId`](@ref AranyaId).
- * @param[out] str ID string [`AranyaId`](@ref AranyaId).
+ * @param[in] device ID
+ * @param[out] str ID string
  * @param[in,out] str_len returns the length of `str`
  *
  * @relates AranyaId.
@@ -977,8 +963,8 @@ AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
 /**
  * Gets the public device ID.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] __output the client's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client
+ * @param[out] __output the client's device ID
  *
  * @relates AranyaClient.
  */
@@ -988,8 +974,8 @@ AranyaError aranya_get_device_id(const struct AranyaClient *client,
 /**
  * Gets the public device ID.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] __output the client's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client
+ * @param[out] __output the client's device ID
  *
  * @relates AranyaClient.
  */
@@ -1008,17 +994,6 @@ AranyaError aranya_get_device_id_ext(const struct AranyaClient *client,
 AranyaError aranya_client_config_builder_init(struct AranyaClientConfigBuilder *out);
 
 /**
- * Initializes `AranyaClientConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaClientConfigBuilder
- */
-AranyaError aranya_client_config_builder_init_ext(struct AranyaClientConfigBuilder *out,
-                                                  struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_client_config_builder_init`.
@@ -1026,16 +1001,6 @@ AranyaError aranya_client_config_builder_init_ext(struct AranyaClientConfigBuild
  * @relates AranyaClientConfigBuilder
  */
 AranyaError aranya_client_config_builder_cleanup(struct AranyaClientConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_client_config_builder_init`.
- *
- * @relates AranyaClientConfigBuilder
- */
-AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBuilder *ptr,
-                                                     struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig).
@@ -1089,143 +1054,6 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaCl
                                                                  const char *address,
                                                                  struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Initializes `AranyaAqcConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAqcConfigBuilder
- */
-AranyaError aranya_aqc_config_builder_init(struct AranyaAqcConfigBuilder *out);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Initializes `AranyaAqcConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAqcConfigBuilder
- */
-AranyaError aranya_aqc_config_builder_init_ext(struct AranyaAqcConfigBuilder *out,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_config_builder_init`.
- *
- * @relates AranyaAqcConfigBuilder
- */
-AranyaError aranya_aqc_config_builder_cleanup(struct AranyaAqcConfigBuilder *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_config_builder_init`.
- *
- * @relates AranyaAqcConfigBuilder
- */
-AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder *ptr,
-                                                  struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
- *
- * This function consumes and releases any resources associated
- * with the memory pointed to by `cfg`.
- *
- * @param[in] cfg a pointer to the aqc config builder
- * @param[out] out a pointer to write the aqc config to
- *
- * @relates AranyaAqcConfigBuilder.
- */
-AranyaError aranya_aqc_config_build(struct AranyaAqcConfigBuilder *cfg,
-                                    struct AranyaAqcConfig *out);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
- *
- * This function consumes and releases any resources associated
- * with the memory pointed to by `cfg`.
- *
- * @param[in] cfg a pointer to the aqc config builder
- * @param[out] out a pointer to write the aqc config to
- *
- * @relates AranyaAqcConfigBuilder.
- */
-AranyaError aranya_aqc_config_build_ext(struct AranyaAqcConfigBuilder *cfg,
-                                        struct AranyaAqcConfig *out,
-                                        struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Sets the network address that the AQC server should listen
- * on.
- *
- * @param[in,out] cfg a pointer to the aqc config builder
- * @param[in] address a string with the address to bind to
- *
- * @relates AranyaAqcConfigBuilder.
- */
-AranyaError aranya_aqc_config_builder_set_address(struct AranyaAqcConfigBuilder *cfg,
-                                                  const char *address);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Sets the network address that the AQC server should listen
- * on.
- *
- * @param[in,out] cfg a pointer to the aqc config builder
- * @param[in] address a string with the address to bind to
- *
- * @relates AranyaAqcConfigBuilder.
- */
-AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuilder *cfg,
-                                                      const char *address,
-                                                      struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Sets the configuration for Aranya QUIC Channels.
- *
- * @param[in,out] cfg a pointer to the client config builder
- * @param[in] aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
- *
- * @relates AranyaAqcConfigBuilder.
- */
-AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfigBuilder *cfg,
-                                                        const struct AranyaAqcConfig *aqc_config);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Sets the configuration for Aranya QUIC Channels.
- *
- * @param[in,out] cfg a pointer to the client config builder
- * @param[in] aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
- *
- * @relates AranyaAqcConfigBuilder.
- */
-AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientConfigBuilder *cfg,
-                                                            const struct AranyaAqcConfig *aqc_config,
-                                                            struct AranyaExtError *__ext_err);
-#endif
-
 /**
  * Initializes `AranyaAddTeamQuicSyncConfigBuilder`.
  *
@@ -1237,17 +1065,6 @@ AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientC
 AranyaError aranya_add_team_quic_sync_config_builder_init(struct AranyaAddTeamQuicSyncConfigBuilder *out);
 
 /**
- * Initializes `AranyaAddTeamQuicSyncConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAddTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_add_team_quic_sync_config_builder_init_ext(struct AranyaAddTeamQuicSyncConfigBuilder *out,
-                                                              struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_add_team_quic_sync_config_builder_init`.
@@ -1255,16 +1072,6 @@ AranyaError aranya_add_team_quic_sync_config_builder_init_ext(struct AranyaAddTe
  * @relates AranyaAddTeamQuicSyncConfigBuilder
  */
 AranyaError aranya_add_team_quic_sync_config_builder_cleanup(struct AranyaAddTeamQuicSyncConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_add_team_quic_sync_config_builder_init`.
- *
- * @relates AranyaAddTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_add_team_quic_sync_config_builder_cleanup_ext(struct AranyaAddTeamQuicSyncConfigBuilder *ptr,
-                                                                 struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaCreateTeamQuicSyncConfigBuilder`.
@@ -1277,17 +1084,6 @@ AranyaError aranya_add_team_quic_sync_config_builder_cleanup_ext(struct AranyaAd
 AranyaError aranya_create_team_quic_sync_config_builder_init(struct AranyaCreateTeamQuicSyncConfigBuilder *out);
 
 /**
- * Initializes `AranyaCreateTeamQuicSyncConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaCreateTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_create_team_quic_sync_config_builder_init_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *out,
-                                                                 struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_create_team_quic_sync_config_builder_init`.
@@ -1295,16 +1091,6 @@ AranyaError aranya_create_team_quic_sync_config_builder_init_ext(struct AranyaCr
  * @relates AranyaCreateTeamQuicSyncConfigBuilder
  */
 AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCreateTeamQuicSyncConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_create_team_quic_sync_config_builder_init`.
- *
- * @relates AranyaCreateTeamQuicSyncConfigBuilder
- */
-AranyaError aranya_create_team_quic_sync_config_builder_cleanup_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *ptr,
-                                                                    struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
@@ -1361,8 +1147,8 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTe
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
  *
- * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder)
- * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
@@ -1374,8 +1160,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreate
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
  *
- * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder)
- * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
@@ -1388,8 +1174,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCr
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
  *
- * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
- * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
@@ -1401,8 +1187,8 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQu
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
  *
- * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
- * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
@@ -1418,8 +1204,8 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTe
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder
+ * @param[out] out a pointer to write the QUIC sync config to
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1432,8 +1218,8 @@ AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQui
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder
+ * @param[out] out a pointer to write the QUIC sync config to
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1447,8 +1233,8 @@ AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTea
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder
+ * @param[out] out a pointer to write the QUIC sync config to
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
@@ -1461,8 +1247,8 @@ AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncC
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder
+ * @param[out] out a pointer to write the QUIC sync config to
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
@@ -1481,17 +1267,6 @@ AranyaError aranya_add_team_quic_sync_config_build_ext(struct AranyaAddTeamQuicS
 AranyaError aranya_add_team_config_builder_init(struct AranyaAddTeamConfigBuilder *out);
 
 /**
- * Initializes `AranyaAddTeamConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaAddTeamConfigBuilder
- */
-AranyaError aranya_add_team_config_builder_init_ext(struct AranyaAddTeamConfigBuilder *out,
-                                                    struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_add_team_config_builder_init`.
@@ -1499,16 +1274,6 @@ AranyaError aranya_add_team_config_builder_init_ext(struct AranyaAddTeamConfigBu
  * @relates AranyaAddTeamConfigBuilder
  */
 AranyaError aranya_add_team_config_builder_cleanup(struct AranyaAddTeamConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_add_team_config_builder_init`.
- *
- * @relates AranyaAddTeamConfigBuilder
- */
-AranyaError aranya_add_team_config_builder_cleanup_ext(struct AranyaAddTeamConfigBuilder *ptr,
-                                                       struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaCreateTeamConfigBuilder`.
@@ -1521,17 +1286,6 @@ AranyaError aranya_add_team_config_builder_cleanup_ext(struct AranyaAddTeamConfi
 AranyaError aranya_create_team_config_builder_init(struct AranyaCreateTeamConfigBuilder *out);
 
 /**
- * Initializes `AranyaCreateTeamConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaCreateTeamConfigBuilder
- */
-AranyaError aranya_create_team_config_builder_init_ext(struct AranyaCreateTeamConfigBuilder *out,
-                                                       struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_create_team_config_builder_init`.
@@ -1541,22 +1295,12 @@ AranyaError aranya_create_team_config_builder_init_ext(struct AranyaCreateTeamCo
 AranyaError aranya_create_team_config_builder_cleanup(struct AranyaCreateTeamConfigBuilder *ptr);
 
 /**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_create_team_config_builder_init`.
- *
- * @relates AranyaCreateTeamConfigBuilder
- */
-AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTeamConfigBuilder *ptr,
-                                                          struct AranyaExtError *__ext_err);
-
-/**
  * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config
+ * @param[in] quic set the QUIC syncer config
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1568,8 +1312,8 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config
+ * @param[in] quic set the QUIC syncer config
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1582,8 +1326,8 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddT
  *
  * By default, the team ID is not set.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
+ * @param[in,out] cfg a pointer to the builder for a team config
+ * @param[in] id a pointer to a
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1595,8 +1339,8 @@ AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuil
  *
  * By default, the team ID is not set.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
+ * @param[in,out] cfg a pointer to the builder for a team config
+ * @param[in] id a pointer to a
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1610,8 +1354,8 @@ AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfig
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[out] out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
+ * @param[in] cfg a pointer to the team config builder
+ * @param[out] out a pointer to write the team config to
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1624,8 +1368,8 @@ AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[out] out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
+ * @param[in] cfg a pointer to the team config builder
+ * @param[out] out a pointer to write the team config to
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1638,8 +1382,8 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config
+ * @param[in] quic set the QUIC syncer config
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1651,8 +1395,8 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config
+ * @param[in] quic set the QUIC syncer config
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1666,8 +1410,8 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaC
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[out] out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
+ * @param[in] cfg a pointer to the team config builder
+ * @param[out] out a pointer to write the team config to
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1680,8 +1424,8 @@ AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[out] out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
+ * @param[in] cfg a pointer to the team config builder
+ * @param[out] out a pointer to write the team config to
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1700,17 +1444,6 @@ AranyaError aranya_create_team_config_build_ext(struct AranyaCreateTeamConfigBui
 AranyaError aranya_sync_peer_config_builder_init(struct AranyaSyncPeerConfigBuilder *out);
 
 /**
- * Initializes `AranyaSyncPeerConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfigBuilder *out,
-                                                     struct AranyaExtError *__ext_err);
-
-/**
  * Releases any resources associated with `ptr`.
  *
  * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
@@ -1720,23 +1453,13 @@ AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfig
 AranyaError aranya_sync_peer_config_builder_cleanup(struct AranyaSyncPeerConfigBuilder *ptr);
 
 /**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerConfigBuilder *ptr,
-                                                        struct AranyaExtError *__ext_err);
-
-/**
  * Attempts to build a [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the builder for a sync config [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder)
- * @param[out] out a pointer to write the sync config to [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig)
+ * @param[in] cfg a pointer to the builder for a sync config
+ * @param[out] out a pointer to write the sync config to
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1749,8 +1472,8 @@ AranyaError aranya_sync_peer_config_build(struct AranyaSyncPeerConfigBuilder *cf
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the builder for a sync config [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder)
- * @param[out] out a pointer to write the sync config to [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig)
+ * @param[in] cfg a pointer to the builder for a sync config
+ * @param[out] out a pointer to write the sync config to
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1766,7 +1489,7 @@ AranyaError aranya_sync_peer_config_build_ext(struct AranyaSyncPeerConfigBuilder
  * this function
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
- * @param[in] interval Set the interval at which syncing occurs
+ * @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1781,7 +1504,7 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
  * this function
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
- * @param[in] interval Set the interval at which syncing occurs
+ * @param[in] interval Set the interval at which syncing occurs (maximum 1 year)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1790,11 +1513,11 @@ AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPe
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Updates the config to enable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
@@ -1803,11 +1526,11 @@ AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPe
 AranyaError aranya_sync_peer_config_builder_set_sync_now(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Updates the config to enable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
  *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
@@ -1817,11 +1540,12 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Updates the config to disable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
+ *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
@@ -1829,11 +1553,12 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
 AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Updates the config to disable immediate syncing with the peer.
+ * Updates the config so the peer will be scheduled for an immediate sync when added.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
  *
- * By default, the peer is synced with immediately.
+ * By default, the peer is scheduled for an immediate sync.
+ *
  * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
@@ -1841,43 +1566,582 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeer
 AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                                struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Sets whether automatic syncing should occur when a hello message is received from this peer
+ * indicating they have a head that we don't have.
+ *
+ * By default, sync on hello is disabled.
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                              uint32_t sync_on_hello);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Sets whether automatic syncing should occur when a hello message is received from this peer
+ * indicating they have a head that we don't have.
+ *
+ * By default, sync on hello is disabled.
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] sync_on_hello whether to enable or disable sync on hello (0 = false, non-zero = true)
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_on_hello_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                                  uint32_t sync_on_hello,
+                                                                  struct AranyaExtError *__ext_err);
+#endif
+
 /**
  * Assign a role to a device.
+ * Setup default roles on team.
+ *
+ * This sets up the following roles with default permissions as
+ * defined in Aranya's default policy:
+ * - admin
+ * - operator
+ * - member
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ *
+ * N.B. this function is meant to be called once to set up the default roles.
+ * Subsequent calls will result in an error if the default roles were already created.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
+ * @param[in] roles_out returns a list of roles that own `role`
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_setup_default_roles(struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *owning_role,
+                                       struct AranyaRole *roles_out,
+                                       size_t *roles_len);
+
+/**
+ * Assign a role to a device.
+ * Setup default roles on team.
+ *
+ * This sets up the following roles with default permissions as
+ * defined in Aranya's default policy:
+ * - admin
+ * - operator
+ * - member
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ *
+ * N.B. this function is meant to be called once to set up the default roles.
+ * Subsequent calls will result in an error if the default roles were already created.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] owning_role the ID of the owning role
+ * @param[in] roles_out returns a list of roles that own `role`
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           const struct AranyaRoleId *owning_role,
+                                           struct AranyaRole *roles_out,
+                                           size_t *roles_len,
+                                           struct AranyaExtError *__ext_err);
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Adds `owning_role` as an owner of role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role ID of the subject role
+ * @param[in] owning_role ID of the owning role
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_role_owner(const struct AranyaClient *client,
+                                  const struct AranyaTeamId *team,
+                                  const struct AranyaRoleId *role,
+                                  const struct AranyaRoleId *owning_role);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Adds `owning_role` as an owner of role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role ID of the subject role
+ * @param[in] owning_role ID of the owning role
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
+                                      const struct AranyaTeamId *team,
+                                      const struct AranyaRoleId *role,
+                                      const struct AranyaRoleId *owning_role,
+                                      struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Removes an owning_role as an owner of role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] owning_role ID of the owning role
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     const struct AranyaRoleId *role,
+                                     const struct AranyaRoleId *owning_role);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Removes an owning_role as an owner of role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] owning_role ID of the owning role
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaRoleId *role,
+                                         const struct AranyaRoleId *owning_role,
+                                         struct AranyaExtError *__ext_err);
+#endif
+
+/**
+ * Returns the roles that own `role`.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] roles_out returns a list of roles that own `role`
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_role_owners(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaRoleId *role,
+                               struct AranyaRole *roles_out,
+                               size_t *roles_len);
+
+/**
+ * Returns the roles that own `role`.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] roles_out returns a list of roles that own `role`
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role,
+                                   struct AranyaRole *roles_out,
+                                   size_t *roles_len,
+                                   struct AranyaExtError *__ext_err);
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Assigns a role management permission to a managing role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] managing_role the ID of the managing role
+ * @param[in] perm the management permission to assign
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_role_management_permission(const struct AranyaClient *client,
+                                                     const struct AranyaTeamId *team,
+                                                     const struct AranyaRoleId *role,
+                                                     const struct AranyaRoleId *managing_role,
+                                                     AranyaRoleManagementPermission perm);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Assigns a role management permission to a managing role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] managing_role the ID of the managing role
+ * @param[in] perm the management permission to assign
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClient *client,
+                                                         const struct AranyaTeamId *team,
+                                                         const struct AranyaRoleId *role,
+                                                         const struct AranyaRoleId *managing_role,
+                                                         AranyaRoleManagementPermission perm,
+                                                         struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Revokes a role management permission from a managing role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] managing_role the ID of the managing role
+ * @param[in] perm the management permission to assign
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *client,
+                                                     const struct AranyaTeamId *team,
+                                                     const struct AranyaRoleId *role,
+                                                     const struct AranyaRoleId *managing_role,
+                                                     AranyaRoleManagementPermission perm);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Revokes a role management permission from a managing role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the subject role
+ * @param[in] managing_role the ID of the managing role
+ * @param[in] perm the management permission to assign
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClient *client,
+                                                         const struct AranyaTeamId *team,
+                                                         const struct AranyaRoleId *role,
+                                                         const struct AranyaRoleId *managing_role,
+                                                         AranyaRoleManagementPermission perm,
+                                                         struct AranyaExtError *__ext_err);
+#endif
+
+/**
+ * Changes the `role` on a `device`
  *
  * This will change the device's current role to the new role assigned.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to assign to the device.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] old_role the ID of the role currently assigned to the device
+ * @param[in] new_role the ID of the role to assign to the device
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_change_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaDeviceId *device,
+                               const struct AranyaRoleId *old_role,
+                               const struct AranyaRoleId *new_role);
+
+/**
+ * Changes the `role` on a `device`
+ *
+ * This will change the device's current role to the new role assigned.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] old_role the ID of the role currently assigned to the device
+ * @param[in] new_role the ID of the role to assign to the device
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_change_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaDeviceId *device,
+                                   const struct AranyaRoleId *old_role,
+                                   const struct AranyaRoleId *new_role,
+                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Returns all of the roles for this team.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] roles_out returns a list of roles on the team
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_roles(const struct AranyaClient *client,
+                              const struct AranyaTeamId *team,
+                              struct AranyaRole *roles_out,
+                              size_t *roles_out_len);
+
+/**
+ * Returns all of the roles for this team.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] roles_out returns a list of roles on the team
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
+                                  const struct AranyaTeamId *team,
+                                  struct AranyaRole *roles_out,
+                                  size_t *roles_out_len,
+                                  struct AranyaExtError *__ext_err);
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Create a role.
+ *
+ * The `owning_role` is the initial owner of the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role_name the name of the new role
+ * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[out] role_out the newly created role
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_create_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               AranyaRoleName role_name,
+                               const struct AranyaRoleId *owning_role,
+                               struct AranyaRole *role_out);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Create a role.
+ *
+ * The `owning_role` is the initial owner of the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role_name the name of the new role
+ * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[out] role_out the newly created role
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_create_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   AranyaRoleName role_name,
+                                   const struct AranyaRoleId *owning_role,
+                                   struct AranyaRole *role_out,
+                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Delete a role.
+ *
+ * The role must not be assigned to any devices, nor should it own any
+ * other roles.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the role to delete
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_delete_role(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaRoleId *role);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Delete a role.
+ *
+ * The role must not be assigned to any devices, nor should it own any
+ * other roles.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the ID of the role to delete
+ *
+ * @relates AranyaClient
+ */
+AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role,
+                                   struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Add a permission to a role.
+ *
+ * It is an error to add a permission already added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being added to
+ * @param[in] perm a permission to add to the role
+ */
+AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaRoleId *role,
+                                    AranyaPermission perm);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Add a permission to a role.
+ *
+ * It is an error to add a permission already added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being added to
+ * @param[in] perm a permission to add to the role
+ */
+AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaRoleId *role,
+                                        AranyaPermission perm,
+                                        struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Remove a permission from a role.
+ *
+ * It is an error to remove a permission not added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being removed from
+ * @param[in] perm a permission to remove from the role
+ */
+AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaRoleId *role,
+                                         AranyaPermission perm);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Remove a permission from a role.
+ *
+ * It is an error to remove a permission not added to the role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID of the role the permission is being removed from
+ * @param[in] perm a permission to remove from the role
+ */
+AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaRoleId *role,
+                                             AranyaPermission perm,
+                                             struct AranyaExtError *__ext_err);
+#endif
+
+/**
+ * Assign a role to a device.
+ *
+ * This will change the device's currently assigned role to the new role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * It is an error if the device has already been assigned a role.
+ * If you want to assign a different role to a device that already
+ * has a role, use `change_role()` instead.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] role_id the ID of the role to assign to the device
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_assign_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaDeviceId *device,
-                               AranyaRole role);
+                               const struct AranyaRoleId *role_id);
 
 /**
  * Assign a role to a device.
  *
- * This will change the device's current role to the new role assigned.
+ * This will change the device's currently assigned role to the new role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to assign to the device.
+ * It is an error if the device has already been assigned a role.
+ * If you want to assign a different role to a device that already
+ * has a role, use `change_role()` instead.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] role_id the ID of the role to assign to the device
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_assign_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaDeviceId *device,
-                                   AranyaRole role,
+                                   const struct AranyaRoleId *role_id,
                                    struct AranyaExtError *__ext_err);
 
 /**
@@ -1885,34 +2149,34 @@ AranyaError aranya_assign_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to revoke from the device.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] role_id the ID of the role to revoke from the device.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_revoke_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaDeviceId *device,
-                               AranyaRole role);
+                               const struct AranyaRoleId *role_id);
 
 /**
  * Revoke a role from a device.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to revoke from the device.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] role_id the ID of the role to revoke from the device.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaDeviceId *device,
-                                   AranyaRole role,
+                                   const struct AranyaRoleId *role_id,
                                    struct AranyaExtError *__ext_err);
 
 /**
@@ -1920,15 +2184,17 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] name label name string
+ * @param[in] managing_role_id the ID of the role that manages this label
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
+                                const struct AranyaRoleId *managing_role_id,
                                 struct AranyaLabelId *__output);
 
 /**
@@ -1936,15 +2202,17 @@ AranyaError aranya_create_label(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] name label name string
+ * @param[in] managing_role_id the ID of the role that manages this label
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
+                                    const struct AranyaRoleId *managing_role_id,
                                     struct AranyaLabelId *__output,
                                     struct AranyaExtError *__ext_err);
 
@@ -1953,9 +2221,9 @@ AranyaError aranya_create_label_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] label_id the channel label ID  to delete.
  *
  * @relates AranyaClient.
  */
@@ -1968,9 +2236,9 @@ AranyaError aranya_delete_label(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] label_id the channel label ID  to delete.
  *
  * @relates AranyaClient.
  */
@@ -1984,10 +2252,10 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label to.
- * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device ID  of the device to assign the label to.
+ * @param[in] label_id the channel label ID
  *
  * @relates AranyaClient.
  */
@@ -2002,10 +2270,10 @@ AranyaError aranya_assign_label(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label to.
- * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device ID  of the device to assign the label to.
+ * @param[in] label_id the channel label ID
  *
  * @relates AranyaClient.
  */
@@ -2021,10 +2289,10 @@ AranyaError aranya_assign_label_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label from.
- * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device ID  of the device to revoke the label from.
+ * @param[in] label_id the channel label ID
  *
  * @relates AranyaClient.
  */
@@ -2038,10 +2306,10 @@ AranyaError aranya_revoke_label(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label from.
- * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device ID  of the device to revoke the label from.
+ * @param[in] label_id the channel label ID
  *
  * @relates AranyaClient.
  */
@@ -2051,12 +2319,51 @@ AranyaError aranya_revoke_label_ext(const struct AranyaClient *client,
                                     const struct AranyaLabelId *label_id,
                                     struct AranyaExtError *__ext_err);
 
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Add label managing role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] label_id the label ID
+ * @param[in] managing_role_id the ID of the managing role
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_label_managing_role(const struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           const struct AranyaLabelId *label_id,
+                                           const struct AranyaRoleId *managing_role_id);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Add label managing role.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] label_id the label ID
+ * @param[in] managing_role_id the ID of the managing role
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_label_managing_role_ext(const struct AranyaClient *client,
+                                               const struct AranyaTeamId *team,
+                                               const struct AranyaLabelId *label_id,
+                                               const struct AranyaRoleId *managing_role_id,
+                                               struct AranyaExtError *__ext_err);
+#endif
+
 /**
  * Create a new graph/team with the current device as the owner.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] cfg the Team Configuration [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
- * @param[out] __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] cfg the Team Configuration
+ * @param[out] __output the team's ID
  *
  * @relates AranyaClient.
  */
@@ -2067,9 +2374,9 @@ AranyaError aranya_create_team(const struct AranyaClient *client,
 /**
  * Create a new graph/team with the current device as the owner.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] cfg the Team Configuration [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
- * @param[out] __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] cfg the Team Configuration
+ * @param[out] __output the team's ID
  *
  * @relates AranyaClient.
  */
@@ -2083,7 +2390,7 @@ AranyaError aranya_create_team_ext(const struct AranyaClient *client,
  *
  * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] client the Aranya Client
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
  *
@@ -2098,7 +2405,7 @@ AranyaError aranya_rand(const struct AranyaClient *client,
  *
  * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] client the Aranya Client
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
  *
@@ -2118,8 +2425,8 @@ AranyaError aranya_rand_ext(const struct AranyaClient *client,
  * Writes the number of bytes that would have been returned to `seed_len`.
  * The application can use `seed_len` to allocate a larger buffer.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team_id the team's ID
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[in] keybundle_len the length of the keybundle
  * @param[out] seed the serialized, encrypted PSK seed.
@@ -2145,8 +2452,8 @@ AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
  * Writes the number of bytes that would have been returned to `seed_len`.
  * The application can use `seed_len` to allocate a larger buffer.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team_id the team's ID
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[in] keybundle_len the length of the keybundle
  * @param[out] seed the serialized, encrypted PSK seed.
@@ -2167,8 +2474,8 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(const struct AranyaClient *clie
 /**
  * Add a team to the local device store.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] cfg the Team Configuration [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ * @param[in] client the Aranya Client
+ * @param[in] cfg the Team Configuration
  *
  * @relates AranyaClient.
  */
@@ -2178,8 +2485,8 @@ AranyaError aranya_add_team(const struct AranyaClient *client,
 /**
  * Add a team to the local device store.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] cfg the Team Configuration [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ * @param[in] client the Aranya Client
+ * @param[in] cfg the Team Configuration
  *
  * @relates AranyaClient.
  */
@@ -2190,8 +2497,8 @@ AranyaError aranya_add_team_ext(const struct AranyaClient *client,
 /**
  * Remove a team from local device storage.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
  *
  * @relates AranyaClient.
  */
@@ -2201,8 +2508,8 @@ AranyaError aranya_remove_team(const struct AranyaClient *client,
 /**
  * Remove a team from local device storage.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
  *
  * @relates AranyaClient.
  */
@@ -2213,8 +2520,8 @@ AranyaError aranya_remove_team_ext(const struct AranyaClient *client,
 /**
  * Close the team and stop all operations on the graph.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
  *
  * @relates AranyaClient.
  */
@@ -2224,8 +2531,8 @@ AranyaError aranya_close_team(const struct AranyaClient *client,
 /**
  * Close the team and stop all operations on the graph.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
  *
  * @relates AranyaClient.
  */
@@ -2238,27 +2545,30 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[in] keybundle_len is the length of the serialized keybundle.
+ * @param[in] role_id (optional) the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
                                       const uint8_t *keybundle,
-                                      size_t keybundle_len);
+                                      size_t keybundle_len,
+                                      const struct AranyaRoleId *role_id);
 
 /**
  * Add a device to the team with the default role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[in] keybundle_len is the length of the serialized keybundle.
+ * @param[in] role_id (optional) the ID of the role to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -2266,6 +2576,7 @@ AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const uint8_t *keybundle,
                                           size_t keybundle_len,
+                                          const struct AranyaRoleId *role_id,
                                           struct AranyaExtError *__ext_err);
 
 /**
@@ -2273,9 +2584,9 @@ AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
  *
  * @relates AranyaClient.
  */
@@ -2288,9 +2599,9 @@ AranyaError aranya_remove_device_from_team(const struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
  *
  * @relates AranyaClient.
  */
@@ -2306,9 +2617,9 @@ AranyaError aranya_remove_device_from_team_ext(const struct AranyaClient *client
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] addr the peer's Aranya network address
  * @param[in] config configuration values for syncing with a peer.
  *
  * @relates AranyaClient.
@@ -2325,9 +2636,9 @@ AranyaError aranya_add_sync_peer(const struct AranyaClient *client,
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] addr the peer's Aranya network address
  * @param[in] config configuration values for syncing with a peer.
  *
  * @relates AranyaClient.
@@ -2341,9 +2652,9 @@ AranyaError aranya_add_sync_peer_ext(const struct AranyaClient *client,
 /**
  * Remove the peer from automatic Aranya state syncing.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] addr the peer's Aranya network address
  *
  * @relates AranyaClient.
  */
@@ -2354,9 +2665,9 @@ AranyaError aranya_remove_sync_peer(const struct AranyaClient *client,
 /**
  * Remove the peer from automatic Aranya state syncing.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] addr the peer's Aranya network address
  *
  * @relates AranyaClient.
  */
@@ -2364,6 +2675,88 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         AranyaAddr addr,
                                         struct AranyaExtError *__ext_err);
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Subscribe to hello notifications from a sync peer.
+ *
+ * This will request the peer to send hello notifications when their graph head changes.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] graph_change_delay minimum delay between notifications when graph changes.
+ * @param[in] duration how long the subscription should remain active.
+ * @param[in] schedule_delay interval for periodic scheduled hello sends.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        AranyaAddr peer,
+                                        AranyaDuration graph_change_delay,
+                                        AranyaDuration duration,
+                                        AranyaDuration schedule_delay);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Subscribe to hello notifications from a sync peer.
+ *
+ * This will request the peer to send hello notifications when their graph head changes.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] graph_change_delay minimum delay between notifications when graph changes.
+ * @param[in] duration how long the subscription should remain active.
+ * @param[in] schedule_delay interval for periodic scheduled hello sends.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_subscribe_ext(const struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            AranyaAddr peer,
+                                            AranyaDuration graph_change_delay,
+                                            AranyaDuration duration,
+                                            AranyaDuration schedule_delay,
+                                            struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Unsubscribe from hello notifications from a sync peer.
+ *
+ * This will stop receiving hello notifications from the specified peer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_unsubscribe(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team,
+                                          AranyaAddr peer);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Unsubscribe from hello notifications from a sync peer.
+ *
+ * This will stop receiving hello notifications from the specified peer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
+                                              const struct AranyaTeamId *team,
+                                              AranyaAddr peer,
+                                              struct AranyaExtError *__ext_err);
+#endif
 
 /**
  * Sync with peer immediately.
@@ -2376,9 +2769,9 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
  * This function ignores [`aranya_sync_peer_config_builder_set_interval`](@ref aranya_sync_peer_config_builder_set_interval) and
  * [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later), if set.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] addr the peer's Aranya network address
  * @param[in] config configuration values for syncing with a peer.
  *
  * Default values for a sync config will be used if `config` is `NULL`
@@ -2401,9 +2794,9 @@ AranyaError aranya_sync_now(const struct AranyaClient *client,
  * This function ignores [`aranya_sync_peer_config_builder_set_interval`](@ref aranya_sync_peer_config_builder_set_interval) and
  * [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later), if set.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] addr the peer's Aranya network address
  * @param[in] config configuration values for syncing with a peer.
  *
  * Default values for a sync config will be used if `config` is `NULL`
@@ -2419,1160 +2812,241 @@ AranyaError aranya_sync_now_ext(const struct AranyaClient *client,
 /**
  * Query devices on team.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in,out] devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] devices returns a list of device IDs on the team
+ * @param[in,out] devices_len returns the length of the devices list
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_devices_on_team(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         struct AranyaDeviceId *devices,
-                                         size_t *devices_len);
+AranyaError aranya_team_devices(const struct AranyaClient *client,
+                                const struct AranyaTeamId *team,
+                                struct AranyaDeviceId *devices,
+                                size_t *devices_len);
 
 /**
  * Query devices on team.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in,out] devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] devices returns a list of device IDs on the team
+ * @param[in,out] devices_len returns the length of the devices list
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_devices_on_team_ext(const struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             struct AranyaDeviceId *devices,
-                                             size_t *devices_len,
-                                             struct AranyaExtError *__ext_err);
-
-/**
- * Query device's keybundle.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] keybundle keybundle byte buffer `KeyBundle`.
- * @param[in,out] keybundle_len returns the length of the serialized keybundle.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_keybundle(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const struct AranyaDeviceId *device,
-                                          uint8_t *keybundle,
-                                          size_t *keybundle_len);
-
-/**
- * Query device's keybundle.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] keybundle keybundle byte buffer `KeyBundle`.
- * @param[in,out] keybundle_len returns the length of the serialized keybundle.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_keybundle_ext(const struct AranyaClient *client,
-                                              const struct AranyaTeamId *team,
-                                              const struct AranyaDeviceId *device,
-                                              uint8_t *keybundle,
-                                              size_t *keybundle_len,
-                                              struct AranyaExtError *__ext_err);
-
-/**
- * Query device label assignments.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_label_assignments(const struct AranyaClient *client,
-                                                  const struct AranyaTeamId *team,
-                                                  const struct AranyaDeviceId *device,
-                                                  struct AranyaLabelId *labels,
-                                                  size_t *labels_len);
-
-/**
- * Query device label assignments.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_label_assignments_ext(const struct AranyaClient *client,
-                                                      const struct AranyaTeamId *team,
-                                                      const struct AranyaDeviceId *device,
-                                                      struct AranyaLabelId *labels,
-                                                      size_t *labels_len,
-                                                      struct AranyaExtError *__ext_err);
-
-/**
- * Query for list of existing labels.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_labels(const struct AranyaClient *client,
-                                const struct AranyaTeamId *team,
-                                struct AranyaLabelId *labels,
-                                size_t *labels_len);
-
-/**
- * Query for list of existing labels.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
- * Writes the number of labels that would have been returned to `labels_len`.
- * The application can use `labels_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
- * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_labels_ext(const struct AranyaClient *client,
+AranyaError aranya_team_devices_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
-                                    struct AranyaLabelId *labels,
-                                    size_t *labels_len,
+                                    struct AranyaDeviceId *devices,
+                                    size_t *devices_len,
                                     struct AranyaExtError *__ext_err);
 
 /**
+ * Returns the role assigned to the device, if any.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] device the ID of the device
+ * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
+ * if a role was not assigned to the device
+ * @param[out] has_role whether a role is assigned to the device
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_role(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaDeviceId *device,
+                                    struct AranyaRole *role_out,
+                                    bool *has_role);
+
+/**
+ * Returns the role assigned to the device, if any.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] device the ID of the device
+ * @param[out] role_out the role assigned to the device. `role_out` will be zeroed
+ * if a role was not assigned to the device
+ * @param[out] has_role whether a role is assigned to the device
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_role_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaDeviceId *device,
+                                        struct AranyaRole *role_out,
+                                        bool *has_role,
+                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Query device's keybundle.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaDeviceId *device,
+                                         uint8_t *keybundle,
+                                         size_t *keybundle_len);
+
+/**
+ * Query device's keybundle.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_keybundle_ext(const struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaDeviceId *device,
+                                             uint8_t *keybundle,
+                                             size_t *keybundle_len,
+                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Query device label assignments.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[out] labels returns a list of labels assigned to the device
+ * @param[in,out] labels_len returns the length of the labels list
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_label_assignments(const struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 struct AranyaLabelId *labels,
+                                                 size_t *labels_len);
+
+/**
+ * Query device label assignments.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[out] labels returns a list of labels assigned to the device
+ * @param[in,out] labels_len returns the length of the labels list
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_device_label_assignments_ext(const struct AranyaClient *client,
+                                                     const struct AranyaTeamId *team,
+                                                     const struct AranyaDeviceId *device,
+                                                     struct AranyaLabelId *labels,
+                                                     size_t *labels_len,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Query for list of existing labels.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] labels returns a list of labels
+ * @param[in,out] labels_len returns the length of the labels list
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_labels(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               struct AranyaLabelId *labels,
+                               size_t *labels_len);
+
+/**
+ * Query for list of existing labels.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] labels returns a list of labels
+ * @param[in,out] labels_len returns the length of the labels list
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_labels_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   struct AranyaLabelId *labels,
+                                   size_t *labels_len,
+                                   struct AranyaExtError *__ext_err);
+
+/**
  * Query if a label exists.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] label the label
  * @param[out] __output boolean indicating whether the label exists.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_label_exists(const struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      const struct AranyaLabelId *label,
-                                      bool *__output);
+AranyaError aranya_team_label_exists(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     const struct AranyaLabelId *label,
+                                     bool *__output);
 
 /**
  * Query if a label exists.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[in] label the label
  * @param[out] __output boolean indicating whether the label exists.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_label_exists_ext(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const struct AranyaLabelId *label,
-                                          bool *__output,
-                                          struct AranyaExtError *__ext_err);
+AranyaError aranya_team_label_exists_ext(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaLabelId *label,
+                                         bool *__output,
+                                         struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Query device's AQC network identifier.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] ident network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- * @param[in,out] length of ident
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_aqc_net_identifier(const struct AranyaClient *client,
-                                            const struct AranyaTeamId *team,
-                                            const struct AranyaDeviceId *device,
-                                            char *ident,
-                                            size_t *ident_len,
-                                            bool *__output);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Query device's AQC network identifier.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[out] ident network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- * @param[in,out] length of ident
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_aqc_net_identifier_ext(const struct AranyaClient *client,
-                                                const struct AranyaTeamId *team,
-                                                const struct AranyaDeviceId *device,
-                                                char *ident,
-                                                size_t *ident_len,
-                                                bool *__output,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Associate a network identifier to a device for use with AQC.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * If the address already exists for this device, it is replaced with the new address. Capable
- * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
- * OpenChannel and receiving messages. Can take either DNS name or IPV4.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_assign_net_identifier(const struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaDeviceId *device,
-                                             AranyaNetIdentifier net_identifier);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Associate a network identifier to a device for use with AQC.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * If the address already exists for this device, it is replaced with the new address. Capable
- * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
- * OpenChannel and receiving messages. Can take either DNS name or IPV4.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_assign_net_identifier_ext(const struct AranyaClient *client,
-                                                 const struct AranyaTeamId *team,
-                                                 const struct AranyaDeviceId *device,
-                                                 AranyaNetIdentifier net_identifier,
-                                                 struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Disassociate an AQC network identifier from a device.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_remove_net_identifier(const struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaDeviceId *device,
-                                             AranyaNetIdentifier net_identifier);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Disassociate an AQC network identifier from a device.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_remove_net_identifier_ext(const struct AranyaClient *client,
-                                                 const struct AranyaTeamId *team,
-                                                 const struct AranyaDeviceId *device,
-                                                 AranyaNetIdentifier net_identifier,
-                                                 struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
+#if defined(ENABLE_ARANYA_AFC)
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_peer_channel_init`.
+ * `ptr` must either be null or initialized by `::aranya_afc_send_channel_init`.
  *
- * @relates AranyaAqcPeerChannel
+ * @relates AranyaAfcSendChannel
  */
-AranyaError aranya_aqc_peer_channel_cleanup(struct AranyaAqcPeerChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_peer_channel_init`.
- *
- * @relates AranyaAqcPeerChannel
- */
-AranyaError aranya_aqc_peer_channel_cleanup_ext(struct AranyaAqcPeerChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_bidi_channel_init`.
- *
- * @relates AranyaAqcBidiChannel
- */
-AranyaError aranya_aqc_bidi_channel_cleanup(struct AranyaAqcBidiChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_bidi_channel_init`.
- *
- * @relates AranyaAqcBidiChannel
- */
-AranyaError aranya_aqc_bidi_channel_cleanup_ext(struct AranyaAqcBidiChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_send_channel_init`.
- *
- * @relates AranyaAqcSendChannel
- */
-AranyaError aranya_aqc_send_channel_cleanup(struct AranyaAqcSendChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_send_channel_init`.
- *
- * @relates AranyaAqcSendChannel
- */
-AranyaError aranya_aqc_send_channel_cleanup_ext(struct AranyaAqcSendChannel *ptr,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_receive_channel_init`.
- *
- * @relates AranyaAqcReceiveChannel
- */
-AranyaError aranya_aqc_receive_channel_cleanup(struct AranyaAqcReceiveChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_receive_channel_init`.
- *
- * @relates AranyaAqcReceiveChannel
- */
-AranyaError aranya_aqc_receive_channel_cleanup_ext(struct AranyaAqcReceiveChannel *ptr,
-                                                   struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_bidi_stream_init`.
- *
- * @relates AranyaAqcBidiStream
- */
-AranyaError aranya_aqc_bidi_stream_cleanup(struct AranyaAqcBidiStream *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_bidi_stream_init`.
- *
- * @relates AranyaAqcBidiStream
- */
-AranyaError aranya_aqc_bidi_stream_cleanup_ext(struct AranyaAqcBidiStream *ptr,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_send_stream_init`.
- *
- * @relates AranyaAqcSendStream
- */
-AranyaError aranya_aqc_send_stream_cleanup(struct AranyaAqcSendStream *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_send_stream_init`.
- *
- * @relates AranyaAqcSendStream
- */
-AranyaError aranya_aqc_send_stream_cleanup_ext(struct AranyaAqcSendStream *ptr,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_receive_stream_init`.
- *
- * @relates AranyaAqcReceiveStream
- */
-AranyaError aranya_aqc_receive_stream_cleanup(struct AranyaAqcReceiveStream *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_aqc_receive_stream_init`.
- *
- * @relates AranyaAqcReceiveStream
- */
-AranyaError aranya_aqc_receive_stream_cleanup_ext(struct AranyaAqcReceiveStream *ptr,
-                                                  struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a bidirectional AQC channel between this device and a peer.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- * @param[in]  label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_create_bidi_channel(const struct AranyaClient *client,
-                                           const struct AranyaTeamId *team,
-                                           AranyaNetIdentifier peer,
-                                           const struct AranyaLabelId *label_id,
-                                           struct AranyaAqcBidiChannel *channel);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a bidirectional AQC channel between this device and a peer.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- * @param[in]  label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_create_bidi_channel_ext(const struct AranyaClient *client,
-                                               const struct AranyaTeamId *team,
-                                               AranyaNetIdentifier peer,
-                                               const struct AranyaLabelId *label_id,
-                                               struct AranyaAqcBidiChannel *channel,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a unidirectional AQC channel between this device and a peer.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- * @param[in]  label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AQC channel object [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_create_uni_channel(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          AranyaNetIdentifier peer,
-                                          const struct AranyaLabelId *label_id,
-                                          struct AranyaAqcSendChannel *channel);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a unidirectional AQC channel between this device and a peer.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- * @param[in]  label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AQC channel object [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
-                                              const struct AranyaTeamId *team,
-                                              AranyaNetIdentifier peer,
-                                              const struct AranyaLabelId *label_id,
-                                              struct AranyaAqcSendChannel *channel,
-                                              struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Delete a bidirectional AQC channel.
- * Zeroizes PSKs associated with the channel.
- * Closes all associated QUIC connections and streams.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
-                                           struct AranyaAqcBidiChannel *channel);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Delete a bidirectional AQC channel.
- * Zeroizes PSKs associated with the channel.
- * Closes all associated QUIC connections and streams.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client,
-                                               struct AranyaAqcBidiChannel *channel,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Delete a send unidirectional AQC channel.
- * Zeroizes PSKs associated with the channel.
- * Closes all associated QUIC connections and streams.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_send_uni_channel(const struct AranyaClient *client,
-                                               struct AranyaAqcSendChannel *channel);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Delete a send unidirectional AQC channel.
- * Zeroizes PSKs associated with the channel.
- * Closes all associated QUIC connections and streams.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_send_uni_channel_ext(const struct AranyaClient *client,
-                                                   struct AranyaAqcSendChannel *channel,
-                                                   struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Delete a receive unidirectional AQC channel.
- * Zeroizes PSKs associated with the channel.
- * Closes all associated QUIC connections and streams.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_receive_uni_channel(const struct AranyaClient *client,
-                                                  struct AranyaAqcReceiveChannel *channel);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Delete a receive unidirectional AQC channel.
- * Zeroizes PSKs associated with the channel.
- * Closes all associated QUIC connections and streams.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_receive_uni_channel_ext(const struct AranyaClient *client,
-                                                      struct AranyaAqcReceiveChannel *channel,
-                                                      struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Tries to poll AQC to see if any channels have been received.
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
- * channels received yet which is considered a non-fatal error.
- *
- * Note that the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) must be converted before it can be used:
- * ```C
- * AranyaAqcPeerChannel channel;
- * AranyaAqcChannelType channel_type;
- * AranyaAqcBidiChannel bidi;
- * AranyaAqcReceiveChannel receiver;
- *
- * aranya_aqc_try_receive_channel(&client, &channel, &channel_type);
- * switch (channel_type) {
- *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
- *         aranya_aqc_get_bidi_channel(&channel, &bidi);
- *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
- *         aranya_aqc_get_receive_channel(&channel, &receiver);
- *         break;
- * }
- * ```
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
- * @param[out] __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_try_receive_channel(const struct AranyaClient *client,
-                                           struct AranyaAqcPeerChannel *channel,
-                                           AranyaAqcChannelType *__output);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Tries to poll AQC to see if any channels have been received.
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
- * channels received yet which is considered a non-fatal error.
- *
- * Note that the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) must be converted before it can be used:
- * ```C
- * AranyaAqcPeerChannel channel;
- * AranyaAqcChannelType channel_type;
- * AranyaAqcBidiChannel bidi;
- * AranyaAqcReceiveChannel receiver;
- *
- * aranya_aqc_try_receive_channel(&client, &channel, &channel_type);
- * switch (channel_type) {
- *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
- *         aranya_aqc_get_bidi_channel(&channel, &bidi);
- *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
- *         aranya_aqc_get_receive_channel(&channel, &receiver);
- *         break;
- * }
- * ```
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
- * @param[out] __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_try_receive_channel_ext(const struct AranyaClient *client,
-                                               struct AranyaAqcPeerChannel *channel,
-                                               AranyaAqcChannelType *__output,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
- *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
- *
- * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
- *
- * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
- * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
- *
- * @relates AranyaAqcPeerChannel.
- */
-AranyaError aranya_aqc_get_bidi_channel(struct AranyaAqcPeerChannel *channel,
-                                        struct AranyaAqcBidiChannel *bidi);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
- *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
- *
- * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
- *
- * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
- * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
- *
- * @relates AranyaAqcPeerChannel.
- */
-AranyaError aranya_aqc_get_bidi_channel_ext(struct AranyaAqcPeerChannel *channel,
-                                            struct AranyaAqcBidiChannel *bidi,
-                                            struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) for receiving data.
- *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
- *
- * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
- *
- * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
- * @param[out] receiver the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- *
- * @relates AranyaAqcPeerChannel.
- */
-AranyaError aranya_aqc_get_receive_channel(struct AranyaAqcPeerChannel *channel,
-                                           struct AranyaAqcReceiveChannel *receiver);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) for receiving data.
- *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
- *
- * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
- *
- * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
- * @param[out] receiver the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- *
- * @relates AranyaAqcPeerChannel.
- */
-AranyaError aranya_aqc_get_receive_channel_ext(struct AranyaAqcPeerChannel *channel,
-                                               struct AranyaAqcReceiveChannel *receiver,
-                                               struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a bidirectional stream from a [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] stream the bidirectional AQC stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_create_bidi_stream(const struct AranyaClient *client,
-                                               struct AranyaAqcBidiChannel *channel,
-                                               struct AranyaAqcBidiStream *stream);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a bidirectional stream from a [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] stream the bidirectional AQC stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_create_bidi_stream_ext(const struct AranyaClient *client,
-                                                   struct AranyaAqcBidiChannel *channel,
-                                                   struct AranyaAqcBidiStream *stream,
-                                                   struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Send some data to a peer using an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] stream the sending side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- * @param[in] data pointer to the data to send.
- * @param[in] data_len length of the data to send.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_stream_send(const struct AranyaClient *client,
-                                        struct AranyaAqcBidiStream *stream,
-                                        const uint8_t *data,
-                                        size_t data_len);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Send some data to a peer using an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] stream the sending side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- * @param[in] data pointer to the data to send.
- * @param[in] data_len length of the data to send.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_stream_send_ext(const struct AranyaClient *client,
-                                            struct AranyaAqcBidiStream *stream,
-                                            const uint8_t *data,
-                                            size_t data_len,
-                                            struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- * @param[out] buffer pointer to the target buffer.
- * @param[in,out] buffer_len length of the target buffer.
- *
- * @relates AranyaAqcBidiStream.
- */
-AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
-                                            uint8_t *buffer,
-                                            size_t *buffer_len);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- * @param[out] buffer pointer to the target buffer.
- * @param[in,out] buffer_len length of the target buffer.
- *
- * @relates AranyaAqcBidiStream.
- */
-AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stream,
-                                                uint8_t *buffer,
-                                                size_t *buffer_len,
-                                                struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a unidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_create_uni_stream(const struct AranyaClient *client,
-                                              struct AranyaAqcBidiChannel *channel,
-                                              struct AranyaAqcSendStream *stream);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a unidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_create_uni_stream_ext(const struct AranyaClient *client,
-                                                  struct AranyaAqcBidiChannel *channel,
-                                                  struct AranyaAqcSendStream *stream,
-                                                  struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Tries to receive the receive (and potentially send) ends of a stream.
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
- * streams received yet which is considered a non-fatal error.
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * Additionally, the send stream will only be initialized if `send_init` is true.
- *
- * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] recv_stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- * @param[out] send_init whether or not we received a `send_stream`.
- *
- * @relates AranyaAqcBidiChannel.
- */
-AranyaError aranya_aqc_bidi_try_receive_stream(struct AranyaAqcBidiChannel *channel,
-                                               struct AranyaAqcReceiveStream *recv_stream,
-                                               struct AranyaAqcSendStream *send_stream,
-                                               bool *send_init);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Tries to receive the receive (and potentially send) ends of a stream.
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
- * streams received yet which is considered a non-fatal error.
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * Additionally, the send stream will only be initialized if `send_init` is true.
- *
- * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] recv_stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- * @param[out] send_init whether or not we received a `send_stream`.
- *
- * @relates AranyaAqcBidiChannel.
- */
-AranyaError aranya_aqc_bidi_try_receive_stream_ext(struct AranyaAqcBidiChannel *channel,
-                                                   struct AranyaAqcReceiveStream *recv_stream,
-                                                   struct AranyaAqcSendStream *send_stream,
-                                                   bool *send_init,
-                                                   struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a unidirectional stream from an [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AQC channel object [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- * @param[out] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_send_create_uni_stream(const struct AranyaClient *client,
-                                              struct AranyaAqcSendChannel *channel,
-                                              struct AranyaAqcSendStream *stream);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Create a unidirectional stream from an [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AQC channel object [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- * @param[out] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_send_create_uni_stream_ext(const struct AranyaClient *client,
-                                                  struct AranyaAqcSendChannel *channel,
-                                                  struct AranyaAqcSendStream *stream,
-                                                  struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Receives the stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- * @param[out] stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- *
- * @relates AranyaAqcReceiveChannel.
- */
-AranyaError aranya_aqc_recv_try_receive_uni_stream(struct AranyaAqcReceiveChannel *channel,
-                                                   struct AranyaAqcReceiveStream *stream);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Receives the stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- *
- * Note that the recipient will not be able to receive the stream until data is
- * sent over the stream.
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- * @param[out] stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- *
- * @relates AranyaAqcReceiveChannel.
- */
-AranyaError aranya_aqc_recv_try_receive_uni_stream_ext(struct AranyaAqcReceiveChannel *channel,
-                                                       struct AranyaAqcReceiveStream *stream,
-                                                       struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Send some data over an [`AranyaAqcSendStream`](@ref AranyaAqcSendStream)m.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- * @param[in] data pointer to the data to send.
- * @param[in] data_len length of the data to send.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_send_stream_send(const struct AranyaClient *client,
-                                        struct AranyaAqcSendStream *stream,
-                                        const uint8_t *data,
-                                        size_t data_len);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Send some data over an [`AranyaAqcSendStream`](@ref AranyaAqcSendStream)m.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- * @param[in] data pointer to the data to send.
- * @param[in] data_len length of the data to send.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_send_stream_send_ext(const struct AranyaClient *client,
-                                            struct AranyaAqcSendStream *stream,
-                                            const uint8_t *data,
-                                            size_t data_len,
-                                            struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[out] buffer pointer to the target buffer.
- * @param[in,out] buffer_len length of the target buffer.
- *
- * @relates AranyaAqcReceiveStream.
- */
-AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *stream,
-                                            uint8_t *buffer,
-                                            size_t *buffer_len);
-#endif
-
-#if defined(ENABLE_ARANYA_AQC)
-/**
- * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- *
- * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[out] buffer pointer to the target buffer.
- * @param[in,out] buffer_len length of the target buffer.
- *
- * @relates AranyaAqcReceiveStream.
- */
-AranyaError aranya_aqc_recv_stream_try_recv_ext(struct AranyaAqcReceiveStream *stream,
-                                                uint8_t *buffer,
-                                                size_t *buffer_len,
-                                                struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_send_channel_cleanup(struct AranyaAfcSendChannel *ptr);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_afc_channel_init`.
+ * `ptr` must either be null or initialized by `::aranya_afc_receive_channel_init`.
  *
- * @relates AranyaAfcChannel
+ * @relates AranyaAfcReceiveChannel
  */
-AranyaError aranya_afc_channel_cleanup(struct AranyaAfcChannel *ptr);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_afc_channel_init`.
- *
- * @relates AranyaAfcChannel
- */
-AranyaError aranya_afc_channel_cleanup_ext(struct AranyaAfcChannel *ptr,
-                                           struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_receive_channel_cleanup(struct AranyaAfcReceiveChannel *ptr);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
@@ -3590,18 +3064,6 @@ AranyaError aranya_afc_ctrl_msg_cleanup(struct AranyaAfcCtrlMsg *ptr);
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_afc_ctrl_msg_init`.
- *
- * @relates AranyaAfcCtrlMsg
- */
-AranyaError aranya_afc_ctrl_msg_cleanup_ext(struct AranyaAfcCtrlMsg *ptr,
-                                            struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Releases any resources associated with `ptr`.
- *
  * `ptr` must either be null or initialized by `::aranya_afc_seq_init`.
  *
  * @relates AranyaAfcSeq
@@ -3611,19 +3073,7 @@ AranyaError aranya_afc_seq_cleanup(struct AranyaAfcSeq *ptr);
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_afc_seq_init`.
- *
- * @relates AranyaAfcSeq
- */
-AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
-                                       struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Create a bidirectional AFC channel between this device and a peer.
+ * Create a send-only AFC channel between this device and a peer.
  *
  * Note that the control message needs to be sent to the other peer using the
  * transport of your choice to create the other side of the channel.
@@ -3632,26 +3082,26 @@ AranyaError aranya_afc_seq_cleanup_ext(struct AranyaAfcSeq *ptr,
  * Both the current node and its peer should have permission to use the label
  * and have appropriate channel permissions.
  *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ * @param[in]  client the Aranya Client
+ * @param[in]  team_id the team's identifier
+ * @param[in]  peer_id the peer's identifier
+ * @param[in]  label_id the label identifier  to create the channel with.
+ * @param[out] channel the AFC channel object
+ * @param[out] control the AFC control message
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_create_bidi_channel(const struct AranyaClient *client,
-                                           const struct AranyaTeamId *team_id,
-                                           const struct AranyaDeviceId *peer_id,
-                                           const struct AranyaLabelId *label_id,
-                                           struct AranyaAfcChannel *channel,
-                                           struct AranyaAfcCtrlMsg *control);
+AranyaError aranya_afc_create_channel(const struct AranyaClient *client,
+                                      const struct AranyaTeamId *team_id,
+                                      const struct AranyaDeviceId *peer_id,
+                                      const struct AranyaLabelId *label_id,
+                                      struct AranyaAfcSendChannel *channel,
+                                      struct AranyaAfcCtrlMsg *control);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Create a bidirectional AFC channel between this device and a peer.
+ * Create a send-only AFC channel between this device and a peer.
  *
  * Note that the control message needs to be sent to the other peer using the
  * transport of your choice to create the other side of the channel.
@@ -3660,223 +3110,199 @@ AranyaError aranya_afc_create_bidi_channel(const struct AranyaClient *client,
  * Both the current node and its peer should have permission to use the label
  * and have appropriate channel permissions.
  *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
+ * @param[in]  client the Aranya Client
+ * @param[in]  team_id the team's identifier
+ * @param[in]  peer_id the peer's identifier
+ * @param[in]  label_id the label identifier  to create the channel with.
+ * @param[out] channel the AFC channel object
+ * @param[out] control the AFC control message
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_create_bidi_channel_ext(const struct AranyaClient *client,
-                                               const struct AranyaTeamId *team_id,
-                                               const struct AranyaDeviceId *peer_id,
-                                               const struct AranyaLabelId *label_id,
-                                               struct AranyaAfcChannel *channel,
-                                               struct AranyaAfcCtrlMsg *control,
+AranyaError aranya_afc_create_channel_ext(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team_id,
+                                          const struct AranyaDeviceId *peer_id,
+                                          const struct AranyaLabelId *label_id,
+                                          struct AranyaAfcSendChannel *channel,
+                                          struct AranyaAfcCtrlMsg *control,
+                                          struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Accept a receive-only AFC channel from by a peer by processing a control message.
+ *
+ * @param[in]  client the Aranya Client
+ * @param[in]  team_id the team's identifier
+ * @param[in]  control the AFC control message.
+ * @param[out] channel the AFC channel object
+ * @param[out] __output the corresponding AFC channel type
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_accept_channel(const struct AranyaClient *client,
+                                      const struct AranyaTeamId *team_id,
+                                      const uint8_t *control,
+                                      size_t control_len,
+                                      struct AranyaAfcReceiveChannel *channel);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Accept a receive-only AFC channel from by a peer by processing a control message.
+ *
+ * @param[in]  client the Aranya Client
+ * @param[in]  team_id the team's identifier
+ * @param[in]  control the AFC control message.
+ * @param[out] channel the AFC channel object
+ * @param[out] __output the corresponding AFC channel type
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_accept_channel_ext(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team_id,
+                                          const uint8_t *control,
+                                          size_t control_len,
+                                          struct AranyaAfcReceiveChannel *channel,
+                                          struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ *
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding label ID
+ */
+AranyaError aranya_afc_send_channel_get_label_id(const struct AranyaAfcSendChannel *channel,
+                                                 struct AranyaLabelId *__output);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ *
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding label ID
+ */
+AranyaError aranya_afc_send_channel_get_label_id_ext(const struct AranyaAfcSendChannel *channel,
+                                                     struct AranyaLabelId *__output,
+                                                     struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ *
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding channel ID
+ */
+AranyaError aranya_afc_send_channel_get_id(const struct AranyaAfcSendChannel *channel,
+                                           struct AranyaAfcChannelId *__output);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel).
+ *
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding channel ID
+ */
+AranyaError aranya_afc_send_channel_get_id_ext(const struct AranyaAfcSendChannel *channel,
+                                               struct AranyaAfcChannelId *__output,
                                                struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Create a send-only AFC channel between this device and a peer.
+ * Returns the device ID of the peer on the other side of the channel.
  *
- * Note that the control message needs to be sent to the other peer using the
- * transport of your choice to create the other side of the channel.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- * Both the current node and its peer should have permission to use the label
- * and have appropriate channel permissions.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
- *
- * @relates AranyaClient.
+ * @param[in]  channel the AFC channel object.
+ * @param[out] __output the peer's ID.
  */
-AranyaError aranya_afc_create_uni_send_channel(const struct AranyaClient *client,
-                                               const struct AranyaTeamId *team_id,
-                                               const struct AranyaDeviceId *peer_id,
-                                               const struct AranyaLabelId *label_id,
-                                               struct AranyaAfcChannel *channel,
-                                               struct AranyaAfcCtrlMsg *control);
+AranyaError aranya_afc_send_channel_get_peer_id(const struct AranyaAfcSendChannel *channel,
+                                                struct AranyaDeviceId *__output);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Create a send-only AFC channel between this device and a peer.
+ * Returns the device ID of the peer on the other side of the channel.
  *
- * Note that the control message needs to be sent to the other peer using the
- * transport of your choice to create the other side of the channel.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- * Both the current node and its peer should have permission to use the label
- * and have appropriate channel permissions.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
- *
- * @relates AranyaClient.
+ * @param[in]  channel the AFC channel object.
+ * @param[out] __output the peer's ID.
  */
-AranyaError aranya_afc_create_uni_send_channel_ext(const struct AranyaClient *client,
-                                                   const struct AranyaTeamId *team_id,
-                                                   const struct AranyaDeviceId *peer_id,
-                                                   const struct AranyaLabelId *label_id,
-                                                   struct AranyaAfcChannel *channel,
-                                                   struct AranyaAfcCtrlMsg *control,
-                                                   struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_send_channel_get_peer_id_ext(const struct AranyaAfcSendChannel *channel,
+                                                    struct AranyaDeviceId *__output,
+                                                    struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Create a receive-only AFC channel between this device and a peer.
+ * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  *
- * Note that the control message needs to be sent to the other peer using the
- * transport of your choice to create the other side of the channel.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- * Both the current node and its peer should have permission to use the label
- * and have appropriate channel permissions.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
- *
- * @relates AranyaClient.
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding label ID
  */
-AranyaError aranya_afc_create_uni_recv_channel(const struct AranyaClient *client,
-                                               const struct AranyaTeamId *team_id,
-                                               const struct AranyaDeviceId *peer_id,
-                                               const struct AranyaLabelId *label_id,
-                                               struct AranyaAfcChannel *channel,
-                                               struct AranyaAfcCtrlMsg *control);
+AranyaError aranya_afc_receive_channel_get_label_id(const struct AranyaAfcReceiveChannel *channel,
+                                                    struct AranyaLabelId *__output);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Create a receive-only AFC channel between this device and a peer.
+ * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  *
- * Note that the control message needs to be sent to the other peer using the
- * transport of your choice to create the other side of the channel.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- * Both the current node and its peer should have permission to use the label
- * and have appropriate channel permissions.
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  peer_id the peer's identifier [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param[in]  label_id the label identifier [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] control the AFC control message [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg)
- *
- * @relates AranyaClient.
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding label ID
  */
-AranyaError aranya_afc_create_uni_recv_channel_ext(const struct AranyaClient *client,
-                                                   const struct AranyaTeamId *team_id,
-                                                   const struct AranyaDeviceId *peer_id,
-                                                   const struct AranyaLabelId *label_id,
-                                                   struct AranyaAfcChannel *channel,
-                                                   struct AranyaAfcCtrlMsg *control,
-                                                   struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_receive_channel_get_label_id_ext(const struct AranyaAfcReceiveChannel *channel,
+                                                        struct AranyaLabelId *__output,
+                                                        struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Use an ephemeral command to create an AFC channel between this device and a peer.
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  control the AFC control message.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
- *
- * @relates AranyaClient.
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding channel ID
  */
-AranyaError aranya_afc_recv_ctrl(const struct AranyaClient *client,
-                                 const struct AranyaTeamId *team_id,
-                                 const uint8_t *control,
-                                 size_t control_len,
-                                 struct AranyaAfcChannel *channel,
-                                 AranyaAfcChannelType *__output);
+AranyaError aranya_afc_receive_channel_get_id(const struct AranyaAfcReceiveChannel *channel,
+                                              struct AranyaAfcChannelId *__output);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Use an ephemeral command to create an AFC channel between this device and a peer.
+ * Returns the [`AranyaAfcChannelId`](@ref AranyaAfcChannelId) for the associated [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel).
  *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  team_id the team's identifier [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in]  control the AFC control message.
- * @param[out] channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
- *
- * @relates AranyaClient.
+ * @param[in]  channel the AFC channel object
+ * @param[out] __output the corresponding channel ID
  */
-AranyaError aranya_afc_recv_ctrl_ext(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team_id,
-                                     const uint8_t *control,
-                                     size_t control_len,
-                                     struct AranyaAfcChannel *channel,
-                                     AranyaAfcChannelType *__output,
-                                     struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_receive_channel_get_id_ext(const struct AranyaAfcReceiveChannel *channel,
+                                                  struct AranyaAfcChannelId *__output,
+                                                  struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Returns the [`AranyaAfcChannelType`](@ref AranyaAfcChannelType) for a given [`AranyaAfcChannel`](@ref AranyaAfcChannel) container.
+ * Returns the device ID of the peer on the other side of the channel.
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
+ * @param[in]  channel the AFC channel object.
+ * @param[out] __output the peer's ID.
  */
-AranyaError aranya_afc_get_channel_type(const struct AranyaAfcChannel *channel,
-                                        AranyaAfcChannelType *__output);
+AranyaError aranya_afc_receive_channel_get_peer_id(const struct AranyaAfcReceiveChannel *channel,
+                                                   struct AranyaDeviceId *__output);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Returns the [`AranyaAfcChannelType`](@ref AranyaAfcChannelType) for a given [`AranyaAfcChannel`](@ref AranyaAfcChannel) container.
+ * Returns the device ID of the peer on the other side of the channel.
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] __output the corresponding AFC channel type [`AranyaAfcChannelType`](@ref AranyaAfcChannelType).
+ * @param[in]  channel the AFC channel object.
+ * @param[out] __output the peer's ID.
  */
-AranyaError aranya_afc_get_channel_type_ext(const struct AranyaAfcChannel *channel,
-                                            AranyaAfcChannelType *__output,
-                                            struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] __output the corresponding label ID [`AranyaLabelId`](@ref AranyaLabelId).
- */
-AranyaError aranya_afc_get_label_id(const struct AranyaAfcChannel *channel,
-                                    struct AranyaLabelId *__output);
-#endif
-
-#if defined(ENABLE_ARANYA_AFC)
-/**
- * Returns the [`AranyaLabelId`](@ref AranyaLabelId) for the associated [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
- * @param[out] __output the corresponding label ID [`AranyaLabelId`](@ref AranyaLabelId).
- */
-AranyaError aranya_afc_get_label_id_ext(const struct AranyaAfcChannel *channel,
-                                        struct AranyaLabelId *__output,
-                                        struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_receive_channel_get_peer_id_ext(const struct AranyaAfcReceiveChannel *channel,
+                                                       struct AranyaDeviceId *__output,
+                                                       struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
@@ -3885,7 +3311,7 @@ AranyaError aranya_afc_get_label_id_ext(const struct AranyaAfcChannel *channel,
  *
  * Note that the lifetime of the pointer is tied to the [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  control the control message produced by creating a channel.
  * @param[out] ptr the raw pointer of the stored buffer.
  * @param[out] len the raw length of the stored buffer.
  */
@@ -3900,7 +3326,7 @@ AranyaError aranya_afc_ctrl_msg_get_bytes(const struct AranyaAfcCtrlMsg *control
  *
  * Note that the lifetime of the pointer is tied to the [`AranyaAfcCtrlMsg`](@ref AranyaAfcCtrlMsg).
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  control the control message produced by creating a channel.
  * @param[out] ptr the raw pointer of the stored buffer.
  * @param[out] len the raw length of the stored buffer.
  */
@@ -3944,11 +3370,11 @@ AranyaError aranya_afc_seq_cmp_ext(const struct AranyaAfcSeq *seq1,
  * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  channel the AFC channel object
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal(const struct AranyaAfcChannel *channel,
+AranyaError aranya_afc_channel_seal(struct AranyaAfcSendChannel *channel,
                                     const uint8_t *plaintext,
                                     size_t plaintext_len,
                                     uint8_t *dst,
@@ -3962,11 +3388,11 @@ AranyaError aranya_afc_channel_seal(const struct AranyaAfcChannel *channel,
  * Note that `dst` must be at least `plaintext.len()` + `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  channel the AFC channel object
  * @param[in]  plaintext the message being encrypted.
  * @param[out] dst the output buffer the ciphertext is written to.
  */
-AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcChannel *channel,
+AranyaError aranya_afc_channel_seal_ext(struct AranyaAfcSendChannel *channel,
                                         const uint8_t *plaintext,
                                         size_t plaintext_len,
                                         uint8_t *dst,
@@ -3981,12 +3407,12 @@ AranyaError aranya_afc_channel_seal_ext(const struct AranyaAfcChannel *channel,
  * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  channel the AFC channel object
  * @param[in]  ciphertext the message being decrypted.
  * @param[out] dst the output buffer the message is written to.
  * @param[out] seq the sequence number for the opened message, for reordering.
  */
-AranyaError aranya_afc_channel_open(const struct AranyaAfcChannel *channel,
+AranyaError aranya_afc_channel_open(const struct AranyaAfcReceiveChannel *channel,
                                     const uint8_t *ciphertext,
                                     size_t ciphertext_len,
                                     uint8_t *dst,
@@ -4001,12 +3427,12 @@ AranyaError aranya_afc_channel_open(const struct AranyaAfcChannel *channel,
  * Note that `dst` must be at least `ciphertext.len()` - `aranya_afc_channel_overhead()`,
  * or the function will return an error (`InvalidArgument` or `BufferTooSmall`).
  *
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  channel the AFC channel object
  * @param[in]  ciphertext the message being decrypted.
  * @param[out] dst the output buffer the message is written to.
  * @param[out] seq the sequence number for the opened message, for reordering.
  */
-AranyaError aranya_afc_channel_open_ext(const struct AranyaAfcChannel *channel,
+AranyaError aranya_afc_channel_open_ext(const struct AranyaAfcReceiveChannel *channel,
                                         const uint8_t *ciphertext,
                                         size_t ciphertext_len,
                                         uint8_t *dst,
@@ -4017,35 +3443,68 @@ AranyaError aranya_afc_channel_open_ext(const struct AranyaAfcChannel *channel,
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Removes an [`AranyaAfcChannel`](@ref AranyaAfcChannel) from use.
+ * Removes an [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel) from use.
  *
- * Note that this function takes ownership of the [`AranyaAfcChannel`](@ref AranyaAfcChannel) and invalidates
- * any further use (i.e. calling open/seal).
+ * Note that this function takes ownership of the [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel) and invalidates
+ * any further use (i.e. calling seal).
  *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  client the Aranya Client
+ * @param[in]  channel the AFC channel object
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_channel_delete(const struct AranyaClient *client,
-                                      struct AranyaAfcChannel *channel);
+AranyaError aranya_afc_send_channel_delete(const struct AranyaClient *client,
+                                           struct AranyaAfcSendChannel *channel);
 #endif
 
 #if defined(ENABLE_ARANYA_AFC)
 /**
- * Removes an [`AranyaAfcChannel`](@ref AranyaAfcChannel) from use.
+ * Removes an [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel) from use.
  *
- * Note that this function takes ownership of the [`AranyaAfcChannel`](@ref AranyaAfcChannel) and invalidates
- * any further use (i.e. calling open/seal).
+ * Note that this function takes ownership of the [`AranyaAfcSendChannel`](@ref AranyaAfcSendChannel) and invalidates
+ * any further use (i.e. calling seal).
  *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  channel the AFC channel object [`AranyaAfcChannel`](@ref AranyaAfcChannel).
+ * @param[in]  client the Aranya Client
+ * @param[in]  channel the AFC channel object
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_afc_channel_delete_ext(const struct AranyaClient *client,
-                                          struct AranyaAfcChannel *channel,
-                                          struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_send_channel_delete_ext(const struct AranyaClient *client,
+                                               struct AranyaAfcSendChannel *channel,
+                                               struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Removes an [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel) from use.
+ *
+ * Note that this function takes ownership of the [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel) and invalidates
+ * any further use (i.e. calling seal).
+ *
+ * @param[in]  client the Aranya Client
+ * @param[in]  channel the AFC channel object
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_receive_channel_delete(const struct AranyaClient *client,
+                                              struct AranyaAfcReceiveChannel *channel);
+#endif
+
+#if defined(ENABLE_ARANYA_AFC)
+/**
+ * Removes an [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel) from use.
+ *
+ * Note that this function takes ownership of the [`AranyaAfcReceiveChannel`](@ref AranyaAfcReceiveChannel) and invalidates
+ * any further use (i.e. calling seal).
+ *
+ * @param[in]  client the Aranya Client
+ * @param[in]  channel the AFC channel object
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_receive_channel_delete_ext(const struct AranyaClient *client,
+                                                  struct AranyaAfcReceiveChannel *channel,
+                                                  struct AranyaExtError *__ext_err);
 #endif
 
 #ifdef __cplusplus

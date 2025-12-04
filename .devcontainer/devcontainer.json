@@ -1,0 +1,14 @@
+{
+  "name": "Codespaces Rust Starter",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "dockerFile": "Dockerfile"
+}

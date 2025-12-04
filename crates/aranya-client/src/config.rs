@@ -9,11 +9,19 @@ use crate::{error::InvalidArg, ConfigError, Result};
 pub mod team;
 pub use team::*;
 
+/// Maximum sync interval of 1 year (365 days).
+///
+/// This limit prevents overflow when calculating deadlines in DelayQueue::insert(),
+/// which adds the interval to Instant::now().
+pub const MAX_SYNC_INTERVAL: Duration = Duration::from_secs(365 * 24 * 60 * 60);
+
 /// Configuration info for syncing with a peer.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SyncPeerConfig {
-    interval: Duration,
+    interval: Option<Duration>,
     sync_now: bool,
+    #[cfg(feature = "preview")]
+    sync_on_hello: bool,
 }
 
 impl SyncPeerConfig {
@@ -28,6 +36,8 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
         Self {
             interval: value.interval,
             sync_now: value.sync_now,
+            #[cfg(feature = "preview")]
+            sync_on_hello: value.sync_on_hello,
         }
     }
 }
@@ -37,6 +47,8 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
+    #[cfg(feature = "preview")]
+    sync_on_hello: bool,
 }
 
 impl SyncPeerConfigBuilder {
@@ -47,34 +59,52 @@ impl SyncPeerConfigBuilder {
 
     /// Attempts to build a [`SyncPeerConfig`] using the provided parameters.
     pub fn build(self) -> Result<SyncPeerConfig> {
-        let Some(interval) = self.interval else {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "interval",
-                "must call `SyncPeerConfigBuilder::interval`",
-            ))
-            .into());
-        };
+        // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
+        // in DelayQueue::insert() (which calculates deadline as current_time + interval)
+        if let Some(interval) = self.interval {
+            if interval > MAX_SYNC_INTERVAL {
+                return Err(ConfigError::InvalidArg(InvalidArg::new(
+                    "duration",
+                    "must not exceed 1 year to prevent overflow",
+                ))
+                .into());
+            }
+        }
 
         Ok(SyncPeerConfig {
-            interval,
+            interval: self.interval,
             sync_now: self.sync_now,
+            #[cfg(feature = "preview")]
+            sync_on_hello: self.sync_on_hello,
         })
     }
 
     /// Sets the interval at which syncing occurs.
     ///
-    /// By default, the interval is not set. It is an error to call [`build`][Self::build] before
-    /// setting the interval with this method
+    /// The interval must be less than 1 year to prevent overflow when calculating deadlines.
+    ///
+    /// By default, the interval is not set (None), which means the peer will not be periodically synced.
     pub fn interval(mut self, duration: Duration) -> Self {
         self.interval = Some(duration);
         self
     }
 
-    /// Configures whether the peer will be immediately synced with after being added.
+    /// Configures whether the peer will be scheduled for an immediate sync when added.
     ///
-    /// By default, the peer is immediately synced with.
+    /// By default, the peer is scheduled for an immediate sync.
     pub fn sync_now(mut self, sync_now: bool) -> Self {
         self.sync_now = sync_now;
+        self
+    }
+
+    /// Configures whether to automatically sync when a hello message is received from this peer
+    /// indicating they have a head that we don't have.
+    ///
+    /// By default, sync on hello is disabled.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    pub fn sync_on_hello(mut self, sync_on_hello: bool) -> Self {
+        self.sync_on_hello = sync_on_hello;
         self
     }
 }
@@ -84,6 +114,8 @@ impl Default for SyncPeerConfigBuilder {
         Self {
             interval: None,
             sync_now: true,
+            #[cfg(feature = "preview")]
+            sync_on_hello: false,
         }
     }
 }

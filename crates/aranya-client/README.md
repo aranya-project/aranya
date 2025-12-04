@@ -34,7 +34,7 @@ The client provides the following functionality:
 - Create and delete Fast Channels channels as determined by the implemented
   policy
 - Send and receive encrypted data using Aranya Fast Channels. Fast Channels
-  supports bidirectional encrypted data exchange over TCP transport.
+  supports encrypted data exchange over TCP transport.
 Note: The functionality noted 'as determined by the implemented policy' are
 defined in the [default policy](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/src/policy.md). As such, these
 may differ depending on the policy implemented in your application.

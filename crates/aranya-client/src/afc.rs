@@ -1,17 +1,22 @@
 //! AFC support.
+
+#![cfg(feature = "afc")]
+#![cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+
 use core::fmt;
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     sync::{Arc, Mutex},
 };
 
 use anyhow::Context;
-use aranya_daemon_api::{AfcChannelId, AfcShmInfo, ChanOp, DaemonApiClient, CS};
+use aranya_daemon_api::{AfcChannelId, AfcLocalChannelId, AfcShmInfo, DaemonApiClient, CS};
 use aranya_fast_channels::{
     self as afc,
     shm::{Flag, Mode, ReadState},
-    Client as AfcClient,
+    AfcState, Client as AfcClient,
 };
+use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tracing::debug;
@@ -54,6 +59,20 @@ impl From<Box<[u8]>> for CtrlMsg {
     }
 }
 
+/// A globally unique channel ID.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ChannelId {
+    #[doc(hidden)]
+    pub __id: AfcChannelId,
+}
+
+impl Display for ChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.__id, f)
+    }
+}
+
 /// AFC seal error.
 #[derive(Debug, thiserror::Error)]
 pub struct AfcSealError(
@@ -61,9 +80,9 @@ pub struct AfcSealError(
     aranya_fast_channels::Error,
 );
 
-impl fmt::Display for AfcSealError {
+impl Display for AfcSealError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -74,9 +93,9 @@ pub struct AfcOpenError(
     aranya_fast_channels::Error,
 );
 
-impl fmt::Display for AfcOpenError {
+impl Display for AfcOpenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -121,17 +140,6 @@ impl Debug for Channels {
     }
 }
 
-/// A channel.
-#[derive(Clone, Debug)]
-pub enum Channel {
-    /// A bidirectional channel.
-    Bidi(BidiChannel),
-    /// A unidirectional send channel.
-    Send(SendChannel),
-    /// A unidirectional receive channel.
-    Recv(ReceiveChannel),
-}
-
 impl Channels {
     /// The number of additional octets required to encrypt
     /// plaintext data.
@@ -141,52 +149,11 @@ impl Channels {
         Self { daemon, keys }
     }
 
-    /// Create a bidirectional channel [`BidiChannel`] between two peers.
-    ///
-    /// The creator of the channel will have a bidirectional channel [`BidiChannel`] that can `open()` and `seal()` data.
-    ///
-    /// Once the peer processes the [`CtrlMsg`] message with `recv_ctrl()`,
-    /// it will have a corresponding bidirectional channel [`BidiChannel`] object that can also `open()` and `seal()` data.
-    ///
-    /// To send data from one peer to the other:
-    /// - Invoke `seal()` on the data to obtain a ciphertext buffer.
-    /// - Send the ciphertext to the peer via any network transport.
-    /// - On the peer, invoke `open()` on the ciphertext to obtain the plaintext.
-    ///
-    /// Returns:
-    /// - A bidirectional channel object that can `open()` and `seal()` data.
-    /// - A [`CtrlMsg`] message to send to the peer.
-    pub async fn create_bidi_channel(
-        &self,
-        team_id: TeamId,
-        peer_id: DeviceId,
-        label_id: LabelId,
-    ) -> Result<(BidiChannel, CtrlMsg)> {
-        let (ctrl, channel_id) = self
-            .daemon
-            .create_afc_bidi_channel(
-                context::current(),
-                team_id.__id,
-                peer_id.__id,
-                label_id.__id,
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        let chan = BidiChannel {
-            daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
-            channel_id,
-            label_id,
-        };
-        Ok((chan, CtrlMsg(ctrl)))
-    }
-
     /// Create a unidirectional send-only channel [`SendChannel`].
     ///
     /// The creator of the channel will have a unidirectional channel [`SendChannel`] that can only `seal()` data.
     ///
-    /// Once the peer processes the [`CtrlMsg`] message with `recv_ctrl()`,
+    /// Once the peer processes the [`CtrlMsg`] message with `accept_channel()`,
     /// it will have a corresponding unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
     ///
     /// To send data from the creator of the channel to the peer:
@@ -197,209 +164,97 @@ impl Channels {
     /// Returns:
     /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
     /// - A [`CtrlMsg`] message to send to the peer.
-    pub async fn create_uni_send_channel(
+    ///
+    /// # Panics
+    ///
+    /// Will panic on poisoned internal mutexes.
+    pub async fn create_channel(
         &self,
         team_id: TeamId,
         peer_id: DeviceId,
         label_id: LabelId,
     ) -> Result<(SendChannel, CtrlMsg)> {
-        let (ctrl, channel_id) = self
+        let info = self
             .daemon
-            .create_afc_uni_send_channel(
+            .create_afc_channel(
                 context::current(),
-                team_id.__id,
-                peer_id.__id,
-                label_id.__id,
+                team_id.into_api(),
+                peer_id.into_api(),
+                label_id.into_api(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        let chan = SendChannel {
-            daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
-            channel_id,
-            label_id,
-        };
-        Ok((chan, CtrlMsg(ctrl)))
-    }
-
-    /// Create a unidirectional receive-only channel [`ReceiveChannel`].
-    ///
-    /// The creator of the channel will have a unidirectional channel [`ReceiveChannel`] that can only `open()` data.
-    ///
-    /// Once the peer processes the [`CtrlMsg`] message with `recv_ctrl()`,
-    /// it will have a corresponding unidirectional channel [`SendChannel`] object that can only `seal()` data.
-    ///
-    /// To send data from the peer to the creator of the channel:
-    /// - On the peer, invoke `seal()` on the data to obtain a ciphertext buffer.
-    /// - Send the ciphertext to the creator of the channel via any network transport.
-    /// - On the creator, invoke `open()` on the ciphertext to obtain the plaintext.
-    ///
-    /// Returns:
-    /// - A unidirectional channel [`ReceiveChannel`] object that can only `open()` data.
-    /// - A [`CtrlMsg`] message to send to the peer.
-    pub async fn create_uni_recv_channel(
-        &self,
-        team_id: TeamId,
-        peer_id: DeviceId,
-        label_id: LabelId,
-    ) -> Result<(ReceiveChannel, CtrlMsg)> {
-        let (ctrl, channel_id) = self
-            .daemon
-            .create_afc_uni_recv_channel(
-                context::current(),
-                team_id.__id,
-                peer_id.__id,
-                label_id.__id,
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        let chan = ReceiveChannel {
-            daemon: self.daemon.clone(),
-            keys: self.keys.clone(),
-            channel_id,
-            label_id,
-        };
-        Ok((chan, CtrlMsg(ctrl)))
-    }
-
-    /// Receive a [`CtrlMsg`] message from a peer to create a corresponding channel.
-    ///
-    /// The type of channel returned by this method depends on which type of channel the peer created:
-    /// - If the peer created a [`BidiChannel`], this will return a [`BidiChannel`]
-    /// - If the peer created a [`SendChannel`], this will return a [`ReceiveChannel`]
-    /// - If the peer created a [`ReceiveChannel`], this will return a [`SendChannel`]
-    ///
-    /// Returns a [`Channel`] enum that can be matched into any of the following channel types:
-    /// - [`BidiChannel`]
-    /// - [`SendChannel`]
-    /// - [`ReceiveChannel`]
-    pub async fn recv_ctrl(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<Channel> {
-        let (label_id, channel_id, op) = self
-            .daemon
-            .receive_afc_ctrl(context::current(), team_id.__id, ctrl.0)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        match op {
-            ChanOp::RecvOnly => Ok(Channel::Recv(ReceiveChannel {
-                daemon: self.daemon.clone(),
-                keys: self.keys.clone(),
-                channel_id,
-                label_id: LabelId { __id: label_id },
-            })),
-            ChanOp::SendOnly => Ok(Channel::Send(SendChannel {
-                daemon: self.daemon.clone(),
-                keys: self.keys.clone(),
-                channel_id,
-                label_id: LabelId { __id: label_id },
-            })),
-            ChanOp::SendRecv => Ok(Channel::Bidi(BidiChannel {
-                daemon: self.daemon.clone(),
-                keys: self.keys.clone(),
-                channel_id,
-                label_id: LabelId { __id: label_id },
-            })),
-        }
-    }
-}
-
-/// A bidirectional channel.
-#[derive(Clone, Debug)]
-pub struct BidiChannel {
-    daemon: DaemonApiClient,
-    keys: Arc<Mutex<ChannelKeys>>,
-    channel_id: AfcChannelId,
-    label_id: LabelId,
-}
-
-impl BidiChannel {
-    // TODO: return channel's unique ID.
-
-    /// The channel's label ID.
-    pub fn label_id(&self) -> LabelId {
-        self.label_id
-    }
-
-    /// Encrypts and authenticates `plaintext` for a channel.
-    ///
-    /// The resulting ciphertext is written to `dst`, which must
-    /// be at least `plaintext.len() + Channels::OVERHEAD` bytes
-    /// long.
-    ///
-    /// Note: it is an error to invoke this method after the channel has been deleted.
-    ///
-    /// # Panics
-    ///
-    /// Will panic on poisoned internal mutexes.
-    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
-        debug!(?self.channel_id, ?self.label_id, "seal");
-        self.keys
-            .lock()
-            .expect("poisoned")
-            .0
-            .seal(self.channel_id, dst, plaintext)
-            .map_err(AfcSealError)
-            .map_err(Error::Seal)?;
-        Ok(())
-    }
-
-    /// Decrypts and authenticates `ciphertext` received from
-    /// from `peer`.
-    ///
-    /// The resulting plaintext is written to `dst`, which must
-    /// be at least `ciphertext.len() - Channels::OVERHEAD` bytes
-    /// long.
-    ///
-    /// It returns the cryptographically verified label and
-    /// sequence number associated with the ciphertext.
-    ///
-    /// Note: it is an error to invoke this method after the channel has been deleted.
-    ///
-    /// # Panics
-    ///
-    /// Will panic on poisoned internal mutexes.
-    pub fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
-        debug!(?self.channel_id, ?self.label_id, "open");
-        let (label_id, seq) = self
+        let seal_ctx = self
             .keys
             .lock()
             .expect("poisoned")
             .0
-            .open(self.channel_id, dst, ciphertext)
-            .map_err(AfcOpenError)
-            .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
-        Ok(Seq(seq))
+            .setup_seal_ctx(info.local_channel_id)
+            .map_err(AfcSealError)
+            .map_err(Error::Seal)?;
+        let chan = SendChannel {
+            daemon: self.daemon.clone(),
+            keys: self.keys.clone(),
+            channel_id: ChannelId {
+                __id: info.channel_id,
+            },
+            local_channel_id: info.local_channel_id,
+            label_id,
+            peer_id,
+            seal_ctx: Box::new(seal_ctx),
+        };
+        Ok((chan, CtrlMsg(info.ctrl)))
     }
 
-    /// Delete the channel.
-    pub async fn delete(&self) -> Result<(), crate::Error> {
-        self.daemon
-            .delete_afc_channel(context::current(), self.channel_id)
+    /// Receive a [`CtrlMsg`] message from a peer to create a corresponding receive channel.
+    pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
+        let info = self
+            .daemon
+            .accept_afc_channel(context::current(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        Ok(())
+        Ok(ReceiveChannel {
+            daemon: self.daemon.clone(),
+            keys: self.keys.clone(),
+            channel_id: ChannelId {
+                __id: info.channel_id,
+            },
+            local_channel_id: info.local_channel_id,
+            label_id: LabelId::from_api(info.label_id),
+            peer_id: DeviceId::from_api(info.peer_id),
+        })
     }
 }
 
 /// A unidirectional channel that can only send.
-#[derive(Clone, Debug)]
+#[derive_where(Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
-    channel_id: AfcChannelId,
+    channel_id: ChannelId,
+    local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    peer_id: DeviceId,
+    #[derive_where(skip(Debug))]
+    seal_ctx: Box<<ReadState<CS> as AfcState>::SealCtx>,
 }
 
 impl SendChannel {
-    // TODO: return channel's unique ID.
+    /// The channel's unique ID.
+    pub fn id(&self) -> ChannelId {
+        self.channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
         self.label_id
+    }
+
+    /// The device ID of the peer on the other side of the channel.
+    pub fn peer_id(&self) -> DeviceId {
+        self.peer_id
     }
 
     /// Encrypts and authenticates `plaintext` for a channel.
@@ -413,13 +268,13 @@ impl SendChannel {
     /// # Panics
     ///
     /// Will panic on poisoned internal mutexes.
-    pub fn seal(&self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
-        debug!(?self.channel_id, ?self.label_id, "seal");
+    pub fn seal(&mut self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
+        debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
             .lock()
             .expect("poisoned")
             .0
-            .seal(self.channel_id, dst, plaintext)
+            .seal(&mut self.seal_ctx, dst, plaintext)
             .map_err(AfcSealError)
             .map_err(Error::Seal)?;
         Ok(())
@@ -428,7 +283,7 @@ impl SendChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(context::current(), self.channel_id)
+            .delete_afc_channel(context::current(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -441,16 +296,26 @@ impl SendChannel {
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
     keys: Arc<Mutex<ChannelKeys>>,
-    channel_id: AfcChannelId,
+    channel_id: ChannelId,
+    local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
+    peer_id: DeviceId,
 }
 
 impl ReceiveChannel {
-    // TODO: return channel's unique ID.
+    /// The channel's unique ID.
+    pub fn id(&self) -> ChannelId {
+        self.channel_id
+    }
 
     /// The channel's label ID.
     pub fn label_id(&self) -> LabelId {
         self.label_id
+    }
+
+    /// The device ID of the peer on the other side of the channel.
+    pub fn peer_id(&self) -> DeviceId {
+        self.peer_id
     }
 
     /// Decrypts and authenticates `ciphertext` received from
@@ -469,23 +334,23 @@ impl ReceiveChannel {
     ///
     /// Will panic on poisoned internal mutexes.
     pub fn open(&self, dst: &mut [u8], ciphertext: &[u8]) -> Result<Seq, Error> {
-        debug!(?self.channel_id, ?self.label_id, "open");
+        debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
             .lock()
             .expect("poisoned")
             .0
-            .open(self.channel_id, dst, ciphertext)
+            .open(self.local_channel_id, dst, ciphertext)
             .map_err(AfcOpenError)
             .map_err(Error::Open)?;
-        debug_assert_eq!(label_id.into_id(), self.label_id.__id.into_id());
+        debug_assert_eq!(label_id.as_base(), self.label_id.into_api().as_base());
         Ok(Seq(seq))
     }
 
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(context::current(), self.channel_id)
+            .delete_afc_channel(context::current(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;

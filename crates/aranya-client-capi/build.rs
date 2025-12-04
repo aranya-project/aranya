@@ -31,6 +31,5 @@ fn main() -> anyhow::Result<()> {
     let data = aranya_capi_codegen::format(&tokens);
     let out_path = PathBuf::from(env::var("OUT_DIR")?).join("generated.rs");
     fs::write(out_path, &data)?;
-    fs::write("/tmp/api-gen.rs", &data)?;
     Ok(())
 }

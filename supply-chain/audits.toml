@@ -208,11 +208,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
 
-[[audits.redox_syscall]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-run"
-delta = "0.5.8 -> 0.5.10"
-
 [[audits.rfc6979]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -276,6 +271,11 @@ version = "0.4.0"
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
 [[audits.rustversion]]
@@ -328,6 +328,11 @@ who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.3.1 -> 0.3.0"
 
+[[audits.signal-hook-registry]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.4.1 -> 1.4.5"
+
 [[audits.spideroak-base58]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -378,6 +383,11 @@ delta = "2.0.6 -> 2.0.12"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.6 -> 2.0.12"
+
+[[audits.tinyvec]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.9.0 -> 1.10.0"
 
 [[audits.tokio]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -469,6 +479,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.1.6"
 
+[[audits.zerovec]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.3 -> 0.11.4"
+
 [[trusted.anstream]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
@@ -504,12 +519,6 @@ criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
 end = "2025-12-19"
-
-[[trusted.aranya-aqc-util]]
-criteria = "safe-to-deploy"
-user-id = 293722 # aranya-project-bot
-start = "2025-04-10"
-end = "2026-04-14"
 
 [[trusted.aranya-base58]]
 criteria = "safe-to-deploy"
@@ -594,6 +603,12 @@ criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
 end = "2025-12-19"
+
+[[trusted.aranya-id]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2025-10-17"
+end = "2026-10-17"
 
 [[trusted.aranya-idam-ffi]]
 criteria = "safe-to-deploy"

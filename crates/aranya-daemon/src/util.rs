@@ -1,7 +1,8 @@
+use core::{error, fmt};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_crypto::{tls::PskSeedId, Id};
+use aranya_crypto::{keystore::fs_keystore, tls::PskSeedId};
 use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
@@ -11,9 +12,9 @@ use tokio::{
 };
 
 use crate::{
+    daemon::{CE, KS},
     keystore::LocalStore,
     sync::task::quic::{self as qs},
-    CE, KS,
 };
 
 #[derive(Debug)]
@@ -25,11 +26,11 @@ impl SeedDir {
         Ok(Self(p))
     }
 
-    pub(crate) async fn get(&self, team_id: &TeamId) -> Result<PskSeedId> {
+    pub(crate) async fn get(&self, team_id: TeamId) -> Result<PskSeedId> {
         Self::read_id(self.0.join(team_id.to_string())).await
     }
 
-    pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &PskSeedId) -> Result<()> {
+    pub(crate) async fn append(&self, team_id: TeamId, seed_id: PskSeedId) -> Result<()> {
         let file_name = self.0.join(team_id.to_string());
 
         // fail if a file with the same name already exists
@@ -41,7 +42,7 @@ impl SeedDir {
         Ok(())
     }
 
-    pub(crate) async fn remove(&self, team_id: &TeamId) -> Result<()> {
+    pub(crate) async fn remove(&self, team_id: TeamId) -> Result<()> {
         let file_name = self.0.join(team_id.to_string());
         remove_file(file_name)
             .await
@@ -64,7 +65,7 @@ impl SeedDir {
     }
 
     async fn read_id(path: PathBuf) -> Result<PskSeedId> {
-        const ID_SIZE: usize = size_of::<Id>();
+        const ID_SIZE: usize = size_of::<PskSeedId>();
         let bytes = read(path).await?;
         let arr: [u8; ID_SIZE] = bytes.try_into().map_err(|input| {
             anyhow::anyhow!(
@@ -85,7 +86,7 @@ pub(crate) async fn load_team_psk_pairs(
     let mut out = Vec::new();
 
     for (team_id, seed_id) in pairs {
-        let Some(seed) = qs::PskSeed::load(eng, store, &seed_id)? else {
+        let Some(seed) = qs::PskSeed::load(eng, store, seed_id)? else {
             continue;
         };
 
@@ -98,12 +99,27 @@ pub(crate) async fn load_team_psk_pairs(
     Ok(out)
 }
 
+// TODO(eric): Add a blanket impl for `Clone`?
+pub trait TryClone: Sized {
+    type Error: fmt::Display + fmt::Debug + error::Error + Send + Sync + 'static;
+
+    fn try_clone(&self) -> Result<Self, Self::Error>;
+}
+
+impl TryClone for fs_keystore::Store {
+    type Error = fs_keystore::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        fs_keystore::Store::try_clone(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
     use anyhow::Context as _;
-    use aranya_crypto::Rng;
+    use aranya_crypto::{id::IdExt, Rng};
     use tempfile::tempdir;
     use test_log::test;
 
@@ -122,8 +138,8 @@ mod tests {
         let mut seen = HashSet::new();
 
         for _ in 0..100 {
-            let team_id = Id::random(&mut Rng).into();
-            let seed_id = Id::random(&mut Rng).into();
+            let team_id = TeamId::random(&mut Rng);
+            let seed_id = PskSeedId::random(&mut Rng);
 
             // may see duplicates by random chance
             if !seen.insert(team_id) {
@@ -131,7 +147,7 @@ mod tests {
             }
 
             seed_dir
-                .append(&team_id, &seed_id)
+                .append(team_id, seed_id)
                 .await
                 .context("could not append")?;
 
@@ -158,15 +174,15 @@ mod tests {
             .context("could not create seed dir")?;
 
         for _ in 0..100 {
-            let team_id = Id::random(&mut Rng).into();
-            let seed_id = Id::random(&mut Rng).into();
+            let team_id = TeamId::random(&mut Rng);
+            let seed_id = PskSeedId::random(&mut Rng);
 
             seed_dir
-                .append(&team_id, &seed_id)
+                .append(team_id, seed_id)
                 .await
                 .context("could not append")?;
 
-            assert!(seed_dir.remove(&team_id).await.is_ok())
+            assert!(seed_dir.remove(team_id).await.is_ok())
         }
 
         Ok(())

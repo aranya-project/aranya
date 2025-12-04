@@ -6,10 +6,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_crypto::{
-    id::IdError, policy::GroupId, tls::PskSeedId, Csprng, Identified as _, KeyStoreExt as _,
-    PolicyId,
-};
+use aranya_crypto::{policy::GroupId, tls::PskSeedId, Csprng, KeyStoreExt as _, PolicyId};
 use aranya_daemon_api::{CipherSuiteId, Ikm, TeamId};
 use s2n_quic::provider::tls::rustls::rustls::{
     client,
@@ -18,7 +15,10 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server,
 };
 
-use crate::{keystore::LocalStore, CE, CS, KS};
+use crate::{
+    daemon::{CE, CS, KS},
+    keystore::LocalStore,
+};
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -29,12 +29,12 @@ pub(crate) struct PskSeed(pub(crate) aranya_crypto::tls::PskSeed<CS>);
 
 impl PskSeed {
     pub(crate) fn new(rng: &mut impl Csprng, team: TeamId) -> Self {
-        let group = GroupId::from(team.into_id());
+        let group = GroupId::transmute(team);
         Self(aranya_crypto::tls::PskSeed::new(rng, &group))
     }
 
     pub(crate) fn import_from_ikm(ikm: &Ikm, team: TeamId) -> Self {
-        let group = GroupId::from(team.into_id());
+        let group = GroupId::transmute(team);
         Self(aranya_crypto::tls::PskSeed::import_from_ikm(
             ikm.raw_ikm_bytes(),
             &group,
@@ -44,16 +44,12 @@ impl PskSeed {
     pub(crate) fn load(
         eng: &mut CE,
         store: &LocalStore<KS>,
-        id: &PskSeedId,
+        id: PskSeedId,
     ) -> Result<Option<Self>> {
         store
-            .get_key(eng, *id)
+            .get_key(eng, id)
             .map(|r| r.map(Self))
             .map_err(Into::into)
-    }
-
-    pub(crate) fn id(&self) -> Result<PskSeedId, IdError> {
-        self.0.id()
     }
 
     pub(crate) fn into_inner(self) -> aranya_crypto::tls::PskSeed<CS> {
@@ -61,7 +57,7 @@ impl PskSeed {
     }
 
     pub(crate) fn generate_psks(self, team: TeamId) -> impl Iterator<Item = Result<PresharedKey>> {
-        let group = GroupId::from(team.into_id());
+        let group = GroupId::transmute(team);
         let policy = PolicyId::default();
         self.0
             .generate_psks(

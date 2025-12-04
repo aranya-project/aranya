@@ -81,9 +81,6 @@ logs_dir = "/var/log/aranya"
 # `$XDG_CONFIG_HOME`.
 config_dir = "/etc/aranya"
 
-[aqc]
-enable = true
-
 [afc]
 enable = true
 shm_path = "/afc"
