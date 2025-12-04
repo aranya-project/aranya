@@ -315,147 +315,6 @@ static void report(const char *name, int ok, int *fails) {
     if (!ok) (*fails)++;
 }
 
-/* Test: afc_create_bidi_channel and afc_channel_delete */
-static int test_afc_create_bidi_channel(void) {
-    printf("\n=== TEST: afc_create_bidi_channel and afc_channel_delete ===\n");
-    
-    Team team = {0};
-    AranyaError err = init_team(&team, g_owner_uds[0] ? g_owner_uds : "run/uds.sock");
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create team: %s\n", aranya_error_to_str(err));
-        return 0;
-    }
-    
-    /* Initialize member1 and member2 */
-    err = init_client(&team.member1, "Member1", g_member1_uds[0] ? g_member1_uds : "run/uds.sock");
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to init member1: %s\n", aranya_error_to_str(err));
-        if (team.owner.pk) free(team.owner.pk);
-        aranya_client_cleanup(&team.owner.client);
-        return 0;
-    }
-    
-    err = init_client(&team.member2, "Member2", g_member2_uds[0] ? g_member2_uds : "run/uds.sock");
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to init member2: %s\n", aranya_error_to_str(err));
-        if (team.member1.pk) free(team.member1.pk);
-        aranya_client_cleanup(&team.member1.client);
-        if (team.owner.pk) free(team.owner.pk);
-        aranya_client_cleanup(&team.owner.client);
-        return 0;
-    }
-    
-    /* Add members to team */
-    err = add_member_to_team(&team, &team.member1, g_member1_sync_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to add member1 to team: %s\n", aranya_error_to_str(err));
-        goto cleanup;
-    }
-    
-    err = add_member_to_team(&team, &team.member2, g_member2_sync_addr);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to add member2 to team: %s\n", aranya_error_to_str(err));
-        goto cleanup;
-    }
-    
-    printf("  ✓ Members added to team with Member role\n");
-    
-    /* Create a label */
-    AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "AFC_TEST_LABEL", NULL, &label_id);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create label: %s\n", aranya_error_to_str(err));
-        goto cleanup;
-    }
-    
-    /* Assign label to both members */
-    err = aranya_assign_label(&team.owner.client, &team.id, &team.member1.id, 
-                             &label_id, ARANYA_CHAN_OP_SEND_RECV);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to assign label to member1: %s\n", aranya_error_to_str(err));
-        goto cleanup;
-    }
-    
-    err = aranya_assign_label(&team.owner.client, &team.id, &team.member2.id, 
-                             &label_id, ARANYA_CHAN_OP_SEND_RECV);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to assign label to member2: %s\n", aranya_error_to_str(err));
-        goto cleanup;
-    }
-    
-    /* Sync again so members see the label assignments */
-    if (g_owner_sync_addr[0] && g_member1_sync_addr[0] && g_member2_sync_addr[0]) {
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member1_sync_addr, NULL);
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member2_sync_addr, NULL);
-        sleep_ms(250);
-        (void)aranya_sync_now(&team.member1.client, &team.id, g_owner_sync_addr, NULL);
-        (void)aranya_sync_now(&team.member1.client, &team.id, g_member2_sync_addr, NULL);
-        sleep_ms(250);
-        (void)aranya_sync_now(&team.member2.client, &team.id, g_owner_sync_addr, NULL);
-        (void)aranya_sync_now(&team.member2.client, &team.id, g_member1_sync_addr, NULL);
-        sleep_ms(500);
-    }
-    
-    printf("  ✓ Label created and assigned\n");
-    
-    /* Create bidirectional AFC channel between members */
-    AranyaAfcChannel channel;
-    AranyaAfcCtrlMsg ctrl_msg;
-    
-    err = aranya_afc_create_bidi_channel(&team.member1.client, &team.id, &team.member2.id, 
-                                         &label_id, &channel, &ctrl_msg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create bidi channel: %s\n", aranya_error_to_str(err));
-        goto cleanup;
-    }
-    
-    printf("  ✓ Bidirectional AFC channel created\n");
-    
-    /* Get channel type */
-    AranyaAfcChannelType chan_type;
-    err = aranya_afc_get_channel_type(&channel, &chan_type);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        printf("  ✓ Channel type: %d (should be %d for Bidirectional)\n", 
-               chan_type, ARANYA_AFC_CHANNEL_TYPE_BIDIRECTIONAL);
-    }
-    
-    /* Get label ID from channel */
-    AranyaLabelId retrieved_label;
-    err = aranya_afc_get_label_id(&channel, &retrieved_label);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        printf("  ✓ Retrieved label from channel\n");
-    }
-    
-    /* Get control message bytes */
-    const uint8_t *ctrl_ptr;
-    size_t ctrl_len;
-    aranya_afc_ctrl_msg_get_bytes(&ctrl_msg, &ctrl_ptr, &ctrl_len);
-    printf("  ✓ Control message size: %zu bytes\n", ctrl_len);
-    
-    /* Delete the channel */
-    err = aranya_afc_channel_delete(&team.member1.client, &channel);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to delete channel: %s\n", aranya_error_to_str(err));
-        aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
-        goto cleanup;
-    }
-    
-    printf("  ✓ Channel deleted\n");
-    
-    /* Cleanup */
-    aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
-    
-cleanup:
-    if (team.member2.pk) free(team.member2.pk);
-    aranya_client_cleanup(&team.member2.client);
-    if (team.member1.pk) free(team.member1.pk);
-    aranya_client_cleanup(&team.member1.client);
-    if (team.owner.pk) free(team.owner.pk);
-    aranya_client_cleanup(&team.owner.client);
-    
-    return (err == ARANYA_ERROR_SUCCESS) ? 1 : 0;
-}
-
 /* Test: afc_create_uni_send_channel */
 static int test_afc_create_uni_send_channel(void) {
     printf("\n=== TEST: afc_create_uni_send_channel ===\n");
@@ -610,10 +469,22 @@ static int test_afc_seal_open(void) {
         return 0;
     }
     
+    /* Assign SEND_ONLY to member1 and RECV_ONLY to member2 */
     err = aranya_assign_label(&team.owner.client, &team.id, &team.member1.id, 
-                             &label_id, ARANYA_CHAN_OP_SEND_RECV);
+                             &label_id, ARANYA_CHAN_OP_SEND_ONLY);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to assign SEND_ONLY label to member1: %s\n", aranya_error_to_str(err));
+        cleanup_team(&team);
+        return 0;
+    }
+    
     err = aranya_assign_label(&team.owner.client, &team.id, &team.member2.id, 
-                             &label_id, ARANYA_CHAN_OP_SEND_RECV);
+                             &label_id, ARANYA_CHAN_OP_RECV_ONLY);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to assign RECV_ONLY label to member2: %s\n", aranya_error_to_str(err));
+        cleanup_team(&team);
+        return 0;
+    }
     
     /* Sync so members see the label assignments */
     if (g_owner_sync_addr[0] && g_member1_sync_addr[0] && g_member2_sync_addr[0]) {
@@ -628,17 +499,19 @@ static int test_afc_seal_open(void) {
         sleep_ms(500);
     }
     
-    /* Create sender channel on member1 */
+    /* Create unidirectional send channel on member1 */
     AranyaAfcChannel sender_channel;
     AranyaAfcCtrlMsg sender_ctrl;
     
-    err = aranya_afc_create_bidi_channel(&team.member1.client, &team.id, &team.member2.id, 
-                                         &label_id, &sender_channel, &sender_ctrl);
+    err = aranya_afc_create_uni_send_channel(&team.member1.client, &team.id, &team.member2.id, 
+                                             &label_id, &sender_channel, &sender_ctrl);
     if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create sender channel: %s\n", aranya_error_to_str(err));
+        printf("  Failed to create uni send channel: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
         return 0;
     }
+    
+    printf("  ✓ Unidirectional send channel created\n");
     
     /* Get control message bytes to send to member2 */
     const uint8_t *ctrl_bytes;
