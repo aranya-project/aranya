@@ -3,7 +3,7 @@ use core::fmt;
 use anyhow::{Context, Result};
 use aranya_crypto::{
     CipherSuite, DeviceId, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine,
-    IdentityKey, IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId,
+    IdentityKey, IdentityVerifyingKey, KeyStore, KeyStoreExt as _, SigningKey, SigningKeyId,
     VerifyingKey,
 };
 use serde::{Deserialize, Serialize};
@@ -139,16 +139,11 @@ impl KeyBundle {
         macro_rules! gen {
             ($key:ident) => {{
                 let sk = $key::<E::CS>::new(eng);
-                let id = sk.id()?;
-                let wrapped =
-                    eng.wrap(sk)
-                        .context(concat!("unable to wrap `", stringify!($key), "`"))?;
-                store.try_insert(id.into(), wrapped).context(concat!(
-                    "unable to insert wrapped `",
+                store.insert_key(eng, sk).context(concat!(
+                    "unable to insert `",
                     stringify!($key),
                     "`"
-                ))?;
-                id
+                ))?
             }};
         }
         Ok(Self {

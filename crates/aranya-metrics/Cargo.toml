@@ -13,7 +13,12 @@ workspace = true
 
 
 [features]
-default = []
+default = [
+    "afc",
+    "aranya-client/default",
+]
+
+afc = ["aranya-client/afc"]
 
 datadog = ["dep:metrics-exporter-dogstatsd"]
 prometheus = ["dep:metrics-exporter-prometheus"]
@@ -21,16 +26,11 @@ tcp = ["dep:metrics-exporter-tcp"]
 
 
 [dependencies]
-aranya-client = { workspace = true, features = ["aqc", "experimental"] }
-aranya-daemon-api = { workspace = true }
-aranya-util = { workspace = true }
-buggy = { workspace = true }
+aranya-client = { workspace = true, default-features = false }
 
 # Required Dependencies
 anyhow = { workspace = true }
 backon = { workspace = true }
-bytes = { workspace = true }
-futures-util = { workspace = true }
 http = { workspace = true }
 libc = { workspace = true }
 metrics = { workspace = true }
@@ -52,5 +52,12 @@ metrics-exporter-tcp = { version = "0.11", optional = true }
 [[bin]]
 name = "aranya-metrics"
 path = "src/main.rs"
+required-features = ["afc"]
 test = false
 bench = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = [
+    "default", # TODO: remove in #448
+]
