@@ -1352,59 +1352,6 @@ effect RoleCreated {
 #### Custom Roles
 
 ```policy
-// Creates a role
-//
-// This action does not (and cannot usefully) check for name
-// overlap. Do not assume that role names are unique.
-//
-// # Required Permissions
-//
-// - `CreateRole`
-action create_role(role_name string) {
-    publish CreateRole {
-        role_name: role_name,
-    }
-}
-
-command CreateRole {
-    attributes {
-        priority: 110
-    }
-
-    fields {
-        role_name string,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_author(envelope)
-        // The author must have the permission to create a role
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateRole)
-
-        let role_id = derive_role_id(envelope)
-
-        let role_rank = saturating_sub(get_object_rank(author.device_id), 1)
-
-        let role_info = RoleInfo {
-            role_id: role_id,
-            name: this.role_name,
-            author_id: author.device_id,
-            rank: role_rank,
-            default: false,
-        }
-        let role_created = role_info as RoleCreated
-
-        finish {
-            create_role_facts(role_info)
-            emit role_created
-        }
-    }
-}
-
 // Creates a role with an initial rank.
 //
 // This action does not (and cannot usefully) check for name

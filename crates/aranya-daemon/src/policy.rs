@@ -343,6 +343,7 @@ pub struct remove_perm_from_role {
 #[action(interface = Persistent)]
 pub struct create_role {
     pub role_name: Text,
+    pub rank: i64,
 }
 /// setup_default_roles policy action.
 #[action(interface = Persistent)]
