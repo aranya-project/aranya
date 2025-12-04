@@ -821,8 +821,6 @@ command SetRank {
     }
 
 }
-
-// TODO: new `WithRank` commands
 ```
 
 ### ChangeRank Command
@@ -1396,6 +1394,59 @@ command CreateRole {
             name: this.role_name,
             author_id: author.device_id,
             rank: role_rank,
+            default: false,
+        }
+        let role_created = role_info as RoleCreated
+
+        finish {
+            create_role_facts(role_info)
+            emit role_created
+        }
+    }
+}
+
+// Creates a role with an initial rank.
+//
+// This action does not (and cannot usefully) check for name
+// overlap. Do not assume that role names are unique.
+//
+// # Required Permissions
+//
+// - `CreateRole`
+action create_role(role_name string, rank int) {
+    publish CreateRole {
+        role_name: role_name,
+        rank: rank,
+    }
+}
+
+command CreateRole {
+    attributes {
+        priority: 110
+    }
+
+    fields {
+        role_name string,
+        rank int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+        // The author must have the permission to create a role
+        check device_has_simple_perm(author.device_id, SimplePerm::CreateRole)
+
+        let role_id = derive_role_id(envelope)
+
+        let role_info = RoleInfo {
+            role_id: role_id,
+            name: this.role_name,
+            author_id: author.device_id,
+            rank: this.rank,
             default: false,
         }
         let role_created = role_info as RoleCreated
