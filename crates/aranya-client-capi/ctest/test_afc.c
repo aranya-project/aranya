@@ -13,36 +13,6 @@
 #include "aranya-client.h"
 #include "utils.h"
 
-/* Helper: write daemon config to given FILE stream */
-static void print_daemon_info(const char *cfg_path, const char *name, const char *run_dir,
-                             const char *shm_path, uint16_t sync_port) {
-    FILE *f = fopen(cfg_path, "w");
-    if (!f) {
-        fprintf(stderr, "Failed to create daemon config: %s\n", cfg_path);
-        return;
-    }
-    fprintf(f, "name = \"%s\"\n", name);
-    fprintf(f, "runtime_dir = \"%s\"\n", run_dir);
-    fprintf(f, "state_dir = \"%s/state\"\n", run_dir);
-    fprintf(f, "cache_dir = \"%s/cache\"\n", run_dir);
-    fprintf(f, "logs_dir = \"%s/logs\"\n", run_dir);
-    fprintf(f, "config_dir = \"%s/config\"\n", run_dir);
-    fprintf(f, "\n[afc]\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "shm_path = \"%s\"\n", shm_path);
-    fprintf(f, "max_chans = 100\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "\n[sync.quic]\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "addr = \"127.0.0.1:%u\"\n", (unsigned)sync_port);
-    fclose(f);
-}
-
-/* Utility: millisecond sleep */
-static void sleep_ms(unsigned int ms) {
-    usleep(ms * 1000);
-}
-
 /* Globals for per-daemon client connection and sync addresses.
     Use static defaults so tests run reproducibly without runtime snprintfs. */
 static const char g_owner_uds[128] = "/tmp/afc-run-owner/uds.sock";
@@ -51,29 +21,6 @@ static const char g_member2_uds[128] = "/tmp/afc-run-member2/uds.sock";
 static const char g_owner_sync_addr[64] = "127.0.0.1:41001";
 static const char g_member1_sync_addr[64] = "127.0.0.1:41002";
 static const char g_member2_sync_addr[64] = "127.0.0.1:41003";
-
-/* Utility: spawn daemon process at run_dir with custom settings */
-static pid_t spawn_daemon_at(const char *daemon_path,
-                             const char *run_dir,
-                             const char *name,
-                             const char *shm_path,
-                             uint16_t sync_port) {
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s && mkdir -p %s/state %s/cache %s/logs %s/config", run_dir, run_dir, run_dir, run_dir, run_dir);
-    system(cmd);
-    
-    char cfg_path[256];
-    snprintf(cfg_path, sizeof(cfg_path), "%s/daemon.toml", run_dir);
-    print_daemon_info(cfg_path, name, run_dir, shm_path, sync_port);
-    
-    pid_t pid = fork();
-    if (pid == 0) {
-        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
-        execl(daemon_path, daemon_path, "--config", cfg_path, NULL);
-        exit(1);
-    }
-    return pid;
-}
 
 /* Initialize a client */
 static AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {

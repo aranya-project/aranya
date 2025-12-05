@@ -13,52 +13,6 @@
 #include "aranya-client.h"
 #include "utils.h"
 
-/* Utility: millisecond sleep */
-static void sleep_ms(unsigned int ms) {
-    usleep(ms * 1000);
-}
-
-/* Utility: spawn daemon process */
-static pid_t spawn_daemon(const char *daemon_path) {
-    /* Create short runtime directory to avoid Unix socket path length limits */
-    system("rm -rf run && mkdir -p run");
-    
-    /* Create required subdirectories */
-    system("mkdir -p run/state run/cache run/logs run/config");
-    
-    /* Create daemon config file */
-    FILE *f = fopen("run/daemon.toml", "w");
-    if (!f) {
-        fprintf(stderr, "Failed to create daemon config\n");
-        return -1;
-    }
-    fprintf(f, "name = \"test-sync-daemon\"\n");
-    fprintf(f, "runtime_dir = \"run\"\n");
-    fprintf(f, "state_dir = \"run/state\"\n");
-    fprintf(f, "cache_dir = \"run/cache\"\n");
-    fprintf(f, "logs_dir = \"run/logs\"\n");
-    fprintf(f, "config_dir = \"run/config\"\n");
-    fprintf(f, "\n");
-    fprintf(f, "[afc]\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "shm_path = \"/test_sync_shm\"\n");
-    fprintf(f, "max_chans = 100\n");
-    fprintf(f, "\n");
-    fprintf(f, "[sync.quic]\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "addr = \"127.0.0.1:0\"\n");
-    fclose(f);
-    
-    pid_t pid = fork();
-    if (pid == 0) {
-        /* Child process */
-        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
-        execl(daemon_path, daemon_path, "--config", "run/daemon.toml", NULL);
-        exit(1);
-    }
-    return pid;
-}
-
 /* Initialize a client */
 static AranyaError init_client(Client *c, const char *daemon_addr) {
     AranyaError err;
@@ -435,7 +389,7 @@ int main(int argc, const char *argv[]) {
     /* Spawn daemon if path provided */
     if (argc == 2) {
         printf("Spawning daemon: %s\n", argv[1]);
-        daemon_pid = spawn_daemon(argv[1]);
+        daemon_pid = spawn_daemon(argv[1], "test-sync-daemon", "/test_sync_shm");
         printf("Daemon PID: %d\n", daemon_pid);
         
         /* Wait for daemon to initialize */

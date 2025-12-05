@@ -96,6 +96,23 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 enable_testing()
 
+# Global cleanup of test runtime directories before any tests run
+add_test(NAME global_cleanup COMMAND ${CMAKE_COMMAND} -E echo "Cleaning test runtime directories...")
+set_property(TEST global_cleanup PROPERTY FIXTURES_SETUP global_test_fixture)
+add_test(NAME cleanup_run COMMAND ${CMAKE_COMMAND} -E rm -rf run)
+set_property(TEST cleanup_run PROPERTY FIXTURES_SETUP global_test_fixture)
+add_test(NAME create_run_dirs COMMAND ${CMAKE_COMMAND} -E make_directory run/state run/cache run/logs run/config)
+set_property(TEST create_run_dirs PROPERTY FIXTURES_SETUP global_test_fixture)
+add_test(NAME cleanup_tmp_team COMMAND ${CMAKE_COMMAND} -E rm -rf /tmp/team-run-owner /tmp/team-run-member /tmp/team-run-admin /tmp/team-run-operator)
+set_property(TEST cleanup_tmp_team PROPERTY FIXTURES_SETUP global_test_fixture)
+add_test(NAME cleanup_tmp_afc COMMAND ${CMAKE_COMMAND} -E rm -rf /tmp/afc-run-owner /tmp/afc-run-member1 /tmp/afc-run-member2)
+set_property(TEST cleanup_tmp_afc PROPERTY FIXTURES_SETUP global_test_fixture)
+add_test(NAME create_tmp_afc_dirs COMMAND ${CMAKE_COMMAND} -E make_directory 
+    /tmp/afc-run-owner/state /tmp/afc-run-owner/cache /tmp/afc-run-owner/logs /tmp/afc-run-owner/config
+    /tmp/afc-run-member1/state /tmp/afc-run-member1/cache /tmp/afc-run-member1/logs /tmp/afc-run-member1/config
+    /tmp/afc-run-member2/state /tmp/afc-run-member2/cache /tmp/afc-run-member2/logs /tmp/afc-run-member2/config)
+set_property(TEST create_tmp_afc_dirs PROPERTY FIXTURES_SETUP global_test_fixture)
+
 # Where the generated C header should be copied for tests.
 set(TEST_HEADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(TEST_INCLUDE_DIRS
@@ -180,6 +197,7 @@ if(ARANYA_DAEMON)
     set_property(TEST TestSimple APPEND PROPERTY ENVIRONMENT
     "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
 )
+    set_property(TEST TestSimple PROPERTY FIXTURES_REQUIRED global_test_fixture)
 else()
     message(STATUS "Skipping TestSimple registration (daemon not found)")
 endif()
@@ -262,6 +280,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_sync.c")
     "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
     add_dependencies(TestSync copy_aranya_artifacts)
+    set_property(TEST TestSync PROPERTY FIXTURES_REQUIRED global_test_fixture)
 endif()
 
 # Optional DataTypes test executable if the source exists
@@ -309,6 +328,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_client.c")
     "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
     )
     add_dependencies(TestClient copy_aranya_artifacts)
+    set_property(TEST TestClient PROPERTY FIXTURES_REQUIRED global_test_fixture)
 endif()
 
 # Optional Query test executable if the source exists
@@ -335,4 +355,5 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_query.c")
     "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}"
 )
     add_dependencies(TestQuery copy_aranya_artifacts)
+    set_property(TEST TestQuery PROPERTY FIXTURES_REQUIRED global_test_fixture)
 endif()

@@ -92,8 +92,8 @@ static inline void aranya_test_log(const struct aranya_test_config *cfg, const c
 }
 
 // Helper function to get role ID by name from a list of roles
-static inline AranyaError aranya_get_role_id_by_name(const AranyaRole* role_list, size_t role_list_len, 
-                                                      const char* name, AranyaRoleId* role_id) {
+static inline AranyaError get_role_id_by_name(const AranyaRole* role_list, size_t role_list_len, 
+                                              const char* name, AranyaRoleId* role_id) {
     AranyaError err;
     for (size_t i = 0; i < role_list_len; i++) {
         AranyaRole role = role_list[i];
@@ -108,6 +108,64 @@ static inline AranyaError aranya_get_role_id_by_name(const AranyaRole* role_list
         }
     }
     return ARANYA_ERROR_OTHER;
+}
+
+// Sleep for a given number of milliseconds (cross-platform helper)
+#include <unistd.h>
+static inline void sleep_ms(unsigned int ms) {
+    usleep(ms * 1000);
+}
+
+// Write daemon configuration file
+#include <sys/types.h>
+static inline void write_daemon_config(const char *cfg_path, const char *name, const char *run_dir,
+                                       const char *shm_path, uint16_t sync_port) {
+    FILE *f = fopen(cfg_path, "w");
+    if (!f) {
+        fprintf(stderr, "Failed to create daemon config: %s\n", cfg_path);
+        return;
+    }
+    fprintf(f, "name = \"%s\"\n", name);
+    fprintf(f, "runtime_dir = \"%s\"\n", run_dir);
+    fprintf(f, "state_dir = \"%s/state\"\n", run_dir);
+    fprintf(f, "cache_dir = \"%s/cache\"\n", run_dir);
+    fprintf(f, "logs_dir = \"%s/logs\"\n", run_dir);
+    fprintf(f, "config_dir = \"%s/config\"\n", run_dir);
+    if (shm_path && shm_path[0]) {
+        fprintf(f, "\n[afc]\n");
+        fprintf(f, "enable = true\n");
+        fprintf(f, "shm_path = \"%s\"\n", shm_path);
+        fprintf(f, "max_chans = 100\n");
+    }
+    fprintf(f, "\n[sync.quic]\n");
+    fprintf(f, "enable = true\n");
+    fprintf(f, "addr = \"127.0.0.1:%u\"\n", (unsigned)sync_port);
+    fclose(f);
+}
+
+// Spawn daemon process with custom configuration
+#include <sys/wait.h>
+static inline pid_t spawn_daemon_at(const char *daemon_path,
+                                    const char *run_dir,
+                                    const char *name,
+                                    const char *shm_path,
+                                    uint16_t sync_port) {
+    char cfg_path[256];
+    snprintf(cfg_path, sizeof(cfg_path), "%s/daemon.toml", run_dir);
+    write_daemon_config(cfg_path, name, run_dir, shm_path, sync_port);
+    
+    pid_t pid = fork();
+    if (pid == 0) {
+        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
+        execl(daemon_path, daemon_path, "--config", cfg_path, NULL);
+        exit(1);
+    }
+    return pid;
+}
+
+// Spawn daemon process with simple configuration (uses "run" directory)
+static inline pid_t spawn_daemon(const char *daemon_path, const char *name, const char *shm_path) {
+    return spawn_daemon_at(daemon_path, "run", name, shm_path, 0);
 }
 
 #ifdef __cplusplus

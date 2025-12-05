@@ -27,56 +27,6 @@ static const char g_owner_uds[256] = "/tmp/team-run-owner/uds.sock";
 static const char g_member_uds[256] = "/tmp/team-run-member/uds.sock";
 static const char g_device_uds[256] = "/tmp/team-run-device/uds.sock";
 
-/* Spawn daemon process at specific location with unique configuration */
-static pid_t spawn_daemon_at(const char *daemon_path,
-                             const char *run_dir,
-                             const char *name,
-                             const char *shm_path,
-                             uint16_t sync_port) {
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s && mkdir -p %s/state %s/cache %s/logs %s/config", run_dir, run_dir, run_dir, run_dir, run_dir);
-    system(cmd);
-    
-    char cfg_path[256];
-    snprintf(cfg_path, sizeof(cfg_path), "%s/daemon.toml", run_dir);
-    FILE *f = fopen(cfg_path, "w");
-    if (!f) {
-        fprintf(stderr, "Failed to create daemon config\n");
-        return -1;
-    }
-    fprintf(f, "name = \"%s\"\n", name);
-    fprintf(f, "runtime_dir = \"%s\"\n", run_dir);
-    fprintf(f, "state_dir = \"%s/state\"\n", run_dir);
-    fprintf(f, "cache_dir = \"%s/cache\"\n", run_dir);
-    fprintf(f, "logs_dir = \"%s/logs\"\n", run_dir);
-    fprintf(f, "config_dir = \"%s/config\"\n", run_dir);
-    fprintf(f, "\n[afc]\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "shm_path = \"%s\"\n", shm_path);
-    fprintf(f, "max_chans = 100\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "\n[sync.quic]\n");
-    fprintf(f, "enable = true\n");
-    fprintf(f, "addr = \"127.0.0.1:%u\"\n", (unsigned)sync_port);
-    fclose(f);
-    
-    pid_t pid = fork();
-    if (pid == 0) {
-        setenv("ARANYA_DAEMON", "aranya_daemon::aranya_daemon::api=debug", 1);
-        execl(daemon_path, daemon_path, "--config", cfg_path, NULL);
-        exit(1);
-    }
-    return pid;
-}
-
-/* Sleep for a given number of milliseconds */
-static void sleep_ms(long ms) {
-    struct timespec ts;
-    ts.tv_sec = ms / 1000;
-    ts.tv_nsec = (ms % 1000) * 1000000;
-    nanosleep(&ts, NULL);
-}
-
 /* Initialize a client (following example.c pattern) */
 static AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
     AranyaError err;
@@ -997,13 +947,6 @@ int main(int argc, const char *argv[]) {
         sleep_ms(200);
         system("pkill -9 -f aranya-daemon || true");
 
-        /* Ensure any leftover runtime directories from previous runs are removed.
-         * Stale runtime dirs (and leftover sockets/shm) can cause tests to hang or
-         * daemons to fail to bind. Remove common prefixes used by the ctests.
-         */
-        printf("Cleaning stale /tmp test runtime directories...\n");
-        system("rm -rf /tmp/team-run-* /tmp/afc-run-* 2>/dev/null || true");
-        
         /* Use /tmp for shorter paths to avoid UDS path length limits */
         /* Prepare owner daemon */
         printf("Spawning owner daemon: %s\n", daemon_path);
