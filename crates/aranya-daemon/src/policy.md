@@ -696,11 +696,11 @@ Objects with higher rank are allowed to operate on objects with a lower rank.
 The ranking system is used to ensure that all objects and operations abide by an application-defined hierarchy. The hierarchy can be audited by ensuring that numerical rank values fall into the expected hierarchical levels.
 Lower ranked objects are guaranteed to not have permission to operate higher ranked objects.
 
-For example, a command author with rank 10 would a be allowed to assign a label of rank 5 to a device of rank 4 because both of the objects it is operating on are lower rank than the author of the command.
+For example, a command author with rank 10 would be allowed to assign a label of rank 5 to a device of rank 4 because both of the objects it is operating on are lower rank than the author of the command.
 
 ### Rank Fact
 
-Each object in Aranya's RBAC system has zero or one rank associated with its Aranya ID.
+Each object in Aranya's RBAC system has at most one rank associated with its Aranya ID.
 
 ```policy
 // An object rank.
