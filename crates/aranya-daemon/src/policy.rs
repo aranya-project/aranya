@@ -53,7 +53,6 @@ pub enum Effect {
     QueryLabelsResult(QueryLabelsResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
     RankChanged(RankChanged),
-    RankSet(RankSet),
     RoleAssigned(RoleAssigned),
     RoleChanged(RoleChanged),
     RoleCreated(RoleCreated),
@@ -207,12 +206,6 @@ pub struct RankChanged {
     pub old_rank: i64,
     pub new_rank: i64,
 }
-/// RankSet policy effect.
-#[effect]
-pub struct RankSet {
-    pub object_id: BaseId,
-    pub rank: i64,
-}
 /// RoleAssigned policy effect.
 #[effect]
 pub struct RoleAssigned {
@@ -264,7 +257,6 @@ pub struct TeamTerminated {
 }
 #[actions(interface = Persistent)]
 pub enum PersistentAction {
-    set_rank(set_rank),
     change_rank(change_rank),
     add_perm_to_role(add_perm_to_role),
     remove_perm_from_role(remove_perm_from_role),
@@ -316,12 +308,6 @@ pub struct query_device_role {
 #[action(interface = Ephemeral)]
 pub struct query_device_keybundle {
     pub device_id: BaseId,
-}
-/// set_rank policy action.
-#[action(interface = Persistent)]
-pub struct set_rank {
-    pub object_id: BaseId,
-    pub rank: i64,
 }
 /// change_rank policy action.
 #[action(interface = Persistent)]

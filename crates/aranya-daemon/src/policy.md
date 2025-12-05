@@ -712,6 +712,34 @@ fact Rank[object_id id]=>{rank int}
 Utility method for checking object ranks before allowing operations to be performed.
 
 ```policy
+// Returns whether the command author object has permission to perform an operation on a set of target objects.
+// The command author's role must have permission to perform the operation.
+// The command author must have a higher rank than all the objects it is operating on.
+function author_has_permission(author_id id, perm enum SimplePerm, target_id1 optional id, target_id2 optional id, target_id3 optional id) bool {
+    check device_has_simple_perm(author_id, perm)
+    let author_rank = get_object_rank(author_id)
+    if target_id1 is Some {
+        let object_rank = get_object_rank(check_unwrap target_id1)
+        if author_rank <= object_rank {
+            return false
+        }
+    }
+    if target_id2 is Some {
+        let object_rank = get_object_rank(check_unwrap target_id2)
+        if author_rank <= object_rank {
+            return false
+        }
+    }
+    if target_id3 is Some {
+        let object_rank = get_object_rank(check_unwrap target_id3)
+        if author_rank <= object_rank {
+            return false
+        }
+    }
+
+    return true
+}
+
 // Returns whether the command author object outranks the target object.
 // If the command author outranks the target, it is allowed to perform operations on the target object.
 //
@@ -727,7 +755,7 @@ function author_outranks_target(author_id id, target_id id) bool {
 }
 ```
 
-### Rank Getter
+### Rank Getters/Setters
 
 Utility methods for getting/setting rank values on objects.
 
@@ -746,6 +774,16 @@ function get_object_rank(object_id id) int {
     let rank = check_unwrap query Rank[object_id: object_id]
 
     return rank.rank
+}
+
+// Set the rank of an object.
+//
+// Assumptions:
+// - Object rank must not exist yet.
+// - Author must have higher rank than rank it is setting.
+finish function set_object_rank(object_id id, rank int) {
+    // Create new rank fact.
+    create Rank[object_id: object_id]=>{rank: rank}
 }
 
 // Unset the rank of an object.
@@ -813,24 +851,15 @@ command ChangeRank {
 
         let author = get_author(envelope)
 
-
-        // The author must have permission to set rank.
-        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRank)
-
-        // Author must outrank both the old and new rank.
-        let author_rank = get_object_rank(author.device_id)
-        // Author must outrank the object it is changing rank on.
-        // An object can always downgrade its own rank.
-        if author.device_id != this.object_id {
-            check author_rank > this.old_rank
+        // The author must have permission to change the rank.
+        if author.device_id == this.object_id {
+            // An object can always downgrade its own rank.
+            check author_has_permission(author.device_id, SimplePerm::ChangeRank, None, None, None)
+        } else {
+            check author_has_permission(author.device_id, SimplePerm::ChangeRank, Some(this.object_id), None, None)
         }
+        let author_rank = get_object_rank(author.device_id)
         check author_rank >= this.new_rank
-
-        // Object must already have a rank.
-        let rank = get_object_rank(this.object_id)
-
-        // Old rank must match current rank.
-        check rank == this.old_rank
 
         finish {
             change_object_rank(this.object_id, this.old_rank, this.new_rank)
@@ -1135,10 +1164,8 @@ command AddPermToRole {
         let author = get_author(envelope)
 
         // The author must have permission to change role perms.
-        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRolePerms)
+        check author_has_permission(author.device_id, SimplePerm::ChangeRolePerms, Some(this.role_id), None, None)
 
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.role_id)
 
         // We should not grant permissions we do not have
         check device_has_simple_perm(author.device_id, this.perm)
@@ -1201,10 +1228,7 @@ command RemovePermFromRole {
         let author = get_author(envelope)
 
         // The author must have permission to change role perms.
-        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRolePerms)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.role_id)
+        check author_has_permission(author.device_id, SimplePerm::ChangeRolePerms, Some(this.role_id), None, None)
 
         // It is an error to remove a permission not assigned to
         // the role.
@@ -1320,8 +1344,9 @@ command CreateRole {
         check team_exists()
 
         let author = get_author(envelope)
+        
         // The author must have the permission to create a role
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateRole)
+        check author_has_permission(author.device_id, SimplePerm::CreateRole, None, None, None)
 
         let role_id = derive_role_id(envelope)
 
@@ -1414,7 +1439,9 @@ command SetupDefaultRole {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::SetupDefaultRole)
+
+        // Author must have permission to setup the default roles.
+        check author_has_permission(author.device_id, SimplePerm::SetupDefaultRole, None, None, None)
 
         check !exists DefaultRoleSeeded[name: this.name]
 
@@ -1554,10 +1581,7 @@ command DeleteRole {
 
         let author = get_author(envelope)
         // The author must have the permission to delete a role
-        check device_has_simple_perm(author.device_id, SimplePerm::DeleteRole)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.role_id)
+        check author_has_permission(author.device_id, SimplePerm::DeleteRole, Some(this.role_id), None, None)
 
         // The role must exists
         check exists Role[role_id: this.role_id]
@@ -1780,11 +1804,7 @@ command AssignRole {
         check author.device_id != this.device_id
 
         // The author must have permission to assign the role.
-        check device_has_simple_perm(author.device_id, SimplePerm::AssignRole)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.device_id)
-        check author_outranks_target(author.device_id, this.role_id)
+        check author_has_permission(author.device_id, SimplePerm::AssignRole, Some(this.role_id), Some(this.device_id), None)
 
         // Ensure the target role exists.
         check exists Role[role_id: this.role_id]
@@ -1887,14 +1907,10 @@ command ChangeRole {
         // TODO(eric): Should this just be a no-op?
         check this.old_role_id != this.new_role_id
 
-        // The author must have permission to assign the new role.
         check exists Role[role_id: this.new_role_id]
-        check device_has_simple_perm(author.device_id, SimplePerm::AssignRole)
 
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.device_id)
-        check author_outranks_target(author.device_id, this.new_role_id)
-        check author_outranks_target(author.device_id, this.old_role_id)
+        // The author must have permission to assign the new role.
+        check author_has_permission(author.device_id, SimplePerm::AssignRole, Some(this.device_id), Some(this.old_role_id), Some(this.new_role_id))
 
         // The target device must exist.
         check exists Device[device_id: this.device_id]
@@ -1993,11 +2009,7 @@ command RevokeRole {
         let author = get_author(envelope)
 
         // The author must have permission to revoke the role.
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.device_id)
-        check author_outranks_target(author.device_id, this.role_id)
+        check author_has_permission(author.device_id, SimplePerm::RevokeRole, Some(this.device_id), Some(this.role_id), None)
 
         let role = check_unwrap query Role[role_id: this.role_id]
 
@@ -2382,7 +2394,9 @@ command TerminateTeam {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::TerminateTeam)
+
+        // Author must have permission to terminate the team.
+        check author_has_permission(author.device_id, SimplePerm::TerminateTeam, None, None, None)
 
         let current_team_id = team_id()
         check this.team_id == current_team_id
@@ -2476,7 +2490,9 @@ command AddDevice {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::AddDevice)
+
+        // Author must have permission to add a device to the team.
+        check author_has_permission(author.device_id, SimplePerm::AddDevice, None, None, None)
 
         let dev_key_ids = derive_device_key_ids(this.device_keys)
 
@@ -2576,10 +2592,8 @@ command RemoveDevice {
         // The target device must exist.
         check exists Device[device_id: this.device_id]
 
-        check device_has_simple_perm(author.device_id, SimplePerm::RemoveDevice)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.device_id)
+        // Author must have permission to remove a device from the team.
+        check author_has_permission(author.device_id, SimplePerm::RemoveDevice, Some(this.device_id), None, None)
 
         // TODO(eric): check that author dominates target?
 
@@ -2770,7 +2784,9 @@ command CreateLabel {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::CreateLabel)
+
+        // Author must have permission to create a label.
+        check author_has_permission(author.device_id, SimplePerm::CreateLabel, None, None, None)
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
@@ -2846,10 +2862,9 @@ command DeleteLabel {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::DeleteLabel)
 
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.label_id)
+        // Author must have permission to delete a label.
+        check author_has_permission(author.device_id, SimplePerm::DeleteLabel, Some(this.label_id), None, None)
 
         // We can't query the label after it's been deleted, so
         // make sure we pull all of its info out of the fact
@@ -2975,11 +2990,8 @@ command AssignLabelToDevice {
         // queries.
         check author.device_id != this.device_id
 
-        check device_has_simple_perm(author.device_id, SimplePerm::AssignLabel)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.device_id)
-        check author_outranks_target(author.device_id, this.label_id)
+        // Author must have permission to assign a label.
+        check author_has_permission(author.device_id, SimplePerm::AssignLabel, Some(this.device_id), Some(this.label_id), None)
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
@@ -3111,11 +3123,7 @@ command RevokeLabelFromDevice {
         let target = get_device(this.device_id)
 
         // The author device must have permission to revoke the label.
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
-
-        // The author device must outrank the target object(s).
-        check author_outranks_target(author.device_id, this.device_id)
-        check author_outranks_target(author.device_id, this.label_id)
+        check author_has_permission(author.device_id, SimplePerm::RevokeLabel, Some(this.device_id), Some(this.label_id), None)
 
         // We need to get label info before deleting
         let label = check_unwrap query Label[label_id: this.label_id]
