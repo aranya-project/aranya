@@ -2455,8 +2455,6 @@ command TerminateTeam {
         let author = get_author(envelope)
         check device_has_simple_perm(author.device_id, SimplePerm::TerminateTeam)
 
-        // TODO: check author rank vs. team rank?
-
         let current_team_id = team_id()
         check this.team_id == current_team_id
 
