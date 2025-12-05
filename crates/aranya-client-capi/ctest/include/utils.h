@@ -55,6 +55,11 @@ typedef struct {
     Client member1;
     Client member2;
     AranyaSeedIkm team_ikm;
+    /* Store default role IDs for use in tests */
+    AranyaRoleId owner_role_id;
+    AranyaRoleId admin_role_id;
+    AranyaRoleId operator_role_id;
+    AranyaRoleId member_role_id;
 } Team;
 
 // Helper to initialize the global config with defaults
@@ -84,6 +89,25 @@ static inline void aranya_test_log(const struct aranya_test_config *cfg, const c
     va_list ap; va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
+}
+
+// Helper function to get role ID by name from a list of roles
+static inline AranyaError aranya_get_role_id_by_name(const AranyaRole* role_list, size_t role_list_len, 
+                                                      const char* name, AranyaRoleId* role_id) {
+    AranyaError err;
+    for (size_t i = 0; i < role_list_len; i++) {
+        AranyaRole role = role_list[i];
+        const char* role_name = NULL;
+        err = aranya_role_get_name(&role, &role_name);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            return err;
+        }
+        if (strcmp(name, role_name) == 0) {
+            err = aranya_role_get_id(&role, role_id);
+            return err;
+        }
+    }
+    return ARANYA_ERROR_OTHER;
 }
 
 #ifdef __cplusplus

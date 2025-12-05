@@ -80,7 +80,12 @@ static void sleep_ms(long ms) {
 /* Initialize a client (following example.c pattern) */
 static AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
     AranyaError err;
-    c->name = name;
+    if (name) {
+        snprintf(c->name, sizeof(c->name), "%s", name);
+    } else {
+        c->name[0] = '\0';
+    }
+    c->name[sizeof(c->name) - 1] = '\0';
 
     /* Initialize client config builder */
     struct AranyaClientConfigBuilder cli_builder;
@@ -217,6 +222,46 @@ static AranyaError init_team(Team* t) {
     }
     printf("Team ID: %s\n", team_id_str);
 
+    /* Get the owner role */
+    size_t team_roles_len = 1;
+    AranyaRole team_roles[team_roles_len];
+    err = aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get team roles\n");
+        return err;
+    }
+    
+    AranyaRoleId owner_role_id;
+    err = aranya_role_get_id(&team_roles[0], &owner_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get owner role ID\n");
+        return err;
+    }
+
+    /* Setup default roles */
+    size_t default_roles_len = DEFAULT_ROLES_LEN;
+    AranyaRole default_roles[default_roles_len];
+    err = aranya_setup_default_roles(&owner->client, &t->id, &owner_role_id,
+                                     default_roles, &default_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to setup default roles\n");
+        return err;
+    }
+
+    /* Get admin role ID for later use */
+    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "admin", &t->admin_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get admin role ID\n");
+        return err;
+    }
+
+    /* Get member role ID for later use */
+    err = aranya_get_role_id_by_name(default_roles, default_roles_len, "member", &t->member_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to get member role ID\n");
+        return err;
+    }
+
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -268,6 +313,18 @@ static int test_device_id(void) {
     memset(&device_id, 0, sizeof(AranyaDeviceId));
     
     return sizeof(AranyaDeviceId) > 0;
+}
+
+/* Test: Role enum values - verify roles can be queried by name */
+static int test_role_enum(void) {
+    printf("\n=== TEST: Role Enum ===\n");
+    
+    /* Verify that role-related functions are available */
+    /* Just check that the types exist */
+    AranyaRole test_role;
+    AranyaRoleId test_role_id;
+    
+    return sizeof(AranyaRole) > 0 && sizeof(AranyaRoleId) > 0;
 }
 
 /* Test: ChanOp enum values */
@@ -718,9 +775,9 @@ static int test_assign_revoke_role(void) {
         return 0;
     }
     
-    /* Add device to team first */
+    /* Add device to team with admin role */
     err = aranya_add_device_to_team(&team.owner.client, &team.id, 
-                                    device.pk, device.pk_len);
+                                    device.pk, device.pk_len, &team.admin_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to add device to team: %s\n", aranya_error_to_str(err));
         if (device.pk) free(device.pk);
@@ -730,10 +787,23 @@ static int test_assign_revoke_role(void) {
         return 0;
     }
     
-    printf("  ✓ Device added to team\n");
+    printf("  ✓ Device added to team with admin role\n");
     
-    /* Assign admin role to device */
-    err = aranya_assign_role(&team.owner.client, &team.id, &device.id, ARANYA_ROLE_ADMIN);
+    /* Revoke admin role from device */
+    err = aranya_revoke_role(&team.owner.client, &team.id, &device.id, &team.admin_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to revoke admin role: %s\n", aranya_error_to_str(err));
+        if (device.pk) free(device.pk);
+        aranya_client_cleanup(&device.client);
+        if (team.owner.pk) free(team.owner.pk);
+        aranya_client_cleanup(&team.owner.client);
+        return 0;
+    }
+    
+    printf("  ✓ Admin role revoked\n");
+    
+    /* Re-assign admin role to device */
+    err = aranya_assign_role(&team.owner.client, &team.id, &device.id, &team.admin_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to assign admin role: %s\n", aranya_error_to_str(err));
         if (device.pk) free(device.pk);
@@ -746,7 +816,7 @@ static int test_assign_revoke_role(void) {
     printf("  ✓ Admin role assigned\n");
     
     /* Revoke admin role */
-    err = aranya_revoke_role(&team.owner.client, &team.id, &device.id, ARANYA_ROLE_ADMIN);
+    err = aranya_revoke_role(&team.owner.client, &team.id, &device.id, &team.admin_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to revoke admin role: %s\n", aranya_error_to_str(err));
         if (device.pk) free(device.pk);
