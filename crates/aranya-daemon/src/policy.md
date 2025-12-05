@@ -1424,6 +1424,9 @@ command SetupDefaultRole {
         let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope)
 
+        let admin_role_rank = 800
+        let operator_role_rank = 700
+        let member_role_rank = 600
         match this.name {
             DefaultRoleName::Admin => {
                 finish {
@@ -1431,7 +1434,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
-                        rank: 800,
+                        rank: admin_role_rank,
                         default: true,
                     })
 
@@ -1450,6 +1453,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
+                        rank: admin_role_rank,
                         default: true,
                     }
 
@@ -1464,7 +1468,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
-                        rank: 700,
+                        rank: operator_role_rank,
                         default: true,
                     })
 
@@ -1478,6 +1482,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
+                        rank: operator_role_rank,
                         default: true,
                     }
 
@@ -1492,7 +1497,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
-                        rank: 600,
+                        rank: member_role_rank,
                         default: true,
                     })
 
@@ -1503,6 +1508,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: name,
                         author_id: author.device_id,
+                        rank: member_role_rank,
                         default: true,
                     }
 
@@ -2213,18 +2219,20 @@ command CreateTeam {
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
+        let owner_device_rank = 1000
+        let owner_role_rank = 900
         finish {
             create TeamStart[]=>{team_id: team_id}
 
             create DeviceGeneration[device_id: owner_key_ids.device_id]=>{generation: 0}
 
-            add_new_device(this.owner_keys, owner_key_ids, 1000)
+            add_new_device(this.owner_keys, owner_key_ids, owner_device_rank)
 
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
-                rank: 900,
+                rank: owner_role_rank,
                 default: true,
             })
             // Set the object rank of the owner device.
@@ -2271,12 +2279,14 @@ command CreateTeam {
             emit DeviceAdded {
                 device_id: owner_key_ids.device_id,
                 device_keys: this.owner_keys,
+                rank: owner_device_rank,
             }
             emit RoleCreated {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
                 default: true,
+                rank: owner_role_rank,
             }
             emit RoleAssigned {
                 device_id: author_id,
@@ -2422,6 +2432,8 @@ effect DeviceAdded {
     device_id id,
     // The device's set of public Device Keys.
     device_keys struct KeyBundle,
+    // The rank of the device object.
+    rank int,
 }
 
 command AddDevice {
@@ -2479,6 +2491,7 @@ command AddDevice {
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
                     device_keys: this.device_keys,
+                    rank: rank,
                 }
             }
         } else {
@@ -2491,6 +2504,7 @@ command AddDevice {
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
                     device_keys: this.device_keys,
+                    rank: rank,
                 }
             }
         }

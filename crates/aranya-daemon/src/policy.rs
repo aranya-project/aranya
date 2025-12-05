@@ -97,6 +97,7 @@ pub struct CheckValidAfcChannels {}
 pub struct DeviceAdded {
     pub device_id: BaseId,
     pub device_keys: KeyBundle,
+    pub rank: i64,
 }
 /// DeviceRemoved policy effect.
 #[effect]
