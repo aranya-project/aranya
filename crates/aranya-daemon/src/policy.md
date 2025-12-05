@@ -2491,6 +2491,27 @@ command TerminateTeam {
 action add_device(device_keys struct KeyBundle, initial_role_id optional id) {
     publish AddDevice {
         device_keys: device_keys,
+        rank: None,
+    }
+    if initial_role_id is Some {
+        let role_id = unwrap initial_role_id
+        publish AssignRole {
+            device_id: derive_device_key_ids(device_keys).device_id,
+            role_id: role_id,
+        }
+    }
+}
+
+// Adds a device to the team with initial rank.
+//
+// # Required Permissions
+//
+// - `AddDevice`
+// - `CanAssignRole(role_id)` for the initial role, if provided.
+action add_device_with_rank(device_keys struct KeyBundle, initial_role_id optional id, rank int) {
+    publish AddDevice {
+        device_keys: device_keys,
+        rank: Some(rank),
     }
     if initial_role_id is Some {
         let role_id = unwrap initial_role_id
@@ -2517,6 +2538,8 @@ command AddDevice {
     fields {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
+        // Device rank.
+        rank optional int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2547,7 +2570,7 @@ command AddDevice {
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
-        let rank = saturating_sub(get_object_rank(author.device_id), 1)
+        let rank = get_initial_rank(this.rank, author.device_id)
         if existing_gen is None {
             finish {
                 create DeviceGeneration[device_id: dev_key_ids.device_id]=>{generation: 0}
@@ -2828,8 +2851,6 @@ command CreateLabel {
         //
         // - the team is active
         // - `author` has the `CreateLabel` permission
-        //let rank = None
-
         let rank = get_initial_rank(this.rank, author.device_id)
         finish {
             create Label[label_id: label_id]=>{
