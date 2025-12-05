@@ -1,3 +1,4 @@
+/build
 /target
 
 .DS_Store
@@ -5,6 +6,3 @@
 *.tar.gz
 
 .vscode
-
-# CMake
-build/
