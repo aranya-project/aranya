@@ -2402,30 +2402,10 @@ command TerminateTeam {
 //
 // - `AddDevice`
 // - `CanAssignRole(role_id)` for the initial role, if provided.
-action add_device(device_keys struct KeyBundle, initial_role_id optional id) {
+action add_device(device_keys struct KeyBundle, initial_role_id optional id, rank optional int) {
     publish AddDevice {
         device_keys: device_keys,
-        rank: None,
-    }
-    if initial_role_id is Some {
-        let role_id = unwrap initial_role_id
-        publish AssignRole {
-            device_id: derive_device_key_ids(device_keys).device_id,
-            role_id: role_id,
-        }
-    }
-}
-
-// Adds a device to the team with initial rank.
-//
-// # Required Permissions
-//
-// - `AddDevice`
-// - `CanAssignRole(role_id)` for the initial role, if provided.
-action add_device_with_rank(device_keys struct KeyBundle, initial_role_id optional id, rank int) {
-    publish AddDevice {
-        device_keys: device_keys,
-        rank: Some(rank),
+        rank: rank,
     }
     if initial_role_id is Some {
         let role_id = unwrap initial_role_id
@@ -2703,25 +2683,10 @@ function derive_label_id(evp struct Envelope) id {
 // # Required Permissions
 //
 // - `CreateLabel`
-action create_label(name string) {
+action create_label(name string, rank optional int) {
     publish CreateLabel {
         label_name: name,
-        rank: None,
-    }
-}
-
-// Creates a label with an initial rank.
-//
-// - `name` is a short description of the label, like
-//   "TELEMETRY".
-//
-// # Required Permissions
-//
-// - `CreateLabel`
-action create_label_with_rank(name string, rank int) {
-    publish CreateLabel {
-        label_name: name,
-        rank: Some(rank),
+        rank: rank,
     }
 }
 
