@@ -691,7 +691,7 @@ ephemeral command QueryDeviceKeyBundle {
 ### Overview
 
 Each object in Aranya's RBAC system has a rank associated with its Aranya ID.
-The highest rank is MAX_U32 while the lowest rank is 0.
+The highest rank is i64::MAX while the lowest rank is 0.
 Objects with higher rank are allowed to operate on objects with a lower rank.
 The ranking system is used to ensure that all objects and operations abide by an application-defined hierarchy. The hierarchy can be audited by ensuring that numerical rank values fall into the expected hierarchical levels.
 Lower ranked objects are guaranteed to not have permission to operate on higher ranked objects.
@@ -770,17 +770,6 @@ function get_object_rank(object_id id) int {
 finish function set_object_rank(object_id id, rank int) {
     // Create new rank fact.
     create Rank[object_id: object_id]=>{rank: rank}
-}
-
-// Unset the rank of an object.
-//
-// Assumptions:
-// - The object has a rank.
-// - The author has a higher rank than the object.
-// - The rank should only be unset if the object is being deleted.
-finish function unset_object_rank(object_id id) {
-    // Delete object rank fact.
-    delete Rank[object_id: object_id]
 }
 ```
 ### ChangeRank Command
@@ -1576,7 +1565,7 @@ command DeleteRole {
 
         finish {
             delete Role[role_id: this.role_id]
-            unset_object_rank(this.role_id)
+            delete Rank[object_id: this.role_id]
 
             emit RoleDeleted {
                 name: role.name,
@@ -2596,7 +2585,7 @@ command RemoveDevice {
                 }
                 delete_role_assignment(this.device_id, role_id)
                 delete_device_core(this.device_id)
-                unset_object_rank(this.device_id)
+                delete Rank[object_id: this.device_id]
 
                 emit DeviceRemoved {
                     device_id: this.device_id,
@@ -2613,7 +2602,7 @@ command RemoveDevice {
                     generation: next_gen
                 }
                 delete_device_core(this.device_id)
-                unset_object_rank(this.device_id)
+                delete Rank[object_id: this.device_id]
 
                 emit DeviceRemoved {
                     device_id: this.device_id,
@@ -2837,7 +2826,7 @@ command DeleteLabel {
             // delete LabelAssignedToDevice[label_id: label.label_id, device_id: ?]
 
             delete Label[label_id: label.label_id]
-            unset_object_rank(label.label_id)
+            delete Rank[object_id: label.label_id]
 
             emit LabelDeleted {
                 label_name: label.name,
