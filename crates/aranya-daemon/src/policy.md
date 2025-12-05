@@ -817,7 +817,7 @@ command SetRank {
 
         // Author must outrank the rank it is setting.
         let author_rank = get_object_rank(author.device_id)
-        check author_rank > this.rank
+        check author_rank >= this.rank
 
         finish {
             set_object_rank(this.object_id, this.rank)
@@ -886,16 +886,18 @@ command ChangeRank {
 
         let author = get_author(envelope)
 
-        // Devices cannot set rank on themselves.
-        check author.device_id != this.object_id
 
         // The author must have permission to set rank.
         check device_has_simple_perm(author.device_id, SimplePerm::ChangeRank)
 
         // Author must outrank both the old and new rank.
         let author_rank = get_object_rank(author.device_id)
-        check author_rank > this.old_rank
-        check author_rank > this.new_rank
+        // Author must outrank the object it is changing rank on.
+        // An object can always downgrade its own rank.
+        if author.device_id != this.object_id {
+            check author_rank > this.old_rank
+        }
+        check author_rank >= this.new_rank
 
         // Object must already have a rank.
         let rank = get_object_rank(this.object_id)
