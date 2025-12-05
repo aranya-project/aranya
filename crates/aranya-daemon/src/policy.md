@@ -739,20 +739,6 @@ function author_has_permission(author_id id, perm enum SimplePerm, target_id1 op
 
     return true
 }
-
-// Returns whether the command author object outranks the target object.
-// If the command author outranks the target, it is allowed to perform operations on the target object.
-//
-// # Caveats
-//
-// - It does NOT check whether the command author has permission to perform the operation.
-// - A check failure will occur if either the author or target object do not have a rank associated with them.
-function author_outranks_target(author_id id, target_id id) bool {
-    let author_rank = get_object_rank(author_id)
-    let target_rank = get_object_rank(target_id)
-
-    return author_rank > target_rank
-}
 ```
 
 ### Rank Getters/Setters
