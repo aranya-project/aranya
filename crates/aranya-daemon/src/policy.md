@@ -1275,9 +1275,8 @@ command RemovePermFromRole {
 
         let author = get_author(envelope)
 
-        // Removing a permission does not *escalate* privilege,
-        // so unlike `AddPermToRole` we only need to check that
-        // the author is allowed to change the role's permissions.
+        // The author must have permission to change role perms.
+        check device_has_simple_perm(author.device_id, SimplePerm::ChangeRolePerms)
 
         // The author device must outrank the target object(s).
         check author_outranks_target(author.device_id, this.role_id)
@@ -2068,6 +2067,8 @@ command RevokeRole {
 
         let author = get_author(envelope)
 
+        // The author must have permission to revoke the role.
+        check device_has_simple_perm(author.device_id, SimplePerm::RevokeRole)
 
         // The author device must outrank the target object(s).
         check author_outranks_target(author.device_id, this.device_id)
@@ -2646,10 +2647,11 @@ command RemoveDevice {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::RemoveDevice)
 
         // The target device must exist.
         check exists Device[device_id: this.device_id]
+
+        check device_has_simple_perm(author.device_id, SimplePerm::RemoveDevice)
 
         // The author device must outrank the target object(s).
         check author_outranks_target(author.device_id, this.device_id)
@@ -3181,8 +3183,10 @@ command RevokeLabelFromDevice {
         check team_exists()
 
         let author = get_author(envelope)
-        check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
         let target = get_device(this.device_id)
+
+        // The author device must have permission to revoke the label.
+        check device_has_simple_perm(author.device_id, SimplePerm::RevokeLabel)
 
         // The author device must outrank the target object(s).
         check author_outranks_target(author.device_id, this.device_id)
