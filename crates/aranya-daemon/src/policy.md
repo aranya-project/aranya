@@ -729,6 +729,15 @@ function author_outranks_target(author_id id, target_id id) bool {
 Utility methods for getting/setting rank values on objects.
 
 ```policy
+// Get initial object rank.
+function get_initial_rank(rank optional int, author_id id) int {
+    if rank is Some {
+        return unwrap rank
+    } else {
+        return saturating_sub(get_object_rank(author_id), 1)
+    }
+}
+
 // Get the rank of an object.
 function get_object_rank(object_id id) int {
     let rank = check_unwrap query Rank[object_id: object_id]
@@ -2759,6 +2768,22 @@ function derive_label_id(evp struct Envelope) id {
 action create_label(name string) {
     publish CreateLabel {
         label_name: name,
+        rank: None,
+    }
+}
+
+// Creates a label with an initial rank.
+//
+// - `name` is a short description of the label, like
+//   "TELEMETRY".
+//
+// # Required Permissions
+//
+// - `CreateLabel`
+action create_label_with_rank(name string, rank int) {
+    publish CreateLabel {
+        label_name: name,
+        rank: Some(rank),
     }
 }
 
@@ -2769,6 +2794,8 @@ effect LabelCreated {
     label_id id,
     // The label name.
     label_name string,
+    // The rank of the label.
+    rank int,
     // The ID of the device that created the label.
     label_author_id id,
 }
@@ -2781,6 +2808,8 @@ command CreateLabel {
     fields {
         // The label name.
         label_name string,
+        // The initial rank of the label.
+        rank optional int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2799,7 +2828,9 @@ command CreateLabel {
         //
         // - the team is active
         // - `author` has the `CreateLabel` permission
-        let rank = saturating_sub(get_object_rank(author.device_id), 1)
+        //let rank = None
+
+        let rank = get_initial_rank(this.rank, author.device_id)
         finish {
             create Label[label_id: label_id]=>{
                 name: this.label_name,
@@ -2810,6 +2841,7 @@ command CreateLabel {
             emit LabelCreated {
                 label_id: label_id,
                 label_name: this.label_name,
+                rank: rank,
                 label_author_id: author.device_id,
             }
         }

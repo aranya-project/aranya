@@ -110,6 +110,7 @@ pub struct DeviceRemoved {
 pub struct LabelCreated {
     pub label_id: BaseId,
     pub label_name: Text,
+    pub rank: i64,
     pub label_author_id: BaseId,
 }
 /// LabelDeleted policy effect.
@@ -278,6 +279,7 @@ pub enum PersistentAction {
     add_device(add_device),
     remove_device(remove_device),
     create_label(create_label),
+    create_label_with_rank(create_label_with_rank),
     delete_label(delete_label),
     assign_label_to_device(assign_label_to_device),
     revoke_label_from_device(revoke_label_from_device),
@@ -401,6 +403,12 @@ pub struct remove_device {
 #[action(interface = Persistent)]
 pub struct create_label {
     pub name: Text,
+}
+/// create_label_with_rank policy action.
+#[action(interface = Persistent)]
+pub struct create_label_with_rank {
+    pub name: Text,
+    pub rank: i64,
 }
 /// delete_label policy action.
 #[action(interface = Persistent)]
