@@ -306,13 +306,6 @@ static int test_afc_create_uni_send_channel(void) {
     
     printf("  ✓ Unidirectional send channel created\n");
     
-    AranyaAfcChannelType chan_type;
-    err = aranya_afc_get_channel_type(&channel, &chan_type);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        printf("  ✓ Channel type: %d (should be %d for Sender)\n", 
-               chan_type, ARANYA_AFC_CHANNEL_TYPE_SENDER);
-    }
-    
     /* Cleanup */
     err = aranya_afc_channel_delete(&team.member1.client, &channel);
     aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
@@ -373,12 +366,14 @@ static int test_afc_create_uni_recv_channel(void) {
     
     printf("  ✓ Unidirectional receive channel created\n");
     
+    /* Note: aranya_afc_get_channel_type is not currently exposed in the C API
     AranyaAfcChannelType chan_type;
     err = aranya_afc_get_channel_type(&channel, &chan_type);
     if (err == ARANYA_ERROR_SUCCESS) {
         printf("  ✓ Channel type: %d (should be %d for Receiver)\n", 
                chan_type, ARANYA_AFC_CHANNEL_TYPE_RECEIVER);
     }
+    */
     
     /* Cleanup */
     err = aranya_afc_channel_delete(&team.member1.client, &channel);
