@@ -831,7 +831,6 @@ command SetRank {
             }
         }
     }
-
 }
 ```
 
@@ -918,7 +917,6 @@ command ChangeRank {
             }
         }
     }
-
 }
 ```
 
