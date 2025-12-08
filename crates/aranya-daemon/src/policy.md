@@ -863,8 +863,12 @@ command ChangeRank {
         } else {
             check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id)
         }
+        // Check that author's rank is >= than the rank being set.
         let author_rank = get_object_rank(author.device_id)
         check author_rank >= this.new_rank
+
+        // Check that old_rank matches the object's current rank.
+        check this.old_rank == get_object_rank(this.object_id)
 
         finish {
             change_object_rank(this.object_id, this.old_rank, this.new_rank)
