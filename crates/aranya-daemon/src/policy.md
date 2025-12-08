@@ -2470,6 +2470,8 @@ command TerminateTeam {
 ```policy
 // Adds a device to the team.
 //
+// If the rank is not specified, it will be set to `rank = author_rank - 1`.
+//
 // # Required Permissions
 //
 // - `AddDevice`
@@ -2752,6 +2754,8 @@ function derive_label_id(evp struct Envelope) id {
 
 ```policy
 // Creates a label.
+//
+// If the rank is not specified, it will be set to `rank = author_rank - 1`.
 //
 // - `name` is a short description of the label, like
 //   "TELEMETRY".
