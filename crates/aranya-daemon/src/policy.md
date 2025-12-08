@@ -996,6 +996,27 @@ to roles, and cannot be assigned directly to devices.
 Permissions are statically defined in the policy file itself and
 cannot be created or deleted at runtime.
 
+The following table shows which objects each permission can be granted to as well as which objects can be modified by an object with the permission:
+| Permission Name | Granted To Team Owner | Granted To Role | Granted To Device | Granted To Label | Modifies Team | Modifies Label | Modifies Role | Modifies Device | Modifies AFC Chan |
+| - | - | - | - | - | - | - | - | - | - |
+| CreateTeam | ✅ (implicit) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| TerminateTeam | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| SetupDefaultRole | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| AddDevice | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| RemoveDevice | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| ChangeRank | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| CreateRole | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| DeleteRole | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| AssignRole | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| RevokeRole | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| ChangeRolePerms | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| CreateLabel | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| DeleteLabel | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| AssignLabel | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| RevokeLabel | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| CanUseAfc | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| CreateAfcUniChannel | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
 ```policy
 // NB: Update `enum Permission` in client and client-capi on changes.
 enum Perm {
@@ -1432,6 +1453,14 @@ To guard against accidental replays, each default role records a
 `DefaultRoleSeeded` fact the first time it is created. Subsequent
 attempts to seed the same default role will fail the policy checks
 before any storage writes occur.
+
+Default role permissions:
+| Role Name | AddDevice | RemoveDevice | TerminateTeam | ChangeRank | CreateRole | DeleteRole | AssignRole | RevokeRole | ChangeRolePerms | SetupDefaultRole | CreateLabel | DeleteLabel | AssignLabel | RevokeLabel | CanUseAfc | CreateAfcUniChannel |
+| - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| Owner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Admin | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Operator | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Member | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ```policy
 fact DefaultRoleSeeded[name enum DefaultRoleName]=>{role_id id}
