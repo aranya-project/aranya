@@ -698,6 +698,8 @@ Lower ranked objects are guaranteed to not have permission to operate on higher 
 
 For example, a command author with rank 10 would be allowed to assign a label of rank 5 to a device of rank 4 because both of the objects it is operating on are lower rank than the author of the command.
 
+It is recommended to never grant a role of lower rank a permission that a device of higher rank does not have. If this scenario were to occur, the device of higher rank could onboard a pawn device to the team and assign the higher privilege but lower rank role to the pawn device in order to escalate its own privileges.
+
 ### Rank Fact
 
 Each object in Aranya's RBAC system has at most one rank associated with its Aranya ID.
