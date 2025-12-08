@@ -936,6 +936,42 @@ function derive_role_id(evp struct Envelope) id {
 > `owner` role. Therefore, the `owner` role is managed by itself.
 > It's [roles all the way down][all-the-way-down].
 
+### Privilege Escalation Mitigations
+
+Since the default owner role has all permissions available to it, it is recommended to only use this role for initial team setup. The owner role should delegate permissions to other roles that can be used for ongoing device, role, and label management. This approach reduces the exposure of the superuser account to potential compromise which could result in an attacker gaining complete control of the team.
+
+To mitigate against privilege escalation attempts, it is recommended to create roles with non-overlapping permissions as much as possible. It is especially important to segment permissions for device management, role creation, role permission management, labels, etc. across different roles.
+
+If a single role has too many permissions, it can attempt to use those permissions to escalate its own permissions, escalate permissions of other devices on the team, or onboard malicious devices it maintains control of to be used as a stronghold for future downgrade resistance.
+
+#### Privilege Escalation Attempt Scenario 1
+
+The following scenario describes a possible privilege escalation attempt as well as policy and operational mitigations to prevent the attack vector from occurring. 
+
+1. Malicious device onboards a new pawn device it maintains control of (`AddDevice` perm).
+2. Malicious device creates a new role (`CreateRole` perm).
+3. Malicious device assigns a permission to that role it does not have (`ChangeRolePerms` perm). Policy does not allow this to happen.
+4. Malicious device assigns role with escalated permissions to the pawn device (`AssignRole` perm).
+5. Malicious device now has escalated permissions via the pawn device it controls.
+
+We guard against this privilege escalation vector in the policy by only allowing devices to assign permissions to roles which they already have themselves in the `ChangeRolePerms` command. This prevents devices from escalating their own permissions via other roles which they control by breaking step 3. in the chain.
+
+It is also recommended to segment the `AddDevice`, `CreateRole`, `ChangeRolePerms`, and `AssignRole` permissions across different roles to prevent a single device from controlling device onboarding, role permissions management, and role assignment. A similar approach is recommended to mitigate against privilege escalation for label management.
+
+#### Privilege Escalation Attempt Scenario 2
+
+The following scenario describes a possible privilege escalation attempt by assigning a higher privilege role to a device that is controlled by a malicious device.
+
+1. Malicious device of rank 10 onboards a new pawn device it maintains control of with rank 5 (`AddDevice` perm).
+2. Malicious device assigns existing role of rank 4 with permissions it does not have to pawn device (`AssignRole` perm).
+3. Malicious device now has escalated permissions via the pawn device it controls.
+
+The ranking system should be leveraged to guard against these types of privilege escalation attempts. The higher privilege role of rank 4 should not have been given a rank lower than a device of rank 10 that is not supposed to have those permissions granted to it.
+
+To mitigate against this privilege escalation attempt, the higher privilege role could have been given a rank higher than the lower privilege device (e.g. a rank of 15). Then the malicious device of rank 10 would not have the ability to assign that role to another device since the rank check in the policy would prevent the role assignment operation from succeeding.
+
+It is recommended to combine a secure ranking system alongside segmented `AddDevice` and `AssignRole` permissions across different roles to safely guard against this scenario.
+
 ### Role Scope
 
 The _scope_ of a role is the aggregate set of resources that the
@@ -1166,7 +1202,8 @@ command AddPermToRole {
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
 
 
-        // We should not grant permissions we do not have
+        // The author device can only grant a permission it has to the target device.
+        // This check is to mitigate against privilege escalation attempts.
         check device_has_perm(author.device_id, this.perm)
 
         // The role must not already have the permission.
