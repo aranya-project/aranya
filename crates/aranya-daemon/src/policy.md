@@ -809,6 +809,9 @@ finish function set_object_rank(object_id id, rank int) {
 Command for changing the rank of an object.
 
 ```policy
+// Maximum rank an object can have.
+let MAX_RANK = 9223372036854775807
+
 // Change the rank of an object.
 //
 // Assumptions:
@@ -2298,7 +2301,7 @@ command CreateTeam {
                 default: true,
             })
             // Set the object rank of the owner device (i64::MAX).
-            set_object_rank(author_id, 9223372036854775807)
+            set_object_rank(author_id, MAX_RANK)
 
             // Assign all of the administrative permissions to
             // the owner role.
