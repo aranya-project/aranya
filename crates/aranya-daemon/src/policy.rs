@@ -51,6 +51,7 @@ pub enum Effect {
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsResult(QueryLabelsResult),
+    QueryRankResult(QueryRankResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
     RankChanged(RankChanged),
     RoleAssigned(RoleAssigned),
@@ -192,6 +193,12 @@ pub struct QueryLabelsResult {
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
+/// QueryRankResult policy effect.
+#[effect]
+pub struct QueryRankResult {
+    pub object_id: BaseId,
+    pub rank: i64,
+}
 /// QueryTeamRolesResult policy effect.
 #[effect]
 pub struct QueryTeamRolesResult {
@@ -282,6 +289,7 @@ pub enum EphemeralAction {
     query_afc_channel_is_valid(query_afc_channel_is_valid),
     query_device_role(query_device_role),
     query_device_keybundle(query_device_keybundle),
+    query_rank(query_rank),
     query_team_roles(query_team_roles),
     query_label(query_label),
     query_labels(query_labels),
@@ -314,6 +322,11 @@ pub struct change_rank {
     pub object_id: BaseId,
     pub old_rank: i64,
     pub new_rank: i64,
+}
+/// query_rank policy action.
+#[action(interface = Ephemeral)]
+pub struct query_rank {
+    pub object_id: BaseId,
 }
 /// add_perm_to_role policy action.
 #[action(interface = Persistent)]

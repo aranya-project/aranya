@@ -804,6 +804,7 @@ finish function set_object_rank(object_id id, rank int) {
     create Rank[object_id: object_id]=>{rank: rank}
 }
 ```
+
 ### ChangeRank Command
 
 Command for changing the rank of an object.
@@ -882,6 +883,57 @@ command ChangeRank {
                 object_id: this.object_id,
                 old_rank: this.old_rank,
                 new_rank: this.new_rank,
+            }
+        }
+    }
+}
+```
+
+### Rank Queries
+
+##### `query_rank`
+
+Returns the rank of an object.
+
+```policy
+// Emits `QueryRankResult` with the rank of the object.
+// If the object does not have a rank, then no effects are emitted.
+ephemeral action query_rank(object_id id) {
+    publish QueryRank {
+        object_id: object_id,
+    }
+}
+
+effect QueryRankResult {
+    // The object's unique ID.
+    object_id id,
+    // The rank of the object.
+    rank int,
+}
+
+ephemeral command QueryRank {
+    fields {
+        object_id id,
+    }
+
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let maybe_rank = query Rank[object_id: this.object_id]
+        if maybe_rank is None {
+            finish {}
+        } else {
+            let rank = unwrap maybe_rank
+            finish {
+                emit QueryRankResult {
+                    object_id: this.object_id,
+                    rank: rank.rank,
+                }
             }
         }
     }
