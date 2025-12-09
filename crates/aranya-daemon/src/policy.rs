@@ -276,9 +276,9 @@ pub enum PersistentAction {
     revoke_role(revoke_role),
     create_team(create_team),
     terminate_team(terminate_team),
-    add_device(add_device),
+    add_device_with_rank(add_device_with_rank),
     remove_device(remove_device),
-    create_label(create_label),
+    create_label_with_rank(create_label_with_rank),
     delete_label(delete_label),
     assign_label_to_device(assign_label_to_device),
     revoke_label_from_device(revoke_label_from_device),
@@ -387,23 +387,23 @@ pub struct create_team {
 pub struct terminate_team {
     pub team_id: BaseId,
 }
-/// add_device policy action.
+/// add_device_with_rank policy action.
 #[action(interface = Persistent)]
-pub struct add_device {
+pub struct add_device_with_rank {
     pub device_keys: KeyBundle,
     pub initial_role_id: Option<BaseId>,
-    pub rank: Option<i64>,
+    pub rank: i64,
 }
 /// remove_device policy action.
 #[action(interface = Persistent)]
 pub struct remove_device {
     pub device_id: BaseId,
 }
-/// create_label policy action.
+/// create_label_with_rank policy action.
 #[action(interface = Persistent)]
-pub struct create_label {
+pub struct create_label_with_rank {
     pub name: Text,
-    pub rank: Option<i64>,
+    pub rank: i64,
 }
 /// delete_label policy action.
 #[action(interface = Persistent)]

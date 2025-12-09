@@ -778,15 +778,6 @@ function author_can_operate_on_target(author_rank int, target_id id) bool {
 Utility methods for getting/setting rank values on objects.
 
 ```policy
-// Get initial object rank.
-function get_initial_rank(rank optional int, author_id id) int {
-    if rank is Some {
-        return unwrap rank
-    } else {
-        return saturating_sub(get_object_rank(author_id), 1)
-    }
-}
-
 // Get the rank of an object.
 function get_object_rank(object_id id) int {
     let rank = check_unwrap query Rank[object_id: object_id]
@@ -2552,15 +2543,13 @@ command TerminateTeam {
 ### Adding Devices
 
 ```policy
-// Adds a device to the team.
-//
-// If the rank is not specified, it will be set to `rank = author_rank - 1`.
+// Adds a device to the team with an initial rank.
 //
 // # Required Permissions
 //
 // - `AddDevice`
 // - `CanAssignRole(role_id)` for the initial role, if provided.
-action add_device(device_keys struct KeyBundle, initial_role_id optional id, rank optional int) {
+action add_device_with_rank(device_keys struct KeyBundle, initial_role_id optional id, rank int) {
     publish AddDevice {
         device_keys: device_keys,
         rank: rank,
@@ -2593,7 +2582,7 @@ command AddDevice {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
         // Device rank.
-        rank optional int,
+        rank int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2626,7 +2615,6 @@ command AddDevice {
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
-        let rank = get_initial_rank(this.rank, author.device_id)
         if existing_gen is None {
             finish {
                 create DeviceGeneration[device_id: dev_key_ids.device_id]=>{generation: 0}
@@ -2634,12 +2622,12 @@ command AddDevice {
                 add_new_device(
                     this.device_keys,
                     dev_key_ids,
-                    rank,
+                    this.rank,
                 )
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
                     device_keys: this.device_keys,
-                    rank: rank,
+                    rank: this.rank,
                 }
             }
         } else {
@@ -2647,12 +2635,12 @@ command AddDevice {
                 add_new_device(
                     this.device_keys,
                     dev_key_ids,
-                    rank,
+                    this.rank,
                 )
                 emit DeviceAdded {
                     device_id: dev_key_ids.device_id,
                     device_keys: this.device_keys,
-                    rank: rank,
+                    rank: this.rank,
                 }
             }
         }
@@ -2837,9 +2825,7 @@ function derive_label_id(evp struct Envelope) id {
 #### Label Creation
 
 ```policy
-// Creates a label.
-//
-// If the rank is not specified, it will be set to `rank = author_rank - 1`.
+// Creates a label with an initial rank.
 //
 // - `name` is a short description of the label, like
 //   "TELEMETRY".
@@ -2847,7 +2833,7 @@ function derive_label_id(evp struct Envelope) id {
 // # Required Permissions
 //
 // - `CreateLabel`
-action create_label(name string, rank optional int) {
+action create_label_with_rank(name string, rank int) {
     publish CreateLabel {
         label_name: name,
         rank: rank,
@@ -2876,7 +2862,7 @@ command CreateLabel {
         // The label name.
         label_name string,
         // The initial rank of the label.
-        rank optional int,
+        rank int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2897,18 +2883,17 @@ command CreateLabel {
         //
         // - the team is active
         // - `author` has the `CreateLabel` permission
-        let rank = get_initial_rank(this.rank, author.device_id)
         finish {
             create Label[label_id: label_id]=>{
                 name: this.label_name,
                 author_id: author.device_id,
             }
-            set_object_rank(label_id, rank)
+            set_object_rank(label_id, this.rank)
 
             emit LabelCreated {
                 label_id: label_id,
                 label_name: this.label_name,
-                rank: rank,
+                rank: this.rank,
                 label_author_id: author.device_id,
             }
         }
