@@ -1,7 +1,7 @@
 #![cfg(feature = "preview")]
 #![cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 
-use crate::{text, Text};
+use aranya_daemon_api as api;
 
 /// Role management permission.
 #[non_exhaustive]
@@ -18,12 +18,26 @@ pub enum RoleManagementPermission {
     CanChangeRolePerms,
 }
 
-impl RoleManagementPermission {
-    pub(crate) fn as_text(self) -> Text {
-        match self {
-            RoleManagementPermission::CanAssignRole => text!("CanAssignRole"),
-            RoleManagementPermission::CanRevokeRole => text!("CanRevokeRole"),
-            RoleManagementPermission::CanChangeRolePerms => text!("CanChangeRolePerms"),
+impl From<api::RoleManagementPerm> for RoleManagementPermission {
+    fn from(value: api::RoleManagementPerm) -> Self {
+        match value {
+            api::RoleManagementPerm::CanAssignRole => RoleManagementPermission::CanAssignRole,
+            api::RoleManagementPerm::CanRevokeRole => RoleManagementPermission::CanRevokeRole,
+            api::RoleManagementPerm::CanChangeRolePerms => {
+                RoleManagementPermission::CanChangeRolePerms
+            }
+        }
+    }
+}
+
+impl From<RoleManagementPermission> for api::RoleManagementPerm {
+    fn from(value: RoleManagementPermission) -> Self {
+        match value {
+            RoleManagementPermission::CanAssignRole => api::RoleManagementPerm::CanAssignRole,
+            RoleManagementPermission::CanRevokeRole => api::RoleManagementPerm::CanRevokeRole,
+            RoleManagementPermission::CanChangeRolePerms => {
+                api::RoleManagementPerm::CanChangeRolePerms
+            }
         }
     }
 }
@@ -90,26 +104,50 @@ pub enum Permission {
     CreateAfcUniChannel,
 }
 
-impl Permission {
-    pub(crate) fn as_text(self) -> Text {
-        match self {
-            Permission::AddDevice => text!("AddDevice"),
-            Permission::RemoveDevice => text!("RemoveDevice"),
-            Permission::TerminateTeam => text!("TerminateTeam"),
-            Permission::CreateRole => text!("CreateRole"),
-            Permission::DeleteRole => text!("DeleteRole"),
-            Permission::AssignRole => text!("AssignRole"),
-            Permission::RevokeRole => text!("RevokeRole"),
-            Permission::ChangeRoleManagementPerms => text!("ChangeRoleManagementPerms"),
-            Permission::SetupDefaultRole => text!("SetupDefaultRole"),
-            Permission::ChangeRoleManagingRole => text!("ChangeRoleManagingRole"),
-            Permission::CreateLabel => text!("CreateLabel"),
-            Permission::DeleteLabel => text!("DeleteLabel"),
-            Permission::ChangeLabelManagingRole => text!("ChangeLabelManagingRole"),
-            Permission::AssignLabel => text!("AssignLabel"),
-            Permission::RevokeLabel => text!("RevokeLabel"),
-            Permission::CanUseAfc => text!("CanUseAfc"),
-            Permission::CreateAfcUniChannel => text!("CreateAfcUniChannel"),
+impl From<api::SimplePerm> for Permission {
+    fn from(value: api::SimplePerm) -> Self {
+        match value {
+            api::SimplePerm::AddDevice => Permission::AddDevice,
+            api::SimplePerm::RemoveDevice => Permission::RemoveDevice,
+            api::SimplePerm::TerminateTeam => Permission::TerminateTeam,
+            api::SimplePerm::CreateRole => Permission::CreateRole,
+            api::SimplePerm::DeleteRole => Permission::DeleteRole,
+            api::SimplePerm::AssignRole => Permission::AssignRole,
+            api::SimplePerm::RevokeRole => Permission::RevokeRole,
+            api::SimplePerm::ChangeRoleManagementPerms => Permission::ChangeRoleManagementPerms,
+            api::SimplePerm::SetupDefaultRole => Permission::SetupDefaultRole,
+            api::SimplePerm::ChangeRoleManagingRole => Permission::ChangeRoleManagingRole,
+            api::SimplePerm::CreateLabel => Permission::CreateLabel,
+            api::SimplePerm::DeleteLabel => Permission::DeleteLabel,
+            api::SimplePerm::ChangeLabelManagingRole => Permission::ChangeLabelManagingRole,
+            api::SimplePerm::AssignLabel => Permission::AssignLabel,
+            api::SimplePerm::RevokeLabel => Permission::RevokeLabel,
+            api::SimplePerm::CanUseAfc => Permission::CanUseAfc,
+            api::SimplePerm::CreateAfcUniChannel => Permission::CreateAfcUniChannel,
+        }
+    }
+}
+
+impl From<Permission> for api::SimplePerm {
+    fn from(value: Permission) -> Self {
+        match value {
+            Permission::AddDevice => api::SimplePerm::AddDevice,
+            Permission::RemoveDevice => api::SimplePerm::RemoveDevice,
+            Permission::TerminateTeam => api::SimplePerm::TerminateTeam,
+            Permission::CreateRole => api::SimplePerm::CreateRole,
+            Permission::DeleteRole => api::SimplePerm::DeleteRole,
+            Permission::AssignRole => api::SimplePerm::AssignRole,
+            Permission::RevokeRole => api::SimplePerm::RevokeRole,
+            Permission::ChangeRoleManagementPerms => api::SimplePerm::ChangeRoleManagementPerms,
+            Permission::SetupDefaultRole => api::SimplePerm::SetupDefaultRole,
+            Permission::ChangeRoleManagingRole => api::SimplePerm::ChangeRoleManagingRole,
+            Permission::CreateLabel => api::SimplePerm::CreateLabel,
+            Permission::DeleteLabel => api::SimplePerm::DeleteLabel,
+            Permission::ChangeLabelManagingRole => api::SimplePerm::ChangeLabelManagingRole,
+            Permission::AssignLabel => api::SimplePerm::AssignLabel,
+            Permission::RevokeLabel => api::SimplePerm::RevokeLabel,
+            Permission::CanUseAfc => api::SimplePerm::CanUseAfc,
+            Permission::CreateAfcUniChannel => api::SimplePerm::CreateAfcUniChannel,
         }
     }
 }

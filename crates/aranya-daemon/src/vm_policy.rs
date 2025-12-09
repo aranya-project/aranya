@@ -22,7 +22,11 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::{keystore::AranyaStore, policy::ChanOp, util::TryClone};
+use crate::{
+    keystore::AranyaStore,
+    policy::{ChanOp, RoleManagementPerm, SimplePerm},
+    util::TryClone,
+};
 
 /// Policy loaded from policy.md file.
 pub(crate) const POLICY_SOURCE: &str = include_str!("./policy.md");
@@ -44,6 +48,60 @@ impl FromStr for ChanOp {
 impl fmt::Display for ChanOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ChanOp::{self:?}")
+    }
+}
+
+/// Converts [`RoleManagementPerm`] to string.
+impl FromStr for RoleManagementPerm {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "SimplePerm::CanAssignRole" => Ok(Self::CanAssignRole),
+            "SimplePerm::CanRevokeRole" => Ok(Self::CanRevokeRole),
+            "SimplePerm::CanChangeRolePerms" => Ok(Self::CanChangeRolePerms),
+            _ => Err(anyhow!("unknown `RoleManagementPerm`: {s}")),
+        }
+    }
+}
+
+/// Display implementation for [`RoleManagementPerm`]
+impl fmt::Display for RoleManagementPerm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RoleManagementPerm::{self:?}")
+    }
+}
+
+/// Converts [`SimplePerm`] to string.
+impl FromStr for SimplePerm {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "SimplePerm::AddDevice" => Ok(Self::AddDevice),
+            "SimplePerm::RemoveDevice" => Ok(Self::RemoveDevice),
+            "SimplePerm::TerminateTeam" => Ok(Self::TerminateTeam),
+            "SimplePerm::CreateRole" => Ok(Self::CreateRole),
+            "SimplePerm::DeleteRole" => Ok(Self::DeleteRole),
+            "SimplePerm::AssignRole" => Ok(Self::AssignRole),
+            "SimplePerm::RevokeRole" => Ok(Self::RevokeRole),
+            "SimplePerm::ChangeRoleManagementPerms" => Ok(Self::ChangeRoleManagementPerms),
+            "SimplePerm::SetupDefaultRole" => Ok(Self::SetupDefaultRole),
+            "SimplePerm::ChangeRoleManagingRole" => Ok(Self::ChangeRoleManagingRole),
+            "SimplePerm::CreateLabel" => Ok(Self::CreateLabel),
+            "SimplePerm::DeleteLabel" => Ok(Self::DeleteLabel),
+            "SimplePerm::ChangeLabelManagingRole" => Ok(Self::ChangeLabelManagingRole),
+            "SimplePerm::AssignLabel" => Ok(Self::AssignLabel),
+            "SimplePerm::RevokeLabel" => Ok(Self::RevokeLabel),
+            "SimplePerm::CanUseAfc" => Ok(Self::CanUseAfc),
+            "SimplePerm::CreateAfcUniChannel" => Ok(Self::CreateAfcUniChannel),
+            _ => Err(anyhow!("unknown `SimplePerm`: {s}")),
+        }
+    }
+}
+
+/// Display implementation for [`SimplePerm`]
+impl fmt::Display for SimplePerm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SimplePerm::{self:?}")
     }
 }
 
