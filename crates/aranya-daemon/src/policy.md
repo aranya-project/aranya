@@ -32,7 +32,7 @@ which commands devices can publish to Aranya's distributed graph:
   "default roles" - `owner` (emergency access), `admin` (system
   administration), `operator` (user management), and `member` (basic
   usage). This policy has the capability to define custom roles as well.
-- **Rank** determines whether a higher ranked object can operate on a lower ranked object.
+- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object.
 - **Authorization** is determined by whether an object has permission to perform the operation and outranks the target object(s).
 - **No Self-Administration**: Devices cannot assign roles or labels to
   themselves, enforcing separation of duties.
