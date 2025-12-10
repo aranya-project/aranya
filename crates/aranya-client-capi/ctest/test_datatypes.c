@@ -8,12 +8,7 @@
 #endif
 
 #include "aranya-client.h"
-
-/* simple pass/fail reporter */
-static void report(const char *name, int ok, int *fails) {
-    printf("%s: %s\n", name, ok ? "PASS" : "FAIL");
-    if (!ok) (*fails)++;
-}
+#include "utils.h"
 
 /* Test: ID string conversion functions */
 static int test_id_string_conversion(void) {
@@ -86,25 +81,27 @@ static int test_label_id(void) {
 }
 
 int main(void) {
-    int fails = 0;
-
 #if defined(ENABLE_ARANYA_PREVIEW)
     printf("Running aranya-client-capi data type tests\n");
     printf("===========================================\n");
 
     /* Test data type functionality */
-    report("duration_constants", test_duration_constants(), &fails);
-    report("id_string_conversion", test_id_string_conversion(), &fails);
-    report("label_id", test_label_id(), &fails);
-
-    printf("\n===========================================\n");
-    if (fails == 0) {
-        printf("ALL DATA TYPE TESTS PASSED\n");
-        return EXIT_SUCCESS;
-    } else {
-        printf("%d DATA TYPE TEST(S) FAILED\n", fails);
+    if (!test_duration_constants()) {
+        printf("FAILED: duration_constants\n");
         return EXIT_FAILURE;
     }
+    if (!test_id_string_conversion()) {
+        printf("FAILED: id_string_conversion\n");
+        return EXIT_FAILURE;
+    }
+    if (!test_label_id()) {
+        printf("FAILED: label_id\n");
+        return EXIT_FAILURE;
+    }
+
+    printf("\n===========================================\n");
+    printf("ALL DATA TYPE TESTS PASSED\n");
+    return EXIT_SUCCESS;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping data type tests\n");
     return EXIT_SUCCESS;

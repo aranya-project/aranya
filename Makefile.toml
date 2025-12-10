@@ -47,6 +47,12 @@ description = "Build Code with preview features"
 command = "cargo"
 args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview", "${@}"]
 
+[tasks.build-daemon]
+category = "build"
+description = "Build daemon for C API tests"
+command = "cargo"
+args = ["build", "--package=aranya-daemon", "--features=preview,experimental"]
+
 [tasks.tgz-daemon]
 category = "build"
 description = "Archive daemon"
@@ -113,6 +119,13 @@ cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview"]
 
+[tasks.build-capi-lib-for-tests]
+category = "build"
+description = "Build C API shared library for tests (without AFC to avoid codegen issues)"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--no-default-features", "--features=preview,experimental"]
+
 [tasks.tgz-capi]
 category = "build"
 description = "Archive C API artifacts"
@@ -127,6 +140,29 @@ cp examples/c/cmake/AranyaConfig.cmake "${capi}"/cmake/
 cp crates/aranya-client-capi/output/aranya-client.h "${capi}"/include/
 tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 '''
+
+# Build C API tests
+[tasks.build-capi-tests]
+category = "build"
+description = "Build C API test suite"
+cwd = "crates/aranya-client-capi/ctest"
+script = '''
+#!/usr/bin/env bash
+set -e
+mkdir -p build
+cd build
+cmake ..
+cmake --build .
+'''
+
+# Run C API tests
+[tasks.test-capi]
+category = "test"
+description = "Run C API test suite"
+cwd = "crates/aranya-client-capi/ctest/build"
+command = "ctest"
+args = ["--output-on-failure"]
+dependencies = ["build-capi-tests"]
 
 [tasks.install-cbindgen]
 private = true

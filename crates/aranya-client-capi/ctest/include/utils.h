@@ -118,8 +118,20 @@ static inline void sleep_ms(unsigned int ms) {
 
 // Write daemon configuration file
 #include <sys/types.h>
+#include <sys/stat.h>
 static inline void write_daemon_config(const char *cfg_path, const char *name, const char *run_dir,
                                        const char *shm_path, uint16_t sync_port) {
+    /* Create all necessary directories */
+    char dir_path[512];
+    snprintf(dir_path, sizeof(dir_path), "%s/state", run_dir);
+    mkdir(dir_path, 0755);
+    snprintf(dir_path, sizeof(dir_path), "%s/cache", run_dir);
+    mkdir(dir_path, 0755);
+    snprintf(dir_path, sizeof(dir_path), "%s/logs", run_dir);
+    mkdir(dir_path, 0755);
+    snprintf(dir_path, sizeof(dir_path), "%s/config", run_dir);
+    mkdir(dir_path, 0755);
+    
     FILE *f = fopen(cfg_path, "w");
     if (!f) {
         fprintf(stderr, "Failed to create daemon config: %s\n", cfg_path);
@@ -145,11 +157,15 @@ static inline void write_daemon_config(const char *cfg_path, const char *name, c
 
 // Spawn daemon process with custom configuration
 #include <sys/wait.h>
+#include <sys/stat.h>
 static inline pid_t spawn_daemon_at(const char *daemon_path,
                                     const char *run_dir,
                                     const char *name,
                                     const char *shm_path,
                                     uint16_t sync_port) {
+    /* Create run directory if it doesn't exist */
+    mkdir(run_dir, 0755);
+    
     char cfg_path[256];
     snprintf(cfg_path, sizeof(cfg_path), "%s/daemon.toml", run_dir);
     write_daemon_config(cfg_path, name, run_dir, shm_path, sync_port);

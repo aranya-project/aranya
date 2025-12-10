@@ -126,12 +126,6 @@ static AranyaError init_team(Team *t) {
     return ARANYA_ERROR_SUCCESS;
 }
 
-/* simple pass/fail reporter */
-static void report(const char *name, int ok, int *fails) {
-    printf("%s: %s\n", name, ok ? "PASS" : "FAIL");
-    if (!ok) (*fails)++;
-}
-
 /* Test: SyncPeerConfigBuilder initialization and cleanup */
 static int test_sync_peer_config_builder(void) {
     printf("\n=== TEST: SyncPeerConfigBuilder ===\n");
@@ -369,8 +363,6 @@ static int test_sync_now(void) {
 }
 
 int main(int argc, const char *argv[]) {
-    int fails = 0;
-    pid_t daemon_pid = -1;
 
 #if defined(ENABLE_ARANYA_PREVIEW)
     /* Set client logging environment variable */
@@ -386,23 +378,38 @@ int main(int argc, const char *argv[]) {
     printf("Running aranya-client-capi sync tests\n");
     printf("=====================================\n");
 
-    /* Spawn daemon if path provided */
-    if (argc == 2) {
-        printf("Spawning daemon: %s\n", argv[1]);
-        daemon_pid = spawn_daemon(argv[1], "test-sync-daemon", "/test_sync_shm");
-        printf("Daemon PID: %d\n", daemon_pid);
-        
-        /* Wait for daemon to initialize */
-        printf("Waiting 7 seconds for daemon to initialize...\n");
-        sleep_ms(7000);
-        printf("Daemon should be ready now\n");
+    /* Fail if daemon path isn't supplied */
+    if (argc != 2) {
+        return EXIT_FAILURE;
     }
+    printf("Spawning daemon: %s\n", argv[1]);
+    pid_t daemon_pid = spawn_daemon(argv[1], "test-sync-daemon", "/test_sync_shm");
+    printf("Daemon PID: %d\n", daemon_pid);
+        
+    /* Wait for daemon to initialize */
+    printf("Waiting 7 seconds for daemon to initialize...\n");
+    sleep_ms(7000);
+    printf("Daemon should be ready now\n");
 
+    int exit_code = EXIT_SUCCESS;
+    
     /* Test sync-related functionality */
-    report("sync_peer_config_builder", test_sync_peer_config_builder(), &fails);
-    report("sync_later", test_sync_later(), &fails);
-    report("add_remove_sync_peer", test_add_remove_sync_peer(), &fails);
-    report("sync_now", test_sync_now(), &fails);
+    if (!test_sync_peer_config_builder()) {
+        printf("FAILED: sync_peer_config_builder\n");
+        exit_code = EXIT_FAILURE;
+    }
+    if (!test_sync_later()) {
+        printf("FAILED: sync_later\n");
+        exit_code = EXIT_FAILURE;
+    }
+    if (!test_add_remove_sync_peer()) {
+        printf("FAILED: add_remove_sync_peer\n");
+        exit_code = EXIT_FAILURE;
+    }
+    if (!test_sync_now()) {
+        printf("FAILED: sync_now\n");
+        exit_code = EXIT_FAILURE;
+    }
 
     /* Clean up daemon if spawned */
     if (daemon_pid > 0) {
@@ -412,13 +419,12 @@ int main(int argc, const char *argv[]) {
     }
 
     printf("\n=====================================\n");
-    if (fails == 0) {
+    if (exit_code == EXIT_SUCCESS) {
         printf("ALL SYNC TESTS PASSED\n");
-        return EXIT_SUCCESS;
     } else {
-        printf("%d SYNC TEST(S) FAILED\n", fails);
-        return EXIT_FAILURE;
+        printf("SOME SYNC TESTS FAILED\n");
     }
+    return exit_code;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping sync tests\n");
     return EXIT_SUCCESS;

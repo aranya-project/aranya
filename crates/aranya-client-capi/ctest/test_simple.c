@@ -10,30 +10,11 @@
 
 /* include the generated C API header (CMake should add the include dir) */
 #include "aranya-client.h"
-
-static pid_t spawn_daemon(const char *path) {
-    pid_t pid = fork();
-        if (pid != 0) {
-        return pid;
-    }
-
-    char *env[] = {
-        "ARANYA_DAEMON=debug",
-        NULL,
-    };
-    int ret = execle(path, path, "--help", NULL, env);
-    fprintf(stderr, "unexpected return %d", ret);
-    abort();
-}
+#include "utils.h"
 
 /* Minimal test harness that runs a few small checks and reports results to stdout.
    CTest will see the executable as a single test; the harness runs multiple
    subtests and fails the whole test if any subtest fails. */
-
-static void report(const char *name, int ok, int *fail_count) {
-    printf("%s: %s\n", name, ok ? "PASS" : "FAIL");
-    if (!ok) (*fail_count)++;
-}
 
 /* Test: aranya_error_to_str returns a non-empty string for success code. */
 static int test_error_to_str_success(void) {
@@ -59,21 +40,31 @@ int main(int argc, const char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    spawn_daemon(argv[1]);
+    /* Run daemon with --help for basic sanity check */
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* Child process */
+        char *env[] = {
+            "ARANYA_DAEMON=debug",
+            NULL,
+        };
+        execle(argv[1], argv[1], "--help", NULL, env);
+        fprintf(stderr, "Failed to exec daemon\n");
+        exit(1);
+    }
     wait(NULL);
-
-    int fails = 0;
 
     printf("Running aranya-client-capi basic subtests\n");
 
-    report("error_to_str(success)", test_error_to_str_success(), &fails);
-    report("error_to_str(invalid)", test_error_to_str_invalid(), &fails);
-
-    if (fails == 0) {
-        printf("ALL SUBTESTS PASSED\n");
-        return EXIT_SUCCESS;
-    } else {
-        printf("%d SUBTEST(S) FAILED\n", fails);
+    if (!test_error_to_str_success()) {
+        printf("FAILED: error_to_str(success)\n");
         return EXIT_FAILURE;
     }
+    if (!test_error_to_str_invalid()) {
+        printf("FAILED: error_to_str(invalid)\n");
+        return EXIT_FAILURE;
+    }
+
+    printf("ALL SUBTESTS PASSED\n");
+    return EXIT_SUCCESS;
 }

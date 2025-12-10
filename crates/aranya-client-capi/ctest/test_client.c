@@ -15,12 +15,6 @@
 #include "aranya-client.h"
 #include "utils.h"
 
-/* Report test result */
-static void report(const char *name, int ok, int *fails) {
-    printf("%s: %s\n", name, ok ? "PASS" : "FAIL");
-    if (!ok) (*fails)++;
-}
-
 /* Test: Initialize logging */
 static int test_init_logging(void) {
     printf("\n=== TEST: Init Logging ===\n");
@@ -31,11 +25,11 @@ static int test_init_logging(void) {
     if (rc != ARANYA_ERROR_SUCCESS) {
         printf("  ℹ Init logging returned: %s\n", aranya_error_to_str(rc));
         printf("  Note: Expected if logging already initialized\n");
-        return 1;
+        return 1; /* Success - already initialized is OK */
     }
     
     printf("  ✓ Logging initialized successfully\n");
-    return 1;
+    return 1; /* Success */
 }
 
 /* Test: Client initialization and cleanup */
@@ -70,10 +64,10 @@ static int test_client_init(void) {
     
     if (rc == ARANYA_ERROR_INVALID_ARGUMENT) {
         printf("  ℹ invalid arguments to config build, skipping test\n");
-        return 1;
+        return 0; /* Success - skip is OK */
     } else if (rc != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to build ClientConfig: %s\n", aranya_error_to_str(rc));
-        return 0;
+        return 1; /* Failure */
     }
     
     printf("  ✓ ClientConfig built successfully\n");
@@ -379,9 +373,6 @@ int test_rand(void) {
 }
 
 int main(int argc, const char *argv[]) {
-    int fails = 0;
-    pid_t daemon_pid = -1;
-
 #if defined(ENABLE_ARANYA_PREVIEW)
     /* Set client logging environment variable */
     setenv("ARANYA_CAPI", "aranya=debug", 1);
@@ -397,23 +388,39 @@ int main(int argc, const char *argv[]) {
     printf("======================================\n");
 
     /* Spawn daemon if path provided */
-    if (argc == 2) {
-        printf("Spawning daemon: %s\n", argv[1]);
-        daemon_pid = spawn_daemon(argv[1], "test-client-daemon", "/test_client_shm");
-        printf("Daemon PID: %d\n", daemon_pid);
-        
-        /* Wait for daemon to initialize */
-        printf("Waiting 7 seconds for daemon to initialize...\n");
-        sleep_ms(7000);
-        printf("Daemon should be ready now\n");
+    if (argc != 2) {
+        return EXIT_FAILURE;
     }
+    printf("Spawning daemon: %s\n", argv[1]);
+    pid_t daemon_pid = spawn_daemon(argv[1], "test-client-daemon", "/test_client_shm");
+    printf("Daemon PID: %d\n", daemon_pid);
+    /* Wait for daemon to initialize */
+    printf("Waiting 7 seconds for daemon to initialize...\n");
+    sleep_ms(7000);
+    printf("Daemon should be ready now\n");
 
     /* Test logging and client initialization */
-    report("init_logging", test_init_logging(), &fails);
-    report("client_init", test_client_init(), &fails);
-    report("get_key_bundle", test_get_key_bundle(), &fails);
-    report("ext_error_msg", test_ext_error_msg(), &fails);
-    report("rand", test_rand(), &fails);
+    /* Note: test functions return 1 for success, 0 for failure */
+    if (test_init_logging() == 0) {
+        printf("FAILED: init_logging\n");
+        return EXIT_FAILURE;
+    }
+    if (test_client_init() == 0) {
+        printf("FAILED: client_init\n");
+        return EXIT_FAILURE;
+    }
+    if (test_get_key_bundle() == 0) {
+        printf("FAILED: get_key_bundle\n");
+        return EXIT_FAILURE;
+    }
+    if (test_ext_error_msg() == 0) {
+        printf("FAILED: ext_error_msg\n");
+        return EXIT_FAILURE;
+    }
+    if (test_rand() == 0) {
+        printf("FAILED: rand\n");
+        return EXIT_FAILURE;
+    }
 
     /* Clean up daemon if spawned */
     if (daemon_pid > 0) {
@@ -423,13 +430,8 @@ int main(int argc, const char *argv[]) {
     }
 
     printf("\n======================================\n");
-    if (fails == 0) {
-        printf("ALL CLIENT TESTS PASSED\n");
-        return EXIT_SUCCESS;
-    } else {
-        printf("%d CLIENT TEST(S) FAILED\n", fails);
-        return EXIT_FAILURE;
-    }
+    printf("ALL CLIENT TESTS PASSED\n");
+    return EXIT_SUCCESS;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping client tests\n");
     return EXIT_SUCCESS;

@@ -182,12 +182,6 @@ static AranyaError init_team(Team *t) {
     return ARANYA_ERROR_SUCCESS;
 }
 
-/* Simple pass/fail reporter */
-static void report(const char *name, int ok, int *fails) {
-    printf("%s: %s\n", name, ok ? "PASS" : "FAIL");
-    if (!ok) (*fails)++;
-}
-
 /* Test: query_devices_on_team */
 static int test_query_devices_on_team(void) {
     printf("\n=== TEST: query_devices_on_team ===\n");
@@ -375,9 +369,6 @@ static int test_query_device_label_assignments(void) {
 }
 
 int main(int argc, const char *argv[]) {
-    int fails = 0;
-    pid_t daemon_pid = -1;
-
 #if defined(ENABLE_ARANYA_PREVIEW)
     /* Set client logging environment variable */
     setenv("ARANYA_CAPI", "aranya=debug", 1);
@@ -393,22 +384,37 @@ int main(int argc, const char *argv[]) {
     printf("======================================\n");
 
     /* Spawn daemon if path provided */
-    if (argc == 2) {
-        printf("Spawning daemon: %s\n", argv[1]);
-        daemon_pid = spawn_daemon(argv[1], "test-query-daemon", "/test_query_shm");
-        printf("Daemon PID: %d\n", daemon_pid);
-        
-        /* Wait for daemon to initialize */
-        printf("Waiting 7 seconds for daemon to initialize...\n");
-        sleep_ms(7000);
-        printf("Daemon should be ready now\n");
+    if (argc != 2) {
+        return EXIT_FAILURE;
     }
+    printf("Spawning daemon: %s\n", argv[1]);
+    pid_t daemon_pid = spawn_daemon(argv[1], "test-query-daemon", "/test_query_shm");
+    printf("Daemon PID: %d\n", daemon_pid);
 
+    /* Wait for daemon to initialize */
+    printf("Waiting 7 seconds for daemon to initialize...\n");
+    sleep_ms(7000);
+    printf("Daemon should be ready now\n");
+
+    int exit_code = EXIT_SUCCESS;
+    
     /* Test query operations */
-    report("query_devices_on_team", test_query_devices_on_team(), &fails);
-    report("query_device_keybundle", test_query_device_keybundle(), &fails);
-    report("query_labels", test_query_labels(), &fails);
-    report("query_device_label_assignments", test_query_device_label_assignments(), &fails);
+    if (!test_query_devices_on_team()) {
+        printf("FAILED: query_devices_on_team\n");
+        exit_code = EXIT_FAILURE;
+    }
+    if (!test_query_device_keybundle()) {
+        printf("FAILED: query_device_keybundle\n");
+        exit_code = EXIT_FAILURE;
+    }
+    if (!test_query_labels()) {
+        printf("FAILED: query_labels\n");
+        exit_code = EXIT_FAILURE;
+    }
+    if (!test_query_device_label_assignments()) {
+        printf("FAILED: query_device_label_assignments\n");
+        exit_code = EXIT_FAILURE;
+    }
 
     /* Clean up daemon if spawned */
     if (daemon_pid > 0) {
@@ -418,13 +424,12 @@ int main(int argc, const char *argv[]) {
     }
 
     printf("\n======================================\n");
-    if (fails == 0) {
+    if (exit_code == EXIT_SUCCESS) {
         printf("ALL QUERY TESTS PASSED\n");
-        return EXIT_SUCCESS;
     } else {
-        printf("%d QUERY TEST(S) FAILED\n", fails);
-        return EXIT_FAILURE;
+        printf("SOME QUERY TESTS FAILED\n");
     }
+    return exit_code;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping query tests\n");
     return EXIT_SUCCESS;
