@@ -1,5 +1,5 @@
 ---
-Language: Cpp
+Language: C
 BasedOnStyle: Google
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: true
