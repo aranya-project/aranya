@@ -10,13 +10,13 @@
             return EXIT_FAILURE;                                               \
     } while (0);
 
-static pid_t spawn_daemon(const char* path) {
+static pid_t spawn_daemon(const char *path) {
     pid_t pid = fork();
     if (pid != 0) {
         return pid;
     }
 
-    char* env[] = {
+    char *env[] = {
         "ARANYA_DAEMON=debug",
         NULL,
     };
@@ -26,7 +26,7 @@ static pid_t spawn_daemon(const char* path) {
     abort();
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "usage: `%s <daemon>`\n", argv[0]);
         return EXIT_FAILURE;
