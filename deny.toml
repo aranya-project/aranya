@@ -79,6 +79,8 @@ ignore = [
     # The `paste` crate is unmaintained. There isn't anything we
     # can do here.
     "RUSTSEC-2024-0436",
+    # The `rustls-pemfile` crate is unmaintained. We're not using certs anyways.
+    "RUSTSEC-2025-0134",
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -144,9 +146,6 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-daemon-api" },
     { allow = ["AGPL-3.0"], crate = "aranya-keygen" },
     { allow = ["AGPL-3.0"], crate = "aranya-util" },
-
-    { allow = ["AGPL-3.0"], crate = "aranya-example" },
-    { allow = ["AGPL-3.0"], crate = "aranya-example-multi-node" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
