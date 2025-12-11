@@ -673,7 +673,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAfcReceiveChannel;
 #endif
 
