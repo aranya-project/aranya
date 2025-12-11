@@ -233,7 +233,7 @@ a globally unique ID, called the _device ID_.
 
 ```policy
 // Records the existence of a device.
-// TODO(eric): We store the key IDs in the key facts themselves,
+// TODO: We store the key IDs in the key facts themselves,
 // do we want to continue storing key IDs here?
 // Fact type: Single-key (one per device)
 fact Device[device_id id]=>{sign_key_id id, enc_key_id id}
@@ -502,7 +502,7 @@ ephemeral command QueryDevicesOnTeam {
         device_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -558,7 +558,7 @@ ephemeral command QueryAfcChannelIsValid {
         label_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -613,7 +613,7 @@ ephemeral command QueryDeviceRole {
         device_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -664,7 +664,7 @@ ephemeral command QueryDeviceKeyBundle {
         device_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -907,7 +907,7 @@ ephemeral command QueryRank {
         object_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -975,7 +975,7 @@ about this situation. -->
 // envelope will always return the same ID.
 function derive_role_id(evp struct Envelope) id {
     // The role ID is the ID of the command that created it.
-    // TODO(eric): Or we could use H(cmd_id, ...).
+    // TODO: Or we could use H(cmd_id, ...).
     return envelope::command_id(evp)
 }
 ```
@@ -1945,7 +1945,7 @@ command ChangeRole {
         // Devices cannot assign roles to themselves.
         check author.device_id != this.device_id
 
-        // TODO(eric): Should this just be a no-op?
+        // TODO: Should this just be a no-op?
         check this.old_role_id != this.new_role_id
 
         check exists Role[role_id: this.new_role_id]
@@ -2133,7 +2133,7 @@ ephemeral command QueryTeamRoles {
         default bool,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -2259,7 +2259,7 @@ command CreateTeam {
         // invert this condition.
         check !team_exists()
 
-        // TODO(eric): check that `this.nonce` length is like
+        // TODO: check that `this.nonce` length is like
         // 32 bytes or something? It *should* be cryptographically
         // secure, but we don't really have a way to check that
         // yet. And I'm not sure we want to have policy generate
@@ -2362,7 +2362,7 @@ finish function add_new_device(
     keys struct DevKeyIds,
     rank int,
 ) {
-    // TODO(eric): check that `kb` matches `keys`.
+    // TODO: check that `kb` matches `keys`.
 
     create Device[device_id: keys.device_id]=>{
         sign_key_id: keys.sign_key_id,
@@ -2620,7 +2620,7 @@ command RemoveDevice {
         // Author must have permission to remove a device from the team.
         check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
 
-        // TODO(eric): check that author dominates target?
+        // TODO: check that author dominates target?
 
         // Clean up optional per-device facts that may or may not
         // exist.
@@ -2663,7 +2663,7 @@ command RemoveDevice {
                 emit CheckValidAfcChannels {}
             }
         } else {
-            // TODO(eric): Consider adding an index on
+            // TODO: Consider adding an index on
             // `device_id` so we can sanity-check that no stray
             // role assignments remain.
             finish {
@@ -2739,7 +2739,7 @@ branches, which could cause a fail-open security bug.
 // envelope will always return the same ID.
 function derive_label_id(evp struct Envelope) id {
     // The label ID is the ID of the command that created it.
-    // TODO(eric): Or we could use H(cmd_id, ...).
+    // TODO: Or we could use H(cmd_id, ...).
     return envelope::command_id(evp)
 }
 ```
@@ -2835,7 +2835,7 @@ granted permission to use it.
 //
 // - `DeleteLabel`
 action delete_label(label_id id) {
-    // TODO(eric): Should we add a `reason` field?
+    // TODO: Should we add a `reason` field?
     publish DeleteLabel {
         label_id: label_id,
     }
@@ -2887,7 +2887,7 @@ command DeleteLabel {
         // - `author` is allowed to manage `this.label_id`
         // - `this.label_id` refers to a label that exists
         finish {
-            // TODO(eric): We can't delete these yet because the
+            // TODO: We can't delete these yet because the
             // storage layer does not yet support prefix deletion.
             // See https://github.com/aranya-project/aranya-core/issues/229
             //
@@ -3254,7 +3254,7 @@ ephemeral command QueryLabel {
         label_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -3314,7 +3314,7 @@ ephemeral command QueryLabels {
         label_author_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -3375,7 +3375,7 @@ ephemeral command QueryLabelsAssignedToDevice {
         label_author_id id,
     }
 
-    // TODO(eric): We don't really need to call `seal_command`
+    // TODO: We don't really need to call `seal_command`
     // or `open_envelope` here since this is a local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -3384,7 +3384,7 @@ ephemeral command QueryLabelsAssignedToDevice {
         check team_exists()
 
         if !exists Device[device_id: this.device_id] {
-            // TODO(eric): Or should we raise a check error?
+            // TODO: Or should we raise a check error?
             finish {}
         } else {
             finish {
