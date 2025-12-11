@@ -1,12 +1,4 @@
 ---
-BasedOnStyle: Google
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: true
-AlignEscapedNewlines: Right
-AllowShortIfStatementsOnASingleLine: Never
-IndentCaseLabels: false
+BasedOnStyle: LLVM
 IndentWidth: 4
-MaxEmptyLinesToKeep: 1
-PointerAlignment: Left
-SpacesBeforeTrailingComments: 1
-UseTab: Never
+...
