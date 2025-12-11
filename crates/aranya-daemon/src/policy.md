@@ -1270,7 +1270,6 @@ command AddPermToRole {
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
 
-
         // The author device can only grant a permission it has to the target device.
         // This check is to mitigate against privilege escalation attempts.
         check device_has_perm(author.device_id, this.perm)
