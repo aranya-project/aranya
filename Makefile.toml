@@ -183,11 +183,19 @@ run_task = { name = [
 ] }
 
 [tasks.check-fmt]
-dependencies = ["check-fmt-rust", "check-fmt-toml"]
+dependencies = [
+    "check-fmt-rust",
+    "check-fmt-toml",
+    "check-fmt-c",
+]
 description = "Check file formatting"
 
 [tasks.fmt]
-dependencies = ["fmt-rust", "fmt-toml"]
+dependencies = [
+    "fmt-rust",
+    "fmt-toml",
+    "fmt-c",
+]
 description = "Format files"
 
 [tasks.check-fmt-rust]
@@ -217,6 +225,16 @@ category = "correctness"
 description = "Format toml"
 script = "git ls-files -z '*.toml' | xargs -0 taplo fmt"
 dependencies = ["install-taplo"]
+
+[tasks.check-fmt-c]
+category = "correctness"
+description = "Check C formatting"
+script = "git ls-files -z '*.c' '*.h' | xargs -0 -- clang-format --Werror --dry-run"
+
+[tasks.fmt-c]
+category = "correctness"
+description = "Format C"
+script = "git ls-files -z '*.c' '*.h' | xargs -0 -- clang-format --Werror -i"
 
 [tasks.install-taplo]
 private = true
