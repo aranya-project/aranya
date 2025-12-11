@@ -258,11 +258,11 @@ AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
 AranyaError init_team(Team* t) {
     AranyaError err;
 
-    Client* owner = &t->clients.owner;
-    Client* admin = &t->clients.admin;
-    Client* operator= & t->clients.operator;
-    Client* membera = &t->clients.membera;
-    Client* memberb = &t->clients.memberb;
+    Client* owner    = &t->clients.owner;
+    Client* admin    = &t->clients.admin;
+    Client* operator = &t->clients.operator;
+    Client* membera  = &t->clients.membera;
+    Client* memberb  = &t->clients.memberb;
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -446,9 +446,8 @@ AranyaError init_team(Team* t) {
     }
 
     // add operator to team.
-    err = aranya_add_device_to_team(&owner->client,
-                                    &t->id, operator->pk, operator->pk_len,
-                                    &operator_role_id);
+    err = aranya_add_device_to_team(&owner->client, &t->id, operator->pk,
+                                    operator->pk_len, &operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -678,9 +677,9 @@ AranyaError run(Team* t) {
     AranyaError err;
     AranyaDeviceId* devices = NULL;
 
-    Client* admin = &t->clients.admin;
-    Client* operator= & t->clients.operator;
-    Client* memberb = &t->clients.memberb;
+    Client* admin    = &t->clients.admin;
+    Client* operator = &t->clients.operator;
+    Client* memberb  = &t->clients.memberb;
 
     // initialize logging.
     printf("initializing logging\n");
