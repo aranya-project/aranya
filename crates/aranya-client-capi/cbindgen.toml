@@ -120,17 +120,6 @@ no_return = "ARANYA_NO_RETURN"
 packed = "ARANYA_PACKED"
 aligned_n = "ARANYA_ALIGNED"
 
-[parse]
-# Required because we expand capi to generate doc comments, which
-# uses -Zunpretty=expanded, which requires nightly, which screws
-# up clippy, etc. afterward because the packages were compiled
-# with a different compiler.
-clean = true
-
-[parse.expand]
-features = ["preview", "experimental"]
-crates = ["aranya-client-capi"]
-
 [ptr]
 non_null_attribute = "ARANYA_NON_NULL"
 
