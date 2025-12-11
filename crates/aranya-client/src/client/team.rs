@@ -280,12 +280,7 @@ impl Team<'_> {
     pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .add_perm_to_role(
-                context::current(),
-                self.id,
-                role_id.into_api(),
-                perm.as_text(),
-            )
+            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -299,12 +294,7 @@ impl Team<'_> {
     pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .remove_perm_from_role(
-                context::current(),
-                self.id,
-                role_id.into_api(),
-                perm.as_text(),
-            )
+            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -384,7 +374,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm.as_text(),
+                perm,
             )
             .await
             .map_err(IpcError::new)?
@@ -409,7 +399,7 @@ impl Team<'_> {
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
-                perm.as_text(),
+                perm,
             )
             .await
             .map_err(IpcError::new)?
