@@ -299,17 +299,15 @@ AranyaError init_team(Team* t) {
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` raw "
-                    "IKM seed"
-                    "mode\n");
+                    "IKM seed mode\n");
             return err;
         }
     } else {
         err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(
-                stderr,
-                "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` generate"
-                "mode\n");
+            fprintf(stderr,
+                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` "
+                    "generate mode\n");
             return err;
         }
     }
@@ -332,9 +330,8 @@ AranyaError init_team(Team* t) {
     err = aranya_create_team_config_builder_set_quic_syncer(&owner_build,
                                                             &owner_quic_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to set `CreateQuicSyncConfig` for "
-                "`AranyaTeamConfigBuilder`\n");
+        fprintf(stderr, "unable to set `CreateQuicSyncConfig` for "
+                        "`AranyaTeamConfigBuilder`\n");
         return err;
     }
 
@@ -500,8 +497,7 @@ AranyaError init_team(Team* t) {
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
-                        "raw IKM "
-                        "seed\n");
+                        "raw IKM seed\n");
                 return err;
             }
         } else {
@@ -533,8 +529,7 @@ AranyaError init_team(Team* t) {
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
-                        "wrapped "
-                        "seed\n");
+                        "wrapped seed\n");
                 return err;
             }
         }
@@ -555,17 +550,15 @@ AranyaError init_team(Team* t) {
 
         err = aranya_add_team_config_builder_set_quic_syncer(&build, &quic_cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `QuicSyncConfig` for "
-                    "`AranyaAddTeamConfigBuilder`\n");
+            fprintf(stderr, "unable to set `QuicSyncConfig` for "
+                            "`AranyaAddTeamConfigBuilder`\n");
             return err;
         }
 
         err = aranya_add_team_config_builder_set_id(&build, &team_id_from_peer);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
-                    "unable to set `Id` for "
-                    "`AranyaAddTeamConfigBuilder`\n");
+                    "unable to set `Id` for `AranyaAddTeamConfigBuilder`\n");
             return err;
         }
 
@@ -783,10 +776,8 @@ AranyaError run(Team* t) {
         aranya_team_device_keybundle(&operator->client, &t->id, &memberb->id,
                                      memberb_keybundle, &memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
-    printf(
-        "%s key bundle len: %zu"
-        "\n",
-        t->clients_arr[MEMBERB].name, memberb_keybundle_len);
+    printf("%s key bundle len: %zu\n", t->clients_arr[MEMBERB].name,
+           memberb_keybundle_len);
 
 // Later, unsubscribe from hello notifications
 #ifdef ENABLE_ARANYA_PREVIEW
