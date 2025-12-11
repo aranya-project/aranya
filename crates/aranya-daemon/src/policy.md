@@ -808,6 +808,7 @@ let MAX_RANK = 9223372036854775807
 //
 // Assumptions:
 // - The object must already have a rank.
+// - The command author must have a higher rank than the object it is changing rank on.
 // - The command author must have a higher rank than the old and new rank.
 // - The command author must know the correct old rank before setting the new rank.
 finish function change_object_rank(object_id id, old_rank int, new_rank int) {
