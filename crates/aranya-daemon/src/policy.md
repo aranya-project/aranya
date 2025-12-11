@@ -762,7 +762,7 @@ function author_has_perm_three_targets(author_id id, perm enum Perm, target_id1 
     return true
 }
 
-// Returns whether the author device's rank is high enough for it to operate on the target object.
+// Returns whether the command author outranks the target object.
 function author_can_operate_on_target(author_rank int, target_id id) bool {
     let object_rank = get_object_rank(target_id)
     if author_rank > object_rank {
