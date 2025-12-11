@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
-use std::{fmt, marker::PhantomData, str::FromStr};
+use std::{fmt, marker::PhantomData};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use aranya_afc_util::Ffi as AfcFfi;
 use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
@@ -22,28 +22,33 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::{keystore::AranyaStore, policy::ChanOp, util::TryClone};
+use crate::{
+    keystore::AranyaStore,
+    policy::{ChanOp, RoleManagementPerm, SimplePerm},
+    util::TryClone,
+};
 
 /// Policy loaded from policy.md file.
 pub(crate) const POLICY_SOURCE: &str = include_str!("./policy.md");
-
-/// Converts [`ChanOp`] to string.
-impl FromStr for ChanOp {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "ChanOp::RecvOnly" => Ok(Self::RecvOnly),
-            "ChanOp::SendOnly" => Ok(Self::SendOnly),
-            "ChanOp::SendRecv" => Ok(Self::SendRecv),
-            _ => Err(anyhow!("unknown `ChanOp`: {s}")),
-        }
-    }
-}
 
 /// Display implementation for [`ChanOp`]
 impl fmt::Display for ChanOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ChanOp::{self:?}")
+    }
+}
+
+/// Display implementation for [`RoleManagementPerm`]
+impl fmt::Display for RoleManagementPerm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RoleManagementPerm::{self:?}")
+    }
+}
+
+/// Display implementation for [`SimplePerm`]
+impl fmt::Display for SimplePerm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SimplePerm::{self:?}")
     }
 }
 
