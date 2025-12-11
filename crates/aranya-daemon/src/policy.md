@@ -716,7 +716,7 @@ Utility method for checking object ranks before allowing operations to be perfor
 ```policy
 // Returns whether the command author object has permission to perform an operation on the target object.
 // The command author's role must have permission to perform the operation.
-// The command author must have a higher rank than all the objects it is operating on.
+// The command author must have a higher rank than the object it is operating on.
 function author_has_perm_one_target(author_id id, perm enum Perm, target_id id) bool {
     check device_has_perm(author_id, perm)
     let author_rank = get_object_rank(author_id)
