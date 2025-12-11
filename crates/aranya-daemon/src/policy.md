@@ -1162,6 +1162,11 @@ function device_has_perm(device_id id, perm enum Perm) bool {
 }
 
 // Adds a permission to the role.
+//
+// Assumptions:
+// 1. The author has the `ChangeRolePerms` permission.
+// 2. The author has the permission it is adding to the target role.
+// 3. The target role does not already have the permission.
 action add_perm_to_role(role_id id, perm enum Perm) {
     publish AddPermToRole {
         role_id: role_id,
