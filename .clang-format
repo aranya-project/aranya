@@ -2,5 +2,4 @@
 BasedOnStyle: LLVM
 AlignConsecutiveAssignments: true
 IndentWidth: 4
-PointerAlignment: Left
 ...

@@ -79,13 +79,13 @@ typedef enum {
 } Members;
 
 // List of Unix domain socket paths for the Aranya clients.
-const char* daemon_socks[] = {
+const char *daemon_socks[] = {
     "out/owner/run/uds.sock", "out/admin/run/uds.sock",
     "out/operator/run/uds.sock", "out/membera/run/uds.sock",
     "out/memberb/run/uds.sock"};
 
 // List of names for the Aranya clients.
-const char* client_names[] = {"owner", "admin", "operator", "membera",
+const char *client_names[] = {"owner", "admin", "operator", "membera",
                               "memberb"};
 
 // List of sync addresses.
@@ -96,11 +96,11 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
 // Aranya client.
 typedef struct {
     // Name of Aranya client.
-    const char* name;
+    const char *name;
     // Pointer to Aranya client.
     AranyaClient client;
     // Aranya client's serialized public key bundle.
-    uint8_t* pk;
+    uint8_t *pk;
     // Aranya client's serialized public key bundle length.
     size_t pk_len;
     // Aranya client's public id.
@@ -138,36 +138,36 @@ typedef struct {
 } Team;
 
 // Forward Declarations
-AranyaError init_client(Client* c, const char* name, const char* daemon_addr);
-AranyaError init_team(Team* t);
-AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg);
-AranyaError run(Team* t);
-AranyaError run_afc_example(Team* t);
-AranyaError run_custom_roles_example(Team* t);
-AranyaError cleanup_team(Team* t);
-AranyaError get_role_id_by_name(const struct AranyaRole* roles,
-                                size_t roles_len, const char* name,
-                                struct AranyaRoleId* role_id);
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr);
+AranyaError init_team(Team *t);
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
+AranyaError run(Team *t);
+AranyaError run_afc_example(Team *t);
+AranyaError run_custom_roles_example(Team *t);
+AranyaError cleanup_team(Team *t);
+AranyaError get_role_id_by_name(const struct AranyaRole *roles,
+                                size_t roles_len, const char *name,
+                                struct AranyaRoleId *role_id);
 
 typedef struct AranyaChannelIdent {
-    AranyaDeviceId* device;
+    AranyaDeviceId *device;
     AranyaChanOp op;
 } AranyaChannelIdent;
-AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
-                                       const char* label_name,
-                                       AranyaLabelId* label_id,
+AranyaError aranya_create_assign_label(AranyaClient *client, AranyaTeamId *id,
+                                       const char *label_name,
+                                       AranyaLabelId *label_id,
                                        AranyaRoleId managing_role_id,
-                                       AranyaChannelIdent* idents,
+                                       AranyaChannelIdent *idents,
                                        int num_peers);
 
-AranyaError get_role_id_by_name(const struct AranyaRole* role_list,
-                                size_t role_list_len, const char* name,
-                                struct AranyaRoleId* __output) {
+AranyaError get_role_id_by_name(const struct AranyaRole *role_list,
+                                size_t role_list_len, const char *name,
+                                struct AranyaRoleId *__output) {
     AranyaError err;
 
     for (size_t i = 0; i < role_list_len; i++) {
         AranyaRole role       = role_list[i];
-        const char* role_name = NULL;
+        const char *role_name = NULL;
         err                   = aranya_role_get_name(&role, &role_name);
 
         if (err != ARANYA_ERROR_SUCCESS) {
@@ -184,7 +184,7 @@ AranyaError get_role_id_by_name(const struct AranyaRole* role_list,
 }
 
 // Initialize an Aranya `Client` with the given parameters.
-AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
     AranyaError err;
     c->name = name;
 
@@ -236,7 +236,7 @@ AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         // Too small, so the actual size was written to
         // `c->pk_len`.
-        uint8_t* new_pk = realloc(c->pk, c->pk_len);
+        uint8_t *new_pk = realloc(c->pk, c->pk_len);
         if (new_pk == NULL) {
             abort();
         }
@@ -255,20 +255,20 @@ AranyaError init_client(Client* c, const char* name, const char* daemon_addr) {
 
 // Initialize the Aranya `Team` by first initializing the team's clients and
 // then creates the team.
-AranyaError init_team(Team* t) {
+AranyaError init_team(Team *t) {
     AranyaError err;
 
-    Client* owner    = &t->clients.owner;
-    Client* admin    = &t->clients.admin;
-    Client* operator = &t->clients.operator;
-    Client* membera  = &t->clients.membera;
-    Client* memberb  = &t->clients.memberb;
+    Client *owner    = &t->clients.owner;
+    Client *admin    = &t->clients.admin;
+    Client *operator = &t->clients.operator;
+    Client *membera  = &t->clients.membera;
+    Client *memberb  = &t->clients.memberb;
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
 
-        Client* client = &t->clients_arr[i];
+        Client *client = &t->clients_arr[i];
         err            = init_client(client, client_names[i], daemon_socks[i]);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to initialize client %s: %s\n",
@@ -503,7 +503,7 @@ AranyaError init_team(Team* t) {
         } else {
             printf("encrypting PSK seed for peer\n");
             size_t wrapped_seed_len = 100;
-            uint8_t* wrapped_seed   = calloc(wrapped_seed_len, 1);
+            uint8_t *wrapped_seed   = calloc(wrapped_seed_len, 1);
             err                     = aranya_encrypt_psk_seed_for_peer(
                 &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
                 t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
@@ -571,7 +571,7 @@ AranyaError init_team(Team* t) {
             return err;
         }
 
-        Client* client = &t->clients_arr[i];
+        Client *client = &t->clients_arr[i];
         err            = aranya_add_team(&client->client, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
@@ -613,7 +613,7 @@ exit:
 }
 
 // Cleanup Aranya `Team`.
-AranyaError cleanup_team(Team* t) {
+AranyaError cleanup_team(Team *t) {
     AranyaError err;
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
 
@@ -641,7 +641,7 @@ AranyaError cleanup_team(Team* t) {
 // Add sync peers.
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
-AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg) {
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
     AranyaError err;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -666,13 +666,13 @@ AranyaError add_sync_peers(Team* t, AranyaSyncPeerConfig* cfg) {
 }
 
 // Run the example.
-AranyaError run(Team* t) {
+AranyaError run(Team *t) {
     AranyaError err;
-    AranyaDeviceId* devices = NULL;
+    AranyaDeviceId *devices = NULL;
 
-    Client* admin    = &t->clients.admin;
-    Client* operator = &t->clients.operator;
-    Client* memberb  = &t->clients.memberb;
+    Client *admin    = &t->clients.admin;
+    Client *operator = &t->clients.operator;
+    Client *memberb  = &t->clients.memberb;
 
     // initialize logging.
     printf("initializing logging\n");
@@ -805,11 +805,11 @@ exit:
     return err;
 }
 
-AranyaError aranya_create_assign_label(AranyaClient* client, AranyaTeamId* id,
-                                       const char* label_name,
-                                       AranyaLabelId* label_id,
+AranyaError aranya_create_assign_label(AranyaClient *client, AranyaTeamId *id,
+                                       const char *label_name,
+                                       AranyaLabelId *label_id,
                                        AranyaRoleId managing_role_id,
-                                       AranyaChannelIdent* idents,
+                                       AranyaChannelIdent *idents,
                                        int num_peers) {
     AranyaError err;
 
@@ -828,14 +828,14 @@ exit:
 }
 
 // Run the AFC example.
-AranyaError run_afc_example(Team* t) {
-    Client* owner   = &t->clients.owner;
-    Client* membera = &t->clients.membera;
-    Client* memberb = &t->clients.memberb;
+AranyaError run_afc_example(Team *t) {
+    Client *owner   = &t->clients.owner;
+    Client *membera = &t->clients.membera;
+    Client *memberb = &t->clients.memberb;
 
-    unsigned char* ciphertext = NULL;
-    unsigned char* plaintext  = NULL;
-    AranyaRole* roles         = NULL;
+    unsigned char *ciphertext = NULL;
+    unsigned char *plaintext  = NULL;
+    AranyaRole *roles         = NULL;
 
     AranyaError err;
 
@@ -920,7 +920,7 @@ AranyaError run_afc_example(Team* t) {
     // In production, you would get the underlying buffer from the control
     // message, and send it to the other peer via your transport of choice,
     // which will allow them to create the other side of the channel.
-    const uint8_t* bytes_ptr;
+    const uint8_t *bytes_ptr;
     size_t bytes_len;
     err = aranya_afc_ctrl_msg_get_bytes(&recv_message, &bytes_ptr, &bytes_len);
     EXPECT("error getting ptr+len from `AranyaAfcCtrlMsg`", err);
@@ -950,7 +950,7 @@ AranyaError run_afc_example(Team* t) {
     // simple string. We need both the original data, as well as a buffer to
     // store the resulting ciphertext, which includes some additional
     // overhead.
-    const char* afc_msg   = "one way msg";
+    const char *afc_msg   = "one way msg";
     size_t afc_msg_len    = strlen(afc_msg);
     size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
     ciphertext            = calloc(ciphertext_len, 1);
@@ -961,7 +961,7 @@ AranyaError run_afc_example(Team* t) {
     // Use the channel to encrypt and authenticate our data, and store the
     // encrypted result in our ciphertext buffer.
     printf("membera: Sealing afc data for memberb\n");
-    err = aranya_afc_channel_seal(&afc_send_channel, (const uint8_t*)afc_msg,
+    err = aranya_afc_channel_seal(&afc_send_channel, (const uint8_t *)afc_msg,
                                   afc_msg_len, ciphertext, &ciphertext_len);
     EXPECT("error sealing afc message", err);
 
@@ -1009,13 +1009,13 @@ exit:
 }
 
 // Run the custom roles example
-AranyaError run_custom_roles_example(Team* t) {
-    Client* owner   = &t->clients.owner;
-    Client* admin   = &t->clients.admin;
-    Client* membera = &t->clients.membera;
+AranyaError run_custom_roles_example(Team *t) {
+    Client *owner   = &t->clients.owner;
+    Client *admin   = &t->clients.admin;
+    Client *membera = &t->clients.membera;
 
     size_t member_owning_roles_len = 1;
-    AranyaRole* member_owning_roles =
+    AranyaRole *member_owning_roles =
         calloc(member_owning_roles_len, sizeof(AranyaRole));
 
     AranyaError err;
@@ -1091,7 +1091,7 @@ AranyaError run_custom_roles_example(Team* t) {
         goto exit;
     }
 
-    const char* role_name = NULL;
+    const char *role_name = NULL;
     err                   = aranya_role_get_name(&member_role, &role_name);
 
     EXPECT("unable to get name of the role assigned to 'membera'", err);
@@ -1203,21 +1203,21 @@ exit:
 
 // Thread-unique data.
 typedef struct {
-    AranyaClient* client;
+    AranyaClient *client;
     AranyaTeamId id;
     AranyaLabelId label1;
     AranyaLabelId label2;
     AranyaError result;
 } channel_context_t;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     Team team       = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
 
     // parse arguments.
     team.seed_mode = GENERATE;
     if (argc >= 2) {
-        char* seed_mode_arg = argv[1];
+        char *seed_mode_arg = argv[1];
         if (!strncmp(seed_mode_arg, "raw_seed_ikm", 10)) {
             team.seed_mode = RAW_IKM;
         }
