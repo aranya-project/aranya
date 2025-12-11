@@ -166,9 +166,9 @@ AranyaError get_role_id_by_name(const struct AranyaRole *role_list,
     AranyaError err;
 
     for (size_t i = 0; i < role_list_len; i++) {
-        AranyaRole role       = role_list[i];
+        AranyaRole role = role_list[i];
         const char *role_name = NULL;
-        err                   = aranya_role_get_name(&role, &role_name);
+        err = aranya_role_get_name(&role, &role_name);
 
         if (err != ARANYA_ERROR_SUCCESS) {
             return err;
@@ -228,7 +228,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
     // `pk_len` is intentionally set to small size to show how to
     // handle reallocations.
     c->pk_len = 1;
-    c->pk     = calloc(c->pk_len, 1);
+    c->pk = calloc(c->pk_len, 1);
     if (c->pk == NULL) {
         abort();
     }
@@ -258,18 +258,18 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
 AranyaError init_team(Team *t) {
     AranyaError err;
 
-    Client *owner    = &t->clients.owner;
-    Client *admin    = &t->clients.admin;
+    Client *owner = &t->clients.owner;
+    Client *admin = &t->clients.admin;
     Client *operator = &t->clients.operator;
-    Client *membera  = &t->clients.membera;
-    Client *memberb  = &t->clients.memberb;
+    Client *membera = &t->clients.membera;
+    Client *memberb = &t->clients.memberb;
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
 
         Client *client = &t->clients_arr[i];
-        err            = init_client(client, client_names[i], daemon_socks[i]);
+        err = init_client(client, client_names[i], daemon_socks[i]);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to initialize client %s: %s\n",
                     client->name, aranya_error_to_str(err));
@@ -355,7 +355,7 @@ AranyaError init_team(Team *t) {
 
     // Test ID serialization and deserialization
     char team_id_str[ARANYA_ID_STR_LEN] = {0};
-    size_t team_id_str_len              = sizeof(team_id_str);
+    size_t team_id_str_len = sizeof(team_id_str);
     err = aranya_id_to_str(&t->id.id, team_id_str, &team_id_str_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to convert ID to string\n");
@@ -503,14 +503,14 @@ AranyaError init_team(Team *t) {
         } else {
             printf("encrypting PSK seed for peer\n");
             size_t wrapped_seed_len = 100;
-            uint8_t *wrapped_seed   = calloc(wrapped_seed_len, 1);
-            err                     = aranya_encrypt_psk_seed_for_peer(
+            uint8_t *wrapped_seed = calloc(wrapped_seed_len, 1);
+            err = aranya_encrypt_psk_seed_for_peer(
                 &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
                 t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
             if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
                 printf("handling buffer too small error\n");
                 wrapped_seed = realloc(wrapped_seed, wrapped_seed_len);
-                err          = aranya_encrypt_psk_seed_for_peer(
+                err = aranya_encrypt_psk_seed_for_peer(
                     &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
                     t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
             }
@@ -572,7 +572,7 @@ AranyaError init_team(Team *t) {
         }
 
         Client *client = &t->clients_arr[i];
-        err            = aranya_add_team(&client->client, &cfg);
+        err = aranya_add_team(&client->client, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);
@@ -670,9 +670,9 @@ AranyaError run(Team *t) {
     AranyaError err;
     AranyaDeviceId *devices = NULL;
 
-    Client *admin    = &t->clients.admin;
+    Client *admin = &t->clients.admin;
     Client *operator = &t->clients.operator;
-    Client *memberb  = &t->clients.memberb;
+    Client *memberb = &t->clients.memberb;
 
     // initialize logging.
     printf("initializing logging\n");
@@ -720,8 +720,8 @@ AranyaError run(Team *t) {
     // Admin subscribes to hello notifications from Owner with 2-second delay
     printf("admin subscribing to hello notifications from owner\n");
     AranyaDuration graph_change_delay = ARANYA_DURATION_SECONDS * 1ULL;
-    AranyaDuration duration           = ARANYA_DURATION_SECONDS * 30ULL;
-    AranyaDuration schedule_delay     = ARANYA_DURATION_SECONDS * 5ULL;
+    AranyaDuration duration = ARANYA_DURATION_SECONDS * 30ULL;
+    AranyaDuration schedule_delay = ARANYA_DURATION_SECONDS * 5ULL;
     err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
                                       graph_change_delay * 2, duration,
                                       schedule_delay);
@@ -741,7 +741,7 @@ AranyaError run(Team *t) {
     printf("running factdb queries\n");
 
     size_t devices_len = 256;
-    devices            = calloc(devices_len, sizeof(AranyaDeviceId));
+    devices = calloc(devices_len, sizeof(AranyaDeviceId));
     if (devices == NULL) {
         abort();
     }
@@ -752,7 +752,7 @@ AranyaError run(Team *t) {
         AranyaDeviceId device_id = devices[i];
 
         char device_str[ARANYA_ID_STR_LEN] = {0};
-        size_t device_str_len              = sizeof(device_str);
+        size_t device_str_len = sizeof(device_str);
         err = aranya_id_to_str(&device_id.id, device_str, &device_str_len);
         EXPECT("unable to convert ID to string", err);
 
@@ -771,7 +771,7 @@ AranyaError run(Team *t) {
     }
 
     uint8_t memberb_keybundle[1024] = {0};
-    size_t memberb_keybundle_len    = sizeof(memberb_keybundle);
+    size_t memberb_keybundle_len = sizeof(memberb_keybundle);
     err =
         aranya_team_device_keybundle(&operator->client, &t->id, &memberb->id,
                                      memberb_keybundle, &memberb_keybundle_len);
@@ -829,13 +829,13 @@ exit:
 
 // Run the AFC example.
 AranyaError run_afc_example(Team *t) {
-    Client *owner   = &t->clients.owner;
+    Client *owner = &t->clients.owner;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
     unsigned char *ciphertext = NULL;
-    unsigned char *plaintext  = NULL;
-    AranyaRole *roles         = NULL;
+    unsigned char *plaintext = NULL;
+    AranyaRole *roles = NULL;
 
     AranyaError err;
 
@@ -846,7 +846,7 @@ AranyaError run_afc_example(Team *t) {
                                    {&memberb->id, ARANYA_CHAN_OP_RECV_ONLY}};
 
     size_t roles_len = 0;
-    roles            = calloc(roles_len, sizeof(AranyaRole));
+    roles = calloc(roles_len, sizeof(AranyaRole));
 
     err = aranya_team_roles(&owner->client, &t->id, roles, &roles_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
@@ -909,7 +909,7 @@ AranyaError run_afc_example(Team *t) {
     err = aranya_afc_send_channel_get_id(&afc_send_channel, &send_id);
     EXPECT("error getting afc send channel id", err);
     char send_id_str[ARANYA_ID_STR_LEN] = {0};
-    size_t send_id_str_len              = sizeof(send_id_str);
+    size_t send_id_str_len = sizeof(send_id_str);
     err = aranya_id_to_str(&send_id.id, send_id_str, &send_id_str_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to convert ID to string\n");
@@ -938,7 +938,7 @@ AranyaError run_afc_example(Team *t) {
     err = aranya_afc_receive_channel_get_id(&afc_recv_channel, &recv_id);
     EXPECT("error getting afc recv channel id", err);
     char recv_id_str[ARANYA_ID_STR_LEN] = {0};
-    size_t recv_id_str_len              = sizeof(recv_id_str);
+    size_t recv_id_str_len = sizeof(recv_id_str);
     err = aranya_id_to_str(&recv_id.id, recv_id_str, &recv_id_str_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to convert ID to string\n");
@@ -950,10 +950,10 @@ AranyaError run_afc_example(Team *t) {
     // simple string. We need both the original data, as well as a buffer to
     // store the resulting ciphertext, which includes some additional
     // overhead.
-    const char *afc_msg   = "one way msg";
-    size_t afc_msg_len    = strlen(afc_msg);
+    const char *afc_msg = "one way msg";
+    size_t afc_msg_len = strlen(afc_msg);
     size_t ciphertext_len = afc_msg_len + ARANYA_AFC_CHANNEL_OVERHEAD;
-    ciphertext            = calloc(ciphertext_len, 1);
+    ciphertext = calloc(ciphertext_len, 1);
     if (ciphertext == NULL) {
         abort();
     }
@@ -972,7 +972,7 @@ AranyaError run_afc_example(Team *t) {
     // The peer needs to allocate a buffer to decrypt the data back into, minus
     // channel overhead. This allows it to calculate the original data's length.
     size_t plaintext_len = ciphertext_len - ARANYA_AFC_CHANNEL_OVERHEAD;
-    plaintext            = calloc(plaintext_len, 1);
+    plaintext = calloc(plaintext_len, 1);
     if (plaintext == NULL) {
         abort();
     }
@@ -1010,8 +1010,8 @@ exit:
 
 // Run the custom roles example
 AranyaError run_custom_roles_example(Team *t) {
-    Client *owner   = &t->clients.owner;
-    Client *admin   = &t->clients.admin;
+    Client *owner = &t->clients.owner;
+    Client *admin = &t->clients.admin;
     Client *membera = &t->clients.membera;
 
     size_t member_owning_roles_len = 1;
@@ -1092,7 +1092,7 @@ AranyaError run_custom_roles_example(Team *t) {
     }
 
     const char *role_name = NULL;
-    err                   = aranya_role_get_name(&member_role, &role_name);
+    err = aranya_role_get_name(&member_role, &role_name);
 
     EXPECT("unable to get name of the role assigned to 'membera'", err);
 
@@ -1211,7 +1211,7 @@ typedef struct {
 } channel_context_t;
 
 int main(int argc, char *argv[]) {
-    Team team       = {0};
+    Team team = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
 
     // parse arguments.

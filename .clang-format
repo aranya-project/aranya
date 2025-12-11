@@ -1,5 +1,4 @@
 ---
 BasedOnStyle: LLVM
-AlignConsecutiveAssignments: true
 IndentWidth: 4
 ...
