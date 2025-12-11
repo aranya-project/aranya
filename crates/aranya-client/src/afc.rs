@@ -127,8 +127,7 @@ pub enum Error {
 /// Aranya Fast Channels handler for managing channels which allow encrypting/decrypting application data buffers.
 pub struct Channels {
     daemon: DaemonApiClient,
-    // TODO: don't use mutex for shm reader aranya-core#399
-    keys: Arc<Mutex<ChannelKeys>>,
+    keys: Arc<ChannelKeys>,
 }
 
 // TODO: derive Debug on [`keys`] when [`AfcClient`] implements it.
@@ -145,7 +144,7 @@ impl Channels {
     /// plaintext data.
     pub const OVERHEAD: usize = AfcClient::<ReadState<CS>>::OVERHEAD;
 
-    pub(crate) fn new(daemon: DaemonApiClient, keys: Arc<Mutex<ChannelKeys>>) -> Self {
+    pub(crate) fn new(daemon: DaemonApiClient, keys: Arc<ChannelKeys>) -> Self {
         Self { daemon, keys }
     }
 
@@ -164,10 +163,6 @@ impl Channels {
     /// Returns:
     /// - A unidirectional channel [`SendChannel`] object that can only `seal()` data.
     /// - A [`CtrlMsg`] message to send to the peer.
-    ///
-    /// # Panics
-    ///
-    /// Will panic on poisoned internal mutexes.
     pub async fn create_channel(
         &self,
         team_id: TeamId,
@@ -187,8 +182,6 @@ impl Channels {
             .map_err(aranya_error)?;
         let seal_ctx = self
             .keys
-            .lock()
-            .expect("poisoned")
             .0
             .setup_seal_ctx(info.local_channel_id)
             .map_err(AfcSealError)
@@ -215,6 +208,12 @@ impl Channels {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
+        let open_ctx = self
+            .keys
+            .0
+            .setup_open_ctx(info.local_channel_id)
+            .map_err(AfcSealError)
+            .map_err(Error::Seal)?;
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
@@ -224,6 +223,7 @@ impl Channels {
             local_channel_id: info.local_channel_id,
             label_id: LabelId::from_api(info.label_id),
             peer_id: DeviceId::from_api(info.peer_id),
+            open_ctx: Arc::new(Mutex::new(open_ctx)),
         })
     }
 }
@@ -232,7 +232,7 @@ impl Channels {
 #[derive_where(Debug)]
 pub struct SendChannel {
     daemon: DaemonApiClient,
-    keys: Arc<Mutex<ChannelKeys>>,
+    keys: Arc<ChannelKeys>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
@@ -271,8 +271,6 @@ impl SendChannel {
     pub fn seal(&mut self, dst: &mut [u8], plaintext: &[u8]) -> Result<(), Error> {
         debug!(?self.local_channel_id, ?self.label_id, "seal");
         self.keys
-            .lock()
-            .expect("poisoned")
             .0
             .seal(&mut self.seal_ctx, dst, plaintext)
             .map_err(AfcSealError)
@@ -292,14 +290,17 @@ impl SendChannel {
 }
 
 /// A unidirectional channel that can only receive.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+#[derive_where(Debug)]
 pub struct ReceiveChannel {
     daemon: DaemonApiClient,
-    keys: Arc<Mutex<ChannelKeys>>,
+    keys: Arc<ChannelKeys>,
     channel_id: ChannelId,
     local_channel_id: AfcLocalChannelId,
     label_id: LabelId,
     peer_id: DeviceId,
+    #[derive_where(skip(Debug))]
+    open_ctx: Arc<Mutex<<ReadState<CS> as AfcState>::OpenCtx>>,
 }
 
 impl ReceiveChannel {
@@ -337,10 +338,12 @@ impl ReceiveChannel {
         debug!(?self.local_channel_id, ?self.label_id, "open");
         let (label_id, seq) = self
             .keys
-            .lock()
-            .expect("poisoned")
             .0
-            .open(self.local_channel_id, dst, ciphertext)
+            .open(
+                &mut *self.open_ctx.lock().expect("poisoned"),
+                dst,
+                ciphertext,
+            )
             .map_err(AfcOpenError)
             .map_err(Error::Open)?;
         debug_assert_eq!(label_id.as_base(), self.label_id.into_api().as_base());
