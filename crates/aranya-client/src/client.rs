@@ -2,7 +2,6 @@
 
 mod device;
 mod label;
-mod perm;
 mod role;
 mod team;
 
@@ -10,12 +9,20 @@ use std::{fmt::Debug, io, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
+#[doc(inline)]
+pub use aranya_daemon_api::ChanOp;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
     DaemonApiClient, Version, CS,
+};
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[doc(inline)]
+pub use aranya_daemon_api::{
+    RoleManagementPerm as RoleManagementPermission, SimplePerm as Permission,
 };
 use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
@@ -24,16 +31,13 @@ use tracing::{debug, error, info};
 #[cfg(feature = "afc")]
 use {
     crate::afc::{ChannelKeys as AfcChannelKeys, Channels as AfcChannels},
-    std::sync::{Arc, Mutex},
+    std::sync::Arc,
 };
 
-#[cfg(feature = "preview")]
-#[doc(inline)]
-pub use crate::client::perm::{Permission, RoleManagementPermission};
 #[doc(inline)]
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},
-    label::{ChanOp, Label, LabelId, Labels},
+    label::{Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };
@@ -139,7 +143,7 @@ impl ClientBuilder<'_> {
                     .map_err(IpcError::new)?
                     .context("unable to retrieve afc shm info")
                     .map_err(error::other)?;
-                Arc::new(Mutex::new(AfcChannelKeys::new(&afc_shm_info)?))
+                Arc::new(AfcChannelKeys::new(&afc_shm_info)?)
             };
 
             let client = Client {
@@ -180,7 +184,7 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// AFC channel keys.
     #[cfg(feature = "afc")]
-    afc_keys: Arc<Mutex<AfcChannelKeys>>,
+    afc_keys: Arc<AfcChannelKeys>,
 }
 
 impl Client {
