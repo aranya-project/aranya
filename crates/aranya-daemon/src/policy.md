@@ -35,7 +35,7 @@ which commands devices can publish to Aranya's distributed graph:
 - **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object.
 - **Authorization** is determined by whether an object has permission to perform the operation and outranks the target object(s).
 - **No Self-Administration**: Devices cannot assign roles or labels to
-  themselves, enforcing separation of duties.
+  themselves, enforcing separation of duties and mitigating against privilege escalation.
 
 # Policy
 
@@ -716,7 +716,7 @@ Utility method for checking object ranks before allowing operations to be perfor
 ```policy
 // Returns whether the command author object has permission to perform an operation on the target object.
 // The command author's role must have permission to perform the operation.
-// The command author must have a higher rank than all the objects it is operating on.
+// The command author must have a higher rank than the object it is operating on.
 function author_has_perm_one_target(author_id id, perm enum Perm, target_id id) bool {
     check device_has_perm(author_id, perm)
     let author_rank = get_object_rank(author_id)
@@ -762,14 +762,14 @@ function author_has_perm_three_targets(author_id id, perm enum Perm, target_id1 
     return true
 }
 
-// Returns whether the author device's rank is high enough for it to operate on the target object.
+// Returns whether the command author outranks the target object.
 function author_can_operate_on_target(author_rank int, target_id id) bool {
     let object_rank = get_object_rank(target_id)
-    if author_rank <= object_rank {
-        return false
+    if author_rank > object_rank {
+        return true
     }
 
-    return true
+    return false
 }
 ```
 
@@ -808,6 +808,7 @@ let MAX_RANK = 9223372036854775807
 //
 // Assumptions:
 // - The object must already have a rank.
+// - The command author must have a higher rank than the object it is changing rank on.
 // - The command author must have a higher rank than the old and new rank.
 // - The command author must know the correct old rank before setting the new rank.
 finish function change_object_rank(object_id id, old_rank int, new_rank int) {
@@ -1005,6 +1006,8 @@ The following scenario describes a possible privilege escalation attempt as well
 We guard against this privilege escalation vector in the policy by only allowing devices to assign permissions to roles which they already have themselves in the `ChangeRolePerms` command. This prevents devices from escalating their own permissions via other roles which they control by breaking step 3. in the chain.
 
 It is also recommended to segment the `AddDevice`, `CreateRole`, `ChangeRolePerms`, and `AssignRole` permissions across different roles to prevent a single device from controlling device onboarding, role permissions management, and role assignment. A similar approach is recommended to mitigate against privilege escalation for label management.
+
+Note that it is important to segment permissions across different roles with the same rank. If the roles have different ranks, one role will outrank the other role and could leverage its privilege over the other role to assign that role to a pawn device it controls in order to escalate permissions.
 
 #### Privilege Escalation Attempt Scenario 2
 
