@@ -1007,6 +1007,8 @@ We guard against this privilege escalation vector in the policy by only allowing
 
 It is also recommended to segment the `AddDevice`, `CreateRole`, `ChangeRolePerms`, and `AssignRole` permissions across different roles to prevent a single device from controlling device onboarding, role permissions management, and role assignment. A similar approach is recommended to mitigate against privilege escalation for label management.
 
+Note that it is important to segment permissions across different roles with the same rank. If the roles have different ranks, one role will outrank the other role and could leverage its privilege over the other role to assign that role to a pawn device it controls in order to escalate permissions.
+
 #### Privilege Escalation Attempt Scenario 2
 
 The following scenario describes a possible privilege escalation attempt by assigning a higher privilege role to a device that is controlled by a malicious device.
