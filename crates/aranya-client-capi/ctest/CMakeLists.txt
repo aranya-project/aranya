@@ -20,27 +20,29 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
 endif()
 
 # Test builds run with extra runtime checks.
-if(NOT DEFINED ENV{NO_TEST_BUILD})
-    # TODO(declan): reenable fsanitize. not sure if the leak is occuring in our code.
-    # could be in the memtxp but the stack trace hints to it being a cgo malloc.
+add_compile_options(
+    -fsanitize=address,undefined
+    -fno-omit-frame-pointer
+)
+add_link_options(
+    -fsanitize=address,undefined
+    -fno-omit-frame-pointer
+)
+if(CLANG)
     add_compile_options(
-        #-fsanitize=address
-        -fsanitize=undefined,nullability,local-bounds
-        -fno-omit-frame-pointer
+        -fsanitize=nullability,local-bounds
     )
     add_link_options(
-        #-fsanitize=address
-        -fsanitize=undefined,nullability,local-bounds
-        -fno-omit-frame-pointer
+        -fsanitize=nullability,local-bounds
     )
+endif()
 
-    # macOS always defines _FORTIFY_SOURCE, so avoid re-defining
-    # the macro by undefining it first.
-    if(APPLE)
-        add_compile_options(-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2)
-    else()
-        add_compile_definitions(_FORTIFY_SOURCE=2)
-    endif()
+# macOS always defines _FORTIFY_SOURCE, so avoid re-defining
+# the macro by undefining it first.
+if(APPLE)
+    add_compile_options(-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2)
+else()
+    add_compile_definitions(_FORTIFY_SOURCE=2)
 endif()
 
 add_compile_options(
@@ -50,9 +52,7 @@ add_compile_options(
     -Wpointer-arith -Wmissing-prototypes
     -Warray-bounds -Werror=array-bounds
     -Wunused-result
-	# TODO(eric): make this conditional. Not all compilers
-	# support it for whatever reason.
-	#-march=native
+	-march=native
     -pedantic
 
 	# These are because of cbindgen.
