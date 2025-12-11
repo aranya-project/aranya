@@ -1223,6 +1223,10 @@ command AddPermToRole {
 }
 
 // Removes the permission from the role.
+//
+// Assumptions:
+// 1. The author has the `ChangeRolePerms` permission.
+// 2. The target role has the permission that is being removed.
 action remove_perm_from_role(role_id id, perm enum Perm) {
     publish RemovePermFromRole {
         role_id: role_id,
