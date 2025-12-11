@@ -2355,8 +2355,8 @@ command CreateTeam {
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
-        let owner_device_rank = 1000
-        let owner_role_rank = 900
+        let owner_device_rank = MAX_RANK
+        let owner_role_rank = MAX_RANK
         finish {
             create TeamStart[]=>{team_id: team_id}
 
@@ -2371,8 +2371,6 @@ command CreateTeam {
                 rank: owner_role_rank,
                 default: true,
             })
-            // Set the object rank of the owner device (i64::MAX).
-            set_object_rank(author_id, MAX_RANK)
 
             // Assign all of the administrative permissions to
             // the owner role.
