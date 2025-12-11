@@ -2,7 +2,6 @@
 
 mod device;
 mod label;
-mod perm;
 mod role;
 mod team;
 
@@ -10,12 +9,20 @@ use std::{fmt::Debug, io, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
+#[doc(inline)]
+pub use aranya_daemon_api::ChanOp;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
     DaemonApiClient, Version, CS,
+};
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[doc(inline)]
+pub use aranya_daemon_api::{
+    RoleManagementPerm as RoleManagementPermission, SimplePerm as Permission,
 };
 use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
@@ -27,13 +34,10 @@ use {
     std::sync::{Arc, Mutex},
 };
 
-#[cfg(feature = "preview")]
-#[doc(inline)]
-pub use crate::client::perm::{Permission, RoleManagementPermission};
 #[doc(inline)]
 pub use crate::client::{
     device::{Device, DeviceId, Devices, KeyBundle},
-    label::{ChanOp, Label, LabelId, Labels},
+    label::{Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };

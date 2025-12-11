@@ -185,7 +185,7 @@ impl Device<'_> {
                 self.team_id,
                 self.id,
                 label.into_api(),
-                op.to_api(),
+                op,
             )
             .await
             .map_err(IpcError::new)?

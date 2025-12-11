@@ -30,6 +30,26 @@ pub enum ChanOp {
     SendOnly,
     SendRecv,
 }
+/// Perm policy enum.
+#[value]
+pub enum Perm {
+    AddDevice,
+    RemoveDevice,
+    TerminateTeam,
+    ChangeRank,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
+    ChangeRolePerms,
+    SetupDefaultRole,
+    CreateLabel,
+    DeleteLabel,
+    AssignLabel,
+    RevokeLabel,
+    CanUseAfc,
+    CreateAfcUniChannel,
+}
 /// Enum of policy effects that can occur in response to a policy action.
 #[effects]
 pub enum Effect {
@@ -135,14 +155,14 @@ pub struct LabelRevokedFromDevice {
 #[effect]
 pub struct PermAddedToRole {
     pub role_id: BaseId,
-    pub perm: Text,
+    pub perm: Perm,
     pub author_id: BaseId,
 }
 /// PermRemovedFromRole policy effect.
 #[effect]
 pub struct PermRemovedFromRole {
     pub role_id: BaseId,
-    pub perm: Text,
+    pub perm: Perm,
     pub author_id: BaseId,
 }
 /// QueryAfcChannelIsValidResult policy effect.
@@ -332,13 +352,13 @@ pub struct query_rank {
 #[action(interface = Persistent)]
 pub struct add_perm_to_role {
     pub role_id: BaseId,
-    pub perm_str: Text,
+    pub perm: Perm,
 }
 /// remove_perm_from_role policy action.
 #[action(interface = Persistent)]
 pub struct remove_perm_from_role {
     pub role_id: BaseId,
-    pub perm_str: Text,
+    pub perm: Perm,
 }
 /// create_role policy action.
 #[action(interface = Persistent)]

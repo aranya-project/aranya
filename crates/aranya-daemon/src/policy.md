@@ -1115,75 +1115,6 @@ enum Perm {
     CreateAfcUniChannel,
 }
 
-// Converts `perm` to a string.
-function perm_to_str(perm enum Perm) string {
-    match perm {
-        Perm::AddDevice => { return "AddDevice" }
-        Perm::RemoveDevice => { return "RemoveDevice" }
-        Perm::TerminateTeam => { return "TerminateTeam" }
-
-        Perm::ChangeRank => { return "ChangeRank" }
-
-        Perm::CreateRole => { return "CreateRole" }
-        Perm::DeleteRole => { return "DeleteRole" }
-        Perm::AssignRole => { return "AssignRole" }
-        Perm::RevokeRole => { return "RevokeRole" }
-        Perm::ChangeRolePerms => { return "ChangeRolePerms" }
-        Perm::SetupDefaultRole => { return "SetupDefaultRole" }
-
-        Perm::CreateLabel => { return "CreateLabel" }
-        Perm::DeleteLabel => { return "DeleteLabel" }
-        Perm::AssignLabel => { return "AssignLabel" }
-        Perm::RevokeLabel => { return "RevokeLabel" }
-
-        Perm::CanUseAfc => { return "CanUseAfc" }
-        Perm::CreateAfcUniChannel => { return "CreateAfcUniChannel" }
-    }
-}
-
-// Returns the `Perm` enum value corresponding to `perm`
-// if `perm` is valid.
-function try_parse_perm(perm string) optional enum Perm {
-    match perm {
-        //
-        // Team management
-        //
-        "AddDevice" => { return Some(Perm::AddDevice) }
-        "RemoveDevice" => { return Some(Perm::RemoveDevice) }
-        "TerminateTeam" => { return Some(Perm::TerminateTeam) }
-
-        //
-        // Rank
-        //
-        "ChangeRank" => { return Some(Perm::ChangeRank) }
-
-        //
-        // Roles
-        //
-        "CreateRole" => { return Some(Perm::CreateRole) }
-        "DeleteRole" => { return Some(Perm::DeleteRole) }
-        "AssignRole" => { return Some(Perm::AssignRole) }
-        "RevokeRole" => { return Some(Perm::RevokeRole) }
-        "ChangeRolePerms" => { return Some(Perm::ChangeRolePerms) }
-
-        //
-        // Labels
-        //
-        "CreateLabel" => { return Some(Perm::CreateLabel) }
-        "DeleteLabel" => { return Some(Perm::DeleteLabel) }
-        "AssignLabel" => { return Some(Perm::AssignLabel) }
-        "RevokeLabel" => { return Some(Perm::RevokeLabel) }
-
-        //
-        // AFC
-        //
-        "CanUseAfc" => { return Some(Perm::CanUseAfc) }
-        "CreateAfcUniChannel" => { return Some(Perm::CreateAfcUniChannel) }
-
-        _ => { return None }
-    }
-}
-
 // Records a permission granted by the role.
 //
 // # Caveats
@@ -1228,8 +1159,7 @@ function device_has_perm(device_id id, perm enum Perm) bool {
 }
 
 // Adds a permission to the role.
-action add_perm_to_role(role_id id, perm_str string) {
-    let perm = check_unwrap try_parse_perm(perm_str)
+action add_perm_to_role(role_id id, perm enum Perm) {
     publish AddPermToRole {
         role_id: role_id,
         perm: perm,
@@ -1241,7 +1171,7 @@ effect PermAddedToRole {
     // The role that was updated.
     role_id id,
     // The permission that was added to the role.
-    perm string,
+    perm enum Perm,
     // The device that added the permission to the role.
     author_id id,
 }
@@ -1277,14 +1207,12 @@ command AddPermToRole {
         // The role must not already have the permission.
         check !role_has_perm(this.role_id, this.perm)
 
-        let perm_str = perm_to_str(this.perm)
-
         finish {
             create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
 
             emit PermAddedToRole {
                 role_id: this.role_id,
-                perm: perm_str,
+                perm: this.perm,
                 author_id: author.device_id,
             }
         }
@@ -1292,8 +1220,7 @@ command AddPermToRole {
 }
 
 // Removes the permission from the role.
-action remove_perm_from_role(role_id id, perm_str string) {
-    let perm = check_unwrap try_parse_perm(perm_str)
+action remove_perm_from_role(role_id id, perm enum Perm) {
     publish RemovePermFromRole {
         role_id: role_id,
         perm: perm,
@@ -1305,7 +1232,7 @@ effect PermRemovedFromRole {
     // The role from which the permission was removed.
     role_id id,
     // The permission that was removed from the role.
-    perm string,
+    perm enum Perm,
     // The device that removed the permission from the role.
     author_id id,
 }
@@ -1338,8 +1265,6 @@ command RemovePermFromRole {
         // the role.
         check role_has_perm(this.role_id, this.perm)
 
-        let perm_str = perm_to_str(this.perm)
-
         // At this point we believe the following to be true:
         //
         // - the team is active
@@ -1353,7 +1278,7 @@ command RemovePermFromRole {
 
             emit PermRemovedFromRole {
                 role_id: this.role_id,
-                perm: perm_str,
+                perm: this.perm,
                 author_id: author.device_id,
             }
         }

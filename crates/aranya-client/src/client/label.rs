@@ -78,28 +78,3 @@ impl_slice_iter_wrapper!(IterLabels<'a> for Label);
 pub struct IntoIterLabels(vec::IntoIter<Label>);
 
 impl_vec_into_iter_wrapper!(IntoIterLabels for Label);
-
-/// Valid channel operations for a label assignment.
-#[derive(Copy, Clone, Debug)]
-#[non_exhaustive]
-pub enum ChanOp {
-    /// The device can only receive data in channels with this
-    /// label.
-    RecvOnly,
-    /// The device can only send data in channels with this
-    /// label.
-    SendOnly,
-    /// The device can send and receive data in channels with this
-    /// label.
-    SendRecv,
-}
-
-impl ChanOp {
-    pub(super) const fn to_api(self) -> api::ChanOp {
-        match self {
-            Self::RecvOnly => api::ChanOp::RecvOnly,
-            Self::SendOnly => api::ChanOp::SendOnly,
-            Self::SendRecv => api::ChanOp::SendRecv,
-        }
-    }
-}

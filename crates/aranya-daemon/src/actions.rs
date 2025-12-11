@@ -19,7 +19,7 @@ use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, KeyBundle},
+    policy::{self, ChanOp, Effect, KeyBundle, RoleManagementPerm, SimplePerm},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -224,7 +224,7 @@ where
     fn add_perm_to_role(
         &self,
         role_id: RoleId,
-        perm: Text,
+        perm: SimplePerm,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::add_perm_to_role(role_id.as_base(), perm))
             .in_current_span()
@@ -277,7 +277,7 @@ where
         &self,
         target_role_id: RoleId,
         managing_role_id: RoleId,
-        perm: Text,
+        perm: RoleManagementPerm,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::assign_role_management_perm(
             target_role_id.as_base(),
@@ -433,7 +433,7 @@ where
     fn remove_perm_from_role(
         &self,
         role_id: RoleId,
-        perm: Text,
+        perm: SimplePerm,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::remove_perm_from_role(role_id.as_base(), perm))
             .in_current_span()
@@ -498,7 +498,7 @@ where
         &self,
         target_role_id: RoleId,
         managing_role_id: RoleId,
-        perm: Text,
+        perm: RoleManagementPerm,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::revoke_role_management_perm(
             target_role_id.as_base(),
