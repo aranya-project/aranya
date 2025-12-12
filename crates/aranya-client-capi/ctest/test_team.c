@@ -1618,7 +1618,6 @@ static int test_assign_revoke_label(void) {
 }
 
 int main(int argc, const char *argv[]) {
-    int exit_code = 0;
     pid_t owner_pid = 0;
     pid_t member_pid = 0;
     pid_t device_pid = 0;
@@ -1669,22 +1668,61 @@ int main(int argc, const char *argv[]) {
     }
 
     /* Test basic structures (don't need daemon) */
-    if (test_team_id() != 0) exit_code = 1;
-    if (test_device_id() != 0) exit_code = 1;
-    if (test_role_id() != 0) exit_code = 1;
-    if (test_label_id() != 0) exit_code = 1;
-    if (test_chan_op_enum() != 0) exit_code = 1;
+    if (test_team_id() != 0) {
+        printf("FAILED: test_team_id\n");
+        return EXIT_FAILURE;
+    }
+    if (test_device_id() != 0) {
+        printf("FAILED: test_device_id\n");
+        return EXIT_FAILURE;
+    }
+    if (test_role_id() != 0) {
+        printf("FAILED: test_role_id\n");
+        return EXIT_FAILURE;
+    }
+    if (test_label_id() != 0) {
+        printf("FAILED: test_label_id\n");
+        return EXIT_FAILURE;
+    }
+    if (test_chan_op_enum() != 0) {
+        printf("FAILED: test_chan_op_enum\n");
+        return EXIT_FAILURE;
+    }
     
     /* Test operations that require daemons */
     if (argc == 2) {
-        if (test_create_team() != 0) exit_code = 1;
-        if (test_add_team() != 0) exit_code = 1;
-        if (test_add_remove_device() != 0) exit_code = 1;
-        if (test_assign_revoke_role() != 0) exit_code = 1;
-        if (test_create_delete_label() != 0) exit_code = 1;
-        if (test_assign_revoke_label() != 0) exit_code = 1;
-        if (test_custom_role_lifecycle() != 0) exit_code = 1;
-        if (test_role_ownership() != 0) exit_code = 1;
+        if (test_create_team() != 0) {
+            printf("FAILED: test_create_team\n");
+            return EXIT_FAILURE;
+        }
+        if (test_add_team() != 0) {
+            printf("FAILED: test_add_team\n");
+            return EXIT_FAILURE;
+        }
+        if (test_add_remove_device() != 0) {
+            printf("FAILED: test_add_remove_device\n");
+            return EXIT_FAILURE;
+        }
+        if (test_assign_revoke_role() != 0) {
+            printf("FAILED: test_assign_revoke_role\n");
+            return EXIT_FAILURE;
+        }
+        if (test_create_delete_label() != 0) {
+            printf("FAILED: test_create_delete_label\n");
+            return EXIT_FAILURE;
+        }
+        if (test_assign_revoke_label() != 0) {
+            printf("FAILED: test_assign_revoke_label\n");
+            return EXIT_FAILURE;
+        }
+        if (test_custom_role_lifecycle() != 0) {
+            printf("FAILED: test_custom_role_lifecycle\n");
+            return EXIT_FAILURE;
+        }
+        if (test_role_ownership() != 0) {
+            printf("FAILED: test_role_ownership\n");
+            return EXIT_FAILURE;
+        }
     } else {
         printf("\nSkipping daemon-dependent tests (no daemon path provided)\n");
     }
@@ -1707,14 +1745,9 @@ int main(int argc, const char *argv[]) {
     }
 
     printf("\n=====================================\n");
-    if (exit_code == 0) {
-        printf("ALL TEAM TESTS PASSED\n");
-        return EXIT_SUCCESS;
-    } else {
-        printf("SOME TEAM TESTS FAILED\n");
-        return EXIT_FAILURE;
-    }
-    
+    printf("ALL TEAM TESTS PASSED\n");
+
+    return EXIT_SUCCESS; 
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping team tests\n");
     return EXIT_SUCCESS;

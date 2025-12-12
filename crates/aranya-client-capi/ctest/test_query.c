@@ -396,24 +396,22 @@ int main(int argc, const char *argv[]) {
     sleep_ms(7000);
     printf("Daemon should be ready now\n");
 
-    int exit_code = EXIT_SUCCESS;
-    
     /* Test query operations */
     if (!test_query_devices_on_team()) {
         printf("FAILED: query_devices_on_team\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     if (!test_query_device_keybundle()) {
         printf("FAILED: query_device_keybundle\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     if (!test_query_labels()) {
         printf("FAILED: query_labels\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     if (!test_query_device_label_assignments()) {
         printf("FAILED: query_device_label_assignments\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
     /* Clean up daemon if spawned */
@@ -424,12 +422,9 @@ int main(int argc, const char *argv[]) {
     }
 
     printf("\n======================================\n");
-    if (exit_code == EXIT_SUCCESS) {
-        printf("ALL QUERY TESTS PASSED\n");
-    } else {
-        printf("SOME QUERY TESTS FAILED\n");
-    }
-    return exit_code;
+    printf("ALL QUERY TESTS PASSED\n");
+    
+    return EXIT_SUCCESS;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping query tests\n");
     return EXIT_SUCCESS;

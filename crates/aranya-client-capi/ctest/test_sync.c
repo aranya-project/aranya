@@ -390,25 +390,23 @@ int main(int argc, const char *argv[]) {
     printf("Waiting 7 seconds for daemon to initialize...\n");
     sleep_ms(7000);
     printf("Daemon should be ready now\n");
-
-    int exit_code = EXIT_SUCCESS;
     
     /* Test sync-related functionality */
     if (!test_sync_peer_config_builder()) {
         printf("FAILED: sync_peer_config_builder\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     if (!test_sync_later()) {
         printf("FAILED: sync_later\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     if (!test_add_remove_sync_peer()) {
         printf("FAILED: add_remove_sync_peer\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     if (!test_sync_now()) {
         printf("FAILED: sync_now\n");
-        exit_code = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
     /* Clean up daemon if spawned */
@@ -419,12 +417,9 @@ int main(int argc, const char *argv[]) {
     }
 
     printf("\n=====================================\n");
-    if (exit_code == EXIT_SUCCESS) {
-        printf("ALL SYNC TESTS PASSED\n");
-    } else {
-        printf("SOME SYNC TESTS FAILED\n");
-    }
-    return exit_code;
+    printf("ALL SYNC TESTS PASSED\n");
+    
+    return EXIT_SUCCESS;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping sync tests\n");
     return EXIT_SUCCESS;
