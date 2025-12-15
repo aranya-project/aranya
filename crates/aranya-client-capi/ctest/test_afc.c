@@ -18,9 +18,9 @@
 static const char g_owner_uds[128] = "/tmp/afc-run-owner/uds.sock";
 static const char g_member1_uds[128] = "/tmp/afc-run-member1/uds.sock";
 static const char g_member2_uds[128] = "/tmp/afc-run-member2/uds.sock";
-static const char g_owner_sync_addr[64] = "127.0.0.1:41001";
-static const char g_member1_sync_addr[64] = "127.0.0.1:41002";
-static const char g_member2_sync_addr[64] = "127.0.0.1:41003";
+static const char g_owner_sync_addr[64] = "127.0.0.1:42001";
+static const char g_member1_sync_addr[64] = "127.0.0.1:42002";
+static const char g_member2_sync_addr[64] = "127.0.0.1:42003";
 
 /* Initialize a client */
 static AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
@@ -137,6 +137,63 @@ static AranyaError init_team(Team *t, const char *owner_uds) {
         return err;
     }
     
+    /* Get the owner role ID */
+    size_t team_roles_len = 10;
+    AranyaRole team_roles[10];
+    err = aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+    
+    if (team_roles_len > 0) {
+        err = aranya_role_get_id(&team_roles[0], &t->owner_role_id);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            for (size_t i = 0; i < team_roles_len; i++) {
+                aranya_role_cleanup(&team_roles[i]);
+            }
+            return err;
+        }
+    }
+    
+    /* Cleanup role structures */
+    for (size_t i = 0; i < team_roles_len; i++) {
+        aranya_role_cleanup(&team_roles[i]);
+    }
+    
+    /* Setup default roles to get member role ID */
+    size_t default_roles_len = 10;
+    AranyaRole default_roles[10];
+    err = aranya_setup_default_roles(&owner->client, &t->id, &t->owner_role_id, 
+                                     default_roles, &default_roles_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+    
+    /* Find and store the member role ID */
+    int found_member = 0;
+    for (size_t i = 0; i < default_roles_len; i++) {
+        const char *role_name = NULL;
+        err = aranya_role_get_name(&default_roles[i], &role_name);
+        if (err == ARANYA_ERROR_SUCCESS && role_name != NULL) {
+            if (strcmp(role_name, "member") == 0) {
+                err = aranya_role_get_id(&default_roles[i], &t->member_role_id);
+                if (err == ARANYA_ERROR_SUCCESS) {
+                    found_member = 1;
+                }
+                break;
+            }
+        }
+    }
+    
+    /* Cleanup default roles */
+    for (size_t i = 0; i < default_roles_len; i++) {
+        aranya_role_cleanup(&default_roles[i]);
+    }
+    
+    if (!found_member) {
+        return ARANYA_ERROR_OTHER;
+    }
+    
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -144,13 +201,11 @@ static AranyaError init_team(Team *t, const char *owner_uds) {
 static AranyaError add_member_to_team(Team *t, Client *member, const char *member_sync_addr) {
     AranyaError err;
     
-    /* Owner adds member device with default Member role (required for AFC channel creation) */
-    err = aranya_add_device_to_team(&t->owner.client, &t->id, member->pk, member->pk_len, NULL);
+    /* Owner adds member device with Member role (required for label assignments) */
+    err = aranya_add_device_to_team(&t->owner.client, &t->id, member->pk, member->pk_len, &t->member_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         return err;
     }
-    
-    /* Note: AFC channels can only be created by Members per policy, so we keep the default Member role */
     
     /* Member joins the team using the shared raw IKM */
     AranyaAddTeamQuicSyncConfigBuilder member_quic_build;
@@ -194,21 +249,32 @@ static AranyaError add_member_to_team(Team *t, Client *member, const char *membe
         return err;
     }
     
-    /* Bidirectional sync to ensure roles/labels/state propagate */
+    /* Setup sync peers for automatic synchronization instead of blocking sync_now */
     if (g_owner_sync_addr[0] && member_sync_addr && member_sync_addr[0]) {
-        printf("    Syncing owner -> member (%s)...\n", member_sync_addr);
-        err = aranya_sync_now(&t->owner.client, &t->id, member_sync_addr, NULL);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            printf("    Warning: owner->member sync failed: %s\n", aranya_error_to_str(err));
-        }
+        printf("    Setting up sync peers...\n");
         
-        printf("    Syncing member -> owner (%s)...\n", g_owner_sync_addr);
-        err = aranya_sync_now(&member->client, &t->id, g_owner_sync_addr, NULL);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            printf("    Warning: member->owner sync failed: %s\n", aranya_error_to_str(err));
+        /* Build sync peer config */
+        AranyaSyncPeerConfigBuilder sync_builder;
+        err = aranya_sync_peer_config_builder_init(&sync_builder);
+        if (err == ARANYA_ERROR_SUCCESS) {
+            AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
+            aranya_sync_peer_config_builder_set_interval(&sync_builder, interval);
+            aranya_sync_peer_config_builder_set_sync_now(&sync_builder);
+            
+            AranyaSyncPeerConfig sync_config;
+            err = aranya_sync_peer_config_build(&sync_builder, &sync_config);
+            if (err == ARANYA_ERROR_SUCCESS) {
+                /* Add owner as sync peer for member */
+                aranya_add_sync_peer(&member->client, &t->id, g_owner_sync_addr, &sync_config);
+                
+                /* Add member as sync peer for owner */
+                aranya_add_sync_peer(&t->owner.client, &t->id, member_sync_addr, &sync_config);
+                
+                printf("    Sync peers configured, waiting for initial sync...\n");
+                sleep_ms(500);  /* Reduced - sync peers handle automatic sync */
+            }
+            aranya_sync_peer_config_builder_cleanup(&sync_builder);
         }
-    
-
     }
     
     return ARANYA_ERROR_SUCCESS;
@@ -216,31 +282,63 @@ static AranyaError add_member_to_team(Team *t, Client *member, const char *membe
 
 /* Helper to setup a team with two members */
 static AranyaError setup_team_with_members(Team *team) {
+    printf("    [DEBUG] setup_team_with_members: Starting init_team\n");
+    fflush(stdout);
     AranyaError err = init_team(team, g_owner_uds[0] ? g_owner_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
+        printf("    [DEBUG] setup_team_with_members: init_team failed: %s\n", aranya_error_to_str(err));
+        fflush(stdout);
         return err;
     }
+    printf("    [DEBUG] setup_team_with_members: init_team succeeded\n");
+    fflush(stdout);
     
+    printf("    [DEBUG] setup_team_with_members: Initializing member1 client\n");
+    fflush(stdout);
     err = init_client(&team->member1, "Member1", g_member1_uds[0] ? g_member1_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
+        printf("    [DEBUG] setup_team_with_members: member1 init_client failed: %s\n", aranya_error_to_str(err));
+        fflush(stdout);
         return err;
     }
+    printf("    [DEBUG] setup_team_with_members: member1 initialized\n");
+    fflush(stdout);
     
+    printf("    [DEBUG] setup_team_with_members: Initializing member2 client\n");
+    fflush(stdout);
     err = init_client(&team->member2, "Member2", g_member2_uds[0] ? g_member2_uds : "run/uds.sock");
     if (err != ARANYA_ERROR_SUCCESS) {
+        printf("    [DEBUG] setup_team_with_members: member2 init_client failed: %s\n", aranya_error_to_str(err));
+        fflush(stdout);
         return err;
     }
+    printf("    [DEBUG] setup_team_with_members: member2 initialized\n");
+    fflush(stdout);
     
+    printf("    [DEBUG] setup_team_with_members: Adding member1 to team\n");
+    fflush(stdout);
     err = add_member_to_team(team, &team->member1, g_member1_sync_addr);
     if (err != ARANYA_ERROR_SUCCESS) {
+        printf("    [DEBUG] setup_team_with_members: add_member_to_team(member1) failed: %s\n", aranya_error_to_str(err));
+        fflush(stdout);
         return err;
     }
+    printf("    [DEBUG] setup_team_with_members: member1 added to team\n");
+    fflush(stdout);
     
+    printf("    [DEBUG] setup_team_with_members: Adding member2 to team\n");
+    fflush(stdout);
     err = add_member_to_team(team, &team->member2, g_member2_sync_addr);
     if (err != ARANYA_ERROR_SUCCESS) {
+        printf("    [DEBUG] setup_team_with_members: add_member_to_team(member2) failed: %s\n", aranya_error_to_str(err));
+        fflush(stdout);
         return err;
     }
+    printf("    [DEBUG] setup_team_with_members: member2 added to team\n");
+    fflush(stdout);
     
+    printf("    [DEBUG] setup_team_with_members: Complete!\n");
+    fflush(stdout);
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -254,12 +352,25 @@ static void cleanup_team(Team *team) {
     aranya_client_cleanup(&team->owner.client);
 }
 
-/* Test: afc_create_uni_send_channel */
-static int test_afc_create_uni_send_channel(void) {
-    printf("\n=== TEST: afc_create_uni_send_channel ===\n");
+/* Test: afc_create_channel (creates send channel) */
+static int test_afc_create_channel(void) {
+    printf("\n=== TEST: afc_create_channel ===\n");
+    fflush(stdout);
     
+    printf("  [DEBUG] test_afc_create_channel: Starting\n");
+    fflush(stdout);
     Team team = {0};
+    printf("  [DEBUG] test_afc_create_channel: Calling setup_team_with_members\n");
+    fflush(stdout);
     AranyaError err = setup_team_with_members(&team);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to setup team: %s\n", aranya_error_to_str(err));
+        fflush(stdout);
+        cleanup_team(&team);
+        return 0;
+    }
+    printf("  [DEBUG] test_afc_create_channel: Team setup succeeded\n");
+    fflush(stdout);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to setup team: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
@@ -267,7 +378,7 @@ static int test_afc_create_uni_send_channel(void) {
     }
     
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "SEND_LABEL", NULL, &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "SEND_LABEL", &team.owner_role_id, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
@@ -279,44 +390,36 @@ static int test_afc_create_uni_send_channel(void) {
     err = aranya_assign_label(&team.owner.client, &team.id, &team.member2.id, 
                              &label_id, ARANYA_CHAN_OP_RECV_ONLY);
     
-    /* Sync so members see the label assignments */
-    if (g_owner_sync_addr[0] && g_member1_sync_addr[0] && g_member2_sync_addr[0]) {
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member1_sync_addr, NULL);
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member2_sync_addr, NULL);
-        sleep_ms(250);
-        (void)aranya_sync_now(&team.member1.client, &team.id, g_owner_sync_addr, NULL);
-        (void)aranya_sync_now(&team.member1.client, &team.id, g_member2_sync_addr, NULL);
-        sleep_ms(250);
-        (void)aranya_sync_now(&team.member2.client, &team.id, g_owner_sync_addr, NULL);
-        (void)aranya_sync_now(&team.member2.client, &team.id, g_member1_sync_addr, NULL);
-        sleep_ms(500);
-    }
+    /* Wait for automatic sync (sync peers are configured with sync_now flag) */
+    printf("  Waiting for label assignments to sync...\n");
+    sleep_ms(3000);
     
-    /* Create unidirectional send channel from member1 to member2 */
-    AranyaAfcChannel channel;
+    /* Create send channel from member1 to member2 (new API) */
+    AranyaAfcSendChannel send_channel;
     AranyaAfcCtrlMsg ctrl_msg;
     
-    err = aranya_afc_create_uni_send_channel(&team.member1.client, &team.id, &team.member2.id, 
-                                             &label_id, &channel, &ctrl_msg);
+    printf("  Creating AFC send channel from member1 to member2...\n");
+    err = aranya_afc_create_channel(&team.member1.client, &team.id, &team.member2.id, 
+                                    &label_id, &send_channel, &ctrl_msg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create uni send channel: %s\n", aranya_error_to_str(err));
+        printf("  Failed to create AFC channel: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
         return 0;
     }
     
-    printf("  ✓ Unidirectional send channel created\n");
+    printf("  ✓ AFC send channel created\n");
     
     /* Cleanup */
-    err = aranya_afc_channel_delete(&team.member1.client, &channel);
+    err = aranya_afc_send_channel_delete(&team.member1.client, &send_channel);
     aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
     cleanup_team(&team);
     
     return 1;
 }
 
-/* Test: afc_create_uni_recv_channel */
-static int test_afc_create_uni_recv_channel(void) {
-    printf("\n=== TEST: afc_create_uni_recv_channel ===\n");
+/* Test: afc_accept_channel (creates receive channel from control message) */
+static int test_afc_accept_channel(void) {
+    printf("\n=== TEST: afc_accept_channel ===\n");
     
     Team team = {0};
     AranyaError err = setup_team_with_members(&team);
@@ -327,56 +430,70 @@ static int test_afc_create_uni_recv_channel(void) {
     }
     
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "RECV_LABEL", NULL, &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "CHANNEL_LABEL", &team.owner_role_id, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
         return 0;
     }
+    printf("  ✓ Label created\n");
     
     err = aranya_assign_label(&team.owner.client, &team.id, &team.member1.id, 
-                             &label_id, ARANYA_CHAN_OP_RECV_ONLY);
-    err = aranya_assign_label(&team.owner.client, &team.id, &team.member2.id, 
                              &label_id, ARANYA_CHAN_OP_SEND_ONLY);
-    
-    /* Sync so members see the label assignments */
-    if (g_owner_sync_addr[0] && g_member1_sync_addr[0] && g_member2_sync_addr[0]) {
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member1_sync_addr, NULL);
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member2_sync_addr, NULL);
-        sleep_ms(250);
-        (void)aranya_sync_now(&team.member1.client, &team.id, g_owner_sync_addr, NULL);
-        (void)aranya_sync_now(&team.member1.client, &team.id, g_member2_sync_addr, NULL);
-        sleep_ms(250);
-        (void)aranya_sync_now(&team.member2.client, &team.id, g_owner_sync_addr, NULL);
-        (void)aranya_sync_now(&team.member2.client, &team.id, g_member1_sync_addr, NULL);
-        sleep_ms(500);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to assign label to member1 (SEND_ONLY): %s\n", aranya_error_to_str(err));
+        cleanup_team(&team);
+        return 0;
     }
+    printf("  ✓ Label assigned to member1 (SEND_ONLY)\n");
     
-    /* Create unidirectional receive channel from member1 receiving from member2 */
-    AranyaAfcChannel channel;
+    err = aranya_assign_label(&team.owner.client, &team.id, &team.member2.id, 
+                             &label_id, ARANYA_CHAN_OP_RECV_ONLY);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to assign label to member2 (RECV_ONLY): %s\n", aranya_error_to_str(err));
+        cleanup_team(&team);
+        return 0;
+    }
+    printf("  ✓ Label assigned to member2 (RECV_ONLY)\n");
+    
+    /* Wait for sync peers to propagate the label assignments */
+    printf("DEBUG: Waiting for sync to propagate label assignments...\n");
+    sleep_ms(1000);  /* Reduced from 8000ms */
+    
+    /* Member1 creates send channel */
+    AranyaAfcSendChannel send_channel;
     AranyaAfcCtrlMsg ctrl_msg;
     
-    err = aranya_afc_create_uni_recv_channel(&team.member1.client, &team.id, &team.member2.id, 
-                                             &label_id, &channel, &ctrl_msg);
+    err = aranya_afc_create_channel(&team.member1.client, &team.id, &team.member2.id, 
+                                    &label_id, &send_channel, &ctrl_msg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create uni recv channel: %s\n", aranya_error_to_str(err));
+        printf("  Failed to create send channel: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
         return 0;
     }
     
-    printf("  ✓ Unidirectional receive channel created\n");
+    /* Get control message bytes */
+    const uint8_t *ctrl_bytes;
+    size_t ctrl_len;
+    aranya_afc_ctrl_msg_get_bytes(&ctrl_msg, &ctrl_bytes, &ctrl_len);
+    printf("  ✓ Send channel created with control message (%zu bytes)\n", ctrl_len);
     
-    /* Note: aranya_afc_get_channel_type is not currently exposed in the C API
-    AranyaAfcChannelType chan_type;
-    err = aranya_afc_get_channel_type(&channel, &chan_type);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        printf("  ✓ Channel type: %d (should be %d for Receiver)\n", 
-               chan_type, ARANYA_AFC_CHANNEL_TYPE_RECEIVER);
+    /* Member2 accepts the channel using the control message */
+    AranyaAfcReceiveChannel recv_channel;
+    err = aranya_afc_accept_channel(&team.member2.client, &team.id, ctrl_bytes, ctrl_len, &recv_channel);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        printf("  Failed to accept channel: %s\n", aranya_error_to_str(err));
+        aranya_afc_send_channel_delete(&team.member1.client, &send_channel);
+        aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
+        cleanup_team(&team);
+        return 0;
     }
-    */
+    
+    printf("  ✓ Receive channel created by accepting control message\n");
     
     /* Cleanup */
-    err = aranya_afc_channel_delete(&team.member1.client, &channel);
+    err = aranya_afc_receive_channel_delete(&team.member2.client, &recv_channel);
+    err = aranya_afc_send_channel_delete(&team.member1.client, &send_channel);
     aranya_afc_ctrl_msg_cleanup(&ctrl_msg);
     cleanup_team(&team);
     
@@ -396,12 +513,13 @@ static int test_afc_seal_open(void) {
     }
     
     AranyaLabelId label_id;
-    err = aranya_create_label(&team.owner.client, &team.id, "SEAL_OPEN_LABEL", NULL, &label_id);
+    err = aranya_create_label(&team.owner.client, &team.id, "SEAL_OPEN_LABEL", &team.owner_role_id, &label_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create label: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
         return 0;
     }
+    printf("  ✓ Label created\n");
     
     /* Assign SEND_ONLY to member1 and RECV_ONLY to member2 */
     err = aranya_assign_label(&team.owner.client, &team.id, &team.member1.id, 
@@ -411,6 +529,7 @@ static int test_afc_seal_open(void) {
         cleanup_team(&team);
         return 0;
     }
+    printf("  ✓ Label assigned to member1 (SEND_ONLY)\n");
     
     err = aranya_assign_label(&team.owner.client, &team.id, &team.member2.id, 
                              &label_id, ARANYA_CHAN_OP_RECV_ONLY);
@@ -419,26 +538,25 @@ static int test_afc_seal_open(void) {
         cleanup_team(&team);
         return 0;
     }
+    printf("  ✓ Label assigned to member2 (RECV_ONLY)\n");
     
-    /* Sync so members see the label assignments */
-    if (g_owner_sync_addr[0] && g_member1_sync_addr[0] && g_member2_sync_addr[0]) {
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member1_sync_addr, NULL);
-        (void)aranya_sync_now(&team.owner.client, &team.id, g_member2_sync_addr, NULL);
-    }
+    /* Wait for sync peers to propagate the label assignments */
+    printf("  Waiting for sync to propagate label assignments...\n");
+    sleep_ms(1000);  /* Reduced from 8000ms */
     
-    /* Create unidirectional send channel on member1 */
-    AranyaAfcChannel sender_channel;
+    /* Create send channel on member1 */
+    AranyaAfcSendChannel sender_channel;
     AranyaAfcCtrlMsg sender_ctrl;
     
-    err = aranya_afc_create_uni_send_channel(&team.member1.client, &team.id, &team.member2.id, 
-                                             &label_id, &sender_channel, &sender_ctrl);
+    err = aranya_afc_create_channel(&team.member1.client, &team.id, &team.member2.id, 
+                                    &label_id, &sender_channel, &sender_ctrl);
     if (err != ARANYA_ERROR_SUCCESS) {
-        printf("  Failed to create uni send channel: %s\n", aranya_error_to_str(err));
+        printf("  Failed to create send channel: %s\n", aranya_error_to_str(err));
         cleanup_team(&team);
         return 0;
     }
     
-    printf("  ✓ Unidirectional send channel created\n");
+    printf("  ✓ Send channel created\n");
     
     /* Get control message bytes to send to member2 */
     const uint8_t *ctrl_bytes;
@@ -447,14 +565,13 @@ static int test_afc_seal_open(void) {
     printf("  ✓ Control message: %zu bytes\n", ctrl_len);
     
     /* Create receiver channel on member2 using control message */
-    AranyaAfcChannel receiver_channel;
-    AranyaAfcChannelType recv_type;
+    AranyaAfcReceiveChannel receiver_channel;
     
-    err = aranya_afc_recv_ctrl(&team.member2.client, &team.id, ctrl_bytes, ctrl_len, 
-                               &receiver_channel, &recv_type);
+    err = aranya_afc_accept_channel(&team.member2.client, &team.id, ctrl_bytes, ctrl_len, 
+                                    &receiver_channel);
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to create receiver from ctrl: %s\n", aranya_error_to_str(err));
-        aranya_afc_channel_delete(&team.member1.client, &sender_channel);
+        aranya_afc_send_channel_delete(&team.member1.client, &sender_channel);
         aranya_afc_ctrl_msg_cleanup(&sender_ctrl);
         cleanup_team(&team);
         return 0;
@@ -473,8 +590,8 @@ static int test_afc_seal_open(void) {
     if (err != ARANYA_ERROR_SUCCESS) {
         printf("  Failed to seal message: %s\n", aranya_error_to_str(err));
         free(ciphertext);
-        aranya_afc_channel_delete(&team.member2.client, &receiver_channel);
-        aranya_afc_channel_delete(&team.member1.client, &sender_channel);
+        aranya_afc_receive_channel_delete(&team.member2.client, &receiver_channel);
+        aranya_afc_send_channel_delete(&team.member1.client, &sender_channel);
         aranya_afc_ctrl_msg_cleanup(&sender_ctrl);
         cleanup_team(&team);
         return 0;
@@ -493,8 +610,8 @@ static int test_afc_seal_open(void) {
         printf("  Failed to open message: %s\n", aranya_error_to_str(err));
         free(decrypted);
         free(ciphertext);
-        aranya_afc_channel_delete(&team.member2.client, &receiver_channel);
-        aranya_afc_channel_delete(&team.member1.client, &sender_channel);
+        aranya_afc_receive_channel_delete(&team.member2.client, &receiver_channel);
+        aranya_afc_send_channel_delete(&team.member1.client, &sender_channel);
         aranya_afc_ctrl_msg_cleanup(&sender_ctrl);
         cleanup_team(&team);
         return 0;
@@ -512,8 +629,8 @@ static int test_afc_seal_open(void) {
         aranya_afc_seq_cleanup(&seq);
         free(decrypted);
         free(ciphertext);
-        aranya_afc_channel_delete(&team.member2.client, &receiver_channel);
-        aranya_afc_channel_delete(&team.member1.client, &sender_channel);
+        aranya_afc_receive_channel_delete(&team.member2.client, &receiver_channel);
+        aranya_afc_send_channel_delete(&team.member1.client, &sender_channel);
         aranya_afc_ctrl_msg_cleanup(&sender_ctrl);
         cleanup_team(&team);
         return 0;
@@ -527,8 +644,8 @@ static int test_afc_seal_open(void) {
     aranya_afc_seq_cleanup(&seq);
     free(decrypted);
     free(ciphertext);
-    aranya_afc_channel_delete(&team.member2.client, &receiver_channel);
-    aranya_afc_channel_delete(&team.member1.client, &sender_channel);
+    aranya_afc_receive_channel_delete(&team.member2.client, &receiver_channel);
+    aranya_afc_send_channel_delete(&team.member1.client, &sender_channel);
     aranya_afc_ctrl_msg_cleanup(&sender_ctrl);
     cleanup_team(&team);
     
@@ -536,10 +653,6 @@ static int test_afc_seal_open(void) {
 }
 
 int main(int argc, const char *argv[]) {
-    pid_t owner_pid = -1;
-    pid_t member1_pid = -1;
-    pid_t member2_pid = -1;
-
 #if defined(ENABLE_ARANYA_PREVIEW)
     setenv("ARANYA_CAPI", "aranya=debug", 1);
     
@@ -552,50 +665,75 @@ int main(int argc, const char *argv[]) {
     printf("Running aranya-client-capi AFC tests\n");
     printf("====================================\n");
 
-    if (argc == 2) {
-        const char *daemon_path = argv[1];
-        /* Using static defaults for UDS and sync addresses; spawn daemons */
-        printf("Spawning owner daemon: %s\n", daemon_path);
-        owner_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-owner", "test-daemon-owner", "/afc-owner", 41001);
-        printf("Owner Daemon PID: %d\n", owner_pid);
-
-        printf("Spawning member1 daemon: %s\n", daemon_path);
-        member1_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-member1", "test-daemon-member1", "/afc-member1", 41002);
-        printf("Member1 Daemon PID: %d\n", member1_pid);
-
-        printf("Spawning member2 daemon: %s\n", daemon_path);
-        member2_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-member2", "test-daemon-member2", "/afc-member2", 41003);
-        printf("Member2 Daemon PID: %d\n", member2_pid);
-
-        printf("Waiting 7 seconds for daemons to initialize...\n");
-        sleep_ms(7000);
-        printf("Daemons should be ready now\n");
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <daemon-path>\n", argc > 0 ? argv[0] : "TestAfc");
+        return EXIT_FAILURE;
     }
+    const char *daemon_path = argv[1];
+    
+    /* Clean up any stray daemon processes from previous runs */
+    printf("Cleaning up any stray daemon processes...\n");
+    system("pkill -TERM -f 'aranya-daemon.*afc-run' 2>/dev/null || true");
+    sleep_ms(500);
+    system("pkill -KILL -f 'aranya-daemon.*afc-run' 2>/dev/null || true");
+    
+    /* Using static defaults for UDS and sync addresses; spawn daemons */
+    printf("Spawning owner daemon: %s\n", daemon_path);
+    pid_t owner_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-owner", "test-daemon-owner", "/afc-owner", 42001);
+    printf("Owner Daemon PID: %d\n", owner_pid);
+    
+    printf("Spawning member1 daemon: %s\n", daemon_path);
+    pid_t member1_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-member1", "test-daemon-member1", "/afc-member1", 42002);
+    printf("Member1 Daemon PID: %d\n", member1_pid);
 
-    /* Test AFC channel operations */
-    test_afc_create_bidi_channel();
-    test_afc_create_uni_send_channel();
-    test_afc_create_uni_recv_channel();
-    test_afc_seal_open();
+    printf("Spawning member2 daemon: %s\n", daemon_path);
+    pid_t member2_pid = spawn_daemon_at(daemon_path, "/tmp/afc-run-member2", "test-daemon-member2", "/afc-member2", 42003);
+    printf("Member2 Daemon PID: %d\n", member2_pid);
 
-    if (owner_pid > 0) {
-        printf("\nTerminating owner daemon (PID %d)\n", owner_pid);
+    printf("Waiting 2 seconds for daemons to initialize...\n");
+    sleep_ms(2000);  /* Reduced from 7000ms */
+    printf("Daemons should be ready now\n");
+
+    /* Test AFC channel operations */    
+    if (!test_afc_create_channel()) {
+        printf("FAILED: test_afc_create_channel\n");
         kill(owner_pid, SIGTERM);
-        waitpid(owner_pid, NULL, 0);
-    }
-    if (member1_pid > 0) {
-        printf("\nTerminating member1 daemon (PID %d)\n", member1_pid);
         kill(member1_pid, SIGTERM);
-        waitpid(member1_pid, NULL, 0);
-    }
-    if (member2_pid > 0) {
-        printf("\nTerminating member2 daemon (PID %d)\n", member2_pid);
         kill(member2_pid, SIGTERM);
-        waitpid(member2_pid, NULL, 0);
+        return EXIT_FAILURE;
+    }
+    
+    if (!test_afc_accept_channel()) {
+        printf("FAILED: test_afc_accept_channel\n");
+        kill(owner_pid, SIGTERM);
+        kill(member1_pid, SIGTERM);
+        kill(member2_pid, SIGTERM);
+        return EXIT_FAILURE;
+    }
+    
+    if (!test_afc_seal_open()) {
+        printf("FAILED: test_afc_seal_open\n");
+        kill(owner_pid, SIGTERM);
+        kill(member1_pid, SIGTERM);
+        kill(member2_pid, SIGTERM);
+        return EXIT_FAILURE;
     }
 
     printf("\n====================================\n");
-    printf("AFC tests completed\n");
+    printf("ALL AFC TESTS PASSED\n");
+    
+    /* Clean up daemons */
+    printf("Cleaning up daemons...\n");
+    kill(owner_pid, SIGTERM);
+    kill(member1_pid, SIGTERM);
+    kill(member2_pid, SIGTERM);
+    
+    /* Wait for daemons to exit */
+    waitpid(owner_pid, NULL, 0);
+    waitpid(member1_pid, NULL, 0);
+    waitpid(member2_pid, NULL, 0);
+    printf("Daemons terminated\n");
+    
     return EXIT_SUCCESS;
 #else
     printf("ENABLE_ARANYA_PREVIEW not defined; skipping AFC tests\n");
