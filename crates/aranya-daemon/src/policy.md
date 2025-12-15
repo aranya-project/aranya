@@ -32,7 +32,10 @@ which commands devices can publish to Aranya's distributed graph:
   "default roles" - `owner` (emergency access), `admin` (system
   administration), `operator` (user management), and `member` (basic
   usage). This policy has the capability to define custom roles as well.
-- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object.
+- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object. 
+Any object in the system with an Aranya ID can have a rank associated with it in the policy.
+Rank checks are only concerned with ranks associated with devices, roles, and labels specifically when determining if an object has permission to perform certain operations.
+The team does not need a rank associated with it since all operations implicitly occur within the context of a team.
 - **Authorization** is determined by whether an object has permission to perform the operation and outranks the target object(s).
 - **No Self-Administration**: Devices cannot assign roles or labels to
   themselves, enforcing separation of duties and mitigating against privilege escalation.
@@ -42,7 +45,8 @@ which commands devices can publish to Aranya's distributed graph:
 ## What This Policy Controls
 
 This policy defines:
-- Which commands each device is authorized to publish to the graph
+- Which commands each device/role is authorized to publish to the graph
+- Which objects are allowed to operate on other objects in the system based on their respective ranks
 - How those commands transform facts in the local database
 - Validation rules that commands must pass before acceptance
 
@@ -230,6 +234,8 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
 
 An identity in Aranya is called a _device_. Each device has
 a globally unique ID, called the _device ID_.
+A device can have up to one role associated with it which grants the device a set of permissions.
+A device can operate on other objects within the system as long as it has the proper permission via its role and outranks the target objects it wishes to operate on.
 
 ```policy
 // Records the existence of a device.
@@ -310,8 +316,7 @@ fact DeviceSignPubKey[device_id id]=>{key_id id, key bytes}
 #### Device Encryption Key
 
 The Device Encryption Key is a KEM key used to securely send
-encapsulated secret keys to other devices. It is primarily used
-by AFC.
+encapsulated secret keys to other devices. It is primarily used to securely transmit encapsulated secret keys for AFC channels.
 
 ```policy
 // Records the public half of the device's Encryption Key.
@@ -339,7 +344,7 @@ function try_find_device(device_id id) optional struct Device {
     return query Device[device_id: device_id]
 }
 
-// Returns a device if it exist, or raises a check error
+// Returns a device if it exists, or raises a check error
 // otherwise.
 function get_device(device_id id) struct Device {
     return check_unwrap try_find_device(device_id)
@@ -588,6 +593,7 @@ Returns the role assigned to a device.
 ```policy
 // Emits `QueryDeviceRoleResult` if a role is assigned to the
 // device.
+// If the device does not have a role assigned to it, then no effect is emitted.
 ephemeral action query_device_role(device_id id) {
     publish QueryDeviceRole {
         device_id: device_id,
@@ -690,7 +696,11 @@ ephemeral command QueryDeviceKeyBundle {
 
 ### Overview
 
-Each object in Aranya's RBAC system has a rank associated with its Aranya ID.
+Any object with an Aranya ID can have a rank associated with it in the Aranya policy.
+Devices, roles, and labels are assigned a rank at the time of creation.
+Afterwards, their rank can be modified with the `ChangeRank` command.
+The team object does not need a rank associated with it since all operations are implicitly performed in the context of a team.
+
 The highest rank is i64::MAX while the lowest rank is 0.
 Objects with higher rank are allowed to operate on objects with a lower rank.
 The ranking system is used to ensure that all objects and operations abide by an application-defined hierarchy. The hierarchy can be audited by ensuring that numerical rank values fall into the expected hierarchical levels.
@@ -801,16 +811,15 @@ finish function set_object_rank(object_id id, rank int) {
 Command for changing the rank of an object.
 
 ```policy
-// Maximum rank an object can have.
+// Maximum rank an object can have: i64::MAX.
 let MAX_RANK = 9223372036854775807
 
 // Change the rank of an object.
 //
 // Assumptions:
 // - The object must already have a rank.
-// - The command author must have a higher rank than the object it is changing rank on.
 // - The command author must have a higher rank than the old and new rank.
-// - The command author must know the correct old rank before setting the new rank.
+// - The command author must know the current rank before setting the new rank (to prevent an accidental race condition).
 finish function change_object_rank(object_id id, old_rank int, new_rank int) {
     update Rank[object_id: object_id]=>{rank: old_rank} to {rank: new_rank}
 }
@@ -889,7 +898,7 @@ Returns the rank of an object.
 
 ```policy
 // Emits `QueryRankResult` with the rank of the object.
-// If the object does not have a rank, then no effects are emitted.
+// If the object does not have a rank, then no effect is emitted.
 ephemeral action query_rank(object_id id) {
     publish QueryRank {
         object_id: object_id,
@@ -939,7 +948,7 @@ ephemeral command QueryRank {
 
 Aranya uses [Role-Based Access Control][rbac] (RBAC) for system
 authorization. Devices are only authorized to access certain
-resources if they have been assigned the requisite role. Aranya
+resources if they have been assigned the requisite role with the requisite permissions. Aranya
 primarily uses RBAC to restrict which commands devices are
 authorized to publish, but custom policy can use roles for many
 other purposes.
@@ -954,6 +963,7 @@ where
   `operator`.
 - `author_id` is the globally unique ID of the device that
   created the role.
+- `rank` is the rank associated with the role (stored in the `Rank` fact).
 
 ```policy
 // An RBAC role.
@@ -1027,10 +1037,7 @@ It is recommended to combine a secure ranking system alongside segmented `AddDev
 
 The _scope_ of a role is the aggregate set of resources that the
 role authorizes devices to access. Resources themselves define
-the role(s) that are required to access the resource. For
-instance, each label is associated with a "manager" role that
-(among other things) authorizes devices to assign the label to
-other devices. Devices with sufficient permissions can change
+the role(s) that are required to access the resource. Devices with sufficient permissions can change
 a role's scope; how this works depends on the resource.
 
 ### Role Permissions
@@ -1078,7 +1085,7 @@ enum Perm {
 
     // # Rank
     //
-    // The role can change to rank of an object.
+    // The role can change the rank of an object.
     ChangeRank,
 
     // # Roles
@@ -1165,7 +1172,7 @@ function device_has_perm(device_id id, perm enum Perm) bool {
 //
 // Assumptions:
 // 1. The author has the `ChangeRolePerms` permission.
-// 2. The author has the permission it is adding to the target role.
+// 2. The author has the permission it is adding to the target role (to mitigate against privilege escalation).
 // 3. The target role does not already have the permission.
 action add_perm_to_role(role_id id, perm enum Perm) {
     publish AddPermToRole {
@@ -1208,7 +1215,7 @@ command AddPermToRole {
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
 
-        // The author device can only grant a permission it has to the target device.
+        // The author device can only grant a permission it has to the target role.
         // This check is to mitigate against privilege escalation attempts.
         check device_has_perm(author.device_id, this.perm)
 
@@ -1272,6 +1279,8 @@ command RemovePermFromRole {
 
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
+
+        // TODO: should the author only be allowed to remove a permission it also has?
 
         // It is an error to remove a permission not assigned to
         // the role.
@@ -1357,6 +1366,8 @@ effect RoleCreated {
 //
 // This action does not (and cannot usefully) check for name
 // overlap. Do not assume that role names are unique.
+//
+// The `role_id` is guaranteed to be unique since it is taken from the unique ID of the role creation command.
 //
 // # Required Permissions
 //
@@ -1600,8 +1611,7 @@ command SetupDefaultRole {
 ```policy
 // Deletes a role
 //
-// The role being deleted must not be assigned to any devices,
-// and must not own any other roles. Doing so will fail.
+// The role being deleted must not be assigned to any devices.
 //
 // # Required Permissions
 //
@@ -1633,10 +1643,10 @@ command DeleteRole {
         check team_exists()
 
         let author = get_author(envelope)
-        // The author must have the permission to delete a role
+        // The author must have the permission to delete the role
         check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id)
 
-        // The role must exists
+        // The role must exist
         check exists Role[role_id: this.role_id]
         // The role must not be assigned to any devices
         check !exists RoleAssignmentIndex[
@@ -1815,7 +1825,6 @@ function try_get_assigned_role_id(device_id id) optional id {
 // # Required Permissions
 //
 // - `AssignRole`
-// - `CanAssignRole(role_id)`
 action assign_role(device_id id, role_id id) {
     publish AssignRole {
         device_id: device_id,
@@ -1856,7 +1865,7 @@ command AssignRole {
         // Devices cannot assign roles to themselves.
         check author.device_id != this.device_id
 
-        // The author must have permission to assign the role.
+        // The author must have permission to assign the role to the target device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id)
 
         // Ensure the target role exists.
@@ -1865,7 +1874,8 @@ command AssignRole {
         // The target device must exist.
         check exists Device[device_id: this.device_id]
 
-        // Device must not already have a role assigned; use ChangeRole instead.
+        // Device must not already have a role assigned.
+        // If the device already has a role assigned, use `ChangeRole` instead.
         check !exists AssignedRole[device_id: this.device_id]
 
         // Ensure the role index is also clear before creating a new assignment.
@@ -1881,7 +1891,7 @@ command AssignRole {
         // - `this.role_id` refers to a role that exists
         // - `author` is not assigning the role to itself
         // - `author` has the `AssignRole` permission
-        // - `author` is allowed to manage `this.role_id`
+        // - `author` outranks the target role and device
         // - the device does not already hold `this.role_id`
         finish {
             create_role_assignment(this.device_id, this.role_id)
@@ -1906,8 +1916,6 @@ command AssignRole {
 //
 // - `RevokeRole` for the old role
 // - `AssignRole` for the new role
-// - `CanRevokeRole(old_role_id)`
-// - `CanAssignRole(new_role_id)`
 action change_role(
     device_id id,
     old_role_id id,
@@ -1962,7 +1970,7 @@ command ChangeRole {
 
         check exists Role[role_id: this.new_role_id]
 
-        // The author must have permission to assign the new role.
+        // The author must have permission to assign the new role to the device.
         check author_has_perm_three_targets(author.device_id, Perm::AssignRole, this.device_id, this.old_role_id, this.new_role_id)
 
         // The target device must exist.
@@ -1991,11 +1999,10 @@ command ChangeRole {
         // - `this.old_role_id` and `this.new_role_id` are
         //   different
         // - `this.old_role_id` refers to a role that exists
-        // - `author` is allowed to manage `this.old_role_id`
         // - `author` has the `RevokeRole` permission
         // - `this.new_role_id` refers to a role that exists
-        // - `author` is allowed to manage `this.new_role_id`
-        // - `author` has the `AddRole` permission
+        // - `author` has the `AssignRole` permission
+        // - `author` outranks `old_role`, `new_role`, and the target device
         finish {
             update_role_assignment(
                 this.device_id,
@@ -2023,7 +2030,6 @@ command ChangeRole {
 // # Required Permissions
 //
 // - `RevokeRole`
-// - `CanRevokeRole(role_id)`
 action revoke_role(device_id id, role_id id) {
     publish RevokeRole {
         device_id: device_id,
@@ -2061,7 +2067,7 @@ command RevokeRole {
 
         let author = get_author(envelope)
 
-        // The author must have permission to revoke the role.
+        // The author must have permission to revoke the role from the device.
         check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id)
 
         let role = check_unwrap query Role[role_id: this.role_id]
@@ -2091,7 +2097,7 @@ command RevokeRole {
         // - `this.device_id` refers to a device that exists
         // - `this.role_id` refers to a role that exists
         // - `author` has the `RevokeRole` permission
-        // - `author` is allowed to manage `this.role_id`
+        // - `author` outranks the target role and device
         // - the owner role retains at least one assignment after this change
         finish {
             delete_role_assignment(this.device_id, this.role_id)
@@ -2292,20 +2298,18 @@ command CreateTeam {
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
-        let owner_device_rank = MAX_RANK
-        let owner_role_rank = MAX_RANK
         finish {
             create TeamStart[]=>{team_id: team_id}
 
             create DeviceGeneration[device_id: owner_key_ids.device_id]=>{generation: 0}
 
-            add_new_device(this.owner_keys, owner_key_ids, owner_device_rank)
+            add_new_device(this.owner_keys, owner_key_ids, MAX_RANK)
 
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
-                rank: owner_role_rank,
+                rank: MAX_RANK,
                 default: true,
             })
 
@@ -2482,7 +2486,7 @@ command TerminateTeam {
 // # Required Permissions
 //
 // - `AddDevice`
-// - `CanAssignRole(role_id)` for the initial role, if provided.
+// - `AssignRole` (if assigned an initial role)
 action add_device_with_rank(device_keys struct KeyBundle, initial_role_id optional id, rank int) {
     publish AddDevice {
         device_keys: device_keys,
@@ -2632,8 +2636,6 @@ command RemoveDevice {
         // Author must have permission to remove a device from the team.
         check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
 
-        // TODO: check that author dominates target?
-
         // Clean up optional per-device facts that may or may not
         // exist.
         let assigned_role = query AssignedRole[device_id: this.device_id]
@@ -2764,6 +2766,11 @@ function derive_label_id(evp struct Envelope) id {
 // - `name` is a short description of the label, like
 //   "TELEMETRY".
 //
+// This action does not (and cannot usefully) check for name
+// overlap. Do not assume that role names are unique.
+//
+// The `label_id` is guaranteed to be unique since it is taken from the unique ID of the label creation command.
+//
 // # Required Permissions
 //
 // - `CreateLabel`
@@ -2884,7 +2891,7 @@ command DeleteLabel {
 
         let author = get_author(envelope)
 
-        // Author must have permission to delete a label.
+        // Author must have permission to delete a label and outrank the label.
         check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id)
 
         // We can't query the label after it's been deleted, so
@@ -2896,7 +2903,7 @@ command DeleteLabel {
         //
         // - the team is active
         // - `author` has the `DeleteLabel` permission
-        // - `author` is allowed to manage `this.label_id`
+        // - `author` outranks `this.label_id`
         // - `this.label_id` refers to a label that exists
         finish {
             // TODO: We can't delete these yet because the
@@ -3011,7 +3018,7 @@ command AssignLabelToDevice {
         // queries.
         check author.device_id != this.device_id
 
-        // Author must have permission to assign a label.
+        // Author must have permission to assign a label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id)
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
@@ -3038,7 +3045,8 @@ command AssignLabelToDevice {
             // At this point we believe the following to be true:
             //
             // - `author` has the `AssignLabel` permission
-            // - `author` is allowed to manage `this.label_id`
+            // - `author` outranks `this.label_id`
+            // - `author` outranks `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
             // - the existing assignment is stale because the device has
@@ -3065,6 +3073,8 @@ command AssignLabelToDevice {
             // At this point we believe the following to be true:
             //
             // - `author` has the `AssignLabel` permission
+            // - `author` outranks `this.label_id`
+            // - `author` outranks `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
             finish {
@@ -3143,7 +3153,7 @@ command RevokeLabelFromDevice {
         let author = get_author(envelope)
         let target = get_device(this.device_id)
 
-        // The author device must have permission to revoke the label.
+        // The author device must have permission to revoke the label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id)
 
         // We need to get label info before deleting
@@ -3158,6 +3168,8 @@ command RevokeLabelFromDevice {
         //
         // - the team is active
         // - `author` has the `RevokeLabel` permission
+        // - `author` outranks `this.device_id`
+        // - `author` outranks `this.label_id`
         // - `this.label_id` refers to a label that exists
         finish {
             delete LabelAssignedToDevice[
@@ -3245,7 +3257,7 @@ Returns a specific label if it exists.
 
 ```policy
 // Emits `QueryLabelResult` for the label if it exists.
-// If the label does not exist then no effects are emitted.
+// If the label does not exist then no effect is emitted.
 ephemeral action query_label(label_id id) {
     publish QueryLabel {
         label_id: label_id,
@@ -3395,17 +3407,15 @@ ephemeral command QueryLabelsAssignedToDevice {
     policy {
         check team_exists()
 
-        if !exists Device[device_id: this.device_id] {
-            // TODO: Or should we raise a check error?
-            finish {}
-        } else {
-            finish {
-                emit QueryLabelsAssignedToDeviceResult {
-                    device_id: this.device_id,
-                    label_id: this.label_id,
-                    label_name: this.label_name,
-                    label_author_id: this.label_author_id,
-                }
+        // Check that the device exists.
+        check exists Device[device_id: this.device_id]
+
+        finish {
+            emit QueryLabelsAssignedToDeviceResult {
+                device_id: this.device_id,
+                label_id: this.label_id,
+                label_name: this.label_name,
+                label_author_id: this.label_author_id,
             }
         }
     }
