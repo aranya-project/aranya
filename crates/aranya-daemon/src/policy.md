@@ -2767,7 +2767,7 @@ function derive_label_id(evp struct Envelope) id {
 //   "TELEMETRY".
 //
 // This action does not (and cannot usefully) check for name
-// overlap. Do not assume that role names are unique.
+// overlap. Do not assume that label names are unique.
 //
 // The `label_id` is guaranteed to be unique since it is taken from the unique ID of the label creation command.
 //
