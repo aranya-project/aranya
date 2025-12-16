@@ -3236,6 +3236,44 @@ function label_assignment_matches_gen(
 }
 ```
 
+#### Permission Queries
+
+Permission queries for determining what permissions are assigned to roles and devices.
+
+##### `query_role_has_perm`
+
+Returns whether a role has a specific permission.
+
+```policy
+// TODO
+```
+
+##### `query_role_perms`
+
+Returns an effect for each permission the role has.
+
+```policy
+// TODO
+```
+
+##### `query_device_has_perm`
+
+Returns whether a device has a specific permission.
+Depends on `query_role_has_perm`.
+
+```policy
+// TODO
+```
+
+##### `query_device_perms`
+
+Returns an effect for each permission the role has.
+Depends on `query_role_perms`.
+
+```policy
+// TODO
+```
+
 #### Label Queries
 
 Label queries retrieve information about labels on the team.
