@@ -2314,7 +2314,7 @@ command CreateTeam {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
-                rank: MAX_RANK,
+                rank: MAX_RANK - 1,
                 default: true,
             })
 
