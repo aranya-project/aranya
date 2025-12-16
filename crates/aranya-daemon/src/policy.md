@@ -2338,11 +2338,6 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, Perm::ChangeRolePerms)
             assign_perm_to_role(owner_role_id, Perm::SetupDefaultRole)
 
-            assign_perm_to_role(owner_role_id, Perm::CreateLabel)
-            assign_perm_to_role(owner_role_id, Perm::DeleteLabel)
-            assign_perm_to_role(owner_role_id, Perm::AssignLabel)
-            assign_perm_to_role(owner_role_id, Perm::RevokeLabel)
-
             assign_perm_to_role(owner_role_id, Perm::CanUseAfc)
             assign_perm_to_role(owner_role_id, Perm::CreateAfcUniChannel)
 
