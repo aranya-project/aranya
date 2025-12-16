@@ -77,6 +77,7 @@ add_custom_command(TARGET copy_aranya_artifacts POST_BUILD
 )
 
 # --- Library Detection ---
+# Note: Library may not exist at configure time but will be built/copied during build phase
 set(ARANYA_LIB "")
 if(EXISTS "${CTEST_LIB_DIR}/libaranya_client_capi.dylib")
     set(ARANYA_LIB "${CTEST_LIB_DIR}/libaranya_client_capi.dylib")
@@ -84,16 +85,11 @@ elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
     set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
 elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client.so")
     set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client.so")
-else()
-    message(WARNING "Rust C API library not found. Build the crate first: cargo build -p aranya-client-capi")
 endif()
 
 # --- Daemon Detection ---
+# Note: Daemon will be copied to exec/ during build phase by copy_aranya_artifacts target
 set(ARANYA_DAEMON "${CTEST_EXEC_DIR}/aranya-daemon")
-if(NOT EXISTS "${ARANYA_DAEMON}")
-    message(WARNING "aranya-daemon not found at ${ARANYA_DAEMON}. Tests requiring daemon will be skipped.")
-    set(ARANYA_DAEMON "")
-endif()
 
 # --- Testing Setup ---
 enable_testing()
