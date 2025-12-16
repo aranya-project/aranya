@@ -3248,35 +3248,222 @@ Permission queries for determining what permissions are assigned to roles and de
 ##### `query_role_has_perm`
 
 Returns whether a role has a specific permission.
+If the role does not have the permission, no effect is emitted.
 
 ```policy
-// TODO
+// Emits `QueryRoleHasPermResult` if the role has the permission.
+// If the role does not have the permission, no effect is emitted.
+ephemeral action query_role_has_perm(role_id id, perm enum Perm) {
+    publish QueryRoleHasPerm {
+        role_id: role_id,
+        perm: perm,
+    }
+}
+
+effect QueryRoleHasPermResult {
+    // The role's unique ID.
+    role_id id,
+    // The permission the role has.
+    perm enum Perm,
+}
+
+ephemeral command QueryRoleHasPerm {
+    fields {
+        role_id id,
+        perm enum Perm,
+    }
+
+    // TODO: We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that the role exists.
+        check exists Role[role_id: this.role_id]
+
+        let has_perm = exists RoleHasPerm[role_id: this.role_id, perm: this.perm]
+
+        if has_perm {
+            finish {
+                emit QueryRoleHasPermResult {
+                    role_id: this.role_id,
+                    perm: this.perm,
+                }
+            }
+        } else {
+            finish {}
+        }
+    }
+}
 ```
 
 ##### `query_role_perms`
 
 Returns an effect for each permission the role has.
+If the role does not have any permissions, no effects are emitted.
 
 ```policy
-// TODO
+// Emits `QueryRolePermsResult` for each permission assigned to the role.
+// If the role does not have any permissions, no effects are emitted.
+ephemeral action query_role_perms(role_id id) {
+    map RoleHasPerm[role_id: role_id, perm: ?] as f {
+        publish QueryRolePerms {
+            role_id: f.role_id,
+            perm: f.perm,
+        }
+    }
+}
+
+effect QueryRolePermsResult {
+    // The role's unique ID.
+    role_id id,
+    // The permission assigned to the role.
+    perm enum Perm,
+}
+
+ephemeral command QueryRolePerms {
+    fields {
+        role_id id,
+        perm enum Perm,
+    }
+
+    // TODO: We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that the role exists.
+        check exists Role[role_id: this.role_id]
+
+        finish {
+            emit QueryRolePermsResult {
+                role_id: this.role_id,
+                perm: this.perm,
+            }
+        }
+    }
+}
 ```
 
 ##### `query_device_has_perm`
 
-Returns whether a device has a specific permission.
-Depends on `query_role_has_perm`.
+Returns whether a device has a specific permission via its assigned role.
+If the device does not have the permission or does not have a role assigned, no effect is emitted.
 
 ```policy
-// TODO
+// Emits `QueryDeviceHasPermResult` if the device has the permission.
+// If the device does not have the permission or does not have a role assigned, no effect is emitted.
+ephemeral action query_device_has_perm(device_id id, perm enum Perm) {
+    publish QueryDeviceHasPerm {
+        device_id: device_id,
+        perm: perm,
+    }
+}
+
+effect QueryDeviceHasPermResult {
+    // The device's unique ID.
+    device_id id,
+    // The permission the device has.
+    perm enum Perm,
+}
+
+ephemeral command QueryDeviceHasPerm {
+    fields {
+        device_id id,
+        perm enum Perm,
+    }
+
+    // TODO: We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that the device exists.
+        check exists Device[device_id: this.device_id]
+
+        let maybe_role = query AssignedRole[device_id: this.device_id]
+        if maybe_role is None {
+            finish {}
+        } else {
+            let assigned = unwrap maybe_role
+            let has_perm = exists RoleHasPerm[role_id: assigned.role_id, perm: this.perm]
+            if has_perm {
+                finish {
+                    emit QueryDeviceHasPermResult {
+                        device_id: this.device_id,
+                        perm: this.perm,
+                    }
+                }
+            } else {
+                finish {}
+            }
+        }
+    }
+}
 ```
 
 ##### `query_device_perms`
 
-Returns an effect for each permission the role has.
-Depends on `query_role_perms`.
+Returns an effect for each permission the device has via its assigned role.
+If the device does not have a role assigned or the role has no permissions, no effects are emitted.
 
 ```policy
-// TODO
+// Emits `QueryDevicePermsResult` for each permission the device has.
+// If the device does not have a role assigned or the role has no permissions, no effects are emitted.
+ephemeral action query_device_perms(device_id id) {
+    let maybe_role = query AssignedRole[device_id: device_id]
+    if maybe_role is Some {
+        let assigned = unwrap maybe_role
+        map RoleHasPerm[role_id: assigned.role_id, perm: ?] as f {
+            publish QueryDevicePerms {
+                device_id: device_id,
+                perm: f.perm,
+            }
+        }
+    }
+}
+
+effect QueryDevicePermsResult {
+    // The device's unique ID.
+    device_id id,
+    // The permission the device has.
+    perm enum Perm,
+}
+
+ephemeral command QueryDevicePerms {
+    fields {
+        device_id id,
+        perm enum Perm,
+    }
+
+    // TODO: We don't really need to call `seal_command`
+    // or `open_envelope` here since this is a local query API.
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that the device exists.
+        check exists Device[device_id: this.device_id]
+
+        finish {
+            emit QueryDevicePermsResult {
+                device_id: this.device_id,
+                perm: this.perm,
+            }
+        }
+    }
+}
 ```
 
 #### Label Queries
