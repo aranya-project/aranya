@@ -508,10 +508,8 @@ ephemeral command QueryDevicesOnTeam {
         device_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -564,10 +562,8 @@ ephemeral command QueryAfcChannelIsValid {
         label_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -621,10 +617,8 @@ ephemeral command QueryDeviceRole {
         device_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -672,10 +666,8 @@ ephemeral command QueryDeviceKeyBundle {
         device_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -909,10 +901,8 @@ ephemeral command QueryRank {
         object_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -2156,10 +2146,8 @@ ephemeral command QueryTeamRoles {
         default bool,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -3271,10 +3259,8 @@ ephemeral command QueryRoleHasPerm {
         perm enum Perm,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -3328,10 +3314,8 @@ ephemeral command QueryRolePerms {
         perm enum Perm,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -3384,10 +3368,8 @@ ephemeral command QueryLabel {
         label_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -3445,10 +3427,8 @@ ephemeral command QueryLabels {
         label_author_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()
@@ -3507,10 +3487,8 @@ ephemeral command QueryLabelsAssignedToDevice {
         label_author_id id,
     }
 
-    // TODO: We don't really need to call `seal_command`
-    // or `open_envelope` here since this is a local query API.
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+    seal { }
+    open { }
 
     policy {
         check team_exists()

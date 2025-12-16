@@ -65,9 +65,7 @@ pub enum Effect {
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
     QueryAfcChannelIsValidResult(QueryAfcChannelIsValidResult),
-    QueryDeviceHasPermResult(QueryDeviceHasPermResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
-    QueryDevicePermsResult(QueryDevicePermsResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryLabelResult(QueryLabelResult),
@@ -177,22 +175,10 @@ pub struct QueryAfcChannelIsValidResult {
     pub label_id: BaseId,
     pub is_valid: bool,
 }
-/// QueryDeviceHasPermResult policy effect.
-#[effect]
-pub struct QueryDeviceHasPermResult {
-    pub device_id: BaseId,
-    pub perm: Perm,
-}
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
 pub struct QueryDeviceKeyBundleResult {
     pub device_keys: KeyBundle,
-}
-/// QueryDevicePermsResult policy effect.
-#[effect]
-pub struct QueryDevicePermsResult {
-    pub device_id: BaseId,
-    pub perm: Perm,
 }
 /// QueryDeviceRoleResult policy effect.
 #[effect]
@@ -341,8 +327,6 @@ pub enum EphemeralAction {
     query_team_roles(query_team_roles),
     query_role_has_perm(query_role_has_perm),
     query_role_perms(query_role_perms),
-    query_device_has_perm(query_device_has_perm),
-    query_device_perms(query_device_perms),
     query_label(query_label),
     query_labels(query_labels),
     query_labels_assigned_to_device(query_labels_assigned_to_device),
@@ -485,17 +469,6 @@ pub struct query_role_has_perm {
 #[action(interface = Ephemeral)]
 pub struct query_role_perms {
     pub role_id: BaseId,
-}
-/// query_device_has_perm policy action.
-#[action(interface = Ephemeral)]
-pub struct query_device_has_perm {
-    pub device_id: BaseId,
-    pub perm: Perm,
-}
-/// query_device_perms policy action.
-#[action(interface = Ephemeral)]
-pub struct query_device_perms {
-    pub device_id: BaseId,
 }
 /// query_label policy action.
 #[action(interface = Ephemeral)]
