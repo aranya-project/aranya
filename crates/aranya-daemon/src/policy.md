@@ -1360,7 +1360,7 @@ action create_role(role_name string, rank int) {
 
 command CreateRole {
     attributes {
-        priority: 110
+        priority: 200
     }
 
     fields {
@@ -1611,7 +1611,7 @@ effect RoleDeleted {
 
 command DeleteRole {
     attributes {
-        priority: 120,
+        priority: 400,
     }
 
     fields {
@@ -1826,7 +1826,7 @@ effect RoleAssigned {
 
 command AssignRole {
     attributes {
-        priority: 200
+        priority: 100
     }
 
     fields {
@@ -1928,7 +1928,7 @@ effect RoleChanged {
 
 command ChangeRole {
     attributes {
-        priority: 200
+        priority: 100
     }
 
     fields {
@@ -2764,7 +2764,7 @@ effect LabelCreated {
 
 command CreateLabel {
     attributes {
-        priority: 100
+        priority: 200
     }
 
     fields {
@@ -2846,7 +2846,7 @@ effect LabelDeleted {
 
 command DeleteLabel {
     attributes {
-        priority: 300
+        priority: 400
     }
 
     fields {
@@ -3105,7 +3105,7 @@ effect LabelRevokedFromDevice {
 
 command RevokeLabelFromDevice {
     attributes {
-        priority: 200
+        priority: 300
     }
 
     fields {
