@@ -130,6 +130,7 @@ tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 [tasks.build-capi-tests]
 category = "build"
 description = "Build C API test suite"
+dependencies = ["build-capi", "build-daemon"]
 cwd = "crates/aranya-client-capi/ctest"
 script = '''
 #!/usr/bin/env bash
