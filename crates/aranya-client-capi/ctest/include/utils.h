@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,8 +73,6 @@ static inline void aranya_test_config_init(struct aranya_test_config *cfg) {
 }
 
 // Small helper to optionally print diagnostics when verbose is enabled
-#include <stdio.h>
-#include <stdarg.h>
 static inline void aranya_test_log(const struct aranya_test_config *cfg, const char *fmt, ...) {
     if (!cfg || !cfg->verbose) return;
     va_list ap; va_start(ap, fmt);
@@ -91,7 +91,7 @@ static inline AranyaError get_role_id_by_name(const AranyaRole* role_list, size_
         if (err != ARANYA_ERROR_SUCCESS) {
             return err;
         }
-        if (strcmp(name, role_name) == 0) {
+        if (strncmp(name, role_name, strlen(name) + 1) == 0) {
             err = aranya_role_get_id(&role, role_id);
             return err;
         }

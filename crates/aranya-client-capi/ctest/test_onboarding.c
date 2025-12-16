@@ -170,10 +170,9 @@ int main(int argc, const char *argv[]) {
     printf("Running aranya-client-capi basic subtests\n");
     
     if (test_create_team_and_onboard_member() != 0) {
-        printf("FAILED: test_create_team_and_onboard_member\n");
+        fprintf(stderr, "FAILED: test_create_team_and_onboard_member\n");
         return EXIT_FAILURE;
     }
 
-    printf("ALL SUBTESTS PASSED\n");
     return EXIT_SUCCESS;
 }

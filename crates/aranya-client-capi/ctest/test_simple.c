@@ -18,12 +18,7 @@
 
 /* Test: aranya_error_to_str returns a non-empty string for success code. */
 static int test_error_to_str_success(void) {
-#ifdef ARANYA_ERROR_SUCCESS
-    unsigned code = (unsigned)ARANYA_ERROR_SUCCESS;
-#else
-    unsigned code = 0u;
-#endif
-    const char *s = aranya_error_to_str(code);
+    const char *s = aranya_error_to_str(ARANYA_ERROR_SUCCESS);
     return s != NULL && s[0] != '\0';
 }
 
@@ -38,14 +33,13 @@ int main(void) {
     printf("Running aranya-client-capi simple subtests\n");
 
     if (!test_error_to_str_success()) {
-        printf("FAILED: error_to_str(success)\n");
+        fprintf(stderr, "FAILED: error_to_str(success)\n");
         return EXIT_FAILURE;
     }
     if (!test_error_to_str_invalid()) {
-        printf("FAILED: error_to_str(invalid)\n");
+        fprintf(stderr, "FAILED: error_to_str(invalid)\n");
         return EXIT_FAILURE;
     }
 
-    printf("ALL SUBTESTS PASSED\n");
     return EXIT_SUCCESS;
 }
