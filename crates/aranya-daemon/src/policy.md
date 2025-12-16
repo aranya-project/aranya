@@ -1312,7 +1312,7 @@ command RemovePermFromRole {
 ### Role Creation
 
 Upon creation, a team only has one role: the `owner` role,
-assigned to the team owner. Afterward, the owner can create
+assigned to the team creator. Afterward, the owner can create
 additional roles as needed.
 
 Devices are notified about new roles via the `RoleCreated`
@@ -2217,9 +2217,9 @@ which creates the `TeamStart` fact.
 
 ```policy
 // Creates a Team.
-action create_team(owner_keys struct KeyBundle, nonce bytes) {
+action create_team(creator_keys struct KeyBundle, nonce bytes) {
     publish CreateTeam {
-        owner_keys: owner_keys,
+        creator_keys: creator_keys,
         nonce: nonce,
     }
 }
@@ -2228,8 +2228,8 @@ action create_team(owner_keys struct KeyBundle, nonce bytes) {
 effect TeamCreated {
     // The ID of the team.
     team_id id,
-    // The ID of the device that owns the team.
-    owner_id id,
+    // The ID of the device that created the team.
+    creator_id id,
 }
 
 command CreateTeam {
@@ -2238,8 +2238,8 @@ command CreateTeam {
     }
 
     fields {
-        // The initial owner's public Device Keys.
-        owner_keys struct KeyBundle,
+        // The creator's public Device Keys.
+        creator_keys struct KeyBundle,
         // Random nonce to enforce this team's uniqueness.
         nonce bytes,
     }
@@ -2251,7 +2251,7 @@ command CreateTeam {
         let parent_id = perspective::head_id()
         let author_id = device::current_device_id()
         let payload = serialize(this)
-        let author_sign_key_id = idam::derive_sign_key_id(this.owner_keys.sign_key)
+        let author_sign_key_id = idam::derive_sign_key_id(this.creator_keys.sign_key)
 
         let signed = crypto::sign(author_sign_key_id, payload)
         return envelope::new(
@@ -2265,7 +2265,7 @@ command CreateTeam {
 
     open {
         let payload = envelope::payload(envelope)
-        let author_sign_key = deserialize(payload).owner_keys.sign_key
+        let author_sign_key = deserialize(payload).creator_keys.sign_key
 
         let verified_command = crypto::verify(
             author_sign_key,
@@ -2290,7 +2290,7 @@ command CreateTeam {
 
         let author_id = envelope::author_id(envelope)
 
-        let owner_key_ids = derive_device_key_ids(this.owner_keys)
+        let creator_key_ids = derive_device_key_ids(this.creator_keys)
 
         // The ID of a team is the ID of the command that created
         // it.
@@ -2298,23 +2298,25 @@ command CreateTeam {
 
         // The author must have signed the command with the same
         // device keys.
-        check author_id == owner_key_ids.device_id
+        check author_id == creator_key_ids.device_id
 
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
+        let creator_rank = MAX_RANK
+        let owner_role_rank = saturating_sub(MAX_RANK, 1)
         finish {
             create TeamStart[]=>{team_id: team_id}
 
-            create DeviceGeneration[device_id: owner_key_ids.device_id]=>{generation: 0}
+            create DeviceGeneration[device_id: creator_key_ids.device_id]=>{generation: 0}
 
-            add_new_device(this.owner_keys, owner_key_ids, MAX_RANK)
+            add_new_device(this.creator_keys, creator_key_ids, creator_rank)
 
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
                 name: "owner",
                 author_id: author_id,
-                rank: MAX_RANK - 1,
+                rank: owner_role_rank,
                 default: true,
             })
 
@@ -2341,7 +2343,7 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, Perm::CanUseAfc)
             assign_perm_to_role(owner_role_id, Perm::CreateAfcUniChannel)
 
-            // And now make sure that the owner has the owner
+            // And now make sure that the creator has the owner
             // role, of course.
             create_role_assignment(author_id, owner_role_id)
 
@@ -2349,12 +2351,12 @@ command CreateTeam {
             // order, but try to make it intuitive.
             emit TeamCreated {
                 team_id: team_id,
-                owner_id: author_id,
+                creator_id: author_id,
             }
             emit DeviceAdded {
-                device_id: owner_key_ids.device_id,
-                device_keys: this.owner_keys,
-                rank: owner_device_rank,
+                device_id: creator_key_ids.device_id,
+                device_keys: this.creator_keys,
+                rank: creator_rank,
             }
             emit RoleCreated {
                 role_id: owner_role_id,
@@ -2428,7 +2430,7 @@ effect TeamTerminated {
     // The ID of the team that was terminated.
     team_id id,
     // The ID of the device that terminated the team.
-    owner_id id,
+    creator_id id,
 }
 
 // This effect is emitted when a command could cause certain AFC channels to be invalidated.
@@ -2469,7 +2471,7 @@ command TerminateTeam {
 
             emit TeamTerminated {
                 team_id: current_team_id,
-                owner_id: author.device_id,
+                creator_id: author.device_id,
             }
 
             emit CheckValidAfcChannels {}

@@ -275,13 +275,13 @@ pub struct RoleRevoked {
 #[effect]
 pub struct TeamCreated {
     pub team_id: BaseId,
-    pub owner_id: BaseId,
+    pub creator_id: BaseId,
 }
 /// TeamTerminated policy effect.
 #[effect]
 pub struct TeamTerminated {
     pub team_id: BaseId,
-    pub owner_id: BaseId,
+    pub creator_id: BaseId,
 }
 #[actions(interface = Persistent)]
 pub enum PersistentAction {
@@ -399,7 +399,7 @@ pub struct query_team_roles {}
 /// create_team policy action.
 #[action(interface = Persistent)]
 pub struct create_team {
-    pub owner_keys: KeyBundle,
+    pub creator_keys: KeyBundle,
     pub nonce: Vec<u8>,
 }
 /// terminate_team policy action.
