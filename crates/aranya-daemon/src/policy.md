@@ -239,10 +239,8 @@ A device can operate on other objects within the system as long as it has the pr
 
 ```policy
 // Records the existence of a device.
-// TODO: We store the key IDs in the key facts themselves,
-// do we want to continue storing key IDs here?
 // Fact type: Single-key (one per device)
-fact Device[device_id id]=>{sign_key_id id, enc_key_id id}
+fact Device[device_id id]=>{}
 
 // Reports whether the invariants for the device are being upheld.
 function valid_device_invariants(device_id id) bool {
@@ -2367,10 +2365,7 @@ finish function add_new_device(
 ) {
     // TODO: check that `kb` matches `keys`.
 
-    create Device[device_id: keys.device_id]=>{
-        sign_key_id: keys.sign_key_id,
-        enc_key_id: keys.enc_key_id,
-    }
+    create Device[device_id: keys.device_id]=>{}
     create DeviceIdentPubKey[device_id: keys.device_id]=>{
         key: kb.ident_key,
     }
