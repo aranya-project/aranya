@@ -106,6 +106,9 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
     target_include_directories(${TEST_NAME} PRIVATE ${CTEST_INCLUDE_DIR})
     target_compile_definitions(${TEST_NAME} PRIVATE ENABLE_ARANYA_PREVIEW=1 ENABLE_ARANYA_EXPERIMENTAL=1)
     
+    # Ensure header is generated before compiling
+    add_dependencies(${TEST_NAME} generate_aranya_header)
+    
     if(ARANYA_LIB)
         target_link_libraries(${TEST_NAME} PRIVATE "${ARANYA_LIB}")
         if(NOT WIN32)
