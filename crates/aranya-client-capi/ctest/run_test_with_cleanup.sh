@@ -6,23 +6,31 @@ set -e
 
 TEST_EXEC="$1"
 DAEMON_PATH="$2"
+TEST_NAME=$(basename "$TEST_EXEC")
+
+# PIDs to track spawned daemons
+DAEMON_PIDS=()
 
 # Track all child processes for cleanup
 cleanup() {
     local exit_code=$?
     echo "Cleaning up processes..."
     
-    # Kill all child processes of this script
-    pkill -P $$ 2>/dev/null || true
-    
-    # Kill any aranya-daemon processes that might be orphaned
+    # First attempt: SIGTERM for clean shutdown
+    # Kill tracked daemon PIDs
+    for pid in "${DAEMON_PIDS[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+    # Also kill any orphaned test daemons by pattern
     pkill -f "aranya-daemon.*test-.*-daemon" 2>/dev/null || true
     
-    # Give processes time to exit cleanly
+    # Wait briefly for clean shutdown
     sleep 1
     
-    # Force kill any remaining processes
-    pkill -9 -P $$ 2>/dev/null || true
+    # Second attempt: SIGKILL for any remaining processes
+    for pid in "${DAEMON_PIDS[@]}"; do
+        kill -9 "$pid" 2>/dev/null || true
+    done
     pkill -9 -f "aranya-daemon.*test-.*-daemon" 2>/dev/null || true
     
     exit $exit_code
@@ -30,6 +38,56 @@ cleanup() {
 
 # Set up cleanup trap
 trap cleanup EXIT INT TERM
+
+# Function to spawn a daemon
+spawn_daemon() {
+    local run_dir="$1"
+    local daemon_name="$2"
+    local shm_path="$3"
+    local sync_port="$4"
+    
+    # Create run directory and subdirectories
+    mkdir -p "$run_dir/state" "$run_dir/cache" "$run_dir/logs" "$run_dir/config"
+    
+    # Create daemon config
+    cat > "$run_dir/daemon.toml" <<EOF
+name = "$daemon_name"
+runtime_dir = "$run_dir"
+state_dir = "$run_dir/state"
+cache_dir = "$run_dir/cache"
+logs_dir = "$run_dir/logs"
+config_dir = "$run_dir/config"
+
+[afc]
+enable = true
+shm_path = "$shm_path"
+max_chans = 100
+
+[sync.quic]
+enable = true
+addr = "127.0.0.1:$sync_port"
+EOF
+    
+    # Spawn daemon
+    ARANYA_DAEMON=aranya_daemon::aranya_daemon::api=debug \
+        "$DAEMON_PATH" --config "$run_dir/daemon.toml" &
+    
+    local pid=$!
+    DAEMON_PIDS+=($pid)
+    echo "Spawned daemon '$daemon_name' (PID: $pid) at $run_dir"
+}
+
+# Spawn daemons based on test name
+if [ "$TEST_NAME" = "TestOnboarding" ]; then
+    echo "=== Spawning daemons for TestOnboarding ==="
+    spawn_daemon "/tmp/onboarding-run-owner" "test-daemon-onboarding-owner" "/onboarding-owner" 40001
+    spawn_daemon "/tmp/onboarding-run-member" "test-daemon-onboarding-member" "/onboarding-member" 40002
+    
+    # Wait for daemons to initialize
+    echo "Waiting 2 seconds for daemons to initialize..."
+    sleep 2
+    echo "Daemons should be ready"
+fi
 
 # Run the test
 if [ -n "$DAEMON_PATH" ]; then
@@ -41,5 +99,5 @@ fi
 # Capture the exit code
 TEST_EXIT_CODE=$?
 
-# Exit with the test's exit code (cleanup will run via trap)
+# Exit with the test's exit code
 exit $TEST_EXIT_CODE

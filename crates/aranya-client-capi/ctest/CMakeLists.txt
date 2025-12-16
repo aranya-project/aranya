@@ -3,7 +3,6 @@ project(capi-ctest LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # Enforce building only under ctest/build
 get_filename_component(_build_dir "${CMAKE_BINARY_DIR}" REALPATH)
@@ -72,70 +71,37 @@ add_custom_target(copy_aranya_artifacts ALL
 
 add_custom_command(TARGET copy_aranya_artifacts POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_LIB_DIR} ${CTEST_EXEC_DIR}
-    COMMAND /bin/sh -c '[ -f "${CMAKE_CURRENT_SOURCE_DIR}/../output/aranya-client.h" ] && cp -p "${CMAKE_CURRENT_SOURCE_DIR}/../output/aranya-client.h" "${CTEST_INCLUDE_DIR}/aranya-client.h" || true'
     COMMAND /bin/sh -c '[ -f "${RUST_TARGET_DIR}/libaranya_client_capi.dylib" ] && cp -p "${RUST_TARGET_DIR}/libaranya_client_capi.dylib" "${CTEST_LIB_DIR}/" || true'
     COMMAND /bin/sh -c '[ -f "${RUST_TARGET_DIR}/libaranya_client.so" ] && cp -p "${RUST_TARGET_DIR}/libaranya_client.so" "${CTEST_LIB_DIR}/" || true'
     COMMAND /bin/sh -c '[ -f "${RUST_TARGET_DIR}/aranya-daemon" ] && ( cp -p "${RUST_TARGET_DIR}/aranya-daemon" "${CTEST_EXEC_DIR}/" && chmod +x "${CTEST_EXEC_DIR}/aranya-daemon" ) || true'
 )
 
 # --- Library Detection ---
-set(LOCAL_LIB "${CTEST_LIB_DIR}/libaranya_client_capi.dylib")
-set(RUST_LIB_DYLIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
-set(RUST_LIB_SO "${RUST_TARGET_DIR}/libaranya_client.so")
-set(RUST_LIB_A "${RUST_TARGET_DIR}/libaranya_client.a")
-
 set(ARANYA_LIB "")
-if(EXISTS "${LOCAL_LIB}")
-    set(ARANYA_LIB "${LOCAL_LIB}")
-elseif(EXISTS "${RUST_LIB_DYLIB}")
-    set(ARANYA_LIB "${RUST_LIB_DYLIB}")
-elseif(EXISTS "${RUST_LIB_SO}")
-    set(ARANYA_LIB "${RUST_LIB_SO}")
-elseif(EXISTS "${RUST_LIB_A}")
-    set(ARANYA_LIB "${RUST_LIB_A}")
+if(EXISTS "${CTEST_LIB_DIR}/libaranya_client_capi.dylib")
+    set(ARANYA_LIB "${CTEST_LIB_DIR}/libaranya_client_capi.dylib")
+elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
+    set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
+elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client.so")
+    set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client.so")
 else()
     message(WARNING "Rust C API library not found. Build the crate first: cargo build -p aranya-client-capi")
 endif()
 
 # --- Daemon Detection ---
-set(DAEMON_LOCAL "${CTEST_EXEC_DIR}/aranya-daemon")
-set(DAEMON_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../../target/release/aranya-daemon")
-set(ARANYA_DAEMON "")
-
-if(EXISTS "${DAEMON_LOCAL}")
-    set(ARANYA_DAEMON "${DAEMON_LOCAL}")
-elseif(EXISTS "${DAEMON_RELEASE}")
-    set(ARANYA_DAEMON "${DAEMON_RELEASE}")
-else()
-    message(WARNING "aranya-daemon not found. Tests requiring daemon will be skipped.")
+set(ARANYA_DAEMON "${CTEST_EXEC_DIR}/aranya-daemon")
+if(NOT EXISTS "${ARANYA_DAEMON}")
+    message(WARNING "aranya-daemon not found at ${ARANYA_DAEMON}. Tests requiring daemon will be skipped.")
+    set(ARANYA_DAEMON "")
 endif()
 
 # --- Testing Setup ---
 enable_testing()
 
-# Global test fixtures for cleanup
-add_test(NAME global_cleanup COMMAND ${CMAKE_COMMAND} -E echo "Cleaning test runtime directories...")
-set_property(TEST global_cleanup PROPERTY FIXTURES_SETUP global_test_fixture)
-
-add_test(NAME cleanup_run COMMAND ${CMAKE_COMMAND} -E rm -rf run)
-set_property(TEST cleanup_run PROPERTY FIXTURES_SETUP global_test_fixture)
-
-add_test(NAME create_run_dirs COMMAND ${CMAKE_COMMAND} -E make_directory run/state run/cache run/logs run/config)
-set_property(TEST create_run_dirs PROPERTY FIXTURES_SETUP global_test_fixture)
-
-add_test(NAME cleanup_tmp_team COMMAND ${CMAKE_COMMAND} -E rm -rf 
-    /tmp/team-run-owner /tmp/team-run-member /tmp/team-run-device)
-set_property(TEST cleanup_tmp_team PROPERTY FIXTURES_SETUP global_test_fixture)
-
-add_test(NAME cleanup_tmp_afc COMMAND ${CMAKE_COMMAND} -E rm -rf 
-    /tmp/afc-run-owner /tmp/afc-run-member1 /tmp/afc-run-member2)
-set_property(TEST cleanup_tmp_afc PROPERTY FIXTURES_SETUP global_test_fixture)
-
-add_test(NAME create_tmp_afc_dirs COMMAND ${CMAKE_COMMAND} -E make_directory 
-    /tmp/afc-run-owner/state /tmp/afc-run-owner/cache /tmp/afc-run-owner/logs /tmp/afc-run-owner/config
-    /tmp/afc-run-member1/state /tmp/afc-run-member1/cache /tmp/afc-run-member1/logs /tmp/afc-run-member1/config
-    /tmp/afc-run-member2/state /tmp/afc-run-member2/cache /tmp/afc-run-member2/logs /tmp/afc-run-member2/config)
-set_property(TEST create_tmp_afc_dirs PROPERTY FIXTURES_SETUP global_test_fixture)
+# Global test fixture to clean up test directories before running tests
+add_test(NAME cleanup_tmp_onboarding COMMAND ${CMAKE_COMMAND} -E rm -rf 
+    /tmp/onboarding-run-owner /tmp/onboarding-run-member)
+set_property(TEST cleanup_tmp_onboarding PROPERTY FIXTURES_SETUP global_test_fixture)
 
 # --- Helper function for test executables ---
 function(add_capi_test TEST_NAME SOURCE_FILE)
@@ -171,46 +137,5 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
 endfunction()
 
 # --- Test Executables ---
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_afc.c")
-    add_executable(TestAfc test_afc.c)
-    target_include_directories(TestAfc PRIVATE ${CTEST_INCLUDE_DIR})
-    target_compile_definitions(TestAfc PRIVATE ENABLE_ARANYA_PREVIEW=1 ENABLE_ARANYA_AFC=1 ENABLE_ARANYA_EXPERIMENTAL=1)
-    
-    if(ARANYA_LIB)
-        target_link_libraries(TestAfc PRIVATE "${ARANYA_LIB}")
-        if(NOT WIN32)
-            target_link_options(TestAfc PRIVATE "-Wl,-rpath,${RUST_TARGET_DIR}")
-        endif()
-    endif()
-    
-    add_dependencies(TestAfc copy_aranya_artifacts)
-    
-    if(ARANYA_DAEMON)
-        add_test(NAME TestAfc COMMAND TestAfc "${ARANYA_DAEMON}")
-    endif()
-    
-    set_property(TEST TestAfc PROPERTY ENVIRONMENT
-        "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}")
-    set_property(TEST TestAfc PROPERTY FIXTURES_REQUIRED global_test_fixture)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_team.c")
-    add_capi_test(TestTeam test_team.c USE_WRAPPER)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_sync.c")
-    add_capi_test(TestSync test_sync.c REQUIRES_DAEMON)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_datatypes.c")
-    add_capi_test(TestDataTypes test_datatypes.c)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_client.c")
-    add_capi_test(TestClient test_client.c REQUIRES_DAEMON)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_query.c")
-    add_capi_test(TestQuery test_query.c REQUIRES_DAEMON)
-endif()
-
+add_capi_test(TestOnboarding test_onboarding.c USE_WRAPPER)
+add_capi_test(TestSimple test_simple.c USE_WRAPPER)

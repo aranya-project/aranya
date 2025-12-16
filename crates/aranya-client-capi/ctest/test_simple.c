@@ -34,27 +34,8 @@ static int test_error_to_str_invalid(void) {
     return s != NULL && s[0] != '\0';
 }
 
-int main(int argc, const char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "usage: `%s <daemon>`\n", argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    /* Run daemon with --help for basic sanity check */
-    pid_t pid = fork();
-    if (pid == 0) {
-        /* Child process */
-        char *env[] = {
-            "ARANYA_DAEMON=debug",
-            NULL,
-        };
-        execle(argv[1], argv[1], "--help", NULL, env);
-        fprintf(stderr, "Failed to exec daemon\n");
-        exit(1);
-    }
-    wait(NULL);
-
-    printf("Running aranya-client-capi basic subtests\n");
+int main(void) {
+    printf("Running aranya-client-capi simple subtests\n");
 
     if (!test_error_to_str_success()) {
         printf("FAILED: error_to_str(success)\n");
