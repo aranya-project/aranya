@@ -50,11 +50,10 @@ if(CBINDGEN_EXECUTABLE)
         DEPENDS build_aranya_client_capi
     )
 else()
-    set(RUST_HEADER_GLOB "${RUST_TARGET_DIR}/build/aranya-client-capi-*/out/aranya-client.h")
     add_custom_command(
         OUTPUT ${CTEST_INCLUDE_DIR}/aranya-client.h
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CTEST_INCLUDE_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RUST_HEADER_GLOB} ${CTEST_INCLUDE_DIR}/aranya-client.h
+        COMMAND /bin/sh -c "cp -p ${RUST_TARGET_DIR}/build/aranya-client-capi-*/out/aranya-client.h ${CTEST_INCLUDE_DIR}/aranya-client.h"
         COMMENT "Copying generated aranya-client.h from Rust build output"
         DEPENDS build_aranya_client_capi
     )
