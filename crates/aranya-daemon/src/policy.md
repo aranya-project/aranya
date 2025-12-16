@@ -1245,7 +1245,7 @@ effect PermRemovedFromRole {
 
 command RemovePermFromRole {
     attributes {
-        priority: 200
+        priority: 300
     }
 
     fields {
@@ -1476,7 +1476,7 @@ action setup_default_roles() {
 
 command SetupDefaultRole {
     attributes {
-        priority: 100
+        priority: 200
     }
 
     fields {
