@@ -104,7 +104,7 @@ use perspective
   device.
 - [`envelope`][evp-ffi]: provides access to the special
   [`Envelope`][envelope] type.
-- [`idam`][idam-ffi]: IDAM functionality, such access to device
+- [`idam`][idam-ffi]: IDAM functionality, such as access to device
   keys.
 - [`perspective`][perspective-ffi]: provides information about
   the current perspective.
@@ -152,7 +152,7 @@ In general, deletion and revocation commands should be higher priority than crea
 TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseFoo(100)
 
 Commands that must be called first should have a higher priority than commands that depend on them.
-For example, a command to create/assign a label to a device should be higher priority than a command that uses the label based.
+For example, a command to create/assign a label to a device should be higher priority than a command that uses the label.
 Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
 For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
 
@@ -299,7 +299,7 @@ A device's ID is derived from the public half of the Device
 Identity Key.
 
 ```policy
-// Records a the public half of a device's Identity Key.
+// Records the public half of a device's Identity Key.
 fact DeviceIdentPubKey[device_id id]=>{key bytes}
 ```
 
@@ -2335,11 +2335,6 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, Perm::ChangeRolePerms)
             assign_perm_to_role(owner_role_id, Perm::SetupDefaultRole)
 
-            assign_perm_to_role(owner_role_id, Perm::CreateLabel)
-            assign_perm_to_role(owner_role_id, Perm::DeleteLabel)
-            assign_perm_to_role(owner_role_id, Perm::AssignLabel)
-            assign_perm_to_role(owner_role_id, Perm::RevokeLabel)
-
             assign_perm_to_role(owner_role_id, Perm::CanUseAfc)
             assign_perm_to_role(owner_role_id, Perm::CreateAfcUniChannel)
 
@@ -3000,7 +2995,7 @@ command AssignLabelToDevice {
         device_id id,
         // The label being assigned to the target device.
         label_id id,
-        // The channel operations the device is allowed to used
+        // The channel operations the device is allowed to use
         // the label for.
         op enum ChanOp,
     }
