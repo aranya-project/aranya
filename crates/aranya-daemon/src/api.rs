@@ -51,7 +51,7 @@ use crate::{
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
-    sync::task::{quic as qs, SyncPeers},
+    sync::task::{quic as qs, SyncPeer, SyncPeers},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
 };
@@ -467,8 +467,8 @@ impl DaemonApi for Api {
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers.add_peer(peer, graph, cfg).await?;
+        let peer = SyncPeer::new(peer, graph);
+        self.peers.add_peer(peer, cfg).await?;
         Ok(())
     }
 
@@ -481,8 +481,8 @@ impl DaemonApi for Api {
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers.sync_now(peer, graph, cfg).await?;
+        let peer = SyncPeer::new(peer, graph);
+        self.peers.sync_now(peer, cfg).await?;
         Ok(())
     }
 
@@ -498,9 +498,9 @@ impl DaemonApi for Api {
         schedule_delay: Duration,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
+        let peer = SyncPeer::new(peer, graph);
         self.peers
-            .sync_hello_subscribe(peer, graph, graph_change_delay, duration, schedule_delay)
+            .sync_hello_subscribe(peer, graph_change_delay, duration, schedule_delay)
             .await?;
         Ok(())
     }
@@ -514,8 +514,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers.sync_hello_unsubscribe(peer, graph).await?;
+        let peer = SyncPeer::new(peer, graph);
+        self.peers.sync_hello_unsubscribe(peer).await?;
         Ok(())
     }
 
@@ -527,9 +527,9 @@ impl DaemonApi for Api {
         team: api::TeamId,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
+        let peer = SyncPeer::new(peer, graph);
         self.peers
-            .remove_peer(peer, graph)
+            .remove_peer(peer)
             .await
             .context("unable to remove sync peer")?;
         Ok(())

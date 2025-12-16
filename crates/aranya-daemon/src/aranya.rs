@@ -10,7 +10,7 @@ use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "preview")]
 use crate::sync::task::quic::HelloSubscriptions;
-use crate::sync::task::PeerCacheKey;
+use crate::sync::task::SyncPeer;
 
 /// Thread-safe wrapper for an Aranya client.
 pub struct Client<EN, SP> {
@@ -51,7 +51,7 @@ impl<EN, SP> Deref for Client<EN, SP> {
 ///
 /// For a given peer, there should only be one cache. If separate caches are used
 /// for the server and state it will reduce the efficiency of the syncer.
-pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
+pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<SyncPeer, PeerCache>>>;
 
 /// Wrapper that pairs an Aranya client with peer caches and hello subscriptions.
 ///
@@ -87,7 +87,7 @@ impl<EN, SP> ClientWithState<EN, SP> {
         &self,
     ) -> (
         MutexGuard<'_, ClientState<EN, SP>>,
-        MutexGuard<'_, BTreeMap<PeerCacheKey, PeerCache>>,
+        MutexGuard<'_, BTreeMap<SyncPeer, PeerCache>>,
     ) {
         let aranya = self.client.aranya.lock().await;
         let caches = self.caches.lock().await;

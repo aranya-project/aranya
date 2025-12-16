@@ -102,7 +102,7 @@ pub(crate) type Reply = SyncResult<()>;
 /// Contains the information needed to sync with a single peer:
 /// - network address
 /// - Aranya graph id
-#[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
@@ -110,7 +110,6 @@ pub(crate) struct SyncPeer {
 
 impl SyncPeer {
     /// Creates a new `SyncPeer`.
-    #[cfg(test)]
     pub fn new(addr: Addr, graph_id: GraphId) -> Self {
         Self { addr, graph_id }
     }
@@ -148,30 +147,17 @@ impl SyncPeers {
     }
 
     /// Add peer to [`Syncer`].
-    pub(crate) async fn add_peer(
-        &self,
-        addr: Addr,
-        graph_id: GraphId,
-        cfg: SyncPeerConfig,
-    ) -> Reply {
-        let peer = SyncPeer { addr, graph_id };
+    pub(crate) async fn add_peer(&self, peer: SyncPeer, cfg: SyncPeerConfig) -> Reply {
         self.send(Msg::AddPeer { peer, cfg }).await
     }
 
     /// Remove peer from [`Syncer`].
-    pub(crate) async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Reply {
-        let peer = SyncPeer { addr, graph_id };
+    pub(crate) async fn remove_peer(&self, peer: SyncPeer) -> Reply {
         self.send(Msg::RemovePeer { peer }).await
     }
 
     /// Sync with a peer immediately.
-    pub(crate) async fn sync_now(
-        &self,
-        addr: Addr,
-        graph_id: GraphId,
-        cfg: Option<SyncPeerConfig>,
-    ) -> Reply {
-        let peer = SyncPeer { addr, graph_id };
+    pub(crate) async fn sync_now(&self, peer: SyncPeer, cfg: Option<SyncPeerConfig>) -> Reply {
         self.send(Msg::SyncNow { peer, cfg }).await
     }
 
@@ -179,16 +165,11 @@ impl SyncPeers {
     #[cfg(feature = "preview")]
     pub(crate) async fn sync_hello_subscribe(
         &self,
-        peer_addr: Addr,
-        graph_id: GraphId,
+        peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> Reply {
-        let peer = SyncPeer {
-            addr: peer_addr,
-            graph_id,
-        };
         self.send(Msg::HelloSubscribe {
             peer,
             graph_change_delay,
@@ -200,19 +181,14 @@ impl SyncPeers {
 
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
-    pub(crate) async fn sync_hello_unsubscribe(&self, peer_addr: Addr, graph_id: GraphId) -> Reply {
-        let peer = SyncPeer {
-            addr: peer_addr,
-            graph_id,
-        };
+    pub(crate) async fn sync_hello_unsubscribe(&self, peer: SyncPeer) -> Reply {
         self.send(Msg::HelloUnsubscribe { peer }).await
     }
 
     /// Trigger sync with a peer based on hello message.
     /// Will be ignored if `SyncPeerConfig::sync_on_hello` is false.
     #[cfg(feature = "preview")]
-    pub(crate) async fn sync_on_hello(&self, addr: Addr, graph_id: GraphId) -> Reply {
-        let peer = SyncPeer { addr, graph_id };
+    pub(crate) async fn sync_on_hello(&self, peer: SyncPeer) -> Reply {
         self.send(Msg::SyncOnHello { peer }).await
     }
 
@@ -224,21 +200,6 @@ impl SyncPeers {
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
-
-/// Key for looking up syncer peer cache in map.
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
-pub struct PeerCacheKey {
-    /// The peer address.
-    pub addr: Addr,
-    /// The Aranya graph ID.
-    pub id: GraphId,
-}
-
-impl PeerCacheKey {
-    fn new(addr: Addr, id: GraphId) -> Self {
-        Self { addr, id }
-    }
-}
 
 /// Syncs with each peer after the specified interval.
 ///
@@ -275,9 +236,8 @@ pub trait SyncState: Sized {
     /// Returns the number of commands that were received and successfully processed.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
-        id: GraphId,
+        peer: SyncPeer,
         sink: &mut S,
-        peer: &Addr,
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<EN as Engine>::Effect> + Send;
@@ -286,8 +246,7 @@ pub trait SyncState: Sized {
     #[cfg(feature = "preview")]
     fn sync_hello_subscribe_impl(
         syncer: &mut Syncer<Self>,
-        id: GraphId,
-        peer: &Addr,
+        peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
@@ -297,8 +256,7 @@ pub trait SyncState: Sized {
     #[cfg(feature = "preview")]
     fn sync_hello_unsubscribe_impl(
         syncer: &mut Syncer<Self>,
-        id: GraphId,
-        peer: &Addr,
+        peer: SyncPeer,
     ) -> impl Future<Output = SyncResult<()>> + Send;
 
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -352,7 +310,7 @@ impl<ST: SyncState> Syncer<ST> {
                 let reply = match msg {
                     Msg::SyncNow { peer, cfg: _cfg } => {
                         // sync with peer right now.
-                        self.sync(&peer).await.map(|_| ())
+                        self.sync(peer).await.map(|_| ())
                     },
                     Msg::AddPeer { peer, cfg } => {
                         self.add_peer(peer, cfg);
@@ -369,19 +327,19 @@ impl<ST: SyncState> Syncer<ST> {
                         duration,
                         schedule_delay,
                     } => {
-                        self.sync_hello_subscribe(&peer, graph_change_delay, duration, schedule_delay)
+                        self.sync_hello_subscribe(peer, graph_change_delay, duration, schedule_delay)
                             .await
                     }
                     #[cfg(feature = "preview")]
                     Msg::HelloUnsubscribe { peer } => {
-                        self.sync_hello_unsubscribe(&peer).await
+                        self.sync_hello_unsubscribe(peer).await
                     }
                     #[cfg(feature = "preview")]
                     Msg::SyncOnHello { peer } => {
                         // Check if sync_on_hello is enabled for this peer
                         if let Some((cfg, _)) = self.peers.get(&peer) {
                             if cfg.sync_on_hello {
-                                self.sync(&peer).await
+                                self.sync(peer).await
                                     .inspect_err(|e| {
                                         warn!(
                                             error = %e,
@@ -422,7 +380,7 @@ impl<ST: SyncState> Syncer<ST> {
                 // Re-insert into queue if interval is still configured
                 *key = cfg.interval.map(|interval| self.queue.insert(peer.clone(), interval));
                 // sync with peer.
-                self.sync(&peer).await?;
+                self.sync(peer).await?;
             }
         }
         Ok(())
@@ -430,10 +388,10 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
+    pub(crate) async fn sync(&mut self, peer: SyncPeer) -> SyncResult<usize> {
         let mut sink = VecSink::new();
 
-        let cmd_count = ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+        let cmd_count = ST::sync_impl(self, peer, &mut sink)
             .await
             .inspect_err(|err| {
                 warn!(
@@ -486,29 +444,22 @@ impl<ST: SyncState> Syncer<ST> {
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     async fn sync_hello_subscribe(
         &mut self,
-        peer: &SyncPeer,
+        peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> SyncResult<()> {
         trace!("subscribing to hello notifications from peer");
-        ST::sync_hello_subscribe_impl(
-            self,
-            peer.graph_id,
-            &peer.addr,
-            graph_change_delay,
-            duration,
-            schedule_delay,
-        )
-        .await
+        ST::sync_hello_subscribe_impl(self, peer, graph_change_delay, duration, schedule_delay)
+            .await
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    async fn sync_hello_unsubscribe(&mut self, peer: &SyncPeer) -> SyncResult<()> {
+    async fn sync_hello_unsubscribe(&mut self, peer: SyncPeer) -> SyncResult<()> {
         trace!("unsubscribing from hello notifications from peer");
-        ST::sync_hello_unsubscribe_impl(self, peer.graph_id, &peer.addr).await
+        ST::sync_hello_unsubscribe_impl(self, peer).await
     }
 
     /// Get peer caches for test inspection.
