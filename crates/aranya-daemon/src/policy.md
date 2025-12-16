@@ -164,6 +164,16 @@ While we could assign sequential priorities (0, 1, 2, ...) to commands to achiev
 Therefore, initial priorities are defined with room between them for new priorities to be added later. E.g.:
 100, 200, 300, etc.
 
+Command priority levels:
+| Priority | Category | Commands | Description |
+|-|-|-|-|
+| 500      | Terminate         | TerminateTeam                                                                                                                                                                                                                         | Highest priority - team termination takes precedence over all operations                   |
+| 400      | Delete/Remove     | DeleteRole, DeleteLabel, RemoveDevice                                                                                                                                                                                                 | Deletions and removals must take precedence to prevent operating on deleted objects        |
+| 300      | Revoke            | RevokeRole, RevokeLabelFromDevice, RemovePermFromRole                                                                                                                                                                                 | Revocations must take precedence over assignments to prevent use of revoked privileges     |
+| 200      | Create            | CreateRole, SetupDefaultRole, CreateLabel                                                                                                                                                                                             | Creations must complete before dependent use/assign operations                             |
+| 100      | Use/Assign/Modify | AssignRole, ChangeRole, AssignLabelToDevice, AddDevice, AddPermToRole, ChangeRank                                                                                                                                                     | Low priority - depends on objects existing first                                           |
+| 0        | Init/Ephemeral    | CreateTeam, QueryDevicesOnTeam, QueryAfcChannelIsValid, QueryDeviceRole, QueryDeviceKeyBundle, QueryRank, QueryTeamRoles, QueryRoleHasPerm, QueryRolePerms, QueryLabel, QueryLabels, QueryLabelsAssignedToDevice, AfcCreateUniChannel | Init command evaluated first by ancestry; ephemeral commands don't participate in braiding |
+
 ### API Stability and Backward Compatibility
 
 Actions and effects are part of a policy's public API.
