@@ -846,6 +846,13 @@ command ChangeRank {
 
         let author = get_author(envelope)
 
+        // Check that the object exists before changing its rank.
+        // TODO: should object existence be tracked in a single fact?
+        let device_exists = exists Device[device_id: this.object_id]
+        let role_exists = exists Role[role_id: this.object_id]
+        let label_exists = exists Label[label_id: this.object_id]
+        check device_exists || role_exists || label_exists
+
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
             // An object can always downgrade its own rank.
@@ -859,6 +866,7 @@ command ChangeRank {
         check author_rank >= this.new_rank
 
         // Check that old_rank matches the object's current rank.
+        // Implicitly checks that the rank exists before modifying it.
         check this.old_rank == get_object_rank(this.object_id)
 
         finish {
@@ -3136,6 +3144,8 @@ command RevokeLabelFromDevice {
         check team_exists()
 
         let author = get_author(envelope)
+
+        // Implicitly checks that the device exists.
         let target = get_device(this.device_id)
 
         // The author device must have permission to revoke the label and outrank the target device and label.
