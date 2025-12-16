@@ -104,7 +104,7 @@ use perspective
   device.
 - [`envelope`][evp-ffi]: provides access to the special
   [`Envelope`][envelope] type.
-- [`idam`][idam-ffi]: IDAM functionality, such access to device
+- [`idam`][idam-ffi]: IDAM functionality, such as access to device
   keys.
 - [`perspective`][perspective-ffi]: provides information about
   the current perspective.
@@ -152,7 +152,7 @@ In general, deletion and revocation commands should be higher priority than crea
 TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseFoo(100)
 
 Commands that must be called first should have a higher priority than commands that depend on them.
-For example, a command to create/assign a label to a device should be higher priority than a command that uses the label based.
+For example, a command to create/assign a label to a device should be higher priority than a command that uses the label.
 Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
 For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
 
@@ -299,7 +299,7 @@ A device's ID is derived from the public half of the Device
 Identity Key.
 
 ```policy
-// Records a the public half of a device's Identity Key.
+// Records the public half of a device's Identity Key.
 fact DeviceIdentPubKey[device_id id]=>{key bytes}
 ```
 
@@ -1401,6 +1401,9 @@ command CreateRole {
         
         // The author must have the permission to create a role
         check device_has_perm(author.device_id, Perm::CreateRole)
+
+        // The author's rank must be greater than the rank of the role it is creating.
+        check get_object_rank(author.device_id) > this.rank
 
         let role_id = derive_role_id(envelope)
 
@@ -2536,6 +2539,9 @@ command AddDevice {
         // Author must have permission to add a device to the team.
         check device_has_perm(author.device_id, Perm::AddDevice)
 
+        // The author's rank must be greater than the rank of the device it is adding to the team.
+        check get_object_rank(author.device_id) > this.rank
+
         let dev_key_ids = derive_device_key_ids(this.device_keys)
 
         check !exists Device[device_id: dev_key_ids.device_id]
@@ -2636,7 +2642,9 @@ command RemoveDevice {
         check exists Device[device_id: this.device_id]
 
         // Author must have permission to remove a device from the team.
-        check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
+        if author.device_id != this.device_id {
+            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
+        }
 
         // Clean up optional per-device facts that may or may not
         // exist.
@@ -2697,24 +2705,6 @@ command RemoveDevice {
             }
         }
     }
-}
-
-// Reports whether a device can remove itself from the team.
-// Owners can only remove themselves if there are other owners
-// remaining. Other roles can always remove themselves.
-function can_remove_self(device_id id) bool {
-    let maybe_role = try_get_assigned_role(device_id)
-    if maybe_role is None {
-        // Device has no role, can be removed
-        return true
-    }
-    let role = unwrap maybe_role
-    if is_owner(role) {
-        // Owner can only remove self if there are other owners
-        return at_least 2 RoleAssignmentIndex[role_id: role.role_id, device_id: ?]=>{}
-    }
-    // All other roles can remove themselves
-    return true
 }
 ```
 
@@ -2818,6 +2808,9 @@ command CreateLabel {
 
         // Author must have permission to create a label.
         check device_has_perm(author.device_id, Perm::CreateLabel)
+
+        // The author's rank must be greater than the rank of the label it is creating.
+        check get_object_rank(author.device_id) > this.rank
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
@@ -3000,7 +2993,7 @@ command AssignLabelToDevice {
         device_id id,
         // The label being assigned to the target device.
         label_id id,
-        // The channel operations the device is allowed to used
+        // The channel operations the device is allowed to use
         // the label for.
         op enum ChanOp,
     }
