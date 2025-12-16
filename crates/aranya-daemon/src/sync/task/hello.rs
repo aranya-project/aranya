@@ -10,21 +10,18 @@ use std::{
 
 use anyhow::Context;
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{Address, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
 use aranya_util::Addr;
 use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
-use crate::{
-    aranya::ClientWithState,
-    sync::{
-        task::{
-            quic::{Error, Server, State},
-            SyncPeer, SyncPeers, Syncer,
-        },
-        Result as SyncResult,
+use crate::sync::{
+    task::{
+        quic::{Error, Server, State},
+        Client, SyncPeer, SyncPeers, Syncer,
     },
+    Result as SyncResult,
 };
 
 /// Storage for sync hello subscriptions
@@ -327,17 +324,14 @@ impl Syncer<State> {
 /// The task will periodically send hello notifications to the subscriber at the specified interval,
 /// regardless of whether the graph has changed. The task will exit when the subscription expires
 /// or the cancellation token is triggered.
-fn spawn_scheduled_hello_sender<EN, SP>(
+fn spawn_scheduled_hello_sender(
     peer: SyncPeer,
     schedule_delay: Duration,
     expires_at: Instant,
     cancel_token: CancellationToken,
     sync_peers: SyncPeers,
-    client: ClientWithState<EN, SP>,
-) where
-    EN: Engine + Send + 'static,
-    SP: StorageProvider + Send + Sync + 'static,
-{
+    client: Client,
+) {
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
     tokio::spawn(async move {
         loop {
@@ -389,18 +383,14 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     });
 }
 
-impl<EN, SP> Server<EN, SP>
-where
-    EN: Engine + Send + 'static,
-    SP: StorageProvider + Send + Sync + 'static,
-{
+impl Server {
     /// Processes a hello message.
     ///
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
     pub(crate) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client: ClientWithState<EN, SP>,
+        client: Client,
         active_team: &TeamId,
         sync_peers: SyncPeers,
     ) {

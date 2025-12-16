@@ -65,10 +65,7 @@ type TestState = sync::task::quic::State;
 type TestSyncer = sync::task::Syncer<TestState>;
 
 // Aranya sync server for testing.
-type TestServer = sync::task::quic::Server<
-    PolicyEngine<DefaultEngine, Store>,
-    LinearStorageProvider<FileManager>,
->;
+type TestServer = sync::task::quic::Server;
 
 struct TestDevice {
     /// Aranya sync client.

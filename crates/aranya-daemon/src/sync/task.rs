@@ -53,7 +53,7 @@ use tracing::trace;
 use tracing::{error, info, instrument, warn};
 
 use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs, EN};
+use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
 
 #[cfg(feature = "preview")]
 pub mod hello;
@@ -200,6 +200,7 @@ impl SyncPeers {
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
+pub(super) type Client = crate::aranya::ClientWithState<crate::EN, crate::SP>;
 
 /// Syncs with each peer after the specified interval.
 ///
@@ -208,7 +209,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 #[derive(Debug)]
 pub(crate) struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(crate) client: crate::aranya::ClientWithState<EN, crate::SP>,
+    pub(crate) client: Client,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Option<Key>)>,
     /// Receives added/removed peers.
@@ -240,7 +241,7 @@ pub(crate) trait SyncState: Sized {
         sink: &mut S,
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
-        S: Sink<<EN as Engine>::Effect> + Send;
+        S: Sink<<crate::EN as Engine>::Effect> + Send;
 
     /// Subscribe to hello notifications from a sync peer.
     #[cfg(feature = "preview")]
@@ -470,13 +471,13 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub fn client(&self) -> &crate::aranya::Client<EN, crate::SP> {
+    pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
         self.client.client()
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, crate::SP> {
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
         self.client.client_mut()
     }
 }
