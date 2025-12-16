@@ -1283,6 +1283,7 @@ command RemovePermFromRole {
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
 
         // TODO: should the author only be allowed to remove a permission it also has?
+        // A device could attempt to remove a permission from a role assigned to a higher ranked device.
 
         // It is an error to remove a permission not assigned to
         // the role.
@@ -1873,6 +1874,9 @@ command AssignRole {
         // The author must have permission to assign the role to the target device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id)
 
+        // TODO: should assigned role rank always exceed target device rank?
+        // May want to add this check to prevent a device from modifying a role assigned to a higher rank device.
+
         // Ensure the target role exists.
         check exists Role[role_id: this.role_id]
 
@@ -2136,6 +2140,7 @@ ephemeral action query_team_roles() {
 }
 
 // Emitted when a role is queried by `query_team_roles`.
+// TODO: return role rank?
 effect QueryTeamRolesResult {
     // The ID of the role.
     role_id id,
@@ -3352,6 +3357,7 @@ ephemeral action query_labels() {
     }
 }
 
+// TODO: return label rank?
 effect QueryLabelsResult {
     // The label's unique ID.
     label_id id,
@@ -3411,6 +3417,7 @@ ephemeral action query_labels_assigned_to_device(device_id id) {
     }
 }
 
+// TODO: return label rank?
 effect QueryLabelsAssignedToDeviceResult {
     // The device's unique ID.
     device_id id,
