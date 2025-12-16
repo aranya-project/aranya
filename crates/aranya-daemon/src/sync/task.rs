@@ -36,7 +36,7 @@ use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{storage::GraphId, Engine, Sink};
+use aranya_runtime::{Engine, GraphId, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
@@ -206,7 +206,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 #[derive(Debug)]
-pub struct Syncer<ST> {
+pub(crate) struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(crate) client: crate::aranya::ClientWithState<EN, crate::SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
@@ -230,7 +230,7 @@ pub struct Syncer<ST> {
 
 /// Types that contain additional data that are part of a [`Syncer`]
 /// object.
-pub trait SyncState: Sized {
+pub(crate) trait SyncState: Sized {
     /// Syncs with the peer.
     ///
     /// Returns the number of commands that were received and successfully processed.
@@ -273,8 +273,8 @@ impl<ST> Syncer<ST> {
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
         let new_key = match cfg.interval {
-            _ if cfg.sync_now => Some(self.queue.insert_at(peer.clone(), Instant::now())),
-            Some(interval) => Some(self.queue.insert(peer.clone(), interval)),
+            _ if cfg.sync_now => Some(self.queue.insert_at(peer, Instant::now())),
+            Some(interval) => Some(self.queue.insert(peer, interval)),
             None => None,
         };
         if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
@@ -378,7 +378,7 @@ impl<ST: SyncState> Syncer<ST> {
                 let peer = expired.into_inner();
                 let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
                 // Re-insert into queue if interval is still configured
-                *key = cfg.interval.map(|interval| self.queue.insert(peer.clone(), interval));
+                *key = cfg.interval.map(|interval| self.queue.insert(peer, interval));
                 // sync with peer.
                 self.sync(peer).await?;
             }

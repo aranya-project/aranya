@@ -482,7 +482,7 @@ where
 {
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     #[cfg(feature = "preview")]
-    pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
+    pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         Arc::clone(self.client.hello_subscriptions())
     }
 
@@ -571,7 +571,7 @@ where
                     },
                     // Handle new connections inserted in the map
                     Some((peer, acceptor)) = self.conn_rx.recv() => {
-                        s.spawn(self.serve_connection(peer.clone(), acceptor));
+                        s.spawn(self.serve_connection(peer, acceptor));
                     }
                     else => break,
                 }
@@ -613,11 +613,12 @@ where
         &mut self,
         peer: SyncPeer,
         mut acceptor: StreamAcceptor,
-    ) -> impl Future<Output = ()> + use<'_, EN, SP> {
+    ) -> impl Future<Output = ()> {
         let active_team = TeamId::transmute(peer.graph_id);
         let conn_source = peer.addr;
         let client = self.client.clone();
         let sync_peers = self._sync_peers.clone();
+        let local_addr = self.local_addr;
         async move {
             // Accept incoming streams.
             while let Some(stream) = acceptor
@@ -631,7 +632,7 @@ where
                     stream,
                     active_team,
                     sync_peers.clone(),
-                    self.local_addr,
+                    local_addr,
                 )
                 .await
                 .context("failed to process sync request")?;
