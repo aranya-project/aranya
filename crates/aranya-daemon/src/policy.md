@@ -755,25 +755,6 @@ function author_has_perm_two_targets(author_id id, perm enum Perm, target_id1 id
     return true
 }
 
-// Returns whether the command author object has permission to perform an operation on a set of three target objects.
-// The command author's role must have permission to perform the operation.
-// The command author must have a higher rank than all the objects it is operating on.
-function author_has_perm_three_targets(author_id id, perm enum Perm, target_id1 id, target_id2 id, target_id3 id) bool {
-    check device_has_perm(author_id, perm)
-    let author_rank = get_object_rank(author_id)
-    if !author_can_operate_on_target(author_rank, target_id1) {
-        return false
-    }
-    if !author_can_operate_on_target(author_rank, target_id2) {
-        return false
-    }
-    if !author_can_operate_on_target(author_rank, target_id3) {
-        return false
-    }
-
-    return true
-}
-
 // Returns whether the command author outranks the target object.
 function author_can_operate_on_target(author_rank int, target_id id) bool {
     let object_rank = get_object_rank(target_id)
