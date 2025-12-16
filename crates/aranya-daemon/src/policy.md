@@ -602,7 +602,7 @@ ephemeral action query_device_role(device_id id) {
 }
 
 // Emitted when a device's role is queried by
-// `query_device_roles`. This is the same structure as the
+// `query_device_role`. This is the same structure as the
 // `Role` fact.
 // TODO: return role rank?
 effect QueryDeviceRoleResult {
@@ -1044,7 +1044,7 @@ cannot be created or deleted at runtime.
 The following table shows which objects each permission can be granted to as well as which objects can be modified by an object with the permission:
 | Permission Name | Granted To Team Owner | Granted To Role | Granted To Device | Granted To Label | Modifies Team | Modifies Label | Modifies Role | Modifies Device | Modifies AFC Chan |
 | - | - | - | - | - | - | - | - | - | - |
-| CreateTeam | ✅ (implicit) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| CreateTeam | ✅ (implicit) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | TerminateTeam | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | SetupDefaultRole | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
 | AddDevice | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ |
@@ -1966,7 +1966,7 @@ command ChangeRole {
         // Devices cannot assign roles to themselves.
         check author.device_id != this.device_id
 
-        // TODO: Should this just be a no-op?
+        // Attempting to change to the same role should fail since a state change is expected.
         check this.old_role_id != this.new_role_id
 
         check exists Role[role_id: this.new_role_id]
@@ -3133,7 +3133,7 @@ command RevokeLabelFromDevice {
     fields {
         // The target device.
         device_id id,
-        // The label being assigned to the target device.
+        // The label being revoked from the target device.
         label_id id,
     }
 
@@ -3437,7 +3437,7 @@ effect QueryLabelsResult {
     label_author_id id,
 }
 
-// Trampoline to forward info to `QueriedLabelsResult`.
+// Trampoline to forward info to `QueryLabelsResult`.
 ephemeral command QueryLabels {
     fields {
         label_id id,
