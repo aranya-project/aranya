@@ -1982,8 +1982,11 @@ command ChangeRole {
 
         check exists Role[role_id: this.new_role_id]
 
+        // The author must have permission to revoke the old role from the device.
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id)
+
         // The author must have permission to assign the new role to the device.
-        check author_has_perm_three_targets(author.device_id, Perm::AssignRole, this.device_id, this.old_role_id, this.new_role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id)
 
         // The target device must exist.
         check exists Device[device_id: this.device_id]
