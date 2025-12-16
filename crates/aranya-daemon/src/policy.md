@@ -873,6 +873,7 @@ command ChangeRank {
             check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id)
         }
         // Check that author's rank is >= than the rank being set.
+        // If the author is the current device, this prevents a device from upgrading its own rank.
         let author_rank = get_object_rank(author.device_id)
         check author_rank >= this.new_rank
 
@@ -1284,6 +1285,7 @@ command RemovePermFromRole {
 
         // TODO: should the author only be allowed to remove a permission it also has?
         // A device could attempt to remove a permission from a role assigned to a higher ranked device.
+        // Current recommendation is for the application to not set up roles and ranks in a way that allows this.
 
         // It is an error to remove a permission not assigned to
         // the role.
@@ -1876,6 +1878,7 @@ command AssignRole {
 
         // TODO: should assigned role rank always exceed target device rank?
         // May want to add this check to prevent a device from modifying a role assigned to a higher rank device.
+        // Current recommendation is for the application to not set up roles and ranks in a way that allows this.
 
         // Ensure the target role exists.
         check exists Role[role_id: this.role_id]
@@ -2644,6 +2647,7 @@ command RemoveDevice {
         check exists Device[device_id: this.device_id]
 
         // Author must have permission to remove a device from the team.
+        // Devices should always be allowed to remove themselves even without RemoveDevice permission.
         if author.device_id != this.device_id {
             check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
         }
