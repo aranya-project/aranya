@@ -496,7 +496,6 @@ ephemeral action query_devices_on_team() {
 }
 
 // Emitted when a device is queried by `query_devices_on_team`.
-// TODO: return device rank?
 effect QueryDevicesOnTeamResult {
     // The ID of a device on the team.
     device_id id,
@@ -600,7 +599,6 @@ ephemeral action query_device_role(device_id id) {
 // Emitted when a device's role is queried by
 // `query_device_role`. This is the same structure as the
 // `Role` fact.
-// TODO: return role rank?
 effect QueryDeviceRoleResult {
     // The role's ID.
     role_id id,
@@ -2125,7 +2123,6 @@ ephemeral action query_team_roles() {
 }
 
 // Emitted when a role is queried by `query_team_roles`.
-// TODO: return role rank?
 effect QueryTeamRolesResult {
     // The ID of the role.
     role_id id,
@@ -3353,7 +3350,6 @@ ephemeral action query_label(label_id id) {
     }
 }
 
-// TODO: return label rank?
 effect QueryLabelResult {
     // The label's unique ID.
     label_id id,
@@ -3409,7 +3405,6 @@ ephemeral action query_labels() {
     }
 }
 
-// TODO: return label rank?
 effect QueryLabelsResult {
     // The label's unique ID.
     label_id id,
@@ -3467,7 +3462,6 @@ ephemeral action query_labels_assigned_to_device(device_id id) {
     }
 }
 
-// TODO: return label rank?
 effect QueryLabelsAssignedToDeviceResult {
     // The device's unique ID.
     device_id id,
