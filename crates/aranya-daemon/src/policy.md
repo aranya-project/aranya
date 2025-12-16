@@ -2392,6 +2392,7 @@ finish function delete_device_core(device_id id) {
     delete DeviceIdentPubKey[device_id: device_id]
     delete DeviceSignPubKey[device_id: device_id]
     delete DeviceEncPubKey[device_id: device_id]
+    delete Rank[object_id: this.device_id]
 }
 ```
 
@@ -2661,7 +2662,6 @@ command RemoveDevice {
                 }
                 delete_role_assignment(this.device_id, role_id)
                 delete_device_core(this.device_id)
-                delete Rank[object_id: this.device_id]
 
                 emit DeviceRemoved {
                     device_id: this.device_id,
@@ -2678,7 +2678,6 @@ command RemoveDevice {
                     generation: next_gen
                 }
                 delete_device_core(this.device_id)
-                delete Rank[object_id: this.device_id]
 
                 emit DeviceRemoved {
                     device_id: this.device_id,
