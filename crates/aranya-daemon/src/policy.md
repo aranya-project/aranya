@@ -829,72 +829,6 @@ enum SimplePerm {
     CreateAfcUniChannel,
 }
 
-// Converts `perm` to a string.
-function simple_perm_to_str(perm enum SimplePerm) string {
-    match perm {
-        SimplePerm::AddDevice => { return "AddDevice" }
-        SimplePerm::RemoveDevice => { return "RemoveDevice" }
-        SimplePerm::TerminateTeam => { return "TerminateTeam" }
-
-        SimplePerm::CreateRole => { return "CreateRole" }
-        SimplePerm::DeleteRole => { return "DeleteRole" }
-        SimplePerm::AssignRole => { return "AssignRole" }
-        SimplePerm::RevokeRole => { return "RevokeRole" }
-        SimplePerm::ChangeRoleManagementPerms => { return "ChangeRoleManagementPerms" }
-        SimplePerm::SetupDefaultRole => { return "SetupDefaultRole" }
-        SimplePerm::ChangeRoleManagingRole => { return "ChangeRoleManagingRole" }
-
-        SimplePerm::CreateLabel => { return "CreateLabel" }
-        SimplePerm::DeleteLabel => { return "DeleteLabel" }
-        SimplePerm::ChangeLabelManagingRole => { return "ChangeLabelManagingRole" }
-        SimplePerm::AssignLabel => { return "AssignLabel" }
-        SimplePerm::RevokeLabel => { return "RevokeLabel" }
-
-        SimplePerm::CanUseAfc => { return "CanUseAfc" }
-        SimplePerm::CreateAfcUniChannel => { return "CreateAfcUniChannel" }
-    }
-}
-
-// Returns the `SimplePerm` enum value corresponding to `perm`
-// if `perm` is valid.
-function try_parse_simple_perm(perm string) optional enum SimplePerm {
-    match perm {
-        //
-        // Team management
-        //
-        "AddDevice" => { return Some(SimplePerm::AddDevice) }
-        "RemoveDevice" => { return Some(SimplePerm::RemoveDevice) }
-        "TerminateTeam" => { return Some(SimplePerm::TerminateTeam) }
-
-        //
-        // Roles
-        //
-        "CreateRole" => { return Some(SimplePerm::CreateRole) }
-        "DeleteRole" => { return Some(SimplePerm::DeleteRole) }
-        "AssignRole" => { return Some(SimplePerm::AssignRole) }
-        "RevokeRole" => { return Some(SimplePerm::RevokeRole) }
-        "ChangeRoleManagementPerms" => { return Some(SimplePerm::ChangeRoleManagementPerms) }
-        "ChangeRoleManagingRole" => { return Some(SimplePerm::ChangeRoleManagingRole) }
-
-        //
-        // Labels
-        //
-        "CreateLabel" => { return Some(SimplePerm::CreateLabel) }
-        "DeleteLabel" => { return Some(SimplePerm::DeleteLabel) }
-        "ChangeLabelManagingRole" => { return Some(SimplePerm::ChangeLabelManagingRole) }
-        "AssignLabel" => { return Some(SimplePerm::AssignLabel) }
-        "RevokeLabel" => { return Some(SimplePerm::RevokeLabel) }
-
-        //
-        // AFC
-        //
-        "CanUseAfc" => { return Some(SimplePerm::CanUseAfc) }
-        "CreateAfcUniChannel" => { return Some(SimplePerm::CreateAfcUniChannel) }
-
-        _ => { return None }
-    }
-}
-
 // Records a simple permission granted by the role.
 //
 // # Caveats
@@ -939,8 +873,7 @@ function device_has_simple_perm(device_id id, perm enum SimplePerm) bool {
 }
 
 // Adds a permission to the role.
-action add_perm_to_role(role_id id, perm_str string) {
-    let perm = check_unwrap try_parse_simple_perm(perm_str)
+action add_perm_to_role(role_id id, perm enum SimplePerm) {
     publish AddPermToRole {
         role_id: role_id,
         perm: perm,
@@ -952,7 +885,7 @@ effect PermAddedToRole {
     // The role that was updated.
     role_id id,
     // The permission that was added to the role.
-    perm string,
+    perm enum SimplePerm,
     // The device that added the permission to the role.
     author_id id,
 }
@@ -984,14 +917,12 @@ command AddPermToRole {
         // The role must not already have the permission.
         check !role_has_simple_perm(this.role_id, this.perm)
 
-        let perm_str = simple_perm_to_str(this.perm)
-
         finish {
             create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
 
             emit PermAddedToRole {
                 role_id: this.role_id,
-                perm: perm_str,
+                perm: this.perm,
                 author_id: author.device_id,
             }
         }
@@ -999,8 +930,7 @@ command AddPermToRole {
 }
 
 // Removes the permission from the role.
-action remove_perm_from_role(role_id id, perm_str string) {
-    let perm = check_unwrap try_parse_simple_perm(perm_str)
+action remove_perm_from_role(role_id id, perm enum SimplePerm) {
     publish RemovePermFromRole {
         role_id: role_id,
         perm: perm,
@@ -1012,7 +942,7 @@ effect PermRemovedFromRole {
     // The role from which the permission was removed.
     role_id id,
     // The permission that was removed from the role.
-    perm string,
+    perm enum SimplePerm,
     // The device that removed the permission from the role.
     author_id id,
 }
@@ -1048,8 +978,6 @@ command RemovePermFromRole {
         // the role.
         check role_has_simple_perm(this.role_id, this.perm)
 
-        let perm_str = simple_perm_to_str(this.perm)
-
         // At this point we believe the following to be true:
         //
         // - the team is active
@@ -1063,7 +991,7 @@ command RemovePermFromRole {
 
             emit PermRemovedFromRole {
                 role_id: this.role_id,
-                perm: perm_str,
+                perm: this.perm,
                 author_id: author.device_id,
             }
         }
@@ -1462,26 +1390,6 @@ enum RoleManagementPerm {
     CanChangeRolePerms,
 }
 
-// Converts `RoleManagementPerm` to a string.
-function role_management_perm_to_str(perm enum RoleManagementPerm) string {
-    match perm {
-        RoleManagementPerm::CanAssignRole => { return "CanAssignRole" }
-        RoleManagementPerm::CanRevokeRole => { return "CanRevokeRole" }
-        RoleManagementPerm::CanChangeRolePerms => { return "CanChangeRolePerms" }
-    }
-}
-
-// Returns the `RoleManagementPerm` enum value corresponding to `perm`
-// if `perm` is valid.
-function try_parse_role_management_perm(perm string) optional enum RoleManagementPerm {
-    match perm {
-        "CanAssignRole" => { return Some(RoleManagementPerm::CanAssignRole) }
-        "CanRevokeRole" => { return Some(RoleManagementPerm::CanRevokeRole) }
-        "CanChangeRolePerms" => { return Some(RoleManagementPerm::CanChangeRolePerms) }
-        _ => { return None }
-    }
-}
-
 // Assigns a role management permission to a role.
 //
 // `perm` must be one of
@@ -1495,13 +1403,12 @@ function try_parse_role_management_perm(perm string) optional enum RoleManagemen
 action assign_role_management_perm(
     target_role_id id,
     managing_role_id id,
-    perm string,
+    perm enum RoleManagementPerm,
 ) {
-    let perm_enum = check_unwrap try_parse_role_management_perm(perm)
     publish AssignRoleManagementPerm {
         target_role_id: target_role_id,
         managing_role_id: managing_role_id,
-        perm: perm_enum,
+        perm: perm,
     }
 }
 
@@ -1515,7 +1422,7 @@ effect RoleManagementPermAssigned {
     // permission.
     managing_role_id id,
     // The permission that was granted.
-    perm string,
+    perm enum RoleManagementPerm,
     // The ID of the device that changed the management
     // permissions.
     author_id id,
@@ -1554,8 +1461,6 @@ command AssignRoleManagementPerm {
         check exists Role[role_id: this.target_role_id]
         check exists Role[role_id: this.managing_role_id]
 
-        let perm = role_management_perm_to_str(this.perm)
-
         // At this point we believe the following to be true:
         //
         // - the team is active
@@ -1579,7 +1484,7 @@ command AssignRoleManagementPerm {
                     emit RoleManagementPermAssigned {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: perm,
+                        perm: this.perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1598,7 +1503,7 @@ command AssignRoleManagementPerm {
                     emit RoleManagementPermAssigned {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: perm,
+                        perm: this.perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1617,7 +1522,7 @@ command AssignRoleManagementPerm {
                     emit RoleManagementPermAssigned {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: perm,
+                        perm: this.perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1640,13 +1545,12 @@ command AssignRoleManagementPerm {
 action revoke_role_management_perm(
     target_role_id id,
     managing_role_id id,
-    perm string,
+    perm enum RoleManagementPerm,
 ) {
-    let perm_enum = check_unwrap try_parse_role_management_perm(perm)
     publish RevokeRoleManagementPerm {
         target_role_id: target_role_id,
         managing_role_id: managing_role_id,
-        perm: perm_enum,
+        perm: perm,
     }
 }
 
@@ -1660,7 +1564,7 @@ effect RoleManagementPermRevoked {
     // removed.
     managing_role_id id,
     // The permission that was revoked.
-    perm string,
+    perm enum RoleManagementPerm,
     // The ID of the device that changed the management
     // permissions.
     author_id id,
@@ -1692,8 +1596,6 @@ command RevokeRoleManagementPerm {
         check device_has_simple_perm(author.device_id, SimplePerm::ChangeRoleManagementPerms)
         check device_owns_role(author.device_id, this.target_role_id)
 
-        let perm = role_management_perm_to_str(this.perm)
-
         // At this point we believe the following to be true:
         //
         // - `author` is authorized to remove management
@@ -1715,7 +1617,7 @@ command RevokeRoleManagementPerm {
                     emit RoleManagementPermRevoked {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: perm,
+                        perm: this.perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1734,7 +1636,7 @@ command RevokeRoleManagementPerm {
                     emit RoleManagementPermRevoked {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: perm,
+                        perm: this.perm,
                         author_id: author.device_id,
                     }
                 }
@@ -1753,7 +1655,7 @@ command RevokeRoleManagementPerm {
                     emit RoleManagementPermRevoked {
                         target_role_id: this.target_role_id,
                         managing_role_id: this.managing_role_id,
-                        perm: perm,
+                        perm: this.perm,
                         author_id: author.device_id,
                     }
                 }
@@ -4407,19 +4309,19 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
 
 [//]: # (links)
 
-[actions]: https://aranya-project.github.io/policy-language-v1/#actions
+[actions]: https://aranya-project.github.io/policy-book/reference/top-level/actions.html
 [afc]: https://aranya-project.github.io/afc/
 [afc-ffi]: https://crates.io/crates/aranya-afc-util
 [all-the-way-down]: https://en.wikipedia.org/wiki/Turtles_all_the_way_down
-[commands]: https://aranya-project.github.io/policy-language-v1/#commands
+[commands]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html
 [crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi
 [device-ffi]: https://crates.io/crates/aranya-device-ffi
-[effects]: https://aranya-project.github.io/policy-language-v1/#effects
-[envelope]: https://aranya-project.github.io/policy-language-v1/#envelope-type
+[effects]: https://aranya-project.github.io/policy-book/reference/top-level/effects.html
+[envelope]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html#envelope-type
 [evp-ffi]: https://crates.io/crates/aranya-envelope-ffi
-[facts]: https://aranya-project.github.io/policy-language-v1/#facts
+[facts]: https://aranya-project.github.io/policy-book/reference/top-level/facts.html
 [idam-ffi]: https://crates.io/crates/aranya-idam-ffi
 [lp]: https://en.wikipedia.org/wiki/Literate_programming
 [perspective-ffi]: https://crates.io/crates/aranya-perspective-ffi
-[policy-lang]: https://aranya-project.github.io/policy-language-v2/
+[policy-lang]: https://aranya-project.github.io/policy-book/reference/introduction.html
 [rbac]: https://csrc.nist.gov/glossary/term/rbac

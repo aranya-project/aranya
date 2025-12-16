@@ -30,6 +30,34 @@ pub enum ChanOp {
     SendOnly,
     SendRecv,
 }
+/// RoleManagementPerm policy enum.
+#[value]
+pub enum RoleManagementPerm {
+    CanAssignRole,
+    CanRevokeRole,
+    CanChangeRolePerms,
+}
+/// SimplePerm policy enum.
+#[value]
+pub enum SimplePerm {
+    AddDevice,
+    RemoveDevice,
+    TerminateTeam,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
+    ChangeRoleManagementPerms,
+    SetupDefaultRole,
+    ChangeRoleManagingRole,
+    CreateLabel,
+    DeleteLabel,
+    ChangeLabelManagingRole,
+    AssignLabel,
+    RevokeLabel,
+    CanUseAfc,
+    CreateAfcUniChannel,
+}
 /// Enum of policy effects that can occur in response to a policy action.
 #[effects]
 pub enum Effect {
@@ -153,14 +181,14 @@ pub struct LabelRevokedFromDevice {
 #[effect]
 pub struct PermAddedToRole {
     pub role_id: BaseId,
-    pub perm: Text,
+    pub perm: SimplePerm,
     pub author_id: BaseId,
 }
 /// PermRemovedFromRole policy effect.
 #[effect]
 pub struct PermRemovedFromRole {
     pub role_id: BaseId,
-    pub perm: Text,
+    pub perm: SimplePerm,
     pub author_id: BaseId,
 }
 /// QueryAfcChannelIsValidResult policy effect.
@@ -262,7 +290,7 @@ pub struct RoleDeleted {
 pub struct RoleManagementPermAssigned {
     pub target_role_id: BaseId,
     pub managing_role_id: BaseId,
-    pub perm: Text,
+    pub perm: RoleManagementPerm,
     pub author_id: BaseId,
 }
 /// RoleManagementPermRevoked policy effect.
@@ -270,7 +298,7 @@ pub struct RoleManagementPermAssigned {
 pub struct RoleManagementPermRevoked {
     pub target_role_id: BaseId,
     pub managing_role_id: BaseId,
-    pub perm: Text,
+    pub perm: RoleManagementPerm,
     pub author_id: BaseId,
 }
 /// RoleOwnerAdded policy effect.
@@ -368,13 +396,13 @@ pub struct query_device_keybundle {
 #[action(interface = Persistent)]
 pub struct add_perm_to_role {
     pub role_id: BaseId,
-    pub perm_str: Text,
+    pub perm: SimplePerm,
 }
 /// remove_perm_from_role policy action.
 #[action(interface = Persistent)]
 pub struct remove_perm_from_role {
     pub role_id: BaseId,
-    pub perm_str: Text,
+    pub perm: SimplePerm,
 }
 /// add_role_owner policy action.
 #[action(interface = Persistent)]
@@ -393,14 +421,14 @@ pub struct remove_role_owner {
 pub struct assign_role_management_perm {
     pub target_role_id: BaseId,
     pub managing_role_id: BaseId,
-    pub perm: Text,
+    pub perm: RoleManagementPerm,
 }
 /// revoke_role_management_perm policy action.
 #[action(interface = Persistent)]
 pub struct revoke_role_management_perm {
     pub target_role_id: BaseId,
     pub managing_role_id: BaseId,
-    pub perm: Text,
+    pub perm: RoleManagementPerm,
 }
 /// create_role policy action.
 #[action(interface = Persistent)]
