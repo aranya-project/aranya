@@ -41,6 +41,24 @@ jobs:
       - name: Unit Tests
         run: cargo make test
 
+  c-tests:
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Unit Tests
+        run: cargo make test-capi
+
 
   c-example-application:
     permissions:
