@@ -50,7 +50,7 @@ use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{ChanOp, Effect, KeyBundle, RoleCreated},
+    policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
@@ -1287,14 +1287,14 @@ impl DaemonApi for Api {
         context: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        perm: Text,
+        perm: api::SimplePerm,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .add_perm_to_role(RoleId::transmute(role), perm)
+            .add_perm_to_role(RoleId::transmute(role), perm.into())
             .await
             .context("unable to add permission to role")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1309,14 +1309,14 @@ impl DaemonApi for Api {
         context: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        perm: Text,
+        perm: api::SimplePerm,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .remove_perm_from_role(RoleId::transmute(role), perm)
+            .remove_perm_from_role(RoleId::transmute(role), perm.into())
             .await
             .context("unable to add permission to role")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1408,7 +1408,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         role: api::RoleId,
         managing_role: api::RoleId,
-        perm: Text,
+        perm: api::RoleManagementPerm,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
@@ -1418,7 +1418,7 @@ impl DaemonApi for Api {
             .assign_role_management_perm(
                 RoleId::transmute(role),
                 RoleId::transmute(managing_role),
-                perm,
+                perm.into(),
             )
             .await
             .context("unable to assign role management permission")?;
@@ -1435,7 +1435,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         role: api::RoleId,
         managing_role: api::RoleId,
-        perm: Text,
+        perm: api::RoleManagementPerm,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
@@ -1445,7 +1445,7 @@ impl DaemonApi for Api {
             .revoke_role_management_perm(
                 RoleId::transmute(role),
                 RoleId::transmute(managing_role),
-                perm,
+                perm.into(),
             )
             .await
             .context("unable to revoke role management permission")?;
@@ -1520,6 +1520,74 @@ impl From<ChanOp> for api::ChanOp {
             ChanOp::SendRecv => api::ChanOp::SendRecv,
             ChanOp::RecvOnly => api::ChanOp::RecvOnly,
             ChanOp::SendOnly => api::ChanOp::SendOnly,
+        }
+    }
+}
+
+impl From<api::RoleManagementPerm> for RoleManagementPerm {
+    fn from(value: api::RoleManagementPerm) -> Self {
+        match value {
+            api::RoleManagementPerm::CanAssignRole => RoleManagementPerm::CanAssignRole,
+            api::RoleManagementPerm::CanRevokeRole => RoleManagementPerm::CanRevokeRole,
+            api::RoleManagementPerm::CanChangeRolePerms => RoleManagementPerm::CanChangeRolePerms,
+        }
+    }
+}
+
+impl From<RoleManagementPerm> for api::RoleManagementPerm {
+    fn from(value: RoleManagementPerm) -> Self {
+        match value {
+            RoleManagementPerm::CanAssignRole => api::RoleManagementPerm::CanAssignRole,
+            RoleManagementPerm::CanRevokeRole => api::RoleManagementPerm::CanRevokeRole,
+            RoleManagementPerm::CanChangeRolePerms => api::RoleManagementPerm::CanChangeRolePerms,
+        }
+    }
+}
+
+impl From<api::SimplePerm> for SimplePerm {
+    fn from(value: api::SimplePerm) -> Self {
+        match value {
+            api::SimplePerm::AddDevice => SimplePerm::AddDevice,
+            api::SimplePerm::RemoveDevice => SimplePerm::RemoveDevice,
+            api::SimplePerm::TerminateTeam => SimplePerm::TerminateTeam,
+            api::SimplePerm::CreateRole => SimplePerm::CreateRole,
+            api::SimplePerm::DeleteRole => SimplePerm::DeleteRole,
+            api::SimplePerm::AssignRole => SimplePerm::AssignRole,
+            api::SimplePerm::RevokeRole => SimplePerm::RevokeRole,
+            api::SimplePerm::ChangeRoleManagementPerms => SimplePerm::ChangeRoleManagementPerms,
+            api::SimplePerm::SetupDefaultRole => SimplePerm::SetupDefaultRole,
+            api::SimplePerm::ChangeRoleManagingRole => SimplePerm::ChangeRoleManagingRole,
+            api::SimplePerm::CreateLabel => SimplePerm::CreateLabel,
+            api::SimplePerm::DeleteLabel => SimplePerm::DeleteLabel,
+            api::SimplePerm::ChangeLabelManagingRole => SimplePerm::ChangeLabelManagingRole,
+            api::SimplePerm::AssignLabel => SimplePerm::AssignLabel,
+            api::SimplePerm::RevokeLabel => SimplePerm::RevokeLabel,
+            api::SimplePerm::CanUseAfc => SimplePerm::CanUseAfc,
+            api::SimplePerm::CreateAfcUniChannel => SimplePerm::CreateAfcUniChannel,
+        }
+    }
+}
+
+impl From<SimplePerm> for api::SimplePerm {
+    fn from(value: SimplePerm) -> Self {
+        match value {
+            SimplePerm::AddDevice => api::SimplePerm::AddDevice,
+            SimplePerm::RemoveDevice => api::SimplePerm::RemoveDevice,
+            SimplePerm::TerminateTeam => api::SimplePerm::TerminateTeam,
+            SimplePerm::CreateRole => api::SimplePerm::CreateRole,
+            SimplePerm::DeleteRole => api::SimplePerm::DeleteRole,
+            SimplePerm::AssignRole => api::SimplePerm::AssignRole,
+            SimplePerm::RevokeRole => api::SimplePerm::RevokeRole,
+            SimplePerm::ChangeRoleManagementPerms => api::SimplePerm::ChangeRoleManagementPerms,
+            SimplePerm::SetupDefaultRole => api::SimplePerm::SetupDefaultRole,
+            SimplePerm::ChangeRoleManagingRole => api::SimplePerm::ChangeRoleManagingRole,
+            SimplePerm::CreateLabel => api::SimplePerm::CreateLabel,
+            SimplePerm::DeleteLabel => api::SimplePerm::DeleteLabel,
+            SimplePerm::ChangeLabelManagingRole => api::SimplePerm::ChangeLabelManagingRole,
+            SimplePerm::AssignLabel => api::SimplePerm::AssignLabel,
+            SimplePerm::RevokeLabel => api::SimplePerm::RevokeLabel,
+            SimplePerm::CanUseAfc => api::SimplePerm::CanUseAfc,
+            SimplePerm::CreateAfcUniChannel => api::SimplePerm::CreateAfcUniChannel,
         }
     }
 }

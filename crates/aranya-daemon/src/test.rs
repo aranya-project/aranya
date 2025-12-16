@@ -47,7 +47,7 @@ use crate::{
     actions::Actions,
     api::EffectReceiver,
     aranya::{self, ClientWithState, PeerCacheMap},
-    policy::{Effect, KeyBundle as DeviceKeyBundle},
+    policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
     sync::{
         self,
         task::{quic::PskStore, PeerCacheKey, SyncPeer},
@@ -512,83 +512,68 @@ async fn test_default_roles_seed_expected_permissions() -> Result<()> {
     for (role, perm, message) in [
         (
             admin_role,
-            text!("AddDevice"),
+            SimplePerm::AddDevice,
             "admin should already grant AddDevice",
         ),
         (
             admin_role,
-            text!("RemoveDevice"),
+            SimplePerm::RemoveDevice,
             "admin should already grant RemoveDevice",
         ),
         (
             admin_role,
-            text!("CreateLabel"),
+            SimplePerm::CreateLabel,
             "admin should already grant CreateLabel",
         ),
         (
             admin_role,
-            text!("DeleteLabel"),
+            SimplePerm::DeleteLabel,
             "admin should already grant DeleteLabel",
         ),
         (
             admin_role,
-            text!("ChangeLabelManagingRole"),
+            SimplePerm::ChangeLabelManagingRole,
             "admin should already grant ChangeLabelManagingRole",
         ),
         (
             admin_role,
-            text!("AssignRole"),
+            SimplePerm::AssignRole,
             "admin should already grant AssignRole",
         ),
         (
             admin_role,
-            text!("RevokeRole"),
+            SimplePerm::RevokeRole,
             "admin should already grant RevokeRole",
         ),
         (
             operator_role,
-            text!("AssignLabel"),
+            SimplePerm::AssignLabel,
             "operator should already grant AssignLabel",
         ),
         (
             operator_role,
-            text!("RevokeLabel"),
+            SimplePerm::RevokeLabel,
             "operator should already grant RevokeLabel",
         ),
         (
             operator_role,
-            text!("SetAqcNetworkName"),
-            "operator should already grant SetAqcNetworkName",
-        ),
-        (
-            operator_role,
-            text!("UnsetAqcNetworkName"),
-            "operator should already grant UnsetAqcNetworkName",
-        ),
-        (
-            operator_role,
-            text!("AssignRole"),
+            SimplePerm::AssignRole,
             "operator should already grant AssignRole",
         ),
         (
             operator_role,
-            text!("RevokeRole"),
+            SimplePerm::RevokeRole,
             "operator should already grant RevokeRole",
         ),
         (
             member_role,
-            text!("CanUseAqc"),
-            "member should already grant CanUseAqc",
+            SimplePerm::CanUseAfc,
+            "member should already grant CanUseAfc",
         ),
         (
             member_role,
-            text!("CreateAqcUniChannel"),
-            "member should already grant CreateAqcUniChannel",
-        ),
-        (
-            member_role,
-            text!("CreateAqcBidiChannel"),
-            "member should already grant CreateAqcBidiChannel",
+            SimplePerm::CreateAfcUniChannel,
+            "member should already grant CreateAfcUniChannel",
         ),
     ] {
         let err = owner
@@ -681,7 +666,7 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
 
     owner
         .actions()
-        .assign_role_management_perm(operator_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(operator_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("delegating operator CanAssignRole should succeed")?;
 
@@ -745,7 +730,7 @@ async fn test_assign_role_rejects_unknown_device() -> Result<()> {
 
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("delegating CanAssignRole should succeed")?;
 
@@ -813,13 +798,13 @@ async fn test_assign_role_management_perm_is_unique() -> Result<()> {
 
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("first delegation should succeed")?;
 
     let err = owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .expect_err("expected duplicate delegation to fail");
     expect_not_authorized(err);
@@ -864,19 +849,19 @@ async fn test_revoke_role_management_perm_requires_existing_fact() -> Result<()>
 
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanRevokeRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
         .await
         .context("granting management perm should succeed")?;
 
     owner
         .actions()
-        .revoke_role_management_perm(member_role, admin_role, text!("CanRevokeRole"))
+        .revoke_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
         .await
         .context("first revocation should succeed")?;
 
     let err = owner
         .actions()
-        .revoke_role_management_perm(member_role, admin_role, text!("CanRevokeRole"))
+        .revoke_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
         .await
         .expect_err("expected second revocation to fail");
     expect_not_authorized(err);
@@ -905,7 +890,7 @@ async fn test_assign_role_management_perm_requires_ownership() -> Result<()> {
 
     let err = admin
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .expect_err("expected assigning management perm without ownership to fail");
     expect_not_authorized(err);
@@ -1173,45 +1158,9 @@ async fn test_add_perm_to_role_requires_management_delegation() -> Result<()> {
 
     let err = admin
         .actions()
-        .add_perm_to_role(member_role, text!("CanUseAqc"))
+        .add_perm_to_role(member_role, SimplePerm::CanUseAfc)
         .await
         .expect_err("expected add_perm_to_role without delegation to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-/// Rejects add_perm_to_role when the permission string is invalid.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_add_perm_to_role_rejects_invalid_permission() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-    let admin = team.admin;
-
-    let roles = load_default_roles(owner).await?;
-    let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanChangeRolePerms"))
-        .await
-        .context("delegating CanChangeRolePerms should succeed")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync delegation")?;
-
-    let err = admin
-        .actions()
-        .add_perm_to_role(member_role, text!("DefinitelyNotAPerm"))
-        .await
-        .expect_err("expected invalid permission to be rejected");
     expect_not_authorized(err);
 
     Ok(())
@@ -1234,7 +1183,11 @@ async fn test_remove_perm_from_role_requires_existing_permission() -> Result<()>
 
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanChangeRolePerms"))
+        .assign_role_management_perm(
+            member_role,
+            admin_role,
+            RoleManagementPerm::CanChangeRolePerms,
+        )
         .await
         .context("delegating CanChangeRolePerms should succeed")?;
 
@@ -1245,7 +1198,7 @@ async fn test_remove_perm_from_role_requires_existing_permission() -> Result<()>
 
     let err = admin
         .actions()
-        .remove_perm_from_role(member_role, text!("AssignLabel"))
+        .remove_perm_from_role(member_role, SimplePerm::AssignLabel)
         .await
         .expect_err("expected remove_perm_from_role on missing perm to fail");
     expect_not_authorized(err);
@@ -1318,17 +1271,17 @@ async fn test_change_role_requires_remaining_owner() -> Result<()> {
     // Allow the admin role to manage both the owner and admin roles.
     owner
         .actions()
-        .assign_role_management_perm(owner_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(owner_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("delegating owner CanAssignRole should succeed")?;
     owner
         .actions()
-        .assign_role_management_perm(owner_role, admin_role, text!("CanRevokeRole"))
+        .assign_role_management_perm(owner_role, admin_role, RoleManagementPerm::CanRevokeRole)
         .await
         .context("delegating owner CanRevokeRole should succeed")?;
     owner
         .actions()
-        .assign_role_management_perm(admin_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(admin_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("delegating admin CanAssignRole should succeed")?;
 
@@ -1365,12 +1318,12 @@ async fn test_change_role_rejects_same_role_transition() -> Result<()> {
 
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("delegating CanAssignRole should succeed")?;
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanRevokeRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
         .await
         .context("delegating CanRevokeRole should succeed")?;
 
@@ -1419,12 +1372,12 @@ async fn test_change_role_rejects_mismatched_current_role() -> Result<()> {
 
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, text!("CanAssignRole"))
+        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
         .await
         .context("delegating CanAssignRole should succeed")?;
     owner
         .actions()
-        .assign_role_management_perm(operator_role, admin_role, text!("CanRevokeRole"))
+        .assign_role_management_perm(operator_role, admin_role, RoleManagementPerm::CanRevokeRole)
         .await
         .context("delegating operator CanRevokeRole should succeed")?;
 
