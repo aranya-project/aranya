@@ -239,7 +239,6 @@ A device can operate on other objects within the system as long as it has the pr
 
 ```policy
 // Records the existence of a device.
-// Fact type: Single-key (one per device)
 fact Device[device_id id]=>{}
 
 // Reports whether the invariants for the device are being upheld.
