@@ -28,9 +28,7 @@
 //!
 //! See the [`hello`] module for implementation details.
 
-#[cfg(feature = "preview")]
-use std::time::Duration;
-use std::{collections::HashMap, future::Future};
+use std::{collections::HashMap, future::Future, time::Duration};
 
 use anyhow::Context;
 use aranya_crypto::{dangerous::spideroak_crypto::csprng::rand::RngCore, Rng};
