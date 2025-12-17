@@ -122,6 +122,16 @@ command = "cargo"
 args = ["--verbose", "test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
 
+[tasks.ctest]
+category = "test"
+description = "Run C Tests"
+script = '''
+cmake -B build -S .
+cd build
+cmake --build .
+ctest
+'''
+
 
 # Security
 [tasks.security]

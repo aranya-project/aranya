@@ -2,8 +2,16 @@ cmake_minimum_required(VERSION 3.24...3.31)
 
 project(aranya-client LANGUAGES C)
 
+# Tests are built by default when the project is used directly. If the project
+# is used as a dependency (like with `FetchContent`), you must manually enable
+# the tests if desired.
+option(ARANYA_BUILD_TESTS "Controls whether to build Aranya's test suite." ${PROJECT_IS_TOP_LEVEL})
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(ARANYA_BUILD_TESTS)
+    include(CTest)
+endif()
 include(FetchContent)
 
 FetchContent_Declare(
