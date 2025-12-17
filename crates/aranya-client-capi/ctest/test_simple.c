@@ -9,8 +9,8 @@
 #endif
 
 /* include the generated C API header (CMake should add the include dir) */
-#include "aranya-client.h"
-#include "utils.h"
+#include "include/aranya-client.h"
+#include "include/utils.h"
 
 /* Minimal test harness that runs a few small checks and reports results to stdout.
    CTest will see the executable as a single test; the harness runs multiple
