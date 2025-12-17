@@ -316,7 +316,7 @@ impl<ST> Syncer<ST> {
     fn jitter(interval: Duration) -> Duration {
         // Get a random u32.
         let rand = Rng.next_u32();
-        // Convert to a random number in [interval/2, interval*3/2].
+        // Convert to a random duration in [interval/2, interval*3/2].
         interval.mul_f64(f64::from(rand) / f64::from(u32::MAX)) + interval / 2
     }
 
