@@ -102,7 +102,8 @@ set_property(TEST cleanup_tmp_onboarding PROPERTY FIXTURES_SETUP global_test_fix
 function(add_capi_test TEST_NAME SOURCE_FILE)
     cmake_parse_arguments(ARG "REQUIRES_DAEMON;USE_WRAPPER" "" "" ${ARGN})
     
-    add_executable(${TEST_NAME} ${SOURCE_FILE})
+    add_executable(${TEST_NAME} ${SOURCE_FILE} ${CTEST_INCLUDE_DIR}/aranya-client.h)
+    set_source_files_properties(${CTEST_INCLUDE_DIR}/aranya-client.h PROPERTIES GENERATED TRUE)
     target_include_directories(${TEST_NAME} PRIVATE ${CTEST_INCLUDE_DIR})
     target_compile_definitions(${TEST_NAME} PRIVATE ENABLE_ARANYA_PREVIEW=1 ENABLE_ARANYA_EXPERIMENTAL=1)
     
