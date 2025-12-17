@@ -15,10 +15,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server,
 };
 
-use crate::{
-    daemon::{CE, CS, KS},
-    keystore::LocalStore,
-};
+use crate::{keystore::LocalStore, CE, CS, KS};
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 

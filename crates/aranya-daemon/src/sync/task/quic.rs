@@ -6,18 +6,17 @@
 //! If a QUIC connection does not exist with a certain peer, a new QUIC connection will be created.
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
-use core::net::SocketAddr;
 #[cfg(feature = "preview")]
 use std::time::Duration;
-use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, future::Future, net::SocketAddr, sync::Arc};
 
-use anyhow::Context;
+use anyhow::Context as _;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use aranya_runtime::{
-    Command, Engine, GraphId, Sink, StorageError, SyncRequestMessage, SyncRequester, SyncResponder,
+    Command as _, Engine, Sink, StorageError, SyncRequestMessage, SyncRequester, SyncResponder,
     SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -26,36 +25,39 @@ use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
     s2n_quic::get_conn_identity,
     task::scope,
-    Addr,
 };
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
-use futures_util::TryFutureExt;
-#[allow(deprecated)]
-use s2n_quic::provider::tls::rustls::rustls::{
-    server::PresharedKeySelection, ClientConfig, ServerConfig,
-};
+use futures_util::{AsyncReadExt as _, TryFutureExt as _};
 use s2n_quic::{
-    application::Error as AppError,
+    application,
     client::Connect,
-    connection::{Error as ConnErr, StreamAcceptor},
-    provider::{congestion_controller::Bbr, tls::rustls as rustls_provider, StartError},
-    stream::{BidirectionalStream, ReceiveStream, SendStream},
-    Client as QuicClient, Server as QuicServer,
+    connection::{self, StreamAcceptor},
+    provider::{
+        congestion_controller::Bbr,
+        tls::rustls::{
+            self as rustls_provider,
+            rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
+        },
+        StartError,
+    },
+    stream::{self, BidirectionalStream, ReceiveStream, SendStream},
 };
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::sync::mpsc;
 #[cfg(feature = "preview")]
 use tokio::sync::Mutex;
-use tokio::{io::AsyncReadExt, sync::mpsc};
 use tokio_util::time::DelayQueue;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
-use super::{Request, SyncHandle, SyncResponse, SyncState};
+#[cfg(feature = "preview")]
+use crate::sync::task::hello::HelloSubscriptions;
 use crate::{
     aranya::PeerCacheMap,
     sync::{
-        task::{Client, SyncPeer, Syncer},
-        Result as SyncResult, SyncError,
+        error::SyncError,
+        task::{Client, Request, SyncHandle, SyncPeer, SyncResponse, SyncState, Syncer},
+        Addr, GraphId, Result,
     },
     InvalidGraphs,
 };
@@ -64,11 +66,7 @@ mod connections;
 mod psk;
 
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
-pub(crate) use psk::PskSeed;
-pub use psk::PskStore;
-
-#[cfg(feature = "preview")]
-pub(crate) use super::hello::HelloSubscriptions;
+pub(crate) use psk::{PskSeed, PskStore};
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -78,10 +76,10 @@ const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 pub enum Error {
     /// QUIC Connection error
     #[error(transparent)]
-    QuicConnectionError(#[from] s2n_quic::connection::Error),
+    QuicConnectionError(#[from] connection::Error),
     /// QUIC Stream error
     #[error(transparent)]
-    QuicStreamError(#[from] s2n_quic::stream::Error),
+    QuicStreamError(#[from] stream::Error),
     /// Invalid PSK used for syncing
     #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
@@ -110,7 +108,7 @@ pub(crate) struct SyncParams {
 #[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
-    client: QuicClient,
+    client: s2n_quic::Client,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
     conns: SharedConnectionMap,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
@@ -123,11 +121,7 @@ impl SyncState for State {
     ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    async fn sync_impl<S>(
-        syncer: &mut Syncer<Self>,
-        peer: SyncPeer,
-        sink: &mut S,
-    ) -> SyncResult<usize>
+    async fn sync_impl<S>(syncer: &mut Syncer<Self>, peer: SyncPeer, sink: &mut S) -> Result<usize>
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
@@ -170,7 +164,7 @@ impl SyncState for State {
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         syncer
             .state
             .store()
@@ -189,10 +183,7 @@ impl SyncState for State {
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
-    async fn sync_hello_unsubscribe_impl(
-        syncer: &mut Syncer<Self>,
-        peer: SyncPeer,
-    ) -> SyncResult<()> {
+    async fn sync_hello_unsubscribe_impl(syncer: &mut Syncer<Self>, peer: SyncPeer) -> Result<()> {
         syncer
             .state
             .store()
@@ -209,7 +200,7 @@ impl SyncState for State {
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
         head: Address,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         syncer.broadcast_hello_notifications(graph_id, head).await
     }
 }
@@ -225,7 +216,7 @@ impl State {
         psk_store: Arc<PskStore>,
         conns: SharedConnectionMap,
         client_addr: Addr,
-    ) -> SyncResult<Self> {
+    ) -> Result<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -238,7 +229,7 @@ impl State {
         #[allow(deprecated)]
         let provider = rustls_provider::Client::new(client_config);
 
-        let client = QuicClient::builder()
+        let client = s2n_quic::Client::builder()
             .with_tls(provider)?
             .with_io((client_addr.host(), client_addr.port()))
             .assume("can set quic client address")?
@@ -263,7 +254,7 @@ impl Syncer<State> {
         (server_addr, client_addr): (Addr, Addr),
         recv: mpsc::Receiver<Request>,
         conns: SharedConnectionMap,
-    ) -> SyncResult<Self> {
+    ) -> Result<Self> {
         let state = State::new(psk_store, conns.clone(), client_addr)?;
 
         Ok(Self {
@@ -294,7 +285,7 @@ impl Syncer<State> {
     /// * `Ok(BidirectionalStream)` if the connection and stream were established successfully
     /// * `Err(SyncError)` if there was an error connecting or opening the stream
     #[instrument(skip_all)]
-    pub(crate) async fn connect(&mut self, peer: SyncPeer) -> SyncResult<BidirectionalStream> {
+    pub(crate) async fn connect(&mut self, peer: SyncPeer) -> Result<BidirectionalStream> {
         trace!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
@@ -328,9 +319,9 @@ impl Syncer<State> {
         let stream = match open_stream_res {
             Ok(stream) => stream,
             // Retry for these errors?
-            Err(e @ ConnErr::StatelessReset { .. })
-            | Err(e @ ConnErr::StreamIdExhausted { .. })
-            | Err(e @ ConnErr::MaxHandshakeDurationExceeded { .. }) => {
+            Err(e @ connection::Error::StatelessReset { .. })
+            | Err(e @ connection::Error::StreamIdExhausted { .. })
+            | Err(e @ connection::Error::MaxHandshakeDurationExceeded { .. }) => {
                 return Err(SyncError::QuicSync(e.into()));
             }
             // Other errors means the stream has closed
@@ -364,7 +355,7 @@ impl Syncer<State> {
         send: &mut SendStream,
         syncer: &mut SyncRequester<A>,
         peer: SyncPeer,
-    ) -> SyncResult<()>
+    ) -> Result<()>
     where
         A: Serialize + DeserializeOwned + Clone,
     {
@@ -402,7 +393,7 @@ impl Syncer<State> {
         syncer: &mut SyncRequester<A>,
         sink: &mut S,
         peer: SyncPeer,
-    ) -> SyncResult<usize>
+    ) -> Result<usize>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
@@ -461,7 +452,7 @@ pub struct Server {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     client: Client,
     /// QUIC server to handle sync requests and send sync responses.
-    server: QuicServer,
+    server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
     /// Connection map shared with [`super::Syncer`]
     conns: SharedConnectionMap,
@@ -493,7 +484,7 @@ impl Server {
         client: Client,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-    ) -> SyncResult<(
+    ) -> Result<(
         Self,
         SyncHandle,
         SharedConnectionMap,
@@ -523,7 +514,7 @@ impl Server {
             .next()
             .assume("invalid server address")?;
         // Use the rustls server provider
-        let server = QuicServer::builder()
+        let server = s2n_quic::Server::builder()
             .with_tls(tls_server_provider)?
             .with_io(addr)
             .assume("can set sync server addr")?
@@ -599,7 +590,7 @@ impl Server {
         }
         .unwrap_or_else(move |err| {
             error!(error = ?err, "server unable to accept connection");
-            handle.close(AppError::UNKNOWN);
+            handle.close(application::Error::UNKNOWN);
         })
     }
 
@@ -647,7 +638,7 @@ impl Server {
         active_team: TeamId,
         handle: SyncHandle,
         local_addr: Addr,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         trace!("server received a sync request");
 
         let mut recv_buf = Vec::new();
@@ -690,8 +681,8 @@ impl Server {
         local_addr: Addr,
         request_data: &[u8],
         active_team: TeamId,
-        handle: SyncHandle,
-    ) -> SyncResult<Box<[u8]>> {
+        _handle: SyncHandle,
+    ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
         let sync_type: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| {
@@ -730,7 +721,7 @@ impl Server {
             SyncType::Hello(_hello_msg) => {
                 #[cfg(feature = "preview")]
                 {
-                    Self::process_hello_message(_hello_msg, client, &active_team, handle).await;
+                    Self::process_hello_message(_hello_msg, client, &active_team, _handle).await;
                     // Hello messages are fire-and-forget, return empty response
                     // Note: returning empty response which will be ignored by client
                     return Ok(Box::new([]));
@@ -751,7 +742,7 @@ impl Server {
         local_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,
-    ) -> SyncResult<Box<[u8]>> {
+    ) -> Result<Box<[u8]>> {
         let mut resp = SyncResponder::new(local_addr);
         let storage_id = check_request(*active_team, &request_msg)?;
         let peer = SyncPeer::new(peer_server_addr, storage_id);
@@ -784,7 +775,7 @@ impl Server {
     }
 }
 
-fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> SyncResult<GraphId> {
+fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
     let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };

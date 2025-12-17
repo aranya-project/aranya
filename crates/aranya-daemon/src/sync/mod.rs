@@ -6,6 +6,9 @@ use error::SyncError;
 /// Possible sync related errors
 pub type Result<T> = core::result::Result<T, SyncError>;
 
+pub(crate) use aranya_runtime::GraphId;
+pub(crate) use aranya_util::Addr;
+
 mod error {
     use std::convert::Infallible;
 

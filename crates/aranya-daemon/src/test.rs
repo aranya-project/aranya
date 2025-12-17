@@ -42,7 +42,7 @@ use tokio::{
 };
 
 #[cfg(feature = "preview")]
-use crate::sync::task::quic::HelloSubscriptions;
+use crate::sync::task::hello::HelloSubscriptions;
 use crate::{
     actions::Actions,
     api::EffectReceiver,

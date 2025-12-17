@@ -8,11 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::Context;
+use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
-use aranya_util::Addr;
-use tokio::io::AsyncReadExt;
+use aranya_runtime::{Address, Storage as _, StorageProvider as _, SyncHelloType, SyncType};
+use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
@@ -21,7 +20,7 @@ use crate::sync::{
         quic::{Error, Server, State},
         Client, SyncHandle, SyncPeer, Syncer,
     },
-    Result as SyncResult,
+    Addr, GraphId, Result,
 };
 
 /// Storage for sync hello subscriptions
@@ -48,7 +47,7 @@ impl Syncer<State> {
         &mut self,
         graph_id: GraphId,
         head: Address,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         let now = Instant::now();
 
         // Get all valid (non-expired) subscribers for this graph
@@ -136,7 +135,7 @@ impl Syncer<State> {
         &mut self,
         peer: SyncPeer,
         sync_type: SyncType<Addr>,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -193,7 +192,7 @@ impl Syncer<State> {
         duration: Duration,
         schedule_delay: Duration,
         subscriber_server_addr: Addr,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         // Create the subscribe message
         let hello_msg = SyncHelloType::Subscribe {
             graph_change_delay,
@@ -224,7 +223,7 @@ impl Syncer<State> {
         &mut self,
         peer: SyncPeer,
         subscriber_server_addr: Addr,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
@@ -254,7 +253,7 @@ impl Syncer<State> {
         &mut self,
         peer: SyncPeer,
         head: Address,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         // Set the team for this graph
         let team_id = TeamId::transmute(peer.graph_id);
         self.state.store().set_team(team_id);

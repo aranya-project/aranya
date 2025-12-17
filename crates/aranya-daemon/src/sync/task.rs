@@ -32,28 +32,30 @@
 use std::time::Duration;
 use std::{collections::HashMap, future::Future};
 
-use anyhow::Context;
+use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{Engine, GraphId, Sink};
-use aranya_util::{error::ReportExt as _, ready, Addr};
-use buggy::BugExt;
-use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
+use aranya_runtime::{Engine, Sink};
+use aranya_util::{error::ReportExt as _, ready};
+use buggy::BugExt as _;
+use futures_util::StreamExt as _;
 #[cfg(feature = "preview")]
 use tokio::task::JoinSet;
 use tokio::{
     sync::{mpsc, oneshot},
     time::Instant,
 };
-use tokio_util::time::{delay_queue::Key, DelayQueue};
+use tokio_util::time::{delay_queue, DelayQueue};
 #[cfg(feature = "preview")]
 use tracing::trace;
 use tracing::{error, info, instrument, warn};
 
-use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
+use crate::{
+    sync::{Addr, GraphId, Result},
+    vm_policy::VecSink,
+    InvalidGraphs,
+};
 
 #[cfg(feature = "preview")]
 pub mod hello;
@@ -95,7 +97,7 @@ pub(crate) enum Msg {
     },
 }
 pub(crate) type Request = (Msg, oneshot::Sender<Reply>);
-pub(crate) type Reply = SyncResult<()>;
+pub(crate) type Reply = Result<()>;
 
 /// A sync peer.
 ///
@@ -123,7 +125,7 @@ pub(crate) struct SyncHandle {
 }
 
 /// A response to a sync request.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) enum SyncResponse {
     /// Success.
     Ok(Box<[u8]>),
@@ -199,7 +201,7 @@ impl SyncHandle {
     }
 }
 
-type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
+type EffectSender = mpsc::Sender<(GraphId, Vec<crate::EF>)>;
 pub(super) type Client = crate::aranya::ClientWithState<crate::EN, crate::SP>;
 
 /// Syncs with each peer after the specified interval.
@@ -211,7 +213,7 @@ pub(crate) struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(crate) client: Client,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
-    peers: HashMap<SyncPeer, (SyncPeerConfig, Option<Key>)>,
+    peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
     /// Receives added/removed peers.
     recv: mpsc::Receiver<Request>,
     /// Delay queue for getting the next peer to sync with.
@@ -239,7 +241,7 @@ pub(crate) trait SyncState: Sized {
         syncer: &mut Syncer<Self>,
         peer: SyncPeer,
         sink: &mut S,
-    ) -> impl Future<Output = SyncResult<usize>> + Send
+    ) -> impl Future<Output = Result<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 
@@ -251,14 +253,14 @@ pub(crate) trait SyncState: Sized {
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-    ) -> impl Future<Output = SyncResult<()>> + Send;
+    ) -> impl Future<Output = Result<()>> + Send;
 
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     fn sync_hello_unsubscribe_impl(
         syncer: &mut Syncer<Self>,
         peer: SyncPeer,
-    ) -> impl Future<Output = SyncResult<()>> + Send;
+    ) -> impl Future<Output = Result<()>> + Send;
 
     /// Broadcast hello notifications to all subscribers of a graph.
     #[cfg(feature = "preview")]
@@ -266,7 +268,7 @@ pub(crate) trait SyncState: Sized {
         syncer: &mut Syncer<Self>,
         graph_id: GraphId,
         head: Address,
-    ) -> impl Future<Output = SyncResult<()>> + Send;
+    ) -> impl Future<Output = Result<()>> + Send;
 }
 
 impl<ST> Syncer<ST> {
@@ -302,7 +304,7 @@ impl<ST: SyncState> Syncer<ST> {
     }
 
     /// Syncs with the next peer in the list.
-    async fn next(&mut self) -> SyncResult<()> {
+    async fn next(&mut self) -> Result<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -389,7 +391,7 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    pub(crate) async fn sync(&mut self, peer: SyncPeer) -> SyncResult<usize> {
+    pub(crate) async fn sync(&mut self, peer: SyncPeer) -> Result<usize> {
         let mut sink = VecSink::new();
 
         let cmd_count = ST::sync_impl(self, peer, &mut sink)
@@ -449,7 +451,7 @@ impl<ST: SyncState> Syncer<ST> {
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-    ) -> SyncResult<()> {
+    ) -> Result<()> {
         trace!("subscribing to hello notifications from peer");
         ST::sync_hello_subscribe_impl(self, peer, graph_change_delay, duration, schedule_delay)
             .await
@@ -458,7 +460,7 @@ impl<ST: SyncState> Syncer<ST> {
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    async fn sync_hello_unsubscribe(&mut self, peer: SyncPeer) -> SyncResult<()> {
+    async fn sync_hello_unsubscribe(&mut self, peer: SyncPeer) -> Result<()> {
         trace!("unsubscribing from hello notifications from peer");
         ST::sync_hello_unsubscribe_impl(self, peer).await
     }
