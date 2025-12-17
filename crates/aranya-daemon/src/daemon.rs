@@ -29,7 +29,7 @@ use crate::{
     policy,
     sync::task::{
         quic::{PskStore, State as QuicSyncClientState, SyncParams},
-        SyncPeers, Syncer,
+        SyncHandle, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -165,7 +165,7 @@ impl Daemon {
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, syncer, peers, recv_effects, local_addr) =
+            let (client, sync_server, syncer, handle, recv_effects, local_addr) =
                 Self::setup_aranya(
                     &cfg,
                     eng.clone(),
@@ -215,7 +215,7 @@ impl Daemon {
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
-                peers,
+                handle,
                 recv_effects,
                 invalid: invalid_graphs,
                 #[cfg(feature = "afc")]
@@ -318,7 +318,7 @@ impl Daemon {
         Client,
         SyncServer,
         Syncer<QuicSyncClientState>,
-        SyncPeers,
+        SyncHandle,
         EffectReceiver,
         SocketAddr,
     )> {

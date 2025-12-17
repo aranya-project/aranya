@@ -50,7 +50,7 @@ use tokio::{io::AsyncReadExt, sync::mpsc};
 use tokio_util::time::DelayQueue;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
-use super::{Request, SyncPeers, SyncResponse, SyncState};
+use super::{Request, SyncHandle, SyncResponse, SyncState};
 use crate::{
     aranya::PeerCacheMap,
     sync::{
@@ -468,7 +468,7 @@ pub struct Server {
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Interface to trigger sync operations
-    _sync_peers: SyncPeers,
+    handle: SyncHandle,
     /// The address we're currently serving on.
     local_addr: Addr,
 }
@@ -495,7 +495,7 @@ impl Server {
         server_keys: Arc<PskStore>,
     ) -> SyncResult<(
         Self,
-        SyncPeers,
+        SyncHandle,
         SharedConnectionMap,
         mpsc::Receiver<Request>,
         SocketAddr,
@@ -503,9 +503,9 @@ impl Server {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
 
-        // Create channel for SyncPeers communication with Syncer
+        // Create channel for SyncHandle communication with Syncer
         let (send, syncer_recv) = mpsc::channel::<Request>(128);
-        let sync_peers = SyncPeers::new(send);
+        let sync_peers = SyncHandle::new(send);
 
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -541,7 +541,7 @@ impl Server {
             server_keys,
             conns: conns.clone(),
             conn_rx: server_conn_rx,
-            _sync_peers: sync_peers.clone(),
+            handle: sync_peers.clone(),
             local_addr: local_addr.into(),
         };
 
@@ -611,7 +611,7 @@ impl Server {
         let active_team = TeamId::transmute(peer.graph_id);
         let conn_source = peer.addr;
         let client = self.client.clone();
-        let sync_peers = self._sync_peers.clone();
+        let sync_peers = self.handle.clone();
         let local_addr = self.local_addr;
         async move {
             // Accept incoming streams.
@@ -645,7 +645,7 @@ impl Server {
         client: Client,
         stream: BidirectionalStream,
         active_team: TeamId,
-        sync_peers: SyncPeers,
+        handle: SyncHandle,
         local_addr: Addr,
     ) -> SyncResult<()> {
         trace!("server received a sync request");
@@ -659,7 +659,7 @@ impl Server {
 
         // Generate a sync response for a sync request.
         let sync_response_res =
-            Self::sync_respond(client, local_addr, &recv_buf, active_team, sync_peers).await;
+            Self::sync_respond(client, local_addr, &recv_buf, active_team, handle).await;
         let resp: SyncResponse = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
@@ -690,7 +690,7 @@ impl Server {
         local_addr: Addr,
         request_data: &[u8],
         active_team: TeamId,
-        _sync_peers: SyncPeers,
+        handle: SyncHandle,
     ) -> SyncResult<Box<[u8]>> {
         trace!("server responding to sync request");
 
@@ -730,8 +730,7 @@ impl Server {
             SyncType::Hello(_hello_msg) => {
                 #[cfg(feature = "preview")]
                 {
-                    Self::process_hello_message(_hello_msg, client, &active_team, _sync_peers)
-                        .await;
+                    Self::process_hello_message(_hello_msg, client, &active_team, handle).await;
                     // Hello messages are fire-and-forget, return empty response
                     // Note: returning empty response which will be ignored by client
                     return Ok(Box::new([]));

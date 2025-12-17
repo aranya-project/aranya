@@ -19,7 +19,7 @@ use tracing::{debug, instrument, trace, warn};
 use crate::sync::{
     task::{
         quic::{Error, Server, State},
-        Client, SyncPeer, SyncPeers, Syncer,
+        Client, SyncHandle, SyncPeer, Syncer,
     },
     Result as SyncResult,
 };
@@ -329,7 +329,7 @@ fn spawn_scheduled_hello_sender(
     schedule_delay: Duration,
     expires_at: Instant,
     cancel_token: CancellationToken,
-    sync_peers: SyncPeers,
+    handle: SyncHandle,
     client: Client,
 ) {
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
@@ -365,7 +365,7 @@ fn spawn_scheduled_hello_sender(
                     };
 
                     // Send scheduled hello notification
-                    match sync_peers.broadcast_hello(peer.graph_id, head).await {
+                    match handle.broadcast_hello(peer.graph_id, head).await {
                         Ok(_) => trace!(?peer, ?head, "Sent scheduled hello notification"),
                         Err(error) => warn!(?peer, %error, "Failed to broadcast scheduled hello"),
                     }
@@ -392,7 +392,7 @@ impl Server {
         hello_msg: SyncHelloType<Addr>,
         client: Client,
         active_team: &TeamId,
-        sync_peers: SyncPeers,
+        handle: SyncHandle,
     ) {
         let graph_id = GraphId::transmute(*active_team);
 
@@ -435,7 +435,7 @@ impl Server {
                     schedule_delay,
                     expires_at,
                     cancel_token,
-                    sync_peers.clone(),
+                    handle,
                     client.clone(),
                 );
 
@@ -474,7 +474,7 @@ impl Server {
                     .await
                     .command_exists(graph_id, head)
                 {
-                    match sync_peers.sync_on_hello(peer).await {
+                    match handle.sync_on_hello(peer).await {
                         Ok(()) => debug!(?peer, ?head, "sent sync_on_hello request"),
                         Err(error) => warn!(
                             ?peer,

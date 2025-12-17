@@ -5,9 +5,9 @@
 //! # Architecture
 //!
 //! - A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
-//! - [`SyncPeers`] handles adding/removing peers for the [`Syncer`].
+//! - [`SyncHandle`] handles adding/removing peers for the [`Syncer`].
 //! - [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
-//! - [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
+//! - [`SyncHandle`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //!
 //! This prevents the need for an `Arc<Mutex>` which would lock until the next peer is retrieved from the [`DelayQueue`].
 //!
@@ -17,14 +17,14 @@
 //! when their graph head changes, enabling more responsive synchronization:
 //!
 //! - **Subscriptions**: Peers can subscribe to hello notifications from other peers using
-//!   SyncPeers::sync_hello_subscribe, specifying a delay between notifications and a duration
+//!   SyncHandle::sync_hello_subscribe, specifying a delay between notifications and a duration
 //!   for the subscription.
 //! - **Broadcasting**: When a graph head changes, hello notifications are broadcast to all
-//!   subscribers via SyncPeers::broadcast_hello.
+//!   subscribers via SyncHandle::broadcast_hello.
 //! - **Sync on Hello**: Peers can be configured to automatically sync when they receive a hello
 //!   notification by setting `sync_on_hello` in their [`SyncPeerConfig`].
 //! - **Unsubscribe**: Peers can unsubscribe from hello notifications using
-//!   SyncPeers::sync_hello_unsubscribe.
+//!   SyncHandle::sync_hello_unsubscribe.
 //!
 //! See the [`hello`] module for implementation details.
 
@@ -59,7 +59,7 @@ use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
 pub mod hello;
 pub mod quic;
 
-/// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
+/// Message sent from [`SyncHandle`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
 pub(crate) enum Msg {
     SyncNow {
@@ -117,7 +117,7 @@ impl SyncPeer {
 
 /// Handles adding and removing sync peers.
 #[derive(Clone, Debug)]
-pub struct SyncPeers {
+pub(crate) struct SyncHandle {
     /// Send messages to add/remove peers.
     sender: mpsc::Sender<Request>,
 }
@@ -131,7 +131,7 @@ pub(crate) enum SyncResponse {
     Err(String),
 }
 
-impl SyncPeers {
+impl SyncHandle {
     /// Create a new peer manager.
     fn new(sender: mpsc::Sender<Request>) -> Self {
         Self { sender }
@@ -205,7 +205,7 @@ pub(super) type Client = crate::aranya::ClientWithState<crate::EN, crate::SP>;
 /// Syncs with each peer after the specified interval.
 ///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
-/// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
+/// Receives added/removed peers from [`SyncHandle`] via mpsc channels.
 #[derive(Debug)]
 pub(crate) struct Syncer<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
