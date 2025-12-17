@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check)",
+      "Bash(cargo build)",
+      "Bash(cargo make)",
+    ],
+    "deny": [
+    ]
+  },
+  "env": {
+  },
+  "companyAnnouncements": [
+  ]
+}
