@@ -53,7 +53,17 @@ elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client_capi.so")
     set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.so")
 elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client.so")
     set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client.so")
+else()
+    # Library doesn't exist yet at configure time, will be built later
+    # Try to use the most likely name for the platform
+    if(APPLE)
+        set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
+    else()
+        set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.so")
+    endif()
 endif()
+
+message(STATUS "Using Aranya library: ${ARANYA_LIB}")
 
 # --- Daemon Detection ---
 # Point directly to Rust target directory instead of copying
@@ -107,3 +117,5 @@ endfunction()
 # --- Test Executables ---
 add_capi_test(TestOnboarding test_onboarding.c USE_WRAPPER)
 add_capi_test(TestSimple test_simple.c USE_WRAPPER)
+
+
