@@ -6,7 +6,7 @@ use error::SyncError;
 /// Possible sync related errors
 pub type Result<T> = core::result::Result<T, SyncError>;
 
-mod error {
+pub(crate) mod error {
     use std::convert::Infallible;
 
     use thiserror::Error;
@@ -24,6 +24,9 @@ mod error {
         SendSyncRequest(Box<SyncError>),
         #[error("Could not receive sync response: {0}")]
         ReceiveSyncResponse(Box<SyncError>),
+        /// Peer sent an empty response
+        #[error("peer sent empty response")]
+        EmptyResponse,
         #[error(transparent)]
         Bug(#[from] buggy::Bug),
         #[error(transparent)]
