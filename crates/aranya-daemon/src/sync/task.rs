@@ -33,6 +33,7 @@ use std::time::Duration;
 use std::{collections::HashMap, future::Future};
 
 use anyhow::Context;
+use aranya_crypto::{dangerous::spideroak_crypto::csprng::rand::RngCore, Rng};
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
@@ -311,12 +312,23 @@ pub trait SyncState: Sized {
 }
 
 impl<ST> Syncer<ST> {
+    /// Calculate sync jitter.
+    fn jitter(interval: Duration) -> Duration {
+        // Get a random u32.
+        let rand = Rng.next_u32();
+        // Convert to a random number in [interval/2, interval*3/2].
+        interval.mul_f64(f64::from(rand) / f64::from(u32::MAX)) + interval / 2
+    }
+
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
         let new_key = match cfg.interval {
             _ if cfg.sync_now => Some(self.queue.insert_at(peer.clone(), Instant::now())),
-            Some(interval) => Some(self.queue.insert(peer.clone(), interval)),
+            Some(interval) => Some(
+                self.queue
+                    .insert(peer.clone(), Syncer::<ST>::jitter(interval)),
+            ),
             None => None,
         };
         if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
@@ -420,7 +432,7 @@ impl<ST: SyncState> Syncer<ST> {
                 let peer = expired.into_inner();
                 let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
                 // Re-insert into queue if interval is still configured
-                *key = cfg.interval.map(|interval| self.queue.insert(peer.clone(), interval));
+                *key = cfg.interval.map(|interval| self.queue.insert(peer.clone(), Syncer::<ST>::jitter(interval)));
                 // sync with peer.
                 self.sync(&peer).await?;
             }
