@@ -18,10 +18,15 @@ set(CTEST_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 set(CTEST_SOURCE_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # --- Build Rust C API and Daemon ---
-add_custom_target(build_aranya_client_capi ALL
+add_custom_command(
+    OUTPUT ${RUST_TARGET_DIR}/libaranya_client_capi.dylib ${RUST_TARGET_DIR}/libaranya_client_capi.so
     COMMAND cargo build -p aranya-client-capi --features afc,experimental,preview
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
     COMMENT "Building aranya-client-capi with cargo"
+)
+
+add_custom_target(build_aranya_client_capi
+    DEPENDS ${RUST_TARGET_DIR}/libaranya_client_capi.dylib ${RUST_TARGET_DIR}/libaranya_client_capi.so
 )
 
 add_custom_target(build_aranya_daemon ALL
