@@ -1,11 +1,11 @@
 #ifndef ARANYA_CTEST_UTILS_H
 #define ARANYA_CTEST_UTILS_H
 
-#include <stddef.h>
+#include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +25,8 @@ struct aranya_test_config {
     // to find daemon in default locations.
     char daemon_path[ARANYA_PATH_MAX];
 
-    // Optional additional library search path (used to set env vars when launching tests)
+    // Optional additional library search path (used to set env vars when
+    // launching tests)
     char lib_search_path[ARANYA_PATH_MAX];
 
     // Per-test timeout in seconds for long-running operations
@@ -35,7 +36,8 @@ struct aranya_test_config {
     bool verbose;
 };
 
-// Extern global config instance (defined in one test translation unit or provided by test runner)
+// Extern global config instance (defined in one test translation unit or
+// provided by test runner)
 extern struct aranya_test_config g_aranya_test_config;
 
 // Client helper structure used by tests. Wraps the generated `AranyaClient`
@@ -44,7 +46,7 @@ typedef struct {
     char name[64];
     AranyaClient client;
     AranyaDeviceId id;
-    uint8_t *pk;
+    uint8_t* pk;
     size_t pk_len;
 } Client;
 
@@ -64,30 +66,36 @@ typedef struct {
 } Team;
 
 // Helper to initialize the global config with defaults
-static inline void aranya_test_config_init(struct aranya_test_config *cfg) {
-    if (!cfg) return;
-    cfg->daemon_path[0] = '\0';
+static inline void aranya_test_config_init(struct aranya_test_config* cfg) {
+    if (!cfg)
+        return;
+    cfg->daemon_path[0]     = '\0';
     cfg->lib_search_path[0] = '\0';
-    cfg->timeout_seconds = ARANYA_TEST_DEFAULT_TIMEOUT;
-    cfg->verbose = false;
+    cfg->timeout_seconds    = ARANYA_TEST_DEFAULT_TIMEOUT;
+    cfg->verbose            = false;
 }
 
 // Small helper to optionally print diagnostics when verbose is enabled
-static inline void aranya_test_log(const struct aranya_test_config *cfg, const char *fmt, ...) {
-    if (!cfg || !cfg->verbose) return;
-    va_list ap; va_start(ap, fmt);
+static inline void aranya_test_log(const struct aranya_test_config* cfg,
+                                   const char* fmt, ...) {
+    if (!cfg || !cfg->verbose)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
 }
 
 // Helper function to get role ID by name from a list of roles
-static inline AranyaError get_role_id_by_name(const AranyaRole* role_list, size_t role_list_len, 
-                                              const char* name, AranyaRoleId* role_id) {
+static inline AranyaError get_role_id_by_name(const AranyaRole* role_list,
+                                              size_t role_list_len,
+                                              const char* name,
+                                              AranyaRoleId* role_id) {
     AranyaError err;
     for (size_t i = 0; i < role_list_len; i++) {
-        AranyaRole role = role_list[i];
+        AranyaRole role       = role_list[i];
         const char* role_name = NULL;
-        err = aranya_role_get_name(&role, &role_name);
+        err                   = aranya_role_get_name(&role, &role_name);
         if (err != ARANYA_ERROR_SUCCESS) {
             return err;
         }
