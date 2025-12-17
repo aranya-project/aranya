@@ -8,8 +8,8 @@
 # define ENABLE_ARANYA_PREVIEW 1
 #endif
 
-#include "include/aranya-client.h"
-#include "include/utils.h"
+#include "aranya-client.h"
+#include "utils.h"
 
 /* Global daemon socket paths - set by wrapper script spawning daemons */
 static const char g_owner_uds[] = "/tmp/onboarding-run-owner/uds.sock";

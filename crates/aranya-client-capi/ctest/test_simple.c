@@ -4,13 +4,9 @@
 #include <string.h>
 #include <stdint.h>
 
-#ifndef ENABLE_ARANYA_PREVIEW
-# define ENABLE_ARANYA_PREVIEW 1
-#endif
-
 /* include the generated C API header (CMake should add the include dir) */
-#include "include/aranya-client.h"
-#include "include/utils.h"
+#include "aranya-client.h"
+#include "utils.h"
 
 /* Minimal test harness that runs a few small checks and reports results to stdout.
    CTest will see the executable as a single test; the harness runs multiple
