@@ -27,9 +27,9 @@ use crate::{
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::{
-        quic::{PskStore, State as QuicSyncClientState, SyncParams},
-        SyncHandle, Syncer,
+    sync::{
+        transport::quic::{PskStore, QuicState as QuicSyncClientState, SyncParams},
+        SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -50,7 +50,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::task::quic::Server;
+pub(crate) type SyncServer = crate::sync::transport::quic::Server;
 
 mod invalid_graphs {
     use std::{
@@ -117,7 +117,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncClientState>,
+    syncer: SyncManager<QuicSyncClientState>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -317,7 +317,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        Syncer<QuicSyncClientState>,
+        SyncManager<QuicSyncClientState>,
         SyncHandle,
         EffectReceiver,
         SocketAddr,
@@ -362,7 +362,7 @@ impl Daemon {
             #[cfg(feature = "preview")]
             server.hello_subscriptions(),
         );
-        let syncer = Syncer::new(
+        let syncer = SyncManager::new(
             client_with_state_for_syncer,
             send_effects,
             invalid_graphs,

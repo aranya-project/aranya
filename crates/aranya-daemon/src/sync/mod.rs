@@ -1,59 +1,72 @@
 //! Aranya syncer for syncing Aranya graph commands.
-pub mod task;
+mod handle;
+#[cfg(feature = "preview")]
+pub mod hello;
+pub mod manager;
+pub mod transport;
+mod types;
 
-use error::SyncError;
+use std::convert::Infallible;
 
 /// Possible sync related errors
 pub type Result<T> = core::result::Result<T, SyncError>;
 
 pub(crate) use aranya_runtime::GraphId;
 pub(crate) use aranya_util::Addr;
+pub(crate) use handle::{Request, SyncHandle};
+pub(crate) use manager::SyncManager;
+pub(crate) use types::SyncPeer;
+pub(super) use types::{Client, EffectSender, SyncResponse};
 
-mod error {
-    use std::convert::Infallible;
+/// Possible errors that could happen in the Aranya Syncer.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum SyncError {
+    /// Something went wrong inside the QUIC Syncer.
+    #[error(transparent)]
+    QuicSync(#[from] transport::quic::QuicError),
 
-    use thiserror::Error;
+    /// Something went wrong in the Aranya Runtime.
+    #[error(transparent)]
+    Runtime(#[from] aranya_runtime::SyncError),
 
-    use super::task::quic::Error as QSError;
+    /// Failed to send sync request.
+    #[error("Could not send sync request: {0}")]
+    SendSyncRequest(Box<SyncError>),
 
-    #[derive(Error, Debug)]
-    #[non_exhaustive]
-    pub enum SyncError {
-        #[error(transparent)]
-        QuicSync(#[from] QSError),
-        #[error(transparent)]
-        Runtime(#[from] aranya_runtime::SyncError),
-        #[error("Could not send sync request: {0}")]
-        SendSyncRequest(Box<SyncError>),
-        #[error("Could not receive sync response: {0}")]
-        ReceiveSyncResponse(Box<SyncError>),
-        #[error(transparent)]
-        Bug(#[from] buggy::Bug),
-        #[error(transparent)]
-        Other(#[from] anyhow::Error),
+    /// Failed to receive sync response.
+    #[error("Could not receive sync response: {0}")]
+    ReceiveSyncResponse(Box<SyncError>),
+
+    /// Encountered a bug in the program.
+    #[error(transparent)]
+    Bug(#[from] buggy::Bug),
+
+    /// Something has gone wrong.
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl From<SyncError> for aranya_daemon_api::Error {
+    fn from(err: SyncError) -> Self {
+        Self::from_err(err)
     }
+}
 
-    impl From<SyncError> for aranya_daemon_api::Error {
-        fn from(err: SyncError) -> Self {
-            Self::from_err(err)
-        }
+impl From<Infallible> for SyncError {
+    fn from(err: Infallible) -> Self {
+        match err {}
     }
+}
 
-    impl From<Infallible> for SyncError {
-        fn from(err: Infallible) -> Self {
-            match err {}
-        }
-    }
-
-    impl SyncError {
-        pub fn is_parallel_finalize(&self) -> bool {
-            use aranya_runtime::ClientError;
-            match self {
-                Self::Other(err) => err
-                    .downcast_ref::<ClientError>()
-                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
-                _ => false,
-            }
+impl SyncError {
+    fn is_parallel_finalize(&self) -> bool {
+        use aranya_runtime::ClientError;
+        match self {
+            Self::Other(err) => err
+                .downcast_ref::<ClientError>()
+                .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
+            _ => false,
         }
     }
 }

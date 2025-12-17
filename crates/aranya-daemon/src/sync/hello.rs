@@ -16,11 +16,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::sync::{
-    task::{
-        quic::{Error, Server, State},
-        Client, SyncHandle, SyncPeer, Syncer,
-    },
-    Addr, GraphId, Result,
+    transport::quic::{QuicError, QuicState, Server},
+    Addr, Client, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
 };
 
 /// Storage for sync hello subscriptions
@@ -40,7 +37,7 @@ pub struct HelloSubscription {
 /// Maps from (team_id, subscriber_address) to subscription details
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
 
-impl Syncer<State> {
+impl SyncManager<QuicState> {
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
     pub async fn broadcast_hello_notifications(
@@ -146,8 +143,8 @@ impl Syncer<State> {
         // Send the message
         send.send(bytes::Bytes::from(data))
             .await
-            .map_err(Error::from)?;
-        send.close().await.map_err(Error::from)?;
+            .map_err(QuicError::from)?;
+        send.close().await.map_err(QuicError::from)?;
 
         // Determine operation name from sync_type
         let operation_name = match &sync_type {

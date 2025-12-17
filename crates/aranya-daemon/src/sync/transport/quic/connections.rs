@@ -16,7 +16,7 @@ use s2n_quic::{
 use tokio::sync::{mpsc, Mutex};
 use tracing::debug;
 
-use crate::sync::task::SyncPeer;
+use crate::sync::SyncPeer;
 
 /// A [`SyncPeer`] and [`StreamAcceptor`] pair that is sent over a channel
 /// when a new connection is inserted.
@@ -81,8 +81,8 @@ impl SharedConnectionMap {
     pub(super) async fn get_or_try_insert_with(
         &mut self,
         peer: SyncPeer,
-        make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
-    ) -> Result<Handle, super::Error> {
+        make_conn: impl AsyncFnOnce() -> Result<Connection, super::QuicError>,
+    ) -> Result<Handle, super::QuicError> {
         let (handle, maybe_acceptor) = match self.handles.lock().await.entry(peer) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");

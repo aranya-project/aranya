@@ -9,8 +9,8 @@ use aranya_runtime::{ClientState, PeerCache};
 use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "preview")]
-use crate::sync::task::hello::HelloSubscriptions;
-use crate::sync::task::SyncPeer;
+use crate::sync::hello::HelloSubscriptions;
+use crate::sync::SyncPeer;
 
 /// Thread-safe wrapper for an Aranya client.
 pub struct Client<EN, SP> {
