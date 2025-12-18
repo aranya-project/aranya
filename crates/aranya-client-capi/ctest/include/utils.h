@@ -130,6 +130,26 @@ static inline AranyaError get_role_id_by_name(const AranyaRole *role_list,
         }                                                                      \
     } while (0)
 
+// Helper function to create a team
+static inline AranyaError create_team(AranyaClient *client, AranyaTeamId *team_id) {
+    AranyaError err;
+    AranyaCreateTeamConfigBuilder team_builder;
+    AranyaCreateTeamConfig team_config;
+
+    err = aranya_create_team_config_builder_init(&team_builder);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+
+    err = aranya_create_team_config_build(&team_builder, &team_config);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+
+    err = aranya_create_team(client, &team_config, team_id);
+    return err;
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -13,16 +13,19 @@ if(NOT (_found_build EQUAL 0 OR _found_build GREATER 0))
 endif()
 
 # --- Paths ---
-set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../target/debug")
+set(RUST_TARGET_DIR "$ENV{ARANYA_TARGET_DIR}")
+if(NOT RUST_TARGET_DIR)
+    set(RUST_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../target/release")
+endif()
 set(CTEST_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 set(CTEST_SOURCE_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # --- Build Rust C API and Daemon ---
 add_custom_command(
     OUTPUT ${RUST_TARGET_DIR}/libaranya_client_capi.dylib ${RUST_TARGET_DIR}/libaranya_client_capi.so
-    COMMAND cargo build -p aranya-client-capi --features afc,experimental,preview
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
-    COMMENT "Building aranya-client-capi with cargo"
+    COMMAND cargo make build-capi
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../..
+    COMMENT "Building aranya-client-capi with cargo make"
 )
 
 add_custom_target(build_aranya_client_capi
@@ -30,9 +33,9 @@ add_custom_target(build_aranya_client_capi
 )
 
 add_custom_target(build_aranya_daemon ALL
-    COMMAND cargo build -p aranya-daemon --features afc,experimental,preview
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
-    COMMENT "Building aranya-daemon with cargo"
+    COMMAND cargo make build-daemon-experimental
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../..
+    COMMENT "Building aranya-daemon with cargo make"
 )
 
 # --- Header Generation ---
@@ -77,7 +80,7 @@ enable_testing()
 
 # --- Helper function for test executables ---
 function(add_capi_test TEST_NAME SOURCE_FILE)
-    cmake_parse_arguments(ARG "REQUIRES_DAEMON;USE_WRAPPER" "" "" ${ARGN})
+    cmake_parse_arguments(ARG "REQUIRES_DAEMON" "DAEMON_NAMES" "" ${ARGN})
     
     add_executable(${TEST_NAME} ${SOURCE_FILE} ${CTEST_INCLUDE_DIR}/aranya-client.h)
     set_source_files_properties(${CTEST_INCLUDE_DIR}/aranya-client.h PROPERTIES GENERATED TRUE)
@@ -96,10 +99,10 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
         endif()
     endif()
     
-    if(ARG_USE_WRAPPER)
+    if(ARG_REQUIRES_DAEMON)
         add_test(NAME ${TEST_NAME} 
             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run_test_with_cleanup.sh 
-                    ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME} "${ARANYA_DAEMON}")
+                    ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME} "${ARANYA_DAEMON}" "${ARG_DAEMON_NAMES}")
     else()
         add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endif()
@@ -109,7 +112,7 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
 endfunction()
 
 # --- Test Executables ---
-add_capi_test(TestOnboarding test_onboarding.c USE_WRAPPER)
-add_capi_test(TestSimple test_simple.c USE_WRAPPER)
+add_capi_test(TestOnboarding test_onboarding.c REQUIRES_DAEMON DAEMON_NAMES "owner,member")
+add_capi_test(TestSimple test_simple.c)
 
 

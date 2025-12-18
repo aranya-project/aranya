@@ -37,17 +37,8 @@ static int test_create_team_and_onboard_member(void) {
                   aranya_client_init(&owner_client, &owner_config));
 
     /* Create team as owner */
-    AranyaCreateTeamConfigBuilder team_builder;
-    CLIENT_EXPECT("Failed to init team config builder", "",
-                  aranya_create_team_config_builder_init(&team_builder));
-
-    AranyaCreateTeamConfig team_config;
-    CLIENT_EXPECT("Failed to build team config", "",
-                  aranya_create_team_config_build(&team_builder, &team_config));
-
     AranyaTeamId team_id;
-    CLIENT_EXPECT("Failed to create team", "",
-                  aranya_create_team(&owner_client, &team_config, &team_id));
+    CLIENT_EXPECT("Failed to create team", "", create_team(&owner_client, &team_id));
 
     printf("Team created by owner\n");
 
@@ -114,12 +105,12 @@ exit:
 int main(int argc, const char *argv[]) {
     AranyaError exit_code;
 
-    if (argc != 3) {
-        fprintf(stderr, "usage: %s <daemon> <tmpdir>\n", argv[0]);
+    if (argc != 2) {
+        fprintf(stderr, "usage: %s <tmpdir>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    const char *tmpdir = argv[2];
+    const char *tmpdir = argv[1];
     snprintf(g_owner_uds, sizeof(g_owner_uds), "%s/owner/uds.sock", tmpdir);
     snprintf(g_member_uds, sizeof(g_member_uds), "%s/member/uds.sock", tmpdir);
 

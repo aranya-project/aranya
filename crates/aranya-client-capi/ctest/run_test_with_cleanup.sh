@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Wrapper script to run C tests and ensure daemon cleanup
-# Usage: run_test_with_cleanup.sh <test_executable> [daemon_path]
+# Usage: run_test_with_cleanup.sh <test_executable> <daemon_path> <daemon_names>
+#   daemon_names: comma-separated list of daemon names to spawn (e.g., "owner,member")
 
 set -e
 
 TEST_EXEC="$1"
 DAEMON_PATH="$2"
+DAEMON_NAMES="$3"
 TEST_NAME=$(basename "$TEST_EXEC")
 
 # PIDs to track spawned daemons
@@ -85,16 +87,22 @@ EOF
     echo "Spawned daemon '$daemon_name' (PID: $pid) at $run_dir"
 }
 
-# Spawn daemons based on test name
-if [ "$TEST_NAME" = "TestOnboarding" ]; then
-    echo "=== Spawning daemons for TestOnboarding ==="
+# Spawn daemons if daemon names are provided
+if [ -n "$DAEMON_NAMES" ]; then
+    echo "=== Spawning daemons: $DAEMON_NAMES ==="
     
     # Create unique temp directory
     TMPDIR=$(mktemp -d)
     echo "Using temp directory: $TMPDIR"
     
-    spawn_daemon "$TMPDIR/owner" "test-daemon-onboarding-owner" "/onboarding-owner" 40001
-    spawn_daemon "$TMPDIR/member" "test-daemon-onboarding-member" "/onboarding-member" 40002
+    # Parse comma-separated daemon names
+    IFS=',' read -ra NAMES <<< "$DAEMON_NAMES"
+    PORT=40001
+    
+    for name in "${NAMES[@]}"; do
+        spawn_daemon "$TMPDIR/$name" "test-daemon-$TEST_NAME-$name" "/$TEST_NAME-$name" "$PORT"
+        PORT=$((PORT + 1))
+    done
     
     # Wait for daemons to initialize
     echo "Waiting 2 seconds for daemons to initialize..."
@@ -103,8 +111,8 @@ if [ "$TEST_NAME" = "TestOnboarding" ]; then
 fi
 
 # Run the test
-if [ -n "$DAEMON_PATH" ]; then
-    "$TEST_EXEC" "$DAEMON_PATH" "$TMPDIR"
+if [ -n "$TMPDIR" ]; then
+    "$TEST_EXEC" "$TMPDIR"
 else
     "$TEST_EXEC"
 fi

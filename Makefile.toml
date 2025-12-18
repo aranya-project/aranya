@@ -104,13 +104,6 @@ cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release", "--features=preview"]
 
-[tasks.build-capi-lib-for-tests]
-category = "build"
-description = "Build C API shared library for tests (without AFC to avoid codegen issues)"
-cwd = "crates/aranya-client-capi"
-command = "cargo"
-args = ["build", "--no-default-features", "--features=preview,experimental"]
-
 [tasks.tgz-capi]
 category = "build"
 description = "Archive C API artifacts"
@@ -132,6 +125,7 @@ category = "build"
 description = "Build C API test suite"
 dependencies = ["install-cbindgen", "build-capi", "build-daemon-experimental"]
 cwd = "crates/aranya-client-capi/ctest"
+env = { "ARANYA_TARGET_DIR" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/release" }
 script = '''
 #!/usr/bin/env bash
 set -e
@@ -139,6 +133,7 @@ mkdir -p build
 cd build
 cmake ..
 cmake --build .
+# TODO: Use ninja
 '''
 
 # Run C API tests

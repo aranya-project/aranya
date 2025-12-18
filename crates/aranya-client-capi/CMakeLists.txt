@@ -1,5 +1,19 @@
 option(ARANYA_ENABLE_PREVIEW "Enable preview Aranya features." ON)
 option(ARANYA_ENABLE_AFC "Enable Aranya Fast Channels." ON)
+
+set(aranya_features preview experimental afc)
+
+# Create lists of generator expressions used to conditionally enable features
+# based on the options above. If the naming pattern becomes inconsistent,
+# we'll probably just want to add the generator expressions manually.
+set(crate_features)
+set(header_features)
+foreach(feat IN LISTS aranya_features)
+    string(TOUPPER "${feat}" big_feat)
+    list(APPEND crate_features $<$<BOOL:${ARANYA_ENABLE_${big_feat}}>:${feat}>)
+    list(APPEND header_features $<$<BOOL:${ARANYA_ENABLE_${big_feat}}>:ENABLE_ARANYA_${big_feat}>)
+endforeach()
+
 option(ARANYA_ENABLE_EXPERIMENTAL "Enable experimental Aranya features." ON)
 
 # ==== Daemon executable ====
