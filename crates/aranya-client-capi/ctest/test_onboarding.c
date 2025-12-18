@@ -38,7 +38,8 @@ static int test_create_team_and_onboard_member(void) {
 
     /* Create team as owner */
     AranyaTeamId team_id;
-    CLIENT_EXPECT("Failed to create team", "", create_team(&owner_client, &team_id));
+    CLIENT_EXPECT("Failed to create team", "",
+                  create_team(&owner_client, &team_id));
 
     printf("Team created by owner\n");
 

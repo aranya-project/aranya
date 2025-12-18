@@ -131,7 +131,8 @@ static inline AranyaError get_role_id_by_name(const AranyaRole *role_list,
     } while (0)
 
 // Helper function to create a team
-static inline AranyaError create_team(AranyaClient *client, AranyaTeamId *team_id) {
+static inline AranyaError create_team(AranyaClient *client,
+                                      AranyaTeamId *team_id) {
     AranyaError err;
     AranyaCreateTeamConfigBuilder team_builder;
     AranyaCreateTeamConfig team_config;
