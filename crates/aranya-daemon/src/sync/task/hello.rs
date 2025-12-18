@@ -318,6 +318,11 @@ impl Syncer<State> {
             // This helps to prevent self DoS via a bunch of subsequent sync requests at the same time from various peers.
             let rand = Rng.next_u32();
             let jitter = graph_change_delay.mul_f64(f64::from(rand) / f64::from(u32::MAX)) / 10;
+            trace!(
+                ?jitter,
+                ?peer,
+                "applying jitter before sending hello notification"
+            );
             sleep(jitter).await;
 
             let (mut recv, mut send) = stream.split();
