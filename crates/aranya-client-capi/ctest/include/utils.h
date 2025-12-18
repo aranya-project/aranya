@@ -46,7 +46,7 @@ typedef struct {
     char name[64];
     AranyaClient client;
     AranyaDeviceId id;
-    uint8_t* pk;
+    uint8_t *pk;
     size_t pk_len;
 } Client;
 
@@ -66,18 +66,18 @@ typedef struct {
 } Team;
 
 // Helper to initialize the global config with defaults
-static inline void aranya_test_config_init(struct aranya_test_config* cfg) {
+static inline void aranya_test_config_init(struct aranya_test_config *cfg) {
     if (!cfg)
         return;
-    cfg->daemon_path[0]     = '\0';
+    cfg->daemon_path[0] = '\0';
     cfg->lib_search_path[0] = '\0';
-    cfg->timeout_seconds    = ARANYA_TEST_DEFAULT_TIMEOUT;
-    cfg->verbose            = false;
+    cfg->timeout_seconds = ARANYA_TEST_DEFAULT_TIMEOUT;
+    cfg->verbose = false;
 }
 
 // Small helper to optionally print diagnostics when verbose is enabled
-static inline void aranya_test_log(const struct aranya_test_config* cfg,
-                                   const char* fmt, ...) {
+static inline void aranya_test_log(const struct aranya_test_config *cfg,
+                                   const char *fmt, ...) {
     if (!cfg || !cfg->verbose)
         return;
     va_list ap;
@@ -87,15 +87,15 @@ static inline void aranya_test_log(const struct aranya_test_config* cfg,
 }
 
 // Helper function to get role ID by name from a list of roles
-static inline AranyaError get_role_id_by_name(const AranyaRole* role_list,
+static inline AranyaError get_role_id_by_name(const AranyaRole *role_list,
                                               size_t role_list_len,
-                                              const char* name,
-                                              AranyaRoleId* role_id) {
+                                              const char *name,
+                                              AranyaRoleId *role_id) {
     AranyaError err;
     for (size_t i = 0; i < role_list_len; i++) {
-        AranyaRole role       = role_list[i];
-        const char* role_name = NULL;
-        err                   = aranya_role_get_name(&role, &role_name);
+        AranyaRole role = role_list[i];
+        const char *role_name = NULL;
+        err = aranya_role_get_name(&role, &role_name);
         if (err != ARANYA_ERROR_SUCCESS) {
             return err;
         }
@@ -106,6 +106,29 @@ static inline AranyaError get_role_id_by_name(const AranyaRole* role_list,
     }
     return ARANYA_ERROR_OTHER;
 }
+
+// Macro for printing AranyaError to stderr and returning the error.
+// Does nothing if error value is ARANYA_SUCCESS.
+#define EXPECT(M, E)                                                           \
+    do {                                                                       \
+        err = (E);                                                             \
+        if (err != ARANYA_ERROR_SUCCESS) {                                     \
+            fprintf(stderr, "%s\n", (M));                                      \
+            goto exit;                                                         \
+        }                                                                      \
+    } while (0)
+
+// Macro for printing client AranyaError to stderr and returning the error.
+// Does nothing if error value is ARANYA_SUCCESS.
+#define CLIENT_EXPECT(M, N, E)                                                 \
+    do {                                                                       \
+        err = (E);                                                             \
+        if (err != ARANYA_ERROR_SUCCESS) {                                     \
+            fprintf(stderr, "%s %s: %s\n", (M), (N),                           \
+                    aranya_error_to_str(err));                                 \
+            goto exit;                                                         \
+        }                                                                      \
+    } while (0)
 
 #ifdef __cplusplus
 }

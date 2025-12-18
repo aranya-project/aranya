@@ -75,11 +75,6 @@ set(ARANYA_DAEMON "${RUST_TARGET_DIR}/aranya-daemon")
 # --- Testing Setup ---
 enable_testing()
 
-# Global test fixture to clean up test directories before running tests
-add_test(NAME cleanup_tmp_onboarding COMMAND ${CMAKE_COMMAND} -E rm -rf 
-    /tmp/onboarding-run-owner /tmp/onboarding-run-member)
-set_property(TEST cleanup_tmp_onboarding PROPERTY FIXTURES_SETUP global_test_fixture)
-
 # --- Helper function for test executables ---
 function(add_capi_test TEST_NAME SOURCE_FILE)
     cmake_parse_arguments(ARG "REQUIRES_DAEMON;USE_WRAPPER" "" "" ${ARGN})
@@ -87,7 +82,7 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
     add_executable(${TEST_NAME} ${SOURCE_FILE} ${CTEST_INCLUDE_DIR}/aranya-client.h)
     set_source_files_properties(${CTEST_INCLUDE_DIR}/aranya-client.h PROPERTIES GENERATED TRUE)
     target_include_directories(${TEST_NAME} PRIVATE ${CTEST_INCLUDE_DIR} ${CTEST_SOURCE_INCLUDE_DIR})
-    target_compile_definitions(${TEST_NAME} PRIVATE ENABLE_ARANYA_PREVIEW=1 ENABLE_ARANYA_EXPERIMENTAL=1)
+    target_compile_definitions(${TEST_NAME} PRIVATE)
     
     # Ensure header is generated before compiling
     add_dependencies(${TEST_NAME} generate_aranya_header)
@@ -101,20 +96,16 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
         endif()
     endif()
     
-    if(ARG_USE_WRAPPER AND ARANYA_DAEMON)
+    if(ARG_USE_WRAPPER)
         add_test(NAME ${TEST_NAME} 
             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run_test_with_cleanup.sh 
                     ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME} "${ARANYA_DAEMON}")
-    elseif(ARG_REQUIRES_DAEMON AND ARANYA_DAEMON)
-        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME} "${ARANYA_DAEMON}")
     else()
         add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endif()
     
     set_property(TEST ${TEST_NAME} PROPERTY ENVIRONMENT
         "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}")
-    
-    set_property(TEST ${TEST_NAME} PROPERTY FIXTURES_REQUIRED global_test_fixture)
 endfunction()
 
 # --- Test Executables ---

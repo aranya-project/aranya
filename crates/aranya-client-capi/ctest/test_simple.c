@@ -14,15 +14,21 @@
 
 /* Test: aranya_error_to_str returns a non-empty string for success code. */
 static int test_error_to_str_success(void) {
-    const char* s = aranya_error_to_str(ARANYA_ERROR_SUCCESS);
-    return s != NULL && s[0] != '\0';
+    const char *s = aranya_error_to_str(ARANYA_ERROR_SUCCESS);
+    if (s == NULL) {
+        return 0;
+    }
+    return s[0] != '\0';
 }
 
 /* Test: aranya_error_to_str returns a non-empty string for an invalid code. */
 static int test_error_to_str_invalid(void) {
     const unsigned bogus = 0xDEADBEEFu;
-    const char* s        = aranya_error_to_str(bogus);
-    return s != NULL && s[0] != '\0';
+    const char *s = aranya_error_to_str(bogus);
+    if (s == NULL) {
+        return 0;
+    }
+    return s[0] != '\0';
 }
 
 int main(void) {

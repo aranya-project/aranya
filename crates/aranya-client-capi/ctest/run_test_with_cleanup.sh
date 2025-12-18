@@ -11,6 +11,9 @@ TEST_NAME=$(basename "$TEST_EXEC")
 # PIDs to track spawned daemons
 DAEMON_PIDS=()
 
+# Temp directory for this test run
+TMPDIR=""
+
 # Track all child processes for cleanup
 cleanup() {
     local exit_code=$?
@@ -32,6 +35,11 @@ cleanup() {
         kill -9 "$pid" 2>/dev/null || true
     done
     pkill -9 -f "aranya-daemon.*test-.*-daemon" 2>/dev/null || true
+    
+    # Remove temp directory
+    if [ -n "$TMPDIR" ] && [ -d "$TMPDIR" ]; then
+        rm -rf "$TMPDIR"
+    fi
     
     exit $exit_code
 }
@@ -80,8 +88,13 @@ EOF
 # Spawn daemons based on test name
 if [ "$TEST_NAME" = "TestOnboarding" ]; then
     echo "=== Spawning daemons for TestOnboarding ==="
-    spawn_daemon "/tmp/onboarding-run-owner" "test-daemon-onboarding-owner" "/onboarding-owner" 40001
-    spawn_daemon "/tmp/onboarding-run-member" "test-daemon-onboarding-member" "/onboarding-member" 40002
+    
+    # Create unique temp directory
+    TMPDIR=$(mktemp -d)
+    echo "Using temp directory: $TMPDIR"
+    
+    spawn_daemon "$TMPDIR/owner" "test-daemon-onboarding-owner" "/onboarding-owner" 40001
+    spawn_daemon "$TMPDIR/member" "test-daemon-onboarding-member" "/onboarding-member" 40002
     
     # Wait for daemons to initialize
     echo "Waiting 2 seconds for daemons to initialize..."
@@ -91,7 +104,7 @@ fi
 
 # Run the test
 if [ -n "$DAEMON_PATH" ]; then
-    "$TEST_EXEC" "$DAEMON_PATH"
+    "$TEST_EXEC" "$DAEMON_PATH" "$TMPDIR"
 else
     "$TEST_EXEC"
 fi
