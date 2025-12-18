@@ -33,7 +33,7 @@ add_custom_target(build_aranya_client_capi
 )
 
 add_custom_target(build_aranya_daemon ALL
-    COMMAND cargo make build-daemon-experimental
+    COMMAND cargo make build-experimental
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../..
     COMMENT "Building aranya-daemon with cargo make"
 )
