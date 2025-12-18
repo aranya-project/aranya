@@ -10,10 +10,11 @@ use std::{
 };
 
 use anyhow::Context;
+use aranya_crypto::{dangerous::spideroak_crypto::csprng::rand::RngCore as _, Rng};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{Address, Engine, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
 use aranya_util::Addr;
-use tokio::{io::AsyncReadExt, sync::Mutex};
+use tokio::{io::AsyncReadExt, sync::Mutex, time::sleep};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
@@ -102,7 +103,12 @@ impl Syncer<State> {
 
             // Send the notification
             match self
-                .send_hello_notification_to_subscriber(subscriber_addr, graph_id, head)
+                .send_hello_notification_to_subscriber(
+                    subscriber_addr,
+                    graph_id,
+                    head,
+                    subscription.graph_change_delay,
+                )
                 .await
             {
                 Ok(()) => {
@@ -280,6 +286,7 @@ impl Syncer<State> {
         peer: &Addr,
         id: GraphId,
         head: Address,
+        graph_change_delay: Duration,
     ) -> SyncResult<()> {
         // Set the team for this graph
         let team_id = TeamId::transmute(id);
@@ -307,6 +314,12 @@ impl Syncer<State> {
         // Spawn async task to send the notification
         let peer = *peer;
         self.hello_tasks.spawn(async move {
+            // Introduce jitter with random sleep in [0, graph_change_delay/10].
+            // This helps to prevent self DoS via a bunch of subsequent sync requests at the same time from various peers.
+            let rand = Rng.next_u32();
+            let jitter = graph_change_delay.mul_f64(f64::from(rand) / f64::from(u32::MAX)) / 10;
+            sleep(jitter).await;
+
             let (mut recv, mut send) = stream.split();
 
             if let Err(e) = send.send(bytes::Bytes::from(data)).await {
@@ -369,7 +382,7 @@ fn spawn_scheduled_hello_sender<EN, SP>(
         loop {
             // Wait for either the schedule delay, expiration, or cancellation
             tokio::select! {
-                _ = tokio::time::sleep(schedule_delay) => {
+                _ = sleep(schedule_delay) => {
                     // Get the current head address
                     let head = {
                         let mut aranya = client.client().aranya.lock().await;
