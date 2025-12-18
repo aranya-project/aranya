@@ -56,8 +56,6 @@ if(EXISTS "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
     set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.dylib")
 elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client_capi.so")
     set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client_capi.so")
-elseif(EXISTS "${RUST_TARGET_DIR}/libaranya_client.so")
-    set(ARANYA_LIB "${RUST_TARGET_DIR}/libaranya_client.so")
 else()
     # Library doesn't exist yet at configure time, will be built later
     # Try to use the most likely name for the platform

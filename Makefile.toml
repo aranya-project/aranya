@@ -47,7 +47,7 @@ description = "Build Code with preview features"
 command = "cargo"
 args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview", "${@}"]
 
-[tasks.build-daemon]
+[tasks.build-daemon-experimental]
 category = "build"
 description = "Build daemon for C API tests"
 command = "cargo"
@@ -130,7 +130,7 @@ tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 [tasks.build-capi-tests]
 category = "build"
 description = "Build C API test suite"
-dependencies = ["install-cbindgen", "build-capi", "build-daemon"]
+dependencies = ["install-cbindgen", "build-capi", "build-daemon-experimental"]
 cwd = "crates/aranya-client-capi/ctest"
 script = '''
 #!/usr/bin/env bash

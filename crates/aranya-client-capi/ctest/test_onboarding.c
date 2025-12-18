@@ -2,11 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-
-#ifndef ENABLE_ARANYA_PREVIEW
-#define ENABLE_ARANYA_PREVIEW 1
-#endif
 
 #include "aranya-client.h"
 #include "utils.h"
