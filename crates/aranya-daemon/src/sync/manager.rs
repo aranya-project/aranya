@@ -24,7 +24,9 @@
 //! - **Unsubscribe**: Peers can unsubscribe from hello notifications using
 //!   SyncHandle::sync_hello_unsubscribe.
 //!
-//! See the [`hello`] module for implementation details.
+//! See the [`hello`](super::hello) module for implementation details.
+//!
+//! [`SyncHandle`]: super::SyncHandle
 
 use std::collections::HashMap;
 #[cfg(feature = "preview")]
@@ -54,8 +56,10 @@ use crate::{vm_policy::VecSink, InvalidGraphs};
 ///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncHandle`] via mpsc channels.
+///
+/// [`SyncHandle`]: super::SyncHandle
 #[derive(Debug)]
-pub(crate) struct SyncManager<ST> {
+pub struct SyncManager<ST> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(super) client: Client,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.

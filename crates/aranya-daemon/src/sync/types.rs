@@ -4,7 +4,7 @@
 /// - network address
 /// - Aranya graph id
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct SyncPeer {
+pub struct SyncPeer {
     pub(crate) addr: super::Addr,
     pub(crate) graph_id: super::GraphId,
 }

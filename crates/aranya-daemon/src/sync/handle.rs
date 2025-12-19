@@ -1,3 +1,6 @@
+//! This module contains the [`SyncHandle`] used to send messages/commands to the [`SyncManager`].
+//!
+//! [`SyncManager`]: super::SyncManager
 #[cfg(feature = "preview")]
 use std::time::Duration;
 
@@ -49,7 +52,7 @@ pub(crate) enum ManagerMessage {
 
 /// Handles adding and removing sync peers.
 #[derive(Clone, Debug)]
-pub(crate) struct SyncHandle {
+pub struct SyncHandle {
     /// Send messages to add/remove peers.
     sender: mpsc::Sender<Request>,
 }

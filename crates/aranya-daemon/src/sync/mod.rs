@@ -1,5 +1,5 @@
 //! Aranya syncer for syncing Aranya graph commands.
-mod handle;
+pub mod handle;
 #[cfg(feature = "preview")]
 pub mod hello;
 pub mod manager;

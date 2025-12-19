@@ -15,7 +15,7 @@ use super::{Result, SyncManager, SyncPeer};
 pub mod quic;
 
 /// Types that contain additional data that are part of a [`SyncManager`] object.
-pub(crate) trait SyncState: Sized {
+pub trait SyncState: Sized {
     /// Syncs with the peer.
     ///
     /// Returns the number of commands that were received and successfully processed.
