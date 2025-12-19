@@ -45,7 +45,7 @@ pub struct Server {
     /// QUIC server to handle sync requests and send sync responses.
     server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
-    /// Connection map shared with [`super::Syncer`]
+    /// Connection map shared with [`super::SyncManager`]
     conns: SharedConnectionMap,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
@@ -85,7 +85,7 @@ impl Server {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
 
-        // Create channel for SyncHandle communication with Syncer
+        // Create channel for SyncHandle communication with SyncManager
         let (send, syncer_recv) = mpsc::channel::<Request>(128);
         let sync_peers = SyncHandle::new(send);
 

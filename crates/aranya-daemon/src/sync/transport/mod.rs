@@ -8,12 +8,13 @@ use std::time::Duration;
 use aranya_runtime::Address;
 use aranya_runtime::{Engine, Sink};
 
-use super::{GraphId, Result, SyncManager, SyncPeer};
+#[cfg(feature = "preview")]
+use super::GraphId;
+use super::{Result, SyncManager, SyncPeer};
 
 pub mod quic;
 
-/// Types that contain additional data that are part of a [`Syncer`]
-/// object.
+/// Types that contain additional data that are part of a [`SyncManager`] object.
 pub(crate) trait SyncState: Sized {
     /// Syncs with the peer.
     ///

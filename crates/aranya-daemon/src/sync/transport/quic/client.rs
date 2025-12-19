@@ -24,10 +24,11 @@ use tokio_util::time::DelayQueue;
 use tracing::{error, instrument, trace};
 
 use super::{PskStore, QuicError, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
+#[cfg(feature = "preview")]
+use crate::sync::GraphId;
 use crate::{
     sync::{
-        Addr, Client, EffectSender, GraphId, Request, Result, SyncError, SyncManager, SyncPeer,
-        SyncResponse,
+        Addr, Client, EffectSender, Request, Result, SyncError, SyncManager, SyncPeer, SyncResponse,
     },
     InvalidGraphs,
 };
@@ -46,6 +47,7 @@ pub struct QuicState {
 
 impl QuicState {
     /// Get a reference to the PSK store
+    #[cfg(feature = "preview")]
     pub fn store(&self) -> &Arc<PskStore> {
         &self.store
     }
@@ -180,7 +182,7 @@ impl SyncState for QuicState {
 }
 
 impl SyncManager<QuicState> {
-    /// Creates a new [`Syncer`].
+    /// Creates a new [`SyncManager`].
     pub(crate) fn new(
         client: Client,
         send_effects: EffectSender,

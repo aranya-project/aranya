@@ -7,9 +7,11 @@ use aranya_runtime::Address;
 use buggy::BugExt as _;
 use tokio::sync::{mpsc, oneshot};
 
-use super::{GraphId, Result, SyncPeer};
+#[cfg(feature = "preview")]
+use super::GraphId;
+use super::{Result, SyncPeer};
 
-/// Message sent from [`SyncHandle`] to [`Syncer`] via mpsc.
+/// Message sent from [`SyncHandle`] to [`SyncManager`] via mpsc.
 #[derive(Clone)]
 pub(crate) enum ManagerMessage {
     SyncNow {
@@ -67,12 +69,12 @@ impl SyncHandle {
         rx.await.assume("no syncer reply")?
     }
 
-    /// Add peer to [`Syncer`].
+    /// Add peer to [`SyncManager`].
     pub(crate) async fn add_peer(&self, peer: SyncPeer, cfg: SyncPeerConfig) -> Reply {
         self.send(ManagerMessage::AddPeer { peer, cfg }).await
     }
 
-    /// Remove peer from [`Syncer`].
+    /// Remove peer from [`SyncManager`].
     pub(crate) async fn remove_peer(&self, peer: SyncPeer) -> Reply {
         self.send(ManagerMessage::RemovePeer { peer }).await
     }

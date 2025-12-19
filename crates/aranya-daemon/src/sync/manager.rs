@@ -1,13 +1,11 @@
-//! Aranya sync task.
-//!
-//! A task for syncing with Aranya peers at specified intervals.
+//! This module handles the [`SyncManager`] used to manage sync tasks.
 //!
 //! # Architecture
 //!
 //! - A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
-//! - [`SyncHandle`] handles adding/removing peers for the [`Syncer`].
-//! - [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
-//! - [`SyncHandle`] and [`Syncer`] communicate via mpsc channels so they can run independently.
+//! - [`SyncHandle`] handles adding/removing peers for the [`SyncManager`].
+//! - [`SyncManager`] syncs with the next available peer from the [`DelayQueue`].
+//! - [`SyncHandle`] and [`SyncManager`] communicate via mpsc channels so they can run independently.
 //!
 //! This prevents the need for an `Arc<Mutex>` which would lock until the next peer is retrieved from the [`DelayQueue`].
 //!

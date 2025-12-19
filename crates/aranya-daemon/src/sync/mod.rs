@@ -6,11 +6,6 @@ pub mod manager;
 pub mod transport;
 mod types;
 
-use std::convert::Infallible;
-
-/// Possible sync related errors
-pub type Result<T> = core::result::Result<T, SyncError>;
-
 pub(crate) use aranya_runtime::GraphId;
 pub(crate) use aranya_util::Addr;
 pub(crate) use handle::{Request, SyncHandle};
@@ -47,14 +42,17 @@ pub enum SyncError {
     Other(#[from] anyhow::Error),
 }
 
+/// Possible sync related errors
+pub type Result<T> = core::result::Result<T, SyncError>;
+
 impl From<SyncError> for aranya_daemon_api::Error {
     fn from(err: SyncError) -> Self {
         Self::from_err(err)
     }
 }
 
-impl From<Infallible> for SyncError {
-    fn from(err: Infallible) -> Self {
+impl From<std::convert::Infallible> for SyncError {
+    fn from(err: std::convert::Infallible) -> Self {
         match err {}
     }
 }
