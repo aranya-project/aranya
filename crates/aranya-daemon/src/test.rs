@@ -42,16 +42,13 @@ use tokio::{
 };
 
 #[cfg(feature = "preview")]
-use crate::sync::task::quic::HelloSubscriptions;
+use crate::sync::hello::HelloSubscriptions;
 use crate::{
     actions::Actions,
     api::EffectReceiver,
     aranya::{self, ClientWithState, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
-    sync::{
-        self,
-        task::{quic::PskStore, PeerCacheKey, SyncPeer},
-    },
+    sync::{self, transport::quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore, InvalidGraphs,
 };
@@ -60,15 +57,12 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::task::quic::State;
+type TestState = sync::transport::quic::QuicState;
 // Aranya sync client for testing.
-type TestSyncer = sync::task::Syncer<TestState>;
+type TestSyncer = sync::SyncManager<TestState>;
 
 // Aranya sync server for testing.
-type TestServer = sync::task::quic::Server<
-    PolicyEngine<DefaultEngine, Store>,
-    LinearStorageProvider<FileManager>,
->;
+type TestServer = sync::transport::quic::QuicServer;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -119,7 +113,7 @@ impl TestDevice {
     ) -> Result<Vec<Effect>> {
         let cmd_count = self
             .syncer
-            .sync(&SyncPeer::new(device.sync_local_addr, self.graph_id))
+            .sync(SyncPeer::new(device.sync_local_addr, self.graph_id))
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
         if let Some(must_receive) = must_receive {
@@ -421,10 +415,7 @@ impl TestCtx {
         admin.sync_expect(owner, None).await?;
 
         let admin_caches = admin.syncer.get_peer_caches();
-        let owner_key = PeerCacheKey {
-            addr: owner.sync_local_addr,
-            id: admin.graph_id,
-        };
+        let owner_key = SyncPeer::new(owner.sync_local_addr, admin.graph_id);
         let admin_cache_size = admin_caches
             .lock()
             .await

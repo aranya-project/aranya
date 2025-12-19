@@ -14,7 +14,7 @@ use tokio::{
 use crate::{
     daemon::{CE, KS},
     keystore::LocalStore,
-    sync::task::quic::{self as qs},
+    sync::transport::quic::{self as qs},
 };
 
 #[derive(Debug)]
