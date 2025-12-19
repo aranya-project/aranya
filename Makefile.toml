@@ -114,7 +114,7 @@ tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 '''
 
 # Build C API tests
-[tasks.build-capi-tests]
+[tasks.ctest-build]
 category = "build"
 description = "Build C API test suite"
 dependencies = ["install-cbindgen", "build-capi", "build-experimental"]
@@ -131,18 +131,27 @@ cmake --build .
 '''
 
 # Run C API tests
-[tasks.test-capi]
+[tasks.ctest]
 category = "test"
 description = "Run C API test suite"
 cwd = "crates/aranya-client-capi/ctest/build"
 command = "ctest"
 args = ["--output-on-failure"]
-dependencies = ["build-capi-tests"]
+dependencies = ["ctest-build"]
 
+# Run C API tests verbosely
+[tasks.ctest-verbose]
+category = "test"
+description = "Run C API test suite with verbose output"
+cwd = "crates/aranya-client-capi/ctest/build"
+command = "ctest"
+args = ["-V", "--output-on-failure"]
+dependencies = ["ctest-build"]
+
+# Install Bindgen
 [tasks.install-cbindgen]
 private = true
 install_crate = { crate_name = "cbindgen", version = "0.29.0", binary = "cbindgen", test_arg = "-V" }
-
 
 # Test
 [tasks.test]

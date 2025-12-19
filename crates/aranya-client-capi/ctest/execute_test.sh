@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Wrapper script to run C tests and ensure daemon cleanup
-# Usage: run_test_with_cleanup.sh <test_executable> <daemon_path> <daemon_names>
+# Usage: execute_test.sh <test_executable> <daemon_path> <daemon_names>
 #   daemon_names: comma-separated list of daemon names to spawn (e.g., "owner,member")
 
 set -e
@@ -87,6 +87,7 @@ EOF
     echo "Spawned daemon '$daemon_name' (PID: $pid) at $run_dir"
 }
 
+TMPDIR=""
 # Spawn daemons if daemon names are provided
 if [ -n "$DAEMON_NAMES" ]; then
     echo "=== Spawning daemons: $DAEMON_NAMES ==="
@@ -111,14 +112,6 @@ if [ -n "$DAEMON_NAMES" ]; then
 fi
 
 # Run the test
-if [ -n "$TMPDIR" ]; then
-    "$TEST_EXEC" "$TMPDIR"
-else
-    "$TEST_EXEC"
-fi
+"$TEST_EXEC" "$TMPDIR"
 
-# Capture the exit code
-TEST_EXIT_CODE=$?
-
-# Exit with the test's exit code
-exit $TEST_EXIT_CODE
+exit $?

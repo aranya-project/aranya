@@ -6,12 +6,8 @@
 #include "aranya-client.h"
 #include "utils.h"
 
-/* Global daemon socket paths - constructed from temp directory argument */
-static char g_owner_uds[512];
-static char g_member_uds[512];
-
 /* Test: Create team and onboard member*/
-static int test_create_team_and_onboard_member(void) {
+static int test_create_team_and_onboard_member(const char *tmpdir) {
     printf("\n=== TEST: Add member to team ===\n");
 
     AranyaError err;
@@ -19,6 +15,12 @@ static int test_create_team_and_onboard_member(void) {
     AranyaClient member_client = {0};
     uint8_t *member_pk = NULL;
     int result = EXIT_FAILURE;
+
+    /* Construct daemon socket paths */
+    char g_owner_uds[512];
+    char g_member_uds[512];
+    snprintf(g_owner_uds, sizeof(g_owner_uds), "%s/owner/uds.sock", tmpdir);
+    snprintf(g_member_uds, sizeof(g_member_uds), "%s/member/uds.sock", tmpdir);
 
     /* Initialize owner client */
     AranyaClientConfigBuilder owner_builder;
@@ -78,11 +80,8 @@ static int test_create_team_and_onboard_member(void) {
         CLIENT_EXPECT(
             "Failed to get member key bundle", "",
             aranya_get_key_bundle(&member_client, member_pk, &member_pk_len));
-    } else if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "Failed to get member key bundle: %s\n",
-                aranya_error_to_str(err));
-        goto exit;
     }
+    CLIENT_EXPECT("Failed to get member key bundle", "", err);
 
     printf("Got member key bundle (%zu bytes)\n", member_pk_len);
 
@@ -112,12 +111,10 @@ int main(int argc, const char *argv[]) {
     }
 
     const char *tmpdir = argv[1];
-    snprintf(g_owner_uds, sizeof(g_owner_uds), "%s/owner/uds.sock", tmpdir);
-    snprintf(g_member_uds, sizeof(g_member_uds), "%s/member/uds.sock", tmpdir);
 
     printf("Running onboarding test\n");
 
-    exit_code = test_create_team_and_onboard_member();
+    exit_code = test_create_team_and_onboard_member(tmpdir);
     if (exit_code == EXIT_FAILURE) {
         fprintf(stderr, "FAILED: test_create_team_and_onboard_member\n");
     }
