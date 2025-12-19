@@ -16,7 +16,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::sync::{
-    transport::quic::{QuicError, QuicState, Server},
+    transport::quic::{QuicError, QuicServer, QuicState},
     Addr, Client, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
 };
 
@@ -379,7 +379,7 @@ fn spawn_scheduled_hello_sender(
     });
 }
 
-impl Server {
+impl QuicServer {
     /// Processes a hello message.
     ///
     /// Handles subscription management and hello notifications.

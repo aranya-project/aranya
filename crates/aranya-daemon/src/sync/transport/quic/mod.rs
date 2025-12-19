@@ -22,7 +22,7 @@ mod server;
 pub(crate) use client::QuicState;
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::{PskSeed, PskStore};
-pub(crate) use server::Server;
+pub(crate) use server::QuicServer;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";

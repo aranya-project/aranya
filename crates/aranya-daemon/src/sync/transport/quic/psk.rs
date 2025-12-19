@@ -89,7 +89,7 @@ fn psk_to_rustls(psk: aranya_crypto::tls::Psk<CS>) -> Result<PresharedKey> {
 }
 
 /// PSK store that's shared between [`super::SyncManager`]
-/// and [`super::Server`]
+/// and [`super::QuicServer`]
 #[derive(Debug)]
 pub struct PskStore {
     inner: SyncMutex<PskStoreInner>,

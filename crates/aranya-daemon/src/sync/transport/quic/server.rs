@@ -39,7 +39,7 @@ use crate::sync::{
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive(Debug)]
-pub struct Server {
+pub struct QuicServer {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     client: Client,
     /// QUIC server to handle sync requests and send sync responses.
@@ -55,7 +55,7 @@ pub struct Server {
     local_addr: Addr,
 }
 
-impl Server {
+impl QuicServer {
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     #[cfg(feature = "preview")]
     pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {

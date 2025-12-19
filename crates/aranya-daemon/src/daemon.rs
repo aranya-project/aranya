@@ -50,7 +50,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::transport::quic::Server;
+pub(crate) type SyncServer = crate::sync::transport::quic::QuicServer;
 
 mod invalid_graphs {
     use std::{
