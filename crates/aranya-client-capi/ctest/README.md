@@ -3,14 +3,6 @@
 
 This document describes how to build and run the C API integration tests for Aranya using CTest and the provided test harnesses.
 
-## Prerequisites
-
-Ensure you have built all required libraries and executables:
-
-- `crates/aranya-client-capi/output/aranya-client.h`
-- `target/release/libaranya_client_capi.dylib` (macOS) or `target/release/libaranya_client_capi.so` (Linux)
-- `target/release/aranya-daemon`
-
 ## Running Tests
 
 ### Run the Full Test Suite using ctest
