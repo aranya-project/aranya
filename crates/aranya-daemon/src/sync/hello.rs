@@ -17,7 +17,7 @@ use tracing::{debug, instrument, trace, warn};
 
 use crate::sync::{
     transport::quic::{QuicError, QuicServer, QuicState},
-    Addr, Client, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
+    Addr, Client, GraphId, Result, SyncError, SyncHandle, SyncManager, SyncPeer,
 };
 
 /// Storage for sync hello subscriptions
