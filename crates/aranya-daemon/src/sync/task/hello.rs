@@ -20,6 +20,7 @@ use tracing::{debug, instrument, trace, warn};
 use crate::{
     aranya::ClientWithState,
     sync::{
+        error::SyncError,
         task::{
             quic::{Error, Server, State},
             PeerCacheKey, SyncPeers, Syncer,
@@ -184,7 +185,9 @@ impl Syncer<State> {
         recv.read_to_end(&mut response_buf)
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
-        assert!(!response_buf.is_empty());
+        if response_buf.is_empty() {
+            return Err(SyncError::EmptyResponse);
+        }
         Ok(())
     }
 
