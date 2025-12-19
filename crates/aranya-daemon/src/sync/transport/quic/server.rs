@@ -62,7 +62,7 @@ impl QuicServer {
         Arc::clone(self.client.hello_subscriptions())
     }
 
-    /// Creates a new `Server`.
+    /// Creates a new `QuicServer`.
     ///
     /// # Panics
     ///
