@@ -160,7 +160,9 @@ impl SyncManager<QuicState> {
         recv.read_to_end(&mut response_buf)
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
-        assert!(!response_buf.is_empty());
+        if response_buf.is_empty() {
+            return Err(SyncError::EmptyResponse);
+        }
         Ok(())
     }
 

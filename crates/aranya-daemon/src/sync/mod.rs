@@ -33,6 +33,10 @@ pub enum SyncError {
     #[error("Could not receive sync response: {0}")]
     ReceiveSyncResponse(Box<SyncError>),
 
+    /// Peer sent an empty response
+    #[error("peer sent empty response")]
+    EmptyResponse,
+
     /// Encountered a bug in the program.
     #[error(transparent)]
     Bug(#[from] buggy::Bug),
