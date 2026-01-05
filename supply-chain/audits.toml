@@ -96,6 +96,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.1 -> 0.3.1"
 
+[[audits.hashbrown]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.16.0 -> 0.16.1"
+
 [[audits.heapless]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -267,6 +272,16 @@ version = "0.4.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
+
+[[audits.rkyv]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.8.12 -> 0.8.13"
+
+[[audits.rkyv_derive]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.8.12 -> 0.8.13"
 
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
