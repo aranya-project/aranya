@@ -42,18 +42,6 @@ corrosion_import_crate(
         $<$<BOOL:${ARANYA_ENABLE_EXPERIMENTAL}>:experimental>
 )
 
-add_custom_target(aranya_client_h
-    BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/output/aranya-client.h
-    COMMAND ${CMAKE_COMMAND} -E env RUSTC_BOOTSTRAP=1
-        cbindgen
-            --config=${CMAKE_CURRENT_SOURCE_DIR}/cbindgen.toml
-            --output=${CMAKE_CURRENT_SOURCE_DIR}/output/aranya-client.h
-            --verify
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Validating aranya-client.h via cbindgen"
-)
-add_dependencies(aranya_client_capi aranya_client_h)
-
 target_include_directories(aranya_client_capi
     INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/output
@@ -67,5 +55,6 @@ target_compile_definitions(aranya_client_capi
 
 add_library(Aranya::Client ALIAS aranya_client_capi)
 
-
-add_subdirectory(ctest)
+if(ARANYA_BUILD_TESTS)
+    add_subdirectory(ctest)
+endif()

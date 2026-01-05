@@ -161,6 +161,16 @@ command = "cargo"
 args = ["--verbose", "test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
 
+[tasks.ctest]
+category = "test"
+description = "Run C Tests"
+script = '''
+cmake -B build -S .
+cd build
+cmake --build .
+ctest
+'''
+
 
 # Security
 [tasks.security]
@@ -174,19 +184,22 @@ run_task = { name = [
 
 [tasks.cargo-audit]
 category = "security"
-install_crate = { crate_name = "cargo-audit", version = "0.21.2", binary = "cargo-audit", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-audit", version = "0.22.0", binary = "cargo-audit", test_arg = "-V" }
 command = "cargo"
 args = ["audit"]
 
 [tasks.cargo-deny]
 category = "security"
-install_crate = { crate_name = "cargo-deny", version = "0.18.2", binary = "cargo-deny", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-deny", version = "0.18.9", binary = "cargo-deny", test_arg = "-V" }
 command = "cargo"
 args = ["deny", "check"]
 
 [tasks.cargo-vet]
 category = "security"
-install_crate = { crate_name = "cargo-vet", version = "0.10.0", binary = "cargo-vet", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-vet", version = "0.10.1", binary = "cargo-vet", test_arg = "-V" }
 command = "cargo"
 args = ["vet", "check"]
 
@@ -257,7 +270,8 @@ script = "git ls-files -z '*.c' '*.h' | xargs -0 -- clang-format --Werror -i"
 
 [tasks.install-taplo]
 private = true
-install_crate = { crate_name = "taplo-cli", version = "0.9.3", binary = "taplo", test_arg = ["-V"] }
+toolchain = "stable"
+install_crate = { crate_name = "taplo-cli", version = "0.10.0", binary = "taplo", test_arg = ["-V"] }
 
 [tasks.check-features]
 category = "correctness"
@@ -280,9 +294,10 @@ cargo clippy --all-targets --all-features
 install_crate = { rustup_component_name = "clippy" }
 
 [tasks.machete]
+toolchain = "stable"
 command = "cargo"
 args = ["machete"]
-install_crate = { crate_name = "cargo-machete", version = "0.8.0", binary = "cargo-machete", test_arg = "--version" }
+install_crate = { crate_name = "cargo-machete", version = "0.9.1", binary = "cargo-machete", test_arg = "--version" }
 
 
 # Docs
@@ -320,7 +335,8 @@ fi
 
 [tasks.install-cargo-all-features]
 private = true
-install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-all-features", version = "1.12.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
 
 
 # Examples

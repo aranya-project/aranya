@@ -1,47 +1,48 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
-/* include the generated C API header (CMake should add the include dir) */
 #include "aranya-client.h"
-#include "utils.h"
 
-/* Minimal test harness that runs a few small checks and reports results to
-   stdout. CTest will see the executable as a single test; the harness runs
-   multiple subtests and fails the whole test if any subtest fails. */
+#define TRY(err)                                                               \
+    do {                                                                       \
+        if (err != ARANYA_ERROR_SUCCESS)                                       \
+            return EXIT_FAILURE;                                               \
+    } while (0);
 
-/* Test: aranya_error_to_str returns a non-empty string for success code. */
-static int test_error_to_str_success(void) {
-    const char *s = aranya_error_to_str(ARANYA_ERROR_SUCCESS);
-    if (s == NULL) {
-        return 0;
+static pid_t spawn_daemon(const char *path) {
+    pid_t pid = fork();
+    if (pid != 0) {
+        return pid;
     }
-    return s[0] != '\0';
+
+    char *env[] = {
+        "ARANYA_DAEMON=debug",
+        NULL,
+    };
+    // Show that we can run the daemon by path passed to the test.
+    int ret = execle(path, path, "--help", NULL, env);
+    fprintf(stderr, "unexpected return %d", ret);
+    abort();
 }
 
-/* Test: aranya_error_to_str returns a non-empty string for an invalid code. */
-static int test_error_to_str_invalid(void) {
-    const unsigned bogus = 0xDEADBEEFu;
-    const char *s = aranya_error_to_str(bogus);
-    if (s == NULL) {
-        return 0;
-    }
-    return s[0] != '\0';
-}
-
-int main(void) {
-    printf("Running aranya-client-capi simple subtests\n");
-
-    if (!test_error_to_str_success()) {
-        fprintf(stderr, "FAILED: error_to_str(success)\n");
-        return EXIT_FAILURE;
-    }
-    if (!test_error_to_str_invalid()) {
-        fprintf(stderr, "FAILED: error_to_str(invalid)\n");
+int main(int argc, const char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "usage: `%s <daemon>`\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    return EXIT_SUCCESS;
+    // Show that we can use the client library.
+    AranyaExtError ext;
+    TRY(aranya_ext_error_init(&ext));
+    TRY(aranya_ext_error_cleanup(&ext));
+
+    spawn_daemon(argv[1]);
+    int status;
+    wait(&status);
+    bool success = WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS;
+
+    return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

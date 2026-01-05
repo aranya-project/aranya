@@ -59,7 +59,6 @@ jobs:
       - name: Unit Tests
         run: cargo make ctest
 
-
   c-example-application:
     permissions:
       contents: read
