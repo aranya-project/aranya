@@ -11,7 +11,7 @@ pub(crate) use aranya_util::Addr;
 pub(crate) use handle::{Request, SyncHandle};
 pub(crate) use manager::SyncManager;
 pub(crate) use types::SyncPeer;
-pub(super) use types::{Client, EffectSender, SyncResponse};
+pub(super) use types::SyncResponse;
 
 /// Possible errors that could happen in the Aranya Syncer.
 #[derive(Debug, thiserror::Error)]

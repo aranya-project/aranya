@@ -50,7 +50,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::transport::quic::QuicServer;
+pub(crate) type SyncServer = crate::sync::transport::quic::QuicServer<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -117,7 +117,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: SyncManager<QuicSyncClientState>,
+    syncer: SyncManager<QuicSyncClientState, EN, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -317,7 +317,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicSyncClientState>,
+        SyncManager<QuicSyncClientState, EN, SP, EF>,
         SyncHandle,
         EffectReceiver,
         SocketAddr,

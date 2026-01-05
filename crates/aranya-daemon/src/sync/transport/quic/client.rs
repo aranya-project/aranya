@@ -7,7 +7,9 @@ use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{Command as _, Engine, Sink, SyncRequester, MAX_SYNC_MESSAGE_SIZE};
+use aranya_runtime::{
+    Command as _, Engine, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
+};
 use aranya_util::{error::ReportExt as _, rustls::SkipServerVerification};
 use buggy::BugExt as _;
 use bytes::Bytes;
@@ -27,9 +29,8 @@ use super::{PskStore, QuicError, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC}
 #[cfg(feature = "preview")]
 use crate::sync::GraphId;
 use crate::{
-    sync::{
-        Addr, Client, EffectSender, Request, Result, SyncError, SyncManager, SyncPeer, SyncResponse,
-    },
+    aranya::ClientWithState,
+    sync::{Addr, Request, Result, SyncError, SyncManager, SyncPeer, SyncResponse},
     InvalidGraphs,
 };
 
@@ -85,19 +86,20 @@ impl QuicState {
     }
 }
 
-impl SyncState for QuicState {
+impl<EN, SP, EF> SyncState<EN, SP, EF> for QuicState
+where
+    EN: Engine,
+    SP: StorageProvider,
+{
     /// Syncs with the peer.
     ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    async fn sync_impl<S>(
-        syncer: &mut SyncManager<Self>,
+    async fn sync_impl<S: Sink<EN::Effect>>(
+        syncer: &mut SyncManager<Self, EN, SP, EF>,
         peer: SyncPeer,
         sink: &mut S,
-    ) -> Result<usize>
-    where
-        S: Sink<<crate::EN as Engine>::Effect> + Send,
-    {
+    ) -> Result<usize> {
         // Sets the active team before starting a QUIC connection
         syncer
             .state
@@ -132,7 +134,7 @@ impl SyncState for QuicState {
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_subscribe_impl(
-        syncer: &mut SyncManager<Self>,
+        syncer: &mut SyncManager<Self, EN, SP, EF>,
         peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
@@ -157,7 +159,7 @@ impl SyncState for QuicState {
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_unsubscribe_impl(
-        syncer: &mut SyncManager<Self>,
+        syncer: &mut SyncManager<Self, EN, SP, EF>,
         peer: SyncPeer,
     ) -> Result<()> {
         syncer
@@ -173,7 +175,7 @@ impl SyncState for QuicState {
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn broadcast_hello_notifications_impl(
-        syncer: &mut SyncManager<Self>,
+        syncer: &mut SyncManager<Self, EN, SP, EF>,
         graph_id: GraphId,
         head: Address,
     ) -> Result<()> {
@@ -181,11 +183,15 @@ impl SyncState for QuicState {
     }
 }
 
-impl SyncManager<QuicState> {
+impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+where
+    EN: Engine,
+    SP: StorageProvider,
+{
     /// Creates a new [`SyncManager`].
     pub(crate) fn new(
-        client: Client,
-        send_effects: EffectSender,
+        client: ClientWithState<EN, SP>,
+        send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         (server_addr, client_addr): (Addr, Addr),
@@ -332,7 +338,7 @@ impl SyncManager<QuicState> {
         peer: SyncPeer,
     ) -> Result<usize>
     where
-        S: Sink<<crate::EN as Engine>::Effect>,
+        S: Sink<EN::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
         trace!("client receiving sync response from QUIC sync server");

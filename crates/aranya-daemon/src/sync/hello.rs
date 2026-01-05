@@ -10,14 +10,17 @@ use std::{
 
 use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Storage as _, StorageProvider as _, SyncHelloType, SyncType};
+use aranya_runtime::{Address, Engine, Storage as _, StorageProvider, SyncHelloType, SyncType};
 use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
-use crate::sync::{
-    transport::quic::{QuicError, QuicServer, QuicState},
-    Addr, Client, GraphId, Result, SyncError, SyncHandle, SyncManager, SyncPeer,
+use crate::{
+    aranya::ClientWithState,
+    sync::{
+        transport::quic::{QuicError, QuicServer, QuicState},
+        Addr, GraphId, Result, SyncError, SyncHandle, SyncManager, SyncPeer,
+    },
 };
 
 /// Storage for sync hello subscriptions
@@ -37,7 +40,11 @@ pub struct HelloSubscription {
 /// Maps from (team_id, subscriber_address) to subscription details
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
 
-impl SyncManager<QuicState> {
+impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+where
+    EN: Engine,
+    SP: StorageProvider,
+{
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
     pub async fn broadcast_hello_notifications(
@@ -322,14 +329,17 @@ impl SyncManager<QuicState> {
 /// The task will periodically send hello notifications to the subscriber at the specified interval,
 /// regardless of whether the graph has changed. The task will exit when the subscription expires
 /// or the cancellation token is triggered.
-fn spawn_scheduled_hello_sender(
+fn spawn_scheduled_hello_sender<EN, SP>(
     peer: SyncPeer,
     schedule_delay: Duration,
     expires_at: Instant,
     cancel_token: CancellationToken,
     handle: SyncHandle,
-    client: Client,
-) {
+    client: ClientWithState<EN, SP>,
+) where
+    EN: Engine + Send + 'static,
+    SP: StorageProvider + Send + 'static,
+{
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
     tokio::spawn(async move {
         loop {
@@ -381,14 +391,18 @@ fn spawn_scheduled_hello_sender(
     });
 }
 
-impl QuicServer {
+impl<EN, SP> QuicServer<EN, SP>
+where
+    EN: Engine + Send + 'static,
+    SP: StorageProvider + Send + 'static,
+{
     /// Processes a hello message.
     ///
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
     pub(crate) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client: Client,
+        client: ClientWithState<EN, SP>,
         active_team: &TeamId,
         handle: SyncHandle,
     ) {

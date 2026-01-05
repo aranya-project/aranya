@@ -24,6 +24,3 @@ pub(crate) enum SyncResponse {
     /// Failure.
     Err(String),
 }
-
-pub(crate) type EffectSender = tokio::sync::mpsc::Sender<(super::GraphId, Vec<crate::EF>)>;
-pub(crate) type Client = crate::aranya::ClientWithState<crate::EN, crate::SP>;

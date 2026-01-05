@@ -28,14 +28,16 @@
 //!
 //! [`SyncHandle`]: super::SyncHandle
 
-use std::collections::HashMap;
 #[cfg(feature = "preview")]
 use std::time::Duration;
+use std::{collections::HashMap, fmt};
 
 use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
+use aranya_runtime::{Engine, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
+use derive_where::derive_where;
 use futures_util::StreamExt as _;
 #[cfg(feature = "preview")]
 use tokio::task::JoinSet;
@@ -48,9 +50,9 @@ use tracing::{error, info, instrument, warn};
 use super::{
     handle::{ManagerMessage, Request},
     transport::SyncState,
-    Addr, Client, EffectSender, Result, SyncPeer,
+    Addr, Result, SyncPeer,
 };
-use crate::{vm_policy::VecSink, InvalidGraphs};
+use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
 
 /// Syncs with each peer after the specified interval.
 ///
@@ -58,10 +60,13 @@ use crate::{vm_policy::VecSink, InvalidGraphs};
 /// Receives added/removed peers from [`SyncHandle`] via mpsc channels.
 ///
 /// [`SyncHandle`]: super::SyncHandle
-#[derive(Debug)]
-pub struct SyncManager<ST> {
+#[derive_where(Debug)]
+pub struct SyncManager<ST, EN, SP, EF>
+where
+    ST: fmt::Debug,
+{
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(super) client: Client,
+    pub(super) client: ClientWithState<EN, SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
     /// Receives added/removed peers.
@@ -69,7 +74,7 @@ pub struct SyncManager<ST> {
     /// Delay queue for getting the next peer to sync with.
     pub(super) queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
-    pub(super) send_effects: EffectSender,
+    pub(super) send_effects: mpsc::Sender<(super::GraphId, Vec<EF>)>,
     /// Keeps track of invalid graphs due to finalization errors.
     pub(super) invalid: InvalidGraphs,
     /// Additional state used by the syncer.
@@ -81,7 +86,10 @@ pub struct SyncManager<ST> {
     pub(super) hello_tasks: JoinSet<()>,
 }
 
-impl<ST> SyncManager<ST> {
+impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
+where
+    ST: fmt::Debug,
+{
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
@@ -103,7 +111,14 @@ impl<ST> SyncManager<ST> {
     }
 }
 
-impl<ST: SyncState> SyncManager<ST> {
+impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
+where
+    ST: SyncState<EN, SP, EF> + fmt::Debug,
+    EN: Engine,
+    SP: StorageProvider,
+    EF: Send + Sync + 'static + TryFrom<EN::Effect>,
+    EF::Error: Send + Sync + 'static + std::error::Error,
+{
     pub(crate) async fn run(mut self, ready: ready::Notifier) {
         ready.notify();
         loop {
@@ -283,13 +298,13 @@ impl<ST: SyncState> SyncManager<ST> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
+    pub fn client(&self) -> &crate::aranya::Client<EN, SP> {
         self.client.client()
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, SP> {
         self.client.client_mut()
     }
 }

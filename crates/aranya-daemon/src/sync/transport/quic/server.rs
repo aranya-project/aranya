@@ -3,13 +3,15 @@ use std::{future::Future, net::SocketAddr, sync::Arc};
 use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    StorageError, SyncRequestMessage, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     error::ReportExt as _, ready, rustls::NoCertResolver, s2n_quic::get_conn_identity, task::scope,
 };
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
+use derive_where::derive_where;
 use futures_util::{AsyncReadExt as _, TryFutureExt as _};
 use s2n_quic::{
     application,
@@ -31,17 +33,18 @@ use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 use super::{ConnectionUpdate, PskStore, QuicError, SharedConnectionMap, ALPN_QUIC_SYNC};
 #[cfg(feature = "preview")]
 use crate::sync::hello::HelloSubscriptions;
-use crate::sync::{
-    Addr, Client, GraphId, Request, Result, SyncError, SyncHandle, SyncPeer, SyncResponse,
+use crate::{
+    aranya::ClientWithState,
+    sync::{Addr, GraphId, Request, Result, SyncError, SyncHandle, SyncPeer, SyncResponse},
 };
 
 /// The Aranya QUIC sync server.
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
-#[derive(Debug)]
-pub struct QuicServer {
+#[derive_where(Debug)]
+pub struct QuicServer<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client: Client,
+    client: ClientWithState<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
@@ -55,7 +58,11 @@ pub struct QuicServer {
     local_addr: Addr,
 }
 
-impl QuicServer {
+impl<EN, SP> QuicServer<EN, SP>
+where
+    EN: Engine + Send + 'static,
+    SP: StorageProvider + Send + 'static,
+{
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     #[cfg(feature = "preview")]
     pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
@@ -72,7 +79,7 @@ impl QuicServer {
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        client: Client,
+        client: ClientWithState<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
     ) -> Result<(
@@ -161,7 +168,7 @@ impl QuicServer {
     fn accept_connection(
         &mut self,
         mut conn: s2n_quic::Connection,
-    ) -> impl Future<Output = ()> + use<'_> {
+    ) -> impl Future<Output = ()> + use<'_, EN, SP> {
         let handle = conn.handle();
         async {
             trace!("received incoming QUIC connection");
@@ -224,7 +231,7 @@ impl QuicServer {
     /// Responds to a sync.
     #[instrument(skip_all)]
     pub(crate) async fn sync(
-        client: Client,
+        client: ClientWithState<EN, SP>,
         stream: BidirectionalStream,
         active_team: TeamId,
         handle: SyncHandle,
@@ -268,7 +275,7 @@ impl QuicServer {
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: Client,
+        client: ClientWithState<EN, SP>,
         local_addr: Addr,
         request_data: &[u8],
         active_team: TeamId,
@@ -329,7 +336,7 @@ impl QuicServer {
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: Client,
+        client: ClientWithState<EN, SP>,
         local_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,
