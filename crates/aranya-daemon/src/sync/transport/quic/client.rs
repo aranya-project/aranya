@@ -26,11 +26,9 @@ use tokio_util::time::DelayQueue;
 use tracing::{error, instrument, trace};
 
 use super::{PskStore, QuicError, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
-#[cfg(feature = "preview")]
-use crate::sync::GraphId;
 use crate::{
     aranya::ClientWithState,
-    sync::{Addr, Request, Result, SyncError, SyncManager, SyncPeer, SyncResponse},
+    sync::{Addr, GraphId, Request, Result, SyncError, SyncManager, SyncPeer, SyncResponse},
     InvalidGraphs,
 };
 

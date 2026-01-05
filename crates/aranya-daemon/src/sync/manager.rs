@@ -50,7 +50,7 @@ use tracing::{error, info, instrument, warn};
 use super::{
     handle::{ManagerMessage, Request},
     transport::SyncState,
-    Addr, Result, SyncPeer,
+    Addr, GraphId, Result, SyncPeer,
 };
 use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
 
@@ -74,7 +74,7 @@ where
     /// Delay queue for getting the next peer to sync with.
     pub(super) queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
-    pub(super) send_effects: mpsc::Sender<(super::GraphId, Vec<EF>)>,
+    pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Keeps track of invalid graphs due to finalization errors.
     pub(super) invalid: InvalidGraphs,
     /// Additional state used by the syncer.
