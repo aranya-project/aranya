@@ -18,7 +18,7 @@ This document describes how to build and run the C API integration tests for Ara
   ```
 3. **Run all tests with verbose output:**
   ```sh
-  ctest -V --output-on-failure
+  ctest -V
   ```
 
 ### Run the Full Test Suite using cargo make
