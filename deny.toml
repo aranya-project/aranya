@@ -81,6 +81,8 @@ ignore = [
     "RUSTSEC-2024-0436",
     # The `rustls-pemfile` crate is unmaintained. We're not using certs anyways.
     "RUSTSEC-2025-0134",
+    # This is throwing an error regarding CVSS version 4.0 not being supported. Unsure of proper fix.
+    "RUSTSEC-2024-0445",
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
