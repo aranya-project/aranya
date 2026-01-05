@@ -131,7 +131,7 @@ cmake --build .
 '''
 
 # Run C API tests
-[tasks.ctest-build]
+[tasks.ctest-new]
 category = "test"
 description = "Run C API test suite"
 cwd = "crates/aranya-client-capi/ctest/build"
