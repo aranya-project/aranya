@@ -127,11 +127,10 @@ mkdir -p build
 cd build
 cmake ..
 cmake --build .
-# TODO: Use ninja
 '''
 
 # Run C API tests
-[tasks.ctest-new]
+[tasks.ctest]
 category = "test"
 description = "Run C API test suite"
 cwd = "crates/aranya-client-capi/ctest/build"
@@ -160,16 +159,6 @@ workspace = true
 command = "cargo"
 args = ["--verbose", "test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
-
-[tasks.ctest]
-category = "test"
-description = "Run C Tests"
-script = '''
-cmake -B build -S .
-cd build
-cmake --build .
-ctest
-'''
 
 
 # Security
