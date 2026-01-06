@@ -215,7 +215,6 @@ pub struct DeviceCtx {
     pub daemon: DaemonHandle,
 }
 
-#[allow(dead_code)]
 impl DeviceCtx {
     pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
