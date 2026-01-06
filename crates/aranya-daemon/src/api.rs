@@ -1019,6 +1019,24 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn process_ephemeral_command(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        command: Vec<u8>,
+    ) -> api::Result<Vec<u8>> {
+        let graph = self.check_team_valid(team).await?;
+
+        let mut session = self.client.session_new(graph).await?;
+        let effects = self.client.session_receive(&mut session, &command).await?;
+
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        // Serialize effects for return
+        postcard::to_allocvec(&effects).map_err(|e| api::Error::Internal(e.to_string()))
+    }
+
+    #[instrument(skip(self), err)]
     async fn create_label(
         self,
         _: context::Context,
