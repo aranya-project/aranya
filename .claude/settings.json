@@ -7,6 +7,8 @@
       "Bash(find)",
       "Bash(cat)",
       "Bash(head)",
+      "Bash(cmake)",
+      "Bash(ctest)",
       "Bash(tail)"
     ],
     "deny": [
