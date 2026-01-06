@@ -68,8 +68,6 @@ macro_rules! find_effect {
     }
 }
 
-pub(crate) type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
-
 /// Daemon API Server.
 #[derive(Debug)]
 pub(crate) struct DaemonApiServer {
@@ -81,7 +79,7 @@ pub(crate) struct DaemonApiServer {
     listener: UnixListener,
 
     /// Channel for receiving effects from the syncer.
-    recv_effects: EffectReceiver,
+    recv_effects: mpsc::Receiver<(GraphId, Vec<EF>)>,
 
     /// Api Handler.
     api: Api,
@@ -94,7 +92,7 @@ pub(crate) struct DaemonApiServerArgs {
     pub(crate) sk: ApiKey<CS>,
     pub(crate) pk: PublicKeys<CS>,
     pub(crate) handle: SyncHandle,
-    pub(crate) recv_effects: EffectReceiver,
+    pub(crate) recv_effects: mpsc::Receiver<(GraphId, Vec<EF>)>,
     pub(crate) invalid: InvalidGraphs,
     #[cfg(feature = "afc")]
     pub(crate) afc: Afc<CE, CS, KS>,
@@ -366,6 +364,7 @@ struct ApiInner {
     /// Handle to talk with the syncer.
     handle: SyncHandle,
     /// Handles graph effects from the syncer.
+    #[derive_where(skip(Debug))]
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,

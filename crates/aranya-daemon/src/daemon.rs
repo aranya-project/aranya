@@ -10,19 +10,23 @@ use aranya_crypto::{
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState,
+    ClientState, GraphId,
 };
 use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, sync::Mutex, task::JoinSet};
+use tokio::{
+    fs,
+    sync::{mpsc, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
-    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
+    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
     aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
@@ -319,7 +323,7 @@ impl Daemon {
         SyncServer,
         SyncManager<QuicSyncClientState, EN, SP, EF>,
         SyncHandle,
-        EffectReceiver,
+        mpsc::Receiver<(GraphId, Vec<EF>)>,
         SocketAddr,
     )> {
         let device_id = pk.ident_pk.id()?;
@@ -334,7 +338,7 @@ impl Daemon {
         let client = Client::new(Arc::clone(&aranya));
 
         // Sync in the background at some specified interval.
-        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+        let (send_effects, recv_effects) = mpsc::channel(256);
 
         // Create shared hello subscriptions for both server and syncer
         #[cfg(feature = "preview")]

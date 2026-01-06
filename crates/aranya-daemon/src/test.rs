@@ -45,7 +45,6 @@ use tokio::{
 use crate::sync::hello::HelloSubscriptions;
 use crate::{
     actions::Actions,
-    api::EffectReceiver,
     aranya::{self, ClientWithState, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
     sync::{self, transport::quic::PskStore, SyncPeer},
@@ -85,7 +84,7 @@ impl TestDevice {
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
         syncer: TestSyncer,
-        effect_recv: EffectReceiver,
+        effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
