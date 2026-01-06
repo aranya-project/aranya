@@ -4,8 +4,13 @@
       "Bash(cargo check)",
       "Bash(cargo build)",
       "Bash(cargo make)",
+      "Bash(find)",
+      "Bash(cat)",
+      "Bash(head)",
+      "Bash(tail)"
     ],
     "deny": [
+      "WebFetch"
     ]
   },
   "env": {
