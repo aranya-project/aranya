@@ -2,7 +2,6 @@
 
 use std::time::Duration;
 
-use crate::tcp::{TcpClient, TcpServer};
 use anyhow::Result;
 use aranya_client::{
     client::{DeviceId, KeyBundle, TeamId},
@@ -10,6 +9,8 @@ use aranya_client::{
 };
 use aranya_example_common::{AgeEncryptor, SecretString};
 use serde::{Deserialize, Serialize};
+
+use crate::tcp::{TcpClient, TcpServer};
 
 /// How long to wait between syncs.
 pub const SYNC_INTERVAL: Duration = Duration::from_millis(100);
