@@ -241,6 +241,7 @@ deny = [
 #exact = true
 
 skip = [
+    "age@0.11.1",
     "base64@0.21.7",
     "generic-array@0.14.9",
     "getrandom@0.2.16",
@@ -281,9 +282,6 @@ skip-tree = [
 include-path-dependencies = false
 duplicates = "deny"
 unused = "deny"
-allow-duplicates = [
-    "age",
-]
 
 # This section is considered when running `cargo deny check sources`.
 # More documentation about the 'sources' section can be found here:
