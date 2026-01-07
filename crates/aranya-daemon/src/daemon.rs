@@ -10,26 +10,30 @@ use aranya_crypto::{
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState,
+    ClientState, GraphId,
 };
 use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, sync::Mutex, task::JoinSet};
+use tokio::{
+    fs,
+    sync::{mpsc, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
-    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
+    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
     aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::{
-        quic::{PskStore, State as QuicSyncClientState, SyncParams},
-        SyncPeers, Syncer,
+    sync::{
+        transport::quic::{PskStore, QuicState as QuicSyncClientState, SyncParams},
+        SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -50,7 +54,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::transport::quic::QuicServer<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -117,7 +121,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncClientState>,
+    syncer: SyncManager<QuicSyncClientState, EN, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -165,7 +169,7 @@ impl Daemon {
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, syncer, peers, recv_effects, local_addr) =
+            let (client, sync_server, syncer, handle, recv_effects, local_addr) =
                 Self::setup_aranya(
                     &cfg,
                     eng.clone(),
@@ -215,7 +219,7 @@ impl Daemon {
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
-                peers,
+                handle,
                 recv_effects,
                 invalid: invalid_graphs,
                 #[cfg(feature = "afc")]
@@ -317,9 +321,9 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        Syncer<QuicSyncClientState>,
-        SyncPeers,
-        EffectReceiver,
+        SyncManager<QuicSyncClientState, EN, SP, EF>,
+        SyncHandle,
+        mpsc::Receiver<(GraphId, Vec<EF>)>,
         SocketAddr,
     )> {
         let device_id = pk.ident_pk.id()?;
@@ -334,7 +338,7 @@ impl Daemon {
         let client = Client::new(Arc::clone(&aranya));
 
         // Sync in the background at some specified interval.
-        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+        let (send_effects, recv_effects) = mpsc::channel(256);
 
         // Create shared hello subscriptions for both server and syncer
         #[cfg(feature = "preview")]
@@ -362,7 +366,7 @@ impl Daemon {
             #[cfg(feature = "preview")]
             server.hello_subscriptions(),
         );
-        let syncer = Syncer::new(
+        let syncer = SyncManager::new(
             client_with_state_for_syncer,
             send_effects,
             invalid_graphs,
