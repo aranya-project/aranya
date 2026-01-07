@@ -1,6 +1,5 @@
 //! Aranya onboarding example lib.
 
-pub mod age;
 pub mod config;
 pub mod env;
 pub mod onboarding;

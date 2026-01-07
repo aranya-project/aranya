@@ -20,8 +20,8 @@ debug = []
 [dependencies]
 aranya-client = { workspace = true, features = ["default"] }
 aranya-util = { workspace = true }
+aranya-example-common = { path = "../aranya-example-common" }
 
-age = { version = "0.11.2" }
 anyhow = { workspace = true }
 backon = { workspace = true }
 clap = { workspace = true }

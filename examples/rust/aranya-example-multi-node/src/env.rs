@@ -2,9 +2,10 @@
 
 use std::{env, fmt::Write, net::Ipv4Addr, path::Path, str::FromStr};
 
-use age::secrecy::{ExposeSecret, SecretString};
+use age::secrecy::ExposeSecret;
 use anyhow::{Context, Result};
 use aranya_client::Addr;
+use aranya_example_common::SecretString;
 use tokio::fs;
 
 /// Environment variable name constants.

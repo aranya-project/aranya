@@ -258,7 +258,6 @@ skip = [
     "rand_core@0.5.1",
     "rustix@0.38.44",
     "rustc-hash@1.1.0",
-    "self_cell@0.10.3",
     "socket2@0.5.10",
     "spin@0.9.8",
     "thiserror-impl@1.0.69",
