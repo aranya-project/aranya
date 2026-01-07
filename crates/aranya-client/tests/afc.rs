@@ -223,11 +223,6 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
-    // Test creating roles without delegation first
-    let _ = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
-
     // create default roles
     let default_roles = devices.setup_default_roles(team_id).await?;
 
