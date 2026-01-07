@@ -145,14 +145,6 @@ set(ARANYA_DAEMON "${RUST_TARGET_DIR}/aranya-daemon")
 
 enable_testing()
 
-#add_executable(TestSimple test_simple.c)
-#target_link_libraries(TestSimple PRIVATE Aranya::Client)
-#add_test(NAME TestSimple COMMAND TestSimple $<TARGET_FILE:Aranya::Daemon>)
-
-#add_executable(TestOnboarding test_onboarding.c)
-#target_link_libraries(TestOnboarding PRIVATE Aranya::Client)
-#add_test(NAME TestOnboarding COMMAND TestOnboarding $<TARGET_FILE:Aranya::Daemon>)
-
 # --- Helper function for test executables ---
 function(add_capi_test TEST_NAME SOURCE_FILE)
     cmake_parse_arguments(ARG "" "DAEMON_NAMES" "" ${ARGN})
@@ -173,14 +165,9 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
     endif()
     
     # Always use wrapper script for uniform test execution
-    if("${TEST_NAME}" STREQUAL "TestOnboarding")
-        add_test(NAME ${TEST_NAME} 
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/execute_test.sh 
-                    ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME} "${ARANYA_DAEMON}" "${ARG_DAEMON_NAMES}")
-    else()
-        add_test(NAME ${TEST_NAME} 
-            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME} "${ARANYA_DAEMON}")
-    endif()
+    add_test(NAME ${TEST_NAME} 
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/execute_test.sh 
+        ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME} "${ARANYA_DAEMON}" "${ARG_DAEMON_NAMES}")
     
     set_property(TEST ${TEST_NAME} PROPERTY ENVIRONMENT
         "DYLD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${RUST_TARGET_DIR}:$ENV{LD_LIBRARY_PATH}")
@@ -188,4 +175,3 @@ endfunction()
 
 # --- Test Executables ---
 add_capi_test(TestOnboarding test_onboarding.c DAEMON_NAMES "owner,member")
-add_capi_test(TestSimple test_simple.c)
