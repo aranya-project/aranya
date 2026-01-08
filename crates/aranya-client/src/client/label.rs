@@ -1,17 +1,19 @@
 use std::{slice, vec};
 
 use aranya_daemon_api as api;
+use aranya_id::custom_id;
 use aranya_policy_text::Text;
 
 use crate::{
     client::DeviceId,
-    util::{custom_id, impl_slice_iter_wrapper, impl_vec_into_iter_wrapper},
+    util::{impl_slice_iter_wrapper, impl_vec_into_iter_wrapper, ApiConv as _, ApiId},
 };
 
 custom_id! {
     /// An AFC label ID.
     pub struct LabelId;
 }
+impl ApiId<api::LabelId> for LabelId {}
 
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
