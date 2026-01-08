@@ -4,6 +4,7 @@
       "Bash(cargo check)",
       "Bash(cargo build)",
       "Bash(cargo make)",
+      "Bash(cargo test)",
       "Bash(find)",
       "Bash(cat)",
       "Bash(head)",
