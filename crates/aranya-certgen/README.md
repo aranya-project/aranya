@@ -1,6 +1,8 @@
 # aranya-certgen
 
-A CLI tool for generating root CA certificates and signed certificates using P-256 ECDSA keys.
+A CLI tool for generating root CA certificates and signed certificates.
+
+All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 
 ## Installation
 
@@ -36,7 +38,7 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--cert <PATH>` | Path for the CA certificate file (PEM format) | required |
-| `--key <PATH>` | Path for the CA private key file (PEM format) | required |
+| `--key <PATH>` | Path for the CA P-256 ECDSA private key file (PEM format) | required |
 | `--ca-name <NAME>` | Common Name (CN) for the root CA | `My Root CA` |
 | `--validity-days <DAYS>` | Validity period in days | `365` |
 
@@ -47,9 +49,9 @@ Create a new certificate signed by an existing root CA with a P-256 ECDSA privat
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--cert <PATH>` | Path for the output certificate file (PEM format) | required |
-| `--key <PATH>` | Path for the output private key file (PEM format) | required |
+| `--key <PATH>` | Path for the output P-256 ECDSA private key file (PEM format) | required |
 | `--ca-cert <PATH>` | Path to the CA certificate file (PEM format) | required |
-| `--ca-key <PATH>` | Path to the CA private key file (PEM format) | required |
+| `--ca-key <PATH>` | Path to the CA P-256 ECDSA private key file (PEM format) | required |
 | `--cn <NAME>` | Common Name (CN) for the certificate | required |
 | `--dns <HOSTNAME>` | DNS name for SAN (can be repeated) | — |
 | `--ip <ADDRESS>` | IP address for SAN (can be repeated) | — |
@@ -80,10 +82,10 @@ This tool simplifies certificate generation compared to OpenSSL:
 
 | Aspect | aranya-certgen | OpenSSL |
 |--------|---------|---------|
-| Commands for CA + 1 cert | 2 | 6 |
+| Commands for CA + 1 cert | 2 | 6+ |
 | Intermediate files | None | CSR, serial |
 | SAN syntax | `--dns x --ip y` | `-extfile <(echo "...")` |
-| Key algorithm | Built-in P-256 | Must specify manually |
+| Key algorithm | P-256 ECDSA (built-in) | Must specify manually |
 
 ## License
 

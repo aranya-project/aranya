@@ -1,13 +1,15 @@
-//! CLI tool for generating root CA certificates and signed certificates using P-256 ECDSA.
+//! CLI tool for generating root CA certificates and signed certificates.
+//!
+//! All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 //!
 //! # Usage
 //!
 //! ```bash
-//! # Create a root CA
-//! certgen ca --cert ca.pem --key ca.key --ca-name "My CA"
+//! # Create a root CA with P-256 ECDSA key
+//! aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My CA"
 //!
-//! # Create a signed certificate
-//! certgen signed --ca-cert ca.pem --ca-key ca.key \
+//! # Create a signed certificate with P-256 ECDSA key
+//! aranya-certgen signed --ca-cert ca.pem --ca-key ca.key \
 //!     --cert server.pem --key server.key \
 //!     --cn server --dns example.com --ip 192.168.1.10
 //! ```
@@ -83,12 +85,12 @@ impl CertGenError {
     }
 }
 
-/// A pair of file paths for a certificate and its corresponding private key.
+/// A pair of file paths for a certificate and its corresponding P-256 ECDSA private key.
 #[derive(Debug, Clone)]
 struct CertKeyPaths {
     /// Path to the certificate file (PEM format).
     cert: PathBuf,
-    /// Path to the private key file (PEM format).
+    /// Path to the P-256 ECDSA private key file (PEM format).
     key: PathBuf,
 }
 
@@ -122,14 +124,14 @@ struct CliArgs {
 enum Commands {
     /// Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
     ///
-    /// Generates a self-signed CA certificate and private key that can be used
-    /// to sign other certificates.
+    /// Generates a self-signed CA certificate and P-256 ECDSA private key that
+    /// can be used to sign other certificates.
     Ca {
         /// Path for the CA certificate file (PEM format).
         #[arg(long)]
         cert: PathBuf,
 
-        /// Path for the CA private key file (PEM format).
+        /// Path for the CA P-256 ECDSA private key file (PEM format).
         #[arg(long)]
         key: PathBuf,
 
@@ -144,7 +146,7 @@ enum Commands {
 
     /// Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
     ///
-    /// Generates a certificate and private key, signed by the specified CA.
+    /// Generates a certificate and P-256 ECDSA private key, signed by the specified CA.
     /// The certificate can include Subject Alternative Names for DNS hostnames
     /// and IP addresses.
     Signed {
@@ -152,7 +154,7 @@ enum Commands {
         #[arg(long)]
         cert: PathBuf,
 
-        /// Path for the output private key file (PEM format).
+        /// Path for the output P-256 ECDSA private key file (PEM format).
         #[arg(long)]
         key: PathBuf,
 
@@ -160,7 +162,7 @@ enum Commands {
         #[arg(long)]
         ca_cert: PathBuf,
 
-        /// Path to the CA private key file used for signing (PEM format).
+        /// Path to the CA P-256 ECDSA private key file used for signing (PEM format).
         #[arg(long)]
         ca_key: PathBuf,
 
@@ -350,14 +352,16 @@ fn generate_signed_cert_files(
     Ok(())
 }
 
-/// Generates a self-signed root CA certificate and private key.
+/// Generates a self-signed root CA certificate with a P-256 ECDSA private key.
+///
+/// The generated key pair uses the NIST P-256 curve (secp256r1) with ECDSA signatures.
 ///
 /// # Arguments
 /// * `cn` - The Common Name for the CA.
 /// * `validity_days` - The number of days the certificate is valid for.
 ///
 /// # Returns
-/// A tuple containing the certificate and private key.
+/// A tuple containing the certificate and P-256 ECDSA private key.
 ///
 /// # Errors
 /// Returns an error if key generation or certificate signing fails.
@@ -389,7 +393,9 @@ fn generate_root_ca(cn: &str, validity_days: u32) -> Result<(Certificate, KeyPai
     Ok((cert, key_pair))
 }
 
-/// Generates a certificate signed by a CA.
+/// Generates a certificate signed by a CA with a P-256 ECDSA private key.
+///
+/// The generated key pair uses the NIST P-256 curve (secp256r1) with ECDSA signatures.
 ///
 /// # Arguments
 /// * `cn` - The Common Name for the certificate.
@@ -398,7 +404,7 @@ fn generate_root_ca(cn: &str, validity_days: u32) -> Result<(Certificate, KeyPai
 /// * `san` - The Subject Alternative Names (DNS and IP addresses).
 ///
 /// # Returns
-/// A tuple containing the certificate and private key.
+/// A tuple containing the certificate and P-256 ECDSA private key.
 ///
 /// # Errors
 /// Returns an error if key generation or certificate signing fails.
