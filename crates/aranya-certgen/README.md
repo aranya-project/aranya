@@ -1,11 +1,11 @@
-# certgen
+# aranya-certgen
 
 A CLI tool for generating root CA certificates and signed certificates using P-256 ECDSA keys.
 
 ## Installation
 
 ```bash
-cargo install --path crates/certgen
+cargo install --path crates/aranya-certgen
 ```
 
 ## Usage
@@ -13,13 +13,13 @@ cargo install --path crates/certgen
 ### Create a Root CA
 
 ```bash
-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA"
+aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA"
 ```
 
 ### Create a Signed Certificate
 
 ```bash
-certgen signed \
+aranya-certgen signed \
   --ca-cert ca.pem --ca-key ca.key \
   --cert server.pem --key server.key \
   --cn webserver \
@@ -29,7 +29,7 @@ certgen signed \
 
 ## Commands
 
-### `certgen ca`
+### `aranya-certgen ca`
 
 Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 
@@ -40,7 +40,7 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 | `--ca-name <NAME>` | Common Name (CN) for the root CA | `My Root CA` |
 | `--validity-days <DAYS>` | Validity period in days | `365` |
 
-### `certgen signed`
+### `aranya-certgen signed`
 
 Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
 
@@ -58,12 +58,12 @@ Create a new certificate signed by an existing root CA with a P-256 ECDSA privat
 ## Example Output
 
 ```
-$ certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA"
+$ aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA"
 Generating root CA certificate...
   Root CA certificate: ca.pem
   Root CA private key: ca.key
 
-$ certgen signed --ca-cert ca.pem --ca-key ca.key \
+$ aranya-certgen signed --ca-cert ca.pem --ca-key ca.key \
     --cert server.pem --key server.key \
     --cn webserver --dns example.com --ip 192.168.1.10
 Generating certificate 'webserver'...
@@ -78,7 +78,7 @@ Generating certificate 'webserver'...
 
 This tool simplifies certificate generation compared to OpenSSL:
 
-| Aspect | certgen | OpenSSL |
+| Aspect | aranya-certgen | OpenSSL |
 |--------|---------|---------|
 | Commands for CA + 1 cert | 2 | 6 |
 | Intermediate files | None | CSR, serial |
