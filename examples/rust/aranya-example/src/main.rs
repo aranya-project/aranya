@@ -31,8 +31,8 @@ use tracing_subscriber::{
 
 /// Generates a CA certificate using aranya-certgen library.
 fn generate_ca(ca_cert: &Path, ca_key: &Path) -> Result<()> {
-    let (cert, key) = generate_root_ca("Aranya Example CA", 365)
-        .context("failed to generate CA certificate")?;
+    let (cert, key) =
+        generate_root_ca("Aranya Example CA", 365).context("failed to generate CA certificate")?;
     write_cert(ca_cert, &cert).context("failed to write CA certificate")?;
     write_key(ca_key, &key).context("failed to write CA key")?;
     Ok(())
@@ -257,12 +257,30 @@ async fn main() -> Result<()> {
     let team_name = "rust_example";
     let owner = ClientCtx::new(team_name, "owner", &daemon_path, &root_certs_dir, &ca_key).await?;
     let admin = ClientCtx::new(team_name, "admin", &daemon_path, &root_certs_dir, &ca_key).await?;
-    let operator =
-        ClientCtx::new(team_name, "operator", &daemon_path, &root_certs_dir, &ca_key).await?;
-    let membera =
-        ClientCtx::new(team_name, "member_a", &daemon_path, &root_certs_dir, &ca_key).await?;
-    let memberb =
-        ClientCtx::new(team_name, "member_b", &daemon_path, &root_certs_dir, &ca_key).await?;
+    let operator = ClientCtx::new(
+        team_name,
+        "operator",
+        &daemon_path,
+        &root_certs_dir,
+        &ca_key,
+    )
+    .await?;
+    let membera = ClientCtx::new(
+        team_name,
+        "member_a",
+        &daemon_path,
+        &root_certs_dir,
+        &ca_key,
+    )
+    .await?;
+    let memberb = ClientCtx::new(
+        team_name,
+        "member_b",
+        &daemon_path,
+        &root_certs_dir,
+        &ca_key,
+    )
+    .await?;
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;

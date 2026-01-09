@@ -557,11 +557,7 @@ where
                         "Removed hello subscription and cancelled scheduled sender"
                     );
                 } else {
-                    debug!(
-                        ?graph_id,
-                        ?address,
-                        "No subscription found to remove"
-                    );
+                    debug!(?graph_id, ?address, "No subscription found to remove");
                 }
             }
             SyncHelloType::Hello { head, address } => {

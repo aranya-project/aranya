@@ -44,14 +44,18 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
                 .with_context(|| format!("failed to open certificate file: {}", path.display()))?;
             let mut reader = BufReader::new(file);
 
-            let certs: Vec<CertificateDer<'static>> =
-                rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>().with_context(
-                    || format!("failed to parse certificates from: {}", path.display()),
-                )?;
+            let certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut reader)
+                .collect::<Result<Vec<_>, _>>()
+                .with_context(|| {
+                    format!("failed to parse certificates from: {}", path.display())
+                })?;
 
             for cert in certs {
                 root_store.add(cert).with_context(|| {
-                    format!("failed to add certificate to root store from: {}", path.display())
+                    format!(
+                        "failed to add certificate to root store from: {}",
+                        path.display()
+                    )
                 })?;
                 cert_count += 1;
             }
@@ -106,7 +110,10 @@ pub fn load_device_cert(
         );
     }
 
-    debug!("loaded {} certificate(s) from device cert file", certs.len());
+    debug!(
+        "loaded {} certificate(s) from device cert file",
+        certs.len()
+    );
 
     // Load private key
     let key_file = File::open(key_path)
@@ -189,9 +196,11 @@ pub fn build_server_config(
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
-    use super::*;
     use std::io::Write;
+
     use tempfile::TempDir;
+
+    use super::*;
 
     // Helper to create a test PEM file with dummy content
     fn create_pem_file(dir: &Path, name: &str, content: &str) -> std::io::Result<()> {

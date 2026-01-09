@@ -41,13 +41,10 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
             // Generate mTLS certificates
             let certs_dir = work_dir.join("certs");
             let root_certs_dir = certs_dir.join("root_certs");
-            std::fs::create_dir_all(&root_certs_dir)
-                .expect("should create root_certs_dir");
+            std::fs::create_dir_all(&root_certs_dir).expect("should create root_certs_dir");
 
-            let (ca_cert, ca_key) =
-                generate_root_ca("Bench CA", 365).expect("should generate CA");
-            write_cert(root_certs_dir.join("ca.pem"), &ca_cert)
-                .expect("should write CA cert");
+            let (ca_cert, ca_key) = generate_root_ca("Bench CA", 365).expect("should generate CA");
+            write_cert(root_certs_dir.join("ca.pem"), &ca_cert).expect("should write CA cert");
 
             let issuer = issuer_from_ca(&ca_cert, ca_key).expect("should create issuer");
             let san = SubjectAltNames {

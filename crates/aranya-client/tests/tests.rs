@@ -1288,7 +1288,9 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Initialize malicious device on team.
     // With mTLS, no add_team call is needed - the device can sync with any team
     // it has valid certificates for once added.
-    owner_team.add_device(devices.membera.pk.clone(), None).await?;
+    owner_team
+        .add_device(devices.membera.pk.clone(), None)
+        .await?;
     let device = &devices.membera;
 
     // Owner creates malicious role on team:

@@ -17,7 +17,9 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use aranya_certgen::{generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames};
+use aranya_certgen::{
+    generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames,
+};
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
@@ -215,8 +217,8 @@ impl TestCtx {
         let ca_key_path = dir.path().join("ca-key.pem");
 
         // Generate CA certificate
-        let (ca_cert, ca_key) = generate_root_ca("Test CA", 365)
-            .context("failed to generate test CA")?;
+        let (ca_cert, ca_key) =
+            generate_root_ca("Test CA", 365).context("failed to generate test CA")?;
         write_cert(&ca_cert_path, &ca_cert).context("failed to write CA cert")?;
         write_key(&ca_key_path, &ca_key).context("failed to write CA key")?;
 
@@ -255,11 +257,7 @@ impl TestCtx {
     }
 
     /// Creates a single client with mTLS certificate.
-    pub async fn new_client(
-        &mut self,
-        name: &str,
-        id: GraphId,
-    ) -> Result<TestDevice> {
+    pub async fn new_client(&mut self, name: &str, id: GraphId) -> Result<TestDevice> {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
         fs::create_dir_all(&root)?;
@@ -311,12 +309,7 @@ impl TestCtx {
                 hello_subscriptions.clone(),
             );
             let (server, _sync_peers, conn_map, syncer_recv, local_addr): (TestServer, _, _, _, _) =
-                TestServer::new(
-                    client_with_state_for_server,
-                    &any_local_addr,
-                    &cert_config,
-                )
-                .await?;
+                TestServer::new(client_with_state_for_server, &any_local_addr, &cert_config).await?;
 
             // Create syncer with the actual server address
             let client_with_state_for_syncer = ClientWithState::new(

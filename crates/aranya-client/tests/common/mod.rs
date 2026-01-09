@@ -1,7 +1,16 @@
-use std::{collections::HashMap, iter, net::Ipv4Addr, path::{Path, PathBuf}, ptr, time::Duration};
+use std::{
+    collections::HashMap,
+    iter,
+    net::Ipv4Addr,
+    path::{Path, PathBuf},
+    ptr,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Context, Result};
-use aranya_certgen::{generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames};
+use aranya_certgen::{
+    generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames,
+};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
     Addr, SyncPeerConfig,
@@ -52,21 +61,50 @@ impl DevicesCtx {
         std::fs::create_dir_all(&root_certs_dir)?;
 
         // Generate CA certificate
-        let (ca_cert, ca_key) = generate_root_ca("Test CA", 365)
-            .context("failed to generate CA")?;
-        write_cert(root_certs_dir.join("ca.pem"), &ca_cert)
-            .context("failed to write CA cert")?;
+        let (ca_cert, ca_key) =
+            generate_root_ca("Test CA", 365).context("failed to generate CA")?;
+        write_cert(root_certs_dir.join("ca.pem"), &ca_cert).context("failed to write CA cert")?;
 
         // Create issuer from CA
-        let issuer = aranya_certgen::issuer_from_ca(&ca_cert, ca_key)
-            .context("failed to create issuer")?;
+        let issuer =
+            aranya_certgen::issuer_from_ca(&ca_cert, ca_key).context("failed to create issuer")?;
 
         let (owner, admin, operator, membera, memberb) = try_join!(
-            DeviceCtx::new(name, "owner", work_dir_path.join("owner"), &issuer, &root_certs_dir),
-            DeviceCtx::new(name, "admin", work_dir_path.join("admin"), &issuer, &root_certs_dir),
-            DeviceCtx::new(name, "operator", work_dir_path.join("operator"), &issuer, &root_certs_dir),
-            DeviceCtx::new(name, "membera", work_dir_path.join("membera"), &issuer, &root_certs_dir),
-            DeviceCtx::new(name, "memberb", work_dir_path.join("memberb"), &issuer, &root_certs_dir),
+            DeviceCtx::new(
+                name,
+                "owner",
+                work_dir_path.join("owner"),
+                &issuer,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "admin",
+                work_dir_path.join("admin"),
+                &issuer,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "operator",
+                work_dir_path.join("operator"),
+                &issuer,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "membera",
+                work_dir_path.join("membera"),
+                &issuer,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "memberb",
+                work_dir_path.join("memberb"),
+                &issuer,
+                &root_certs_dir
+            ),
         )?;
 
         Ok(Self {
@@ -238,12 +276,9 @@ impl DeviceCtx {
             dns_names: vec![format!("{}.test.local", name)],
             ip_addresses: vec!["127.0.0.1".parse().expect("valid IP address")],
         };
-        let (device_cert, device_key) = generate_signed_cert(
-            &format!("{} Device", name),
-            issuer,
-            365,
-            &san,
-        ).context("failed to generate device cert")?;
+        let (device_cert, device_key) =
+            generate_signed_cert(&format!("{} Device", name), issuer, 365, &san)
+                .context("failed to generate device cert")?;
         write_cert(&device_cert_path, &device_cert)?;
         write_key(&device_key_path, &device_key)?;
 

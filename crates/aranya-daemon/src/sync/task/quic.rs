@@ -18,15 +18,20 @@ use aranya_runtime::{
     Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
-use aranya_util::{error::ReportExt as _, ready, task::{scope, Scope}, Addr};
+use aranya_util::{
+    error::ReportExt as _,
+    ready,
+    task::{scope, Scope},
+    Addr,
+};
 use buggy::{bug, BugExt as _};
 use derive_where::derive_where;
 use futures_util::TryFutureExt;
 use quinn::{Connection, Endpoint, RecvStream, SendStream};
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::sync::mpsc;
 #[cfg(feature = "preview")]
 use tokio::sync::Mutex;
-use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
 use tracing::{debug, error, info, info_span, instrument, trace, warn, Instrument as _};
 
@@ -205,8 +210,8 @@ impl State {
         client_addr: Addr,
     ) -> SyncResult<Self> {
         // Load certificates
-        let root_store = certs::load_root_certs(&cert_config.root_certs_dir)
-            .map_err(Error::CertificateError)?;
+        let root_store =
+            certs::load_root_certs(&cert_config.root_certs_dir).map_err(Error::CertificateError)?;
         let (device_certs, device_key) =
             certs::load_device_cert(&cert_config.device_cert, &cert_config.device_key)
                 .map_err(Error::CertificateError)?;
@@ -496,8 +501,8 @@ where
         let sync_peers = SyncPeers::new(send);
 
         // Load certificates
-        let root_store = certs::load_root_certs(&cert_config.root_certs_dir)
-            .map_err(Error::CertificateError)?;
+        let root_store =
+            certs::load_root_certs(&cert_config.root_certs_dir).map_err(Error::CertificateError)?;
         let (device_certs, device_key) =
             certs::load_device_cert(&cert_config.device_cert, &cert_config.device_key)
                 .map_err(Error::CertificateError)?;
@@ -572,11 +577,7 @@ where
         error!("server terminated");
     }
 
-    async fn accept_connection(
-        &mut self,
-        incoming: quinn::Incoming,
-        s: &mut Scope,
-    ) {
+    async fn accept_connection(&mut self, incoming: quinn::Incoming, s: &mut Scope) {
         let conns = self.conns.clone();
         let client = self.client.clone();
         let sync_peers = self._sync_peers.clone();
@@ -670,9 +671,7 @@ where
         let data_len = {
             let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
             let data_len = data.len();
-            send.write_all(&data)
-                .await
-                .map_err(Error::QuicWriteError)?;
+            send.write_all(&data).await.map_err(Error::QuicWriteError)?;
             data_len
         };
         send.finish().ok();
@@ -705,9 +704,7 @@ where
             SyncType::Poll {
                 request: request_msg,
                 address: peer_server_addr,
-            } => {
-                Self::process_poll_message(request_msg, client, addr, peer_server_addr).await
-            }
+            } => Self::process_poll_message(request_msg, client, addr, peer_server_addr).await,
             SyncType::Subscribe { .. } => {
                 bug!("Push subscribe messages are not implemented")
             }
@@ -777,5 +774,4 @@ where
         buf.truncate(len);
         Ok(buf.into())
     }
-
 }

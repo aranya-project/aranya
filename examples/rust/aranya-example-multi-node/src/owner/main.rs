@@ -55,10 +55,7 @@ async fn main() -> Result<()> {
 
     // Create team (mTLS handles authentication - no config needed).
     info!("owner: creating team");
-    let team = client
-        .create_team()
-        .await
-        .expect("expected to create team");
+    let team = client.create_team().await.expect("expected to create team");
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 
@@ -86,9 +83,7 @@ async fn main() -> Result<()> {
 
         // Send team ID to device (mTLS handles auth - no PSK seed needed).
         info!("owner: sending team info to {}", device.name);
-        onboard
-            .send(&TeamInfo { team_id }, device.tcp_addr)
-            .await?;
+        onboard.send(&TeamInfo { team_id }, device.tcp_addr).await?;
         info!("owner: sent team info to {}", device.name);
 
         // Receive device info from device.

@@ -334,13 +334,10 @@ impl Daemon {
             #[cfg(feature = "preview")]
             Arc::clone(&hello_subscriptions),
         );
-        let (server, peers, conns, syncer_recv, server_addr) = SyncServer::new(
-            client_with_state_for_server,
-            &server_addr,
-            &cert_config,
-        )
-        .await
-        .context("unable to initialize QUIC sync server")?;
+        let (server, peers, conns, syncer_recv, server_addr) =
+            SyncServer::new(client_with_state_for_server, &server_addr, &cert_config)
+                .await
+                .context("unable to initialize QUIC sync server")?;
 
         // Initialize the syncer
         let client_with_state_for_syncer = ClientWithState::new(
@@ -460,7 +457,9 @@ mod tests {
 
     use std::time::Duration;
 
-    use aranya_certgen::{generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames};
+    use aranya_certgen::{
+        generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames,
+    };
     use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
@@ -490,13 +489,11 @@ mod tests {
         let root_certs_dir = certs_dir.join("root_certs");
         std::fs::create_dir_all(&root_certs_dir).expect("should create root certs dir");
 
-        let (ca_cert, ca_key) = generate_root_ca("Test CA", 365)
-            .expect("should generate CA");
-        write_cert(root_certs_dir.join("ca.pem"), &ca_cert)
-            .expect("should write CA cert");
+        let (ca_cert, ca_key) = generate_root_ca("Test CA", 365).expect("should generate CA");
+        write_cert(root_certs_dir.join("ca.pem"), &ca_cert).expect("should write CA cert");
 
-        let issuer = aranya_certgen::issuer_from_ca(&ca_cert, ca_key)
-            .expect("should create issuer");
+        let issuer =
+            aranya_certgen::issuer_from_ca(&ca_cert, ca_key).expect("should create issuer");
 
         let san = SubjectAltNames::new()
             .with_dns("localhost")
