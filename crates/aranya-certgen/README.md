@@ -78,14 +78,37 @@ Generating certificate 'webserver'...
 
 ## Comparison with OpenSSL
 
-This tool simplifies certificate generation compared to OpenSSL:
+This tool simplifies certificate generation compared to OpenSSL while guaranteeing use of expected P-256 ECDSA keys.
 
-| Aspect | aranya-certgen | OpenSSL |
-|--------|---------|---------|
-| Commands for CA + 1 cert | 2 | 6+ |
-| Intermediate files | None | CSR, serial |
-| SAN syntax | `--dns x --ip y` | `-extfile <(echo "...")` |
-| Key algorithm | P-256 ECDSA (built-in) | Must specify manually |
+certgen:
+```
+aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA" --validity-days 365
+
+aranya-certgen signed \
+  --ca-cert ca.pem --ca-key ca.key \
+  --cert server.pem --key server.key \
+  --cn webserver \
+  --dns example.com --dns www.example.com \
+  --ip 192.168.1.10
+  --validity-days 365
+```
+
+openssl:
+```
+openssl req -x509 \
+    -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -keyout ca.key -nodes \
+    -days 365 \
+    -subj "/CN=My Company CA" \
+    -out ca.pem
+
+openssl req -x509 \
+    -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -keyout server.key -nodes \
+    -CA ca.pem -CAkey ca.key \
+    -days 365 \
+    -subj "/CN=webserver" \
+    -addext "subjectAltName=DNS.1:example.com,DNS.2:www.example.com,IP:192.168.1.10" \
+    -out server.pem
+```
 
 ## License
 
