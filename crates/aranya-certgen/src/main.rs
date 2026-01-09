@@ -51,7 +51,7 @@ enum Commands {
 
         /// Validity period in days from today.
         #[arg(long = "days", default_value_t = 365)]
-        validity_days: u32,
+        days: u32,
     },
 
     /// Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
@@ -86,7 +86,7 @@ enum Commands {
 
         /// Validity period in days from today.
         #[arg(long = "days", default_value_t = 365)]
-        validity_days: u32,
+        days: u32,
     },
 }
 
@@ -119,11 +119,11 @@ fn main() -> Result<(), CertGenError> {
             cert,
             key,
             ca_name,
-            validity_days,
+            days,
         } => {
             println!("Generating root CA certificate...");
-            let cert_gen = CertGen::new_ca(&ca_name, validity_days)?;
-            cert_gen.write_ca(&cert, &key)?;
+            let cert_gen = CertGen::ca(&ca_name, days)?;
+            cert_gen.save(&cert, &key)?;
 
             println!("  Root CA certificate: {}", cert.display());
             println!("  Root CA private key: {}", key.display());
@@ -135,7 +135,7 @@ fn main() -> Result<(), CertGenError> {
             ca_key,
             san,
             cn,
-            validity_days,
+            days,
         } => {
             if san.dns_names.is_empty() && san.ip_addresses.is_empty() {
                 eprintln!(
@@ -144,14 +144,12 @@ fn main() -> Result<(), CertGenError> {
                 );
             }
 
-            let cert_gen = CertGen::load_ca(&ca_cert, &ca_key)?;
+            let cert_gen = CertGen::load(&ca_cert, &ca_key)?;
 
             println!("Generating certificate '{}'...", cn);
             let san_lib: SubjectAltNames = san.clone().into();
-            let (device_cert, device_key) = cert_gen.generate_cert(&cn, validity_days, &san_lib)?;
-
-            CertGen::write_cert(&cert, &device_cert)?;
-            CertGen::write_key(&key, &device_key)?;
+            let device = CertGen::generate(&cert_gen, &cn, days, &san_lib)?;
+            device.save(&cert, &key)?;
 
             println!("  Certificate: {}", cert.display());
             println!("  Private key: {}", key.display());

@@ -249,6 +249,7 @@ version = "4.1.0"
 dependencies = [
  "clap",
  "rcgen",
+ "tempfile",
  "thiserror 2.0.12",
  "time",
 ]
