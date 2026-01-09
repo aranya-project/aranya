@@ -44,7 +44,7 @@ use crate::actions::SessionData;
 use crate::afc::Afc;
 use crate::{
     actions::Actions,
-    daemon::{CE, CS, KS},
+    daemon::CS,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
     sync::task::SyncPeers,
     Client, InvalidGraphs, EF,
