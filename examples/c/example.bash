@@ -51,7 +51,7 @@ mkdir -p "${root_certs_dir}"
 cargo build -p aranya-certgen --bin aranya-certgen --release
 
 # Generate CA certificate
-"${release}/aranya-certgen" ca --output "${root_certs_dir}/ca.pem" --key "${out}/ca-key.pem"
+"${release}/aranya-certgen" ca --cert "${root_certs_dir}/ca.pem" --key "${out}/ca-key.pem"
 
 port=10001
 for device in "${devices[@]}"; do
@@ -61,10 +61,11 @@ for device in "${devices[@]}"; do
 
     # Generate device certificate signed by CA
     "${release}/aranya-certgen" signed \
-        --ca "${root_certs_dir}/ca.pem" \
+        --ca-cert "${root_certs_dir}/ca.pem" \
         --ca-key "${out}/ca-key.pem" \
-        --name "${device}" \
-        --output "${config_dir}/device.pem" \
+        --cn "${device}" \
+        --ip "127.0.0.1" \
+        --cert "${config_dir}/device.pem" \
         --key "${config_dir}/device-key.pem"
 
     cat <<EOF >"${example}/configs/${device}-config.toml"
