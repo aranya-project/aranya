@@ -95,32 +95,52 @@ impl SharedConnectionMap {
         key: ConnectionKey,
         make_conn: impl AsyncFnOnce() -> Result<Connection, E>,
     ) -> Result<Connection, E> {
-        let (conn, is_new) = match self.connections.lock().await.entry(key) {
-            Entry::Occupied(mut entry) => {
-                debug!(peer = ?key.addr, "existing QUIC connection found");
+        // First, check if we have an existing usable connection
+        {
+            let connections = self.connections.lock().await;
+            let map_size = connections.len();
+            let existing_keys: Vec<_> = connections.keys().map(|k| k.addr).collect();
+            debug!(
+                peer = ?key.addr,
+                map_size,
+                existing_keys = ?existing_keys,
+                "looking up connection in map"
+            );
 
-                // Check if connection is still open by checking close_reason
-                if entry.get().close_reason().is_none() {
+            if let Some(conn) = connections.get(&key) {
+                if conn.close_reason().is_none() {
                     debug!(peer = ?key.addr, "re-using existing QUIC connection");
-                    (entry.get().clone(), false)
-                } else {
-                    debug!(peer = ?key.addr, "existing connection closed, creating new one");
-                    let conn = make_conn().await?;
-                    let _ = entry.insert(conn.clone());
-                    (conn, true)
+                    return Ok(conn.clone());
                 }
+                debug!(peer = ?key.addr, "existing connection is closed");
+            }
+        }
+        // Lock is dropped here
+
+        // Need to create a new connection
+        debug!(peer = ?key.addr, "creating new QUIC connection");
+        let conn = make_conn().await?;
+
+        // Re-acquire lock and insert, handling race conditions
+        let mut connections = self.connections.lock().await;
+        match connections.entry(key) {
+            Entry::Occupied(mut entry) => {
+                // Another task may have inserted a connection while we were connecting
+                if entry.get().close_reason().is_none() {
+                    debug!(peer = ?key.addr, "another task inserted connection, closing ours");
+                    conn.close(0u32.into(), b"duplicate connection");
+                    return Ok(entry.get().clone());
+                }
+                // Replace the closed connection
+                entry.insert(conn.clone());
             }
             Entry::Vacant(entry) => {
-                debug!(peer = ?key.addr, "no existing QUIC connection, creating new one");
-                let conn = make_conn().await?;
-                (entry.insert(conn).clone(), true)
+                entry.insert(conn.clone());
             }
-        };
-
-        if is_new {
-            debug!("created new quic connection");
-            self.tx.send((key, conn.clone())).await.ok();
         }
+
+        debug!(peer = ?key.addr, "created new quic connection");
+        self.tx.send((key, conn.clone())).await.ok();
         Ok(conn)
     }
 
