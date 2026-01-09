@@ -108,7 +108,7 @@ impl CertGenError {
 ///
 /// SANs specify additional identities (hostnames and IP addresses) that the
 /// certificate is valid for, beyond the Common Name.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct SubjectAltNames {
     /// DNS names for Subject Alternative Names.
     pub dns_names: Vec<String>,
@@ -360,6 +360,14 @@ impl std::fmt::Debug for CertGen {
     }
 }
 
+impl PartialEq for CertGen {
+    fn eq(&self, other: &Self) -> bool {
+        self.cert_pem == other.cert_pem && self.key.serialize_pem() == other.key.serialize_pem()
+    }
+}
+
+impl Eq for CertGen {}
+
 // ============================================================================
 // Internal helper functions
 // ============================================================================
@@ -449,73 +457,50 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cert_gen_ca() {
-        let cert_gen = CertGen::ca("Test CA", 365).expect("should create CA");
+    fn test_cert_gen_ca_roundtrip() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
 
         let dir = tempfile::tempdir().unwrap();
         let cert_path = dir.path().join("ca.pem");
         let key_path = dir.path().join("ca.key");
 
-        cert_gen.save(&cert_path, &key_path).expect("should save");
+        ca.save(&cert_path, &key_path).expect("should save");
+        let loaded = CertGen::load(&cert_path, &key_path).expect("should load");
 
-        let cert_contents = fs::read_to_string(&cert_path).unwrap();
-        assert!(cert_contents.contains("BEGIN CERTIFICATE"));
-
-        let key_contents = fs::read_to_string(&key_path).unwrap();
-        assert!(key_contents.contains("BEGIN PRIVATE KEY"));
+        assert_eq!(ca, loaded);
     }
 
     #[test]
-    fn test_cert_gen_generate() {
-        let cert_gen = CertGen::ca("Test CA", 365).expect("should create CA");
+    fn test_cert_gen_generate_roundtrip() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
 
         let sans = SubjectAltNames::new()
             .with_dns("localhost")
             .with_ip("127.0.0.1".parse().unwrap());
 
-        let device = CertGen::generate(&cert_gen, "test-device", 365, &sans)
-            .expect("should generate cert");
+        let cert = CertGen::generate(&ca, "test-device", 365, &sans).expect("should generate cert");
 
         let dir = tempfile::tempdir().unwrap();
         let cert_path = dir.path().join("device.pem");
         let key_path = dir.path().join("device.key");
 
-        device.save(&cert_path, &key_path).expect("should save");
+        cert.save(&cert_path, &key_path).expect("should save");
+        let loaded = CertGen::load(&cert_path, &key_path).expect("should load");
 
-        let cert_contents = fs::read_to_string(&cert_path).unwrap();
-        assert!(cert_contents.contains("BEGIN CERTIFICATE"));
-
-        let key_contents = fs::read_to_string(&key_path).unwrap();
-        assert!(key_contents.contains("BEGIN PRIVATE KEY"));
+        assert_eq!(cert, loaded);
     }
 
     #[test]
-    fn test_cert_gen_multiple_certs() {
-        let cert_gen = CertGen::ca("Test CA", 365).expect("should create CA");
+    fn test_cert_gen_multiple_certs_are_unique() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
 
-        let san1 = SubjectAltNames::new().with_dns("device1.local");
-        let san2 = SubjectAltNames::new().with_dns("device2.local");
+        let sans1 = SubjectAltNames::new().with_dns("device1.local");
+        let sans2 = SubjectAltNames::new().with_dns("device2.local");
 
-        let device1 = CertGen::generate(&cert_gen, "device-1", 365, &san1)
-            .expect("should generate cert 1");
-        let device2 = CertGen::generate(&cert_gen, "device-2", 365, &san2)
-            .expect("should generate cert 2");
+        let cert1 = CertGen::generate(&ca, "device-1", 365, &sans1).expect("should generate cert 1");
+        let cert2 = CertGen::generate(&ca, "device-2", 365, &sans2).expect("should generate cert 2");
 
-        let dir = tempfile::tempdir().unwrap();
-
-        // Both should save successfully with valid certs and keys
-        device1
-            .save(dir.path().join("d1.pem"), dir.path().join("d1.key"))
-            .expect("should save device1");
-        device2
-            .save(dir.path().join("d2.pem"), dir.path().join("d2.key"))
-            .expect("should save device2");
-
-        assert!(fs::read_to_string(dir.path().join("d1.pem"))
-            .unwrap()
-            .contains("BEGIN CERTIFICATE"));
-        assert!(fs::read_to_string(dir.path().join("d2.pem"))
-            .unwrap()
-            .contains("BEGIN CERTIFICATE"));
+        // Each generated cert should be unique
+        assert_ne!(cert1, cert2);
     }
 }

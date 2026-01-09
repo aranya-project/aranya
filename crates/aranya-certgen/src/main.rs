@@ -78,7 +78,7 @@ enum Commands {
 
         /// Subject Alternative Names (DNS and IP).
         #[command(flatten)]
-        san: CliSubjectAltNames,
+        sans: CliSubjectAltNames,
 
         /// Common Name (CN) for the certificate.
         #[arg(long)]
@@ -133,11 +133,11 @@ fn main() -> Result<(), CertGenError> {
             key,
             ca_cert,
             ca_key,
-            san,
+            sans,
             cn,
             days,
         } => {
-            if san.dns_names.is_empty() && san.ip_addresses.is_empty() {
+            if sans.dns_names.is_empty() && sans.ip_addresses.is_empty() {
                 eprintln!(
                     "Warning: No SANs provided. Using CN '{}' as default DNS SAN.",
                     cn
@@ -147,19 +147,18 @@ fn main() -> Result<(), CertGenError> {
             let cert_gen = CertGen::load(&ca_cert, &ca_key)?;
 
             println!("Generating certificate '{}'...", cn);
-            let sans: SubjectAltNames = san.clone().into();
-            let device = CertGen::generate(&cert_gen, &cn, days, &sans)?;
+            let device = CertGen::generate(&cert_gen, &cn, days, &sans.clone().into())?;
             device.save(&cert, &key)?;
 
             println!("  Certificate: {}", cert.display());
             println!("  Private key: {}", key.display());
 
-            if !san.dns_names.is_empty() || !san.ip_addresses.is_empty() {
+            if !sans.dns_names.is_empty() || !sans.ip_addresses.is_empty() {
                 println!("  SANs:");
-                for dns in &san.dns_names {
+                for dns in &sans.dns_names {
                     println!("    - DNS: {}", dns);
                 }
-                for ip in &san.ip_addresses {
+                for ip in &sans.ip_addresses {
                     println!("    - IP:  {}", ip);
                 }
             }
