@@ -11,14 +11,14 @@
 //! let cert_gen = CertGen::ca("My Root CA", 365).unwrap();
 //!
 //! // Generate a signed certificate
-//! let san = SubjectAltNames::new()
+//! let sans = SubjectAltNames::new()
 //!     .with_dns("localhost")
 //!     .with_ip("127.0.0.1".parse().unwrap());
-//! let device = CertGen::generate(&cert_gen, "my-device", 365, &san).unwrap();
+//! let device = CertGen::generate(&cert_gen, "my-device", 365, &sans).unwrap();
 //!
 //! // Save CA and device certificates to files
-//! cert_gen.save("ca.pem", "ca-key.pem").unwrap();
-//! device.save("device.pem", "device-key.pem").unwrap();
+//! cert_gen.save("ca.pem", "ca.key").unwrap();
+//! device.save("device.pem", "device.key").unwrap();
 //! ```
 //!
 //! # Loading an Existing CA
@@ -27,20 +27,19 @@
 //! use aranya_certgen::{CertGen, SubjectAltNames};
 //!
 //! // Load an existing CA from PEM files
-//! let cert_gen = CertGen::load("ca.pem", "ca-key.pem").unwrap();
+//! let cert_gen = CertGen::load("ca.pem", "ca.key").unwrap();
 //!
 //! // Generate certificates signed by the loaded CA
-//! let san = SubjectAltNames::new().with_dns("myserver.local");
-//! let server = CertGen::generate(&cert_gen, "server", 365, &san).unwrap();
+//! let sans = SubjectAltNames::new().with_dns("myserver.local");
+//! let server = CertGen::generate(&cert_gen, "server", 365, &sans).unwrap();
 //! ```
 
 use std::{fs, net::IpAddr, path::Path};
 
 use rcgen::{
-    BasicConstraints, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa, Issuer,
-    KeyPair, KeyUsagePurpose, SanType,
+    BasicConstraints, Certificate, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose,
+    IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType,
 };
-pub use rcgen::Certificate;
 use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 
@@ -136,6 +135,9 @@ impl SubjectAltNames {
     }
 }
 
+/// A PEM-encoded string.
+type PemString = String;
+
 /// Certificate generator for creating CA and signed certificates.
 ///
 /// `CertGen` holds a Certificate Authority (CA) and can generate certificates
@@ -150,14 +152,14 @@ impl SubjectAltNames {
 /// let cert_gen = CertGen::ca("My CA", 365).unwrap();
 ///
 /// // Generate device certificates
-/// let san = SubjectAltNames::new()
+/// let sans = SubjectAltNames::new()
 ///     .with_dns("device.local")
 ///     .with_ip("192.168.1.100".parse().unwrap());
-/// let device = CertGen::generate(&cert_gen, "device-1", 365, &san).unwrap();
+/// let device = CertGen::generate(&cert_gen, "device-1", 365, &sans).unwrap();
 /// ```
 pub struct CertGen {
-    ca_cert_pem: String,
-    ca_key: KeyPair,
+    cert_pem: PemString,
+    key: KeyPair,
     issuer: Issuer<'static, KeyPair>,
 }
 
@@ -186,16 +188,15 @@ impl CertGen {
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn ca(cn: &str, days: u32) -> Result<Self, CertGenError> {
-        let (cert, key_pair) = generate_root_ca(cn, days)?;
-        let ca_cert_pem = cert.pem();
+        let (cert, key) = generate_root_ca(cn, days)?;
+        let cert_pem = cert.pem();
 
-        // Create a new key pair for the issuer (we need to keep the original for writing)
-        let issuer_key = KeyPair::from_pem(&key_pair.serialize_pem())?;
-        let issuer = Issuer::from_ca_cert_pem(&ca_cert_pem, issuer_key)?;
+        let issuer_key = KeyPair::from_pem(&key.serialize_pem())?;
+        let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)?;
 
         Ok(Self {
-            ca_cert_pem,
-            ca_key: key_pair,
+            cert_pem,
+            key,
             issuer,
         })
     }
@@ -223,10 +224,10 @@ impl CertGen {
     ///
     /// let ca = CertGen::ca("My CA", 365)?;
     ///
-    /// let san = SubjectAltNames::new()
+    /// let sans = SubjectAltNames::new()
     ///     .with_dns("server.local")
     ///     .with_ip("192.168.1.10".parse().unwrap());
-    /// let cert = CertGen::generate(&ca, "server", 365, &san)?;
+    /// let cert = CertGen::generate(&ca, "server", 365, &sans)?;
     /// cert.save("server.pem", "server.key")?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
@@ -239,13 +240,12 @@ impl CertGen {
         let (cert, key) = generate_signed_cert(cn, &signer.issuer, days, san)?;
         let cert_pem = cert.pem();
 
-        // Create issuer for the new cert (even though it's not a CA)
         let issuer_key = KeyPair::from_pem(&key.serialize_pem())?;
         let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)?;
 
         Ok(Self {
-            ca_cert_pem: cert_pem,
-            ca_key: key,
+            cert_pem,
+            key,
             issuer,
         })
     }
@@ -273,8 +273,8 @@ impl CertGen {
     ///
     /// let ca = CertGen::load("ca.pem", "ca.key")?;
     ///
-    /// let san = SubjectAltNames::new().with_dns("device.local");
-    /// let device = CertGen::generate(&ca, "device", 365, &san)?;
+    /// let sans = SubjectAltNames::new().with_dns("device.local");
+    /// let device = CertGen::generate(&ca, "device", 365, &sans)?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn load(
@@ -284,21 +284,20 @@ impl CertGen {
         let cert_path = cert_path.as_ref();
         let key_path = key_path.as_ref();
 
-        let ca_cert_pem =
+        let cert_pem =
             fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
         let key_pem = fs::read_to_string(key_path).map_err(|e| CertGenError::io(key_path, e))?;
 
-        let ca_key =
-            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
+        let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
 
         let issuer_key =
             KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
-        let issuer = Issuer::from_ca_cert_pem(&ca_cert_pem, issuer_key)
+        let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)
             .map_err(|e| CertGenError::parse_cert(cert_path, e))?;
 
         Ok(Self {
-            ca_cert_pem,
-            ca_key,
+            cert_pem,
+            key,
             issuer,
         })
     }
@@ -338,14 +337,14 @@ impl CertGen {
                 fs::create_dir_all(parent).map_err(|e| CertGenError::io(cert_path, e))?;
             }
         }
-        fs::write(cert_path, &self.ca_cert_pem).map_err(|e| CertGenError::io(cert_path, e))?;
+        fs::write(cert_path, &self.cert_pem).map_err(|e| CertGenError::io(cert_path, e))?;
 
         if let Some(parent) = key_path.parent() {
             if !parent.as_os_str().is_empty() {
                 fs::create_dir_all(parent).map_err(|e| CertGenError::io(key_path, e))?;
             }
         }
-        fs::write(key_path, self.ca_key.serialize_pem())
+        fs::write(key_path, self.key.serialize_pem())
             .map_err(|e| CertGenError::io(key_path, e))?;
 
         Ok(())
@@ -355,7 +354,8 @@ impl CertGen {
 impl std::fmt::Debug for CertGen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CertGen")
-            .field("ca_cert_pem", &"<PEM data>")
+            .field("cert_pem", &"<PEM data>")
+            .field("key", &"<private key>")
             .finish_non_exhaustive()
     }
 }
@@ -469,11 +469,11 @@ mod tests {
     fn test_cert_gen_generate() {
         let cert_gen = CertGen::ca("Test CA", 365).expect("should create CA");
 
-        let san = SubjectAltNames::new()
+        let sans = SubjectAltNames::new()
             .with_dns("localhost")
             .with_ip("127.0.0.1".parse().unwrap());
 
-        let device = CertGen::generate(&cert_gen, "test-device", 365, &san)
+        let device = CertGen::generate(&cert_gen, "test-device", 365, &sans)
             .expect("should generate cert");
 
         let dir = tempfile::tempdir().unwrap();

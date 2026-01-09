@@ -147,8 +147,8 @@ fn main() -> Result<(), CertGenError> {
             let cert_gen = CertGen::load(&ca_cert, &ca_key)?;
 
             println!("Generating certificate '{}'...", cn);
-            let san_lib: SubjectAltNames = san.clone().into();
-            let device = CertGen::generate(&cert_gen, &cn, days, &san_lib)?;
+            let sans: SubjectAltNames = san.clone().into();
+            let device = CertGen::generate(&cert_gen, &cn, days, &sans)?;
             device.save(&cert, &key)?;
 
             println!("  Certificate: {}", cert.display());

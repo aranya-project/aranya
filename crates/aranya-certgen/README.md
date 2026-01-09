@@ -4,11 +4,13 @@ A CLI tool for generating root CA certificates and signed certificates.
 
 All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 
-## Installation
+## Building
 
 ```bash
-cargo install --path crates/aranya-certgen
+cargo make build-certgen
 ```
+
+The binary will be at `target/release/aranya-certgen`.
 
 ## Usage
 
