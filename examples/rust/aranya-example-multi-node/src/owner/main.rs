@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{Client, CreateTeamConfig};
+use aranya_client::Client;
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo},
@@ -53,11 +53,10 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("owner: initialized client");
 
-    // Create team (mTLS handles authentication - no PSK seed needed).
+    // Create team (mTLS handles authentication - no config needed).
     info!("owner: creating team");
-    let cfg = CreateTeamConfig::builder().build()?;
     let team = client
-        .create_team(cfg)
+        .create_team()
         .await
         .expect("expected to create team");
     let team_id = team.team_id();

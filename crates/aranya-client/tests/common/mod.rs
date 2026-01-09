@@ -4,8 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use aranya_certgen::{generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
-    config::CreateTeamConfig,
-    AddTeamConfig, Addr, SyncPeerConfig,
+    Addr, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -139,28 +138,17 @@ impl DevicesCtx {
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         // With mTLS, no PSK seed is needed - certificates handle authentication.
-        let owner_cfg = CreateTeamConfig::builder().build()?;
-
         let team = {
             self.owner
                 .client
-                .create_team(owner_cfg)
+                .create_team()
                 .await
                 .expect("expected to create team")
         };
         let team_id = team.team_id();
         info!(?team_id);
 
-        // With mTLS, teams are added without quic_sync config
-        let cfg = AddTeamConfig::builder()
-            .team_id(team_id)
-            .build()?;
-
-        // Owner has the team added due to calling `create_team`, now we assign it to all other peers
-        self.admin.client.add_team(cfg.clone()).await?;
-        self.operator.client.add_team(cfg.clone()).await?;
-        self.membera.client.add_team(cfg.clone()).await?;
-        self.memberb.client.add_team(cfg).await?;
+        // With mTLS, no add_team call is required - devices can sync any team they have the ID for
 
         Ok(team_id)
     }

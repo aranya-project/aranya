@@ -760,76 +760,6 @@ pub fn client_config_builder_set_daemon_uds_path(
     cfg.daemon_addr(address);
 }
 
-/// Team configuration used when joining a team.
-///
-/// Use an [`AddTeamConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 320, align = 8)]
-pub type AddTeamConfig = Safe<imp::AddTeamConfig>;
-
-/// A builder for initializing an [`AddTeamConfig`].
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 328, align = 8)]
-pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
-
-/// Team configuration used when creating a team.
-///
-/// Use a [`CreateTeamConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
-
-/// A builder for initializing a [`CreateTeamConfig`].
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
-
-/// Configures team ID field for [`AddTeamConfigBuilder`].
-///
-/// By default, the team ID is not set.
-///
-/// @param[in,out] cfg a pointer to the builder for a team config
-/// @param[in] id a pointer to a
-///
-/// @relates AranyaAddTeamConfigBuilder.
-pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &TeamId) {
-    cfg.id(*team_id);
-}
-
-/// Attempts to construct an [`AddTeamConfig`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
-/// @param[in] cfg a pointer to the team config builder
-/// @param[out] out a pointer to write the team config to
-///
-/// @relates AranyaAddTeamConfigBuilder.
-pub fn add_team_config_build(
-    cfg: OwnedPtr<AddTeamConfigBuilder>,
-    out: &mut MaybeUninit<AddTeamConfig>,
-) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
-    Ok(())
-}
-
-/// Attempts to construct a [`CreateTeamConfig`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
-/// @param[in] cfg a pointer to the team config builder
-/// @param[out] out a pointer to write the team config to
-///
-/// @relates AranyaCreateTeamConfigBuilder.
-pub fn create_team_config_build(
-    cfg: OwnedPtr<CreateTeamConfigBuilder>,
-    out: &mut MaybeUninit<CreateTeamConfig>,
-) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
-    Ok(())
-}
-
 /// Sync Peer config.
 ///
 /// Use a [`SyncPeerConfigBuilder`] to construct this object.
@@ -1484,16 +1414,11 @@ pub fn add_label_managing_role(
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param[in] client the Aranya Client
-/// @param[in] cfg the Team Configuration
 /// @param[out] __output the team's ID
 ///
 /// @relates AranyaClient.
-pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
-    let cfg: &imp::CreateTeamConfig = cfg.deref();
-    let team_id = client
-        .rt
-        .block_on(client.inner.create_team(cfg.into()))?
-        .team_id();
+pub fn create_team(client: &Client) -> Result<TeamId, imp::Error> {
+    let team_id = client.rt.block_on(client.inner.create_team())?.team_id();
 
     Ok(team_id.into())
 }
@@ -1511,18 +1436,6 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
     let buf = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), buf.len()) };
 
     client.rt.block_on(client.inner.rand(buf));
-}
-
-/// Add a team to the local device store.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] cfg the Team Configuration
-///
-/// @relates AranyaClient.
-pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
-    let cfg: &imp::AddTeamConfig = cfg.deref();
-    client.rt.block_on(client.inner.add_team(cfg.into()))?;
-    Ok(())
 }
 
 /// Remove a team from local device storage.

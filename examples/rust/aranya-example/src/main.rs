@@ -11,7 +11,7 @@ use aranya_certgen::{
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    text, AddTeamConfig, Addr, CreateTeamConfig, SyncPeerConfig,
+    text, Addr, SyncPeerConfig,
 };
 #[cfg(feature = "preview")]
 use aranya_client::{Permission, RoleManagementPermission};
@@ -264,9 +264,6 @@ async fn main() -> Result<()> {
     let memberb =
         ClientCtx::new(team_name, "member_b", &daemon_path, &root_certs_dir, &ca_key).await?;
 
-    // Create the team config (mTLS replaces PSK - no seed needed)
-    let owner_cfg = CreateTeamConfig::builder().build()?;
-
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
     let admin_addr = admin.aranya_local_addr().await?;
@@ -274,11 +271,11 @@ async fn main() -> Result<()> {
     let membera_addr = membera.aranya_local_addr().await?;
     let memberb_addr = memberb.aranya_local_addr().await?;
 
-    // Create a team.
+    // Create a team (with mTLS, no config needed - authentication is handled by certificates)
     info!("creating team");
     let owner_team = owner
         .client
-        .create_team(owner_cfg)
+        .create_team()
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
@@ -311,13 +308,11 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no member role"))?
         .clone();
 
-    // Add team config (mTLS replaces PSK - no seed needed)
-    let add_team_cfg = AddTeamConfig::builder().team_id(team_id).build()?;
-
-    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
-    let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
-    let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
-    let memberb_team = memberb.client.add_team(add_team_cfg).await?;
+    // With mTLS, no add_team call is required - just get team references
+    let admin_team = admin.client.team(team_id);
+    let operator_team = operator.client.team(team_id);
+    let membera_team = membera.client.team(team_id);
+    let memberb_team = memberb.client.team(team_id);
 
     // setup sync peers.
     info!("adding admin to team");

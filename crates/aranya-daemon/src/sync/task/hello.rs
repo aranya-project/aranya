@@ -446,19 +446,29 @@ where
         peer_addr: Addr,
         sync_peers: SyncPeers,
     ) {
+        // Extract the server address from the message.
+        // For Subscribe/Unsubscribe/Hello messages, this is the peer's server address
+        // which is what we use to key the peer cache (not the ephemeral client connection address).
+        let server_addr = match &hello_msg {
+            SyncHelloType::Subscribe { address, .. } => *address,
+            SyncHelloType::Unsubscribe { address } => *address,
+            SyncHelloType::Hello { address, .. } => *address,
+        };
+
         // With mTLS, we need to determine the graph_id from context.
-        // Look up the graph_id from the peer caches based on the peer address.
+        // Look up the graph_id from the peer caches based on the peer's server address.
         // This assumes the peer has synced with us before for at least one graph.
         // TODO: Add graph_id to the hello message protocol for proper multi-team support.
         let graph_id = {
             let (_, caches) = client.lock_aranya_and_caches().await;
-            // Find any cache entry for this peer address
-            let entry = caches.keys().find(|key| key.addr == peer_addr);
+            // Find any cache entry for this peer's server address
+            let entry = caches.keys().find(|key| key.addr == server_addr);
             match entry {
                 Some(key) => key.id,
                 None => {
                     warn!(
                         ?peer_addr,
+                        ?server_addr,
                         "No graph found for peer in hello message processing"
                     );
                     return;

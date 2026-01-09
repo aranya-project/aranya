@@ -270,27 +270,11 @@ AranyaError init_team(Team *t) {
         }
     }
 
-    // Setup team config for owner device (mTLS handles auth - no PSK needed).
-    AranyaCreateTeamConfigBuilder owner_build;
-    err = aranya_create_team_config_builder_init(&owner_build);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaCreateTeamConfigBuilder`\n");
-        return err;
-    }
-
-    // NB: A builder's "_build" method consumes the builder, so
-    // do _not_ call "_cleanup" afterward.
-    AranyaCreateTeamConfig owner_cfg;
-    err = aranya_create_team_config_build(&owner_build, &owner_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaCreateTeamConfig`\n");
-        return err;
-    }
-
-    // have owner create the team.
+    // Have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
-    // team to operate on.
-    err = aranya_create_team(&t->clients.owner.client, &owner_cfg, &t->id);
+    // team to operate on. With mTLS, no config is needed - authentication
+    // is handled by certificates.
+    err = aranya_create_team(&t->clients.owner.client, &t->id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to create team\n");
         return err;
@@ -419,41 +403,7 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add_team() for each non-owner device (mTLS handles auth - no PSK needed)
-    for (int i = 1; i < NUM_CLIENTS; i++) {
-        printf("add_team() client: %s\n", client_names[i]);
-
-        AranyaAddTeamConfigBuilder build;
-        err = aranya_add_team_config_builder_init(&build);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder`\n");
-            return err;
-        }
-
-        err = aranya_add_team_config_builder_set_id(&build, &t->id);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `Id` for `AranyaAddTeamConfigBuilder`\n");
-            return err;
-        }
-
-        // NB: A builder's "_build" method consumes the builder, so
-        // do _not_ call "_cleanup" afterward.
-        AranyaAddTeamConfig cfg;
-        err = aranya_add_team_config_build(&build, &cfg);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaAddTeamConfig`\n");
-            return err;
-        }
-
-        Client *client = &t->clients_arr[i];
-        err = aranya_add_team(&client->client, &cfg);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to add_team() for client: %s\n",
-                    client_names[i]);
-            return err;
-        }
-    }
+    // With mTLS, no add_team() call is required for non-owner devices
 
     // assign role management permissions.
     err = aranya_assign_role_management_permission(

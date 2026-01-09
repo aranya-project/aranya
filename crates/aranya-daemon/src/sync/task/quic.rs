@@ -725,10 +725,10 @@ where
             SyncType::Push { .. } => {
                 bug!("Push messages are not implemented")
             }
-            SyncType::Hello(hello_msg) => {
+            SyncType::Hello(_hello_msg) => {
                 #[cfg(feature = "preview")]
                 {
-                    Self::process_hello_message(hello_msg, client, addr, _sync_peers).await;
+                    Self::process_hello_message(_hello_msg, client, addr, _sync_peers).await;
                     // Hello messages are fire-and-forget, return empty response
                     return Ok(Box::new([]));
                 }

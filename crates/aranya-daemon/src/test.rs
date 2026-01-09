@@ -17,7 +17,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use aranya_certgen::{generate_root_ca, generate_signed_cert, issuer_from_ca, write_cert, write_key, SubjectAltNames};
+use aranya_certgen::{generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames};
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
@@ -1665,7 +1665,7 @@ async fn test_mtls_rejects_untrusted_certificate() -> Result<()> {
 
     // Create second context with a DIFFERENT CA
     let mut ctx2 = TestCtx::new()?;
-    let client2 = ctx2
+    let mut client2 = ctx2
         .new_client("untrusted_client", client1.graph_id)
         .await
         .context("unable to create second client")?;

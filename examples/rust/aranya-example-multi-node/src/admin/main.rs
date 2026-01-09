@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{text, AddTeamConfig, Client, SyncPeerConfig};
+use aranya_client::{text, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -53,12 +53,9 @@ async fn main() -> Result<()> {
     let team_info: TeamInfo = onboard.recv().await?;
     info!("admin: received team info from owner");
 
-    // Add team (mTLS handles auth - no PSK seed needed).
-    let add_team_cfg = AddTeamConfig::builder()
-        .team_id(team_info.team_id)
-        .build()?;
-    let team = client.add_team(add_team_cfg).await?;
-    info!("admin: added team");
+    // With mTLS, no add_team call is required - just get team reference
+    let team = client.team(team_info.team_id);
+    info!("admin: got team reference");
 
     // Send device info to owner.
     info!("admin: sending device info to owner");
