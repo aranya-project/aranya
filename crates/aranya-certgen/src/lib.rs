@@ -18,8 +18,8 @@
 //!
 //! // Write CA and device certificates to files
 //! cert_gen.write_ca("ca.pem", "ca-key.pem").unwrap();
-//! aranya_certgen::write_cert("device.pem", &cert).unwrap();
-//! aranya_certgen::write_key("device-key.pem", &key).unwrap();
+//! CertGen::write_cert("device.pem", &cert).unwrap();
+//! CertGen::write_key("device-key.pem", &key).unwrap();
 //! ```
 //!
 //! # Loading an Existing CA
@@ -38,10 +38,10 @@
 use std::{fs, net::IpAddr, path::Path};
 
 use rcgen::{
-    BasicConstraints, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa,
+    BasicConstraints, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa, Issuer,
     KeyUsagePurpose, SanType,
 };
-pub use rcgen::{Certificate, Issuer, KeyPair};
+pub use rcgen::{Certificate, KeyPair};
 use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 
@@ -207,7 +207,8 @@ impl CertGen {
             fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
         let key_pem = fs::read_to_string(key_path).map_err(|e| CertGenError::io(key_path, e))?;
 
-        let ca_key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
+        let ca_key =
+            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
 
         // Create a separate key for the issuer
         let issuer_key =
@@ -253,11 +254,6 @@ impl CertGen {
         &self.ca_key
     }
 
-    /// Returns a reference to the issuer for advanced use cases.
-    pub fn issuer(&self) -> &Issuer<'static, KeyPair> {
-        &self.issuer
-    }
-
     /// Writes the CA certificate and private key to PEM files.
     ///
     /// # Arguments
@@ -287,6 +283,44 @@ impl CertGen {
 
         Ok(())
     }
+
+    /// Writes a certificate to a file in PEM format.
+    ///
+    /// # Arguments
+    /// * `path` - The file path to write to.
+    /// * `cert` - The certificate to write.
+    ///
+    /// # Errors
+    /// Returns an error if writing fails.
+    pub fn write_cert(path: impl AsRef<Path>, cert: &Certificate) -> Result<(), CertGenError> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|e| CertGenError::io(path, e))?;
+            }
+        }
+        fs::write(path, cert.pem()).map_err(|e| CertGenError::io(path, e))?;
+        Ok(())
+    }
+
+    /// Writes a private key to a file in PEM format.
+    ///
+    /// # Arguments
+    /// * `path` - The file path to write to.
+    /// * `key` - The private key to write.
+    ///
+    /// # Errors
+    /// Returns an error if writing fails.
+    pub fn write_key(path: impl AsRef<Path>, key: &KeyPair) -> Result<(), CertGenError> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|e| CertGenError::io(path, e))?;
+            }
+        }
+        fs::write(path, key.serialize_pem()).map_err(|e| CertGenError::io(path, e))?;
+        Ok(())
+    }
 }
 
 impl std::fmt::Debug for CertGen {
@@ -298,26 +332,11 @@ impl std::fmt::Debug for CertGen {
 }
 
 // ============================================================================
-// Standalone functions (for backwards compatibility and simple use cases)
+// Internal helper functions
 // ============================================================================
 
 /// Generates a self-signed root CA certificate with a P-256 ECDSA private key.
-///
-/// The generated key pair uses the NIST P-256 curve (secp256r1) with ECDSA signatures.
-///
-/// # Arguments
-/// * `cn` - The Common Name for the CA.
-/// * `validity_days` - The number of days the certificate is valid for.
-///
-/// # Returns
-/// A tuple containing the certificate and P-256 ECDSA private key.
-///
-/// # Errors
-/// Returns an error if key generation or certificate signing fails.
-pub fn generate_root_ca(
-    cn: &str,
-    validity_days: u32,
-) -> Result<(Certificate, KeyPair), CertGenError> {
+fn generate_root_ca(cn: &str, validity_days: u32) -> Result<(Certificate, KeyPair), CertGenError> {
     let mut params = CertificateParams::default();
 
     params
@@ -345,40 +364,8 @@ pub fn generate_root_ca(
     Ok((cert, key_pair))
 }
 
-/// Creates an Issuer from a CA certificate and key pair.
-///
-/// This is used to sign other certificates with the CA.
-///
-/// # Arguments
-/// * `ca_cert` - The CA certificate.
-/// * `ca_key` - The CA private key.
-///
-/// # Returns
-/// An Issuer that can be used to sign certificates.
-pub fn issuer_from_ca(
-    ca_cert: &Certificate,
-    ca_key: KeyPair,
-) -> Result<Issuer<'static, KeyPair>, CertGenError> {
-    let issuer = Issuer::from_ca_cert_pem(&ca_cert.pem(), ca_key)?;
-    Ok(issuer)
-}
-
 /// Generates a certificate signed by a CA with a P-256 ECDSA private key.
-///
-/// The generated key pair uses the NIST P-256 curve (secp256r1) with ECDSA signatures.
-///
-/// # Arguments
-/// * `cn` - The Common Name for the certificate.
-/// * `issuer` - The CA issuer to sign with.
-/// * `validity_days` - The number of days the certificate is valid for.
-/// * `san` - The Subject Alternative Names (DNS and IP addresses).
-///
-/// # Returns
-/// A tuple containing the certificate and P-256 ECDSA private key.
-///
-/// # Errors
-/// Returns an error if key generation or certificate signing fails.
-pub fn generate_signed_cert(
+fn generate_signed_cert(
     cn: &str,
     issuer: &Issuer<'_, KeyPair>,
     validity_days: u32,
@@ -428,101 +415,18 @@ pub fn generate_signed_cert(
     Ok((cert, key_pair))
 }
 
-/// Writes a certificate to a file in PEM format.
-///
-/// # Arguments
-/// * `path` - The file path to write to.
-/// * `cert` - The certificate to write.
-///
-/// # Errors
-/// Returns an error if writing fails.
-pub fn write_cert(path: impl AsRef<Path>, cert: &Certificate) -> Result<(), CertGenError> {
-    let path = path.as_ref();
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| CertGenError::io(path, e))?;
-    }
-    fs::write(path, cert.pem()).map_err(|e| CertGenError::io(path, e))?;
-    Ok(())
-}
-
-/// Writes a private key to a file in PEM format.
-///
-/// # Arguments
-/// * `path` - The file path to write to.
-/// * `key` - The private key to write.
-///
-/// # Errors
-/// Returns an error if writing fails.
-pub fn write_key(path: impl AsRef<Path>, key: &KeyPair) -> Result<(), CertGenError> {
-    let path = path.as_ref();
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| CertGenError::io(path, e))?;
-    }
-    fs::write(path, key.serialize_pem()).map_err(|e| CertGenError::io(path, e))?;
-    Ok(())
-}
-
-/// Loads a CA certificate and private key from PEM files.
-///
-/// # Arguments
-/// * `cert_path` - Path to the CA certificate file.
-/// * `key_path` - Path to the CA private key file.
-///
-/// # Returns
-/// An Issuer that can be used to sign certificates.
-///
-/// # Errors
-/// Returns an error if the files cannot be read or parsed.
-pub fn load_ca(
-    cert_path: impl AsRef<Path>,
-    key_path: impl AsRef<Path>,
-) -> Result<Issuer<'static, KeyPair>, CertGenError> {
-    let cert_path = cert_path.as_ref();
-    let key_path = key_path.as_ref();
-
-    let cert_pem = fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
-    let key_pem = fs::read_to_string(key_path).map_err(|e| CertGenError::io(key_path, e))?;
-
-    let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
-    let issuer = Issuer::from_ca_cert_pem(&cert_pem, key)
-        .map_err(|e| CertGenError::parse_cert(cert_path, e))?;
-
-    Ok(issuer)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_root_ca() {
-        let (cert, _key) = generate_root_ca("Test CA", 365).expect("should generate CA");
-        let pem = cert.pem();
-        assert!(pem.contains("BEGIN CERTIFICATE"));
-        assert!(pem.contains("END CERTIFICATE"));
-    }
-
-    #[test]
-    fn test_generate_signed_cert() {
-        let (ca_cert, ca_key) = generate_root_ca("Test CA", 365).expect("should generate CA");
-        let issuer = issuer_from_ca(&ca_cert, ca_key).expect("should create issuer");
-
-        let san = SubjectAltNames::new()
-            .with_dns("localhost")
-            .with_ip("127.0.0.1".parse().unwrap());
-
-        let (cert, _key) =
-            generate_signed_cert("test-device", &issuer, 365, &san).expect("should generate cert");
-
-        let pem = cert.pem();
-        assert!(pem.contains("BEGIN CERTIFICATE"));
-        assert!(pem.contains("END CERTIFICATE"));
-    }
-
-    #[test]
     fn test_cert_gen_new_ca() {
         let cert_gen = CertGen::new_ca("Test CA", 365).expect("should create CA");
         assert!(cert_gen.ca_cert_pem().contains("BEGIN CERTIFICATE"));
+        assert!(cert_gen
+            .ca_key()
+            .serialize_pem()
+            .contains("BEGIN PRIVATE KEY"));
     }
 
     #[test]

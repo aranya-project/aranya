@@ -16,10 +16,7 @@
 
 use std::{net::IpAddr, path::PathBuf};
 
-use aranya_certgen::{
-    generate_root_ca, generate_signed_cert, load_ca, write_cert, write_key, CertGenError,
-    SubjectAltNames,
-};
+use aranya_certgen::{CertGen, CertGenError, SubjectAltNames};
 use clap::{Args, Parser, Subcommand};
 
 /// Command-line arguments for the certgen tool.
@@ -125,10 +122,8 @@ fn main() -> Result<(), CertGenError> {
             validity_days,
         } => {
             println!("Generating root CA certificate...");
-            let (ca_cert, ca_key) = generate_root_ca(&ca_name, validity_days)?;
-
-            write_cert(&cert, &ca_cert)?;
-            write_key(&key, &ca_key)?;
+            let cert_gen = CertGen::new_ca(&ca_name, validity_days)?;
+            cert_gen.write_ca(&cert, &key)?;
 
             println!("  Root CA certificate: {}", cert.display());
             println!("  Root CA private key: {}", key.display());
@@ -149,15 +144,14 @@ fn main() -> Result<(), CertGenError> {
                 );
             }
 
-            let issuer = load_ca(&ca_cert, &ca_key)?;
+            let cert_gen = CertGen::load_ca(&ca_cert, &ca_key)?;
 
             println!("Generating certificate '{}'...", cn);
             let san_lib: SubjectAltNames = san.clone().into();
-            let (device_cert, device_key) =
-                generate_signed_cert(&cn, &issuer, validity_days, &san_lib)?;
+            let (device_cert, device_key) = cert_gen.generate_cert(&cn, validity_days, &san_lib)?;
 
-            write_cert(&cert, &device_cert)?;
-            write_key(&key, &device_key)?;
+            CertGen::write_cert(&cert, &device_cert)?;
+            CertGen::write_key(&key, &device_key)?;
 
             println!("  Certificate: {}", cert.display());
             println!("  Private key: {}", key.display());
