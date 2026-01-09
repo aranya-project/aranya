@@ -52,6 +52,18 @@ category = "build"
 description = "Archive daemon"
 script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
 
+# Build aranya-certgen
+[tasks.build-certgen]
+category = "build"
+description = "Build aranya-certgen CLI tool"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-certgen", "${@}"]
+
+[tasks.tgz-certgen]
+category = "build"
+description = "Archive aranya-certgen"
+script = "tar -czf aranya-certgen.tar.gz -C target/release aranya-certgen"
+
 # Build the `aranya-client-capi` C API.
 [tasks.build-capi]
 category = "build"

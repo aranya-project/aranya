@@ -105,8 +105,8 @@ jobs:
 
       - name: Build aranya-certgen
         run: |
-          cargo build --release --package=aranya-certgen
-          tar -czf aranya-certgen.tar.gz -C target/release aranya-certgen
+          cargo make build-certgen
+          cargo make tgz-certgen
 
       - name: Publish aranya-certgen
         uses: actions/upload-artifact@v4
