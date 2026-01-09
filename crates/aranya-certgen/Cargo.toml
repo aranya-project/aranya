@@ -1,6 +1,6 @@
 [package]
 name = "aranya-certgen"
-description = "CLI tool for generating root CA certificates and signed certificates using P-256 ECDSA"
+description = "Library and CLI tool for generating root CA certificates and signed certificates using P-256 ECDSA"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
+
+[lib]
+name = "aranya_certgen"
+path = "src/lib.rs"
 
 [[bin]]
 name = "aranya-certgen"
@@ -17,7 +21,7 @@ path = "src/main.rs"
 clap = { workspace = true }
 thiserror = { workspace = true }
 
-rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "x509-parser", "ring"] }
+rcgen = { workspace = true }
 time = "0.3"
 
 [lints]
