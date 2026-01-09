@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
+use std::{collections::HashMap, iter, net::Ipv4Addr, path::{Path, PathBuf}, ptr, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use aranya_certgen::{generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames};
@@ -212,7 +212,7 @@ impl DeviceCtx {
         name: &str,
         work_dir: PathBuf,
         issuer: &aranya_certgen::Issuer<'_, rcgen::KeyPair>,
-        root_certs_dir: &PathBuf,
+        root_certs_dir: &Path,
     ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
@@ -236,7 +236,7 @@ impl DeviceCtx {
 
         let san = SubjectAltNames {
             dns_names: vec![format!("{}.test.local", name)],
-            ip_addresses: vec!["127.0.0.1".parse().unwrap()],
+            ip_addresses: vec!["127.0.0.1".parse().expect("valid IP address")],
         };
         let (device_cert, device_key) = generate_signed_cert(
             &format!("{} Device", name),
@@ -263,7 +263,7 @@ impl DeviceCtx {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
                     client_addr: None,
-                    root_certs_dir: root_certs_dir.clone(),
+                    root_certs_dir: root_certs_dir.to_path_buf(),
                     device_cert: device_cert_path,
                     device_key: device_key_path,
                 }),

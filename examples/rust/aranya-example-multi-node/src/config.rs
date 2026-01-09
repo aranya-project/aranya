@@ -61,7 +61,7 @@ impl CertificateAuthority {
 
         let san = SubjectAltNames {
             dns_names: vec![format!("{}.example.local", device_name)],
-            ip_addresses: vec!["127.0.0.1".parse().unwrap()],
+            ip_addresses: vec!["127.0.0.1".parse().expect("valid IP address")],
         };
 
         let (device_cert, device_key) =

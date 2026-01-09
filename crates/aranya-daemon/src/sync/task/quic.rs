@@ -231,10 +231,10 @@ impl State {
         let addr = tokio::net::lookup_host(client_addr.to_socket_addrs())
             .await
             .context("DNS lookup for client address")
-            .map_err(|e| SyncError::Other(e.into()))?
+            .map_err(SyncError::Other)?
             .next()
             .context("could not resolve client address")
-            .map_err(|e| SyncError::Other(e.into()))?;
+            .map_err(SyncError::Other)?;
 
         let endpoint = Endpoint::client(addr)
             .map_err(|e| Error::EndpointError(format!("failed to create client endpoint: {e}")))?;
