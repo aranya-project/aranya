@@ -455,6 +455,7 @@ version = "0.0.0"
 dependencies = [
  "age",
  "anyhow",
+ "aranya-certgen",
  "aranya-client",
  "backon",
  "clap",

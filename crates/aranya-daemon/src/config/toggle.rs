@@ -63,7 +63,7 @@ mod imp {
     pub struct False;
     impl<'de> Deserialize<'de> for False {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            if bool::deserialize(deserializer)? {
+            if !bool::deserialize(deserializer)? {
                 Ok(Self)
             } else {
                 Err(de::Error::invalid_value(
