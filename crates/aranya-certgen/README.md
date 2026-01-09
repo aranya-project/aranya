@@ -40,7 +40,7 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 | `--cert <PATH>` | Path for the CA certificate file (PEM format) | required |
 | `--key <PATH>` | Path for the CA P-256 ECDSA private key file (PEM format) | required |
 | `--ca-name <NAME>` | Common Name (CN) for the root CA | `My Root CA` |
-| `--validity-days <DAYS>` | Validity period in days | `365` |
+| `--days <DAYS>` | Validity period in days | `365` |
 
 ### `aranya-certgen signed`
 
@@ -55,7 +55,7 @@ Create a new certificate signed by an existing root CA with a P-256 ECDSA privat
 | `--cn <NAME>` | Common Name (CN) for the certificate | required |
 | `--dns <HOSTNAME>` | DNS name for SAN (can be repeated) | — |
 | `--ip <ADDRESS>` | IP address for SAN (can be repeated) | — |
-| `--validity-days <DAYS>` | Validity period in days | `365` |
+| `--days <DAYS>` | Validity period in days | `365` |
 
 ## Example Output
 
@@ -82,7 +82,7 @@ This tool simplifies certificate generation compared to OpenSSL while guaranteei
 
 certgen:
 ```
-aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA" --validity-days 365
+aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA" --days 365
 
 aranya-certgen signed \
   --ca-cert ca.pem --ca-key ca.key \
@@ -90,7 +90,7 @@ aranya-certgen signed \
   --cn webserver \
   --dns example.com --dns www.example.com \
   --ip 192.168.1.10
-  --validity-days 365
+  --days 365
 ```
 
 openssl:

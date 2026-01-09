@@ -53,7 +53,7 @@ enum Commands {
         ca_name: String,
 
         /// Validity period in days from today.
-        #[arg(long, default_value_t = 365)]
+        #[arg(long = "days", default_value_t = 365)]
         validity_days: u32,
     },
 
@@ -88,7 +88,7 @@ enum Commands {
         cn: String,
 
         /// Validity period in days from today.
-        #[arg(long, default_value_t = 365)]
+        #[arg(long = "days", default_value_t = 365)]
         validity_days: u32,
     },
 }
