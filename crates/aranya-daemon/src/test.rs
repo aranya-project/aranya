@@ -339,7 +339,7 @@ impl TestCtx {
             (syncer, server, local_addr, pk, effects_recv)
         };
 
-        Ok(TestDevice::new(server, local_addr.into(), pk, id, syncer, effects_recv)?)
+        TestDevice::new(server, local_addr.into(), pk, id, syncer, effects_recv)
     }
 
     /// Creates `n` members with mTLS certificates.
