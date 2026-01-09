@@ -177,6 +177,16 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.4.25 -> 0.4.26"
 
+[[audits.lru-slab]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.2"
+
+[[audits.lru-slab]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.2"
+
 [[audits.matchers]]
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -261,6 +271,16 @@ delta = "0.2.25 -> 0.2.30"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.93 -> 1.0.94"
+
+[[audits.quinn]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.11.9"
+
+[[audits.quinn-proto]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.11.13"
 
 [[audits.quote]]
 who = "gknopf <gknopf@spideroak.com>"
