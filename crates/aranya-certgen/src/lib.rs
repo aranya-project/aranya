@@ -5,17 +5,34 @@
 //! # Example
 //!
 //! ```no_run
-//! use aranya_certgen::{generate_root_ca, generate_signed_cert, issuer_from_ca, SubjectAltNames};
+//! use aranya_certgen::{CertGen, SubjectAltNames};
 //!
-//! // Generate a root CA
-//! let (ca_cert, ca_key) = generate_root_ca("My Root CA", 365).unwrap();
+//! // Create a new CA
+//! let cert_gen = CertGen::new_ca("My Root CA", 365).unwrap();
 //!
 //! // Generate a signed certificate
-//! let issuer = issuer_from_ca(&ca_cert, ca_key).unwrap();
 //! let san = SubjectAltNames::new()
 //!     .with_dns("localhost")
 //!     .with_ip("127.0.0.1".parse().unwrap());
-//! let (cert, key) = generate_signed_cert("my-device", &issuer, 365, &san).unwrap();
+//! let (cert, key) = cert_gen.generate_cert("my-device", 365, &san).unwrap();
+//!
+//! // Write CA and device certificates to files
+//! cert_gen.write_ca("ca.pem", "ca-key.pem").unwrap();
+//! aranya_certgen::write_cert("device.pem", &cert).unwrap();
+//! aranya_certgen::write_key("device-key.pem", &key).unwrap();
+//! ```
+//!
+//! # Loading an Existing CA
+//!
+//! ```no_run
+//! use aranya_certgen::{CertGen, SubjectAltNames};
+//!
+//! // Load an existing CA from PEM files
+//! let cert_gen = CertGen::load_ca("ca.pem", "ca-key.pem").unwrap();
+//!
+//! // Generate certificates signed by the loaded CA
+//! let san = SubjectAltNames::new().with_dns("myserver.local");
+//! let (cert, key) = cert_gen.generate_cert("server", 365, &san).unwrap();
 //! ```
 
 use std::{fs, net::IpAddr, path::Path};
@@ -119,6 +136,170 @@ impl SubjectAltNames {
         self
     }
 }
+
+/// Certificate generator for creating CA and signed certificates.
+///
+/// `CertGen` holds a Certificate Authority (CA) and can generate certificates
+/// signed by that CA. All generated keys use P-256 ECDSA.
+///
+/// # Example
+///
+/// ```no_run
+/// use aranya_certgen::{CertGen, SubjectAltNames};
+///
+/// // Create a new CA
+/// let cert_gen = CertGen::new_ca("My CA", 365).unwrap();
+///
+/// // Generate device certificates
+/// let san = SubjectAltNames::new()
+///     .with_dns("device.local")
+///     .with_ip("192.168.1.100".parse().unwrap());
+/// let (cert, key) = cert_gen.generate_cert("device-1", 365, &san).unwrap();
+/// ```
+pub struct CertGen {
+    ca_cert_pem: String,
+    ca_key: KeyPair,
+    issuer: Issuer<'static, KeyPair>,
+}
+
+impl CertGen {
+    /// Creates a new Certificate Authority with a self-signed certificate.
+    ///
+    /// The generated key pair uses the NIST P-256 curve (secp256r1) with ECDSA signatures.
+    ///
+    /// # Arguments
+    /// * `cn` - The Common Name for the CA.
+    /// * `validity_days` - The number of days the CA certificate is valid for.
+    ///
+    /// # Errors
+    /// Returns an error if key generation or certificate signing fails.
+    pub fn new_ca(cn: &str, validity_days: u32) -> Result<Self, CertGenError> {
+        let (cert, key_pair) = generate_root_ca(cn, validity_days)?;
+        let ca_cert_pem = cert.pem();
+
+        // Create a new key pair for the issuer (we need to keep the original for writing)
+        let issuer_key = KeyPair::from_pem(&key_pair.serialize_pem())?;
+        let issuer = Issuer::from_ca_cert_pem(&ca_cert_pem, issuer_key)?;
+
+        Ok(Self {
+            ca_cert_pem,
+            ca_key: key_pair,
+            issuer,
+        })
+    }
+
+    /// Loads an existing CA from PEM files.
+    ///
+    /// # Arguments
+    /// * `cert_path` - Path to the CA certificate file (PEM format).
+    /// * `key_path` - Path to the CA private key file (PEM format).
+    ///
+    /// # Errors
+    /// Returns an error if the files cannot be read or parsed.
+    pub fn load_ca(
+        cert_path: impl AsRef<Path>,
+        key_path: impl AsRef<Path>,
+    ) -> Result<Self, CertGenError> {
+        let cert_path = cert_path.as_ref();
+        let key_path = key_path.as_ref();
+
+        let ca_cert_pem =
+            fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
+        let key_pem = fs::read_to_string(key_path).map_err(|e| CertGenError::io(key_path, e))?;
+
+        let ca_key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
+
+        // Create a separate key for the issuer
+        let issuer_key =
+            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
+        let issuer = Issuer::from_ca_cert_pem(&ca_cert_pem, issuer_key)
+            .map_err(|e| CertGenError::parse_cert(cert_path, e))?;
+
+        Ok(Self {
+            ca_cert_pem,
+            ca_key,
+            issuer,
+        })
+    }
+
+    /// Generates a certificate signed by this CA with a P-256 ECDSA private key.
+    ///
+    /// # Arguments
+    /// * `cn` - The Common Name for the certificate.
+    /// * `validity_days` - The number of days the certificate is valid for.
+    /// * `san` - The Subject Alternative Names (DNS and IP addresses).
+    ///
+    /// # Returns
+    /// A tuple containing the certificate and P-256 ECDSA private key.
+    ///
+    /// # Errors
+    /// Returns an error if key generation or certificate signing fails.
+    pub fn generate_cert(
+        &self,
+        cn: &str,
+        validity_days: u32,
+        san: &SubjectAltNames,
+    ) -> Result<(Certificate, KeyPair), CertGenError> {
+        generate_signed_cert(cn, &self.issuer, validity_days, san)
+    }
+
+    /// Returns the CA certificate in PEM format.
+    pub fn ca_cert_pem(&self) -> &str {
+        &self.ca_cert_pem
+    }
+
+    /// Returns a reference to the CA private key.
+    pub fn ca_key(&self) -> &KeyPair {
+        &self.ca_key
+    }
+
+    /// Returns a reference to the issuer for advanced use cases.
+    pub fn issuer(&self) -> &Issuer<'static, KeyPair> {
+        &self.issuer
+    }
+
+    /// Writes the CA certificate and private key to PEM files.
+    ///
+    /// # Arguments
+    /// * `cert_path` - Path for the CA certificate file.
+    /// * `key_path` - Path for the CA private key file.
+    ///
+    /// # Errors
+    /// Returns an error if writing fails.
+    pub fn write_ca(
+        &self,
+        cert_path: impl AsRef<Path>,
+        key_path: impl AsRef<Path>,
+    ) -> Result<(), CertGenError> {
+        let cert_path = cert_path.as_ref();
+        let key_path = key_path.as_ref();
+
+        if let Some(parent) = cert_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| CertGenError::io(cert_path, e))?;
+        }
+        fs::write(cert_path, &self.ca_cert_pem).map_err(|e| CertGenError::io(cert_path, e))?;
+
+        if let Some(parent) = key_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| CertGenError::io(key_path, e))?;
+        }
+        fs::write(key_path, self.ca_key.serialize_pem())
+            .map_err(|e| CertGenError::io(key_path, e))?;
+
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for CertGen {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CertGen")
+            .field("ca_cert_pem", &"<PEM data>")
+            .finish_non_exhaustive()
+    }
+}
+
+// ============================================================================
+// Standalone functions (for backwards compatibility and simple use cases)
+// ============================================================================
 
 /// Generates a self-signed root CA certificate with a P-256 ECDSA private key.
 ///
@@ -336,5 +517,49 @@ mod tests {
         let pem = cert.pem();
         assert!(pem.contains("BEGIN CERTIFICATE"));
         assert!(pem.contains("END CERTIFICATE"));
+    }
+
+    #[test]
+    fn test_cert_gen_new_ca() {
+        let cert_gen = CertGen::new_ca("Test CA", 365).expect("should create CA");
+        assert!(cert_gen.ca_cert_pem().contains("BEGIN CERTIFICATE"));
+    }
+
+    #[test]
+    fn test_cert_gen_generate_cert() {
+        let cert_gen = CertGen::new_ca("Test CA", 365).expect("should create CA");
+
+        let san = SubjectAltNames::new()
+            .with_dns("localhost")
+            .with_ip("127.0.0.1".parse().unwrap());
+
+        let (cert, key) = cert_gen
+            .generate_cert("test-device", 365, &san)
+            .expect("should generate cert");
+
+        assert!(cert.pem().contains("BEGIN CERTIFICATE"));
+        assert!(key.serialize_pem().contains("BEGIN PRIVATE KEY"));
+    }
+
+    #[test]
+    fn test_cert_gen_multiple_certs() {
+        let cert_gen = CertGen::new_ca("Test CA", 365).expect("should create CA");
+
+        let san1 = SubjectAltNames::new().with_dns("device1.local");
+        let san2 = SubjectAltNames::new().with_dns("device2.local");
+
+        let (cert1, _) = cert_gen
+            .generate_cert("device-1", 365, &san1)
+            .expect("should generate cert 1");
+        let (cert2, _) = cert_gen
+            .generate_cert("device-2", 365, &san2)
+            .expect("should generate cert 2");
+
+        // Both should be valid certificates
+        assert!(cert1.pem().contains("BEGIN CERTIFICATE"));
+        assert!(cert2.pem().contains("BEGIN CERTIFICATE"));
+
+        // They should be different
+        assert_ne!(cert1.pem(), cert2.pem());
     }
 }
