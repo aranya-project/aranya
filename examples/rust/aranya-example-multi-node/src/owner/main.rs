@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
+use aranya_client::{Client, CreateTeamConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo},
@@ -53,19 +53,9 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("owner: initialized client");
 
-    // Create team.
+    // Create team (mTLS handles authentication - no PSK seed needed).
     info!("owner: creating team");
-    let seed_ikm = {
-        let mut buf = [0; 32];
-        client.rand(&mut buf).await;
-        buf
-    };
-    let cfg = {
-        let qs_cfg = CreateTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
+    let cfg = CreateTeamConfig::builder().build()?;
     let team = client
         .create_team(cfg)
         .await
@@ -86,7 +76,7 @@ async fn main() -> Result<()> {
             .expect("could not set up default roles");
     }
 
-    // Send team ID and IKM to each device except for itself.
+    // Send team ID to each device except for itself.
     // Receive the device ID and public key bundle from each device.
     // Add each device to the team.
     // Assign the proper role to each device.
@@ -95,10 +85,10 @@ async fn main() -> Result<()> {
             continue;
         }
 
-        // Send team ID to device.
+        // Send team ID to device (mTLS handles auth - no PSK seed needed).
         info!("owner: sending team info to {}", device.name);
         onboard
-            .send(&TeamInfo { team_id, seed_ikm }, device.tcp_addr)
+            .send(&TeamInfo { team_id }, device.tcp_addr)
             .await?;
         info!("owner: sent team info to {}", device.name);
 

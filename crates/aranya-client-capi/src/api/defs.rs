@@ -294,9 +294,6 @@ impl From<aranya_id::BaseId> for Id {
     }
 }
 
-/// The size in bytes of a PSK seed IKM.
-pub const ARANYA_SEED_IKM_LEN: usize = 32;
-
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -763,137 +760,6 @@ pub fn client_config_builder_set_daemon_uds_path(
     cfg.daemon_addr(address);
 }
 
-/// QUIC syncer configuration.
-///
-/// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
-
-/// QUIC syncer configuration.
-///
-/// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
-
-/// A builder for initializing an [`AddTeamQuicSyncConfig`].
-///
-/// The [`AddTeamQuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`].
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
-
-/// A builder for initializing a [`CreateTeamQuicSyncConfig`].
-///
-/// The [`CreateTeamQuicSyncConfig`] is an optional part of initializing a [`CreateTeamConfig`].
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
-
-/// Attempts to set PSK seed generation mode value on [`CreateTeamQuicSyncConfigBuilder`].
-///
-/// @param[in,out] cfg a pointer to the quic sync config builder
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
-/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
-pub fn create_team_quic_sync_config_generate(
-    cfg: &mut CreateTeamQuicSyncConfigBuilder,
-) -> Result<(), imp::Error> {
-    cfg.generate();
-    Ok(())
-}
-
-/// Attempts to set wrapped PSK seed value on [`AddTeamQuicSyncConfigBuilder`].
-///
-/// @param[in,out] cfg a pointer to the quic sync config builder
-/// @param[in] encap_seed a pointer the encapsulated PSK seed
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
-/// @relates AranyaAddTeamQuicSyncConfigBuilder.
-pub fn add_team_quic_sync_config_wrapped_seed(
-    cfg: &mut AddTeamQuicSyncConfigBuilder,
-    encap_seed: &[u8],
-) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed)?;
-    Ok(())
-}
-
-/// Raw PSK seed IKM for QUIC syncer.
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct SeedIkm {
-    bytes: [u8; ARANYA_SEED_IKM_LEN],
-}
-
-/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateTeamQuicSyncConfigBuilder`].
-///
-/// @param[in,out] cfg a pointer to the quic sync config builder
-/// @param[in] ikm a pointer the raw PSK seed IKM
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
-/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
-pub fn create_team_quic_sync_config_raw_seed_ikm(
-    cfg: &mut CreateTeamQuicSyncConfigBuilder,
-    ikm: &SeedIkm,
-) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(ikm.bytes);
-    Ok(())
-}
-
-/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddTeamQuicSyncConfigBuilder`].
-///
-/// @param[in,out] cfg a pointer to the quic sync config builder
-/// @param[in] ikm a pointer the raw PSK seed IKM
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
-/// @relates AranyaAddTeamQuicSyncConfigBuilder.
-pub fn add_team_quic_sync_config_raw_seed_ikm(
-    cfg: &mut AddTeamQuicSyncConfigBuilder,
-    ikm: &SeedIkm,
-) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(ikm.bytes);
-    Ok(())
-}
-
-/// Attempts to construct a [`CreateTeamQuicSyncConfig`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
-/// @param[in] cfg a pointer to the QUIC sync config builder
-/// @param[out] out a pointer to write the QUIC sync config to
-///
-/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
-pub fn create_team_quic_sync_config_build(
-    cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
-) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
-    Ok(())
-}
-
-/// Attempts to construct an [`AddTeamQuicSyncConfig`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
-/// @param[in] cfg a pointer to the QUIC sync config builder
-/// @param[out] out a pointer to write the QUIC sync config to
-///
-/// @relates AranyaAddTeamQuicSyncConfigBuilder.
-pub fn add_team_quic_sync_config_build(
-    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
-) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
-    Ok(())
-}
-
 /// Team configuration used when joining a team.
 ///
 /// Use an [`AddTeamConfigBuilder`] to construct this object.
@@ -915,23 +781,6 @@ pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
-
-/// Configures QUIC syncer for [`AddTeamConfigBuilder`].
-///
-/// By default, the QUIC syncer config is not set.
-///
-/// @param[in,out] cfg a pointer to the builder for a team config
-/// @param[in] quic set the QUIC syncer config
-///
-/// @relates AranyaAddTeamConfigBuilder.
-pub fn add_team_config_builder_set_quic_syncer(
-    cfg: &mut AddTeamConfigBuilder,
-    quic: OwnedPtr<AddTeamQuicSyncConfig>,
-) {
-    // SAFETY: the user is responsible for passing in a valid AddTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
-}
 
 /// Configures team ID field for [`AddTeamConfigBuilder`].
 ///
@@ -961,23 +810,6 @@ pub fn add_team_config_build(
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
     Ok(())
-}
-
-/// Configures QUIC syncer for [`CreateTeamConfigBuilder`].
-///
-/// By default, the QUIC syncer config is not set.
-///
-/// @param[in,out] cfg a pointer to the builder for a team config
-/// @param[in] quic set the QUIC syncer config
-///
-/// @relates AranyaCreateTeamConfigBuilder.
-pub fn create_team_config_builder_set_quic_syncer(
-    cfg: &mut CreateTeamConfigBuilder,
-    quic: OwnedPtr<CreateTeamQuicSyncConfig>,
-) {
-    // SAFETY: the user is responsible for passing in a valid CreateTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
 }
 
 /// Attempts to construct a [`CreateTeamConfig`].
@@ -1668,8 +1500,6 @@ pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, im
 
 /// Return random bytes from Aranya's CSPRNG.
 ///
-/// This method can be used to generate a PSK seed IKM for the QUIC syncer.
-///
 /// @param[in] client the Aranya Client
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
@@ -1681,53 +1511,6 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
     let buf = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), buf.len()) };
 
     client.rt.block_on(client.inner.rand(buf));
-}
-
-/// Return serialized PSK seed encrypted for another device on the team.
-///
-/// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
-///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
-/// Writes the number of bytes that would have been returned to `seed_len`.
-/// The application can use `seed_len` to allocate a larger buffer.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team_id the team's ID
-/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param[in] keybundle_len the length of the keybundle
-/// @param[out] seed the serialized, encrypted PSK seed.
-/// @param[in,out] seed_len the number of bytes written to the seed buffer.
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
-/// @relates AranyaClient.
-pub unsafe fn encrypt_psk_seed_for_peer(
-    client: &Client,
-    team_id: &TeamId,
-    keybundle: &[u8],
-    seed: *mut MaybeUninit<u8>,
-    seed_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let keybundle = imp::key_bundle_deserialize(keybundle)?;
-
-    let wrapped_seed = client.rt.block_on(
-        client
-            .inner
-            .team(team_id.into())
-            .encrypt_psk_seed_for_peer(keybundle.encryption()),
-    )?;
-
-    if *seed_len < wrapped_seed.len() {
-        *seed_len = wrapped_seed.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *seed_len = wrapped_seed.len();
-    let out = aranya_capi_core::try_as_mut_slice!(seed, *seed_len);
-    for (dst, src) in out.iter_mut().zip(&wrapped_seed) {
-        dst.write(*src);
-    }
-
-    Ok(())
 }
 
 /// Add a team to the local device store.

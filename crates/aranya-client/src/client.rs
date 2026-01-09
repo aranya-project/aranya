@@ -238,7 +238,6 @@ impl Client {
     }
 
     /// Generate random bytes from a CSPRNG.
-    /// Can be used to generate IKM for a generating a PSK seed.
     pub async fn rand(&self, buf: &mut [u8]) {
         <Rng as Csprng>::fill_bytes(&mut Rng, buf);
     }

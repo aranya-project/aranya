@@ -90,3 +90,15 @@ max_chans = 100
 enable = true
 # Aranya sync server address.
 addr = "0.0.0.0:4321"
+
+# Directory containing trusted root CA certificates (PEM format).
+# All .pem files in this directory will be loaded as trust anchors
+# for verifying peer certificates during mTLS handshake.
+root_certs_dir = "/etc/aranya/root_certs"
+
+# This daemon's device certificate (PEM format).
+# Must be signed by one of the root CAs for peers to accept connections.
+device_cert = "/etc/aranya/device.pem"
+
+# This daemon's private key (PEM format, PKCS#8 or SEC1).
+device_key = "/etc/aranya/device-key.pem"

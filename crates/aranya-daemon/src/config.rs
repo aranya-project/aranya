@@ -156,6 +156,7 @@ impl Config {
     ///
     /// The local keystore contains key material for the daemon.
     /// E.g., its API key.
+    #[allow(dead_code)]
     pub(crate) fn local_keystore_path(&self) -> PathBuf {
         self.keystore_path().join("local")
     }
@@ -163,11 +164,6 @@ impl Config {
     /// Path to the runtime's storage.
     pub(crate) fn storage_path(&self) -> PathBuf {
         self.state_dir.join("storage")
-    }
-
-    /// Path to file containing the seed IDs.
-    pub(crate) fn seed_id_path(&self) -> PathBuf {
-        self.state_dir.join("seeds")
     }
 
     /// Path to the daemon's UDS API socket.
@@ -216,6 +212,26 @@ pub struct QuicSyncConfig {
     pub addr: Addr,
     /// Client bind address.
     pub client_addr: Option<Addr>,
+
+    /// Directory containing trusted root CA certificates (PEM format).
+    ///
+    /// All `.pem` files in this directory will be loaded as trust anchors
+    /// for verifying peer certificates during mTLS handshake.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub root_certs_dir: PathBuf,
+
+    /// Path to this daemon's device certificate (PEM format).
+    ///
+    /// This certificate must be signed by one of the root CAs for peers
+    /// to accept connections. The file may contain a certificate chain.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub device_cert: PathBuf,
+
+    /// Path to this daemon's device private key (PEM format).
+    ///
+    /// Supports PKCS#8 or SEC1/EC key formats.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub device_key: PathBuf,
 }
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -256,6 +272,9 @@ mod tests {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                     client_addr: None,
+                    root_certs_dir: "/etc/aranya/root_certs".into(),
+                    device_cert: "/etc/aranya/device.pem".into(),
+                    device_key: "/etc/aranya/device-key.pem".into(),
                 }),
             },
             #[cfg(feature = "afc")]

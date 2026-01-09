@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{client::ChanOp, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{client::ChanOp, AddTeamConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -53,17 +53,11 @@ async fn main() -> Result<()> {
     let team_info: TeamInfo = onboard.recv().await?;
     info!("operator: received team info from owner");
 
-    // Add team.
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(team_info.seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_info.team_id)
-            .build()?
-    };
-    let team = client.add_team(add_team_cfg.clone()).await?;
+    // Add team (mTLS handles auth - no PSK seed needed).
+    let add_team_cfg = AddTeamConfig::builder()
+        .team_id(team_info.team_id)
+        .build()?;
+    let team = client.add_team(add_team_cfg).await?;
     info!("operator: added team");
 
     // Send device info to owner.

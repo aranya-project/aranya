@@ -46,8 +46,7 @@ pub use crate::{
         Roles, Team, TeamId,
     },
     config::{
-        AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
-        CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+        AddTeamConfig, AddTeamConfigBuilder, CreateTeamConfig, CreateTeamConfigBuilder,
         SyncPeerConfig, SyncPeerConfigBuilder,
     },
     error::{ConfigError, Error, Result},

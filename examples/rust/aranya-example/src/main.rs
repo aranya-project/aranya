@@ -5,11 +5,13 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
+use aranya_certgen::{
+    generate_root_ca, generate_signed_cert, load_ca, write_cert, write_key, SubjectAltNames,
+};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
-    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
-    SyncPeerConfig,
+    text, AddTeamConfig, Addr, CreateTeamConfig, SyncPeerConfig,
 };
 #[cfg(feature = "preview")]
 use aranya_client::{Permission, RoleManagementPermission};
@@ -26,6 +28,37 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
+
+/// Generates a CA certificate using aranya-certgen library.
+fn generate_ca(ca_cert: &Path, ca_key: &Path) -> Result<()> {
+    let (cert, key) = generate_root_ca("Aranya Example CA", 365)
+        .context("failed to generate CA certificate")?;
+    write_cert(ca_cert, &cert).context("failed to write CA certificate")?;
+    write_key(ca_key, &key).context("failed to write CA key")?;
+    Ok(())
+}
+
+/// Generates a device certificate signed by the CA.
+fn generate_device_cert(
+    name: &str,
+    root_certs_dir: &Path,
+    ca_key: &Path,
+    device_cert: &Path,
+    device_key: &Path,
+) -> Result<()> {
+    let ca_cert = root_certs_dir.join("ca.pem");
+    let issuer = load_ca(&ca_cert, ca_key).context("failed to load CA")?;
+
+    let san = SubjectAltNames::new()
+        .with_dns(name)
+        .with_ip("127.0.0.1".parse().expect("valid IP"));
+
+    let (cert, key) = generate_signed_cert(name, &issuer, 365, &san)
+        .context("failed to generate device certificate")?;
+    write_cert(device_cert, &cert).context("failed to write device certificate")?;
+    write_key(device_key, &key).context("failed to write device key")?;
+    Ok(())
+}
 
 #[derive(Clone, Debug)]
 struct DaemonPath(PathBuf);
@@ -67,7 +100,13 @@ struct ClientCtx {
 }
 
 impl ClientCtx {
-    pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
+    pub async fn new(
+        team_name: &str,
+        user_name: &str,
+        daemon_path: &DaemonPath,
+        root_certs_dir: &Path,
+        ca_key: &Path,
+    ) -> Result<Self> {
         info!(team_name, user_name, "creating `ClientCtx`");
 
         let work_dir = TempDir::with_prefix(user_name)?;
@@ -91,6 +130,11 @@ impl ClientCtx {
                     .with_context(|| format!("unable to create directory: {}", dir.display()))?;
             }
 
+            // Generate device certificate for this daemon
+            let device_cert = config_dir.join("device.pem");
+            let device_key = config_dir.join("device-key.pem");
+            generate_device_cert(user_name, root_certs_dir, ca_key, &device_cert, &device_key)?;
+
             let buf = format!(
                 r#"
                 name = {user_name:?}
@@ -108,6 +152,9 @@ impl ClientCtx {
                 [sync.quic]
                 enable = true
                 addr = "127.0.0.1:0"
+                root_certs_dir = {root_certs_dir:?}
+                device_cert = {device_cert:?}
+                device_key = {device_key:?}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
@@ -198,25 +245,27 @@ async fn main() -> Result<()> {
         builder.build()?
     };
 
-    let team_name = "rust_example";
-    let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
-    let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
-    let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    // Generate CA certificate for mTLS
+    let certs_dir = TempDir::with_prefix("aranya_certs")?;
+    let root_certs_dir = certs_dir.path().join("root_certs");
+    fs::create_dir_all(&root_certs_dir).await?;
+    let ca_cert = root_certs_dir.join("ca.pem");
+    let ca_key = certs_dir.path().join("ca-key.pem");
+    info!("generating CA certificate");
+    generate_ca(&ca_cert, &ca_key)?;
 
-    // Create the team config
-    let seed_ikm = {
-        let mut buf = [0; 32];
-        owner.client.rand(&mut buf).await;
-        buf
-    };
-    let owner_cfg = {
-        let qs_cfg = CreateTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
+    let team_name = "rust_example";
+    let owner = ClientCtx::new(team_name, "owner", &daemon_path, &root_certs_dir, &ca_key).await?;
+    let admin = ClientCtx::new(team_name, "admin", &daemon_path, &root_certs_dir, &ca_key).await?;
+    let operator =
+        ClientCtx::new(team_name, "operator", &daemon_path, &root_certs_dir, &ca_key).await?;
+    let membera =
+        ClientCtx::new(team_name, "member_a", &daemon_path, &root_certs_dir, &ca_key).await?;
+    let memberb =
+        ClientCtx::new(team_name, "member_b", &daemon_path, &root_certs_dir, &ca_key).await?;
+
+    // Create the team config (mTLS replaces PSK - no seed needed)
+    let owner_cfg = CreateTeamConfig::builder().build()?;
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -262,15 +311,8 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no member role"))?
         .clone();
 
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_id)
-            .build()?
-    };
+    // Add team config (mTLS replaces PSK - no seed needed)
+    let add_team_cfg = AddTeamConfig::builder().team_id(team_id).build()?;
 
     let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
     let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
@@ -398,7 +440,8 @@ async fn main() -> Result<()> {
 
         // Create a custom role.
         info!("creating a custom role");
-        let custom = ClientCtx::new(team_name, "custom", &daemon_path).await?;
+        let custom =
+            ClientCtx::new(team_name, "custom", &daemon_path, &root_certs_dir, &ca_key).await?;
         let custom_role = owner_team
             .create_role(text!("custom_role"), owner_role.id)
             .await?;

@@ -20,6 +20,7 @@ macro_rules! impl_typed_keystore {
             /// Creates a new
             #[doc = concat!("`", stringify!($name), "`.")]
             #[inline]
+            #[allow(dead_code)]
             pub fn new(store: S) -> Self {
                 Self(store)
             }
