@@ -91,20 +91,20 @@ aranya-certgen signed \
   --cert server.pem --key server.key \
   --cn webserver \
   --dns example.com --dns www.example.com \
-  --ip 192.168.1.10
+  --ip 192.168.1.10 \
   --days 365
 ```
 
 openssl:
 ```
 openssl req -x509 \
-    -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -keyout ca.key -nodes \
+    -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout ca.key -nodes \
     -days 365 \
     -subj "/CN=My Company CA" \
     -out ca.pem
 
 openssl req -x509 \
-    -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -keyout server.key -nodes \
+    -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout server.key -nodes \
     -CA ca.pem -CAkey ca.key \
     -days 365 \
     -subj "/CN=webserver" \

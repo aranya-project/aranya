@@ -427,18 +427,14 @@ fn generate_signed_cert(
     // Build Subject Alternative Names
     let mut sans: Vec<SanType> = Vec::new();
     for dns in &san.dns_names {
-        sans.push(SanType::DnsName(
-            dns.clone().try_into().expect("expected DNS name"),
-        ));
+        sans.push(SanType::DnsName(dns.clone().try_into()?));
     }
     for ip in &san.ip_addresses {
         sans.push(SanType::IpAddress(*ip));
     }
     // If no SANs provided, use the CN as a default DNS name
     if sans.is_empty() {
-        sans.push(SanType::DnsName(
-            cn.to_string().try_into().expect("expected DNS name"),
-        ));
+        sans.push(SanType::DnsName(cn.to_string().try_into()?));
     }
     params.subject_alt_names = sans;
 
