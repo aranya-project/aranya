@@ -97,21 +97,21 @@ impl SharedConnectionMap {
     ) -> Result<Connection, E> {
         let (conn, is_new) = match self.connections.lock().await.entry(key) {
             Entry::Occupied(mut entry) => {
-                debug!("existing QUIC connection found");
+                debug!(peer = ?key.addr, "existing QUIC connection found");
 
                 // Check if connection is still open by checking close_reason
                 if entry.get().close_reason().is_none() {
-                    debug!("re-using QUIC connection");
+                    debug!(peer = ?key.addr, "re-using existing QUIC connection");
                     (entry.get().clone(), false)
                 } else {
-                    debug!("existing connection closed, creating new one");
+                    debug!(peer = ?key.addr, "existing connection closed, creating new one");
                     let conn = make_conn().await?;
                     let _ = entry.insert(conn.clone());
                     (conn, true)
                 }
             }
             Entry::Vacant(entry) => {
-                debug!("existing QUIC connection not found, creating new one");
+                debug!(peer = ?key.addr, "no existing QUIC connection, creating new one");
                 let conn = make_conn().await?;
                 (entry.insert(conn).clone(), true)
             }

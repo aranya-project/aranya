@@ -222,13 +222,9 @@ impl State {
                 .map_err(|e| Error::TlsConfigError(anyhow::anyhow!("invalid TLS config: {}", e)))?,
         ));
 
-        // Configure transport settings for faster connection handling
+        // Disable idle timeout to keep connections alive indefinitely for reuse
         let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_idle_timeout(Some(
-            Duration::from_secs(10)
-                .try_into()
-                .expect("10 seconds is a valid idle timeout"),
-        ));
+        transport_config.max_idle_timeout(None);
         client_config.transport_config(Arc::new(transport_config));
 
         // Create client-only endpoint
@@ -517,13 +513,9 @@ where
                 .map_err(|e| Error::TlsConfigError(anyhow::anyhow!("invalid TLS config: {}", e)))?,
         ));
 
-        // Configure transport settings for faster connection handling
+        // Disable idle timeout to keep connections alive indefinitely for reuse
         let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_idle_timeout(Some(
-            Duration::from_secs(10)
-                .try_into()
-                .expect("10 seconds is a valid idle timeout"),
-        ));
+        transport_config.max_idle_timeout(None);
         server_config.transport_config(Arc::new(transport_config));
 
         let bind_addr = tokio::net::lookup_host(addr.to_socket_addrs())
