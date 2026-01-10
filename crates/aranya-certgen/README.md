@@ -111,7 +111,3 @@ openssl req -x509 \
     -addext "subjectAltName=DNS.1:example.com,DNS.2:www.example.com,IP:192.168.1.10" \
     -out server.pem
 ```
-
-## License
-
-Apache-2.0
