@@ -13,7 +13,6 @@ Before attempting to use this API, verify that you are using a matching version 
 # Function Cheat Sheet
 
 - `aranya_create_team()` - Create an Aranya team
-- `aranya_add_team()` - Add an Aranya team to a device
 - `aranya_add_device_to_team()` - Add a device to the Aranya team
 - `aranya_add_sync_peer()` - Add peer to sync with
 - `aranya_create_label()` - Create a new label
@@ -28,14 +27,6 @@ Before attempting to use this API, verify that you are using a matching version 
 Objects for creating an Aranya client and Aranya team:
 - `AranyaClient`
 - `AranyaClientConfig`
-- `AranyaCreateTeamConfig`
-- `AranyaCreateTeamConfigBuilder`
-- `AranyaCreateTeamQuicSyncConfig`
-- `AranyaCreateTeamQuicSyncConfigBuilder`
-- `AranyaAddTeamConfig`
-- `AranyaAddTeamConfigBuilder`
-- `AranyaAddTeamQuicSyncConfig`
-- `AranyaAddTeamQuicSyncConfigBuilder`
 - `AranyaSyncPeerConfig`
 - `AranyaSyncPeerConfigBuilder`
 

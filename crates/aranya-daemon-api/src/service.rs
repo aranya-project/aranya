@@ -9,7 +9,7 @@ use aranya_crypto::{
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    EncryptionPublicKey, Engine,
+    Engine,
 };
 use aranya_id::custom_id;
 pub use aranya_policy_text::{text, InvalidText, Text};
@@ -19,11 +19,9 @@ pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
 pub mod afc;
-pub mod quic_sync;
 
 #[cfg(feature = "afc")]
 pub use self::afc::*;
-pub use self::quic_sync::*;
 
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
@@ -135,64 +133,12 @@ impl fmt::Debug for KeyBundle {
     }
 }
 
-// Note: any fields added to this type should be public
-/// A configuration for adding a team in the daemon.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AddTeamConfig {
-    pub team_id: TeamId,
-    pub quic_sync: Option<AddTeamQuicSyncConfig>,
-}
-
-// Note: any fields added to this type should be public
-/// A configuration for creating a team in the daemon.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateTeamConfig {
-    pub quic_sync: Option<CreateTeamQuicSyncConfig>,
-}
-
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
     pub name: Text,
     pub author_id: DeviceId,
-}
-
-/// A PSK IKM.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Ikm([u8; SEED_IKM_SIZE]);
-
-impl Ikm {
-    /// Provides access to the raw IKM bytes.
-    #[inline]
-    pub fn raw_ikm_bytes(&self) -> &[u8; SEED_IKM_SIZE] {
-        &self.0
-    }
-}
-
-impl From<[u8; SEED_IKM_SIZE]> for Ikm {
-    fn from(value: [u8; SEED_IKM_SIZE]) -> Self {
-        Self(value)
-    }
-}
-
-impl ConstantTimeEq for Ikm {
-    fn ct_eq(&self, other: &Self) -> Choice {
-        self.0.ct_eq(&other.0)
-    }
-}
-
-impl ZeroizeOnDrop for Ikm {}
-impl Drop for Ikm {
-    fn drop(&mut self) {
-        self.0.zeroize()
-    }
-}
-
-impl fmt::Debug for Ikm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Ikm").finish_non_exhaustive()
-    }
 }
 
 /// A secret.
@@ -390,22 +336,14 @@ pub trait DaemonApi {
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
-    /// add a team to the local device store that was created by someone else. Not an aranya action/command.
-    async fn add_team(cfg: AddTeamConfig) -> Result<()>;
 
     /// Remove a team from local device storage.
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: CreateTeamConfig) -> Result<TeamId>;
+    async fn create_team() -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
-
-    /// Encrypts the team's syncing PSK(s) for the peer.
-    async fn encrypt_psk_seed_for_peer(
-        team: TeamId,
-        peer_enc_pk: EncryptionPublicKey<CS>,
-    ) -> Result<WrappedSeed>;
 
     //
     // Device onboarding

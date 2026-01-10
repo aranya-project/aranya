@@ -1,17 +1,23 @@
-use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
+use std::{
+    collections::HashMap,
+    iter,
+    net::Ipv4Addr,
+    path::{Path, PathBuf},
+    ptr,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Context, Result};
+use aranya_certgen::{CertGen, SubjectAltNames};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
-    config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    Addr, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -45,12 +51,54 @@ impl DevicesCtx {
         let work_dir = tempfile::tempdir()?;
         let work_dir_path = work_dir.path();
 
+        // Generate a shared CA for all devices
+        let certs_dir = work_dir_path.join("certs");
+        std::fs::create_dir_all(&certs_dir)?;
+
+        let root_certs_dir = certs_dir.join("root_certs");
+        std::fs::create_dir_all(&root_certs_dir)?;
+
+        // Generate CA certificate
+        let ca = CertGen::ca("Test CA", 365).context("failed to generate CA")?;
+        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+            .context("failed to write CA cert/key")?;
+
         let (owner, admin, operator, membera, memberb) = try_join!(
-            DeviceCtx::new(name, "owner", work_dir_path.join("owner")),
-            DeviceCtx::new(name, "admin", work_dir_path.join("admin")),
-            DeviceCtx::new(name, "operator", work_dir_path.join("operator")),
-            DeviceCtx::new(name, "membera", work_dir_path.join("membera")),
-            DeviceCtx::new(name, "memberb", work_dir_path.join("memberb")),
+            DeviceCtx::new(
+                name,
+                "owner",
+                work_dir_path.join("owner"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "admin",
+                work_dir_path.join("admin"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "operator",
+                work_dir_path.join("operator"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "membera",
+                work_dir_path.join("membera"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "memberb",
+                work_dir_path.join("memberb"),
+                &ca,
+                &root_certs_dir
+            ),
         )?;
 
         Ok(Self {
@@ -121,43 +169,18 @@ impl DevicesCtx {
 
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
-        let seed_ikm = {
-            let mut buf = [0; SEED_IKM_SIZE];
-            self.owner.client.rand(&mut buf).await;
-            buf
-        };
-        let owner_cfg = {
-            let qs_cfg = CreateTeamQuicSyncConfig::builder()
-                .seed_ikm(seed_ikm)
-                .build()?;
-            CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
-        };
-
+        // With mTLS, no PSK seed is needed - certificates handle authentication.
         let team = {
             self.owner
                 .client
-                .create_team(owner_cfg)
+                .create_team()
                 .await
                 .expect("expected to create team")
         };
         let team_id = team.team_id();
         info!(?team_id);
 
-        let cfg = {
-            let qs_cfg = AddTeamQuicSyncConfig::builder()
-                .seed_ikm(seed_ikm)
-                .build()?;
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(qs_cfg)
-                .build()?
-        };
-
-        // Owner has the team added due to calling `create_team`, now we assign it to all other peers
-        self.admin.client.add_team(cfg.clone()).await?;
-        self.operator.client.add_team(cfg.clone()).await?;
-        self.membera.client.add_team(cfg.clone()).await?;
-        self.memberb.client.add_team(cfg).await?;
+        // With mTLS, no add_team call is required - devices can sync any team they have the ID for
 
         Ok(team_id)
     }
@@ -216,7 +239,13 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub(crate) async fn new(
+        team_name: &str,
+        name: &str,
+        work_dir: PathBuf,
+        ca: &CertGen,
+        root_certs_dir: &Path,
+    ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // TODO: only compile when 'afc' feature is enabled
@@ -231,6 +260,21 @@ impl DeviceCtx {
             let _ = shm::unlink(&path);
             path
         };
+
+        // Generate device certificate
+        let device_cert_path = work_dir.join("device.pem");
+        let device_key_path = work_dir.join("device-key.pem");
+        std::fs::create_dir_all(&work_dir)?;
+
+        let sans = SubjectAltNames::new()
+            .with_dns(format!("{}.test.local", name))
+            .with_ip("127.0.0.1".parse().expect("valid IP address"));
+        let signed = ca
+            .generate(&format!("{} Server", name), 365, &sans)
+            .context("failed to generate signed cert")?;
+        signed
+            .save(&device_cert_path, &device_key_path)
+            .context("failed to write signed cert/key")?;
 
         // Setup daemon config.
         let cfg = Config {
@@ -248,6 +292,9 @@ impl DeviceCtx {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
                     client_addr: None,
+                    root_certs_dir: root_certs_dir.to_path_buf(),
+                    device_cert: device_cert_path,
+                    device_key: device_key_path,
                 }),
             },
         };

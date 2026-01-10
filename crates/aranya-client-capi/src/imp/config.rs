@@ -7,9 +7,6 @@ use aranya_capi_core::{Builder, InvalidArg};
 use super::Error;
 use crate::api::defs::{self, Duration};
 
-pub(crate) mod team;
-pub(crate) use team::*;
-
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
 pub struct ClientConfig {

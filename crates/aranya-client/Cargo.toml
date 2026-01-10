@@ -42,7 +42,6 @@ aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
-postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
@@ -51,8 +50,10 @@ tracing = { workspace = true }
 
 
 [dev-dependencies]
+aranya-certgen = { path = "../aranya-certgen" }
 aranya-client = { path = ".", features = ["preview"] }
 aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview"] }
+rcgen = { workspace = true }
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }

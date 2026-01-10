@@ -10,10 +10,10 @@ use std::{
 };
 
 use anyhow::Context;
-use aranya_daemon_api::TeamId;
 use aranya_runtime::{Address, Engine, GraphId, Storage, StorageProvider, SyncHelloType, SyncType};
 use aranya_util::Addr;
-use tokio::{io::AsyncReadExt, sync::Mutex};
+use quinn::{ConnectionError, WriteError};
+use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
@@ -155,21 +155,20 @@ impl Syncer<State> {
     async fn send_hello_request(
         &mut self,
         peer: &Addr,
-        id: GraphId,
+        _id: GraphId, // GraphId is kept in API for future use but not needed for mTLS connection
         sync_type: SyncType<Addr>,
     ) -> SyncResult<()> {
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
         // Connect to the peer
-        let stream = self.connect(peer, id).await?;
-        let (mut recv, mut send) = stream.split();
+        let (mut send, mut recv) = self.connect(peer).await?;
 
         // Send the message
-        send.send(bytes::Bytes::from(data))
-            .await
-            .map_err(Error::from)?;
-        send.close().await.map_err(Error::from)?;
+        send.write_all(&data).await.map_err(Error::QuicWriteError)?;
+        send.finish().map_err(|_| {
+            Error::QuicWriteError(WriteError::ConnectionLost(ConnectionError::LocallyClosed))
+        })?;
 
         // Determine operation name from sync_type
         let operation_name = match &sync_type {
@@ -181,8 +180,8 @@ impl Syncer<State> {
             _ => "unknown",
         };
         // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
+        let response_buf = recv
+            .read_to_end(64 * 1024) // 64KB limit for hello response
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
         if response_buf.is_empty() {
@@ -281,10 +280,6 @@ impl Syncer<State> {
         id: GraphId,
         head: Address,
     ) -> SyncResult<()> {
-        // Set the team for this graph
-        let team_id = TeamId::transmute(id);
-        self.state.store().set_team(team_id);
-
         // Create the hello message
         let hello_msg = SyncHelloType::Hello {
             head,
@@ -294,7 +289,7 @@ impl Syncer<State> {
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
-        let stream = self.connect(peer, id).await.map_err(|e| {
+        let (mut send, mut recv) = self.connect(peer).await.map_err(|e| {
             warn!(
                 error = %e,
                 ?peer,
@@ -307,9 +302,7 @@ impl Syncer<State> {
         // Spawn async task to send the notification
         let peer = *peer;
         self.hello_tasks.spawn(async move {
-            let (mut recv, mut send) = stream.split();
-
-            if let Err(e) = send.send(bytes::Bytes::from(data)).await {
+            if let Err(e) = send.write_all(&data).await {
                 warn!(
                     error = %e,
                     ?peer,
@@ -318,29 +311,31 @@ impl Syncer<State> {
                 return;
             }
 
-            if let Err(e) = send.close().await {
+            if let Err(e) = send.finish() {
                 warn!(
                     error = %e,
                     ?peer,
-                    "Failed to close send stream"
+                    "Failed to finish send stream"
                 );
                 return;
             }
 
             // Read the response to avoid race condition with server
-            let mut response_buf = Vec::new();
-            if let Err(e) = recv.read_to_end(&mut response_buf).await {
-                warn!(
-                    error = %e,
-                    ?peer,
-                    "Failed to read hello notification response"
-                );
-                return;
+            match recv.read_to_end(64 * 1024).await {
+                Ok(response_buf) => {
+                    debug!(
+                        response_len = response_buf.len(),
+                        "received hello notification response"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        ?peer,
+                        "Failed to read hello notification response"
+                    );
+                }
             }
-            debug!(
-                response_len = response_buf.len(),
-                "received hello notification response"
-            );
         });
 
         Ok(())
@@ -442,15 +437,44 @@ where
     /// Processes a hello message.
     ///
     /// Handles subscription management and hello notifications.
+    /// Note: With mTLS, the graph_id is determined from the peer caches.
+    /// TODO: Add graph_id to the hello message protocol for proper multi-team support.
     #[instrument(skip_all)]
     pub(crate) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
         client: ClientWithState<EN, SP>,
         peer_addr: Addr,
-        active_team: &TeamId,
         sync_peers: SyncPeers,
     ) {
-        let graph_id = GraphId::transmute(*active_team);
+        // Extract the server address from the message.
+        // For Subscribe/Unsubscribe/Hello messages, this is the peer's server address
+        // which is what we use to key the peer cache (not the ephemeral client connection address).
+        let server_addr = match &hello_msg {
+            SyncHelloType::Subscribe { address, .. } => *address,
+            SyncHelloType::Unsubscribe { address } => *address,
+            SyncHelloType::Hello { address, .. } => *address,
+        };
+
+        // With mTLS, we need to determine the graph_id from context.
+        // Look up the graph_id from the peer caches based on the peer's server address.
+        // This assumes the peer has synced with us before for at least one graph.
+        // TODO: Add graph_id to the hello message protocol for proper multi-team support.
+        let graph_id = {
+            let (_, caches) = client.lock_aranya_and_caches().await;
+            // Find any cache entry for this peer's server address
+            let entry = caches.keys().find(|key| key.addr == server_addr);
+            match entry {
+                Some(key) => key.id,
+                None => {
+                    warn!(
+                        ?peer_addr,
+                        ?server_addr,
+                        "No graph found for peer in hello message processing"
+                    );
+                    return;
+                }
+            }
+        };
 
         match hello_msg {
             SyncHelloType::Subscribe {
@@ -528,16 +552,12 @@ where
                     // Cancel the scheduled sending task
                     subscription.cancel_token.cancel();
                     debug!(
-                        team_id = ?active_team,
+                        ?graph_id,
                         ?address,
                         "Removed hello subscription and cancelled scheduled sender"
                     );
                 } else {
-                    debug!(
-                        team_id = ?active_team,
-                        ?address,
-                        "No subscription found to remove"
-                    );
+                    debug!(?graph_id, ?address, "No subscription found to remove");
                 }
             }
             SyncHelloType::Hello { head, address } => {

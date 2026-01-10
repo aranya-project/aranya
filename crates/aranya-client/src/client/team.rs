@@ -1,12 +1,9 @@
 #[cfg(feature = "preview")]
 use std::time::Duration;
 
-use anyhow::Context as _;
-use aranya_crypto::EncryptionPublicKey;
-use aranya_daemon_api::{self as api, CS};
+use aranya_daemon_api as api;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
-use buggy::BugExt as _;
 use tarpc::context;
 use tracing::instrument;
 
@@ -17,7 +14,7 @@ use crate::{
         Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
-    error::{self, aranya_error, IpcError, Result},
+    error::{aranya_error, IpcError, Result},
     util::custom_id,
 };
 
@@ -52,25 +49,6 @@ impl Team<'_> {
 }
 
 impl Team<'_> {
-    /// Encrypts the team's QUIC syncer PSK seed for a peer.
-    /// `peer_enc_pk` is the public encryption key of the peer device.
-    /// See [`KeyBundle::encryption`].
-    #[instrument(skip(self))]
-    pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
-        let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
-            .context("bad peer_enc_pk")
-            .map_err(error::other)?;
-        let wrapped = self
-            .client
-            .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        let wrapped = postcard::to_allocvec(&wrapped).assume("can serialize")?;
-        Ok(wrapped)
-    }
-
     /// Adds a peer for automatic periodic Aranya state syncing.
     #[instrument(skip(self))]
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
