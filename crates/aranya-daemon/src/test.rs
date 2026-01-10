@@ -17,9 +17,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use aranya_certgen::{
-    generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames,
-};
+use aranya_certgen::{CertGen, SubjectAltNames};
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
@@ -217,10 +215,9 @@ impl TestCtx {
         let ca_key_path = dir.path().join("ca-key.pem");
 
         // Generate CA certificate
-        let (ca_cert, ca_key) =
-            generate_root_ca("Test CA", 365).context("failed to generate test CA")?;
-        write_cert(&ca_cert_path, &ca_cert).context("failed to write CA cert")?;
-        write_key(&ca_key_path, &ca_key).context("failed to write CA key")?;
+        let ca = CertGen::ca("Test CA", 365).context("failed to generate test CA")?;
+        ca.save(&ca_cert_path, &ca_key_path)
+            .context("failed to write CA cert/key")?;
 
         Ok(Self {
             dir,
@@ -235,19 +232,20 @@ impl TestCtx {
         let cert_path = device_dir.join("device.pem");
         let key_path = device_dir.join("device-key.pem");
 
-        // Load CA and generate device cert
+        // Load CA and generate signed cert
         let ca_cert_path = self.root_certs_dir.join("ca.pem");
-        let issuer = aranya_certgen::load_ca(&ca_cert_path, &self.ca_key_path)
-            .context("failed to load CA")?;
+        let ca = CertGen::load(&ca_cert_path, &self.ca_key_path).context("failed to load CA")?;
 
-        let san = SubjectAltNames::new()
+        let sans = SubjectAltNames::new()
             .with_dns(name)
             .with_ip("127.0.0.1".parse().expect("valid IP"));
 
-        let (device_cert, device_key) = generate_signed_cert(name, &issuer, 365, &san)
-            .context("failed to generate device cert")?;
-        write_cert(&cert_path, &device_cert).context("failed to write device cert")?;
-        write_key(&key_path, &device_key).context("failed to write device key")?;
+        let signed = ca
+            .generate(name, 365, &sans)
+            .context("failed to generate signed cert")?;
+        signed
+            .save(&cert_path, &key_path)
+            .context("failed to write signed cert/key")?;
 
         Ok(CertConfig {
             root_certs_dir: self.root_certs_dir.clone(),

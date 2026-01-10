@@ -457,9 +457,7 @@ mod tests {
 
     use std::time::Duration;
 
-    use aranya_certgen::{
-        generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames,
-    };
+    use aranya_certgen::{CertGen, SubjectAltNames};
     use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
@@ -489,21 +487,21 @@ mod tests {
         let root_certs_dir = certs_dir.join("root_certs");
         std::fs::create_dir_all(&root_certs_dir).expect("should create root certs dir");
 
-        let (ca_cert, ca_key) = generate_root_ca("Test CA", 365).expect("should generate CA");
-        write_cert(root_certs_dir.join("ca.pem"), &ca_cert).expect("should write CA cert");
+        let ca = CertGen::ca("Test CA", 365).expect("should generate CA");
+        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+            .expect("should write CA cert/key");
 
-        let issuer =
-            aranya_certgen::issuer_from_ca(&ca_cert, ca_key).expect("should create issuer");
-
-        let san = SubjectAltNames::new()
+        let sans = SubjectAltNames::new()
             .with_dns("localhost")
             .with_ip("127.0.0.1".parse().expect("valid IP"));
-        let (device_cert, device_key) = generate_signed_cert("test-daemon", &issuer, 365, &san)
-            .expect("should generate device cert");
+        let signed = ca
+            .generate("test-daemon", 365, &sans)
+            .expect("should generate signed cert");
         let device_cert_path = certs_dir.join("device.pem");
         let device_key_path = certs_dir.join("device-key.pem");
-        write_cert(&device_cert_path, &device_cert).expect("should write device cert");
-        write_key(&device_key_path, &device_key).expect("should write device key");
+        signed
+            .save(&device_cert_path, &device_key_path)
+            .expect("should write signed cert/key");
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {

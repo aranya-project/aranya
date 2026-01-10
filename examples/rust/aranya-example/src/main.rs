@@ -5,9 +5,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use aranya_certgen::{
-    generate_root_ca, generate_signed_cert, load_ca, write_cert, write_key, SubjectAltNames,
-};
+use aranya_certgen::{CertGen, SubjectAltNames};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
@@ -31,32 +29,33 @@ use tracing_subscriber::{
 
 /// Generates a CA certificate using aranya-certgen library.
 fn generate_ca(ca_cert: &Path, ca_key: &Path) -> Result<()> {
-    let (cert, key) =
-        generate_root_ca("Aranya Example CA", 365).context("failed to generate CA certificate")?;
-    write_cert(ca_cert, &cert).context("failed to write CA certificate")?;
-    write_key(ca_key, &key).context("failed to write CA key")?;
+    let ca = CertGen::ca("Aranya Example CA", 365).context("failed to generate CA certificate")?;
+    ca.save(ca_cert, ca_key)
+        .context("failed to write CA certificate/key")?;
     Ok(())
 }
 
-/// Generates a device certificate signed by the CA.
-fn generate_device_cert(
+/// Generates a signed certificate using the CA.
+fn generate_signed_cert(
     name: &str,
     root_certs_dir: &Path,
     ca_key: &Path,
-    device_cert: &Path,
-    device_key: &Path,
+    cert_path: &Path,
+    key_path: &Path,
 ) -> Result<()> {
     let ca_cert = root_certs_dir.join("ca.pem");
-    let issuer = load_ca(&ca_cert, ca_key).context("failed to load CA")?;
+    let ca = CertGen::load(&ca_cert, ca_key).context("failed to load CA")?;
 
-    let san = SubjectAltNames::new()
+    let sans = SubjectAltNames::new()
         .with_dns(name)
         .with_ip("127.0.0.1".parse().expect("valid IP"));
 
-    let (cert, key) = generate_signed_cert(name, &issuer, 365, &san)
-        .context("failed to generate device certificate")?;
-    write_cert(device_cert, &cert).context("failed to write device certificate")?;
-    write_key(device_key, &key).context("failed to write device key")?;
+    let signed = ca
+        .generate(name, 365, &sans)
+        .context("failed to generate signed certificate")?;
+    signed
+        .save(cert_path, key_path)
+        .context("failed to write signed certificate/key")?;
     Ok(())
 }
 
@@ -133,7 +132,7 @@ impl ClientCtx {
             // Generate device certificate for this daemon
             let device_cert = config_dir.join("device.pem");
             let device_key = config_dir.join("device-key.pem");
-            generate_device_cert(user_name, root_certs_dir, ca_key, &device_cert, &device_key)?;
+            generate_signed_cert(user_name, root_certs_dir, ca_key, &device_cert, &device_key)?;
 
             let buf = format!(
                 r#"

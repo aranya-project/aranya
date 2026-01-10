@@ -3,16 +3,14 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
-use aranya_certgen::{
-    generate_root_ca, generate_signed_cert, write_cert, write_key, Issuer, KeyPair, SubjectAltNames,
-};
+use aranya_certgen::{CertGen, SubjectAltNames};
 use aranya_client::Addr;
 use tokio::fs;
 use tracing::info;
 
-/// Certificate authority for signing device certificates.
+/// Certificate authority for signing certificates.
 pub struct CertificateAuthority {
-    issuer: Issuer<'static, KeyPair>,
+    ca: CertGen,
     root_certs_dir: PathBuf,
 }
 
@@ -31,18 +29,11 @@ impl CertificateAuthority {
         std::fs::create_dir_all(&root_certs_dir)?;
 
         // Generate CA certificate
-        let (ca_cert, ca_key) =
-            generate_root_ca("Aranya Example CA", 365).context("failed to generate CA")?;
-        write_cert(root_certs_dir.join("ca.pem"), &ca_cert).context("failed to write CA cert")?;
+        let ca = CertGen::ca("Aranya Example CA", 365).context("failed to generate CA")?;
+        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+            .context("failed to write CA cert/key")?;
 
-        // Create issuer from CA
-        let issuer =
-            aranya_certgen::issuer_from_ca(&ca_cert, ca_key).context("failed to create issuer")?;
-
-        Ok(Self {
-            issuer,
-            root_certs_dir,
-        })
+        Ok(Self { ca, root_certs_dir })
     }
 
     /// Returns the path to the root certificates directory.
@@ -50,28 +41,29 @@ impl CertificateAuthority {
         &self.root_certs_dir
     }
 
-    /// Generates a device certificate signed by this CA.
-    pub fn generate_device_cert(
+    /// Generates a signed certificate.
+    pub fn generate_signed_cert(
         &self,
-        device_name: &str,
+        name: &str,
         work_dir: &Path,
     ) -> Result<(PathBuf, PathBuf)> {
-        let device_cert_path = work_dir.join("device.pem");
-        let device_key_path = work_dir.join("device-key.pem");
+        let cert_path = work_dir.join("device.pem");
+        let key_path = work_dir.join("device-key.pem");
 
-        let san = SubjectAltNames {
-            dns_names: vec![format!("{}.example.local", device_name)],
-            ip_addresses: vec!["127.0.0.1".parse().expect("valid IP address")],
-        };
+        let sans = SubjectAltNames::new()
+            .with_dns(format!("{}.example.local", name))
+            .with_ip("127.0.0.1".parse().expect("valid IP address"));
 
-        let (device_cert, device_key) =
-            generate_signed_cert(&format!("{} Device", device_name), &self.issuer, 365, &san)
-                .context("failed to generate device cert")?;
+        let signed = self
+            .ca
+            .generate(&format!("{} Server", name), 365, &sans)
+            .context("failed to generate signed cert")?;
 
-        write_cert(&device_cert_path, &device_cert)?;
-        write_key(&device_key_path, &device_key)?;
+        signed
+            .save(&cert_path, &key_path)
+            .context("failed to write signed cert/key")?;
 
-        Ok((device_cert_path, device_key_path))
+        Ok((cert_path, key_path))
     }
 }
 
@@ -103,8 +95,8 @@ pub async fn create_config(
             .with_context(|| format!("unable to create directory: {}", dir.display()))?;
     }
 
-    // Generate device certificate
-    let (device_cert, device_key) = ca.generate_device_cert(&device, &work_dir)?;
+    // Generate signed certificate
+    let (device_cert, device_key) = ca.generate_signed_cert(&device, &work_dir)?;
     let root_certs_dir = ca.root_certs_dir();
 
     let buf = format!(

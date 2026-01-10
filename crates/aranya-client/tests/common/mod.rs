@@ -8,9 +8,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_certgen::{
-    generate_root_ca, generate_signed_cert, write_cert, write_key, SubjectAltNames,
-};
+use aranya_certgen::{CertGen, SubjectAltNames};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
     Addr, SyncPeerConfig,
@@ -61,48 +59,44 @@ impl DevicesCtx {
         std::fs::create_dir_all(&root_certs_dir)?;
 
         // Generate CA certificate
-        let (ca_cert, ca_key) =
-            generate_root_ca("Test CA", 365).context("failed to generate CA")?;
-        write_cert(root_certs_dir.join("ca.pem"), &ca_cert).context("failed to write CA cert")?;
-
-        // Create issuer from CA
-        let issuer =
-            aranya_certgen::issuer_from_ca(&ca_cert, ca_key).context("failed to create issuer")?;
+        let ca = CertGen::ca("Test CA", 365).context("failed to generate CA")?;
+        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+            .context("failed to write CA cert/key")?;
 
         let (owner, admin, operator, membera, memberb) = try_join!(
             DeviceCtx::new(
                 name,
                 "owner",
                 work_dir_path.join("owner"),
-                &issuer,
+                &ca,
                 &root_certs_dir
             ),
             DeviceCtx::new(
                 name,
                 "admin",
                 work_dir_path.join("admin"),
-                &issuer,
+                &ca,
                 &root_certs_dir
             ),
             DeviceCtx::new(
                 name,
                 "operator",
                 work_dir_path.join("operator"),
-                &issuer,
+                &ca,
                 &root_certs_dir
             ),
             DeviceCtx::new(
                 name,
                 "membera",
                 work_dir_path.join("membera"),
-                &issuer,
+                &ca,
                 &root_certs_dir
             ),
             DeviceCtx::new(
                 name,
                 "memberb",
                 work_dir_path.join("memberb"),
-                &issuer,
+                &ca,
                 &root_certs_dir
             ),
         )?;
@@ -249,7 +243,7 @@ impl DeviceCtx {
         team_name: &str,
         name: &str,
         work_dir: PathBuf,
-        issuer: &aranya_certgen::Issuer<'_, rcgen::KeyPair>,
+        ca: &CertGen,
         root_certs_dir: &Path,
     ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
@@ -272,15 +266,15 @@ impl DeviceCtx {
         let device_key_path = work_dir.join("device-key.pem");
         std::fs::create_dir_all(&work_dir)?;
 
-        let san = SubjectAltNames {
-            dns_names: vec![format!("{}.test.local", name)],
-            ip_addresses: vec!["127.0.0.1".parse().expect("valid IP address")],
-        };
-        let (device_cert, device_key) =
-            generate_signed_cert(&format!("{} Device", name), issuer, 365, &san)
-                .context("failed to generate device cert")?;
-        write_cert(&device_cert_path, &device_cert)?;
-        write_key(&device_key_path, &device_key)?;
+        let sans = SubjectAltNames::new()
+            .with_dns(format!("{}.test.local", name))
+            .with_ip("127.0.0.1".parse().expect("valid IP address"));
+        let signed = ca
+            .generate(&format!("{} Server", name), 365, &sans)
+            .context("failed to generate signed cert")?;
+        signed
+            .save(&device_cert_path, &device_key_path)
+            .context("failed to write signed cert/key")?;
 
         // Setup daemon config.
         let cfg = Config {
