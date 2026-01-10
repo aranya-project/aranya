@@ -25,6 +25,7 @@ time = "0.3"
 
 [dev-dependencies]
 tempfile = "3"
+x509-parser = "0.18"
 
 [lints]
 workspace = true

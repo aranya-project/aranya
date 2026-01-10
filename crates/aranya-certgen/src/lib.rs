@@ -451,6 +451,7 @@ fn generate_signed_cert(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x509_parser::prelude::*;
 
     #[test]
     fn test_cert_gen_ca_roundtrip() {
@@ -498,5 +499,30 @@ mod tests {
 
         // Each generated cert should be unique
         assert_ne!(cert1, cert2);
+    }
+
+    #[test]
+    fn test_cert_signed_by_ca() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
+
+        let sans = SubjectAltNames::new()
+            .with_dns("localhost")
+            .with_ip("127.0.0.1".parse().unwrap());
+
+        let cert = CertGen::generate(&ca, "test-device", 365, &sans).expect("should generate cert");
+
+        // Parse the CA certificate to get its public key
+        let (_, ca_pem) = parse_x509_pem(ca.cert_pem.as_bytes()).expect("should parse CA PEM");
+        let ca_cert = ca_pem.parse_x509().expect("should parse CA cert");
+
+        // Parse the signed certificate
+        let (_, signed_pem) =
+            parse_x509_pem(cert.cert_pem.as_bytes()).expect("should parse signed PEM");
+        let signed_cert = signed_pem.parse_x509().expect("should parse signed cert");
+
+        // Verify the signed certificate's signature using the CA's public key
+        signed_cert
+            .verify_signature(Some(ca_cert.public_key()))
+            .expect("certificate should be signed by CA");
     }
 }
