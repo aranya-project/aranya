@@ -144,11 +144,11 @@ fn main() -> Result<(), CertGenError> {
                 );
             }
 
-            let cert_gen = CertGen::load(&ca_cert, &ca_key)?;
+            let ca = CertGen::load(&ca_cert, &ca_key)?;
 
             println!("Generating certificate '{}'...", cn);
-            let device = CertGen::generate(&cert_gen, &cn, days, &sans.clone().into())?;
-            device.save(&cert, &key)?;
+            let signed = ca.generate(&cn, days, &sans.clone().into())?;
+            signed.save(&cert, &key)?;
 
             println!("  Certificate: {}", cert.display());
             println!("  Private key: {}", key.display());
