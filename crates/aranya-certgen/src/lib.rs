@@ -34,10 +34,9 @@
 //! let signed = ca.generate("server", 365, &sans).unwrap();
 //! ```
 
-use std::{fs, net::IpAddr, path::Path};
-
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::{fs, net::IpAddr, path::Path};
 
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose,
@@ -244,7 +243,12 @@ impl CertGen {
     /// signed.save("server.pem", "server.key")?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn generate(&self, cn: &str, days: u32, sans: &SubjectAltNames) -> Result<Self, CertGenError> {
+    pub fn generate(
+        &self,
+        cn: &str,
+        days: u32,
+        sans: &SubjectAltNames,
+    ) -> Result<Self, CertGenError> {
         if days == 0 {
             return Err(CertGenError::InvalidDays);
         }
@@ -295,8 +299,7 @@ impl CertGen {
         let cert_path = cert_path.as_ref();
         let key_path = key_path.as_ref();
 
-        let cert_pem =
-            fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
+        let cert_pem = fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
         let key_pem = fs::read_to_string(key_path).map_err(|e| CertGenError::io(key_path, e))?;
 
         let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
@@ -355,8 +358,7 @@ impl CertGen {
                 fs::create_dir_all(parent).map_err(|e| CertGenError::io(key_path, e))?;
             }
         }
-        fs::write(key_path, self.key.serialize_pem())
-            .map_err(|e| CertGenError::io(key_path, e))?;
+        fs::write(key_path, self.key.serialize_pem()).map_err(|e| CertGenError::io(key_path, e))?;
 
         // Set restrictive permissions on private key (Unix only)
         #[cfg(unix)]
@@ -476,8 +478,9 @@ fn generate_signed_cert(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use x509_parser::prelude::*;
+
+    use super::*;
 
     #[test]
     fn test_cert_gen_ca_roundtrip() {
@@ -501,7 +504,9 @@ mod tests {
             .with_dns("localhost")
             .with_ip("127.0.0.1".parse().unwrap());
 
-        let cert = ca.generate("test-server", 365, &sans).expect("should generate cert");
+        let cert = ca
+            .generate("test-server", 365, &sans)
+            .expect("should generate cert");
 
         let dir = tempfile::tempdir().unwrap();
         let cert_path = dir.path().join("server.pem");
@@ -520,8 +525,12 @@ mod tests {
         let sans1 = SubjectAltNames::new().with_dns("server1.local");
         let sans2 = SubjectAltNames::new().with_dns("server2.local");
 
-        let cert1 = ca.generate("server-1", 365, &sans1).expect("should generate cert 1");
-        let cert2 = ca.generate("server-2", 365, &sans2).expect("should generate cert 2");
+        let cert1 = ca
+            .generate("server-1", 365, &sans1)
+            .expect("should generate cert 1");
+        let cert2 = ca
+            .generate("server-2", 365, &sans2)
+            .expect("should generate cert 2");
 
         // Each generated cert should be unique
         assert_ne!(cert1, cert2);
@@ -535,7 +544,9 @@ mod tests {
             .with_dns("localhost")
             .with_ip("127.0.0.1".parse().unwrap());
 
-        let cert = ca.generate("test-server", 365, &sans).expect("should generate cert");
+        let cert = ca
+            .generate("test-server", 365, &sans)
+            .expect("should generate cert");
 
         // Parse the CA certificate to get its public key
         let (_, ca_pem) = parse_x509_pem(ca.cert_pem().as_bytes()).expect("should parse CA PEM");
