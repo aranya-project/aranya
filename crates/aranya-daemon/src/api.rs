@@ -42,6 +42,8 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use crate::actions::SessionData;
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
+#[cfg(feature = "afc")]
+use crate::daemon::{CE, KS};
 use crate::{
     actions::Actions,
     daemon::CS,
@@ -49,8 +51,6 @@ use crate::{
     sync::task::SyncPeers,
     Client, InvalidGraphs, EF,
 };
-#[cfg(feature = "afc")]
-use crate::daemon::{CE, KS};
 
 /// Find the first effect matching a given pattern.
 ///
