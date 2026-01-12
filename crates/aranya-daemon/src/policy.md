@@ -36,7 +36,13 @@ which commands devices can publish to Aranya's distributed graph:
 Any object in the system with an Aranya ID can have a rank associated with it in the policy.
 Rank checks are only concerned with ranks associated with devices, roles, and labels specifically when determining if an object has permission to perform certain operations.
 The team does not need a rank associated with it since all operations implicitly occur within the context of a team.
+
+## Security Properties
+
+- **Confidentiality** is not a property of the Aranya graph or policy itself. Confidentially is currently enforced with PSKs in the QUIC syncer implementation with plans to migrate to mTLS certificates in the future.
+- **Integrity** is enforced by cryptographic hashes of commands added to the Aranya graph.
 - **Authorization** is determined by whether an object has permission to perform the operation and outranks the target object(s).
+- **Non-Repudiation** graph commands are signed by the device that publishes them allowing the command author to be verified.
 - **No Self-Administration**: Devices cannot assign roles or labels to
   themselves, enforcing separation of duties and mitigating against privilege escalation.
 
@@ -153,7 +159,7 @@ TerminateTeam(500) -> DeleteFoo(400) -> RevokeFoo(300) -> CreateFoo(200) -> UseF
 
 Commands that must be called first should have a higher priority than commands that depend on them.
 For example, a command to create/assign a label to a device should be higher priority than a command that uses the label.
-Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the weave, but must take precedence over other commands that modify the state of the object.
+Delete*, Revoke*, Terminate*, Remove*, etc. commands must have a higher priority assigned to them since they occur later in the braid, but must take precedence over other commands that modify the state of the object.
 For example, deleting a label should be higher priority than assigning a label to a device because if the label doesn't exist, operations with the label are invalid.
 
 Command priorities will be required to be defined for each command in the policy. Even the zero priority should be defined. That way, the policy can be audited and does not have any default priorities that cannot be audited.
@@ -707,7 +713,7 @@ Lower ranked objects are guaranteed to not have permission to operate on higher 
 
 For example, a command author with rank 10 would be allowed to assign a label of rank 5 to a device of rank 4 because both of the objects it is operating on are lower rank than the author of the command.
 
-It is recommended to never grant a role of lower rank a permission that a device of higher rank does not have. If this scenario were to occur, the device of higher rank could onboard a pawn device to the team and assign the higher privilege but lower rank role to the pawn device in order to escalate its own privileges.
+It is recommended to never grant a role of lower rank a permission that a device of higher rank does not have (see [Privilege Escalation Attempt Scenario 2](#Privilege-Escalation-Attempt-Scenario-2)). If this scenario were to occur, the device of higher rank could onboard a pawn device to the team and assign the higher privilege but lower rank role to the pawn device in order to escalate its own privileges.
 
 ### Rank Fact
 
@@ -779,10 +785,18 @@ function get_object_rank(object_id id) int {
 //
 // Assumptions:
 // - Object rank must not exist yet.
-// - Author must have higher rank than rank it is setting.
+// - Author must have rank >= rank it is setting.
 finish function set_object_rank(object_id id, rank int) {
     // Create new rank fact.
     create Rank[object_id: object_id]=>{rank: rank}
+}
+
+// Returns whether an object exists.
+function object_exists(object_id id) bool {
+        let device_exists = exists Device[device_id: this.object_id]
+        let role_exists = exists Role[role_id: this.object_id]
+        let label_exists = exists Label[label_id: this.object_id]
+        check device_exists || role_exists || label_exists
 }
 ```
 
@@ -798,7 +812,8 @@ let MAX_RANK = 9223372036854775807
 //
 // Assumptions:
 // - The object must already have a rank.
-// - The command author must have a higher rank than the old and new rank.
+// - The command author must have rank > the old rank.
+// - The command author must have rank >= the new rank.
 // - The command author must know the current rank before setting the new rank (to prevent an accidental race condition).
 finish function change_object_rank(object_id id, old_rank int, new_rank int) {
     update Rank[object_id: object_id]=>{rank: old_rank} to {rank: new_rank}
@@ -844,11 +859,7 @@ command ChangeRank {
         let author = get_author(envelope)
 
         // Check that the object exists before changing its rank.
-        // TODO: should object existence be tracked in a single fact?
-        let device_exists = exists Device[device_id: this.object_id]
-        let role_exists = exists Role[role_id: this.object_id]
-        let label_exists = exists Label[label_id: this.object_id]
-        check device_exists || role_exists || label_exists
+        check object_exists(this.object_id)
 
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
@@ -988,7 +999,7 @@ Since the default owner role has all permissions available to it, it is recommen
 
 To mitigate against privilege escalation attempts, it is recommended to create roles with non-overlapping permissions as much as possible. It is especially important to segment permissions for device management, role creation, role permission management, labels, etc. across different roles.
 
-If a single role has too many permissions, it can attempt to use those permissions to escalate its own permissions, escalate permissions of other devices on the team, or onboard malicious devices it maintains control of to be used as a stronghold for future downgrade resistance.
+If a single role has too many permissions, it can attempt to use those permissions to escalate its own permissions, escalate permissions of other devices on the team, or onboard malicious devices it maintains control of to be used as a stronghold for future downgrade resistance (see [Privilege Escalation Attempt Scenario 1](#Privilege-Escalation-Attempt-Scenario-1)).
 
 #### Privilege Escalation Attempt Scenario 1
 
@@ -1390,7 +1401,7 @@ command CreateRole {
         check device_has_perm(author.device_id, Perm::CreateRole)
 
         // The author's rank must be greater than the rank of the role it is creating.
-        check get_object_rank(author.device_id) > this.rank
+        check get_object_rank(author.device_id) >= this.rank
 
         let role_id = derive_role_id(envelope)
 
@@ -2527,7 +2538,7 @@ command AddDevice {
         check device_has_perm(author.device_id, Perm::AddDevice)
 
         // The author's rank must be greater than the rank of the device it is adding to the team.
-        check get_object_rank(author.device_id) > this.rank
+        check get_object_rank(author.device_id) >= this.rank
 
         let dev_key_ids = derive_device_key_ids(this.device_keys)
 
@@ -2796,7 +2807,7 @@ command CreateLabel {
         check device_has_perm(author.device_id, Perm::CreateLabel)
 
         // The author's rank must be greater than the rank of the label it is creating.
-        check get_object_rank(author.device_id) > this.rank
+        check get_object_rank(author.device_id) >= this.rank
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
