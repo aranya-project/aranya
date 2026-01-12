@@ -1,5 +1,4 @@
-#[cfg(feature = "preview")]
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
@@ -54,6 +53,8 @@ impl Team<'_> {
 }
 
 impl Team<'_> {
+    const SYNC_NOW_REQUEST_DEADLINE: Duration = Duration::from_secs(60 * 5);
+
     /// Encrypts the team's QUIC syncer PSK seed for a peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
     /// See [`KeyBundle::encryption`].
@@ -90,9 +91,12 @@ impl Team<'_> {
     /// be used.
     #[instrument(skip(self))]
     pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+        let mut req_ctx = context::current();
+        req_ctx.deadline = Instant::now() + Self::SYNC_NOW_REQUEST_DEADLINE;
+
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
+            .sync_now(req_ctx, addr, self.id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
