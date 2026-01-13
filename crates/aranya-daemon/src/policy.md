@@ -1023,6 +1023,8 @@ The following scenario describes a possible privilege escalation attempt as well
 
 It is recommended to segment the `AddDevice`, `CreateRole`, `ChangeRolePerms`, and `AssignRole` permissions across different roles to prevent a single device from controlling device onboarding, role permissions management, and role assignment. A similar approach is recommended to mitigate against privilege escalation for label management.
 
+> **Warning**: The `ChangeRolePerms` and `AssignRole` permissions should **never** be assigned to the same role unless it is a superuser role like Owner. A device with both permissions can add any permission to a role it manages and then assign that role to a device it controls, effectively escalating its own privileges. This is a critical security consideration when designing your role hierarchy.
+
 Note that it is important to segment permissions across different roles with the same rank. If the roles have different ranks, one role will outrank the other role and could leverage its privilege over the other role to assign that role to a pawn device it controls in order to escalate permissions.
 
 #### Privilege Escalation Attempt Scenario 2
@@ -1101,10 +1103,14 @@ enum Perm {
     // The role can delete a role.
     DeleteRole,
     // The role can assign a role to other devices.
+    // WARNING: Do not combine with `ChangeRolePerms` on the same role
+    // (see [Privilege Escalation Mitigations](#privilege-escalation-mitigations)).
     AssignRole,
     // The role can revoke a role from other devices.
     RevokeRole,
     // The role can change permissions of other roles.
+    // WARNING: Do not combine with `AssignRole` on the same role
+    // (see [Privilege Escalation Mitigations](#privilege-escalation-mitigations)).
     ChangeRolePerms,
     // The role can set up default roles. This can only be done
     // once, so this permission can only effectively be used by
@@ -1176,7 +1182,15 @@ function device_has_perm(device_id id, perm enum Perm) bool {
 
 // Adds a permission to the role.
 //
-// Assumptions:
+// # Security Warning
+//
+// The `ChangeRolePerms` permission should not be combined with `AssignRole`
+// on the same role. A device with both permissions can escalate privileges
+// by adding permissions to a role and assigning it to a device it controls.
+// See [Privilege Escalation Mitigations](#privilege-escalation-mitigations) for details.
+//
+// # Assumptions
+//
 // 1. The author has the `ChangeRolePerms` permission.
 // 2. The target role does not already have the permission.
 action add_perm_to_role(role_id id, perm enum Perm) {
@@ -1828,6 +1842,13 @@ function try_get_assigned_role_id(device_id id) optional id {
 // If you want to assign a different role to a device that already
 // has a role, use `change_role()` instead.
 //
+// # Security Warning
+//
+// The `AssignRole` permission should not be combined with `ChangeRolePerms`
+// on the same role. A device with both permissions can escalate privileges
+// by adding permissions to a role and assigning it to a device it controls.
+// See [Privilege Escalation Mitigations](#privilege-escalation-mitigations) for details.
+//
 // # Required Permissions
 //
 // - `AssignRole`
@@ -1921,6 +1942,13 @@ command AssignRole {
 
 ```policy
 // Changes a device's role.
+//
+// # Security Warning
+//
+// The `AssignRole` permission should not be combined with `ChangeRolePerms`
+// on the same role. A device with both permissions can escalate privileges
+// by adding permissions to a role and assigning it to a device it controls.
+// See [Privilege Escalation Mitigations](#privilege-escalation-mitigations) for details.
 //
 // # Required Permissions
 //
