@@ -44,7 +44,7 @@ impl CertificateAuthority {
     /// Generates a signed certificate.
     pub fn generate_signed_cert(&self, name: &str, work_dir: &Path) -> Result<(PathBuf, PathBuf)> {
         let cert_path = work_dir.join("device.pem");
-        let key_path = work_dir.join("device-key.pem");
+        let key_path = work_dir.join("device.key");
 
         let sans = SubjectAltNames::new()
             .with_dns(format!("{}.example.local", name))

@@ -66,7 +66,7 @@ for device in "${devices[@]}"; do
         --cn "${device}" \
         --ip "127.0.0.1" \
         --cert "${config_dir}/device.pem" \
-        --key "${config_dir}/device-key.pem"
+        --key "${config_dir}/device.key"
 
     cat <<EOF >"${example}/configs/${device}-config.toml"
 name = "${device}"
@@ -86,7 +86,7 @@ enable = true
 addr = "127.0.0.1:${port}"
 root_certs_dir = "${root_certs_dir}"
 device_cert = "${config_dir}/device.pem"
-device_key = "${config_dir}/device-key.pem"
+device_key = "${config_dir}/device.key"
 EOF
     port=$((port + 1))
 done
@@ -124,7 +124,7 @@ for device in "${devices[@]}"; do
         --config "${cfg_path}" &
 done
 # give the daemons time to startup
-sleep 1
+sleep 2
 
 # start the example app.
 ASAN_OPTIONS=detect_leaks=0 \

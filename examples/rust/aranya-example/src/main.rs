@@ -131,7 +131,7 @@ impl ClientCtx {
 
             // Generate device certificate for this daemon
             let device_cert = config_dir.join("device.pem");
-            let device_key = config_dir.join("device-key.pem");
+            let device_key = config_dir.join("device.key");
             generate_signed_cert(user_name, root_certs_dir, ca_key, &device_cert, &device_key)?;
 
             let buf = format!(
