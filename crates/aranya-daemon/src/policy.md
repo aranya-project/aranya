@@ -1003,17 +1003,15 @@ If a single role has too many permissions, it can attempt to use those permissio
 
 #### Privilege Escalation Attempt Scenario 1
 
-The following scenario describes a possible privilege escalation attempt as well as policy and operational mitigations to prevent the attack vector from occurring. 
+The following scenario describes a possible privilege escalation attempt as well as operational mitigations to prevent the attack vector from occurring.
 
 1. Malicious device onboards a new pawn device it maintains control of (`AddDevice` perm).
 2. Malicious device creates a new role (`CreateRole` perm).
-3. Malicious device assigns a permission to that role it does not have (`ChangeRolePerms` perm). Policy does not allow this to happen.
+3. Malicious device assigns a permission to that role it does not have (`ChangeRolePerms` perm).
 4. Malicious device assigns role with escalated permissions to the pawn device (`AssignRole` perm).
 5. Malicious device now has escalated permissions via the pawn device it controls.
 
-We guard against this privilege escalation vector in the policy by only allowing devices to assign permissions to roles which they already have themselves in the `ChangeRolePerms` command. This prevents devices from escalating their own permissions via other roles which they control by breaking step 3. in the chain.
-
-It is also recommended to segment the `AddDevice`, `CreateRole`, `ChangeRolePerms`, and `AssignRole` permissions across different roles to prevent a single device from controlling device onboarding, role permissions management, and role assignment. A similar approach is recommended to mitigate against privilege escalation for label management.
+It is recommended to segment the `AddDevice`, `CreateRole`, `ChangeRolePerms`, and `AssignRole` permissions across different roles to prevent a single device from controlling device onboarding, role permissions management, and role assignment. A similar approach is recommended to mitigate against privilege escalation for label management.
 
 Note that it is important to segment permissions across different roles with the same rank. If the roles have different ranks, one role will outrank the other role and could leverage its privilege over the other role to assign that role to a pawn device it controls in order to escalate permissions.
 
@@ -1170,8 +1168,7 @@ function device_has_perm(device_id id, perm enum Perm) bool {
 //
 // Assumptions:
 // 1. The author has the `ChangeRolePerms` permission.
-// 2. The author has the permission it is adding to the target role (to mitigate against privilege escalation).
-// 3. The target role does not already have the permission.
+// 2. The target role does not already have the permission.
 action add_perm_to_role(role_id id, perm enum Perm) {
     publish AddPermToRole {
         role_id: role_id,
@@ -1212,10 +1209,6 @@ command AddPermToRole {
 
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
-
-        // The author device can only grant a permission it has to the target role.
-        // This check is to mitigate against privilege escalation attempts.
-        check device_has_perm(author.device_id, this.perm)
 
         // The role must not already have the permission.
         check !role_has_perm(this.role_id, this.perm)
