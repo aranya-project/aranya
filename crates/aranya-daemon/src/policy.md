@@ -803,10 +803,10 @@ function role_rank_gte_device_rank(role_id id, device_id id) bool {
 
 // Returns whether an object exists.
 function object_exists(object_id id) bool {
-        let device_exists = exists Device[device_id: this.object_id]
-        let role_exists = exists Role[role_id: this.object_id]
-        let label_exists = exists Label[label_id: this.object_id]
-        check device_exists || role_exists || label_exists
+    let device_exists = exists Device[device_id: object_id]
+    let role_exists = exists Role[role_id: object_id]
+    let label_exists = exists Label[label_id: object_id]
+    return device_exists || role_exists || label_exists
 }
 ```
 
