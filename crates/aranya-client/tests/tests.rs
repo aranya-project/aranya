@@ -668,7 +668,7 @@ async fn test_remove_team() -> Result<()> {
 }
 
 /// Tests that a device can create multiple teams and receive sync requests for each team.
-/// With mTLS, devices can sync with any team they have the ID for - no add_team call needed.
+/// With mTLS, devices can sync with any team they have the team ID for - no add_team call needed.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
