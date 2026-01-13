@@ -810,6 +810,21 @@ function role_rank_gte_device_rank(role_id id, device_id id) bool {
     return role_rank >= device_rank
 }
 
+// Returns whether a label's rank is >= a device's rank.
+//
+// This check prevents a device from being assigned a label it could
+// potentially operate on (delete, assign to others, revoke from others).
+//
+// Note: Uses greater-than-or-equal (>=) comparison, unlike `author_can_operate_on_target`
+// which uses strict greater-than (>). This allows a device to be assigned a label of equal
+// rank, which is safe because the device still cannot operate on that label (since operations
+// require strictly outranking the target).
+function label_rank_gte_device_rank(label_id id, device_id id) bool {
+    let label_rank = get_object_rank(label_id)
+    let device_rank = get_object_rank(device_id)
+    return label_rank >= device_rank
+}
+
 // Returns whether an object exists.
 function object_exists(object_id id) bool {
     let device_exists = exists Device[device_id: object_id]
@@ -3054,6 +3069,9 @@ command AssignLabelToDevice {
         // Author must have permission to assign a label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id)
 
+        // The label's rank must be >= the device's rank.
+        check label_rank_gte_device_rank(this.label_id, this.device_id)
+
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
         check exists Device[device_id: this.device_id]
@@ -3080,6 +3098,7 @@ command AssignLabelToDevice {
             // - `author` has the `AssignLabel` permission
             // - `author` outranks `this.label_id`
             // - `author` outranks `this.device_id`
+            // - `this.label_id` has rank >= `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
             // - the existing assignment is stale because the device has
@@ -3108,6 +3127,7 @@ command AssignLabelToDevice {
             // - `author` has the `AssignLabel` permission
             // - `author` outranks `this.label_id`
             // - `author` outranks `this.device_id`
+            // - `this.label_id` has rank >= `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
             finish {
