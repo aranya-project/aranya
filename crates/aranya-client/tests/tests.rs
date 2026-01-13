@@ -796,7 +796,7 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             admin_addr,
             Duration::from_millis(100),
-            Duration::from_secs(30), // Duration must be long enough for label creation + hello + sync
+            Duration::from_millis(2000), // Duration must be long enough for label creation + hello + sync
             Duration::from_secs(60), // Schedule delay for periodic sends
         )
         .await?;
