@@ -1,3 +1,6 @@
+// Allow deprecated usage within this module since we're implementing the deprecated API
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};
@@ -100,16 +103,13 @@ pub struct CreateTeamQuicSyncConfigBuilder {
 
 impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     #[doc(hidden)]
+    #[allow(dead_code)]
     pub(crate) fn mode(&mut self, mode: CreateSeedMode) {
         self.mode = mode;
     }
 
     /// Sets the seed to be generated.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     ///
     /// Overwrites [`Self::seed_ikm`].
     pub fn generate(&mut self) {
@@ -117,8 +117,6 @@ impl CreateTeamQuicSyncConfigBuilder {
     }
 
     /// Sets the seed mode to 'IKM'.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     ///
     /// Overwrites [`Self::gen_seed`].
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
@@ -147,23 +145,18 @@ pub struct AddTeamQuicSyncConfigBuilder {
 
 impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     #[doc(hidden)]
+    #[allow(dead_code)]
     pub(crate) fn mode(&mut self, mode: AddSeedMode) {
         self.mode = Some(mode);
     }
 
     /// Sets raw PSK seed IKM.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
         self.mode = Some(AddSeedMode::IKM(ikm.into()));
     }
 
     /// Sets wrapped PSK seed.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
         let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
             error!(error = %err, "could not deserialize wrapped_seed");

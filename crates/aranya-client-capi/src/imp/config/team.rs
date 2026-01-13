@@ -1,3 +1,6 @@
+// Allow deprecated usage within this module since we use deprecated types
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};

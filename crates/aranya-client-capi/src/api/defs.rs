@@ -295,8 +295,14 @@ impl From<aranya_id::BaseId> for Id {
 }
 
 /// The size in bytes of a PSK seed IKM.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This constant exists for backward compatibility but will be removed in a future release.
 pub const ARANYA_SEED_IKM_LEN: usize = 32;
 
+#[allow(deprecated)]
 const _: () = {
     assert!(ARANYA_SEED_IKM_LEN == aranya_client::config::SEED_IKM_SIZE);
 };
@@ -770,18 +776,33 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// QUIC syncer configuration.
 ///
 /// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This type exists for backward compatibility but will be removed in a future release.
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
 ///
 /// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This type exists for backward compatibility but will be removed in a future release.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
 
 /// A builder for initializing an [`AddTeamQuicSyncConfig`].
 ///
 /// The [`AddTeamQuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`].
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This type exists for backward compatibility but will be removed in a future release.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
@@ -789,6 +810,11 @@ pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 /// A builder for initializing a [`CreateTeamQuicSyncConfig`].
 ///
 /// The [`CreateTeamQuicSyncConfig`] is an optional part of initializing a [`CreateTeamConfig`].
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This type exists for backward compatibility but will be removed in a future release.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
@@ -796,8 +822,6 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 /// Attempts to set PSK seed generation mode value on [`CreateTeamQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
 pub fn create_team_quic_sync_config_generate(
@@ -812,8 +836,6 @@ pub fn create_team_quic_sync_config_generate(
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 pub fn add_team_quic_sync_config_wrapped_seed(
     cfg: &mut AddTeamQuicSyncConfigBuilder,
@@ -824,6 +846,11 @@ pub fn add_team_quic_sync_config_wrapped_seed(
 }
 
 /// Raw PSK seed IKM for QUIC syncer.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This type exists for backward compatibility but will be removed in a future release.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct SeedIkm {
@@ -834,8 +861,6 @@ pub struct SeedIkm {
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
 pub fn create_team_quic_sync_config_raw_seed_ikm(
@@ -851,8 +876,6 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 pub fn add_team_quic_sync_config_raw_seed_ikm(
     cfg: &mut AddTeamQuicSyncConfigBuilder,
@@ -866,6 +889,11 @@ pub fn add_team_quic_sync_config_raw_seed_ikm(
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
 ///
 /// @param[in] cfg a pointer to the QUIC sync config builder
 /// @param[out] out a pointer to write the QUIC sync config to
@@ -884,6 +912,11 @@ pub fn create_team_quic_sync_config_build(
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
 ///
 /// @param[in] cfg a pointer to the QUIC sync config builder
 /// @param[out] out a pointer to write the QUIC sync config to
@@ -923,6 +956,11 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 /// Configures QUIC syncer for [`AddTeamConfigBuilder`].
 ///
 /// By default, the QUIC syncer config is not set.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
 ///
 /// @param[in,out] cfg a pointer to the builder for a team config
 /// @param[in] quic set the QUIC syncer config
@@ -970,6 +1008,11 @@ pub fn add_team_config_build(
 /// Configures QUIC syncer for [`CreateTeamConfigBuilder`].
 ///
 /// By default, the QUIC syncer config is not set.
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
 ///
 /// @param[in,out] cfg a pointer to the builder for a team config
 /// @param[in] quic set the QUIC syncer config
@@ -1701,8 +1744,6 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[in] keybundle_len the length of the keybundle
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaClient.
 pub unsafe fn encrypt_psk_seed_for_peer(
