@@ -1,4 +1,4 @@
-// Allow deprecated usage within this module since we use deprecated types
+// Allow deprecated usage since From impls call deprecated aranya_client::*ConfigBuilder::quic_sync()
 #![allow(deprecated)]
 
 use core::mem::MaybeUninit;
