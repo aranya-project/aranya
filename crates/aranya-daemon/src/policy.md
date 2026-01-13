@@ -791,6 +791,16 @@ finish function set_object_rank(object_id id, rank int) {
     create Rank[object_id: object_id]=>{rank: rank}
 }
 
+// Returns whether a role's rank is >= a device's rank.
+//
+// This check prevents a device from being assigned a role it could
+// potentially modify, which would allow it to escalate its own permissions.
+function role_rank_gte_device_rank(role_id id, device_id id) bool {
+    let role_rank = get_object_rank(role_id)
+    let device_rank = get_object_rank(device_id)
+    return role_rank >= device_rank
+}
+
 // Returns whether an object exists.
 function object_exists(object_id id) bool {
         let device_exists = exists Device[device_id: this.object_id]
@@ -1864,9 +1874,8 @@ command AssignRole {
         // The author must have permission to assign the role to the target device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id)
 
-        // TODO: should assigned role rank always exceed target device rank?
-        // May want to add this check to prevent a device from modifying a role assigned to a higher rank device.
-        // Current recommendation is for the application to not set up roles and ranks in a way that allows this.
+        // The role's rank must be >= the device's rank.
+        check role_rank_gte_device_rank(this.role_id, this.device_id)
 
         // Ensure the target role exists.
         check exists Role[role_id: this.role_id]
@@ -1892,6 +1901,7 @@ command AssignRole {
         // - `author` is not assigning the role to itself
         // - `author` has the `AssignRole` permission
         // - `author` outranks the target role and device
+        // - the role's rank >= the device's rank
         // - the device does not already hold `this.role_id`
         finish {
             create_role_assignment(this.device_id, this.role_id)
@@ -1976,6 +1986,9 @@ command ChangeRole {
         // The author must have permission to assign the new role to the device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id)
 
+        // The new role's rank must be >= the device's rank.
+        check role_rank_gte_device_rank(this.new_role_id, this.device_id)
+
         // The target device must exist.
         check exists Device[device_id: this.device_id]
 
@@ -2006,6 +2019,7 @@ command ChangeRole {
         // - `this.new_role_id` refers to a role that exists
         // - `author` has the `AssignRole` permission
         // - `author` outranks `old_role`, `new_role`, and the target device
+        // - the new role's rank >= the device's rank
         finish {
             update_role_assignment(
                 this.device_id,
