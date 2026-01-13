@@ -44,7 +44,8 @@ The team does not need a rank associated with it since all operations implicitly
 - **Authorization** is determined by whether an object has permission to perform the operation and outranks the target object(s).
 - **Non-Repudiation** graph commands are signed by the device that publishes them allowing the command author to be verified.
 - **No Self-Administration**: Devices cannot assign roles or labels to
-  themselves, enforcing separation of duties and mitigating against privilege escalation.
+  themselves. This is enforced by rank-based authorization since a device
+  cannot outrank itself (strict `>` comparison).
 
 # Policy
 
@@ -1910,9 +1911,6 @@ command AssignRole {
 
         let author = get_author(envelope)
 
-        // Devices cannot assign roles to themselves.
-        check author.device_id != this.device_id
-
         // The author must have permission to assign the role to the target device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id)
 
@@ -1940,7 +1938,6 @@ command AssignRole {
         // - the team is active
         // - `this.device_id` refers to a device that exists
         // - `this.role_id` refers to a role that exists
-        // - `author` is not assigning the role to itself
         // - `author` has the `AssignRole` permission
         // - `author` outranks the target role and device
         // - the role's rank >= the device's rank
@@ -2020,9 +2017,6 @@ command ChangeRole {
         check team_exists()
 
         let author = get_author(envelope)
-
-        // Devices cannot assign roles to themselves.
-        check author.device_id != this.device_id
 
         // Attempting to change to the same role should fail since a state change is expected.
         check this.old_role_id != this.new_role_id
@@ -3058,13 +3052,6 @@ command AssignLabelToDevice {
         check team_exists()
 
         let author = get_author(envelope)
-
-        // Devices are never allowed to assign labels to
-        // themselves.
-        //
-        // Perform this check before we make more fact database
-        // queries.
-        check author.device_id != this.device_id
 
         // Author must have permission to assign a label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id)
