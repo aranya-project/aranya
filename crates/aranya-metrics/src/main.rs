@@ -249,12 +249,12 @@ async fn setup_demo(team_name: &str) -> Result<(Vec<Pid>, DemoContext)> {
 }
 
 async fn run_demo_body(ctx: DemoContext) -> Result<()> {
-    // Create a team (with mTLS, no config needed - authentication is handled by certificates).
+    // Create a team (with mTLS, config is accepted for backward compatibility).
     info!("creating team");
     let owner = ctx
         .owner
         .client
-        .create_team()
+        .create_team(Default::default())
         .await
         .context("expected to create team")?;
     let team_id = owner.team_id();

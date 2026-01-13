@@ -173,7 +173,7 @@ impl DevicesCtx {
         let team = {
             self.owner
                 .client
-                .create_team()
+                .create_team(Default::default())
                 .await
                 .expect("expected to create team")
         };

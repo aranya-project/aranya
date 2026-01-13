@@ -220,7 +220,10 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&self) -> Result<Team<'_>> {
+    ///
+    /// The `_cfg` parameter exists for backward compatibility and is ignored.
+    /// With mTLS authentication, team configuration is no longer required.
+    pub async fn create_team(&self, _cfg: crate::CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
             .create_team(context::current())
@@ -231,6 +234,19 @@ impl Client {
         Ok(Team {
             client: self,
             id: team_id.into_api(),
+        })
+    }
+
+    /// Add an existing team to this device.
+    ///
+    /// This method exists for backward compatibility. With mTLS authentication,
+    /// devices authenticate via certificates at the connection level, not
+    /// per-team PSKs. The method returns a handle to the team but performs
+    /// no additional operations.
+    pub async fn add_team(&self, cfg: crate::AddTeamConfig) -> Result<Team<'_>> {
+        Ok(Team {
+            client: self,
+            id: cfg.id.into_api(),
         })
     }
 

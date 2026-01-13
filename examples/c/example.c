@@ -253,7 +253,7 @@ AranyaError init_team(Team *t) {
 
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
@@ -272,9 +272,19 @@ AranyaError init_team(Team *t) {
 
     // Have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
-    // team to operate on. With mTLS, no config is needed - authentication
-    // is handled by certificates.
-    err = aranya_create_team(&t->clients.owner.client, &t->id);
+    // team to operate on. With mTLS, config is accepted for backward
+    // compatibility but authentication is handled by certificates.
+    AranyaCreateTeamConfigBuilder create_team_cfg_builder;
+    aranya_create_team_config_builder_init(&create_team_cfg_builder);
+    AranyaCreateTeamConfig create_team_cfg;
+    err = aranya_create_team_config_build(&create_team_cfg_builder,
+                                          &create_team_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to build create team config\n");
+        return err;
+    }
+    err =
+        aranya_create_team(&t->clients.owner.client, &create_team_cfg, &t->id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to create team\n");
         return err;
@@ -370,8 +380,9 @@ AranyaError init_team(Team *t) {
     }
 
     // add operator to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, operator->pk,
-                                    operator->pk_len, &operator_role_id);
+    err = aranya_add_device_to_team(&owner->client,
+                                    &t->id, operator->pk, operator->pk_len, &
+                                    operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -418,12 +429,12 @@ AranyaError init_team(Team *t) {
     err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
     EXPECT("error calling `sync_now` to sync with peer: admin->owner", err);
 
-    err = aranya_revoke_role(&admin->client, &t->id, &operator->id,
-                             &operator_role_id);
+    err = aranya_revoke_role(&admin->client, &t->id,
+                             &operator->id, & operator_role_id);
     EXPECT("unable to revoke 'operator' role from 'operator'", err);
 
-    err = aranya_assign_role(&admin->client, &t->id, &operator->id,
-                             &operator_role_id);
+    err = aranya_assign_role(&admin->client, &t->id,
+                             &operator->id, & operator_role_id);
     EXPECT("unable to assign 'operator' role to 'operator'\n", err);
 
     err = aranya_sync_now(&owner->client, &t->id, sync_addrs[ADMIN], NULL);
@@ -496,7 +507,7 @@ AranyaError run(Team *t) {
     AranyaDeviceId *devices = NULL;
 
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *memberb = &t->clients.memberb;
 
     // initialize logging.
@@ -554,7 +565,7 @@ AranyaError run(Team *t) {
 
     // Operator subscribes to hello notifications from Admin with 1-second delay
     printf("operator subscribing to hello notifications from admin\n");
-    err = aranya_sync_hello_subscribe(&operator->client, &t->id,
+    err = aranya_sync_hello_subscribe(&operator->client, & t->id,
                                       sync_addrs[ADMIN], graph_change_delay,
                                       duration, schedule_delay);
     EXPECT("error subscribing operator to admin hello notifications", err);
@@ -570,7 +581,8 @@ AranyaError run(Team *t) {
     if (devices == NULL) {
         abort();
     }
-    err = aranya_team_devices(&operator->client, &t->id, devices, &devices_len);
+    err =
+        aranya_team_devices(&operator->client, & t->id, devices, & devices_len);
     EXPECT("error querying devices on team", err);
 
     for (size_t i = 0; i < devices_len; i++) {
@@ -597,9 +609,9 @@ AranyaError run(Team *t) {
 
     uint8_t memberb_keybundle[1024] = {0};
     size_t memberb_keybundle_len = sizeof(memberb_keybundle);
-    err =
-        aranya_team_device_keybundle(&operator->client, &t->id, &memberb->id,
-                                     memberb_keybundle, &memberb_keybundle_len);
+    err = aranya_team_device_keybundle(
+        &operator->client, & t->id, & memberb->id,
+        memberb_keybundle, & memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
     printf("%s key bundle len: %zu\n", t->clients_arr[MEMBERB].name,
            memberb_keybundle_len);
@@ -612,7 +624,7 @@ AranyaError run(Team *t) {
     EXPECT("error unsubscribing admin from owner hello notifications", err);
 
     printf("operator unsubscribing from hello notifications from admin\n");
-    err = aranya_sync_hello_unsubscribe(&operator->client, &t->id,
+    err = aranya_sync_hello_unsubscribe(&operator->client, & t->id,
                                         sync_addrs[ADMIN]);
     EXPECT("error unsubscribing operator from admin hello notifications", err);
 #endif

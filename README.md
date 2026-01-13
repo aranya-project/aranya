@@ -135,7 +135,7 @@ info!("creating team");
 let team_id = team
 	.owner
 	.client
-	.create_team()
+	.create_team(Default::default())
 	.await
 	.expect("expected to create team");
 info!(?team_id);

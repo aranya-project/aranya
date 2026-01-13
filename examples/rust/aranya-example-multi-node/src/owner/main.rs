@@ -53,9 +53,12 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("owner: initialized client");
 
-    // Create team (mTLS handles authentication - no config needed).
+    // Create team (mTLS handles authentication - config is accepted for backward compatibility).
     info!("owner: creating team");
-    let team = client.create_team().await.expect("expected to create team");
+    let team = client
+        .create_team(Default::default())
+        .await
+        .expect("expected to create team");
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 

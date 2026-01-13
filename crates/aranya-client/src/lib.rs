@@ -45,6 +45,10 @@ pub use crate::{
         ChanOp, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,
         Roles, Team, TeamId,
     },
-    config::{SyncPeerConfig, SyncPeerConfigBuilder},
+    config::{
+        AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
+        CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+        SyncPeerConfig, SyncPeerConfigBuilder,
+    },
     error::{ConfigError, Error, Result},
 };

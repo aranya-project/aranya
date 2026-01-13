@@ -217,7 +217,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     let owner = devices
         .owner
         .client
-        .create_team()
+        .create_team(Default::default())
         .await
         .expect("expected to create team");
     let team_id = owner.team_id();
@@ -681,7 +681,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team1 = devices
         .owner
         .client
-        .create_team()
+        .create_team(Default::default())
         .await
         .expect("expected to create team1");
     let team_id1 = team1.team_id();
@@ -691,7 +691,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team2 = devices
         .owner
         .client
-        .create_team()
+        .create_team(Default::default())
         .await
         .expect("expected to create team2");
     let team_id2 = team2.team_id();
