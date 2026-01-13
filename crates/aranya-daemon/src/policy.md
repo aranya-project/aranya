@@ -759,6 +759,10 @@ function author_has_perm_two_targets(author_id id, perm enum Perm, target_id1 id
 }
 
 // Returns whether the command author outranks the target object.
+//
+// Note: Uses strict greater-than (>) comparison. A device cannot operate on
+// objects of equal rank, enforcing a strict hierarchy where devices can only
+// modify objects below them in the rank hierarchy.
 function author_can_operate_on_target(author_rank int, target_id id) bool {
     let object_rank = get_object_rank(target_id)
     if author_rank > object_rank {
@@ -795,6 +799,11 @@ finish function set_object_rank(object_id id, rank int) {
 //
 // This check prevents a device from being assigned a role it could
 // potentially modify, which would allow it to escalate its own permissions.
+//
+// Note: Uses greater-than-or-equal (>=) comparison, unlike `author_can_operate_on_target`
+// which uses strict greater-than (>). This allows a device to be assigned a role of equal
+// rank, which is safe because the device still cannot modify that role (since modification
+// requires strictly outranking the target).
 function role_rank_gte_device_rank(role_id id, device_id id) bool {
     let role_rank = get_object_rank(role_id)
     let device_rank = get_object_rank(device_id)
