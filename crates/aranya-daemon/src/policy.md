@@ -1477,8 +1477,8 @@ Default role permissions:
 | Role Name | AddDevice | RemoveDevice | TerminateTeam | ChangeRank | CreateRole | DeleteRole | AssignRole | RevokeRole | ChangeRolePerms | SetupDefaultRole | CreateLabel | DeleteLabel | AssignLabel | RevokeLabel | CanUseAfc | CreateAfcUniChannel |
 | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | Owner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Admin | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Operator | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Admin | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Operator | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Member | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ```policy
@@ -1558,8 +1558,6 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, Perm::DeleteLabel)
                     assign_perm_to_role(role_id, Perm::CreateRole)
                     assign_perm_to_role(role_id, Perm::DeleteRole)
-                    assign_perm_to_role(role_id, Perm::AssignRole)
-                    assign_perm_to_role(role_id, Perm::RevokeRole)
                     assign_perm_to_role(role_id, Perm::ChangeRolePerms)
 
                     emit RoleCreated {
@@ -1589,7 +1587,6 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, Perm::RevokeLabel)
                     assign_perm_to_role(role_id, Perm::AssignRole)
                     assign_perm_to_role(role_id, Perm::RevokeRole)
-                    assign_perm_to_role(role_id, Perm::ChangeRolePerms)
 
                     emit RoleCreated {
                         role_id: role_id,
