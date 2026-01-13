@@ -15,8 +15,8 @@ use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
 pub use quic_sync::{
-    AddSeedMode, AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateSeedMode,
-    CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder, SEED_IKM_SIZE,
+    AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfigBuilder, SEED_IKM_SIZE,
 };
 
 /// Builder for [`CreateTeamConfig`].

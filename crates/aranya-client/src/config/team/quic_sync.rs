@@ -16,7 +16,7 @@ pub const SEED_IKM_SIZE: usize = 32;
 
 /// Mode for creating a PSK seed when creating a team.
 #[derive(Clone, Debug, Default)]
-pub enum CreateSeedMode {
+pub(crate) enum CreateSeedMode {
     /// Generate a random seed.
     #[default]
     Generate,
@@ -26,7 +26,7 @@ pub enum CreateSeedMode {
 
 /// Mode for providing a PSK seed when adding a team.
 #[derive(Clone, Debug)]
-pub enum AddSeedMode {
+pub(crate) enum AddSeedMode {
     /// Use the provided IKM (Input Keying Material).
     IKM(Box<[u8; SEED_IKM_SIZE]>),
     /// Use a wrapped (encrypted) seed.
@@ -70,7 +70,7 @@ pub struct CreateTeamQuicSyncConfigBuilder {
 impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
-    pub fn mode(mut self, mode: CreateSeedMode) -> Self {
+    pub(crate) fn mode(mut self, mode: CreateSeedMode) -> Self {
         self.mode = mode;
         self
     }
@@ -106,7 +106,7 @@ pub struct AddTeamQuicSyncConfigBuilder {
 impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
-    pub fn mode(mut self, mode: AddSeedMode) -> Self {
+    pub(crate) fn mode(mut self, mode: AddSeedMode) -> Self {
         self.mode = Some(mode);
         self
     }

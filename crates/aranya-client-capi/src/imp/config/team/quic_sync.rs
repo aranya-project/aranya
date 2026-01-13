@@ -1,11 +1,30 @@
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};
-use aranya_client::config::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
+use aranya_client::config::SEED_IKM_SIZE;
 use tracing::error;
 
 use super::Error;
 use crate::api::defs::{self};
+
+/// Mode for creating a PSK seed when creating a team.
+#[derive(Clone, Debug, Default)]
+pub(crate) enum CreateSeedMode {
+    /// Generate a random seed.
+    #[default]
+    Generate,
+    /// Use the provided IKM (Input Keying Material).
+    IKM(Box<[u8; SEED_IKM_SIZE]>),
+}
+
+/// Mode for providing a PSK seed when adding a team.
+#[derive(Clone, Debug)]
+pub(crate) enum AddSeedMode {
+    /// Use the provided IKM (Input Keying Material).
+    IKM(Box<[u8; SEED_IKM_SIZE]>),
+    /// Use a wrapped (encrypted) seed.
+    Wrapped(Vec<u8>),
+}
 
 /// QUIC syncer configuration for CreateTeam() operation.
 #[derive(Clone, Debug, Default)]
@@ -31,10 +50,11 @@ impl CreateTeamQuicSyncConfig {
 
 impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig {
     fn from(value: CreateTeamQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+        let builder = match value.mode {
+            CreateSeedMode::Generate => Self::builder().gen_seed(),
+            CreateSeedMode::IKM(ikm) => Self::builder().seed_ikm(*ikm),
+        };
+        builder.build().expect("All fields are set")
     }
 }
 
@@ -62,10 +82,13 @@ impl AddTeamQuicSyncConfig {
 
 impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
     fn from(value: AddTeamQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+        let builder = match value.mode {
+            AddSeedMode::IKM(ikm) => Self::builder().seed_ikm(*ikm),
+            AddSeedMode::Wrapped(wrapped) => Self::builder()
+                .wrapped_seed(&wrapped)
+                .expect("wrapped_seed should not fail"),
+        };
+        builder.build().expect("All fields are set")
     }
 }
 
@@ -80,7 +103,7 @@ impl CreateTeamQuicSyncConfigBuilder {
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     #[doc(hidden)]
-    pub fn mode(&mut self, mode: CreateSeedMode) {
+    pub(crate) fn mode(&mut self, mode: CreateSeedMode) {
         self.mode = mode;
     }
 
@@ -127,7 +150,7 @@ impl AddTeamQuicSyncConfigBuilder {
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     #[doc(hidden)]
-    pub fn mode(&mut self, mode: AddSeedMode) {
+    pub(crate) fn mode(&mut self, mode: AddSeedMode) {
         self.mode = Some(mode);
     }
 
