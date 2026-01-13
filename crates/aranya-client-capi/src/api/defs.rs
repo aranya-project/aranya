@@ -821,6 +821,11 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 
 /// Attempts to set PSK seed generation mode value on [`CreateTeamQuicSyncConfigBuilder`].
 ///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
+///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
@@ -832,6 +837,11 @@ pub fn create_team_quic_sync_config_generate(
 }
 
 /// Attempts to set wrapped PSK seed value on [`AddTeamQuicSyncConfigBuilder`].
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
@@ -859,6 +869,11 @@ pub struct SeedIkm {
 
 /// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateTeamQuicSyncConfigBuilder`].
 ///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
+///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
 ///
@@ -872,6 +887,11 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 }
 
 /// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddTeamQuicSyncConfigBuilder`].
+///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
@@ -1715,8 +1735,6 @@ pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, im
 
 /// Return random bytes from Aranya's CSPRNG.
 ///
-/// This method can be used to generate a PSK seed IKM for the QUIC syncer.
-///
 /// @param[in] client the Aranya Client
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
@@ -1734,6 +1752,12 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 ///
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
 ///
+/// # Deprecation Notice
+///
+/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+/// This function exists for backward compatibility but will be removed in a future release.
+/// It currently returns an empty buffer.
+///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
 /// Writes the number of bytes that would have been returned to `seed_len`.
 /// The application can use `seed_len` to allocate a larger buffer.
@@ -1746,6 +1770,7 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
 ///
 /// @relates AranyaClient.
+#[allow(deprecated)]
 pub unsafe fn encrypt_psk_seed_for_peer(
     client: &Client,
     team_id: &TeamId,

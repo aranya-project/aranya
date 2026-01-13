@@ -1117,6 +1117,11 @@ AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCre
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
  *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
+ *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
@@ -1125,6 +1130,11 @@ AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeam
 
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
@@ -1135,6 +1145,11 @@ AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreate
 
 /**
  * Attempts to set wrapped PSK seed value on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
@@ -1147,6 +1162,11 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQu
 
 /**
  * Attempts to set wrapped PSK seed value on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
@@ -1161,6 +1181,11 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTe
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
  *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
+ *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
@@ -1171,6 +1196,11 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreate
 
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
@@ -1184,6 +1214,11 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCr
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
  *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
+ *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
@@ -1194,6 +1229,11 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQu
 
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
@@ -2434,8 +2474,6 @@ AranyaError aranya_create_team_ext(const struct AranyaClient *client,
 /**
  * Return random bytes from Aranya's CSPRNG.
  *
- * This method can be used to generate a PSK seed IKM for the QUIC syncer.
- *
  * @param[in] client the Aranya Client
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
@@ -2448,8 +2486,6 @@ AranyaError aranya_rand(const struct AranyaClient *client,
 
 /**
  * Return random bytes from Aranya's CSPRNG.
- *
- * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
  * @param[in] client the Aranya Client
  * @param[out] buf buffer where random bytes are written to.
@@ -2466,6 +2502,12 @@ AranyaError aranya_rand_ext(const struct AranyaClient *client,
  * Return serialized PSK seed encrypted for another device on the team.
  *
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
+ * It currently returns an empty buffer.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
  * Writes the number of bytes that would have been returned to `seed_len`.
@@ -2491,6 +2533,12 @@ AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
  * Return serialized PSK seed encrypted for another device on the team.
  *
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This function exists for backward compatibility but will be removed in a future release.
+ * It currently returns an empty buffer.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
  * Writes the number of bytes that would have been returned to `seed_len`.

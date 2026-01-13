@@ -59,6 +59,7 @@ pub struct CreateTeamQuicSyncConfig {
 
 impl CreateTeamQuicSyncConfig {
     /// Creates a new builder for team creation configuration.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
         CreateTeamQuicSyncConfigBuilder::default()
     }
@@ -79,6 +80,7 @@ pub struct AddTeamQuicSyncConfig {
 
 impl AddTeamQuicSyncConfig {
     /// Creates a new builder for team member addition configuration.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         AddTeamQuicSyncConfigBuilder::default()
     }
@@ -108,6 +110,7 @@ impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the seed to be generated.
     ///
     /// Overwrites [`Self::seed_ikm`].
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn gen_seed(mut self) -> Self {
         self.mode = CreateSeedMode::Generate;
         self
@@ -116,12 +119,14 @@ impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the seed mode to 'IKM'.
     ///
     /// Overwrites [`Self::gen_seed`].
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
         self.mode = CreateSeedMode::IKM(ikm.into());
         self
     }
 
     /// Builds the config.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn build(self) -> Result<CreateTeamQuicSyncConfig> {
         Ok(CreateTeamQuicSyncConfig { mode: self.mode })
     }
@@ -151,6 +156,7 @@ impl AddTeamQuicSyncConfigBuilder {
     /// Sets the seed mode to 'IKM'.
     ///
     /// Overwrites [`Self::wrapped_seed`].
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
         self.mode = Some(AddSeedMode::IKM(ikm.into()));
         self
@@ -159,12 +165,14 @@ impl AddTeamQuicSyncConfigBuilder {
     /// Sets the seed mode to 'Wrapped'.
     ///
     /// Overwrites [`Self::seed_ikm`].
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
         self.mode = Some(AddSeedMode::Wrapped(wrapped_seed.to_vec()));
         Ok(self)
     }
 
     /// Builds the config.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn build(self) -> Result<AddTeamQuicSyncConfig> {
         let Some(mode) = self.mode else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(

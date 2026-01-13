@@ -49,8 +49,12 @@ impl Team<'_> {
 
     /// Encrypts the PSK seed for a peer using their encryption public key.
     ///
-    /// This method exists for backward compatibility. With mTLS authentication,
-    /// PSK seeds are no longer used and this method returns an empty Vec.
+    /// # Deprecation Notice
+    ///
+    /// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+    /// This method exists for backward compatibility but will be removed in a future release.
+    /// It currently returns an empty Vec.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This method returns an empty Vec.")]
     #[instrument(skip(self))]
     pub async fn encrypt_psk_seed_for_peer(&self, _peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         // No-op: With mTLS, PSK seeds are no longer used.
