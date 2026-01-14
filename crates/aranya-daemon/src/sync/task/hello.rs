@@ -29,6 +29,17 @@ use crate::{
     },
 };
 
+/// Maximum size for hello response buffer.
+///
+/// Hello responses are either:
+/// - Success: `SyncResponse::Ok([])` (~3 bytes with postcard)
+/// - Error: `SyncResponse::Err(String)` (3 bytes + error message)
+///
+/// Actual responses are small, but we use 64KB as a defensive upper bound
+/// to accommodate potentially long error chains while preventing unbounded
+/// allocations from malicious peers.
+const MAX_HELLO_RESPONSE_SIZE: usize = 64 * 1024;
+
 /// Storage for sync hello subscriptions
 #[derive(Debug, Clone)]
 pub struct HelloSubscription {
@@ -181,7 +192,7 @@ impl Syncer<State> {
         };
         // Read the response to avoid race condition with server
         let response_buf = recv
-            .read_to_end(64 * 1024) // 64KB limit for hello response
+            .read_to_end(MAX_HELLO_RESPONSE_SIZE)
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
         if response_buf.is_empty() {
@@ -321,7 +332,7 @@ impl Syncer<State> {
             }
 
             // Read the response to avoid race condition with server
-            match recv.read_to_end(64 * 1024).await {
+            match recv.read_to_end(MAX_HELLO_RESPONSE_SIZE).await {
                 Ok(response_buf) => {
                     debug!(
                         response_len = response_buf.len(),
