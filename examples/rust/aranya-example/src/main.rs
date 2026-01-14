@@ -288,7 +288,7 @@ async fn main() -> Result<()> {
     let membera_addr = membera.aranya_local_addr().await?;
     let memberb_addr = memberb.aranya_local_addr().await?;
 
-    // Create a team (with mTLS, config is no longer required - authentication is handled by certificates)
+    // Create a team.
     info!("creating team");
     let owner_team = owner
         .client
