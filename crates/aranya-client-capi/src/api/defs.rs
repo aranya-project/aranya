@@ -1939,8 +1939,11 @@ pub unsafe fn sync_hello_unsubscribe(
 /// @param[in] team the team's ID
 /// @param[in] addr the peer's Aranya network address
 /// @param[in] config configuration values for syncing with a peer.
+/// @param[in] timeout the maximum amount of time this request can take.
 ///
 /// Default values for a sync config will be used if `config` is `NULL`
+///
+/// The default timeout, 10 seconds, will be used if `timeout` is `NULL`.
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
@@ -1948,15 +1951,15 @@ pub unsafe fn sync_now(
     team: &TeamId,
     addr: Addr,
     config: Option<&SyncPeerConfig>,
+    timeout: Option<&Duration>,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .sync_now(addr, config.map(|config| (*config).clone().into())),
-    )?;
+    client.rt.block_on(client.inner.team(team.into()).sync_now(
+        addr,
+        config.map(|config| (*config).clone().into()),
+        timeout.copied().map(Into::into),
+    ))?;
     Ok(())
 }
 

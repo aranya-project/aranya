@@ -53,8 +53,6 @@ impl Team<'_> {
 }
 
 impl Team<'_> {
-    const SYNC_NOW_REQUEST_DEADLINE: Duration = Duration::from_secs(60 * 5);
-
     /// Encrypts the team's QUIC syncer PSK seed for a peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
     /// See [`KeyBundle::encryption`].
@@ -89,10 +87,20 @@ impl Team<'_> {
     ///
     /// If `config` is `None`, default values (including those from the daemon) will
     /// be used.
+    ///
+    /// If `timeout` is `None`, the defaut timeout (10 seconds) will
+    /// be used.
     #[instrument(skip(self))]
-    pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+    pub async fn sync_now(
+        &self,
+        addr: Addr,
+        cfg: Option<SyncPeerConfig>,
+        timeout: Option<Duration>,
+    ) -> Result<()> {
         let mut req_ctx = context::current();
-        req_ctx.deadline = Instant::now() + Self::SYNC_NOW_REQUEST_DEADLINE;
+        if let Some(t) = timeout {
+            req_ctx.deadline = Instant::now() + t;
+        }
 
         self.client
             .daemon

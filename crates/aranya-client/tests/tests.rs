@@ -111,7 +111,7 @@ async fn test_sync_now() -> Result<()> {
 
     // Let's sync immediately, which will propagate the role change.
     admin
-        .sync_now(owner_addr, None)
+        .sync_now(owner_addr, None, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -272,7 +272,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Admin sync with owner.
     admin_team
-        .sync_now(owner_addr, None)
+        .sync_now(owner_addr, None, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -290,7 +290,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Admin sync with owner.
     admin_team
-        .sync_now(owner_addr, None)
+        .sync_now(owner_addr, None, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -322,7 +322,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Admin sync with owner.
     admin_team
-        .sync_now(owner_addr, None)
+        .sync_now(owner_addr, None, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -403,7 +403,7 @@ async fn test_add_devices() -> Result<()> {
         .context("owner should be able to add admin to team")?;
 
     admin
-        .sync_now(team.owner.aranya_local_addr().await?, None)
+        .sync_now(team.owner.aranya_local_addr().await?, None, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -413,7 +413,7 @@ async fn test_add_devices() -> Result<()> {
         .context("admin should be able to add operator to team")?;
 
     operator
-        .sync_now(team.admin.aranya_local_addr().await?, None)
+        .sync_now(team.admin.aranya_local_addr().await?, None, None)
         .await
         .context("operator unable to sync with admin")?;
 
@@ -426,7 +426,7 @@ async fn test_add_devices() -> Result<()> {
             .await
             .with_context(|| format!("admin should be able to add `{name}` to team"))?;
         operator
-            .sync_now(team.admin.aranya_local_addr().await?, None)
+            .sync_now(team.admin.aranya_local_addr().await?, None, None)
             .await
             .context("operator unable to sync with admin")?;
         operator
@@ -462,7 +462,7 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
         .context("owner should be able to add admin to team")?;
 
     admin_team
-        .sync_now(devices.owner.aranya_local_addr().await?, None)
+        .sync_now(devices.owner.aranya_local_addr().await?, None, None)
         .await
         .context("admin unable to sync with owner")?;
 
@@ -566,13 +566,13 @@ async fn test_query_functions() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None)
+        .sync_now(owner_addr, None, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None)
+        .sync_now(owner_addr, None, None)
         .await?;
 
     // Test all our fact database queries.
@@ -670,7 +670,7 @@ async fn test_add_team() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id);
-        match admin.sync_now(owner_addr, None).await {
+        match admin.sync_now(owner_addr, None, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -709,7 +709,7 @@ async fn test_add_team() -> Result<()> {
         .await?;
     {
         let admin = devices.admin.client.team(team_id);
-        admin.sync_now(owner_addr, None).await?;
+        admin.sync_now(owner_addr, None, None).await?;
 
         // Now we should be able to successfully assign a role.
         admin
@@ -755,7 +755,7 @@ async fn test_remove_team() -> Result<()> {
             .await?;
 
         admin
-            .sync_now(devices.owner.aranya_local_addr().await?, None)
+            .sync_now(devices.owner.aranya_local_addr().await?, None, None)
             .await?;
 
         // We should be able to successfully assign a role.
@@ -860,7 +860,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id1);
-        match admin.sync_now(owner_addr, None).await {
+        match admin.sync_now(owner_addr, None, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -899,7 +899,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await?;
 
     let admin1 = devices.admin.client.team(team_id1);
-    admin1.sync_now(owner_addr, None).await?;
+    admin1.sync_now(owner_addr, None, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin1
@@ -911,7 +911,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id2);
-        match admin.sync_now(owner_addr, None).await {
+        match admin.sync_now(owner_addr, None, None).await {
             Ok(()) => bail!("expected syncing to fail"),
             // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
             // but currently the handshake timeout races with the tarpc timeout.
@@ -950,7 +950,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await?;
 
     let admin2 = devices.admin.client.team(team_id2);
-    admin2.sync_now(owner_addr, None).await?;
+    admin2.sync_now(owner_addr, None, None).await?;
 
     // Now we should be able to successfully assign a role.
     admin2
@@ -1414,7 +1414,7 @@ async fn test_create_role() -> Result<()> {
         .await?;
     let admin_team = devices.admin.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     let test_role2 = admin_team
         .roles()
@@ -1459,7 +1459,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
 
     // Sync the admin and test that they can add the operator
     let admin_team = devices.admin.client.team(team_id);
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     admin_team
         .add_device(devices.operator.pk, None)
@@ -1524,7 +1524,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Malicious device syncs with owner.
     let device_team = device.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    device_team.sync_now(owner_addr, None).await?;
+    device_team.sync_now(owner_addr, None, None).await?;
 
     // Malicious device creates a new target role (which it maintains control of).
     let target_role = device_team
@@ -1568,7 +1568,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
 
     // Sync the admin
     let admin_team = devices.admin.client.team(team_id);
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     // Admin cannot add operator
     admin_team
@@ -1667,7 +1667,7 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     match admin_team
         .device(devices.membera.id)
@@ -1699,7 +1699,7 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     match admin_team
         .assign_role_management_permission(
@@ -1754,7 +1754,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
     // Sync admin with owner
     let admin_team = devices.admin.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     // Try to assign operator role as admin - should succeed with the permission
     admin_team
@@ -1774,7 +1774,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
         .context("Failed to revoke role management permission")?;
 
     // Sync admin with owner again to get the revocation
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     // Try to assign operator role again as admin - should fail now
     match admin_team
@@ -1824,7 +1824,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
     // Sync admin with owner
     let admin_team = devices.admin.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     // Try to assign operator role as admin - should succeed with the permission
     admin_team
@@ -1896,7 +1896,7 @@ async fn test_delete_label_requires_permission() -> Result<()> {
         .await?;
 
     operator_team
-        .sync_now(devices.owner.aranya_local_addr().await?, None)
+        .sync_now(devices.owner.aranya_local_addr().await?, None, None)
         .await
         .context("operator unable to sync owner state")?;
 
@@ -1972,7 +1972,7 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
     let admin_team = devices.admin.client.team(team_id);
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     match admin_team
         .add_role_owner(roles.member().id, roles.operator().id)
@@ -2142,7 +2142,7 @@ async fn test_role_owners_query() -> Result<()> {
     // Verify other clients can also query role owners after sync
     let owner_addr = devices.owner.aranya_local_addr().await?;
     let admin_team = devices.admin.client.team(team_id);
-    admin_team.sync_now(owner_addr, None).await?;
+    admin_team.sync_now(owner_addr, None, None).await?;
 
     let admin_view_owners = admin_team.role_owners(roles.member().id).await?;
     let admin_view_owners_vec: Vec<_> = admin_view_owners.iter().collect();

@@ -590,7 +590,7 @@ AranyaError init_team(Team *t) {
         ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
     EXPECT("unable to assign role management permission", err);
 
-    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
+    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL, NULL);
     EXPECT("error calling `sync_now` to sync with peer: admin->owner", err);
 
     err = aranya_revoke_role(&admin->client, &t->id, &operator->id,
@@ -601,7 +601,7 @@ AranyaError init_team(Team *t) {
                              &operator_role_id);
     EXPECT("unable to assign 'operator' role to 'operator'\n", err);
 
-    err = aranya_sync_now(&owner->client, &t->id, sync_addrs[ADMIN], NULL);
+    err = aranya_sync_now(&owner->client, &t->id, sync_addrs[ADMIN], NULL, NULL);
     EXPECT("error calling `sync_now` to sync with pee: owner->admin", err);
 
     err = aranya_revoke_role_management_permission(
@@ -887,10 +887,10 @@ AranyaError run_afc_example(Team *t) {
     EXPECT("error adding a new managing role to the label", err);
 
     // Tell them both to sync with the owner to see their new label.
-    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OWNER], NULL);
+    err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OWNER], NULL, NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
 
-    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OWNER], NULL);
+    err = aranya_sync_now(&memberb->client, &t->id, sync_addrs[OWNER], NULL, NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
 
     // Create a new uni send channel, which will give back an `AranyaAfcChannel`
