@@ -358,4 +358,53 @@ mod tests {
             .to_string()
             .contains("no device certificate found"));
     }
+
+    #[test]
+    fn test_load_certs_generated_by_certgen() {
+        use aranya_certgen::{CertGen, SubjectAltNames};
+
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+
+        // Generate CA and device certificates using aranya-certgen
+        let ca = CertGen::ca("Test Root CA", 365).expect("failed to create CA");
+        let sans = SubjectAltNames::new()
+            .with_dns("localhost")
+            .with_ip("127.0.0.1".parse().unwrap());
+        let device = ca
+            .generate("test-device", 365, &sans)
+            .expect("failed to generate device cert");
+
+        // Save certificates to temp directory
+        let root_certs_dir = temp_dir.path().join("root_certs");
+        fs::create_dir(&root_certs_dir).expect("failed to create root_certs dir");
+
+        let ca_cert_path = root_certs_dir.join("ca.pem");
+        let ca_key_path = temp_dir.path().join("ca.key");
+        ca.save(&ca_cert_path, &ca_key_path)
+            .expect("failed to save CA");
+
+        let device_cert_path = temp_dir.path().join("device.pem");
+        let device_key_path = temp_dir.path().join("device.key");
+        device
+            .save(&device_cert_path, &device_key_path)
+            .expect("failed to save device cert");
+
+        // Load root certs
+        let root_store = load_root_certs(&root_certs_dir).expect("failed to load root certs");
+        assert!(!root_store.is_empty(), "root store should not be empty");
+
+        // Load device cert
+        let (device_certs, device_key) =
+            load_device_cert(&device_cert_path, &device_key_path).expect("failed to load device cert");
+        assert!(!device_certs.is_empty(), "device certs should not be empty");
+
+        // Build TLS configs to verify everything works together
+        let client_config = build_client_config(root_store.clone(), device_certs.clone(), device_key.clone_key())
+            .expect("failed to build client config");
+        assert!(client_config.alpn_protocols.is_empty(), "ALPN not set yet");
+
+        let server_config = build_server_config(root_store, device_certs, device_key)
+            .expect("failed to build server config");
+        assert!(server_config.alpn_protocols.is_empty(), "ALPN not set yet");
+    }
 }
