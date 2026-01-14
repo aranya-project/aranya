@@ -12,7 +12,7 @@ use std::{
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use thiserror::Error;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use super::CertConfig;
 
@@ -51,9 +51,13 @@ pub enum CertError {
         source: rustls::Error,
     },
 
-    /// No certificates found in file.
-    #[error("no certificates found in '{0}'")]
-    NoCertsFound(PathBuf),
+    /// No device certificate found in file.
+    #[error("no device certificate found in '{0}'")]
+    NoDeviceCertFound(PathBuf),
+
+    /// No root CA certificates found in directory.
+    #[error("no root CA certificates found in '{0}'")]
+    NoRootCertsFound(PathBuf),
 
     /// Failed to parse a private key from a PEM file.
     #[error("failed to parse private key from '{path}': {source}")]
@@ -134,14 +138,10 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
     }
 
     if cert_count == 0 {
-        warn!(
-            "no certificates found in root certs directory: {}",
-            dir.display()
-        );
-    } else {
-        debug!("loaded {} root CA certificate(s)", cert_count);
+        return Err(CertError::NoRootCertsFound(dir.to_path_buf()));
     }
 
+    debug!("loaded {} root CA certificate(s)", cert_count);
     Ok(root_store)
 }
 
@@ -175,7 +175,7 @@ pub fn load_device_cert(
         })?;
 
     if certs.is_empty() {
-        return Err(CertError::NoCertsFound(cert_path.to_path_buf()));
+        return Err(CertError::NoDeviceCertFound(cert_path.to_path_buf()));
     }
 
     debug!(
@@ -300,9 +300,11 @@ mod tests {
     fn test_load_root_certs_empty_dir() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let result = load_root_certs(temp_dir.path());
-        assert!(result.is_ok());
-        let store = result.expect("expected Ok");
-        assert!(store.is_empty());
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("no root CA certificates found"));
     }
 
     #[test]
@@ -311,9 +313,11 @@ mod tests {
         create_pem_file(temp_dir.path(), "not-a-cert.txt", "hello world")
             .expect("failed to create file");
         let result = load_root_certs(temp_dir.path());
-        assert!(result.is_ok());
-        let store = result.expect("expected Ok");
-        assert!(store.is_empty());
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("no root CA certificates found"));
     }
 
     #[test]
@@ -322,8 +326,12 @@ mod tests {
         create_pem_file(temp_dir.path(), "invalid.pem", "not a valid certificate")
             .expect("failed to create file");
         let result = load_root_certs(temp_dir.path());
-        // Invalid PEM content should result in empty certs (rustls_pemfile returns empty)
-        assert!(result.is_ok());
+        // Invalid PEM content results in no certs parsed, which is now an error
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("no root CA certificates found"));
     }
 
     #[test]
@@ -348,6 +356,6 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("no certificates found"));
+            .contains("no device certificate found"));
     }
 }
