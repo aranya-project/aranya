@@ -25,3 +25,12 @@ How to run the example:
 This example is essentially the same as the single node example except that each device runs code in its own executable. It is designed to allow each executable to be easily deployed to different machines.
 
 More information can be found in the [README.md](aranya-example-multi-node/README.md)
+
+# Onboarding Example
+
+How to run the example:
+`cargo make run-rust-example-onboarding`
+
+This example is essentially a subset of the multi-node example, only using owner and admin users. It is designed to show all the required steps for onboarding.
+
+More information can be found in the [README.md](aranya-example-onboarding/README.md)
