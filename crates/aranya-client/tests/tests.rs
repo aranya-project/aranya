@@ -898,7 +898,7 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             owner_addr,
             Duration::from_millis(1000),
-            Duration::from_millis(1000),
+            Duration::from_secs(120),
             Duration::from_secs(60), // Schedule delay for periodic sends
         )
         .await?;
@@ -909,7 +909,7 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             owner_addr,
             Duration::from_millis(2000),
-            Duration::from_millis(1000),
+            Duration::from_secs(120),
             Duration::from_secs(60), // Schedule delay for periodic sends
         )
         .await?;
@@ -917,7 +917,7 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             admin_addr,
             Duration::from_millis(1500),
-            Duration::from_millis(1000),
+            Duration::from_secs(120),
             Duration::from_secs(60), // Schedule delay for periodic sends
         )
         .await?;
@@ -935,7 +935,7 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             owner_addr,
             Duration::from_millis(100),
-            Duration::from_millis(1000),
+            Duration::from_secs(120),
             Duration::from_secs(60), // Schedule delay for periodic sends
         )
         .await?;
