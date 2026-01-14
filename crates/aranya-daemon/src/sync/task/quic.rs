@@ -350,6 +350,19 @@ impl Syncer<State> {
     }
 
     /// Sends a sync request to a peer over an established QUIC stream.
+    ///
+    /// This method uses the SyncRequester to generate the sync request data,
+    /// serializes it, and sends it over the provided QUIC send stream.
+    ///
+    /// # Arguments
+    /// * `send` - The QUIC send stream to use for sending the request
+    /// * `syncer` - The SyncRequester instance that generates the sync request
+    /// * `id` - The graph ID for the team/graph to sync
+    /// * `peer` - The network address of the peer
+    ///
+    /// # Returns
+    /// * `Ok(())` if the sync request was sent successfully
+    /// * `Err(SyncError)` if there was an error generating or sending the request
     #[instrument(skip_all)]
     pub(crate) async fn send_sync_request<A>(
         &self,
