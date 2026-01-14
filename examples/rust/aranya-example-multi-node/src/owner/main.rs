@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
             continue;
         }
 
-        // Send team ID to device (mTLS handles auth - no PSK seed needed).
+        // Send team ID to device.
         info!("owner: sending team info to {}", device.name);
         onboard.send(&TeamInfo { team_id }, device.tcp_addr).await?;
         info!("owner: sent team info to {}", device.name);
