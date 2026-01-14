@@ -5,19 +5,21 @@ This document describes how to build and run the C API integration tests for Ara
 
 ## Running Tests
 
+Start from the workspace/repo root.
+
 ### Run the Full Test Suite using ctest
 
 1. **Configure the build directory:**
   ```sh
-  cd [workspace_path]/crates/aranya-client-capi/ctest/build
-  cmake ..
+  cmake -B build -S .
   ```
 2. **Build the tests:**
   ```sh
-  make
+  cmake --build build
   ```
 3. **Run all tests with verbose output:**
   ```sh
+  cd build
   ctest -V
   ```
 
@@ -51,21 +53,21 @@ Create a new `.c` file in `crates/aranya-client-capi/ctest/`:
 
 static int test_my_feature(void) {
     AranyaError err;
-    
+
     // Your test logic here
     // Use CLIENT_EXPECT macro for error handling
-    
+
     return EXIT_SUCCESS;
 }
 
 int main(int argc, const char *argv[]) {
     printf("Running my feature test\n");
-    
+
     if (test_my_feature() != EXIT_SUCCESS) {
         fprintf(stderr, "FAILED: test_my_feature\n");
         return EXIT_FAILURE;
     }
-    
+
     return EXIT_SUCCESS;
 }
 ```
@@ -77,7 +79,6 @@ Add your test to the "Test Executables" section in `CMakeLists.txt`:
 ```cmake
 # --- Test Executables ---
 add_capi_test(TestOnboarding test_onboarding.c REQUIRES_DAEMON DAEMON_NAMES "owner,member")
-add_capi_test(TestSimple test_simple.c)
 add_capi_test(TestMyFeature test_my_feature.c)  # Add your test here
 ```
 
@@ -100,7 +101,3 @@ When `DAEMON_NAMES` is specified:
 - Each daemon runs in `$TMPDIR/<name>/` (e.g., `$TMPDIR/owner/`)
 - UDS socket is at `$TMPDIR/<name>/uds.sock`
 - Your test receives `$TMPDIR` as argv[1]
-
-
-
-
