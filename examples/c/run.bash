@@ -16,5 +16,5 @@ cleanup() {
 trap 'cleanup' EXIT
 trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
-# Run example (mTLS handles authentication - no PSK seed modes needed)
+# Run example
 ./example.bash
