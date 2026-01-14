@@ -321,7 +321,7 @@ impl Syncer<State> {
                     .map_err(|_| Error::QuicConnectionTimeout)?
                     .map_err(Error::from)?;
 
-                debug!("established new QUIC connection to peer");
+                debug!(%addr, "established new QUIC connection to peer");
                 Ok::<_, Error>(conn)
             })
             .await?;
