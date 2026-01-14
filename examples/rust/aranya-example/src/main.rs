@@ -325,7 +325,6 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no member role"))?
         .clone();
 
-    // With mTLS, no add_team call is required - just get team references
     let admin_team = admin.client.team(team_id);
     let operator_team = operator.client.team(team_id);
     let membera_team = membera.client.team(team_id);
