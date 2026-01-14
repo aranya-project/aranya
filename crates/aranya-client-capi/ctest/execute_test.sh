@@ -5,16 +5,16 @@
 
 set -e
 
-TEST_EXEC="$1"
-DAEMON_PATH="$2"
-DAEMON_NAMES="$3"
-TEST_NAME=$(basename "$TEST_EXEC")
+test_exec="$1"
+daemon_path="$2"
+daemon_names="$3"
+test_name=$(basename "$test_exec")
 
 # PIDs to track spawned daemons
-DAEMON_PIDS=()
+daemon_pids=()
 
 # Temp directory for this test run
-TMPDIR=""
+tmpdir=""
 
 # Track all child processes for cleanup
 cleanup() {
@@ -23,7 +23,7 @@ cleanup() {
     
     # First attempt: SIGTERM for clean shutdown
     # Kill tracked daemon PIDs
-    for pid in "${DAEMON_PIDS[@]}"; do
+    for pid in "${daemon_pids[@]}"; do
         kill "$pid" 2>/dev/null || true
     done
     # Also kill any orphaned test daemons by pattern
@@ -33,14 +33,14 @@ cleanup() {
     sleep 1
     
     # Second attempt: SIGKILL for any remaining processes
-    for pid in "${DAEMON_PIDS[@]}"; do
+    for pid in "${daemon_pids[@]}"; do
         kill -9 "$pid" 2>/dev/null || true
     done
     pkill -9 -f "aranya-daemon.*test-.*-daemon" 2>/dev/null || true
     
     # Remove temp directory
-    if [ -n "$TMPDIR" ] && [ -d "$TMPDIR" ]; then
-        rm -rf "$TMPDIR"
+    if [ -n "$tmpdir" ] && [ -d "$tmpdir" ]; then
+        rm -rf "$tmpdir"
     fi
     
     exit $exit_code
@@ -80,29 +80,29 @@ EOF
     
     # Spawn daemon
     ARANYA_DAEMON=aranya_daemon::aranya_daemon::api=debug \
-        "$DAEMON_PATH" --config "$run_dir/daemon.toml" &
+        "$daemon_path" --config "$run_dir/daemon.toml" &
     
     local pid=$!
-    DAEMON_PIDS+=($pid)
+    daemon_pids+=($pid)
     echo "Spawned daemon '$daemon_name' (PID: $pid) at $run_dir"
 }
 
-TMPDIR=""
+tmpdir=""
 # Spawn daemons if daemon names are provided
-if [ -n "$DAEMON_NAMES" ]; then
-    echo "=== Spawning daemons: $DAEMON_NAMES ==="
+if [ -n "$daemon_names" ]; then
+    echo "=== Spawning daemons: $daemon_names ==="
     
     # Create unique temp directory
-    TMPDIR=$(mktemp -d)
-    echo "Using temp directory: $TMPDIR"
+    tmpdir=$(mktemp -d)
+    echo "Using temp directory: $tmpdir"
     
     # Parse comma-separated daemon names
-    IFS=',' read -ra NAMES <<< "$DAEMON_NAMES"
-    PORT=40001
+    IFS=',' read -ra names <<< "$daemon_names"
+    port=40001
     
-    for name in "${NAMES[@]}"; do
-        spawn_daemon "$TMPDIR/$name" "test-daemon-$TEST_NAME-$name" "/$TEST_NAME-$name" "$PORT"
-        PORT=$((PORT + 1))
+    for name in "${names[@]}"; do
+        spawn_daemon "$tmpdir/$name" "test-daemon-$test_name-$name" "/$test_name-$name" "$port"
+        port=$((port + 1))
     done
     
     # Wait for daemons to initialize
@@ -112,6 +112,6 @@ if [ -n "$DAEMON_NAMES" ]; then
 fi
 
 # Run the test
-"$TEST_EXEC" "$TMPDIR"
+"$test_exec" "$tmpdir"
 
 exit $?
