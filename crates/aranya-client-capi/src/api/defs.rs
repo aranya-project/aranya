@@ -294,6 +294,9 @@ impl From<aranya_id::BaseId> for Id {
     }
 }
 
+// TODO: Add #[deprecated] attribute to this constant to have cbindgen
+// output deprecation warnings in the C header.
+
 /// The size in bytes of a PSK seed IKM.
 ///
 /// # Deprecation Notice
@@ -773,6 +776,9 @@ pub fn client_config_builder_set_daemon_uds_path(
     cfg.daemon_addr(address);
 }
 
+// TODO: Add #[deprecated] attribute to these PSK-related types and functions
+// to have cbindgen output deprecation warnings in the C header.
+
 /// QUIC syncer configuration.
 ///
 /// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
@@ -854,6 +860,9 @@ pub fn add_team_quic_sync_config_wrapped_seed(
     cfg.wrapped_seed(encap_seed)?;
     Ok(())
 }
+
+// TODO: Add #[deprecated] attribute to this struct to have cbindgen
+// output deprecation warnings in the C header.
 
 /// Raw PSK seed IKM for QUIC syncer.
 ///
