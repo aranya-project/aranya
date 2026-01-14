@@ -180,7 +180,6 @@ impl DevicesCtx {
         let team_id = team.team_id();
         info!(?team_id);
 
-        // With mTLS, no add_team call is required - devices can sync any team they have the ID for
 
         Ok(team_id)
     }
