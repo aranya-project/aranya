@@ -68,7 +68,6 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                 sync: SyncConfig {
                     quic: Toggle::Enabled(QuicSyncConfig {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                        client_addr: None,
                         root_certs_dir,
                         device_cert: device_cert_path,
                         device_key: device_key_path,

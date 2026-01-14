@@ -299,17 +299,17 @@ impl TestCtx {
 
             let (send_effects, effects_recv) = mpsc::channel(1);
 
-            // Create server first to get the actual listening address
+            // Create server first to get the actual listening address and shared endpoint
             let client_with_state_for_server = ClientWithState::new(
                 client.clone(),
                 caches.clone(),
                 #[cfg(feature = "preview")]
                 hello_subscriptions.clone(),
             );
-            let (server, _sync_peers, conn_map, syncer_recv, local_addr): (TestServer, _, _, _, _) =
+            let (server, _sync_peers, conn_map, syncer_recv, local_addr, endpoint, client_config): (TestServer, _, _, _, _, _, _) =
                 TestServer::new(client_with_state_for_server, &any_local_addr, &cert_config).await?;
 
-            // Create syncer with the actual server address
+            // Create syncer using the shared endpoint from the server
             let client_with_state_for_syncer = ClientWithState::new(
                 client.clone(),
                 caches.clone(),
@@ -320,12 +320,12 @@ impl TestCtx {
                 client_with_state_for_syncer,
                 send_effects,
                 InvalidGraphs::default(),
-                &cert_config,
-                (local_addr.into(), any_local_addr),
+                local_addr.into(),
                 syncer_recv,
                 conn_map,
-            )
-            .await?;
+                endpoint,
+                client_config,
+            );
 
             (syncer, server, local_addr, pk, effects_recv)
         };

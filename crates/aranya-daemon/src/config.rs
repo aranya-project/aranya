@@ -209,9 +209,10 @@ pub struct AfcConfig {
 #[serde(deny_unknown_fields)]
 pub struct QuicSyncConfig {
     /// Network address of Aranya sync server.
+    ///
+    /// This address is used for both accepting incoming connections and making
+    /// outbound connections to peers, enabling bidirectional connection reuse.
     pub addr: Addr,
-    /// Client bind address.
-    pub client_addr: Option<Addr>,
 
     /// Directory containing trusted root CA certificates (PEM format).
     ///
@@ -271,7 +272,6 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
-                    client_addr: None,
                     root_certs_dir: "/etc/aranya/root_certs".into(),
                     device_cert: "/etc/aranya/device.pem".into(),
                     device_key: "/etc/aranya/device-key.pem".into(),

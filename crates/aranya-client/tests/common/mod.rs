@@ -291,7 +291,6 @@ impl DeviceCtx {
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
-                    client_addr: None,
                     root_certs_dir: root_certs_dir.to_path_buf(),
                     device_cert: device_cert_path,
                     device_key: device_key_path,

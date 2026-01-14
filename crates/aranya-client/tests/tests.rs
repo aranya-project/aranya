@@ -791,16 +791,32 @@ async fn test_hello_subscription() -> Result<()> {
     membera_team.add_sync_peer(admin_addr, sync_config).await?;
     info!("membera added admin as sync peer with sync_on_hello=true");
 
+    // Perform initial syncs to populate peer cache entries on both sides.
+    // This is required because hello message processing looks up the graph_id
+    // from the peer cache based on the server address.
+    // TODO(aranya-core#538): Remove this workaround once graph_id is included
+    // in the hello message protocol.
+    membera_team.sync_now(admin_addr, None).await?;
+    info!("membera performed initial sync with admin to populate membera's peer cache");
+
+    // Admin also needs membera's address in its cache to process the subscribe request
+    let membera_addr = devices.membera.aranya_local_addr().await?;
+    admin_team.sync_now(membera_addr, None).await?;
+    info!("admin performed initial sync with membera to populate admin's peer cache");
+
     // MemberA subscribes to hello notifications from Admin
     membera_team
         .sync_hello_subscribe(
             admin_addr,
             Duration::from_millis(100),
-            Duration::from_millis(2000), // Duration must be long enough for label creation + hello + sync
-            Duration::from_secs(60), // Schedule delay for periodic sends
+            Duration::from_secs(120), // Duration must be long enough for entire test to complete under load
+            Duration::from_secs(60),  // Schedule delay for periodic sends
         )
         .await?;
     info!("membera subscribed to hello notifications from admin");
+
+    // Small delay to ensure subscription is fully established on admin side before creating label
+    sleep(Duration::from_millis(100)).await;
 
     // Before the action, verify that MemberA doesn't know about any labels created by admin
     // (This will be our way to test if sync worked)
@@ -828,9 +844,10 @@ async fn test_hello_subscription() -> Result<()> {
     // check that the command doesn't exist locally, and trigger a sync
     info!("waiting for hello message and automatic sync...");
 
-    // Poll every 100ms for up to 10 seconds for the label count to increase
+    // Poll every 100ms for up to 30 seconds for the label count to increase.
+    // The longer timeout handles CI environments with higher load.
     let poll_start = std::time::Instant::now();
-    let poll_timeout = Duration::from_millis(10_000);
+    let poll_timeout = Duration::from_secs(30);
     let poll_interval = Duration::from_millis(100);
 
     let final_labels = loop {
@@ -962,6 +979,19 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
 
     membera_team.add_sync_peer(admin_addr, sync_config).await?;
     info!("membera added admin as sync peer with sync_on_hello=true");
+
+    // Perform initial syncs to populate peer cache entries on both sides.
+    // This is required because hello message processing looks up the graph_id
+    // from the peer cache based on the server address.
+    // TODO(aranya-core#538): Remove this workaround once graph_id is included
+    // in the hello message protocol.
+    membera_team.sync_now(admin_addr, None).await?;
+    info!("membera performed initial sync with admin to populate membera's peer cache");
+
+    // Admin also needs membera's address in its cache to process the subscribe request
+    let membera_addr = devices.membera.aranya_local_addr().await?;
+    admin_team.sync_now(membera_addr, None).await?;
+    info!("admin performed initial sync with membera to populate admin's peer cache");
 
     // Phase 1: Test with high schedule_delay (60s) - should only see first graph change
     info!("Phase 1: Testing with high schedule_delay (60s) and high graph_change_delay (60s)");

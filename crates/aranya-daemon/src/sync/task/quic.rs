@@ -209,64 +209,43 @@ impl SyncState for State {
 }
 
 impl State {
-    /// Creates a new instance with mTLS configuration.
-    async fn new(
-        cert_config: &CertConfig,
+    /// Creates a new instance using a shared endpoint.
+    ///
+    /// The endpoint is created by [`Server::new()`] and shared with the Syncer.
+    /// Using a single endpoint ensures that outbound connections use the server's
+    /// bound address as the source, enabling bidirectional connection reuse.
+    fn new(
+        endpoint: Endpoint,
+        client_config: quinn::ClientConfig,
         conns: SharedConnectionMap,
-        client_addr: Addr,
-    ) -> SyncResult<Self> {
-        // Load certificates
-        let (root_store, device_certs, device_key) =
-            certs::load_certs(cert_config).map_err(Error::from)?;
-
-        // Build client TLS config for mTLS
-        let mut client_tls_config =
-            certs::build_client_config(root_store, device_certs, device_key).map_err(Error::from)?;
-        client_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
-
-        let mut client_config = quinn::ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(client_tls_config)
-                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
-        ));
-
-        client_config.transport_config(keep_alive_transport_config());
-
-        // Create client-only endpoint
-        let addr = tokio::net::lookup_host(client_addr.to_socket_addrs())
-            .await
-            .context("DNS lookup for client address")
-            .map_err(SyncError::Other)?
-            .next()
-            .context("could not resolve client address")
-            .map_err(SyncError::Other)?;
-
-        let endpoint = Endpoint::client(addr)
-            .map_err(|e| Error::EndpointError(format!("failed to create client endpoint: {e}")))?;
-
-        debug!("created QUIC client endpoint with mTLS");
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             endpoint,
             client_config,
             conns,
-        })
+        }
     }
 }
 
 impl Syncer<State> {
     /// Creates a new [`Syncer`].
-    pub(crate) async fn new(
+    ///
+    /// The `endpoint` and `client_config` should come from [`Server::new()`] to ensure
+    /// that outbound connections use the same endpoint as the server, enabling
+    /// bidirectional connection reuse.
+    pub(crate) fn new(
         client: ClientWithState<EN, crate::SP>,
         send_effects: super::EffectSender,
         invalid: InvalidGraphs,
-        cert_config: &CertConfig,
-        (server_addr, client_addr): (Addr, Addr),
+        server_addr: Addr,
         recv: mpsc::Receiver<Request>,
         conns: SharedConnectionMap,
-    ) -> SyncResult<Self> {
-        let state = State::new(cert_config, conns.clone(), client_addr).await?;
+        endpoint: Endpoint,
+        client_config: quinn::ClientConfig,
+    ) -> Self {
+        let state = State::new(endpoint, client_config, conns);
 
-        Ok(Self {
+        Self {
             client,
             peers: HashMap::new(),
             recv,
@@ -277,7 +256,7 @@ impl Syncer<State> {
             server_addr,
             #[cfg(feature = "preview")]
             hello_tasks: tokio::task::JoinSet::new(),
-        })
+        }
     }
 
     /// Establishes a QUIC connection to a peer and opens a bidirectional stream.
@@ -491,6 +470,12 @@ where
 
     /// Creates a new `Server`.
     ///
+    /// Creates a unified QUIC endpoint that serves both as a server (accepting incoming
+    /// connections) and can be used by the Syncer as a client (making outbound connections).
+    /// Using a single endpoint bound to the server address ensures that when we connect
+    /// to peers, our source address is our server address, enabling bidirectional
+    /// connection reuse.
+    ///
     /// # Panics
     ///
     /// Will panic if called outside tokio runtime.
@@ -504,6 +489,8 @@ where
         SharedConnectionMap,
         mpsc::Receiver<Request>,
         SocketAddr,
+        Endpoint,
+        quinn::ClientConfig,
     )> {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
@@ -512,13 +499,17 @@ where
         let (send, syncer_recv) = mpsc::channel::<Request>(128);
         let sync_peers = SyncPeers::new(send);
 
-        // Load certificates
+        // Load certificates once for both client and server configs
         let (root_store, device_certs, device_key) =
-            certs::load_certs(&cert_config).map_err(Error::from)?;
+            certs::load_certs(cert_config).map_err(Error::from)?;
 
         // Build server TLS config for mTLS (requires client certs)
-        let mut server_tls_config =
-            certs::build_server_config(root_store, device_certs, device_key).map_err(Error::from)?;
+        let mut server_tls_config = certs::build_server_config(
+            root_store.clone(),
+            device_certs.clone(),
+            device_key.clone_key(),
+        )
+        .map_err(Error::from)?;
         server_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
 
         let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(
@@ -527,6 +518,19 @@ where
         ));
 
         server_config.transport_config(keep_alive_transport_config());
+
+        // Build client TLS config for mTLS (for outbound connections)
+        let mut client_tls_config =
+            certs::build_client_config(root_store, device_certs, device_key)
+                .map_err(Error::from)?;
+        client_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
+
+        let mut client_config = quinn::ClientConfig::new(Arc::new(
+            quinn::crypto::rustls::QuicClientConfig::try_from(client_tls_config)
+                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
+        ));
+
+        client_config.transport_config(keep_alive_transport_config());
 
         let bind_addr = tokio::net::lookup_host(addr.to_socket_addrs())
             .await
@@ -541,17 +545,25 @@ where
             .local_addr()
             .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
 
-        debug!("created QUIC server endpoint with mTLS at {}", local_addr);
+        debug!("created unified QUIC endpoint with mTLS at {}", local_addr);
 
         let server_instance = Self {
             client,
-            endpoint,
+            endpoint: endpoint.clone(),
             conns: conns.clone(),
             conn_rx: server_conn_rx,
             _sync_peers: sync_peers.clone(),
         };
 
-        Ok((server_instance, sync_peers, conns, syncer_recv, local_addr))
+        Ok((
+            server_instance,
+            sync_peers,
+            conns,
+            syncer_recv,
+            local_addr,
+            endpoint,
+            client_config,
+        ))
     }
 
     /// Begins accepting incoming requests.

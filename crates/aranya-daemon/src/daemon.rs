@@ -12,7 +12,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
-use aranya_util::{ready, Addr};
+use aranya_util::ready;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
@@ -133,10 +133,6 @@ impl Daemon {
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
-            let qs_client_addr = match qs_config.client_addr {
-                None => Addr::new(qs_config.addr.host(), 0)?,
-                Some(v) => v,
-            };
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
@@ -176,7 +172,6 @@ impl Daemon {
                         server_addr: qs_config.addr,
                         caches: Arc::clone(&caches),
                     },
-                    qs_client_addr,
                     invalid_graphs.clone(),
                 )
                 .await?;
@@ -299,7 +294,6 @@ impl Daemon {
             server_addr,
             caches,
         }: SyncParams,
-        client_addr: Addr,
         invalid_graphs: InvalidGraphs,
     ) -> Result<(
         Client,
@@ -327,19 +321,19 @@ impl Daemon {
         #[cfg(feature = "preview")]
         let hello_subscriptions = Arc::default();
 
-        // Create the sync server
+        // Create the sync server (also creates the shared endpoint for client use)
         let client_with_state_for_server = ClientWithState::new(
             client.clone(),
             Arc::clone(&caches),
             #[cfg(feature = "preview")]
             Arc::clone(&hello_subscriptions),
         );
-        let (server, peers, conns, syncer_recv, server_addr) =
+        let (server, peers, conns, syncer_recv, server_addr, endpoint, client_config) =
             SyncServer::new(client_with_state_for_server, &server_addr, &cert_config)
                 .await
                 .context("unable to initialize QUIC sync server")?;
 
-        // Initialize the syncer
+        // Initialize the syncer using the shared endpoint from the server
         let client_with_state_for_syncer = ClientWithState::new(
             client.clone(),
             caches,
@@ -350,12 +344,12 @@ impl Daemon {
             client_with_state_for_syncer,
             send_effects,
             invalid_graphs,
-            &cert_config,
-            (server_addr.into(), client_addr),
+            server_addr.into(),
             syncer_recv,
             conns,
-        )
-        .await?;
+            endpoint,
+            client_config,
+        );
 
         Ok((client, server, syncer, peers, recv_effects, server_addr))
     }
@@ -514,7 +508,6 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: any,
-                    client_addr: None,
                     root_certs_dir,
                     device_cert: device_cert_path,
                     device_key: device_key_path,

@@ -128,10 +128,12 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
                 })?;
 
             for cert in certs {
-                root_store.add(cert).map_err(|e| CertError::AddToRootStore {
-                    path: path.clone(),
-                    source: e,
-                })?;
+                root_store
+                    .add(cert)
+                    .map_err(|e| CertError::AddToRootStore {
+                        path: path.clone(),
+                        source: e,
+                    })?;
                 cert_count += 1;
             }
         }
@@ -403,13 +405,17 @@ mod tests {
         assert!(!root_store.is_empty(), "root store should not be empty");
 
         // Load device cert
-        let (device_certs, device_key) =
-            load_device_cert(&device_cert_path, &device_key_path).expect("failed to load device cert");
+        let (device_certs, device_key) = load_device_cert(&device_cert_path, &device_key_path)
+            .expect("failed to load device cert");
         assert!(!device_certs.is_empty(), "device certs should not be empty");
 
         // Build TLS configs to verify everything works together
-        let client_config = build_client_config(root_store.clone(), device_certs.clone(), device_key.clone_key())
-            .expect("failed to build client config");
+        let client_config = build_client_config(
+            root_store.clone(),
+            device_certs.clone(),
+            device_key.clone_key(),
+        )
+        .expect("failed to build client config");
         assert!(client_config.alpn_protocols.is_empty(), "ALPN not set yet");
 
         let server_config = build_server_config(root_store, device_certs, device_key)
