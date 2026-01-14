@@ -14,6 +14,8 @@ use anyhow::{Context, Result};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use tracing::{debug, warn};
 
+use super::CertConfig;
+
 /// Loads root CA certificates from a directory.
 ///
 /// Reads all `.pem` files from the specified directory and parses them as X.509 certificates.
@@ -191,6 +193,24 @@ pub fn build_server_config(
 
     debug!("built rustls server config for mTLS");
     Ok(config)
+}
+
+/// Loads all certificates needed for mTLS from a [`CertConfig`].
+///
+/// This is a convenience function that combines [`load_root_certs`] and [`load_device_cert`].
+///
+/// # Returns
+/// A tuple of (root cert store, device certificate chain, device private key)
+pub fn load_certs(
+    config: &CertConfig,
+) -> Result<(
+    rustls::RootCertStore,
+    Vec<CertificateDer<'static>>,
+    PrivateKeyDer<'static>,
+)> {
+    let root_store = load_root_certs(&config.root_certs_dir)?;
+    let (device_certs, device_key) = load_device_cert(&config.device_cert, &config.device_key)?;
+    Ok((root_store, device_certs, device_key))
 }
 
 #[cfg(test)]

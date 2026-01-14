@@ -57,6 +57,15 @@ pub(crate) use super::hello::HelloSubscriptions;
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 
+/// Creates a QUIC transport configuration that keeps connections alive indefinitely.
+///
+/// Disables idle timeout so connections can be reused across multiple sync operations.
+fn keep_alive_transport_config() -> Arc<quinn::TransportConfig> {
+    let mut transport_config = quinn::TransportConfig::default();
+    transport_config.max_idle_timeout(None);
+    Arc::new(transport_config)
+}
+
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -210,11 +219,8 @@ impl State {
         client_addr: Addr,
     ) -> SyncResult<Self> {
         // Load certificates
-        let root_store =
-            certs::load_root_certs(&cert_config.root_certs_dir).map_err(Error::CertificateError)?;
-        let (device_certs, device_key) =
-            certs::load_device_cert(&cert_config.device_cert, &cert_config.device_key)
-                .map_err(Error::CertificateError)?;
+        let (root_store, device_certs, device_key) =
+            certs::load_certs(cert_config).map_err(Error::CertificateError)?;
 
         // Build client TLS config for mTLS
         let mut client_tls_config =
@@ -227,10 +233,7 @@ impl State {
                 .map_err(|e| Error::TlsConfigError(anyhow::anyhow!("invalid TLS config: {}", e)))?,
         ));
 
-        // Disable idle timeout to keep connections alive indefinitely for reuse
-        let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_idle_timeout(None);
-        client_config.transport_config(Arc::new(transport_config));
+        client_config.transport_config(keep_alive_transport_config());
 
         // Create client-only endpoint
         let addr = tokio::net::lookup_host(client_addr.to_socket_addrs())
@@ -514,11 +517,8 @@ where
         let sync_peers = SyncPeers::new(send);
 
         // Load certificates
-        let root_store =
-            certs::load_root_certs(&cert_config.root_certs_dir).map_err(Error::CertificateError)?;
-        let (device_certs, device_key) =
-            certs::load_device_cert(&cert_config.device_cert, &cert_config.device_key)
-                .map_err(Error::CertificateError)?;
+        let (root_store, device_certs, device_key) =
+            certs::load_certs(&cert_config).map_err(Error::CertificateError)?;
 
         // Build server TLS config for mTLS (requires client certs)
         let mut server_tls_config =
@@ -531,10 +531,7 @@ where
                 .map_err(|e| Error::TlsConfigError(anyhow::anyhow!("invalid TLS config: {}", e)))?,
         ));
 
-        // Disable idle timeout to keep connections alive indefinitely for reuse
-        let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_idle_timeout(None);
-        server_config.transport_config(Arc::new(transport_config));
+        server_config.transport_config(keep_alive_transport_config());
 
         let bind_addr = tokio::net::lookup_host(addr.to_socket_addrs())
             .await
