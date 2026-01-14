@@ -24,6 +24,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Set up automatic syncing between all peers
     devices.add_all_sync_peers(team_id).await?;
@@ -159,6 +160,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -231,6 +233,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -310,6 +313,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -394,9 +398,12 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
+
+    // create default roles
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -500,9 +507,12 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
+
+    // create default roles
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -612,9 +622,12 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
+
+    // create default roles
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -733,9 +746,12 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
+
+    // create default roles
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -852,9 +868,12 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
+
+    // create default roles
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices
@@ -976,6 +995,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let default_roles = devices
         .setup_default_roles_without_delegation(team_id)
         .await?;
+    let _ = devices.setup_default_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices

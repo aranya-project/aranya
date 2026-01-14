@@ -45,14 +45,11 @@ async fn main() -> Result<()> {
 
     // Start a daemon for each device.
     let tmp = tempdir()?;
-    let current_dir_path_buf: PathBuf =
-        env::current_dir().expect("Failed to get current working directory");
     let mut daemons = Vec::with_capacity(env.devices().count());
     for device in env.devices() {
         // Generate config file.
-        info!("\n--generating daemon config file for {}--\n", device.name);
-        let cfg_dir: PathBuf = current_dir_path_buf.join("out");
-        let cfg = create_config(device.name.clone(), device.sync_addr, &cfg_dir)
+        info!("generating daemon config file for {}", device.name);
+        let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path())
             .await
             .expect("expected to generate daemon config file");
 
