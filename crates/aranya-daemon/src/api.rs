@@ -541,7 +541,6 @@ impl DaemonApi for Api {
         debug!(?graph_id);
         let team_id = api::TeamId::transmute(graph_id);
 
-        // With mTLS, no PSK setup is required - authentication is handled by certificates
         Ok(team_id)
     }
 
