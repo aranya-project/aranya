@@ -5,12 +5,11 @@
 
 use std::{
     fs::{self, File},
-    io::BufReader,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 use thiserror::Error;
 use tracing::debug;
 
@@ -41,7 +40,7 @@ pub enum CertError {
     #[error("failed to parse certificates from '{path}': {source}")]
     ParseCert {
         path: PathBuf,
-        source: std::io::Error,
+        source: rustls::pki_types::pem::Error,
     },
 
     /// Failed to add a certificate to the root store.
@@ -63,7 +62,7 @@ pub enum CertError {
     #[error("failed to parse private key from '{path}': {source}")]
     ParseKey {
         path: PathBuf,
-        source: std::io::Error,
+        source: rustls::pki_types::pem::Error,
     },
 
     /// No private key found in file.
@@ -118,9 +117,8 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
                 path: path.clone(),
                 source: e,
             })?;
-            let mut reader = BufReader::new(file);
 
-            let certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut reader)
+            let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_reader_iter(file)
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(|e| CertError::ParseCert {
                     path: path.clone(),
@@ -167,9 +165,8 @@ pub fn load_device_cert(
         path: cert_path.to_path_buf(),
         source: e,
     })?;
-    let mut cert_reader = BufReader::new(cert_file);
 
-    let certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut cert_reader)
+    let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_reader_iter(cert_file)
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|e| CertError::ParseCert {
             path: cert_path.to_path_buf(),
@@ -190,14 +187,11 @@ pub fn load_device_cert(
         path: key_path.to_path_buf(),
         source: e,
     })?;
-    let mut key_reader = BufReader::new(key_file);
 
-    let key = rustls_pemfile::private_key(&mut key_reader)
-        .map_err(|e| CertError::ParseKey {
-            path: key_path.to_path_buf(),
-            source: e,
-        })?
-        .ok_or_else(|| CertError::NoKeyFound(key_path.to_path_buf()))?;
+    let key = PrivateKeyDer::from_pem_reader(key_file).map_err(|e| CertError::ParseKey {
+        path: key_path.to_path_buf(),
+        source: e,
+    })?;
 
     debug!("loaded device private key");
 
