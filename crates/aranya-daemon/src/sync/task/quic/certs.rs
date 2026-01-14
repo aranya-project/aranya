@@ -6,15 +6,81 @@
 use std::{
     fs::{self, File},
     io::BufReader,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
-use anyhow::{Context, Result};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use thiserror::Error;
 use tracing::{debug, warn};
 
 use super::CertConfig;
+
+/// Errors that can occur during certificate loading and TLS configuration.
+#[derive(Error, Debug)]
+pub enum CertError {
+    /// Failed to read a directory.
+    #[error("failed to read directory '{path}': {source}")]
+    ReadDir {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    /// Failed to read a directory entry.
+    #[error("failed to read directory entry: {0}")]
+    ReadDirEntry(#[source] std::io::Error),
+
+    /// Failed to open a file.
+    #[error("failed to open '{path}': {source}")]
+    OpenFile {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    /// Failed to parse certificates from a PEM file.
+    #[error("failed to parse certificates from '{path}': {source}")]
+    ParseCert {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    /// Failed to add a certificate to the root store.
+    #[error("failed to add certificate from '{path}' to root store: {source}")]
+    AddToRootStore {
+        path: PathBuf,
+        source: rustls::Error,
+    },
+
+    /// No certificates found in file.
+    #[error("no certificates found in '{0}'")]
+    NoCertsFound(PathBuf),
+
+    /// Failed to parse a private key from a PEM file.
+    #[error("failed to parse private key from '{path}': {source}")]
+    ParseKey {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    /// No private key found in file.
+    #[error("no private key found in '{0}'")]
+    NoKeyFound(PathBuf),
+
+    /// Failed to build client TLS configuration.
+    #[error("failed to build client TLS config: {0}")]
+    BuildClientConfig(#[source] rustls::Error),
+
+    /// Failed to build client certificate verifier.
+    #[error("failed to build client certificate verifier: {0}")]
+    BuildClientVerifier(#[source] rustls::server::VerifierBuilderError),
+
+    /// Failed to build server TLS configuration.
+    #[error("failed to build server TLS config: {0}")]
+    BuildServerConfig(#[source] rustls::Error),
+}
+
+/// Result type for certificate operations.
+pub type Result<T> = std::result::Result<T, CertError>;
 
 /// Loads root CA certificates from a directory.
 ///
@@ -32,32 +98,35 @@ use super::CertConfig;
 pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
     let mut root_store = rustls::RootCertStore::empty();
 
-    let entries = fs::read_dir(dir)
-        .with_context(|| format!("failed to read root certs directory: {}", dir.display()))?;
+    let entries = fs::read_dir(dir).map_err(|e| CertError::ReadDir {
+        path: dir.to_path_buf(),
+        source: e,
+    })?;
 
     let mut cert_count = 0;
     for entry in entries {
-        let entry = entry.context("failed to read directory entry")?;
+        let entry = entry.map_err(CertError::ReadDirEntry)?;
         let path = entry.path();
 
         // Only process .pem files
         if path.extension().is_some_and(|ext| ext == "pem") {
-            let file = File::open(&path)
-                .with_context(|| format!("failed to open certificate file: {}", path.display()))?;
+            let file = File::open(&path).map_err(|e| CertError::OpenFile {
+                path: path.clone(),
+                source: e,
+            })?;
             let mut reader = BufReader::new(file);
 
             let certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut reader)
-                .collect::<Result<Vec<_>, _>>()
-                .with_context(|| {
-                    format!("failed to parse certificates from: {}", path.display())
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|e| CertError::ParseCert {
+                    path: path.clone(),
+                    source: e,
                 })?;
 
             for cert in certs {
-                root_store.add(cert).with_context(|| {
-                    format!(
-                        "failed to add certificate to root store from: {}",
-                        path.display()
-                    )
+                root_store.add(cert).map_err(|e| CertError::AddToRootStore {
+                    path: path.clone(),
+                    source: e,
                 })?;
                 cert_count += 1;
             }
@@ -92,24 +161,21 @@ pub fn load_device_cert(
     key_path: &Path,
 ) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
     // Load certificate chain
-    let cert_file = File::open(cert_path)
-        .with_context(|| format!("failed to open device certificate: {}", cert_path.display()))?;
+    let cert_file = File::open(cert_path).map_err(|e| CertError::OpenFile {
+        path: cert_path.to_path_buf(),
+        source: e,
+    })?;
     let mut cert_reader = BufReader::new(cert_file);
 
     let certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut cert_reader)
-        .collect::<Result<Vec<_>, _>>()
-        .with_context(|| {
-            format!(
-                "failed to parse device certificate: {}",
-                cert_path.display()
-            )
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|e| CertError::ParseCert {
+            path: cert_path.to_path_buf(),
+            source: e,
         })?;
 
     if certs.is_empty() {
-        anyhow::bail!(
-            "no certificates found in device certificate file: {}",
-            cert_path.display()
-        );
+        return Err(CertError::NoCertsFound(cert_path.to_path_buf()));
     }
 
     debug!(
@@ -118,18 +184,18 @@ pub fn load_device_cert(
     );
 
     // Load private key
-    let key_file = File::open(key_path)
-        .with_context(|| format!("failed to open device key: {}", key_path.display()))?;
+    let key_file = File::open(key_path).map_err(|e| CertError::OpenFile {
+        path: key_path.to_path_buf(),
+        source: e,
+    })?;
     let mut key_reader = BufReader::new(key_file);
 
     let key = rustls_pemfile::private_key(&mut key_reader)
-        .with_context(|| format!("failed to parse device key: {}", key_path.display()))?
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "no private key found in device key file: {}",
-                key_path.display()
-            )
-        })?;
+        .map_err(|e| CertError::ParseKey {
+            path: key_path.to_path_buf(),
+            source: e,
+        })?
+        .ok_or_else(|| CertError::NoKeyFound(key_path.to_path_buf()))?;
 
     debug!("loaded device private key");
 
@@ -157,7 +223,7 @@ pub fn build_client_config(
     let config = rustls::ClientConfig::builder()
         .with_root_certificates(roots)
         .with_client_auth_cert(certs, key)
-        .context("failed to build client TLS config with client auth")?;
+        .map_err(CertError::BuildClientConfig)?;
 
     debug!("built rustls client config for mTLS");
     Ok(config)
@@ -184,12 +250,12 @@ pub fn build_server_config(
     // Build client certificate verifier that requires valid client certs
     let client_verifier = rustls::server::WebPkiClientVerifier::builder(Arc::new(roots))
         .build()
-        .context("failed to build client certificate verifier")?;
+        .map_err(CertError::BuildClientVerifier)?;
 
     let config = rustls::ServerConfig::builder()
         .with_client_cert_verifier(client_verifier)
         .with_single_cert(certs, key)
-        .context("failed to build server TLS config")?;
+        .map_err(CertError::BuildServerConfig)?;
 
     debug!("built rustls server config for mTLS");
     Ok(config)

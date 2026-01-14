@@ -81,12 +81,9 @@ pub enum Error {
     /// QUIC Connect error
     #[error("QUIC connect error: {0}")]
     QuicConnectError(#[from] quinn::ConnectError),
-    /// Certificate loading error
-    #[error("certificate loading error: {0}")]
-    CertificateError(#[source] anyhow::Error),
-    /// TLS configuration error
-    #[error("TLS configuration error: {0}")]
-    TlsConfigError(#[source] anyhow::Error),
+    /// Certificate or TLS configuration error
+    #[error(transparent)]
+    Cert(#[from] certs::CertError),
     /// QUIC endpoint error
     #[error("QUIC endpoint error: {0}")]
     EndpointError(String),
@@ -220,17 +217,16 @@ impl State {
     ) -> SyncResult<Self> {
         // Load certificates
         let (root_store, device_certs, device_key) =
-            certs::load_certs(cert_config).map_err(Error::CertificateError)?;
+            certs::load_certs(cert_config).map_err(Error::from)?;
 
         // Build client TLS config for mTLS
         let mut client_tls_config =
-            certs::build_client_config(root_store, device_certs, device_key)
-                .map_err(Error::TlsConfigError)?;
+            certs::build_client_config(root_store, device_certs, device_key).map_err(Error::from)?;
         client_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
 
         let mut client_config = quinn::ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_tls_config)
-                .map_err(|e| Error::TlsConfigError(anyhow::anyhow!("invalid TLS config: {}", e)))?,
+                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
         ));
 
         client_config.transport_config(keep_alive_transport_config());
@@ -518,17 +514,16 @@ where
 
         // Load certificates
         let (root_store, device_certs, device_key) =
-            certs::load_certs(&cert_config).map_err(Error::CertificateError)?;
+            certs::load_certs(&cert_config).map_err(Error::from)?;
 
         // Build server TLS config for mTLS (requires client certs)
         let mut server_tls_config =
-            certs::build_server_config(root_store, device_certs, device_key)
-                .map_err(Error::TlsConfigError)?;
+            certs::build_server_config(root_store, device_certs, device_key).map_err(Error::from)?;
         server_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
 
         let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_tls_config)
-                .map_err(|e| Error::TlsConfigError(anyhow::anyhow!("invalid TLS config: {}", e)))?,
+                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
         ));
 
         server_config.transport_config(keep_alive_transport_config());
