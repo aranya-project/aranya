@@ -53,7 +53,6 @@ async fn main() -> Result<()> {
     let team_info: TeamInfo = onboard.recv().await?;
     info!("admin: received team info from owner");
 
-    // With mTLS, no add_team call is required - just get team reference
     let team = client.team(team_info.team_id);
     info!("admin: got team reference");
 
