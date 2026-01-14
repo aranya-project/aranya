@@ -449,7 +449,7 @@ where
     ///
     /// Handles subscription management and hello notifications.
     /// Note: With mTLS, the graph_id is determined from the peer caches.
-    /// TODO: Add graph_id to the hello message protocol for proper multi-team support.
+    /// TODO(aranya-core#538): Add graph_id to the hello message protocol for proper multi-team support.
     #[instrument(skip_all)]
     pub(crate) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
@@ -469,7 +469,7 @@ where
         // With mTLS, we need to determine the graph_id from context.
         // Look up the graph_id from the peer caches based on the peer's server address.
         // This assumes the peer has synced with us before for at least one graph.
-        // TODO: Add graph_id to the hello message protocol for proper multi-team support.
+        // TODO(aranya-core#538): Add graph_id to the hello message protocol for proper multi-team support.
         let graph_id = {
             let (_, caches) = client.lock_aranya_and_caches().await;
             // Find any cache entry for this peer's server address
