@@ -180,7 +180,6 @@ impl DevicesCtx {
         let team_id = team.team_id();
         info!(?team_id);
 
-
         Ok(team_id)
     }
 
