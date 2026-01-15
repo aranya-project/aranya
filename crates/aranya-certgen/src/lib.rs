@@ -162,7 +162,6 @@ impl SaveOptions {
 /// ```
 pub struct CertGen {
     cert_pem: String,
-    key: KeyPair,
     issuer: Issuer<'static, KeyPair>,
 }
 
@@ -198,15 +197,9 @@ impl CertGen {
         }
         let (cert, key) = generate_root_ca(cn, days)?;
         let cert_pem = cert.pem();
+        let issuer = Issuer::from_ca_cert_pem(&cert_pem, key)?;
 
-        let issuer_key = KeyPair::from_pem(&key.serialize_pem())?;
-        let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)?;
-
-        Ok(Self {
-            cert_pem,
-            key,
-            issuer,
-        })
+        Ok(Self { cert_pem, issuer })
     }
 
     /// Generates a certificate signed by this CA.
@@ -241,15 +234,9 @@ impl CertGen {
         }
         let (cert, key) = generate_signed_cert(cn, &self.issuer, days)?;
         let cert_pem = cert.pem();
+        let issuer = Issuer::from_ca_cert_pem(&cert_pem, key)?;
 
-        let issuer_key = KeyPair::from_pem(&key.serialize_pem())?;
-        let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)?;
-
-        Ok(Self {
-            cert_pem,
-            key,
-            issuer,
-        })
+        Ok(Self { cert_pem, issuer })
     }
 
     /// Loads a certificate and private key from PEM files.
@@ -288,17 +275,10 @@ impl CertGen {
         let key_pem = fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?;
 
         let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
-
-        let issuer_key =
-            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
-        let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)
+        let issuer = Issuer::from_ca_cert_pem(&cert_pem, key)
             .map_err(|e| CertGenError::parse_cert(&cert_path, e))?;
 
-        Ok(Self {
-            cert_pem,
-            key,
-            issuer,
-        })
+        Ok(Self { cert_pem, issuer })
     }
 
     /// Saves the certificate and private key to PEM files.
@@ -379,7 +359,7 @@ impl CertGen {
             .open(&key_path)
             .map_err(|e| CertGenError::io(&key_path, e))?;
         key_file
-            .write_all(self.key.serialize_pem().as_bytes())
+            .write_all(self.issuer.key().serialize_pem().as_bytes())
             .map_err(|e| CertGenError::io(&key_path, e))?;
 
         Ok(())
@@ -392,7 +372,7 @@ impl CertGen {
 
     /// Returns the private key as a PEM-encoded string.
     pub fn key_pem(&self) -> String {
-        self.key.serialize_pem()
+        self.issuer.key().serialize_pem()
     }
 }
 
