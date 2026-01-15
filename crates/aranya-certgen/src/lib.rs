@@ -38,8 +38,13 @@
 //! ```
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-use std::{fs, net::IpAddr, path::Path};
+use std::os::unix::fs::OpenOptionsExt;
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    net::IpAddr,
+    path::Path,
+};
 
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose,
@@ -413,11 +418,19 @@ impl CertGen {
         }
 
         fs::write(&cert_path, &self.cert_pem).map_err(|e| CertGenError::io(&cert_path, e))?;
-        fs::write(&key_path, self.key.serialize_pem()).map_err(|e| CertGenError::io(&key_path, e))?;
 
-        // Set restrictive permissions on private key (Unix only)
+        // Write private key with restrictive permissions set at creation time
+        // to prevent race condition where others could read the key before
+        // permissions are set.
+        let mut key_options = OpenOptions::new();
+        key_options.write(true).create(true).truncate(true);
         #[cfg(unix)]
-        fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
+        key_options.mode(0o600);
+        let mut key_file = key_options
+            .open(&key_path)
+            .map_err(|e| CertGenError::io(&key_path, e))?;
+        key_file
+            .write_all(self.key.serialize_pem().as_bytes())
             .map_err(|e| CertGenError::io(&key_path, e))?;
 
         Ok(())
