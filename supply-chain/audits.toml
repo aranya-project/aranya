@@ -16,24 +16,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.94 -> 1.0.97"
 
-[[audits.asn1-rs]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.7.1"
-notes = "Pure Rust ASN.1/BER/DER library. Uses #![forbid(unsafe_code)]. No file system or network access. Defensive programming with recursion limits."
-
-[[audits.asn1-rs-derive]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.6.0"
-notes = "Procedural macro crate for asn1-rs derive macros. No unsafe code, no file system or network access."
-
-[[audits.asn1-rs-impl]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.2.0"
-notes = "Simple proc-macro for OID and integer encoding at compile time. No unsafe code, no file system/network access."
-
 [[audits.async-trait]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -98,24 +80,6 @@ delta = "0.2.16 -> 0.2.17"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.2 -> 0.2.3"
-
-[[audits.data-encoding]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "2.9.0"
-notes = "Base encoding library (hex, base32, base64). Contains well-documented unsafe for performance. No file system or network access. no_std compatible."
-
-[[audits.der-parser]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "10.0.0"
-notes = "BER/DER parser using nom. Uses #![forbid(unsafe_code)]. No file system or network access. Includes recursion limits and fuzzing."
-
-[[audits.deranged]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.4.0 -> 0.5.5"
-notes = "MSRV update, uses core::hint::assert_unchecked, API improvements for ranged integers. Unsafe code follows standard library patterns."
 
 [[audits.dunce]]
 who = "Declan Johnson <djohnson@spideroak.com>"
@@ -192,33 +156,15 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.46.0 -> 0.50.1"
 
-[[audits.num-bigint]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.4.5 -> 0.4.6"
-notes = "Fixed compilation on x86_64-unknown-linux-gnux32, documentation improvements. No security concerns."
-
 [[audits.object]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.36.5 -> 0.36.7"
 
-[[audits.oid-registry]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.8.1"
-notes = "OID registry/database. Uses #![forbid(unsafe_code)]. No runtime file system or network access. Build script only reads bundled assets."
-
 [[audits.p384]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.13.0 -> 0.13.1"
-
-[[audits.pem]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "3.0.6"
-notes = "PEM encoding/decoding library. Uses #![deny(unsafe_code)]. No file system or network access. Pure parsing library."
 
 [[audits.pin-project]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -266,12 +212,6 @@ delta = "1.0.93 -> 1.0.94"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
-
-[[audits.rcgen]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.14.6"
-notes = "X.509 certificate generator. Uses #![forbid(unsafe_code)]. No file system or network access. Part of rustls project."
 
 [[audits.rfc6979]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -342,12 +282,6 @@ delta = "0.8.12 -> 0.8.13"
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.8.12 -> 0.8.13"
-
-[[audits.rusticata-macros]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "4.1.0"
-notes = "Helper macros for nom parsers. Uses #![deny(unsafe_code)]. No file system or network access."
 
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -465,24 +399,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.6 -> 2.0.12"
 
-[[audits.time]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.3.44"
-notes = "Date/time library. Contains well-documented unsafe for FFI and performance. Defensive programming with proper error handling for local offset detection."
-
-[[audits.time-core]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.1.4 -> 0.1.6"
-notes = "Refactored Per trait to MultipleOf, added inline attributes, lint updates. No unsafe code."
-
-[[audits.time-macros]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-delta = "0.2.22 -> 0.2.24"
-notes = "Updated time-core dependency, refactored ToTokenTree to ToTokenStream, MSRV update. Proc macro code."
-
 [[audits.tinyvec]]
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -567,18 +483,6 @@ version = "0.4.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
-
-[[audits.x509-parser]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.18.0"
-notes = "X.509 certificate parser. Uses #![forbid(unsafe_code)]. No file system or network access in library code. Part of rusticata project."
-
-[[audits.yasna]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.5.2"
-notes = "ASN.1/DER encoding library. Uses #![forbid(unsafe_code)]. No file system or network access. no_std compatible."
 
 [[audits.zerofrom]]
 who = "gknopf <gknopf@spideroak.com>"
