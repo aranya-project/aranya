@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -10,26 +10,30 @@ use aranya_crypto::{
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState,
+    ClientState, GraphId,
 };
 use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, sync::Mutex, task::JoinSet};
+use tokio::{
+    fs,
+    sync::{mpsc, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
-    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver, QSData},
+    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
     aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::{
-        quic::{PskStore, State as QuicSyncClientState, SyncParams},
-        SyncPeers, Syncer,
+    sync::{
+        quic::{PskStore, QuicState, SyncParams},
+        SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -50,7 +54,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::quic::Server<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -117,7 +121,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncClientState>,
+    manager: SyncManager<QuicState, EN, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -165,23 +169,22 @@ impl Daemon {
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, syncer, peers, recv_effects, local_addr) =
-                Self::setup_aranya(
-                    &cfg,
-                    eng.clone(),
-                    aranya_store
-                        .try_clone()
-                        .context("unable to clone keystore")?,
-                    &pks,
-                    SyncParams {
-                        psk_store: Arc::clone(&psk_store),
-                        server_addr: qs_config.addr,
-                        caches: Arc::clone(&caches),
-                    },
-                    qs_client_addr,
-                    invalid_graphs.clone(),
-                )
-                .await?;
+            let (client, sync_server, manager, syncer, recv_effects) = Self::setup_aranya(
+                &cfg,
+                eng.clone(),
+                aranya_store
+                    .try_clone()
+                    .context("unable to clone keystore")?,
+                &pks,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    server_addr: qs_config.addr,
+                    caches: Arc::clone(&caches),
+                },
+                qs_client_addr,
+                invalid_graphs.clone(),
+            )
+            .await?;
 
             #[cfg(feature = "afc")]
             let afc = {
@@ -211,11 +214,11 @@ impl Daemon {
 
             let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
-                local_addr,
+                local_addr: sync_server.local_addr(),
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
-                peers,
+                syncer,
                 recv_effects,
                 invalid: invalid_graphs,
                 #[cfg(feature = "afc")]
@@ -226,7 +229,7 @@ impl Daemon {
             })?;
             Ok(Self {
                 sync_server,
-                syncer,
+                manager,
                 api,
                 span,
             })
@@ -246,7 +249,7 @@ impl Daemon {
                 .instrument(info_span!("sync-server")),
         );
         set.spawn({
-            self.syncer
+            self.manager
                 .run(waiter.notifier())
                 .instrument(info_span!("syncer"))
         });
@@ -317,10 +320,9 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        Syncer<QuicSyncClientState>,
-        SyncPeers,
-        EffectReceiver,
-        SocketAddr,
+        SyncManager<QuicState, EN, SP, EF>,
+        SyncHandle,
+        mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {
         let device_id = pk.ident_pk.id()?;
 
@@ -334,7 +336,7 @@ impl Daemon {
         let client = Client::new(Arc::clone(&aranya));
 
         // Sync in the background at some specified interval.
-        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+        let (send_effects, recv_effects) = mpsc::channel(256);
 
         // Create shared hello subscriptions for both server and syncer
         #[cfg(feature = "preview")]
@@ -347,7 +349,7 @@ impl Daemon {
             #[cfg(feature = "preview")]
             Arc::clone(&hello_subscriptions),
         );
-        let (server, peers, conns, syncer_recv, server_addr) = SyncServer::new(
+        let (server, peers, conns, syncer_recv) = SyncServer::new(
             client_with_state_for_server,
             &server_addr,
             Arc::clone(&psk_store),
@@ -362,17 +364,17 @@ impl Daemon {
             #[cfg(feature = "preview")]
             server.hello_subscriptions(),
         );
-        let syncer = Syncer::new(
+        let syncer = SyncManager::new(
             client_with_state_for_syncer,
             send_effects,
             invalid_graphs,
             psk_store,
-            (server_addr.into(), client_addr),
+            (server.local_addr().into(), client_addr),
             syncer_recv,
             conns,
         )?;
 
-        Ok((client, server, syncer, peers, recv_effects, server_addr))
+        Ok((client, server, syncer, peers, recv_effects))
     }
 
     /// Loads the crypto engine.
