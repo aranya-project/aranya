@@ -6,6 +6,7 @@ members = [
     "examples/rust/*",
 ]
 
+
 [workspace.package]
 version = "4.1.0"
 authors = ["SpiderOak, Inc."]

@@ -6,4 +6,6 @@
 *.tar.gz
 
 .vscode
-Testing/Temporary/
+
+# CMake
+build/
