@@ -10,7 +10,7 @@ use std::{
 
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose,
-    IsCa, Issuer, KeyPair, KeyUsagePurpose,
+    IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType,
 };
 use time::{Duration, OffsetDateTime};
 
@@ -433,6 +433,9 @@ fn generate_signed_cert(
         ExtendedKeyUsagePurpose::ServerAuth,
         ExtendedKeyUsagePurpose::ClientAuth,
     ];
+
+    // Add CN as DNS SAN for rustls compatibility (rustls ignores CN, only checks SAN)
+    params.subject_alt_names = vec![SanType::DnsName(cn.to_string().try_into()?)];
 
     let now = OffsetDateTime::now_utc();
     params.not_before = now;
