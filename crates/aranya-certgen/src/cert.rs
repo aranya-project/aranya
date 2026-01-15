@@ -80,16 +80,6 @@ impl CaCert {
     /// Returns an error if:
     /// - `days` is 0 ([`CertGenError::InvalidDays`])
     /// - Key generation or certificate signing fails ([`CertGenError::Generate`])
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use aranya_certgen::CaCert;
-    ///
-    /// let ca = CaCert::new("My Root CA", 365)?;
-    /// ca.save("ca", None)?;
-    /// # Ok::<(), aranya_certgen::CertGenError>(())
-    /// ```
     pub fn new(cn: &str, days: u32) -> Result<Self, CertGenError> {
         if days == 0 {
             return Err(CertGenError::InvalidDays);
@@ -116,17 +106,6 @@ impl CaCert {
     /// Returns an error if:
     /// - `days` is 0 ([`CertGenError::InvalidDays`])
     /// - Key generation or certificate signing fails ([`CertGenError::Generate`])
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use aranya_certgen::CaCert;
-    ///
-    /// let ca = CaCert::new("My CA", 365)?;
-    /// let signed = ca.generate("server", 365)?;
-    /// signed.save("server", None)?;
-    /// # Ok::<(), aranya_certgen::CertGenError>(())
-    /// ```
     pub fn generate(&self, cn: &str, days: u32) -> Result<SignedCert, CertGenError> {
         if days == 0 {
             return Err(CertGenError::InvalidDays);
@@ -151,16 +130,6 @@ impl CaCert {
     /// - The files cannot be read ([`CertGenError::Io`])
     /// - The certificate cannot be parsed ([`CertGenError::ParseCert`])
     /// - The private key cannot be parsed ([`CertGenError::ParseKey`])
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use aranya_certgen::CaCert;
-    ///
-    /// let ca = CaCert::load("ca")?;
-    /// let ca = CaCert::load("./certs/myca")?;
-    /// # Ok::<(), aranya_certgen::CertGenError>(())
-    /// ```
     pub fn load(path: &str) -> Result<Self, CertGenError> {
         let path = Path::new(path);
         let cert_path = path.with_extension("crt.pem");
@@ -192,17 +161,6 @@ impl CaCert {
     /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use aranya_certgen::{CaCert, SaveOptions};
-    ///
-    /// let ca = CaCert::new("My CA", 365)?;
-    /// ca.save("ca", None)?;
-    /// ca.save("./certs/ca", Some(SaveOptions::default().create_parents().force()))?;
-    /// # Ok::<(), aranya_certgen::CertGenError>(())
-    /// ```
     pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
         save_cert_and_key(
             path,
@@ -260,18 +218,6 @@ impl SignedCert {
     /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use aranya_certgen::{CaCert, SaveOptions};
-    ///
-    /// let ca = CaCert::new("My CA", 365)?;
-    /// let signed = ca.generate("server", 365)?;
-    /// signed.save("server", None)?;
-    /// signed.save("./certs/server", Some(SaveOptions::default().create_parents().force()))?;
-    /// # Ok::<(), aranya_certgen::CertGenError>(())
-    /// ```
     pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
         save_cert_and_key(path, &self.cert_pem, &self.key.serialize_pem(), options)
     }
