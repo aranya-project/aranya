@@ -5,19 +5,18 @@
 //! # Example
 //!
 //! ```no_run
-//! use aranya_certgen::CaCert;
+//! use aranya_certgen::{CaCert, SaveOptions};
 //!
-//! // Create a new CA
+//! // Create a new CA and save
 //! let ca = CaCert::new("My Root CA", 365).unwrap();
+//! ca.save("ca", None).unwrap();  // Creates ./ca.crt.pem and ./ca.key.pem
 //!
-//! // Generate a signed certificate
+//! // Generate a signed certificate and save
 //! let signed = ca.generate("my-server", 365).unwrap();
+//! signed.save("server", None).unwrap();  // Creates ./server.crt.pem
 //!
-//! // Save CA and signed certificates to files
-//! // Creates ./ca.crt.pem and ./ca.key.pem
-//! ca.save(".", "ca", None).unwrap();
-//! // Creates ./server.crt.pem and ./server.key.pem
-//! signed.save(".", "server", None).unwrap();
+//! // Save to a specific path with options
+//! ca.save("./certs/myca", Some(SaveOptions::default().create_parents())).unwrap();
 //! ```
 //!
 //! # Loading an Existing CA
@@ -25,9 +24,8 @@
 //! ```no_run
 //! use aranya_certgen::CaCert;
 //!
-//! // Load an existing CA from PEM files
-//! // Loads from ./ca.crt.pem and ./ca.key.pem
-//! let ca = CaCert::load(".", "ca").unwrap();
+//! let ca = CaCert::load("ca").unwrap();
+//! let ca = CaCert::load("./certs/myca").unwrap();
 //!
 //! // Generate certificates signed by the loaded CA
 //! let signed = ca.generate("server", 365).unwrap();

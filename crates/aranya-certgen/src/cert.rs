@@ -49,11 +49,13 @@ impl SaveOptions {
 /// ```no_run
 /// use aranya_certgen::CaCert;
 ///
-/// // Create a new CA
+/// // Create a new CA and save
 /// let ca = CaCert::new("My CA", 365).unwrap();
+/// ca.save("ca", None).unwrap();  // Creates ./ca.crt.pem and ./ca.key.pem
 ///
 /// // Generate a signed certificate
 /// let signed = ca.generate("my-server", 365).unwrap();
+/// signed.save("server", None).unwrap();  // Creates ./server.crt.pem and ./server.key.pem
 /// ```
 pub struct CaCert {
     cert_pem: String,
@@ -83,7 +85,7 @@ impl CaCert {
     /// use aranya_certgen::CaCert;
     ///
     /// let ca = CaCert::new("My Root CA", 365)?;
-    /// ca.save(".", "ca", None)?;  // Creates ./ca.crt.pem and ./ca.key.pem
+    /// ca.save("ca", None)?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn new(cn: &str, days: u32) -> Result<Self, CertGenError> {
@@ -120,7 +122,7 @@ impl CaCert {
     ///
     /// let ca = CaCert::new("My CA", 365)?;
     /// let signed = ca.generate("server", 365)?;
-    /// signed.save(".", "server", None)?;  // Creates ./server.crt.pem and ./server.key.pem
+    /// signed.save("server", None)?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn generate(&self, cn: &str, days: u32) -> Result<SignedCert, CertGenError> {
@@ -135,13 +137,11 @@ impl CaCert {
 
     /// Loads a CA certificate and private key from PEM files.
     ///
-    /// Use this to load an existing CA for signing new certificates.
-    /// Files are loaded from `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
-    ///
     /// # Arguments
     ///
-    /// * `dir` - Directory containing the certificate and key files.
-    /// * `name` - Base name for the files (without extension).
+    /// * `path` - Path prefix for the certificate and key files.
+    ///   - `"ca"` → loads `./ca.crt.pem` and `./ca.key.pem`
+    ///   - `"./certs/ca"` → loads `./certs/ca.crt.pem` and `./certs/ca.key.pem`
     ///
     /// # Errors
     ///
@@ -155,17 +155,17 @@ impl CaCert {
     /// ```no_run
     /// use aranya_certgen::CaCert;
     ///
-    /// // Loads from ./ca.crt.pem and ./ca.key.pem
-    /// let ca = CaCert::load(".", "ca")?;
-    /// let signed = ca.generate("server", 365)?;
+    /// let ca = CaCert::load("ca")?;
+    /// let ca = CaCert::load("./certs/myca")?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn load(dir: impl AsRef<Path>, name: &str) -> Result<Self, CertGenError> {
-        let dir = dir.as_ref();
-        let cert_path = dir.join(format!("{name}.crt.pem"));
-        let key_path = dir.join(format!("{name}.key.pem"));
+    pub fn load(path: &str) -> Result<Self, CertGenError> {
+        let path = Path::new(path);
+        let cert_path = path.with_extension("crt.pem");
+        let key_path = path.with_extension("key.pem");
 
-        let cert_pem = fs::read_to_string(&cert_path).map_err(|e| CertGenError::io(&cert_path, e))?;
+        let cert_pem =
+            fs::read_to_string(&cert_path).map_err(|e| CertGenError::io(&cert_path, e))?;
         let key_pem = fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?;
 
         let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
@@ -177,16 +177,11 @@ impl CaCert {
 
     /// Saves the CA certificate and private key to PEM files.
     ///
-    /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
-    ///
-    /// By default (when `options` is `None`), this function will return an error if:
-    /// - The directory does not exist
-    /// - The files already exist
-    ///
     /// # Arguments
     ///
-    /// * `dir` - Directory to save the files in.
-    /// * `name` - Base name for the files (without extension).
+    /// * `path` - Path prefix for the certificate and key files.
+    ///   - `"ca"` → saves to `./ca.crt.pem` and `./ca.key.pem`
+    ///   - `"./certs/ca"` → saves to `./certs/ca.crt.pem` and `./certs/ca.key.pem`
     /// * `options` - Optional settings for directory creation and file overwriting.
     ///
     /// # Errors
@@ -202,23 +197,13 @@ impl CaCert {
     /// use aranya_certgen::{CaCert, SaveOptions};
     ///
     /// let ca = CaCert::new("My CA", 365)?;
-    ///
-    /// // Save with default options (fails if dir missing or files exist)
-    /// ca.save(".", "ca", None)?;
-    ///
-    /// // Create directory if needed and overwrite existing files
-    /// ca.save("certs", "ca", Some(SaveOptions::default().create_parents().force()))?;
+    /// ca.save("ca", None)?;
+    /// ca.save("./certs/ca", Some(SaveOptions::default().create_parents().force()))?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn save(
-        &self,
-        dir: impl AsRef<Path>,
-        name: &str,
-        options: Option<SaveOptions>,
-    ) -> Result<(), CertGenError> {
+    pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
         save_cert_and_key(
-            dir,
-            name,
+            path,
             &self.cert_pem,
             &self.issuer.key().serialize_pem(),
             options,
@@ -256,7 +241,7 @@ impl std::fmt::Debug for CaCert {
 ///
 /// let ca = CaCert::new("My CA", 365).unwrap();
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save(".", "server", None).unwrap();
+/// signed.save("server", None).unwrap();  // Creates ./server.crt.pem and ./server.key.pem
 /// ```
 pub struct SignedCert {
     cert_pem: String,
@@ -266,16 +251,11 @@ pub struct SignedCert {
 impl SignedCert {
     /// Saves the certificate and private key to PEM files.
     ///
-    /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
-    ///
-    /// By default (when `options` is `None`), this function will return an error if:
-    /// - The directory does not exist
-    /// - The files already exist
-    ///
     /// # Arguments
     ///
-    /// * `dir` - Directory to save the files in.
-    /// * `name` - Base name for the files (without extension).
+    /// * `path` - Path prefix for the certificate and key files.
+    ///   - `"server"` → saves to `./server.crt.pem` and `./server.key.pem`
+    ///   - `"./certs/server"` → saves to `./certs/server.crt.pem` and `./certs/server.key.pem`
     /// * `options` - Optional settings for directory creation and file overwriting.
     ///
     /// # Errors
@@ -292,21 +272,12 @@ impl SignedCert {
     ///
     /// let ca = CaCert::new("My CA", 365)?;
     /// let signed = ca.generate("server", 365)?;
-    ///
-    /// // Save with default options (fails if dir missing or files exist)
-    /// signed.save(".", "server", None)?;
-    ///
-    /// // Create directory if needed and overwrite existing files
-    /// signed.save("certs", "server", Some(SaveOptions::default().create_parents().force()))?;
+    /// signed.save("server", None)?;
+    /// signed.save("./certs/server", Some(SaveOptions::default().create_parents().force()))?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn save(
-        &self,
-        dir: impl AsRef<Path>,
-        name: &str,
-        options: Option<SaveOptions>,
-    ) -> Result<(), CertGenError> {
-        save_cert_and_key(dir, name, &self.cert_pem, &self.key.serialize_pem(), options)
+    pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
+        save_cert_and_key(path, &self.cert_pem, &self.key.serialize_pem(), options)
     }
 
     /// Returns the certificate as a PEM-encoded string.
@@ -333,24 +304,27 @@ impl std::fmt::Debug for SignedCert {
 // ============================================================================
 
 /// Saves a certificate and private key to PEM files.
+///
+/// The path is used as a prefix: `path.crt.pem` and `path.key.pem`.
 fn save_cert_and_key(
-    dir: impl AsRef<Path>,
-    name: &str,
+    path: impl AsRef<Path>,
     cert_pem: &str,
     key_pem: &str,
     options: Option<SaveOptions>,
 ) -> Result<(), CertGenError> {
     let options = options.unwrap_or_default();
-    let dir = dir.as_ref();
-    let cert_path = dir.join(format!("{name}.crt.pem"));
-    let key_path = dir.join(format!("{name}.key.pem"));
+    let path = path.as_ref();
+    let cert_path = path.with_extension("crt.pem");
+    let key_path = path.with_extension("key.pem");
 
-    // Check/create directory
-    if !dir.exists() {
-        if options.create_parents {
-            fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
-        } else {
-            return Err(CertGenError::DirNotFound(dir.display().to_string()));
+    // Check/create parent directory
+    if let Some(dir) = path.parent() {
+        if !dir.as_os_str().is_empty() && !dir.exists() {
+            if options.create_parents {
+                fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
+            } else {
+                return Err(CertGenError::DirNotFound(dir.display().to_string()));
+            }
         }
     }
 

@@ -8,9 +8,10 @@ fn test_ca_cert_roundtrip() {
     let ca = CaCert::new("Test CA", 365).expect("should create CA");
 
     let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ca");
 
-    ca.save(dir.path(), "ca", None).expect("should save");
-    let loaded = CaCert::load(dir.path(), "ca").expect("should load");
+    ca.save(path.to_str().unwrap(), None).expect("should save");
+    let loaded = CaCert::load(path.to_str().unwrap()).expect("should load");
 
     assert_eq!(ca.cert_pem(), loaded.cert_pem());
 
@@ -28,8 +29,10 @@ fn test_signed_cert_save() {
         .expect("should generate cert");
 
     let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("server");
 
-    cert.save(dir.path(), "server", None).expect("should save");
+    cert.save(path.to_str().unwrap(), None)
+        .expect("should save");
 
     // Verify the files are named correctly
     assert!(dir.path().join("server.crt.pem").exists());
@@ -79,9 +82,9 @@ fn test_save_fails_if_dir_not_exists() {
     let ca = CaCert::new("Test CA", 365).expect("should create CA");
 
     let dir = tempfile::tempdir().unwrap();
-    let nonexistent = dir.path().join("nonexistent");
+    let path = dir.path().join("nonexistent").join("ca");
 
-    let result = ca.save(&nonexistent, "ca", None);
+    let result = ca.save(path.to_str().unwrap(), None);
 
     assert!(
         matches!(result, Err(CertGenError::DirNotFound(_))),
@@ -95,13 +98,14 @@ fn test_save_fails_if_file_exists() {
     let ca = CaCert::new("Test CA", 365).expect("should create CA");
 
     let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ca");
 
     // Save once successfully
-    ca.save(dir.path(), "ca", None)
+    ca.save(path.to_str().unwrap(), None)
         .expect("first save should succeed");
 
     // Second save should fail because files exist
-    let result = ca.save(dir.path(), "ca", None);
+    let result = ca.save(path.to_str().unwrap(), None);
 
     assert!(
         matches!(result, Err(CertGenError::FileExists(_))),
@@ -115,14 +119,17 @@ fn test_save_with_create_parents() {
     let ca = CaCert::new("Test CA", 365).expect("should create CA");
 
     let dir = tempfile::tempdir().unwrap();
-    let nested = dir.path().join("a").join("b").join("c");
+    let path = dir.path().join("a").join("b").join("c").join("ca");
 
     // Should succeed with create_parents option
-    ca.save(&nested, "ca", Some(SaveOptions::default().create_parents()))
-        .expect("save with create_parents should succeed");
+    ca.save(
+        path.to_str().unwrap(),
+        Some(SaveOptions::default().create_parents()),
+    )
+    .expect("save with create_parents should succeed");
 
-    assert!(nested.join("ca.crt.pem").exists());
-    assert!(nested.join("ca.key.pem").exists());
+    assert!(dir.path().join("a/b/c/ca.crt.pem").exists());
+    assert!(dir.path().join("a/b/c/ca.key.pem").exists());
 }
 
 #[test]
@@ -130,12 +137,13 @@ fn test_save_with_force() {
     let ca = CaCert::new("Test CA", 365).expect("should create CA");
 
     let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ca");
 
     // Save once
-    ca.save(dir.path(), "ca", None)
+    ca.save(path.to_str().unwrap(), None)
         .expect("first save should succeed");
 
     // Second save with force should succeed
-    ca.save(dir.path(), "ca", Some(SaveOptions::default().force()))
+    ca.save(path.to_str().unwrap(), Some(SaveOptions::default().force()))
         .expect("save with force should succeed");
 }

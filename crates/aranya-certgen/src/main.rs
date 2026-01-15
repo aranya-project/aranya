@@ -30,10 +30,6 @@ struct CliArgs {
 /// Common output arguments for certificate generation.
 #[derive(Args, Debug)]
 struct OutputArgs {
-    /// Directory to save the certificate and key files.
-    #[arg(long, default_value = ".")]
-    dir: PathBuf,
-
     /// Common Name (CN) for the certificate.
     #[arg(long)]
     cn: String,
@@ -74,69 +70,61 @@ enum Commands {
     ///
     /// Generates a self-signed CA certificate and P-256 ECDSA private key that
     /// can be used to sign other certificates. Files are saved as
-    /// `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
+    /// `{output}.crt.pem` and `{output}.key.pem`.
     Ca {
         /// Output file arguments.
         #[command(flatten)]
-        output: OutputArgs,
+        args: OutputArgs,
 
-        /// Base name for the output files (creates {name}.crt.pem and {name}.key.pem).
-        #[arg(long, default_value = "ca")]
-        name: String,
+        /// Output path prefix (creates {output}.crt.pem and {output}.key.pem).
+        #[arg(long, short, default_value = "ca")]
+        output: PathBuf,
     },
 
     /// Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
     ///
     /// Generates a certificate and P-256 ECDSA private key, signed by the specified CA.
-    /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
+    /// Files are saved as `{output}.crt.pem` and `{output}.key.pem`.
     Signed {
         /// Output file arguments.
         #[command(flatten)]
-        output: OutputArgs,
+        args: OutputArgs,
 
-        /// Base name for the output files (creates {name}.crt.pem and {name}.key.pem).
-        #[arg(long, default_value = "cert")]
-        name: String,
+        /// Output path prefix (creates {output}.crt.pem and {output}.key.pem).
+        #[arg(long, short, default_value = "cert")]
+        output: PathBuf,
 
-        /// Directory containing the CA certificate and key files.
-        #[arg(long, default_value = ".")]
-        ca_dir: PathBuf,
-
-        /// Base name of the CA files (loads {ca-name}.crt.pem and {ca-name}.key.pem).
+        /// Path prefix for the CA files (loads {ca}.crt.pem and {ca}.key.pem).
         #[arg(long, default_value = "ca")]
-        ca_name: String,
+        ca: PathBuf,
     },
 }
 
 fn main() -> Result<(), CertGenError> {
-    let args = CliArgs::parse();
+    let cli = CliArgs::parse();
 
-    match args.command {
-        Commands::Ca { output, name } => {
+    match cli.command {
+        Commands::Ca { args, output } => {
             println!("Generating root CA certificate...");
-            let ca = CaCert::new(&output.cn, output.days)?;
+            let ca = CaCert::new(&args.cn, args.days)?;
 
-            let save_opts = output.save_options();
-            ca.save(&output.dir, &name, save_opts)?;
+            let output_str = output.to_str().expect("invalid path");
+            ca.save(output_str, args.save_options())?;
 
-            let cert_path = output.dir.join(format!("{name}.crt.pem"));
+            let cert_path = output.with_extension("crt.pem");
             println!("  Certificate: {}", cert_path.display());
         }
-        Commands::Signed {
-            output,
-            name,
-            ca_dir,
-            ca_name,
-        } => {
-            let ca = CaCert::load(&ca_dir, &ca_name)?;
+        Commands::Signed { args, output, ca } => {
+            let ca_path = ca.to_str().expect("invalid CA path");
+            let ca = CaCert::load(ca_path)?;
 
-            println!("Generating certificate '{}'...", output.cn);
-            let signed = ca.generate(&output.cn, output.days)?;
+            println!("Generating certificate '{}'...", args.cn);
+            let signed = ca.generate(&args.cn, args.days)?;
 
-            let save_opts = output.save_options();
-            signed.save(&output.dir, &name, save_opts)?;
+            let output_str = output.to_str().expect("invalid path");
+            signed.save(output_str, args.save_options())?;
 
-            let cert_path = output.dir.join(format!("{name}.crt.pem"));
+            let cert_path = output.with_extension("crt.pem");
             println!("  Certificate: {}", cert_path.display());
         }
     }
