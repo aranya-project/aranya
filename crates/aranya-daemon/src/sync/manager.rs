@@ -28,9 +28,9 @@
 //!
 //! [`SyncHandle`]: super::SyncHandle
 
+use std::collections::HashMap;
 #[cfg(feature = "preview")]
 use std::time::Duration;
-use std::{collections::HashMap, fmt};
 
 use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
@@ -59,11 +59,8 @@ use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
 /// Receives added/removed peers from [`SyncHandle`] via mpsc channels.
 ///
 /// [`SyncHandle`]: super::SyncHandle
-#[derive_where(Debug)]
-pub(crate) struct SyncManager<ST, EN, SP, EF>
-where
-    ST: fmt::Debug,
-{
+#[derive_where(Debug; ST)]
+pub(crate) struct SyncManager<ST, EN, SP, EF> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(super) client: ClientWithState<EN, SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
@@ -85,10 +82,7 @@ where
     pub(super) hello_tasks: JoinSet<()>,
 }
 
-impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
-where
-    ST: fmt::Debug,
-{
+impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF> {
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
@@ -130,7 +124,7 @@ where
 
 impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
 where
-    ST: SyncState<EN, SP, EF> + fmt::Debug,
+    ST: SyncState<EN, SP, EF>,
     EN: Engine,
     SP: StorageProvider,
 {
@@ -160,7 +154,7 @@ where
 
 impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
 where
-    ST: SyncState<EN, SP, EF> + fmt::Debug,
+    ST: SyncState<EN, SP, EF>,
     EN: Engine,
     SP: StorageProvider,
     EF: Send + Sync + 'static + TryFrom<EN::Effect>,
