@@ -121,7 +121,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: SyncManager<QuicSyncClientState, EN, SP, EF>,
+    manager: SyncManager<QuicSyncClientState, EN, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -169,7 +169,7 @@ impl Daemon {
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, syncer, handle, recv_effects, local_addr) =
+            let (client, sync_server, manager, syncer, recv_effects, local_addr) =
                 Self::setup_aranya(
                     &cfg,
                     eng.clone(),
@@ -219,7 +219,7 @@ impl Daemon {
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
-                handle,
+                syncer,
                 recv_effects,
                 invalid: invalid_graphs,
                 #[cfg(feature = "afc")]
@@ -230,7 +230,7 @@ impl Daemon {
             })?;
             Ok(Self {
                 sync_server,
-                syncer,
+                manager,
                 api,
                 span,
             })
@@ -250,7 +250,7 @@ impl Daemon {
                 .instrument(info_span!("sync-server")),
         );
         set.spawn({
-            self.syncer
+            self.manager
                 .run(waiter.notifier())
                 .instrument(info_span!("syncer"))
         });

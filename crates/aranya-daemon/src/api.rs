@@ -91,7 +91,7 @@ pub(crate) struct DaemonApiServerArgs {
     pub(crate) uds_path: PathBuf,
     pub(crate) sk: ApiKey<CS>,
     pub(crate) pk: PublicKeys<CS>,
-    pub(crate) handle: SyncHandle,
+    pub(crate) syncer: SyncHandle,
     pub(crate) recv_effects: mpsc::Receiver<(GraphId, Vec<EF>)>,
     pub(crate) invalid: InvalidGraphs,
     #[cfg(feature = "afc")]
@@ -111,7 +111,7 @@ impl DaemonApiServer {
             uds_path,
             sk,
             pk,
-            handle,
+            syncer,
             recv_effects,
             invalid,
             #[cfg(feature = "afc")]
@@ -135,7 +135,7 @@ impl DaemonApiServer {
             #[cfg(feature = "preview")]
             client: client.clone(),
             #[cfg(feature = "preview")]
-            handle: handle.clone(),
+            syncer: syncer.clone(),
             #[cfg(feature = "preview")]
             prev_head_addresses: Arc::default(),
         };
@@ -143,7 +143,7 @@ impl DaemonApiServer {
             client,
             local_addr,
             pk: std::sync::Mutex::new(pk),
-            handle,
+            syncer,
             effect_handler,
             invalid,
             #[cfg(feature = "afc")]
@@ -225,7 +225,7 @@ struct EffectHandler {
     #[cfg(feature = "preview")]
     client: Client,
     #[cfg(feature = "preview")]
-    handle: SyncHandle,
+    syncer: SyncHandle,
     /// Stores the previous head address for each graph to detect changes
     #[cfg(feature = "preview")]
     prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
@@ -336,9 +336,9 @@ impl EffectHandler {
     #[instrument(skip(self))]
     async fn broadcast_hello_notifications(&self, graph_id: GraphId, head: Address) {
         // TODO: Don't fire off a spawn here.
-        let handle = self.handle.clone();
+        let syncer = self.syncer.clone();
         drop(tokio::spawn(async move {
-            if let Err(e) = handle.broadcast_hello(graph_id, head).await {
+            if let Err(e) = syncer.broadcast_hello(graph_id, head).await {
                 warn!(
                     error = %e,
                     ?graph_id,
@@ -362,7 +362,7 @@ struct ApiInner {
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Handle to talk with the syncer.
-    handle: SyncHandle,
+    syncer: SyncHandle,
     /// Handles graph effects from the syncer.
     #[derive_where(skip(Debug))]
     effect_handler: EffectHandler,
@@ -467,7 +467,7 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
-        self.handle.add_peer(peer, cfg).await?;
+        self.syncer.add_peer(peer, cfg).await?;
         Ok(())
     }
 
@@ -481,7 +481,7 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
-        self.handle.sync_now(peer, cfg).await?;
+        self.syncer.sync_now(peer, cfg).await?;
         Ok(())
     }
 
@@ -498,7 +498,7 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
-        self.handle
+        self.syncer
             .sync_hello_subscribe(peer, graph_change_delay, duration, schedule_delay)
             .await?;
         Ok(())
@@ -514,7 +514,7 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
-        self.handle.sync_hello_unsubscribe(peer).await?;
+        self.syncer.sync_hello_unsubscribe(peer).await?;
         Ok(())
     }
 
@@ -527,7 +527,7 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
-        self.handle
+        self.syncer
             .remove_peer(peer)
             .await
             .context("unable to remove sync peer")?;
