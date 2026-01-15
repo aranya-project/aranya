@@ -379,14 +379,6 @@ impl std::fmt::Debug for CertGen {
     }
 }
 
-impl PartialEq for CertGen {
-    fn eq(&self, other: &Self) -> bool {
-        self.cert_pem == other.cert_pem && self.key.serialize_pem() == other.key.serialize_pem()
-    }
-}
-
-impl Eq for CertGen {}
-
 // ============================================================================
 // Internal helper functions
 // ============================================================================
@@ -482,7 +474,7 @@ mod tests {
         ca.save(dir.path(), "ca").expect("should save");
         let loaded = CertGen::load(dir.path(), "ca").expect("should load");
 
-        assert_eq!(ca, loaded);
+        assert_eq!(ca.cert_pem(), loaded.cert_pem());
 
         // Verify the files are named correctly
         assert!(dir.path().join("ca.crt.pem").exists());
@@ -506,7 +498,7 @@ mod tests {
         cert.save(dir.path(), "server").expect("should save");
         let loaded = CertGen::load(dir.path(), "server").expect("should load");
 
-        assert_eq!(cert, loaded);
+        assert_eq!(cert.cert_pem(), loaded.cert_pem());
 
         // Verify the files are named correctly
         assert!(dir.path().join("server.crt.pem").exists());
@@ -528,7 +520,7 @@ mod tests {
             .expect("should generate cert 2");
 
         // Each generated cert should be unique
-        assert_ne!(cert1, cert2);
+        assert_ne!(cert1.cert_pem(), cert2.cert_pem());
     }
 
     #[test]
