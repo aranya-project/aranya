@@ -144,9 +144,6 @@ impl SubjectAltNames {
     }
 }
 
-/// A PEM-encoded string.
-type PemString = String;
-
 /// Certificate generator for creating CA and signed certificates.
 ///
 /// `CertGen` holds a Certificate Authority (CA) and can generate certificates
@@ -167,7 +164,7 @@ type PemString = String;
 /// let signed = ca.generate("my-server", 365, &sans).unwrap();
 /// ```
 pub struct CertGen {
-    cert_pem: PemString,
+    cert_pem: String,
     key: KeyPair,
     issuer: Issuer<'static, KeyPair>,
 }
