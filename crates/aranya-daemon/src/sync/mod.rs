@@ -10,10 +10,11 @@ mod types;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
 
+#[cfg(feature = "preview")]
+pub(crate) use self::hello::HelloSubscriptions;
 pub(super) use self::{handle::Callback, types::SyncResponse};
 pub(crate) use self::{
     handle::SyncHandle,
-    hello::HelloSubscriptions,
     manager::SyncManager,
     transport::{quic, SyncState},
     types::SyncPeer,
