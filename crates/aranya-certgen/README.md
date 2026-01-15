@@ -7,7 +7,7 @@ All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA 
 ## Building
 
 ```bash
-cargo make build-certgen
+cargo build --release -p aranya-certgen
 ```
 
 The binary will be at `target/release/aranya-certgen`.
