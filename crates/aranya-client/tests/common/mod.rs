@@ -89,12 +89,12 @@ impl DevicesCtx {
 
         // Make sure it sees the configuration change.
         admin_team
-            .sync_now(self.owner.aranya_local_addr().await?, None)
+            .sync_now(self.owner.aranya_local_addr().await?, None, None)
             .await?;
 
         // Make sure it sees the configuration change.
         operator_team
-            .sync_now(self.admin.aranya_local_addr().await?, None)
+            .sync_now(self.admin.aranya_local_addr().await?, None, None)
             .await?;
 
         // Add member A as a new device.
@@ -111,10 +111,10 @@ impl DevicesCtx {
 
         // Make sure all see the configuration change.
         let admin_addr = self.admin.aranya_local_addr().await?;
-        owner_team.sync_now(admin_addr, None).await?;
-        operator_team.sync_now(admin_addr, None).await?;
-        membera_team.sync_now(admin_addr, None).await?;
-        memberb_team.sync_now(admin_addr, None).await?;
+        owner_team.sync_now(admin_addr, None, None).await?;
+        operator_team.sync_now(admin_addr, None, None).await?;
+        membera_team.sync_now(admin_addr, None, None).await?;
+        memberb_team.sync_now(admin_addr, None, None).await?;
 
         Ok(())
     }

@@ -1,5 +1,4 @@
-#[cfg(feature = "preview")]
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
@@ -86,11 +85,24 @@ impl Team<'_> {
     ///
     /// If `config` is `None`, default values (including those from the daemon) will
     /// be used.
+    ///
+    /// If `timeout` is `None`, the defaut timeout (10 seconds) will
+    /// be used.
     #[instrument(skip(self))]
-    pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+    pub async fn sync_now(
+        &self,
+        addr: Addr,
+        cfg: Option<SyncPeerConfig>,
+        timeout: Option<Duration>,
+    ) -> Result<()> {
+        let mut req_ctx = context::current();
+        if let Some(t) = timeout {
+            req_ctx.deadline = Instant::now() + t;
+        }
+
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
+            .sync_now(req_ctx, addr, self.id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

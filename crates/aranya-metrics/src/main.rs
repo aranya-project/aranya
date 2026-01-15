@@ -337,14 +337,14 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     owner
         .add_device(ctx.membera.pk.clone(), Some(member_role.id))
         .await?;
-    membera.sync_now(owner_addr, None).await?;
+    membera.sync_now(owner_addr, None, None).await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     owner
         .add_device(ctx.memberb.pk.clone(), Some(member_role.id))
         .await?;
-    memberb.sync_now(owner_addr, None).await?;
+    memberb.sync_now(owner_addr, None, None).await?;
 
     // fact database queries
     let devices = membera.devices().await?;
@@ -369,8 +369,8 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .assign_label(label3, op)
         .await?;
 
-    membera.sync_now(owner_addr, None).await?;
-    memberb.sync_now(owner_addr, None).await?;
+    membera.sync_now(owner_addr, None, None).await?;
+    memberb.sync_now(owner_addr, None, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");
