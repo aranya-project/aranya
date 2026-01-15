@@ -42,6 +42,7 @@ pub(crate) enum Error {
     ReceiveSyncResponse(Box<Error>),
 
     /// Peer sent an empty response.
+    #[cfg(feature = "preview")]
     #[error("peer sent empty response")]
     EmptyResponse,
 
