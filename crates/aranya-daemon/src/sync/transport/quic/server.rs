@@ -55,7 +55,7 @@ pub(crate) struct QuicServer<EN, SP> {
     /// Interface to trigger sync operations
     handle: SyncHandle,
     /// The address we're currently serving on.
-    local_addr: Addr,
+    local_addr: SocketAddr,
 }
 
 impl<EN, SP> QuicServer<EN, SP>
@@ -67,6 +67,10 @@ where
     #[cfg(feature = "preview")]
     pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         Arc::clone(self.client.hello_subscriptions())
+    }
+
+    pub(crate) fn local_addr(&self) -> SocketAddr {
+        self.local_addr
     }
 
     /// Creates a new `QuicServer`.
@@ -87,7 +91,6 @@ where
         SyncHandle,
         SharedConnectionMap,
         mpsc::Receiver<Callback>,
-        SocketAddr,
     )> {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
@@ -131,10 +134,10 @@ where
             conns: conns.clone(),
             conn_rx: server_conn_rx,
             handle: sync_peers.clone(),
-            local_addr: local_addr.into(),
+            local_addr,
         };
 
-        Ok((server_instance, sync_peers, conns, syncer_recv, local_addr))
+        Ok((server_instance, sync_peers, conns, syncer_recv))
     }
 
     /// Begins accepting incoming requests.
@@ -201,7 +204,7 @@ where
         let conn_source = peer.addr;
         let client = self.client.clone();
         let sync_peers = self.handle.clone();
-        let local_addr = self.local_addr;
+        let local_addr = self.local_addr.into();
         async move {
             // Accept incoming streams.
             while let Some(stream) = acceptor

@@ -80,7 +80,6 @@ struct TestDevice {
 impl TestDevice {
     pub fn new(
         server: TestServer,
-        sync_local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
         syncer: TestSyncer,
@@ -88,6 +87,7 @@ impl TestDevice {
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
+        let sync_local_addr = server.local_addr().into();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
@@ -211,7 +211,7 @@ impl TestCtx {
 
         let caches = PeerCacheMap::new(Mutex::new(BTreeMap::new()));
 
-        let (syncer, server, local_addr, pk, psk_store, effects_recv) = {
+        let (syncer, server, pk, psk_store, effects_recv) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -254,7 +254,7 @@ impl TestCtx {
                 #[cfg(feature = "preview")]
                 hello_subscriptions.clone(),
             );
-            let (server, _sync_peers, conn_map, syncer_recv, local_addr): (TestServer, _, _, _, _) =
+            let (server, _sync_peers, conn_map, syncer_recv): (TestServer, _, _, _) =
                 TestServer::new(
                     client_with_state_for_server,
                     &any_local_addr,
@@ -274,16 +274,16 @@ impl TestCtx {
                 send_effects,
                 InvalidGraphs::default(),
                 psk_store.clone(),
-                (local_addr.into(), any_local_addr),
+                (server.local_addr().into(), any_local_addr),
                 syncer_recv,
                 conn_map,
             )?;
 
-            (syncer, server, local_addr, pk, psk_store, effects_recv)
+            (syncer, server, pk, psk_store, effects_recv)
         };
 
         Ok((
-            TestDevice::new(server, local_addr.into(), pk, id, syncer, effects_recv)?,
+            TestDevice::new(server, pk, id, syncer, effects_recv)?,
             psk_store,
         ))
     }

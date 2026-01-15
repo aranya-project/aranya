@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -169,23 +169,22 @@ impl Daemon {
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, manager, syncer, recv_effects, local_addr) =
-                Self::setup_aranya(
-                    &cfg,
-                    eng.clone(),
-                    aranya_store
-                        .try_clone()
-                        .context("unable to clone keystore")?,
-                    &pks,
-                    SyncParams {
-                        psk_store: Arc::clone(&psk_store),
-                        server_addr: qs_config.addr,
-                        caches: Arc::clone(&caches),
-                    },
-                    qs_client_addr,
-                    invalid_graphs.clone(),
-                )
-                .await?;
+            let (client, sync_server, manager, syncer, recv_effects) = Self::setup_aranya(
+                &cfg,
+                eng.clone(),
+                aranya_store
+                    .try_clone()
+                    .context("unable to clone keystore")?,
+                &pks,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    server_addr: qs_config.addr,
+                    caches: Arc::clone(&caches),
+                },
+                qs_client_addr,
+                invalid_graphs.clone(),
+            )
+            .await?;
 
             #[cfg(feature = "afc")]
             let afc = {
@@ -215,7 +214,7 @@ impl Daemon {
 
             let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
-                local_addr,
+                local_addr: sync_server.local_addr(),
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
@@ -324,7 +323,6 @@ impl Daemon {
         SyncManager<QuicSyncClientState, EN, SP, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
-        SocketAddr,
     )> {
         let device_id = pk.ident_pk.id()?;
 
@@ -351,7 +349,7 @@ impl Daemon {
             #[cfg(feature = "preview")]
             Arc::clone(&hello_subscriptions),
         );
-        let (server, peers, conns, syncer_recv, server_addr) = SyncServer::new(
+        let (server, peers, conns, syncer_recv) = SyncServer::new(
             client_with_state_for_server,
             &server_addr,
             Arc::clone(&psk_store),
@@ -371,12 +369,12 @@ impl Daemon {
             send_effects,
             invalid_graphs,
             psk_store,
-            (server_addr.into(), client_addr),
+            (server.local_addr().into(), client_addr),
             syncer_recv,
             conns,
         )?;
 
-        Ok((client, server, syncer, peers, recv_effects, server_addr))
+        Ok((client, server, syncer, peers, recv_effects))
     }
 
     /// Loads the crypto engine.
