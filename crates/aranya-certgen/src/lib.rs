@@ -618,4 +618,70 @@ mod tests {
             .verify_signature(Some(ca_cert.public_key()))
             .expect("certificate should be signed by CA");
     }
+
+    #[test]
+    fn test_save_fails_if_dir_not_exists() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
+
+        let dir = tempfile::tempdir().unwrap();
+        let nonexistent = dir.path().join("nonexistent");
+
+        let result = ca.save(&nonexistent, "ca", SaveOptions::new());
+
+        assert!(
+            matches!(result, Err(CertGenError::DirNotFound(_))),
+            "expected DirNotFound error, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_save_fails_if_file_exists() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
+
+        let dir = tempfile::tempdir().unwrap();
+
+        // Save once successfully
+        ca.save(dir.path(), "ca", SaveOptions::new())
+            .expect("first save should succeed");
+
+        // Second save should fail because files exist
+        let result = ca.save(dir.path(), "ca", SaveOptions::new());
+
+        assert!(
+            matches!(result, Err(CertGenError::FileExists(_))),
+            "expected FileExists error, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_save_with_create_parents() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
+
+        let dir = tempfile::tempdir().unwrap();
+        let nested = dir.path().join("a").join("b").join("c");
+
+        // Should succeed with create_parents option
+        ca.save(&nested, "ca", SaveOptions::new().create_parents())
+            .expect("save with create_parents should succeed");
+
+        assert!(nested.join("ca.crt.pem").exists());
+        assert!(nested.join("ca.key.pem").exists());
+    }
+
+    #[test]
+    fn test_save_with_force() {
+        let ca = CertGen::ca("Test CA", 365).expect("should create CA");
+
+        let dir = tempfile::tempdir().unwrap();
+
+        // Save once
+        ca.save(dir.path(), "ca", SaveOptions::new())
+            .expect("first save should succeed");
+
+        // Second save with force should succeed
+        ca.save(dir.path(), "ca", SaveOptions::new().force())
+            .expect("save with force should succeed");
+    }
 }
