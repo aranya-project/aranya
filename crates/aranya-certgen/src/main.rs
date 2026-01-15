@@ -51,6 +51,22 @@ struct OutputArgs {
     force: bool,
 }
 
+impl OutputArgs {
+    fn save_options(&self) -> Option<SaveOptions> {
+        if !self.create_parents && !self.force {
+            return None;
+        }
+        let mut opts = SaveOptions::default();
+        if self.create_parents {
+            opts = opts.create_parents();
+        }
+        if self.force {
+            opts = opts.force();
+        }
+        Some(opts)
+    }
+}
+
 /// Available subcommands for certificate generation.
 #[derive(Subcommand, Debug)]
 enum Commands {
@@ -118,20 +134,6 @@ impl From<CliSubjectAltNames> for SubjectAltNames {
     }
 }
 
-fn make_save_options(create_parents: bool, force: bool) -> Option<SaveOptions> {
-    if !create_parents && !force {
-        return None;
-    }
-    let mut opts = SaveOptions::default();
-    if create_parents {
-        opts = opts.create_parents();
-    }
-    if force {
-        opts = opts.force();
-    }
-    Some(opts)
-}
-
 fn main() -> Result<(), CertGenError> {
     let args = CliArgs::parse();
 
@@ -140,7 +142,7 @@ fn main() -> Result<(), CertGenError> {
             println!("Generating root CA certificate...");
             let cert_gen = CertGen::ca(&output.cn, output.days)?;
 
-            let save_opts = make_save_options(output.create_parents, output.force);
+            let save_opts = output.save_options();
             cert_gen.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
@@ -165,7 +167,7 @@ fn main() -> Result<(), CertGenError> {
             println!("Generating certificate '{}'...", output.cn);
             let signed = ca.generate(&output.cn, output.days, &sans.clone().into())?;
 
-            let save_opts = make_save_options(output.create_parents, output.force);
+            let save_opts = output.save_options();
             signed.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
