@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use aranya_certgen::{CertGen, CertGenError, SaveOptions};
+use aranya_certgen::{CaCert, CertGenError, SaveOptions};
 use clap::{Args, Parser, Subcommand};
 
 /// Command-line arguments for the certgen tool.
@@ -114,10 +114,10 @@ fn main() -> Result<(), CertGenError> {
     match args.command {
         Commands::Ca { output, name } => {
             println!("Generating root CA certificate...");
-            let cert_gen = CertGen::ca(&output.cn, output.days)?;
+            let ca = CaCert::new(&output.cn, output.days)?;
 
             let save_opts = output.save_options();
-            cert_gen.save(&output.dir, &name, save_opts)?;
+            ca.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
             println!("  Certificate: {}", cert_path.display());
@@ -128,7 +128,7 @@ fn main() -> Result<(), CertGenError> {
             ca_dir,
             ca_name,
         } => {
-            let ca = CertGen::load(&ca_dir, &ca_name)?;
+            let ca = CaCert::load(&ca_dir, &ca_name)?;
 
             println!("Generating certificate '{}'...", output.cn);
             let signed = ca.generate(&output.cn, output.days)?;
