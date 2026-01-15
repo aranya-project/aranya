@@ -5,13 +5,11 @@
 //! # Usage
 //!
 //! ```bash
-//! # Create a root CA with P-256 ECDSA key
-//! aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My CA"
+//! # Create a root CA with P-256 ECDSA key (creates ./ca.crt.pem and ./ca.key.pem)
+//! aranya-certgen ca --cn "My CA"
 //!
-//! # Create a signed certificate with P-256 ECDSA key
-//! aranya-certgen signed --ca-cert ca.pem --ca-key ca.key \
-//!     --cert server.pem --key server.key \
-//!     --cn server --dns example.com --ip 192.168.1.10
+//! # Create a signed certificate with P-256 ECDSA key (creates ./cert.crt.pem and ./cert.key.pem)
+//! aranya-certgen signed --cn server --dns example.com --ip 192.168.1.10
 //! ```
 
 use std::{net::IpAddr, path::PathBuf};
@@ -29,64 +27,65 @@ struct CliArgs {
     command: Commands,
 }
 
+/// Common output arguments for certificate generation.
+#[derive(Args, Debug)]
+struct OutputArgs {
+    /// Directory to save the certificate and key files.
+    #[arg(long, default_value = ".")]
+    dir: PathBuf,
+
+    /// Common Name (CN) for the certificate.
+    #[arg(long)]
+    cn: String,
+
+    /// Validity period in days from today.
+    #[arg(long = "days", default_value_t = 365)]
+    days: u32,
+}
+
 /// Available subcommands for certificate generation.
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
     ///
     /// Generates a self-signed CA certificate and P-256 ECDSA private key that
-    /// can be used to sign other certificates.
+    /// can be used to sign other certificates. Files are saved as
+    /// `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
     Ca {
-        /// Path for the CA certificate file (PEM format).
-        #[arg(long)]
-        cert: PathBuf,
+        /// Output file arguments.
+        #[command(flatten)]
+        output: OutputArgs,
 
-        /// Path for the CA P-256 ECDSA private key file (PEM format).
-        #[arg(long)]
-        key: PathBuf,
-
-        /// Common Name (CN) for the root CA.
-        #[arg(long, default_value = "My Root CA")]
-        ca_name: String,
-
-        /// Validity period in days from today.
-        #[arg(long = "days", default_value_t = 365)]
-        days: u32,
+        /// Base name for the output files (creates {name}.crt.pem and {name}.key.pem).
+        #[arg(long, default_value = "ca")]
+        name: String,
     },
 
     /// Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
     ///
     /// Generates a certificate and P-256 ECDSA private key, signed by the specified CA.
     /// The certificate can include Subject Alternative Names for DNS hostnames
-    /// and IP addresses.
+    /// and IP addresses. Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
     Signed {
-        /// Path for the output certificate file (PEM format).
-        #[arg(long)]
-        cert: PathBuf,
+        /// Output file arguments.
+        #[command(flatten)]
+        output: OutputArgs,
 
-        /// Path for the output P-256 ECDSA private key file (PEM format).
-        #[arg(long)]
-        key: PathBuf,
+        /// Base name for the output files (creates {name}.crt.pem and {name}.key.pem).
+        #[arg(long, default_value = "cert")]
+        name: String,
 
-        /// Path to the CA certificate file used for signing (PEM format).
-        #[arg(long)]
-        ca_cert: PathBuf,
+        /// Directory containing the CA certificate and key files.
+        #[arg(long, default_value = ".")]
+        ca_dir: PathBuf,
 
-        /// Path to the CA P-256 ECDSA private key file used for signing (PEM format).
-        #[arg(long)]
-        ca_key: PathBuf,
+        /// Base name of the CA files (loads {ca-name}.crt.pem and {ca-name}.key.pem).
+        #[arg(long, default_value = "ca")]
+        ca_name: String,
 
         /// Subject Alternative Names (DNS and IP).
         #[command(flatten)]
         sans: CliSubjectAltNames,
-
-        /// Common Name (CN) for the certificate.
-        #[arg(long)]
-        cn: String,
-
-        /// Validity period in days from today.
-        #[arg(long = "days", default_value_t = 365)]
-        days: u32,
     },
 }
 
@@ -115,43 +114,40 @@ fn main() -> Result<(), CertGenError> {
     let args = CliArgs::parse();
 
     match args.command {
-        Commands::Ca {
-            cert,
-            key,
-            ca_name,
-            days,
-        } => {
+        Commands::Ca { output, name } => {
             println!("Generating root CA certificate...");
-            let cert_gen = CertGen::ca(&ca_name, days)?;
-            cert_gen.save(&cert, &key)?;
+            let cert_gen = CertGen::ca(&output.cn, output.days)?;
+            cert_gen.save(&output.dir, &name)?;
 
-            println!("  Root CA certificate: {}", cert.display());
-            println!("  Root CA private key: {}", key.display());
+            let cert_path = output.dir.join(format!("{name}.crt.pem"));
+            let key_path = output.dir.join(format!("{name}.key.pem"));
+            println!("  Root CA certificate: {}", cert_path.display());
+            println!("  Root CA private key: {}", key_path.display());
         }
         Commands::Signed {
-            cert,
-            key,
-            ca_cert,
-            ca_key,
+            output,
+            name,
+            ca_dir,
+            ca_name,
             sans,
-            cn,
-            days,
         } => {
             if sans.dns_names.is_empty() && sans.ip_addresses.is_empty() {
                 eprintln!(
                     "Warning: No SANs provided. Using CN '{}' as default DNS SAN.",
-                    cn
+                    output.cn
                 );
             }
 
-            let ca = CertGen::load(&ca_cert, &ca_key)?;
+            let ca = CertGen::load(&ca_dir, &ca_name)?;
 
-            println!("Generating certificate '{}'...", cn);
-            let signed = ca.generate(&cn, days, &sans.clone().into())?;
-            signed.save(&cert, &key)?;
+            println!("Generating certificate '{}'...", output.cn);
+            let signed = ca.generate(&output.cn, output.days, &sans.clone().into())?;
+            signed.save(&output.dir, &name)?;
 
-            println!("  Certificate: {}", cert.display());
-            println!("  Private key: {}", key.display());
+            let cert_path = output.dir.join(format!("{name}.crt.pem"));
+            let key_path = output.dir.join(format!("{name}.key.pem"));
+            println!("  Certificate: {}", cert_path.display());
+            println!("  Private key: {}", key_path.display());
 
             if !sans.dns_names.is_empty() || !sans.ip_addresses.is_empty() {
                 println!("  SANs:");

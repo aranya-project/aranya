@@ -17,8 +17,10 @@
 //! let signed = ca.generate("my-server", 365, &sans).unwrap();
 //!
 //! // Save CA and signed certificates to files
-//! ca.save("ca.pem", "ca.key").unwrap();
-//! signed.save("server.pem", "server.key").unwrap();
+//! // Creates ./ca.crt.pem and ./ca.key.pem
+//! ca.save(".", "ca").unwrap();
+//! // Creates ./server.crt.pem and ./server.key.pem
+//! signed.save(".", "server").unwrap();
 //! ```
 //!
 //! # Loading an Existing CA
@@ -27,7 +29,8 @@
 //! use aranya_certgen::{CertGen, SubjectAltNames};
 //!
 //! // Load an existing CA from PEM files
-//! let ca = CertGen::load("ca.pem", "ca.key").unwrap();
+//! // Loads from ./ca.crt.pem and ./ca.key.pem
+//! let ca = CertGen::load(".", "ca").unwrap();
 //!
 //! // Generate certificates signed by the loaded CA
 //! let sans = SubjectAltNames::new().with_dns("myserver.local");
@@ -192,7 +195,7 @@ impl CertGen {
     /// use aranya_certgen::CertGen;
     ///
     /// let ca = CertGen::ca("My Root CA", 365)?;
-    /// ca.save("ca.pem", "ca.key")?;
+    /// ca.save(".", "ca")?;  // Creates ./ca.crt.pem and ./ca.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn ca(cn: &str, days: u32) -> Result<Self, CertGenError> {
@@ -240,7 +243,7 @@ impl CertGen {
     ///     .with_dns("server.local")
     ///     .with_ip("192.168.1.10".parse().unwrap());
     /// let signed = ca.generate("server", 365, &sans)?;
-    /// signed.save("server.pem", "server.key")?;
+    /// signed.save(".", "server")?;  // Creates ./server.crt.pem and ./server.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn generate(
@@ -268,11 +271,12 @@ impl CertGen {
     /// Loads a certificate and private key from PEM files.
     ///
     /// Use this to load an existing CA for signing new certificates.
+    /// Files are loaded from `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
     ///
     /// # Arguments
     ///
-    /// * `cert_path` - Path to the certificate file (PEM format).
-    /// * `key_path` - Path to the private key file (PEM format).
+    /// * `dir` - Directory containing the certificate and key files.
+    /// * `name` - Base name for the files (without extension).
     ///
     /// # Errors
     ///
@@ -286,28 +290,27 @@ impl CertGen {
     /// ```no_run
     /// use aranya_certgen::{CertGen, SubjectAltNames};
     ///
-    /// let ca = CertGen::load("ca.pem", "ca.key")?;
+    /// // Loads from ./ca.crt.pem and ./ca.key.pem
+    /// let ca = CertGen::load(".", "ca")?;
     ///
     /// let sans = SubjectAltNames::new().with_dns("server.local");
     /// let signed = ca.generate("server", 365, &sans)?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn load(
-        cert_path: impl AsRef<Path>,
-        key_path: impl AsRef<Path>,
-    ) -> Result<Self, CertGenError> {
-        let cert_path = cert_path.as_ref();
-        let key_path = key_path.as_ref();
+    pub fn load(dir: impl AsRef<Path>, name: &str) -> Result<Self, CertGenError> {
+        let dir = dir.as_ref();
+        let cert_path = dir.join(format!("{name}.crt.pem"));
+        let key_path = dir.join(format!("{name}.key.pem"));
 
-        let cert_pem = fs::read_to_string(cert_path).map_err(|e| CertGenError::io(cert_path, e))?;
-        let key_pem = fs::read_to_string(key_path).map_err(|e| CertGenError::io(key_path, e))?;
+        let cert_pem = fs::read_to_string(&cert_path).map_err(|e| CertGenError::io(&cert_path, e))?;
+        let key_pem = fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?;
 
-        let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
+        let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
 
         let issuer_key =
-            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(key_path, e))?;
+            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
         let issuer = Issuer::from_ca_cert_pem(&cert_pem, issuer_key)
-            .map_err(|e| CertGenError::parse_cert(cert_path, e))?;
+            .map_err(|e| CertGenError::parse_cert(&cert_path, e))?;
 
         Ok(Self {
             cert_pem,
@@ -318,12 +321,13 @@ impl CertGen {
 
     /// Saves the certificate and private key to PEM files.
     ///
-    /// Creates parent directories if they don't exist.
+    /// Creates the directory if it doesn't exist.
+    /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
     ///
     /// # Arguments
     ///
-    /// * `cert_path` - Path for the certificate file (PEM format).
-    /// * `key_path` - Path for the private key file (PEM format).
+    /// * `dir` - Directory to save the files in.
+    /// * `name` - Base name for the files (without extension).
     ///
     /// # Errors
     ///
@@ -335,35 +339,23 @@ impl CertGen {
     /// use aranya_certgen::CertGen;
     ///
     /// let ca = CertGen::ca("My CA", 365)?;
-    /// ca.save("certs/ca.pem", "certs/ca.key")?;
+    /// ca.save("certs", "ca")?;  // Creates certs/ca.crt.pem and certs/ca.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn save(
-        &self,
-        cert_path: impl AsRef<Path>,
-        key_path: impl AsRef<Path>,
-    ) -> Result<(), CertGenError> {
-        let cert_path = cert_path.as_ref();
-        let key_path = key_path.as_ref();
+    pub fn save(&self, dir: impl AsRef<Path>, name: &str) -> Result<(), CertGenError> {
+        let dir = dir.as_ref();
+        let cert_path = dir.join(format!("{name}.crt.pem"));
+        let key_path = dir.join(format!("{name}.key.pem"));
 
-        if let Some(parent) = cert_path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| CertGenError::io(cert_path, e))?;
-            }
-        }
-        fs::write(cert_path, &self.cert_pem).map_err(|e| CertGenError::io(cert_path, e))?;
+        fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
 
-        if let Some(parent) = key_path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| CertGenError::io(key_path, e))?;
-            }
-        }
-        fs::write(key_path, self.key.serialize_pem()).map_err(|e| CertGenError::io(key_path, e))?;
+        fs::write(&cert_path, &self.cert_pem).map_err(|e| CertGenError::io(&cert_path, e))?;
+        fs::write(&key_path, self.key.serialize_pem()).map_err(|e| CertGenError::io(&key_path, e))?;
 
         // Set restrictive permissions on private key (Unix only)
         #[cfg(unix)]
-        fs::set_permissions(key_path, fs::Permissions::from_mode(0o600))
-            .map_err(|e| CertGenError::io(key_path, e))?;
+        fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
+            .map_err(|e| CertGenError::io(&key_path, e))?;
 
         Ok(())
     }
@@ -487,13 +479,15 @@ mod tests {
         let ca = CertGen::ca("Test CA", 365).expect("should create CA");
 
         let dir = tempfile::tempdir().unwrap();
-        let cert_path = dir.path().join("ca.pem");
-        let key_path = dir.path().join("ca.key");
 
-        ca.save(&cert_path, &key_path).expect("should save");
-        let loaded = CertGen::load(&cert_path, &key_path).expect("should load");
+        ca.save(dir.path(), "ca").expect("should save");
+        let loaded = CertGen::load(dir.path(), "ca").expect("should load");
 
         assert_eq!(ca, loaded);
+
+        // Verify the files are named correctly
+        assert!(dir.path().join("ca.crt.pem").exists());
+        assert!(dir.path().join("ca.key.pem").exists());
     }
 
     #[test]
@@ -509,13 +503,15 @@ mod tests {
             .expect("should generate cert");
 
         let dir = tempfile::tempdir().unwrap();
-        let cert_path = dir.path().join("server.pem");
-        let key_path = dir.path().join("server.key");
 
-        cert.save(&cert_path, &key_path).expect("should save");
-        let loaded = CertGen::load(&cert_path, &key_path).expect("should load");
+        cert.save(dir.path(), "server").expect("should save");
+        let loaded = CertGen::load(dir.path(), "server").expect("should load");
 
         assert_eq!(cert, loaded);
+
+        // Verify the files are named correctly
+        assert!(dir.path().join("server.crt.pem").exists());
+        assert!(dir.path().join("server.key.pem").exists());
     }
 
     #[test]
