@@ -1,25 +1,32 @@
-//! Aranya syncer for syncing Aranya graph commands.
-pub mod handle;
+//! Aranya syncer used to send/receive graph commands to other peers.
+
+mod handle;
 #[cfg(feature = "preview")]
-pub mod hello;
-pub mod manager;
-pub mod transport;
+mod hello;
+mod manager;
+mod transport;
 mod types;
 
-pub(crate) use aranya_runtime::GraphId;
-pub(crate) use aranya_util::Addr;
-pub(crate) use handle::{Request, SyncHandle};
-pub(crate) use manager::SyncManager;
-pub(crate) use types::SyncPeer;
-pub(super) use types::SyncResponse;
+use aranya_runtime::GraphId;
+use aranya_util::Addr;
 
-/// Possible errors that could happen in the Aranya Syncer.
+pub(super) use self::{handle::Callback, types::SyncResponse};
+pub(crate) use self::{
+    handle::SyncHandle,
+    hello::HelloSubscriptions,
+    manager::SyncManager,
+    transport::{quic, SyncState},
+    types::SyncPeer,
+};
+
+/// The error type which is returned from syncing with peers.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum SyncError {
+pub(crate) enum Error {
+    // TODO(nikki): generalize for generic transport support.
     /// Something went wrong inside the QUIC Syncer.
     #[error(transparent)]
-    QuicSync(#[from] transport::quic::QuicError),
+    QuicSync(#[from] quic::QuicError),
 
     /// Something went wrong in the Aranya Runtime.
     #[error(transparent)]
@@ -27,13 +34,13 @@ pub enum SyncError {
 
     /// Failed to send sync request.
     #[error("Could not send sync request: {0}")]
-    SendSyncRequest(Box<SyncError>),
+    SendSyncRequest(Box<Error>),
 
     /// Failed to receive sync response.
     #[error("Could not receive sync response: {0}")]
-    ReceiveSyncResponse(Box<SyncError>),
+    ReceiveSyncResponse(Box<Error>),
 
-    /// Peer sent an empty response
+    /// Peer sent an empty response.
     #[error("peer sent empty response")]
     EmptyResponse,
 
@@ -46,22 +53,22 @@ pub enum SyncError {
     Other(#[from] anyhow::Error),
 }
 
-/// Possible sync related errors
-pub type Result<T> = core::result::Result<T, SyncError>;
-
-impl From<SyncError> for aranya_daemon_api::Error {
-    fn from(err: SyncError) -> Self {
+// Implements this error type to allow it being sent over RPC.
+impl From<Error> for aranya_daemon_api::Error {
+    fn from(err: Error) -> Self {
         Self::from_err(err)
     }
 }
 
-impl From<std::convert::Infallible> for SyncError {
+// Allows Infallible types to be desugared properly with ?.
+impl From<std::convert::Infallible> for Error {
     fn from(err: std::convert::Infallible) -> Self {
         match err {}
     }
 }
 
-impl SyncError {
+impl Error {
+    /// Returns whether a `ParallelFinalize` error occurred, which needs to be resolved manually.
     fn is_parallel_finalize(&self) -> bool {
         use aranya_runtime::ClientError;
         match self {
@@ -72,3 +79,16 @@ impl SyncError {
         }
     }
 }
+
+/// A specialized Result type for sync operations.
+///
+/// This type is used broadly across [`aranya_daemon::sync`] for any operation which may produce an
+/// error.
+///
+/// This type alias is generally used to avoid writing out [`sync::Error`] directly and is otherwise
+/// a direct mapping to [`Result`].
+///
+/// [`aranya_daemon::sync`]: crate::sync
+/// [`sync::Error`]: Error
+/// [`Result`]: std::result::Result
+type Result<T> = core::result::Result<T, Error>;

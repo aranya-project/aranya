@@ -42,12 +42,12 @@ use tokio::{
 };
 
 #[cfg(feature = "preview")]
-use crate::sync::hello::HelloSubscriptions;
+use crate::sync::HelloSubscriptions;
 use crate::{
     actions::Actions,
     aranya::{self, ClientWithState, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
-    sync::{self, transport::quic::PskStore, SyncPeer},
+    sync::{self, quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore, InvalidGraphs,
 };
@@ -56,12 +56,12 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::transport::quic::QuicState;
+type TestState = sync::quic::QuicState;
 // Aranya sync client for testing.
 type TestSyncer = sync::SyncManager<TestState, crate::EN, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
-type TestServer = sync::transport::quic::QuicServer<crate::EN, crate::SP>;
+type TestServer = sync::quic::QuicServer<crate::EN, crate::SP>;
 
 struct TestDevice {
     /// Aranya sync client.

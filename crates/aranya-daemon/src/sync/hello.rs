@@ -1,7 +1,7 @@
-//! Hello notification functionality for Aranya QUIC sync.
+//! Hello notification functionality for the Aranya syncer.
 //!
-//! This module handles subscription management and broadcasting of hello notifications
-//! when graph heads change, allowing peers to stay synchronized.
+//! This module handles managing subscriptions and broadcasting hello messages periodically and when
+//! graph heads change.
 
 use std::{
     collections::HashMap,
@@ -19,25 +19,24 @@ use crate::{
     aranya::ClientWithState,
     sync::{
         transport::quic::{QuicError, QuicServer, QuicState},
-        Addr, GraphId, Result, SyncError, SyncHandle, SyncManager, SyncPeer,
+        Addr, Error, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
     },
 };
 
-/// Storage for sync hello subscriptions
+/// Storage for a subscription to hello messages.
 #[derive(Debug, Clone)]
-pub struct HelloSubscription {
-    /// Delay between notifications when graph changes (rate limiting)
+pub(crate) struct HelloSubscription {
+    /// Rate limiting on how often to notify when a graph changes.
     graph_change_delay: Duration,
-    /// Last notification time for delay management
+    /// The last time we notified a peer about our current graph.
     last_notified: Option<Instant>,
-    /// Expiration time of the subscription
+    /// How long until the subscription is no longer valid.
     expires_at: Instant,
-    /// Token to cancel the scheduled sending task
+    /// Token to cancel the spawned sync task.
     cancel_token: CancellationToken,
 }
 
-/// Type alias for hello subscription storage
-/// Maps from (team_id, subscriber_address) to subscription details
+/// Type alias to map a unique [`SyncPeer`] to their associated subscription.
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
 
 impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
@@ -47,7 +46,7 @@ where
 {
     /// Broadcast hello notifications to all subscribers of a graph.
     #[instrument(skip_all)]
-    pub async fn broadcast_hello_notifications(
+    pub(super) async fn broadcast_hello_notifications(
         &mut self,
         graph_id: GraphId,
         head: Address,
@@ -121,14 +120,13 @@ where
         Ok(())
     }
 
-    /// Sends a hello message to a peer and waits for a response.
+    /// Send a hello message to a peer and wait for a response.
     ///
     /// This is a helper method that handles the common logic for sending hello messages,
     /// including serialization, connection management, and response handling.
     ///
     /// # Arguments
-    /// * `peer` - The network address of the peer to send the message to
-    /// * `id` - The graph ID for the team/graph
+    /// * `peer` - The unique identifier of the peer to send the message to
     /// * `sync_type` - The hello message to send
     ///
     /// # Returns
@@ -168,7 +166,7 @@ where
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
         if response_buf.is_empty() {
-            return Err(SyncError::EmptyResponse);
+            return Err(Error::EmptyResponse);
         }
         Ok(())
     }
@@ -180,18 +178,17 @@ where
     /// send hello notifications with the specified delay between them.
     ///
     /// # Arguments
-    /// * `peer` - The network address of the peer to send the subscribe request to
-    /// * `id` - The graph ID for the team/graph to subscribe to
-    /// * `graph_change_delay` - Delay between notifications when graph changes (rate limiting)
+    /// * `peer` - The unique identifier of the peer to send the message to
+    /// * `graph_change_delay` - Rate limiting on how often to notify when a graph changes
     /// * `duration` - How long the subscription should last
-    /// * `schedule_delay` - Schedule-based hello sending delay
-    /// * `subscriber_server_addr` - The address where this subscriber's QUIC sync server is listening
+    /// * `schedule_delay` - Interval to send hello notifications, regardless of graph changes
+    /// * `subscriber_server_addr` - The address where this subscriber's sync server is listening
     ///
     /// # Returns
     /// * `Ok(())` if the subscribe request was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    pub async fn send_sync_hello_subscribe_request(
+    pub(super) async fn send_sync_hello_subscribe_request(
         &mut self,
         peer: SyncPeer,
         graph_change_delay: Duration,
@@ -217,15 +214,14 @@ where
     /// requesting to stop receiving hello notifications when the peer's graph head changes.
     ///
     /// # Arguments
-    /// * `peer` - The network address of the peer to send the unsubscribe request to
-    /// * `id` - The graph ID for the team/graph to unsubscribe from
+    /// * `peer` - The unique identifier of the peer to send the message to
     /// * `subscriber_server_addr` - The subscriber's server address to identify which subscription to remove
     ///
     /// # Returns
     /// * `Ok(())` if the unsubscribe request was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    pub async fn send_hello_unsubscribe_request(
+    pub(super) async fn send_hello_unsubscribe_request(
         &mut self,
         peer: SyncPeer,
         subscriber_server_addr: Addr,
@@ -247,15 +243,14 @@ where
     /// infrastructure to efficiently reuse connections.
     ///
     /// # Arguments
-    /// * `peer` - The network address of the subscriber to send the notification to
-    /// * `id` - The graph ID for the team/graph
+    /// * `peer` - The unique identifier of the peer to send the message to
     /// * `head` - The new head address to include in the notification
     ///
     /// # Returns
     /// * `Ok(())` if the notification was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    pub async fn send_hello_notification_to_subscriber(
+    async fn send_hello_notification_to_subscriber(
         &mut self,
         peer: SyncPeer,
         head: Address,
@@ -400,7 +395,7 @@ where
     ///
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
-    pub(crate) async fn process_hello_message(
+    pub(super) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
         client: ClientWithState<EN, SP>,
         active_team: &TeamId,

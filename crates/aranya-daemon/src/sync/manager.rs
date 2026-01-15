@@ -48,9 +48,8 @@ use tracing::trace;
 use tracing::{error, info, instrument, warn};
 
 use super::{
-    handle::{ManagerMessage, Request},
-    transport::SyncState,
-    Addr, GraphId, Result, SyncPeer,
+    handle::{Callback, ManagerMessage},
+    Addr, GraphId, Result, SyncPeer, SyncState,
 };
 use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
 
@@ -61,7 +60,7 @@ use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
 ///
 /// [`SyncHandle`]: super::SyncHandle
 #[derive_where(Debug)]
-pub struct SyncManager<ST, EN, SP, EF>
+pub(crate) struct SyncManager<ST, EN, SP, EF>
 where
     ST: fmt::Debug,
 {
@@ -70,7 +69,7 @@ where
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
     /// Receives added/removed peers.
-    pub(super) recv: mpsc::Receiver<Request>,
+    pub(super) recv: mpsc::Receiver<Callback>,
     /// Delay queue for getting the next peer to sync with.
     pub(super) queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
@@ -109,6 +108,54 @@ where
             self.queue.remove(&key);
         }
     }
+
+    /// Get peer caches for test inspection.
+    #[cfg(test)]
+    pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
+        self.client.caches_for_test()
+    }
+
+    /// Returns a reference to the Aranya client.
+    #[cfg(test)]
+    pub(crate) fn client(&self) -> &crate::aranya::Client<EN, SP> {
+        self.client.client()
+    }
+
+    /// Returns a mutable reference to the Aranya client.
+    #[cfg(test)]
+    pub(crate) fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, SP> {
+        self.client.client_mut()
+    }
+}
+
+impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
+where
+    ST: SyncState<EN, SP, EF> + fmt::Debug,
+    EN: Engine,
+    SP: StorageProvider,
+{
+    /// Subscribe to hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
+    async fn sync_hello_subscribe(
+        &mut self,
+        peer: SyncPeer,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> Result<()> {
+        trace!("subscribing to hello notifications from peer");
+        ST::sync_hello_subscribe_impl(self, peer, graph_change_delay, duration, schedule_delay)
+            .await
+    }
+
+    /// Unsubscribe from hello notifications from a sync peer.
+    #[cfg(feature = "preview")]
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
+    async fn sync_hello_unsubscribe(&mut self, peer: SyncPeer) -> Result<()> {
+        trace!("unsubscribing from hello notifications from peer");
+        ST::sync_hello_unsubscribe_impl(self, peer).await
+    }
 }
 
 impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
@@ -119,6 +166,7 @@ where
     EF: Send + Sync + 'static + TryFrom<EN::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,
 {
+    /// Run the main syncer loop, which will handle syncing with peers.
     pub(crate) async fn run(mut self, ready: ready::Notifier) {
         ready.notify();
         loop {
@@ -265,46 +313,5 @@ where
             "Sync completed successfully"
         );
         Ok(cmd_count)
-    }
-
-    /// Subscribe to hello notifications from a sync peer.
-    #[cfg(feature = "preview")]
-    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    async fn sync_hello_subscribe(
-        &mut self,
-        peer: SyncPeer,
-        graph_change_delay: Duration,
-        duration: Duration,
-        schedule_delay: Duration,
-    ) -> Result<()> {
-        trace!("subscribing to hello notifications from peer");
-        ST::sync_hello_subscribe_impl(self, peer, graph_change_delay, duration, schedule_delay)
-            .await
-    }
-
-    /// Unsubscribe from hello notifications from a sync peer.
-    #[cfg(feature = "preview")]
-    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    async fn sync_hello_unsubscribe(&mut self, peer: SyncPeer) -> Result<()> {
-        trace!("unsubscribing from hello notifications from peer");
-        ST::sync_hello_unsubscribe_impl(self, peer).await
-    }
-
-    /// Get peer caches for test inspection.
-    #[cfg(test)]
-    pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
-        self.client.caches_for_test()
-    }
-
-    /// Returns a reference to the Aranya client.
-    #[cfg(test)]
-    pub fn client(&self) -> &crate::aranya::Client<EN, SP> {
-        self.client.client()
-    }
-
-    /// Returns a mutable reference to the Aranya client.
-    #[cfg(test)]
-    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, SP> {
-        self.client.client_mut()
     }
 }

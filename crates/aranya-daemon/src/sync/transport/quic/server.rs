@@ -35,14 +35,14 @@ use super::{ConnectionUpdate, PskStore, QuicError, SharedConnectionMap, ALPN_QUI
 use crate::sync::hello::HelloSubscriptions;
 use crate::{
     aranya::ClientWithState,
-    sync::{Addr, GraphId, Request, Result, SyncError, SyncHandle, SyncPeer, SyncResponse},
+    sync::{Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse},
 };
 
 /// The Aranya QUIC sync server.
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
-pub struct QuicServer<EN, SP> {
+pub(crate) struct QuicServer<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     client: ClientWithState<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
@@ -86,14 +86,14 @@ where
         Self,
         SyncHandle,
         SharedConnectionMap,
-        mpsc::Receiver<Request>,
+        mpsc::Receiver<Callback>,
         SocketAddr,
     )> {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
 
         // Create channel for SyncHandle communication with SyncManager
-        let (send, syncer_recv) = mpsc::channel::<Request>(128);
+        let (send, syncer_recv) = mpsc::channel::<Callback>(128);
         let sync_peers = SyncHandle::new(send);
 
         // Create Server Config
@@ -140,7 +140,7 @@ where
     /// Begins accepting incoming requests.
     #[instrument(skip_all, fields(addr = ?self.local_addr))]
     #[allow(clippy::disallowed_macros, reason = "tokio::select! uses unreachable!")]
-    pub async fn serve(mut self, ready: ready::Notifier) {
+    pub(crate) async fn serve(mut self, ready: ready::Notifier) {
         info!("QUIC sync server listening for incoming connections");
 
         ready.notify();
@@ -230,7 +230,7 @@ where
 
     /// Responds to a sync.
     #[instrument(skip_all)]
-    pub(crate) async fn sync(
+    async fn sync(
         client: ClientWithState<EN, SP>,
         stream: BidirectionalStream,
         active_team: TeamId,
@@ -378,7 +378,7 @@ fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphI
         bug!("Should be a SyncRequest")
     };
     if team_id.as_bytes() != storage_id.as_bytes() {
-        return Err(SyncError::QuicSync(QuicError::InvalidPSK));
+        return Err(Error::QuicSync(QuicError::InvalidPSK));
     }
 
     Ok(*storage_id)

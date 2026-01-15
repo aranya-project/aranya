@@ -28,13 +28,13 @@ use tracing::{error, instrument, trace};
 use super::{PskStore, QuicError, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
 use crate::{
     aranya::ClientWithState,
-    sync::{Addr, GraphId, Request, Result, SyncError, SyncManager, SyncPeer, SyncResponse},
+    sync::{Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer, SyncResponse},
     InvalidGraphs,
 };
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 #[derive(Debug)]
-pub struct QuicState {
+pub(crate) struct QuicState {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: s2n_quic::Client,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
@@ -47,7 +47,7 @@ pub struct QuicState {
 impl QuicState {
     /// Get a reference to the PSK store
     #[cfg(feature = "preview")]
-    pub fn store(&self) -> &Arc<PskStore> {
+    pub(crate) fn store(&self) -> &Arc<PskStore> {
         &self.store
     }
 
@@ -117,13 +117,13 @@ where
         syncer
             .send_sync_request(&mut send, &mut sync_requester, peer)
             .await
-            .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
+            .map_err(|e| Error::SendSyncRequest(e.into()))?;
 
         // receive sync response.
         let cmd_count = syncer
             .receive_sync_response(&mut recv, &mut sync_requester, sink, peer)
             .await
-            .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
+            .map_err(|e| Error::ReceiveSyncResponse(e.into()))?;
 
         Ok(cmd_count)
     }
@@ -193,7 +193,7 @@ where
         invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         (server_addr, client_addr): (Addr, Addr),
-        recv: mpsc::Receiver<Request>,
+        recv: mpsc::Receiver<Callback>,
         conns: SharedConnectionMap,
     ) -> Result<Self> {
         let state = QuicState::new(psk_store, conns.clone(), client_addr)?;
@@ -219,8 +219,7 @@ where
     /// stream for sending sync requests and receiving responses.
     ///
     /// # Arguments
-    /// * `peer` - The network address of the peer to connect to
-    /// * `id` - The graph ID for the team/graph to sync with
+    /// * `peer` - The unique identifier of the peer to connect to
     ///
     /// # Returns
     /// * `Ok(BidirectionalStream)` if the connection and stream were established successfully
@@ -263,12 +262,12 @@ where
             Err(e @ connection::Error::StatelessReset { .. })
             | Err(e @ connection::Error::StreamIdExhausted { .. })
             | Err(e @ connection::Error::MaxHandshakeDurationExceeded { .. }) => {
-                return Err(SyncError::QuicSync(e.into()));
+                return Err(Error::QuicSync(e.into()));
             }
             // Other errors means the stream has closed
             Err(e) => {
                 self.state.conns.remove(peer, handle).await;
-                return Err(SyncError::QuicSync(e.into()));
+                return Err(Error::QuicSync(e.into()));
             }
         };
 
@@ -284,14 +283,13 @@ where
     /// # Arguments
     /// * `send` - The QUIC send stream to use for sending the request
     /// * `syncer` - The SyncRequester instance that generates the sync request
-    /// * `id` - The graph ID for the team/graph to sync
-    /// * `peer` - The network address of the peer
+    /// * `peer` - The unique identifier of the peer to send the message to
     ///
     /// # Returns
     /// * `Ok(())` if the sync request was sent successfully
     /// * `Err(SyncError)` if there was an error generating or sending the request
     #[instrument(skip_all)]
-    pub(crate) async fn send_sync_request<A>(
+    async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
         syncer: &mut SyncRequester<A>,
@@ -328,7 +326,7 @@ where
     /// Receives and processes a sync response from the server.
     ///
     /// Returns the number of commands that were received and successfully processed.
-    pub async fn receive_sync_response<S, A>(
+    async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
         syncer: &mut SyncRequester<A>,

@@ -12,10 +12,10 @@ use aranya_runtime::{Engine, Sink, StorageProvider};
 use super::GraphId;
 use super::{Result, SyncManager, SyncPeer};
 
-pub mod quic;
+pub(crate) mod quic;
 
 /// Types that contain additional data that are part of a [`SyncManager`] object.
-pub trait SyncState<EN, SP, EF>: Sized + fmt::Debug
+pub(crate) trait SyncState<EN, SP, EF>: Sized + fmt::Debug
 where
     EN: Engine,
     SP: StorageProvider,

@@ -29,7 +29,7 @@ const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
-pub enum QuicError {
+pub(crate) enum QuicError {
     /// QUIC Connection error
     #[error(transparent)]
     QuicConnectionError(#[from] connection::Error),

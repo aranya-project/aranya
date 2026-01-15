@@ -27,13 +27,13 @@ type ConnectionMap = BTreeMap<SyncPeer, Handle>;
 ///
 /// This map stores persistent QUIC connections indexed by [`SyncPeer`].
 #[derive(Clone, Debug)]
-pub struct SharedConnectionMap {
+pub(crate) struct SharedConnectionMap {
     tx: mpsc::Sender<ConnectionUpdate>,
     handles: Arc<Mutex<ConnectionMap>>,
 }
 
 impl SharedConnectionMap {
-    pub(crate) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
+    pub(super) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
         let (tx, rx) = mpsc::channel(32);
         (
             Self {

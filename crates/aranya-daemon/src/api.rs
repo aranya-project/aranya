@@ -51,7 +51,7 @@ use crate::{
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
-    sync::{transport::quic as qs, SyncHandle, SyncPeer},
+    sync::{quic as qs, SyncHandle, SyncPeer},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
 };

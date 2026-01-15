@@ -3,7 +3,7 @@ use std::sync::Arc;
 use aranya_daemon_api::{AddSeedMode, CreateSeedMode, CreateTeamQuicSyncConfig};
 
 use super::*;
-use crate::sync::transport::quic::PskStore;
+use crate::sync::quic::PskStore;
 
 /// Held by [`super::DaemonApiServer`] when the QUIC syncer is used
 #[derive(Debug)]
