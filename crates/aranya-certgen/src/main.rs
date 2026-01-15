@@ -118,6 +118,20 @@ impl From<CliSubjectAltNames> for SubjectAltNames {
     }
 }
 
+fn make_save_options(create_parents: bool, force: bool) -> Option<SaveOptions> {
+    if !create_parents && !force {
+        return None;
+    }
+    let mut opts = SaveOptions::default();
+    if create_parents {
+        opts = opts.create_parents();
+    }
+    if force {
+        opts = opts.force();
+    }
+    Some(opts)
+}
+
 fn main() -> Result<(), CertGenError> {
     let args = CliArgs::parse();
 
@@ -126,13 +140,7 @@ fn main() -> Result<(), CertGenError> {
             println!("Generating root CA certificate...");
             let cert_gen = CertGen::ca(&output.cn, output.days)?;
 
-            let mut save_opts = SaveOptions::default();
-            if output.create_parents {
-                save_opts = save_opts.create_parents();
-            }
-            if output.force {
-                save_opts = save_opts.force();
-            }
+            let save_opts = make_save_options(output.create_parents, output.force);
             cert_gen.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
@@ -157,13 +165,7 @@ fn main() -> Result<(), CertGenError> {
             println!("Generating certificate '{}'...", output.cn);
             let signed = ca.generate(&output.cn, output.days, &sans.clone().into())?;
 
-            let mut save_opts = SaveOptions::default();
-            if output.create_parents {
-                save_opts = save_opts.create_parents();
-            }
-            if output.force {
-                save_opts = save_opts.force();
-            }
+            let save_opts = make_save_options(output.create_parents, output.force);
             signed.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));

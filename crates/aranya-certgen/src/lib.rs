@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use aranya_certgen::{CertGen, SaveOptions, SubjectAltNames};
+//! use aranya_certgen::{CertGen, SubjectAltNames};
 //!
 //! // Create a new CA
 //! let ca = CertGen::ca("My Root CA", 365).unwrap();
@@ -18,9 +18,9 @@
 //!
 //! // Save CA and signed certificates to files
 //! // Creates ./ca.crt.pem and ./ca.key.pem
-//! ca.save(".", "ca", SaveOptions::default()).unwrap();
+//! ca.save(".", "ca", None).unwrap();
 //! // Creates ./server.crt.pem and ./server.key.pem
-//! signed.save(".", "server", SaveOptions::default()).unwrap();
+//! signed.save(".", "server", None).unwrap();
 //! ```
 //!
 //! # Loading an Existing CA
@@ -220,10 +220,10 @@ impl CertGen {
     /// # Example
     ///
     /// ```no_run
-    /// use aranya_certgen::{CertGen, SaveOptions};
+    /// use aranya_certgen::CertGen;
     ///
     /// let ca = CertGen::ca("My Root CA", 365)?;
-    /// ca.save(".", "ca", SaveOptions::default())?;  // Creates ./ca.crt.pem and ./ca.key.pem
+    /// ca.save(".", "ca", None)?;  // Creates ./ca.crt.pem and ./ca.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn ca(cn: &str, days: u32) -> Result<Self, CertGenError> {
@@ -263,7 +263,7 @@ impl CertGen {
     /// # Example
     ///
     /// ```no_run
-    /// use aranya_certgen::{CertGen, SaveOptions, SubjectAltNames};
+    /// use aranya_certgen::{CertGen, SubjectAltNames};
     ///
     /// let ca = CertGen::ca("My CA", 365)?;
     ///
@@ -271,7 +271,7 @@ impl CertGen {
     ///     .with_dns("server.local")
     ///     .with_ip("192.168.1.10".parse().unwrap());
     /// let signed = ca.generate("server", 365, &sans)?;
-    /// signed.save(".", "server", SaveOptions::default())?;  // Creates ./server.crt.pem and ./server.key.pem
+    /// signed.save(".", "server", None)?;  // Creates ./server.crt.pem and ./server.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn generate(
@@ -351,15 +351,15 @@ impl CertGen {
     ///
     /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
     ///
-    /// By default, this function will return an error if:
-    /// - The directory does not exist (use `SaveOptions::create_parents()` to create it)
-    /// - The files already exist (use `SaveOptions::force()` to overwrite)
+    /// By default (when `options` is `None`), this function will return an error if:
+    /// - The directory does not exist
+    /// - The files already exist
     ///
     /// # Arguments
     ///
     /// * `dir` - Directory to save the files in.
     /// * `name` - Base name for the files (without extension).
-    /// * `options` - Options controlling directory creation and file overwriting.
+    /// * `options` - Optional settings for directory creation and file overwriting.
     ///
     /// # Errors
     ///
@@ -375,19 +375,20 @@ impl CertGen {
     ///
     /// let ca = CertGen::ca("My CA", 365)?;
     ///
-    /// // Save to existing directory (fails if dir doesn't exist or files exist)
-    /// ca.save(".", "ca", SaveOptions::default())?;
+    /// // Save with default options (fails if dir missing or files exist)
+    /// ca.save(".", "ca", None)?;
     ///
     /// // Create directory if needed and overwrite existing files
-    /// ca.save("certs", "ca", SaveOptions::default().create_parents().force())?;
+    /// ca.save("certs", "ca", Some(SaveOptions::default().create_parents().force()))?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn save(
         &self,
         dir: impl AsRef<Path>,
         name: &str,
-        options: SaveOptions,
+        options: Option<SaveOptions>,
     ) -> Result<(), CertGenError> {
+        let options = options.unwrap_or_default();
         let dir = dir.as_ref();
         let cert_path = dir.join(format!("{name}.crt.pem"));
         let key_path = dir.join(format!("{name}.key.pem"));
@@ -533,8 +534,7 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
 
-        ca.save(dir.path(), "ca", SaveOptions::default())
-            .expect("should save");
+        ca.save(dir.path(), "ca", None).expect("should save");
         let loaded = CertGen::load(dir.path(), "ca").expect("should load");
 
         assert_eq!(ca.cert_pem(), loaded.cert_pem());
@@ -558,8 +558,7 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
 
-        cert.save(dir.path(), "server", SaveOptions::default())
-            .expect("should save");
+        cert.save(dir.path(), "server", None).expect("should save");
         let loaded = CertGen::load(dir.path(), "server").expect("should load");
 
         assert_eq!(cert.cert_pem(), loaded.cert_pem());
@@ -621,7 +620,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let nonexistent = dir.path().join("nonexistent");
 
-        let result = ca.save(&nonexistent, "ca", SaveOptions::default());
+        let result = ca.save(&nonexistent, "ca", None);
 
         assert!(
             matches!(result, Err(CertGenError::DirNotFound(_))),
@@ -637,11 +636,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
 
         // Save once successfully
-        ca.save(dir.path(), "ca", SaveOptions::default())
-            .expect("first save should succeed");
+        ca.save(dir.path(), "ca", None).expect("first save should succeed");
 
         // Second save should fail because files exist
-        let result = ca.save(dir.path(), "ca", SaveOptions::default());
+        let result = ca.save(dir.path(), "ca", None);
 
         assert!(
             matches!(result, Err(CertGenError::FileExists(_))),
@@ -658,7 +656,7 @@ mod tests {
         let nested = dir.path().join("a").join("b").join("c");
 
         // Should succeed with create_parents option
-        ca.save(&nested, "ca", SaveOptions::default().create_parents())
+        ca.save(&nested, "ca", Some(SaveOptions::default().create_parents()))
             .expect("save with create_parents should succeed");
 
         assert!(nested.join("ca.crt.pem").exists());
@@ -672,11 +670,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
 
         // Save once
-        ca.save(dir.path(), "ca", SaveOptions::default())
-            .expect("first save should succeed");
+        ca.save(dir.path(), "ca", None).expect("first save should succeed");
 
         // Second save with force should succeed
-        ca.save(dir.path(), "ca", SaveOptions::default().force())
+        ca.save(dir.path(), "ca", Some(SaveOptions::default().force()))
             .expect("save with force should succeed");
     }
 }
