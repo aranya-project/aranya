@@ -17,18 +17,13 @@ The binary will be at `target/release/aranya-certgen`.
 ### Create a Root CA
 
 ```bash
-aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA"
+aranya-certgen ca --cn "My Company CA"
 ```
 
 ### Create a Signed Certificate
 
 ```bash
-aranya-certgen signed \
-  --ca-cert ca.pem --ca-key ca.key \
-  --cert server.pem --key server.key \
-  --cn webserver \
-  --dns example.com --dns www.example.com \
-  --ip 192.168.1.10
+aranya-certgen signed --cn webserver
 ```
 
 ## Commands
@@ -39,10 +34,12 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--cert <PATH>` | Path for the CA certificate file (PEM format) | required |
-| `--key <PATH>` | Path for the CA P-256 ECDSA private key file (PEM format) | required |
-| `--ca-name <NAME>` | Common Name (CN) for the root CA | `My Root CA` |
+| `--cn <NAME>` | Common Name (CN) for the root CA | required |
+| `--dir <PATH>` | Directory to save the certificate and key files | `.` |
+| `--name <NAME>` | Base name for output files (creates {name}.crt.pem and {name}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
+| `-p` | Create parent directories if they don't exist | — |
+| `--force` | Overwrite existing files | — |
 
 ### `aranya-certgen signed`
 
@@ -50,32 +47,25 @@ Create a new certificate signed by an existing root CA with a P-256 ECDSA privat
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--cert <PATH>` | Path for the output certificate file (PEM format) | required |
-| `--key <PATH>` | Path for the output P-256 ECDSA private key file (PEM format) | required |
-| `--ca-cert <PATH>` | Path to the CA certificate file (PEM format) | required |
-| `--ca-key <PATH>` | Path to the CA P-256 ECDSA private key file (PEM format) | required |
 | `--cn <NAME>` | Common Name (CN) for the certificate | required |
-| `--dns <HOSTNAME>` | DNS name for SAN (can be repeated) | — |
-| `--ip <ADDRESS>` | IP address for SAN (can be repeated) | — |
+| `--dir <PATH>` | Directory to save the certificate and key files | `.` |
+| `--name <NAME>` | Base name for output files (creates {name}.crt.pem and {name}.key.pem) | `cert` |
+| `--ca-dir <PATH>` | Directory containing the CA certificate and key files | `.` |
+| `--ca-name <NAME>` | Base name of the CA files (loads {ca-name}.crt.pem and {ca-name}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
+| `-p` | Create parent directories if they don't exist | — |
+| `--force` | Overwrite existing files | — |
 
 ## Example Output
 
 ```
-$ aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA"
+$ aranya-certgen ca --cn "My Company CA"
 Generating root CA certificate...
-  Root CA certificate: ca.pem
-  Root CA private key: ca.key
+  Certificate: ./ca.crt.pem
 
-$ aranya-certgen signed --ca-cert ca.pem --ca-key ca.key \
-    --cert server.pem --key server.key \
-    --cn webserver --dns example.com --ip 192.168.1.10
+$ aranya-certgen signed --cn webserver
 Generating certificate 'webserver'...
-  Certificate: server.pem
-  Private key: server.key
-  SANs:
-    - DNS: example.com
-    - IP:  192.168.1.10
+  Certificate: ./cert.crt.pem
 ```
 
 ## Comparison with OpenSSL
@@ -84,15 +74,9 @@ This tool simplifies certificate generation compared to OpenSSL while guaranteei
 
 certgen:
 ```
-aranya-certgen ca --cert ca.pem --key ca.key --ca-name "My Company CA" --days 365
+aranya-certgen ca --cn "My Company CA" --days 365
 
-aranya-certgen signed \
-  --ca-cert ca.pem --ca-key ca.key \
-  --cert server.pem --key server.key \
-  --cn webserver \
-  --dns example.com --dns www.example.com \
-  --ip 192.168.1.10 \
-  --days 365
+aranya-certgen signed --cn webserver --days 365
 ```
 
 openssl:
@@ -108,6 +92,5 @@ openssl req -x509 \
     -CA ca.pem -CAkey ca.key \
     -days 365 \
     -subj "/CN=webserver" \
-    -addext "subjectAltName=DNS.1:example.com,DNS.2:www.example.com,IP:192.168.1.10" \
     -out server.pem
 ```

@@ -9,12 +9,12 @@
 //! aranya-certgen ca --cn "My CA"
 //!
 //! # Create a signed certificate with P-256 ECDSA key (creates ./cert.crt.pem and ./cert.key.pem)
-//! aranya-certgen signed --cn server --dns example.com --ip 192.168.1.10
+//! aranya-certgen signed --cn server
 //! ```
 
-use std::{net::IpAddr, path::PathBuf};
+use std::path::PathBuf;
 
-use aranya_certgen::{CertGen, CertGenError, SaveOptions, SubjectAltNames};
+use aranya_certgen::{CertGen, CertGenError, SaveOptions};
 use clap::{Args, Parser, Subcommand};
 
 /// Command-line arguments for the certgen tool.
@@ -88,8 +88,7 @@ enum Commands {
     /// Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
     ///
     /// Generates a certificate and P-256 ECDSA private key, signed by the specified CA.
-    /// The certificate can include Subject Alternative Names for DNS hostnames
-    /// and IP addresses. Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
+    /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
     Signed {
         /// Output file arguments.
         #[command(flatten)]
@@ -106,32 +105,7 @@ enum Commands {
         /// Base name of the CA files (loads {ca-name}.crt.pem and {ca-name}.key.pem).
         #[arg(long, default_value = "ca")]
         ca_name: String,
-
-        /// Subject Alternative Names (DNS and IP).
-        #[command(flatten)]
-        sans: CliSubjectAltNames,
     },
-}
-
-/// CLI-specific Subject Alternative Names with clap derives.
-#[derive(Args, Debug, Clone)]
-struct CliSubjectAltNames {
-    /// DNS names for Subject Alternative Names (can be specified multiple times).
-    #[arg(long = "dns", value_name = "HOSTNAME")]
-    dns_names: Vec<String>,
-
-    /// IP addresses for Subject Alternative Names (can be specified multiple times).
-    #[arg(long = "ip", value_name = "ADDRESS")]
-    ip_addresses: Vec<IpAddr>,
-}
-
-impl From<CliSubjectAltNames> for SubjectAltNames {
-    fn from(cli: CliSubjectAltNames) -> Self {
-        SubjectAltNames {
-            dns_names: cli.dns_names,
-            ip_addresses: cli.ip_addresses,
-        }
-    }
 }
 
 fn main() -> Result<(), CertGenError> {
@@ -153,35 +127,17 @@ fn main() -> Result<(), CertGenError> {
             name,
             ca_dir,
             ca_name,
-            sans,
         } => {
-            if sans.dns_names.is_empty() && sans.ip_addresses.is_empty() {
-                eprintln!(
-                    "Warning: No SANs provided. Using CN '{}' as default DNS SAN.",
-                    output.cn
-                );
-            }
-
             let ca = CertGen::load(&ca_dir, &ca_name)?;
 
             println!("Generating certificate '{}'...", output.cn);
-            let signed = ca.generate(&output.cn, output.days, &sans.clone().into())?;
+            let signed = ca.generate(&output.cn, output.days)?;
 
             let save_opts = output.save_options();
             signed.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
             println!("  Certificate: {}", cert_path.display());
-
-            if !sans.dns_names.is_empty() || !sans.ip_addresses.is_empty() {
-                println!("  SANs:");
-                for dns in &sans.dns_names {
-                    println!("    - DNS: {}", dns);
-                }
-                for ip in &sans.ip_addresses {
-                    println!("    - IP:  {}", ip);
-                }
-            }
         }
     }
 
