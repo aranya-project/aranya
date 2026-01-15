@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use aranya_certgen::{CertGen, SubjectAltNames};
+//! use aranya_certgen::{CertGen, SaveOptions, SubjectAltNames};
 //!
 //! // Create a new CA
 //! let ca = CertGen::ca("My Root CA", 365).unwrap();
@@ -18,9 +18,9 @@
 //!
 //! // Save CA and signed certificates to files
 //! // Creates ./ca.crt.pem and ./ca.key.pem
-//! ca.save(".", "ca").unwrap();
+//! ca.save(".", "ca", SaveOptions::new()).unwrap();
 //! // Creates ./server.crt.pem and ./server.key.pem
-//! signed.save(".", "server").unwrap();
+//! signed.save(".", "server", SaveOptions::new()).unwrap();
 //! ```
 //!
 //! # Loading an Existing CA
@@ -85,6 +85,14 @@ pub enum CertGenError {
     /// Invalid validity period.
     #[error("Invalid validity period: days must be greater than 0")]
     InvalidDays,
+
+    /// Directory does not exist.
+    #[error("Directory does not exist: {0}")]
+    DirNotFound(String),
+
+    /// File already exists.
+    #[error("File already exists: {0}")]
+    FileExists(String),
 }
 
 impl CertGenError {
@@ -144,6 +152,34 @@ impl SubjectAltNames {
     }
 }
 
+/// Options for saving certificates to disk.
+#[derive(Debug, Clone, Default)]
+pub struct SaveOptions {
+    /// Create parent directories if they don't exist.
+    pub create_parents: bool,
+    /// Overwrite existing files.
+    pub force: bool,
+}
+
+impl SaveOptions {
+    /// Creates new save options with default values (no create, no overwrite).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Enable creating parent directories if they don't exist.
+    pub fn create_parents(mut self) -> Self {
+        self.create_parents = true;
+        self
+    }
+
+    /// Enable overwriting existing files.
+    pub fn force(mut self) -> Self {
+        self.force = true;
+        self
+    }
+}
+
 /// Certificate generator for creating CA and signed certificates.
 ///
 /// `CertGen` holds a Certificate Authority (CA) and can generate certificates
@@ -189,10 +225,10 @@ impl CertGen {
     /// # Example
     ///
     /// ```no_run
-    /// use aranya_certgen::CertGen;
+    /// use aranya_certgen::{CertGen, SaveOptions};
     ///
     /// let ca = CertGen::ca("My Root CA", 365)?;
-    /// ca.save(".", "ca")?;  // Creates ./ca.crt.pem and ./ca.key.pem
+    /// ca.save(".", "ca", SaveOptions::new())?;  // Creates ./ca.crt.pem and ./ca.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn ca(cn: &str, days: u32) -> Result<Self, CertGenError> {
@@ -232,7 +268,7 @@ impl CertGen {
     /// # Example
     ///
     /// ```no_run
-    /// use aranya_certgen::{CertGen, SubjectAltNames};
+    /// use aranya_certgen::{CertGen, SaveOptions, SubjectAltNames};
     ///
     /// let ca = CertGen::ca("My CA", 365)?;
     ///
@@ -240,7 +276,7 @@ impl CertGen {
     ///     .with_dns("server.local")
     ///     .with_ip("192.168.1.10".parse().unwrap());
     /// let signed = ca.generate("server", 365, &sans)?;
-    /// signed.save(".", "server")?;  // Creates ./server.crt.pem and ./server.key.pem
+    /// signed.save(".", "server", SaveOptions::new())?;  // Creates ./server.crt.pem and ./server.key.pem
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
     pub fn generate(
@@ -318,33 +354,67 @@ impl CertGen {
 
     /// Saves the certificate and private key to PEM files.
     ///
-    /// Creates the directory if it doesn't exist.
     /// Files are saved as `{dir}/{name}.crt.pem` and `{dir}/{name}.key.pem`.
+    ///
+    /// By default, this function will return an error if:
+    /// - The directory does not exist (use `SaveOptions::create_parents()` to create it)
+    /// - The files already exist (use `SaveOptions::force()` to overwrite)
     ///
     /// # Arguments
     ///
     /// * `dir` - Directory to save the files in.
     /// * `name` - Base name for the files (without extension).
+    /// * `options` - Options controlling directory creation and file overwriting.
     ///
     /// # Errors
     ///
-    /// Returns [`CertGenError::Io`] if creating directories or writing files fails.
+    /// Returns an error if:
+    /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
+    /// - [`CertGenError::FileExists`] if files exist and `force` is false
+    /// - [`CertGenError::Io`] if writing files fails
     ///
     /// # Example
     ///
     /// ```no_run
-    /// use aranya_certgen::CertGen;
+    /// use aranya_certgen::{CertGen, SaveOptions};
     ///
     /// let ca = CertGen::ca("My CA", 365)?;
-    /// ca.save("certs", "ca")?;  // Creates certs/ca.crt.pem and certs/ca.key.pem
+    ///
+    /// // Save to existing directory (fails if dir doesn't exist or files exist)
+    /// ca.save(".", "ca", SaveOptions::new())?;
+    ///
+    /// // Create directory if needed and overwrite existing files
+    /// ca.save("certs", "ca", SaveOptions::new().create_parents().force())?;
     /// # Ok::<(), aranya_certgen::CertGenError>(())
     /// ```
-    pub fn save(&self, dir: impl AsRef<Path>, name: &str) -> Result<(), CertGenError> {
+    pub fn save(
+        &self,
+        dir: impl AsRef<Path>,
+        name: &str,
+        options: SaveOptions,
+    ) -> Result<(), CertGenError> {
         let dir = dir.as_ref();
         let cert_path = dir.join(format!("{name}.crt.pem"));
         let key_path = dir.join(format!("{name}.key.pem"));
 
-        fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
+        // Check/create directory
+        if !dir.exists() {
+            if options.create_parents {
+                fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
+            } else {
+                return Err(CertGenError::DirNotFound(dir.display().to_string()));
+            }
+        }
+
+        // Check for existing files
+        if !options.force {
+            if cert_path.exists() {
+                return Err(CertGenError::FileExists(cert_path.display().to_string()));
+            }
+            if key_path.exists() {
+                return Err(CertGenError::FileExists(key_path.display().to_string()));
+            }
+        }
 
         fs::write(&cert_path, &self.cert_pem).map_err(|e| CertGenError::io(&cert_path, e))?;
         fs::write(&key_path, self.key.serialize_pem()).map_err(|e| CertGenError::io(&key_path, e))?;
@@ -468,7 +538,8 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
 
-        ca.save(dir.path(), "ca").expect("should save");
+        ca.save(dir.path(), "ca", SaveOptions::new())
+            .expect("should save");
         let loaded = CertGen::load(dir.path(), "ca").expect("should load");
 
         assert_eq!(ca.cert_pem(), loaded.cert_pem());
@@ -492,7 +563,8 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
 
-        cert.save(dir.path(), "server").expect("should save");
+        cert.save(dir.path(), "server", SaveOptions::new())
+            .expect("should save");
         let loaded = CertGen::load(dir.path(), "server").expect("should load");
 
         assert_eq!(cert.cert_pem(), loaded.cert_pem());

@@ -14,7 +14,7 @@
 
 use std::{net::IpAddr, path::PathBuf};
 
-use aranya_certgen::{CertGen, CertGenError, SubjectAltNames};
+use aranya_certgen::{CertGen, CertGenError, SaveOptions, SubjectAltNames};
 use clap::{Args, Parser, Subcommand};
 
 /// Command-line arguments for the certgen tool.
@@ -41,6 +41,14 @@ struct OutputArgs {
     /// Validity period in days from today.
     #[arg(long = "days", default_value_t = 365)]
     days: u32,
+
+    /// Create parent directories if they don't exist.
+    #[arg(short = 'p')]
+    create_parents: bool,
+
+    /// Overwrite existing files.
+    #[arg(long)]
+    force: bool,
 }
 
 /// Available subcommands for certificate generation.
@@ -117,7 +125,15 @@ fn main() -> Result<(), CertGenError> {
         Commands::Ca { output, name } => {
             println!("Generating root CA certificate...");
             let cert_gen = CertGen::ca(&output.cn, output.days)?;
-            cert_gen.save(&output.dir, &name)?;
+
+            let mut save_opts = SaveOptions::new();
+            if output.create_parents {
+                save_opts = save_opts.create_parents();
+            }
+            if output.force {
+                save_opts = save_opts.force();
+            }
+            cert_gen.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
             println!("  Certificate: {}", cert_path.display());
@@ -140,7 +156,15 @@ fn main() -> Result<(), CertGenError> {
 
             println!("Generating certificate '{}'...", output.cn);
             let signed = ca.generate(&output.cn, output.days, &sans.clone().into())?;
-            signed.save(&output.dir, &name)?;
+
+            let mut save_opts = SaveOptions::new();
+            if output.create_parents {
+                save_opts = save_opts.create_parents();
+            }
+            if output.force {
+                save_opts = save_opts.force();
+            }
+            signed.save(&output.dir, &name, save_opts)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
             println!("  Certificate: {}", cert_path.display());
