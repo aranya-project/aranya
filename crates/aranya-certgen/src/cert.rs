@@ -434,7 +434,9 @@ fn generate_signed_cert(
         ExtendedKeyUsagePurpose::ClientAuth,
     ];
 
-    // Add CN as DNS SAN for rustls compatibility (rustls ignores CN, only checks SAN)
+    // Add CN as DNS SAN for rustls compatibility (rustls ignores CN, only checks SAN).
+    // TODO: We've considered adding explicit SAN support (--dns, --ip flags) but decided
+    // against it for now to keep the tool simple. If needed, this can be added later.
     params.subject_alt_names = vec![SanType::DnsName(cn.to_string().try_into()?)];
 
     let now = OffsetDateTime::now_utc();
