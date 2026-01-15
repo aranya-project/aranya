@@ -57,6 +57,8 @@ impl SaveOptions {
 /// let signed = ca.generate("my-server", 365).unwrap();
 /// signed.save("server", None).unwrap();  // Creates ./server.crt.pem and ./server.key.pem
 /// ```
+// Debug intentionally not implemented to avoid risk of exposing private keys.
+#[allow(missing_debug_implementations)]
 pub struct CaCert {
     cert_pem: String,
     issuer: Issuer<'static, KeyPair>,
@@ -221,14 +223,6 @@ impl CaCert {
     }
 }
 
-impl std::fmt::Debug for CaCert {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CaCert")
-            .field("cert_pem", &"<PEM data>")
-            .finish_non_exhaustive()
-    }
-}
-
 /// A signed leaf certificate that cannot sign other certificates.
 ///
 /// `SignedCert` holds a certificate signed by a CA and its private key.
@@ -243,6 +237,8 @@ impl std::fmt::Debug for CaCert {
 /// let signed = ca.generate("my-server", 365).unwrap();
 /// signed.save("server", None).unwrap();  // Creates ./server.crt.pem and ./server.key.pem
 /// ```
+// Debug intentionally not implemented to avoid risk of exposing private keys.
+#[allow(missing_debug_implementations)]
 pub struct SignedCert {
     cert_pem: String,
     key: KeyPair,
@@ -288,14 +284,6 @@ impl SignedCert {
     /// Returns the private key as a PEM-encoded string.
     pub fn key_pem(&self) -> String {
         self.key.serialize_pem()
-    }
-}
-
-impl std::fmt::Debug for SignedCert {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SignedCert")
-            .field("cert_pem", &"<PEM data>")
-            .finish_non_exhaustive()
     }
 }
 
