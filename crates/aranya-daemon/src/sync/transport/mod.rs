@@ -1,4 +1,4 @@
-//! Holds all transport traits, as well as any transport-specific implementations.
+//! This module contains all generic syncer transport traits, as well as any transport-specific syncer implementations.
 
 #[cfg(feature = "preview")]
 use std::time::Duration;
