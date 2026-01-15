@@ -30,19 +30,21 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
-use super::{ConnectionUpdate, PskStore, QuicError, SharedConnectionMap, ALPN_QUIC_SYNC};
+use super::{ConnectionUpdate, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
 #[cfg(feature = "preview")]
 use crate::sync::hello::HelloSubscriptions;
 use crate::{
     aranya::ClientWithState,
-    sync::{Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse},
+    sync::{
+        transport::quic, Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
+    },
 };
 
 /// The Aranya QUIC sync server.
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
-pub(crate) struct QuicServer<EN, SP> {
+pub(crate) struct Server<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     client: ClientWithState<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
@@ -58,7 +60,7 @@ pub(crate) struct QuicServer<EN, SP> {
     local_addr: SocketAddr,
 }
 
-impl<EN, SP> QuicServer<EN, SP>
+impl<EN, SP> Server<EN, SP>
 where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + 'static,
@@ -73,7 +75,7 @@ where
         self.local_addr
     }
 
-    /// Creates a new `QuicServer`.
+    /// Creates a new `Server`.
     ///
     /// # Panics
     ///
@@ -121,7 +123,7 @@ where
             .assume("can set sync server addr")?
             .with_congestion_controller(Bbr::default())?
             .start()
-            .map_err(QuicError::ServerStart)?;
+            .map_err(quic::Error::ServerStart)?;
 
         let local_addr = server
             .local_addr()
@@ -381,7 +383,7 @@ fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphI
         bug!("Should be a SyncRequest")
     };
     if team_id.as_bytes() != storage_id.as_bytes() {
-        return Err(Error::QuicSync(QuicError::InvalidPSK));
+        return Err(Error::QuicSync(quic::Error::InvalidPSK));
     }
 
     Ok(*storage_id)

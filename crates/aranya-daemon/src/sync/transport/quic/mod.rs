@@ -22,20 +22,20 @@ mod server;
 pub(crate) use client::QuicState;
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::{PskSeed, PskStore};
-pub(crate) use server::QuicServer;
+pub(crate) use server::Server;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum QuicError {
+pub(crate) enum Error {
     /// QUIC Connection error
     #[error(transparent)]
-    QuicConnectionError(#[from] connection::Error),
+    QuicConnection(#[from] connection::Error),
     /// QUIC Stream error
     #[error(transparent)]
-    QuicStreamError(#[from] stream::Error),
+    QuicStream(#[from] stream::Error),
     /// Invalid PSK used for syncing
     #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
@@ -47,7 +47,7 @@ pub(crate) enum QuicError {
     ServerStart(#[source] StartError),
 }
 
-impl From<Infallible> for QuicError {
+impl From<Infallible> for Error {
     fn from(err: Infallible) -> Self {
         match err {}
     }

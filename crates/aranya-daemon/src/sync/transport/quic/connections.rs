@@ -81,8 +81,8 @@ impl SharedConnectionMap {
     pub(super) async fn get_or_try_insert_with(
         &mut self,
         peer: SyncPeer,
-        make_conn: impl AsyncFnOnce() -> Result<Connection, super::QuicError>,
-    ) -> Result<Handle, super::QuicError> {
+        make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
+    ) -> Result<Handle, super::Error> {
         let (handle, maybe_acceptor) = match self.handles.lock().await.entry(peer) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");

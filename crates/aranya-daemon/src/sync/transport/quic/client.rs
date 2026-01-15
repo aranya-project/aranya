@@ -25,10 +25,13 @@ use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
 use tracing::{error, instrument, trace};
 
-use super::{PskStore, QuicError, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
+use super::{PskStore, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
 use crate::{
     aranya::ClientWithState,
-    sync::{Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer, SyncResponse},
+    sync::{
+        transport::quic, Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer,
+        SyncResponse,
+    },
     InvalidGraphs,
 };
 
@@ -74,7 +77,7 @@ impl QuicState {
             .with_io((client_addr.host(), client_addr.port()))
             .assume("can set quic client address")?
             .start()
-            .map_err(QuicError::ClientStart)?;
+            .map_err(quic::Error::ClientStart)?;
 
         Ok(Self {
             client,
@@ -315,8 +318,8 @@ where
 
         send.send(Bytes::from(send_buf))
             .await
-            .map_err(QuicError::from)?;
-        send.close().await.map_err(QuicError::from)?;
+            .map_err(quic::Error::from)?;
+        send.close().await.map_err(quic::Error::from)?;
         trace!("sent sync request");
 
         Ok(())

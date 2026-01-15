@@ -18,7 +18,7 @@ use tracing::{debug, instrument, trace, warn};
 use crate::{
     aranya::ClientWithState,
     sync::{
-        transport::quic::{QuicError, QuicServer, QuicState},
+        transport::quic::{self, QuicState},
         Addr, Error, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
     },
 };
@@ -148,8 +148,8 @@ where
         // Send the message
         send.send(bytes::Bytes::from(data))
             .await
-            .map_err(QuicError::from)?;
-        send.close().await.map_err(QuicError::from)?;
+            .map_err(quic::Error::from)?;
+        send.close().await.map_err(quic::Error::from)?;
 
         // Determine operation name from sync_type
         let operation_name = match &sync_type {
@@ -386,7 +386,7 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     });
 }
 
-impl<EN, SP> QuicServer<EN, SP>
+impl<EN, SP> quic::Server<EN, SP>
 where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + 'static,

@@ -27,7 +27,7 @@ pub(crate) enum Error {
     // TODO(nikki): generalize for generic transport support.
     /// Something went wrong inside the QUIC Syncer.
     #[error(transparent)]
-    QuicSync(#[from] quic::QuicError),
+    QuicSync(#[from] quic::Error),
 
     /// Something went wrong in the Aranya Runtime.
     #[error(transparent)]

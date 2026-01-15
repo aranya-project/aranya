@@ -32,7 +32,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicState as QuicSyncClientState, SyncParams},
+        quic::{PskStore, QuicState, SyncParams},
         SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -54,7 +54,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::quic::QuicServer<EN, SP>;
+pub(crate) type SyncServer = crate::sync::quic::Server<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -121,7 +121,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicSyncClientState, EN, SP, EF>,
+    manager: SyncManager<QuicState, EN, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -320,7 +320,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicSyncClientState, EN, SP, EF>,
+        SyncManager<QuicState, EN, SP, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {
