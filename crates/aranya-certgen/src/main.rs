@@ -126,7 +126,7 @@ fn main() -> Result<(), CertGenError> {
             println!("Generating root CA certificate...");
             let cert_gen = CertGen::ca(&output.cn, output.days)?;
 
-            let mut save_opts = SaveOptions::new();
+            let mut save_opts = SaveOptions::default();
             if output.create_parents {
                 save_opts = save_opts.create_parents();
             }
@@ -157,7 +157,7 @@ fn main() -> Result<(), CertGenError> {
             println!("Generating certificate '{}'...", output.cn);
             let signed = ca.generate(&output.cn, output.days, &sans.clone().into())?;
 
-            let mut save_opts = SaveOptions::new();
+            let mut save_opts = SaveOptions::default();
             if output.create_parents {
                 save_opts = save_opts.create_parents();
             }
