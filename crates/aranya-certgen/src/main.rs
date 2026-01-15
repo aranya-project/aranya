@@ -120,9 +120,7 @@ fn main() -> Result<(), CertGenError> {
             cert_gen.save(&output.dir, &name)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
-            let key_path = output.dir.join(format!("{name}.key.pem"));
-            println!("  Root CA certificate: {}", cert_path.display());
-            println!("  Root CA private key: {}", key_path.display());
+            println!("  Certificate: {}", cert_path.display());
         }
         Commands::Signed {
             output,
@@ -145,9 +143,7 @@ fn main() -> Result<(), CertGenError> {
             signed.save(&output.dir, &name)?;
 
             let cert_path = output.dir.join(format!("{name}.crt.pem"));
-            let key_path = output.dir.join(format!("{name}.key.pem"));
             println!("  Certificate: {}", cert_path.display());
-            println!("  Private key: {}", key_path.display());
 
             if !sans.dns_names.is_empty() || !sans.ip_addresses.is_empty() {
                 println!("  SANs:");
