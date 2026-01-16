@@ -9,14 +9,18 @@
 //!
 //! // Create a new CA and save
 //! let ca = CaCert::new("My Root CA", 365).unwrap();
-//! ca.save("ca", None).unwrap();  // Creates ./ca.crt.pem and ./ca.key.pem
+//! ca.save("ca", None).unwrap(); // Creates ./ca.crt.pem and ./ca.key.pem
 //!
 //! // Generate a signed certificate and save
 //! let signed = ca.generate("my-server", 365).unwrap();
-//! signed.save("server", None).unwrap();  // Creates ./server.crt.pem
+//! signed.save("server", None).unwrap(); // Creates ./server.crt.pem
 //!
 //! // Save to a specific path with options
-//! ca.save("./certs/myca", Some(SaveOptions::default().create_parents())).unwrap();
+//! ca.save(
+//!     "./certs/myca",
+//!     Some(SaveOptions::default().create_parents()),
+//! )
+//! .unwrap();
 //! ```
 //!
 //! # Loading an Existing CA

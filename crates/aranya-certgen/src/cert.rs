@@ -59,11 +59,11 @@ impl SaveOptions {
 ///
 /// // Create a new CA and save
 /// let ca = CaCert::new("My CA", 365).unwrap();
-/// ca.save("ca", None).unwrap();  // Creates ./ca.crt.pem and ./ca.key.pem
+/// ca.save("ca", None).unwrap(); // Creates ./ca.crt.pem and ./ca.key.pem
 ///
 /// // Generate a signed certificate
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save("server", None).unwrap();  // Creates ./server.crt.pem and ./server.key.pem
+/// signed.save("server", None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -216,7 +216,7 @@ impl Drop for CaCert {
 ///
 /// let ca = CaCert::new("My CA", 365).unwrap();
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save("server", None).unwrap();  // Creates ./server.crt.pem and ./server.key.pem
+/// signed.save("server", None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]

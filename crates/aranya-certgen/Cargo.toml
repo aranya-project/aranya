@@ -19,9 +19,9 @@ path = "src/main.rs"
 [dependencies]
 clap = { workspace = true }
 rcgen = { version = "0.14", features = ["x509-parser", "zeroize"] }
-zeroize = "1"
 thiserror = { workspace = true }
 time = "0.3"
+zeroize = "1"
 
 [dev-dependencies]
 tempfile = { workspace = true }
