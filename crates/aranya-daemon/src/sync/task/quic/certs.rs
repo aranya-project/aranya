@@ -366,33 +366,32 @@ mod tests {
     /// the certificate generation tool and the daemon's certificate loading code.
     #[test]
     fn test_load_certs_generated_by_certgen() {
-        use aranya_certgen::{CertGen, SubjectAltNames};
+        use aranya_certgen::CaCert;
 
         let temp_dir = TempDir::new().expect("failed to create temp dir");
 
         // Generate CA and device certificates using aranya-certgen
-        let ca = CertGen::ca("Test Root CA", 365).expect("failed to create CA");
-        let sans = SubjectAltNames::new()
-            .with_dns("localhost")
-            .with_ip("127.0.0.1".parse().unwrap());
+        let ca = CaCert::new("Test Root CA", 365).expect("failed to create CA");
+        // CN is automatically added as DNS SAN by the new certgen API
         let device = ca
-            .generate("test-device", 365, &sans)
+            .generate("localhost", 365)
             .expect("failed to generate device cert");
 
         // Save certificates to temp directory
         let root_certs_dir = temp_dir.path().join("root_certs");
         fs::create_dir(&root_certs_dir).expect("failed to create root_certs dir");
 
-        let ca_cert_path = root_certs_dir.join("ca.pem");
-        let ca_key_path = temp_dir.path().join("ca.key");
-        ca.save(&ca_cert_path, &ca_key_path)
+        let ca_prefix = root_certs_dir.join("ca");
+        ca.save(ca_prefix.to_str().expect("valid path"), None)
             .expect("failed to save CA");
 
-        let device_cert_path = temp_dir.path().join("device.pem");
-        let device_key_path = temp_dir.path().join("device.key");
+        let device_prefix = temp_dir.path().join("device");
         device
-            .save(&device_cert_path, &device_key_path)
+            .save(device_prefix.to_str().expect("valid path"), None)
             .expect("failed to save device cert");
+
+        let device_cert_path = temp_dir.path().join("device.crt.pem");
+        let device_key_path = temp_dir.path().join("device.key.pem");
 
         // Load root certs
         let root_store = load_root_certs(&root_certs_dir).expect("failed to load root certs");

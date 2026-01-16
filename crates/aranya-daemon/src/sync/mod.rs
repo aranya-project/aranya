@@ -1,7 +1,6 @@
 //! Aranya syncer for syncing Aranya graph commands.
 pub mod task;
 
-
 use error::SyncError;
 
 /// Possible sync related errors

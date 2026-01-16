@@ -3,14 +3,14 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
-use aranya_certgen::{CertGen, SubjectAltNames};
+use aranya_certgen::CaCert;
 use aranya_client::Addr;
 use tokio::fs;
 use tracing::info;
 
 /// Certificate authority for signing certificates.
 pub struct CertificateAuthority {
-    ca: CertGen,
+    ca: CaCert,
     root_certs_dir: PathBuf,
 }
 
@@ -29,8 +29,9 @@ impl CertificateAuthority {
         std::fs::create_dir_all(&root_certs_dir)?;
 
         // Generate CA certificate
-        let ca = CertGen::ca("Aranya Example CA", 365).context("failed to generate CA")?;
-        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+        let ca = CaCert::new("Aranya Example CA", 365).context("failed to generate CA")?;
+        let ca_prefix = root_certs_dir.join("ca");
+        ca.save(ca_prefix.to_str().expect("valid UTF-8 path"), None)
             .context("failed to write CA cert/key")?;
 
         Ok(Self { ca, root_certs_dir })
@@ -43,23 +44,21 @@ impl CertificateAuthority {
 
     /// Generates a signed certificate.
     pub fn generate_signed_cert(&self, name: &str, work_dir: &Path) -> Result<(PathBuf, PathBuf)> {
-        let cert_path = work_dir.join("device.pem");
-        let key_path = work_dir.join("device.key");
-
-        let sans = SubjectAltNames::new()
-            .with_dns(format!("{}.example.local", name))
-            .with_ip("127.0.0.1".parse().expect("valid IP address"));
-
+        // CN is automatically added as DNS SAN by the new certgen API
         let signed = self
             .ca
-            .generate(&format!("{} Server", name), 365, &sans)
+            .generate(&format!("{}.example.local", name), 365)
             .context("failed to generate signed cert")?;
 
+        let device_prefix = work_dir.join("device");
         signed
-            .save(&cert_path, &key_path)
+            .save(device_prefix.to_str().expect("valid UTF-8 path"), None)
             .context("failed to write signed cert/key")?;
 
-        Ok((cert_path, key_path))
+        Ok((
+            work_dir.join("device.crt.pem"),
+            work_dir.join("device.key.pem"),
+        ))
     }
 }
 

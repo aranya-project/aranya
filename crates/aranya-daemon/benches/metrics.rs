@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use aranya_certgen::{CertGen, SubjectAltNames};
+use aranya_certgen::CaCert;
 use aranya_daemon::{
     config::{Config, QuicSyncConfig, SyncConfig, Toggle},
     Daemon,
@@ -41,22 +41,22 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
             let root_certs_dir = certs_dir.join("root_certs");
             std::fs::create_dir_all(&root_certs_dir).expect("should create root_certs_dir");
 
-            let ca = CertGen::ca("Bench CA", 365).expect("should generate CA");
-            ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+            let ca = CaCert::new("Bench CA", 365).expect("should generate CA");
+            let ca_prefix = root_certs_dir.join("ca");
+            ca.save(ca_prefix.to_str().expect("valid path"), None)
                 .expect("should write CA cert/key");
 
-            let sans = SubjectAltNames::new()
-                .with_dns("bench.test.local")
-                .with_ip("127.0.0.1".parse().expect("valid IP"));
+            // CN is automatically added as DNS SAN
             let signed = ca
-                .generate("Bench Server", 365, &sans)
+                .generate("bench.test.local", 365)
                 .expect("should generate signed cert");
 
-            let device_cert_path = certs_dir.join("device.pem");
-            let device_key_path = certs_dir.join("device-key.pem");
+            let device_prefix = certs_dir.join("device");
             signed
-                .save(&device_cert_path, &device_key_path)
+                .save(device_prefix.to_str().expect("valid path"), None)
                 .expect("should write signed cert/key");
+            let device_cert_path = certs_dir.join("device.crt.pem");
+            let device_key_path = certs_dir.join("device.key.pem");
 
             let cfg = Config {
                 name: "test-daemon-run".into(),

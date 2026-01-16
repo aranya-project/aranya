@@ -17,7 +17,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use aranya_certgen::{CertGen, SubjectAltNames};
+use aranya_certgen::CaCert;
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
@@ -196,10 +196,10 @@ struct TestCtx {
     dir: TempDir,
     /// Per-client ID counter.
     id: u64,
-    /// Path to root CA certificate directory (contains ca.pem).
+    /// Path to root CA certificate directory (contains ca.crt.pem).
     root_certs_dir: PathBuf,
-    /// Path to CA private key for signing device certs.
-    ca_key_path: PathBuf,
+    /// The certificate authority for signing device certs.
+    ca: CaCert,
 }
 
 impl TestCtx {
@@ -211,46 +211,37 @@ impl TestCtx {
         let root_certs_dir = dir.path().join("root_certs");
         fs::create_dir_all(&root_certs_dir)?;
 
-        let ca_cert_path = root_certs_dir.join("ca.pem");
-        let ca_key_path = dir.path().join("ca-key.pem");
-
         // Generate CA certificate
-        let ca = CertGen::ca("Test CA", 365).context("failed to generate test CA")?;
-        ca.save(&ca_cert_path, &ca_key_path)
+        let ca = CaCert::new("Test CA", 365).context("failed to generate test CA")?;
+        let ca_prefix = root_certs_dir.join("ca");
+        ca.save(ca_prefix.to_str().expect("valid path"), None)
             .context("failed to write CA cert/key")?;
 
         Ok(Self {
             dir,
             id: 0,
             root_certs_dir,
-            ca_key_path,
+            ca,
         })
     }
 
     /// Generates a device certificate signed by the test CA.
     fn generate_device_cert(&self, name: &str, device_dir: &std::path::Path) -> Result<CertConfig> {
-        let cert_path = device_dir.join("device.pem");
-        let key_path = device_dir.join("device-key.pem");
-
-        // Load CA and generate signed cert
-        let ca_cert_path = self.root_certs_dir.join("ca.pem");
-        let ca = CertGen::load(&ca_cert_path, &self.ca_key_path).context("failed to load CA")?;
-
-        let sans = SubjectAltNames::new()
-            .with_dns(name)
-            .with_ip("127.0.0.1".parse().expect("valid IP"));
-
-        let signed = ca
-            .generate(name, 365, &sans)
+        // CN is automatically added as DNS SAN by the new certgen API
+        let signed = self
+            .ca
+            .generate(name, 365)
             .context("failed to generate signed cert")?;
+
+        let device_prefix = device_dir.join("device");
         signed
-            .save(&cert_path, &key_path)
+            .save(device_prefix.to_str().expect("valid path"), None)
             .context("failed to write signed cert/key")?;
 
         Ok(CertConfig {
             root_certs_dir: self.root_certs_dir.clone(),
-            device_cert: cert_path,
-            device_key: key_path,
+            device_cert: device_dir.join("device.crt.pem"),
+            device_key: device_dir.join("device.key.pem"),
         })
     }
 

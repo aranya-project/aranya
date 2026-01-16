@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_certgen::{CertGen, SubjectAltNames};
+use aranya_certgen::CaCert;
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
     Addr, SyncPeerConfig,
@@ -59,8 +59,9 @@ impl DevicesCtx {
         std::fs::create_dir_all(&root_certs_dir)?;
 
         // Generate CA certificate
-        let ca = CertGen::ca("Test CA", 365).context("failed to generate CA")?;
-        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+        let ca = CaCert::new("Test CA", 365).context("failed to generate CA")?;
+        let ca_prefix = root_certs_dir.join("ca");
+        ca.save(ca_prefix.to_str().expect("valid path"), None)
             .context("failed to write CA cert/key")?;
 
         let (owner, admin, operator, membera, memberb) = try_join!(
@@ -241,7 +242,7 @@ impl DeviceCtx {
         team_name: &str,
         name: &str,
         work_dir: PathBuf,
-        ca: &CertGen,
+        ca: &CaCert,
         root_certs_dir: &Path,
     ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
@@ -260,19 +261,16 @@ impl DeviceCtx {
         };
 
         // Generate device certificate
-        let device_cert_path = work_dir.join("device.pem");
-        let device_key_path = work_dir.join("device-key.pem");
         std::fs::create_dir_all(&work_dir)?;
-
-        let sans = SubjectAltNames::new()
-            .with_dns(format!("{}.test.local", name))
-            .with_ip("127.0.0.1".parse().expect("valid IP address"));
         let signed = ca
-            .generate(&format!("{} Server", name), 365, &sans)
+            .generate(&format!("{}.test.local", name), 365)
             .context("failed to generate signed cert")?;
+        let device_prefix = work_dir.join("device");
         signed
-            .save(&device_cert_path, &device_key_path)
+            .save(device_prefix.to_str().expect("valid path"), None)
             .context("failed to write signed cert/key")?;
+        let device_cert_path = work_dir.join("device.crt.pem");
+        let device_key_path = work_dir.join("device.key.pem");
 
         // Setup daemon config.
         let cfg = Config {
