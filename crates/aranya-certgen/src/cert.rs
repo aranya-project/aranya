@@ -372,10 +372,13 @@ fn generate_signed_cert(
         ExtendedKeyUsagePurpose::ClientAuth,
     ];
 
-    // Add CN as DNS SAN for rustls compatibility (rustls ignores CN, only checks SAN).
-    // TODO: We've considered adding explicit SAN support (--dns, --ip flags) but decided
-    // against it for now to keep the tool simple. If needed, this can be added later.
-    params.subject_alt_names = vec![SanType::DnsName(cn.to_string().try_into()?)];
+    // Add CN as SAN for rustls compatibility (rustls ignores CN, only checks SAN).
+    // Auto-detect whether CN is an IP address or hostname and use the appropriate SAN type.
+    params.subject_alt_names = if let Ok(ip) = cn.parse::<std::net::IpAddr>() {
+        vec![SanType::IpAddress(ip)]
+    } else {
+        vec![SanType::DnsName(cn.to_string().try_into()?)]
+    };
 
     let now = OffsetDateTime::now_utc();
     params.not_before = now;
