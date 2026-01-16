@@ -2,6 +2,26 @@
 //!
 //! All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 //!
+//! # Future Work
+//!
+//! The following features may be added in the future:
+//!
+//! - **DER format support**: Currently only PEM format is supported for saving/loading
+//!   certificates. DER (binary) format support could be added for environments where
+//!   base64 encoding overhead is undesirable.
+//!
+//! - **Additional key types**: Support for other key algorithms such as:
+//!   - P-384 ECDSA
+//!   - Ed25519
+//!   - HPKE (Hybrid Public Key Encryption) keys for use with MLS or other protocols
+//!   - Post-quantum algorithms (e.g., ML-KEM, ML-DSA)
+//!
+//! - **Certificate extensions**: Support for additional X.509 extensions such as:
+//!   - Subject Alternative Names (SANs) for IP addresses and additional DNS names
+//!   - Custom extensions
+//!
+//! - **CSR support**: Certificate Signing Request (CSR) generation and signing.
+//!
 //! # Example
 //!
 //! ```no_run
