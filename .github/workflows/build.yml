@@ -85,3 +85,32 @@ jobs:
           name: ${{ matrix.artifact }}-${{ matrix.features }}
           path: aranya-client-lib.tar.gz
           if-no-files-found: error
+
+  build-certgen:
+    strategy:
+      matrix:
+        runner: ["ubuntu2404-arm64-4core", "ubuntu-latest"]
+        include:
+          - runner: "ubuntu2404-arm64-4core"
+            artifact: "aranya-certgen-aarch64-unknown-linux-gnu"
+          - runner: "ubuntu-latest"
+            artifact: "aranya-certgen-x86_64-unknown-linux-gnu"
+    name: build certgen ${{ matrix.artifact }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Build aranya-certgen
+        run: |
+          cargo make build-certgen
+          cargo make tgz-certgen
+
+      - name: Publish aranya-certgen
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: aranya-certgen.tar.gz
+          if-no-files-found: error

@@ -115,6 +115,37 @@ jobs:
           asset_name: aranya-client-capi-${{ inputs.tag }}-${{ matrix.target }}-${{ matrix.features }}.tar.gz
           asset_content_type: application/gzip
 
+  publish-certgen:
+    permissions:
+      contents: write
+    needs:
+      - release
+      - build
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
+    name: publish certgen ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download certgen artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aranya-certgen-${{ matrix.target }}
+          path: aranya-certgen-${{ matrix.target }}
+      - name: List files
+        run: ls -R -al
+      - name: Upload certgen to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+            GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: aranya-certgen-${{ matrix.target }}/aranya-certgen.tar.gz
+          asset_name: aranya-certgen-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
   publish-capi-docs:
     permissions:
       contents: write
