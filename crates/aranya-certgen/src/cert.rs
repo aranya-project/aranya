@@ -13,7 +13,7 @@ use rcgen::{
     IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType, SigningKey,
 };
 use time::{Duration, OffsetDateTime};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::CertGenError;
 
@@ -147,13 +147,13 @@ impl CaCert {
 
         let cert_pem =
             fs::read_to_string(&cert_path).map_err(|e| CertGenError::io(&cert_path, e))?;
-        let mut key_pem =
-            fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?;
+
+        // Wrap in Zeroizing to ensure the key PEM is zeroized on drop, even if parsing fails
+        let key_pem = Zeroizing::new(
+            fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?,
+        );
 
         let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
-
-        // Zeroize the key PEM string after parsing
-        key_pem.zeroize();
 
         // Validate that the cert can be parsed (will be parsed again in generate())
         Issuer::from_ca_cert_pem(&cert_pem, &key)
