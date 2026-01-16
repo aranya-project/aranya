@@ -1,5 +1,7 @@
 //! Integration tests for certificate generation.
 
+#![allow(clippy::panic)]
+
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use aranya_certgen::{CaCert, CertGenError, SaveOptions};
