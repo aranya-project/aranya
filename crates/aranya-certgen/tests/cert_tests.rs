@@ -1,5 +1,7 @@
 //! Integration tests for certificate generation.
 
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
 use aranya_certgen::{CaCert, CertGenError, SaveOptions};
 use x509_parser::prelude::*;
 
@@ -146,4 +148,111 @@ fn test_save_with_force() {
     // Second save with force should succeed
     ca.save(path.to_str().unwrap(), Some(SaveOptions::default().force()))
         .expect("save with force should succeed");
+}
+
+#[test]
+fn test_hostname_cn_creates_dns_san() {
+    let ca = CaCert::new("Test CA", 365).expect("should create CA");
+
+    let cert = ca
+        .generate("my-server.local", 365)
+        .expect("should generate cert");
+
+    // Parse the certificate and verify SANs
+    let (_, pem) = parse_x509_pem(cert.cert_pem().as_bytes()).expect("should parse PEM");
+    let x509_cert = pem.parse_x509().expect("should parse cert");
+
+    // Get Subject Alternative Names extension
+    let san_ext = x509_cert
+        .get_extension_unique(&oid_registry::OID_X509_EXT_SUBJECT_ALT_NAME)
+        .expect("should have SAN extension")
+        .expect("SAN extension should exist");
+
+    let san = match san_ext.parsed_extension() {
+        ParsedExtension::SubjectAlternativeName(san) => san,
+        _ => panic!("expected SubjectAlternativeName"),
+    };
+
+    // Should have exactly one DNS SAN matching the CN
+    assert_eq!(san.general_names.len(), 1);
+    match &san.general_names[0] {
+        GeneralName::DNSName(name) => assert_eq!(*name, "my-server.local"),
+        other => panic!("expected DNSName, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_ipv4_cn_creates_ip_san() {
+    let ca = CaCert::new("Test CA", 365).expect("should create CA");
+
+    let cert = ca
+        .generate("127.0.0.1", 365)
+        .expect("should generate cert with IPv4 CN");
+
+    // Parse the certificate and verify SANs
+    let (_, pem) = parse_x509_pem(cert.cert_pem().as_bytes()).expect("should parse PEM");
+    let x509_cert = pem.parse_x509().expect("should parse cert");
+
+    // Get Subject Alternative Names extension
+    let san_ext = x509_cert
+        .get_extension_unique(&oid_registry::OID_X509_EXT_SUBJECT_ALT_NAME)
+        .expect("should have SAN extension")
+        .expect("SAN extension should exist");
+
+    let san = match san_ext.parsed_extension() {
+        ParsedExtension::SubjectAlternativeName(san) => san,
+        _ => panic!("expected SubjectAlternativeName"),
+    };
+
+    // Should have exactly one IP SAN matching the CN
+    assert_eq!(san.general_names.len(), 1);
+    match &san.general_names[0] {
+        GeneralName::IPAddress(bytes) => {
+            assert_eq!(bytes.len(), 4);
+            let arr: [u8; 4] = (*bytes).try_into().expect("should be 4 bytes");
+            assert_eq!(
+                IpAddr::V4(Ipv4Addr::from(arr)),
+                "127.0.0.1".parse::<IpAddr>().unwrap()
+            );
+        }
+        other => panic!("expected IPAddress, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_ipv6_cn_creates_ip_san() {
+    let ca = CaCert::new("Test CA", 365).expect("should create CA");
+
+    let cert = ca
+        .generate("::1", 365)
+        .expect("should generate cert with IPv6 CN");
+
+    // Parse the certificate and verify SANs
+    let (_, pem) = parse_x509_pem(cert.cert_pem().as_bytes()).expect("should parse PEM");
+    let x509_cert = pem.parse_x509().expect("should parse cert");
+
+    // Get Subject Alternative Names extension
+    let san_ext = x509_cert
+        .get_extension_unique(&oid_registry::OID_X509_EXT_SUBJECT_ALT_NAME)
+        .expect("should have SAN extension")
+        .expect("SAN extension should exist");
+
+    let san = match san_ext.parsed_extension() {
+        ParsedExtension::SubjectAlternativeName(san) => san,
+        _ => panic!("expected SubjectAlternativeName"),
+    };
+
+    // Should have exactly one IP SAN matching the CN
+    assert_eq!(san.general_names.len(), 1);
+    match &san.general_names[0] {
+        GeneralName::IPAddress(bytes) => {
+            assert_eq!(bytes.len(), 16);
+            let arr: [u8; 16] = (*bytes).try_into().expect("should be 16 bytes");
+            assert_eq!(
+                IpAddr::V6(Ipv6Addr::from(arr)),
+                "::1".parse::<IpAddr>().unwrap()
+            );
+        }
+        other => panic!("expected IPAddress, got {:?}", other),
+    }
 }
