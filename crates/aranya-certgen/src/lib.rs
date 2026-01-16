@@ -6,9 +6,10 @@
 //!
 //! The following features may be added in the future:
 //!
-//! - **DER format support**: Currently only PEM format is supported for saving/loading
-//!   certificates. DER (binary) format support could be added for environments where
-//!   base64 encoding overhead is undesirable.
+//! - **DER/BER format support**: Currently only PEM format is supported for saving/loading
+//!   certificates. DER (Distinguished Encoding Rules) and BER (Basic Encoding Rules)
+//!   binary format support could be added for environments where base64 encoding
+//!   overhead is undesirable.
 //!
 //! - **Additional key types**: Support for other key algorithms such as:
 //!   - P-384 ECDSA
