@@ -10,9 +10,10 @@ use std::{
 
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, DnValue, ExtendedKeyUsagePurpose,
-    IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType,
+    IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType, SigningKey,
 };
 use time::{Duration, OffsetDateTime};
+use zeroize::Zeroize;
 
 use crate::error::CertGenError;
 
@@ -44,6 +45,13 @@ impl SaveOptions {
 /// `CaCert` holds a CA certificate and its private key, and can generate
 /// signed certificates. All generated keys use P-256 ECDSA.
 ///
+/// # Security
+///
+/// The private key is zeroized when this type is dropped to prevent key material
+/// from lingering in memory. The key is stored directly (not inside rcgen's `Issuer`)
+/// so we can zeroize it on drop. When signing certificates, an `Issuer` is created
+/// temporarily with a reference to the key - no copy is made.
+///
 /// # Example
 ///
 /// ```no_run
@@ -61,7 +69,7 @@ impl SaveOptions {
 #[allow(missing_debug_implementations)]
 pub struct CaCert {
     cert_pem: String,
-    issuer: Issuer<'static, KeyPair>,
+    key: KeyPair,
 }
 
 impl CaCert {
@@ -86,9 +94,8 @@ impl CaCert {
         }
         let (cert, key) = generate_root_ca(cn, days)?;
         let cert_pem = cert.pem();
-        let issuer = Issuer::from_ca_cert_pem(&cert_pem, key)?;
 
-        Ok(Self { cert_pem, issuer })
+        Ok(Self { cert_pem, key })
     }
 
     /// Generates a leaf certificate signed by this CA.
@@ -110,7 +117,10 @@ impl CaCert {
         if days == 0 {
             return Err(CertGenError::InvalidDays);
         }
-        let (cert, key) = generate_signed_cert(cn, &self.issuer, days)?;
+        // Create issuer on-demand using a reference to our key.
+        // This allows us to store the key directly for zeroization on drop.
+        let issuer = Issuer::from_ca_cert_pem(&self.cert_pem, &self.key)?;
+        let (cert, key) = generate_signed_cert(cn, &issuer, days)?;
         let cert_pem = cert.pem();
 
         Ok(SignedCert { cert_pem, key })
@@ -137,13 +147,19 @@ impl CaCert {
 
         let cert_pem =
             fs::read_to_string(&cert_path).map_err(|e| CertGenError::io(&cert_path, e))?;
-        let key_pem = fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?;
+        let mut key_pem =
+            fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?;
 
         let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
-        let issuer = Issuer::from_ca_cert_pem(&cert_pem, key)
+
+        // Zeroize the key PEM string after parsing
+        key_pem.zeroize();
+
+        // Validate that the cert can be parsed (will be parsed again in generate())
+        Issuer::from_ca_cert_pem(&cert_pem, &key)
             .map_err(|e| CertGenError::parse_cert(&cert_path, e))?;
 
-        Ok(Self { cert_pem, issuer })
+        Ok(Self { cert_pem, key })
     }
 
     /// Saves the CA certificate and private key to PEM files.
@@ -162,12 +178,7 @@ impl CaCert {
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
     pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
-        save_cert_and_key(
-            path,
-            &self.cert_pem,
-            &self.issuer.key().serialize_pem(),
-            options,
-        )
+        save_cert_and_key(path, &self.cert_pem, &self.key.serialize_pem(), options)
     }
 
     /// Returns the certificate as a PEM-encoded string.
@@ -177,7 +188,13 @@ impl CaCert {
 
     /// Returns the private key as a PEM-encoded string.
     pub fn key_pem(&self) -> String {
-        self.issuer.key().serialize_pem()
+        self.key.serialize_pem()
+    }
+}
+
+impl Drop for CaCert {
+    fn drop(&mut self) {
+        self.key.zeroize();
     }
 }
 
@@ -185,6 +202,11 @@ impl CaCert {
 ///
 /// `SignedCert` holds a certificate signed by a CA and its private key.
 /// Unlike [`CaCert`], this type cannot be used to sign other certificates.
+///
+/// # Security
+///
+/// The private key is zeroized when this type is dropped to prevent key material
+/// from lingering in memory.
 ///
 /// # Example
 ///
@@ -230,6 +252,12 @@ impl SignedCert {
     /// Returns the private key as a PEM-encoded string.
     pub fn key_pem(&self) -> String {
         self.key.serialize_pem()
+    }
+}
+
+impl Drop for SignedCert {
+    fn drop(&mut self) {
+        self.key.zeroize();
     }
 }
 
@@ -323,7 +351,7 @@ fn generate_root_ca(cn: &str, days: u32) -> Result<(Certificate, KeyPair), CertG
 /// Generates a certificate signed by a CA with a P-256 ECDSA private key.
 fn generate_signed_cert(
     cn: &str,
-    issuer: &Issuer<'_, KeyPair>,
+    issuer: &Issuer<'_, impl SigningKey>,
     days: u32,
 ) -> Result<(Certificate, KeyPair), CertGenError> {
     let mut params = CertificateParams::default();
