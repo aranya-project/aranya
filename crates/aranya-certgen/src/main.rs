@@ -43,7 +43,7 @@ struct OutputArgs {
     create_parents: bool,
 
     /// Overwrite existing files.
-    #[arg(long)]
+    #[arg(short, long)]
     force: bool,
 }
 

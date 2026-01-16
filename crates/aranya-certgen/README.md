@@ -38,7 +38,7 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 | `-o, --output <PATH>` | Output path prefix (creates {output}.crt.pem and {output}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
 | `-p` | Create parent directories if they don't exist | — |
-| `--force` | Overwrite existing files | — |
+| `-f, --force` | Overwrite existing files | — |
 
 ### `aranya-certgen signed`
 
@@ -51,7 +51,7 @@ Create a new certificate signed by an existing root CA with a P-256 ECDSA privat
 | `--ca <PATH>` | Path prefix for CA files (loads {ca}.crt.pem and {ca}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
 | `-p` | Create parent directories if they don't exist | — |
-| `--force` | Overwrite existing files | — |
+| `-f, --force` | Overwrite existing files | — |
 
 ## Example Output
 
