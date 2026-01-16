@@ -35,8 +35,7 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--cn <NAME>` | Common Name (CN) for the root CA | required |
-| `--dir <PATH>` | Directory to save the certificate and key files | `.` |
-| `--name <NAME>` | Base name for output files (creates {name}.crt.pem and {name}.key.pem) | `ca` |
+| `-o, --output <PATH>` | Output path prefix (creates {output}.crt.pem and {output}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
 | `-p` | Create parent directories if they don't exist | — |
 | `--force` | Overwrite existing files | — |
@@ -48,10 +47,8 @@ Create a new certificate signed by an existing root CA with a P-256 ECDSA privat
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--cn <NAME>` | Common Name (CN) for the certificate | required |
-| `--dir <PATH>` | Directory to save the certificate and key files | `.` |
-| `--name <NAME>` | Base name for output files (creates {name}.crt.pem and {name}.key.pem) | `cert` |
-| `--ca-dir <PATH>` | Directory containing the CA certificate and key files | `.` |
-| `--ca-name <NAME>` | Base name of the CA files (loads {ca-name}.crt.pem and {ca-name}.key.pem) | `ca` |
+| `-o, --output <PATH>` | Output path prefix (creates {output}.crt.pem and {output}.key.pem) | `cert` |
+| `--ca <PATH>` | Path prefix for CA files (loads {ca}.crt.pem and {ca}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
 | `-p` | Create parent directories if they don't exist | — |
 | `--force` | Overwrite existing files | — |
