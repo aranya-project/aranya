@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -10,32 +10,27 @@ use aranya_crypto::{
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId,
+    ClientState,
 };
-use aranya_util::{ready, Addr};
+use aranya_util::ready;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    fs,
-    sync::{mpsc, Mutex},
-    task::JoinSet,
-};
+use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
-    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
+    api::{ApiKey, DaemonApiServer, DaemonApiServerArgs, EffectReceiver},
     aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
-    keystore::{AranyaStore, LocalStore},
+    keystore::AranyaStore,
     policy,
-    sync::{
-        quic::{PskStore, QuicState, SyncParams},
-        SyncHandle, SyncManager,
+    sync::task::{
+        quic::{CertConfig, State as QuicSyncClientState, SyncParams},
+        SyncPeers, Syncer,
     },
-    util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
@@ -54,7 +49,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::quic::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -121,7 +116,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicState, EN, SP, EF>,
+    syncer: Syncer<QuicSyncClientState>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -138,17 +133,11 @@ impl Daemon {
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
-            let qs_client_addr = match qs_config.client_addr {
-                None => Addr::new(qs_config.addr.host(), 0)?,
-                Some(v) => v,
-            };
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
             let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
-
-            let mut local_store = Self::load_local_keystore(&cfg).await?;
 
             // Generate a fresh API key at startup.
             let api_sk = ApiKey::generate(&mut eng);
@@ -157,34 +146,35 @@ impl Daemon {
                 .context("unable to write API public key")?;
             info!(path = %cfg.api_pk_path().display(), "wrote API public key");
 
-            // Initialize the PSK store used by the syncer and sync server
-            let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
-            let initial_keys =
-                load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
-            let psk_store = Arc::new(PskStore::new(initial_keys));
-
             let invalid_graphs = InvalidGraphs::default();
 
             // Create a shared PeerCacheMap
             let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
 
-            // Initialize Aranya client, sync client,and sync server.
-            let (client, sync_server, manager, syncer, recv_effects) = Self::setup_aranya(
-                &cfg,
-                eng.clone(),
-                aranya_store
-                    .try_clone()
-                    .context("unable to clone keystore")?,
-                &pks,
-                SyncParams {
-                    psk_store: Arc::clone(&psk_store),
-                    server_addr: qs_config.addr,
-                    caches: Arc::clone(&caches),
-                },
-                qs_client_addr,
-                invalid_graphs.clone(),
-            )
-            .await?;
+            // Create certificate configuration for mTLS
+            let cert_config = CertConfig {
+                root_certs_dir: qs_config.root_certs_dir.clone(),
+                device_cert: qs_config.device_cert.clone(),
+                device_key: qs_config.device_key.clone(),
+            };
+
+            // Initialize Aranya client, sync client, and sync server.
+            let (client, sync_server, syncer, peers, recv_effects, local_addr) =
+                Self::setup_aranya(
+                    &cfg,
+                    eng.clone(),
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    &pks,
+                    SyncParams {
+                        cert_config,
+                        server_addr: qs_config.addr,
+                        caches: Arc::clone(&caches),
+                    },
+                    invalid_graphs.clone(),
+                )
+                .await?;
 
             #[cfg(feature = "afc")]
             let afc = {
@@ -204,32 +194,21 @@ impl Daemon {
                 )?
             };
 
-            let data = QSData { psk_store };
-
-            let crypto = api::Crypto {
-                engine: eng,
-                local_store,
-                aranya_store,
-            };
-
             let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
-                local_addr: sync_server.local_addr(),
+                local_addr,
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
-                syncer,
+                peers,
                 recv_effects,
                 invalid: invalid_graphs,
                 #[cfg(feature = "afc")]
                 afc,
-                crypto,
-                seed_id_dir,
-                quic: Some(data),
             })?;
             Ok(Self {
                 sync_server,
-                manager,
+                syncer,
                 api,
                 span,
             })
@@ -249,7 +228,7 @@ impl Daemon {
                 .instrument(info_span!("sync-server")),
         );
         set.spawn({
-            self.manager
+            self.syncer
                 .run(waiter.notifier())
                 .instrument(info_span!("syncer"))
         });
@@ -311,18 +290,18 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         SyncParams {
-            psk_store,
+            cert_config,
             server_addr,
             caches,
         }: SyncParams,
-        client_addr: Addr,
         invalid_graphs: InvalidGraphs,
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicState, EN, SP, EF>,
-        SyncHandle,
-        mpsc::Receiver<(GraphId, Vec<EF>)>,
+        Syncer<QuicSyncClientState>,
+        SyncPeers,
+        EffectReceiver,
+        SocketAddr,
     )> {
         let device_id = pk.ident_pk.id()?;
 
@@ -336,45 +315,43 @@ impl Daemon {
         let client = Client::new(Arc::clone(&aranya));
 
         // Sync in the background at some specified interval.
-        let (send_effects, recv_effects) = mpsc::channel(256);
+        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
         // Create shared hello subscriptions for both server and syncer
         #[cfg(feature = "preview")]
         let hello_subscriptions = Arc::default();
 
-        // Create the sync server
+        // Create the sync server (also creates the shared endpoint for client use)
         let client_with_state_for_server = ClientWithState::new(
             client.clone(),
             Arc::clone(&caches),
             #[cfg(feature = "preview")]
             Arc::clone(&hello_subscriptions),
         );
-        let (server, peers, conns, syncer_recv) = SyncServer::new(
-            client_with_state_for_server,
-            &server_addr,
-            Arc::clone(&psk_store),
-        )
-        .await
-        .context("unable to initialize QUIC sync server")?;
+        let (server, peers, conns, syncer_recv, server_addr, endpoint, client_config) =
+            SyncServer::new(client_with_state_for_server, &server_addr, &cert_config)
+                .await
+                .context("unable to initialize QUIC sync server")?;
 
-        // Initialize the syncer
+        // Initialize the syncer using the shared endpoint from the server
         let client_with_state_for_syncer = ClientWithState::new(
             client.clone(),
             caches,
             #[cfg(feature = "preview")]
             server.hello_subscriptions(),
         );
-        let syncer = SyncManager::new(
+        let syncer = Syncer::new(
             client_with_state_for_syncer,
             send_effects,
             invalid_graphs,
-            psk_store,
-            (server.local_addr().into(), client_addr),
+            server_addr.into(),
             syncer_recv,
             conns,
-        )?;
+            endpoint,
+            client_config,
+        );
 
-        Ok((client, server, syncer, peers, recv_effects))
+        Ok((client, server, syncer, peers, recv_effects, server_addr))
     }
 
     /// Loads the crypto engine.
@@ -392,18 +369,6 @@ impl Daemon {
         KS::open(&dir)
             .context("unable to open Aranya keystore")
             .map(AranyaStore::new)
-    }
-
-    /// Loads the local keystore.
-    ///
-    /// The local keystore contains key material for the daemon.
-    /// E.g., its API key.
-    async fn load_local_keystore(cfg: &Config) -> Result<LocalStore<KS>> {
-        let dir = cfg.local_keystore_path();
-        aranya_util::create_dir_all(&dir).await?;
-        KS::open(&dir)
-            .context("unable to open local keystore")
-            .map(LocalStore::new)
     }
 
     /// Loads the daemon's [`PublicKeys`].
@@ -486,6 +451,7 @@ mod tests {
 
     use std::time::Duration;
 
+    use aranya_certgen::{CertGen, SubjectAltNames};
     use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
@@ -509,6 +475,28 @@ mod tests {
             path
         };
 
+        // Generate certificates for mTLS
+        let certs_dir = work_dir.join("certs");
+        std::fs::create_dir_all(&certs_dir).expect("should create certs dir");
+        let root_certs_dir = certs_dir.join("root_certs");
+        std::fs::create_dir_all(&root_certs_dir).expect("should create root certs dir");
+
+        let ca = CertGen::ca("Test CA", 365).expect("should generate CA");
+        ca.save(root_certs_dir.join("ca.pem"), root_certs_dir.join("ca.key"))
+            .expect("should write CA cert/key");
+
+        let sans = SubjectAltNames::new()
+            .with_dns("localhost")
+            .with_ip("127.0.0.1".parse().expect("valid IP"));
+        let signed = ca
+            .generate("test-daemon", 365, &sans)
+            .expect("should generate signed cert");
+        let device_cert_path = certs_dir.join("device.pem");
+        let device_key_path = certs_dir.join("device-key.pem");
+        signed
+            .save(&device_cert_path, &device_key_path)
+            .expect("should write signed cert/key");
+
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "test-daemon-run".into(),
@@ -520,7 +508,9 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: any,
-                    client_addr: None,
+                    root_certs_dir,
+                    device_cert: device_cert_path,
+                    device_key: device_key_path,
                 }),
             },
             #[cfg(feature = "afc")]
