@@ -3,7 +3,7 @@ use std::{future::Future, net::SocketAddr, sync::Arc};
 use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
+    PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
     MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -44,9 +44,9 @@ use crate::{
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
-pub(crate) struct Server<EN, SP> {
+pub(crate) struct Server<PS, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client: ClientWithState<EN, SP>,
+    client: ClientWithState<PS, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
@@ -60,9 +60,9 @@ pub(crate) struct Server<EN, SP> {
     local_addr: SocketAddr,
 }
 
-impl<EN, SP> Server<EN, SP>
+impl<PS, SP> Server<PS, SP>
 where
-    EN: Engine + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
@@ -85,7 +85,7 @@ where
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        client: ClientWithState<EN, SP>,
+        client: ClientWithState<PS, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
     ) -> Result<(
@@ -173,7 +173,7 @@ where
     fn accept_connection(
         &mut self,
         mut conn: s2n_quic::Connection,
-    ) -> impl Future<Output = ()> + use<'_, EN, SP> {
+    ) -> impl Future<Output = ()> + use<'_, PS, SP> {
         let handle = conn.handle();
         async {
             trace!("received incoming QUIC connection");
@@ -236,7 +236,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     async fn sync(
-        client: ClientWithState<EN, SP>,
+        client: ClientWithState<PS, SP>,
         stream: BidirectionalStream,
         active_team: TeamId,
         handle: SyncHandle,
@@ -280,7 +280,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: ClientWithState<EN, SP>,
+        client: ClientWithState<PS, SP>,
         local_addr: Addr,
         request_data: &[u8],
         active_team: TeamId,
@@ -341,7 +341,7 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: ClientWithState<EN, SP>,
+        client: ClientWithState<PS, SP>,
         local_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,

@@ -30,10 +30,10 @@ use serde::{Deserialize, Serialize};
 /// # use aranya_crypto::{Engine, KeyStore};
 /// # use aranya_keygen::KeyBundle;
 /// #
-/// # fn example<E, S>(engine: &mut E, store: &mut S) -> Result<()>
+/// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
 /// # where
-/// #     E: Engine,
-/// #     S: KeyStore,
+/// #     CE: Engine,
+/// #     KS: KeyStore,
 /// # {
 /// // Generate a new key bundle and store the keys in the keystore
 /// let key_bundle = KeyBundle::generate(engine, store)?;
@@ -102,8 +102,8 @@ impl KeyBundle {
     ///
     /// # Type Parameters
     ///
-    /// * `E` - The cryptographic engine implementation
-    /// * `S` - The key store implementation
+    /// * `CE` - The cryptographic engine implementation
+    /// * `KS` - The key store implementation
     ///
     /// # Arguments
     ///
@@ -122,23 +122,23 @@ impl KeyBundle {
     /// # use aranya_crypto::{Engine, KeyStore};
     /// # use aranya_keygen::KeyBundle;
     /// #
-    /// # fn example<E, S>(engine: &mut E, store: &mut S) -> Result<()>
+    /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
     /// # where
-    /// #     E: Engine,
-    /// #     S: KeyStore,
+    /// #     CE: Engine,
+    /// #     KS: KeyStore,
     /// # {
     /// let key_bundle = KeyBundle::generate(engine, store)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn generate<E, S>(eng: &mut E, store: &mut S) -> Result<Self>
+    pub fn generate<CE, KS>(eng: &mut CE, store: &mut KS) -> Result<Self>
     where
-        E: Engine,
-        S: KeyStore,
+        CE: Engine,
+        KS: KeyStore,
     {
         macro_rules! gen {
             ($key:ident) => {{
-                let sk = $key::<E::CS>::new(eng);
+                let sk = $key::<CE::CS>::new(eng);
                 store.insert_key(eng, sk).context(concat!(
                     "unable to insert `",
                     stringify!($key),
@@ -160,8 +160,8 @@ impl KeyBundle {
     ///
     /// # Type Parameters
     ///
-    /// * `E` - The cryptographic engine implementation
-    /// * `S` - The key store implementation
+    /// * `CE` - The cryptographic engine implementation
+    /// * `KS` - The key store implementation
     ///
     /// # Arguments
     ///
@@ -180,34 +180,34 @@ impl KeyBundle {
     /// # use aranya_crypto::{Engine, KeyStore};
     /// # use aranya_keygen::KeyBundle;
     /// #
-    /// # fn example<E, S>(engine: &mut E, store: &mut S) -> Result<()>
+    /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
     /// # where
-    /// #     E: Engine,
-    /// #     S: KeyStore,
+    /// #     CE: Engine,
+    /// #     KS: KeyStore,
     /// # {
     /// let key_bundle = KeyBundle::generate(engine, store)?;
     /// let public_keys = key_bundle.public_keys(engine, store)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn public_keys<E, S>(&self, eng: &mut E, store: &S) -> Result<PublicKeys<E::CS>>
+    pub fn public_keys<CE, KS>(&self, eng: &mut CE, store: &KS) -> Result<PublicKeys<CE::CS>>
     where
-        E: Engine,
-        S: KeyStore,
+        CE: Engine,
+        KS: KeyStore,
     {
         Ok(PublicKeys {
             ident_pk: store
-                .get_key::<_, IdentityKey<E::CS>>(eng, self.device_id)
+                .get_key::<_, IdentityKey<CE::CS>>(eng, self.device_id)
                 .context("unable to load `IdentityKey`")?
                 .context("unable to find `IdentityKey`")?
                 .public()?,
             enc_pk: store
-                .get_key::<_, EncryptionKey<E::CS>>(eng, self.enc_id)
+                .get_key::<_, EncryptionKey<CE::CS>>(eng, self.enc_id)
                 .context("unable to load `EncryptionKey`")?
                 .context("unable to find `EncryptionKey`")?
                 .public()?,
             sign_pk: store
-                .get_key::<_, SigningKey<E::CS>>(eng, self.sign_id)
+                .get_key::<_, SigningKey<CE::CS>>(eng, self.sign_id)
                 .context("unable to load `SigningKey`")?
                 .context("unable to find `SigningKey`")?
                 .public()?,

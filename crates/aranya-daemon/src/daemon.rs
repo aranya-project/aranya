@@ -46,15 +46,15 @@ pub(crate) type CE = DefaultEngine;
 pub(crate) type CS = <DefaultEngine as Engine>::CS;
 /// KS = Key Store
 pub(crate) type KS = Store;
-/// EN = Engine (Policy)
-pub(crate) type EN = PolicyEngine<CE, KS>;
+/// PS = Policy Store
+pub(crate) type PS = PolicyEngine<CE, KS>;
 /// SP = Storage Provider
 pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::quic::Server<EN, SP>;
+pub(crate) type Client = aranya::Client<PS, SP>;
+pub(crate) type SyncServer = crate::sync::quic::Server<PS, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -121,7 +121,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicState, EN, SP, EF>,
+    manager: SyncManager<QuicState, PS, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -320,14 +320,14 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicState, EN, SP, EF>,
+        SyncManager<QuicState, PS, SP, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(POLICY_SOURCE, eng, store, device_id)?,
+            PS::new(POLICY_SOURCE, eng, store, device_id)?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
@@ -407,14 +407,14 @@ impl Daemon {
     }
 
     /// Loads the daemon's [`PublicKeys`].
-    async fn load_or_gen_public_keys<E, S>(
+    async fn load_or_gen_public_keys<CE, KS>(
         cfg: &Config,
-        eng: &mut E,
-        store: &mut AranyaStore<S>,
-    ) -> Result<PublicKeys<E::CS>>
+        eng: &mut CE,
+        store: &mut AranyaStore<KS>,
+    ) -> Result<PublicKeys<CE::CS>>
     where
-        E: Engine,
-        S: KeyStore,
+        CE: Engine,
+        KS: KeyStore,
     {
         let path = cfg.key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {

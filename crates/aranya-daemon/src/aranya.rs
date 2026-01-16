@@ -13,25 +13,25 @@ use crate::sync::HelloSubscriptions;
 use crate::sync::SyncPeer;
 
 /// Thread-safe wrapper for an Aranya client.
-pub struct Client<EN, SP> {
+pub struct Client<PS, SP> {
     /// Thread-safe Aranya client reference.
-    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    pub(crate) aranya: Arc<Mutex<ClientState<PS, SP>>>,
 }
 
-impl<EN, SP> Client<EN, SP> {
+impl<PS, SP> Client<PS, SP> {
     /// Creates a new Client
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
+    pub fn new(aranya: Arc<Mutex<ClientState<PS, SP>>>) -> Self {
         Client { aranya }
     }
 }
 
-impl<EN, SP> fmt::Debug for Client<EN, SP> {
+impl<PS, SP> fmt::Debug for Client<PS, SP> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 
-impl<EN, SP> Clone for Client<EN, SP> {
+impl<PS, SP> Clone for Client<PS, SP> {
     fn clone(&self) -> Self {
         Self {
             aranya: Arc::clone(&self.aranya),
@@ -39,8 +39,8 @@ impl<EN, SP> Clone for Client<EN, SP> {
     }
 }
 
-impl<EN, SP> Deref for Client<EN, SP> {
-    type Target = Mutex<ClientState<EN, SP>>;
+impl<PS, SP> Deref for Client<PS, SP> {
+    type Target = Mutex<ClientState<PS, SP>>;
 
     fn deref(&self) -> &Self::Target {
         &self.aranya
@@ -57,17 +57,17 @@ pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<SyncPeer, PeerCache>>>;
 ///
 /// Ensures safe lock ordering by providing a method that locks both in the correct order.
 /// The client must always be locked before the caches to prevent deadlocks.
-pub(crate) struct ClientWithState<EN, SP> {
-    client: Client<EN, SP>,
+pub(crate) struct ClientWithState<PS, SP> {
+    client: Client<PS, SP>,
     caches: PeerCacheMap,
     #[cfg(feature = "preview")]
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
 }
 
-impl<EN, SP> ClientWithState<EN, SP> {
+impl<PS, SP> ClientWithState<PS, SP> {
     /// Creates a new `ClientWithState`.
     pub fn new(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         caches: PeerCacheMap,
         #[cfg(feature = "preview")] hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     ) -> Self {
@@ -86,7 +86,7 @@ impl<EN, SP> ClientWithState<EN, SP> {
     pub async fn lock_aranya_and_caches(
         &self,
     ) -> (
-        MutexGuard<'_, ClientState<EN, SP>>,
+        MutexGuard<'_, ClientState<PS, SP>>,
         MutexGuard<'_, BTreeMap<SyncPeer, PeerCache>>,
     ) {
         let aranya = self.client.aranya.lock().await;
@@ -98,7 +98,7 @@ impl<EN, SP> ClientWithState<EN, SP> {
     ///
     /// Use this when you need to access the client alone without locking the caches.
     #[cfg(any(feature = "preview", test))]
-    pub fn client(&self) -> &Client<EN, SP> {
+    pub fn client(&self) -> &Client<PS, SP> {
         &self.client
     }
 
@@ -114,7 +114,7 @@ impl<EN, SP> ClientWithState<EN, SP> {
     ///
     /// Use this when you need mutable access to the client alone without locking the caches.
     #[cfg(test)]
-    pub(crate) fn client_mut(&mut self) -> &mut Client<EN, SP> {
+    pub(crate) fn client_mut(&mut self) -> &mut Client<PS, SP> {
         &mut self.client
     }
 
@@ -127,13 +127,13 @@ impl<EN, SP> ClientWithState<EN, SP> {
     }
 }
 
-impl<EN, SP> fmt::Debug for ClientWithState<EN, SP> {
+impl<PS, SP> fmt::Debug for ClientWithState<PS, SP> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ClientWithState").finish_non_exhaustive()
     }
 }
 
-impl<EN, SP> Clone for ClientWithState<EN, SP> {
+impl<PS, SP> Clone for ClientWithState<PS, SP> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
