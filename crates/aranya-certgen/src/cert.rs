@@ -192,6 +192,7 @@ impl CaCert {
     }
 }
 
+/// Zeroizes the private key when dropped to prevent key material from lingering in memory.
 impl Drop for CaCert {
     fn drop(&mut self) {
         self.key.zeroize();
@@ -255,6 +256,7 @@ impl SignedCert {
     }
 }
 
+/// Zeroizes the private key when dropped to prevent key material from lingering in memory.
 impl Drop for SignedCert {
     fn drop(&mut self) {
         self.key.zeroize();
