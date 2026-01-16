@@ -17,9 +17,12 @@
 //!   - HPKE (Hybrid Public Key Encryption) keys for use with MLS or other protocols
 //!   - Post-quantum algorithms (e.g., ML-KEM, ML-DSA)
 //!
-//! - **Certificate extensions**: Support for additional X.509 extensions such as:
-//!   - Subject Alternative Names (SANs) for IP addresses and additional DNS names
-//!   - Custom extensions
+//! - **Subject Alternative Names (SANs)**: Currently, only the Common Name (CN) is added
+//!   as a DNS SAN. Explicit SAN support could be added via `--dns` and `--ip` flags to
+//!   allow multiple DNS names and IP addresses in a single certificate.
+//!
+//! - **Certificate extensions**: Support for additional X.509 extensions such as
+//!   custom OIDs and extension values.
 //!
 //! - **CSR support**: Certificate Signing Request (CSR) generation and signing.
 //!
