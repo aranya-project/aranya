@@ -166,6 +166,11 @@ impl Config {
         self.state_dir.join("storage")
     }
 
+    /// Path to file containing the seed IDs.
+    pub(crate) fn seed_id_path(&self) -> PathBuf {
+        self.state_dir.join("seeds")
+    }
+
     /// Path to the daemon's UDS API socket.
     pub fn uds_api_sock(&self) -> PathBuf {
         self.runtime_dir.join("uds.sock")
@@ -213,6 +218,9 @@ pub struct QuicSyncConfig {
     /// This address is used for both accepting incoming connections and making
     /// outbound connections to peers, enabling bidirectional connection reuse.
     pub addr: Addr,
+
+    /// Client bind address (optional, defaults to same host as server with port 0).
+    pub client_addr: Option<Addr>,
 
     /// Directory containing trusted root CA certificates (PEM format).
     ///
@@ -272,6 +280,7 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
+                    client_addr: None,
                     root_certs_dir: "/etc/aranya/root_certs".into(),
                     device_cert: "/etc/aranya/device.pem".into(),
                     device_key: "/etc/aranya/device-key.pem".into(),
