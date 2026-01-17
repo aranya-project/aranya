@@ -41,10 +41,7 @@ pub use crate::client::{
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };
-use crate::{
-    config::{AddTeamConfig, CreateTeamConfig},
-    error::{self, aranya_error, InvalidArg, IpcError, Result},
-};
+use crate::error::{self, aranya_error, InvalidArg, IpcError, Result};
 
 /// Builds a [`Client`].
 #[derive(Debug, Default)]
@@ -223,10 +220,13 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
+    ///
+    /// The `_cfg` parameter exists for backward compatibility and is ignored.
+    /// With mTLS authentication, team configuration is no longer required.
+    pub async fn create_team(&self, _cfg: crate::CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
-            .create_team(context::current(), cfg.into())
+            .create_team(context::current())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -237,8 +237,20 @@ impl Client {
         })
     }
 
+    /// Add an existing team to this device.
+    ///
+    /// This method exists for backward compatibility. With mTLS authentication,
+    /// devices authenticate via certificates at the connection level, not
+    /// per-team PSKs. The method returns a handle to the team but performs
+    /// no additional operations.
+    pub async fn add_team(&self, cfg: crate::AddTeamConfig) -> Result<Team<'_>> {
+        Ok(Team {
+            client: self,
+            id: cfg.id.into_api(),
+        })
+    }
+
     /// Generate random bytes from a CSPRNG.
-    /// Can be used to generate IKM for a generating a PSK seed.
     pub async fn rand(&self, buf: &mut [u8]) {
         <Rng as Csprng>::fill_bytes(&mut Rng, buf);
     }
@@ -249,22 +261,6 @@ impl Client {
             client: self,
             id: team_id.into_api(),
         }
-    }
-
-    /// Add a team to local device storage.
-    pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
-        let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
-        let team_id = TeamId::from_api(cfg.team_id);
-
-        self.daemon
-            .add_team(context::current(), cfg)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        Ok(Team {
-            client: self,
-            id: team_id.into_api(),
-        })
     }
 
     /// Remove a team from local device storage.

@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
 
+use aranya_certgen::CaCert;
 use aranya_daemon::{
     config::{Config, QuicSyncConfig, SyncConfig, Toggle},
     Daemon,
@@ -35,6 +36,28 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                 path
             };
 
+            // Generate mTLS certificates
+            let certs_dir = work_dir.join("certs");
+            let root_certs_dir = certs_dir.join("root_certs");
+            std::fs::create_dir_all(&root_certs_dir).expect("should create root_certs_dir");
+
+            let ca = CaCert::new("Bench CA", 365).expect("should generate CA");
+            let ca_prefix = root_certs_dir.join("ca");
+            ca.save(ca_prefix.to_str().expect("valid path"), None)
+                .expect("should write CA cert/key");
+
+            // CN is automatically added as DNS SAN
+            let signed = ca
+                .generate("bench.test.local", 365)
+                .expect("should generate signed cert");
+
+            let device_prefix = certs_dir.join("device");
+            signed
+                .save(device_prefix.to_str().expect("valid path"), None)
+                .expect("should write signed cert/key");
+            let device_cert_path = certs_dir.join("device.crt.pem");
+            let device_key_path = certs_dir.join("device.key.pem");
+
             let cfg = Config {
                 name: "test-daemon-run".into(),
                 runtime_dir: work_dir.join("run"),
@@ -45,7 +68,9 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                 sync: SyncConfig {
                     quic: Toggle::Enabled(QuicSyncConfig {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                        client_addr: None,
+                        root_certs_dir,
+                        device_cert: device_cert_path,
+                        device_key: device_key_path,
                     }),
                 },
                 #[cfg(feature = "afc")]

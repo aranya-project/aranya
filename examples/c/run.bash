@@ -16,8 +16,5 @@ cleanup() {
 trap 'cleanup' EXIT
 trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
-# Run example with randomly generated QUIC syncer PSK seed
+# Run example
 ./example.bash
-
-# Run example with raw QUIC syncer PSK seed IKM
-./example.bash raw_seed_ikm

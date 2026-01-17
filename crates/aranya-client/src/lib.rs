@@ -40,6 +40,7 @@ pub use aranya_util::Addr;
 #[doc(inline)]
 pub use crate::client::{Permission, RoleManagementPermission};
 #[doc(inline)]
+#[allow(deprecated)]
 pub use crate::{
     client::{
         ChanOp, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,

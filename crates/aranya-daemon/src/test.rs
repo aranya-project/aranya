@@ -12,24 +12,25 @@ use std::{
     fs,
     net::Ipv4Addr,
     ops::{Deref, DerefMut},
+    path::PathBuf,
     sync::Arc,
 };
 
 use anyhow::{bail, Context, Result};
+use aranya_certgen::CaCert;
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
     policy::{LabelId, RoleId},
     Csprng, DeviceId, Rng,
 };
-use aranya_daemon_api::{text, TeamId};
+use aranya_daemon_api::text;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientError, ClientState, GraphId,
 };
 use aranya_util::{ready, Addr};
-use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
 use serial_test::serial;
 use tempfile::{tempdir, TempDir};
 use test_log::test;
@@ -42,12 +43,16 @@ use tokio::{
 };
 
 #[cfg(feature = "preview")]
-use crate::sync::HelloSubscriptions;
+use crate::sync::task::quic::HelloSubscriptions;
 use crate::{
     actions::Actions,
+    api::EffectReceiver,
     aranya::{self, ClientWithState, PeerCacheMap},
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
-    sync::{self, quic::PskStore, SyncPeer},
+    sync::{
+        self,
+        task::{quic::CertConfig, PeerCacheKey, SyncPeer},
+    },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore, InvalidGraphs,
 };
@@ -56,12 +61,15 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::quic::QuicState;
+type TestState = sync::task::quic::State;
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<TestState, crate::EN, crate::SP, crate::EF>;
+type TestSyncer = sync::task::Syncer<TestState>;
 
 // Aranya sync server for testing.
-type TestServer = sync::quic::Server<crate::EN, crate::SP>;
+type TestServer = sync::task::quic::Server<
+    PolicyEngine<DefaultEngine, Store>,
+    LinearStorageProvider<FileManager>,
+>;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -80,14 +88,14 @@ struct TestDevice {
 impl TestDevice {
     pub fn new(
         server: TestServer,
+        sync_local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
         syncer: TestSyncer,
-        effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
+        effect_recv: EffectReceiver,
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
-        let sync_local_addr = server.local_addr().into();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
@@ -112,7 +120,7 @@ impl TestDevice {
     ) -> Result<Vec<Effect>> {
         let cmd_count = self
             .syncer
-            .sync(SyncPeer::new(device.sync_local_addr, self.graph_id))
+            .sync(&SyncPeer::new(device.sync_local_addr, self.graph_id))
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
         if let Some(must_receive) = must_receive {
@@ -186,32 +194,69 @@ impl<'a> TestTeam<'a> {
 struct TestCtx {
     /// The working directory for the test.
     dir: TempDir,
-    // Per-client ID.
-    // Incrementing counter is used to differentiate clients for test purposes.
+    /// Per-client ID counter.
     id: u64,
+    /// Path to root CA certificate directory (contains ca.crt.pem).
+    root_certs_dir: PathBuf,
+    /// The certificate authority for signing device certs.
+    ca: CaCert,
 }
 
 impl TestCtx {
-    /// Creates a new test context.
+    /// Creates a new test context with a shared CA for mTLS.
     pub fn new() -> Result<Self> {
+        let dir = tempdir()?;
+
+        // Create shared CA certificate for all test clients
+        let root_certs_dir = dir.path().join("root_certs");
+        fs::create_dir_all(&root_certs_dir)?;
+
+        // Generate CA certificate
+        let ca = CaCert::new("Test CA", 365).context("failed to generate test CA")?;
+        let ca_prefix = root_certs_dir.join("ca");
+        ca.save(ca_prefix.to_str().expect("valid path"), None)
+            .context("failed to write CA cert/key")?;
+
         Ok(Self {
-            dir: tempdir()?,
+            dir,
             id: 0,
+            root_certs_dir,
+            ca,
         })
     }
 
-    /// Creates a single client.
-    pub async fn new_client(
-        &mut self,
-        name: &str,
-        id: GraphId,
-    ) -> Result<(TestDevice, Arc<PskStore>)> {
+    /// Generates a device certificate signed by the test CA.
+    fn generate_device_cert(&self, name: &str, device_dir: &std::path::Path) -> Result<CertConfig> {
+        // CN is automatically added as DNS SAN by the new certgen API
+        let signed = self
+            .ca
+            .generate(name, 365)
+            .context("failed to generate signed cert")?;
+
+        let device_prefix = device_dir.join("device");
+        signed
+            .save(device_prefix.to_str().expect("valid path"), None)
+            .context("failed to write signed cert/key")?;
+
+        Ok(CertConfig {
+            root_certs_dir: self.root_certs_dir.clone(),
+            device_cert: device_dir.join("device.crt.pem"),
+            device_key: device_dir.join("device.key.pem"),
+        })
+    }
+
+    /// Creates a single client with mTLS certificate.
+    pub async fn new_client(&mut self, name: &str, id: GraphId) -> Result<TestDevice> {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
+        fs::create_dir_all(&root)?;
+
+        // Generate device certificate
+        let cert_config = self.generate_device_cert(name, &root)?;
 
         let caches = PeerCacheMap::new(Mutex::new(BTreeMap::new()));
 
-        let (syncer, server, pk, psk_store, effects_recv) = {
+        let (syncer, server, local_addr, pk, effects_recv) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -239,30 +284,23 @@ impl TestCtx {
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
             let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-            let psk_store = PskStore::new([]);
-            let psk_store = Arc::new(psk_store);
 
             #[cfg(feature = "preview")]
             let hello_subscriptions = Arc::<Mutex<HelloSubscriptions>>::default();
 
             let (send_effects, effects_recv) = mpsc::channel(1);
 
-            // Create server first to get the actual listening address
+            // Create server first to get the actual listening address and shared endpoint
             let client_with_state_for_server = ClientWithState::new(
                 client.clone(),
                 caches.clone(),
                 #[cfg(feature = "preview")]
                 hello_subscriptions.clone(),
             );
-            let (server, _sync_peers, conn_map, syncer_recv): (TestServer, _, _, _) =
-                TestServer::new(
-                    client_with_state_for_server,
-                    &any_local_addr,
-                    psk_store.clone(),
-                )
-                .await?;
+            let (server, _sync_peers, conn_map, syncer_recv, local_addr, endpoint, client_config): (TestServer, _, _, _, _, _, _) =
+                TestServer::new(client_with_state_for_server, &any_local_addr, &cert_config).await?;
 
-            // Create syncer with the actual server address
+            // Create syncer using the shared endpoint from the server
             let client_with_state_for_syncer = ClientWithState::new(
                 client.clone(),
                 caches.clone(),
@@ -273,30 +311,21 @@ impl TestCtx {
                 client_with_state_for_syncer,
                 send_effects,
                 InvalidGraphs::default(),
-                psk_store.clone(),
-                (server.local_addr().into(), any_local_addr),
+                local_addr.into(),
                 syncer_recv,
                 conn_map,
-            )?;
+                endpoint,
+                client_config,
+            );
 
-            (syncer, server, pk, psk_store, effects_recv)
+            (syncer, server, local_addr, pk, effects_recv)
         };
 
-        Ok((
-            TestDevice::new(server, pk, id, syncer, effects_recv)?,
-            psk_store,
-        ))
+        TestDevice::new(server, local_addr.into(), pk, id, syncer, effects_recv)
     }
 
-    /// Creates `n` members.
+    /// Creates `n` members with mTLS certificates.
     pub async fn new_group(&mut self, n: usize) -> Result<Vec<TestDevice>> {
-        let test_psk = PresharedKey::external(b"test-identity", b"test-secret-key-32-bytes-long!!")
-            .context("failed to create test PSK")?
-            .with_hash_alg(
-                s2n_quic::provider::tls::rustls::rustls::crypto::hash::HashAlgorithm::SHA384,
-            )
-            .context("failed to set hash algorithm")?;
-        let mut stores = Vec::<Arc<PskStore>>::new();
         let mut clients = Vec::<TestDevice>::new();
         for i in 0..n {
             let name = format!("client_{}", self.id);
@@ -307,12 +336,12 @@ impl TestCtx {
             } else {
                 clients[0].graph_id
             };
-            let (mut client, psk_store) = self
+            let mut client = self
                 .new_client(&name, id)
                 .await
                 .with_context(|| format!("unable to create client {name}"))?;
-            stores.push(psk_store);
-            // Eww, gross.
+
+            // Create team for the first client
             if id == GraphId::default() {
                 let nonce = &mut [0u8; 16];
                 Rng.fill_bytes(nonce);
@@ -321,11 +350,6 @@ impl TestCtx {
                     .await?;
             }
             clients.push(client)
-        }
-        for store in stores {
-            let team_id = TeamId::from(*clients[0].graph_id.as_array());
-            store.insert(team_id, Arc::new(test_psk.clone()));
-            store.set_team(team_id);
         }
         Ok(clients)
     }
@@ -344,7 +368,6 @@ impl TestCtx {
         let memberb = team.memberb;
 
         // team setup - first setup default roles
-        let _team_id = TeamId::from(*owner.graph_id.as_array());
 
         // Get owner role ID from existing roles
         let role_effects = owner.actions().query_team_roles().await?;
@@ -414,7 +437,10 @@ impl TestCtx {
         admin.sync_expect(owner, None).await?;
 
         let admin_caches = admin.syncer.get_peer_caches();
-        let owner_key = SyncPeer::new(owner.sync_local_addr, admin.graph_id);
+        let owner_key = PeerCacheKey {
+            addr: owner.sync_local_addr,
+            id: admin.graph_id,
+        };
         let admin_cache_size = admin_caches
             .lock()
             .await
@@ -617,7 +643,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let (extra, _extra_store) = ctx
+    let extra = ctx
         .new_client("extra", owner.graph_id)
         .await
         .context("unable to create extra device")?;
@@ -665,7 +691,7 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
         .await
         .context("admin unable to sync owner state")?;
 
-    let (candidate, _store) = ctx
+    let candidate = ctx
         .new_client("candidate", owner.graph_id)
         .await
         .context("unable to create candidate device")?;
@@ -729,7 +755,7 @@ async fn test_assign_role_rejects_unknown_device() -> Result<()> {
         .await
         .context("admin unable to sync delegation")?;
 
-    let (extra, _store) = ctx
+    let extra = ctx
         .new_client("unknown-device", owner.graph_id)
         .await
         .context("unable to create extra device")?;
@@ -1596,6 +1622,58 @@ async fn test_revoke_label_managing_role_requires_change_perm() -> Result<()> {
         .revoke_label_managing_role(label_id, admin_role)
         .await
         .context("owner should be able to revoke label managing roles")?;
+
+    Ok(())
+}
+
+/// Tests that mTLS connections are rejected when the peer's certificate
+/// is signed by an untrusted CA.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_mtls_rejects_untrusted_certificate() -> Result<()> {
+    // Create first context with its own CA
+    let mut ctx1 = TestCtx::new()?;
+    let mut client1 = ctx1
+        .new_client("trusted_client", GraphId::default())
+        .await
+        .context("unable to create first client")?;
+
+    // Create team on client1
+    let nonce = &mut [0u8; 16];
+    Rng.fill_bytes(nonce);
+    (client1.graph_id, _) = client1
+        .create_team(DeviceKeyBundle::try_from(&client1.pk)?, Some(nonce))
+        .await?;
+
+    // Create second context with a DIFFERENT CA
+    let mut ctx2 = TestCtx::new()?;
+    let mut client2 = ctx2
+        .new_client("untrusted_client", client1.graph_id)
+        .await
+        .context("unable to create second client")?;
+
+    // Try to sync from client2 to client1 - this should fail because
+    // client2's certificate is signed by a different CA that client1 doesn't trust
+    let sync_result = client2
+        .syncer
+        .sync(&SyncPeer::new(client1.sync_local_addr, client1.graph_id))
+        .await;
+
+    assert!(
+        sync_result.is_err(),
+        "sync should fail when peer certificate is signed by untrusted CA"
+    );
+
+    // Also try the reverse direction
+    let sync_result = client1
+        .syncer
+        .sync(&SyncPeer::new(client2.sync_local_addr, client2.graph_id))
+        .await;
+
+    assert!(
+        sync_result.is_err(),
+        "sync should fail when connecting to peer with untrusted CA"
+    );
 
     Ok(())
 }

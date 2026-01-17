@@ -1,3 +1,6 @@
+// Allow deprecated usage since From impls call deprecated aranya_client::*ConfigBuilder::quic_sync()
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};

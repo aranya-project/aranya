@@ -21,12 +21,13 @@ pub const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(600);
 
 /// Team info sent from team owner to other devices during onboarding.
+///
+/// With mTLS authentication, only the team ID needs to be shared.
+/// Device authentication is handled by TLS certificates rather than PSKs.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TeamInfo {
     /// Aranya team ID.
     pub team_id: TeamId,
-    /// QUIC syncer seed IKM (initial key material).
-    pub seed_ikm: [u8; 32],
 }
 
 /// Device info sent between peers during onboarding.

@@ -11,24 +11,33 @@
 //!
 //! Both operations support optional transport configuration.
 
+// Allow deprecated usage within this module since we re-export deprecated types
+#![allow(deprecated)]
+
 use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
 pub use quic_sync::{
-    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+    AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfigBuilder, SEED_IKM_SIZE,
 };
 
 /// Builder for [`CreateTeamConfig`].
 #[derive(Debug, Default)]
+#[allow(deprecated)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
 impl CreateTeamConfigBuilder {
-    /// Configures the quic_sync config..
+    /// Configures the quic_sync config.
     ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
+    /// # Deprecation Notice
+    ///
+    /// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+    /// This method exists for backward compatibility but the config is ignored.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
+    #[allow(deprecated)]
     pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
         self.quic_sync = Some(cfg);
         self
@@ -44,6 +53,7 @@ impl CreateTeamConfigBuilder {
 
 /// Builder for [`AddTeamConfig`].
 #[derive(Debug, Default)]
+#[allow(deprecated)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
     quic_sync: Option<AddTeamQuicSyncConfig>,
@@ -56,10 +66,14 @@ impl AddTeamConfigBuilder {
         self
     }
 
-    /// Configures the quic_sync config..
+    /// Configures the quic_sync config.
     ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
+    /// # Deprecation Notice
+    ///
+    /// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+    /// This method exists for backward compatibility but the config is ignored.
+    #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
+    #[allow(deprecated)]
     pub fn quic_sync(mut self, cfg: AddTeamQuicSyncConfig) -> Self {
         self.quic_sync = Some(cfg);
         self
@@ -82,8 +96,10 @@ impl AddTeamConfigBuilder {
 }
 
 /// Configuration for creating a new team.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
+#[allow(deprecated)]
 pub struct CreateTeamConfig {
+    #[allow(dead_code)]
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
@@ -94,18 +110,12 @@ impl CreateTeamConfig {
     }
 }
 
-impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
-    fn from(value: CreateTeamConfig) -> Self {
-        Self {
-            quic_sync: value.quic_sync.map(Into::into),
-        }
-    }
-}
-
 /// Configuration for joining an existing team.
 #[derive(Clone, Debug)]
+#[allow(deprecated)]
 pub struct AddTeamConfig {
-    id: TeamId,
+    pub(crate) id: TeamId,
+    #[allow(dead_code)]
     quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
@@ -113,14 +123,5 @@ impl AddTeamConfig {
     /// Creates a default [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
         AddTeamConfigBuilder::default()
-    }
-}
-
-impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
-    fn from(value: AddTeamConfig) -> Self {
-        Self {
-            team_id: value.id.into_api(),
-            quic_sync: value.quic_sync.map(Into::into),
-        }
     }
 }

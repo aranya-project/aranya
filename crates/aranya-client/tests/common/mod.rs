@@ -1,17 +1,23 @@
-use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
+use std::{
+    collections::HashMap,
+    iter,
+    net::Ipv4Addr,
+    path::{Path, PathBuf},
+    ptr,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Context, Result};
+use aranya_certgen::CaCert;
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
-    config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    Addr, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -45,12 +51,55 @@ impl DevicesCtx {
         let work_dir = tempfile::tempdir()?;
         let work_dir_path = work_dir.path();
 
+        // Generate a shared CA for all devices
+        let certs_dir = work_dir_path.join("certs");
+        std::fs::create_dir_all(&certs_dir)?;
+
+        let root_certs_dir = certs_dir.join("root_certs");
+        std::fs::create_dir_all(&root_certs_dir)?;
+
+        // Generate CA certificate
+        let ca = CaCert::new("Test CA", 365).context("failed to generate CA")?;
+        let ca_prefix = root_certs_dir.join("ca");
+        ca.save(ca_prefix.to_str().expect("valid path"), None)
+            .context("failed to write CA cert/key")?;
+
         let (owner, admin, operator, membera, memberb) = try_join!(
-            DeviceCtx::new(name, "owner", work_dir_path.join("owner")),
-            DeviceCtx::new(name, "admin", work_dir_path.join("admin")),
-            DeviceCtx::new(name, "operator", work_dir_path.join("operator")),
-            DeviceCtx::new(name, "membera", work_dir_path.join("membera")),
-            DeviceCtx::new(name, "memberb", work_dir_path.join("memberb")),
+            DeviceCtx::new(
+                name,
+                "owner",
+                work_dir_path.join("owner"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "admin",
+                work_dir_path.join("admin"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "operator",
+                work_dir_path.join("operator"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "membera",
+                work_dir_path.join("membera"),
+                &ca,
+                &root_certs_dir
+            ),
+            DeviceCtx::new(
+                name,
+                "memberb",
+                work_dir_path.join("memberb"),
+                &ca,
+                &root_certs_dir
+            ),
         )?;
 
         Ok(Self {
@@ -121,43 +170,16 @@ impl DevicesCtx {
 
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
-        let seed_ikm = {
-            let mut buf = [0; SEED_IKM_SIZE];
-            self.owner.client.rand(&mut buf).await;
-            buf
-        };
-        let owner_cfg = {
-            let qs_cfg = CreateTeamQuicSyncConfig::builder()
-                .seed_ikm(seed_ikm)
-                .build()?;
-            CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
-        };
-
+        // With mTLS, no PSK seed is needed - certificates handle authentication.
         let team = {
             self.owner
                 .client
-                .create_team(owner_cfg)
+                .create_team(Default::default())
                 .await
                 .expect("expected to create team")
         };
         let team_id = team.team_id();
         info!(?team_id);
-
-        let cfg = {
-            let qs_cfg = AddTeamQuicSyncConfig::builder()
-                .seed_ikm(seed_ikm)
-                .build()?;
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(qs_cfg)
-                .build()?
-        };
-
-        // Owner has the team added due to calling `create_team`, now we assign it to all other peers
-        self.admin.client.add_team(cfg.clone()).await?;
-        self.operator.client.add_team(cfg.clone()).await?;
-        self.membera.client.add_team(cfg.clone()).await?;
-        self.memberb.client.add_team(cfg).await?;
 
         Ok(team_id)
     }
@@ -216,7 +238,13 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub(crate) async fn new(
+        team_name: &str,
+        name: &str,
+        work_dir: PathBuf,
+        ca: &CaCert,
+        root_certs_dir: &Path,
+    ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // TODO: only compile when 'afc' feature is enabled
@@ -231,6 +259,22 @@ impl DeviceCtx {
             let _ = shm::unlink(&path);
             path
         };
+
+        // Generate device certificate
+        std::fs::create_dir_all(&work_dir)?;
+        // Use "127.0.0.1" as the CN - this will create an IP SAN that matches
+        // the actual socket address used by QUIC. This ensures that:
+        // 1. TLS server name verification passes (127.0.0.1 matches IP SAN)
+        // 2. Hello subscription peer lookups work (127.0.0.1:port matches exactly)
+        let signed = ca
+            .generate("127.0.0.1", 365)
+            .context("failed to generate signed cert")?;
+        let device_prefix = work_dir.join("device");
+        signed
+            .save(device_prefix.to_str().expect("valid path"), None)
+            .context("failed to write signed cert/key")?;
+        let device_cert_path = work_dir.join("device.crt.pem");
+        let device_key_path = work_dir.join("device.key.pem");
 
         // Setup daemon config.
         let cfg = Config {
@@ -247,7 +291,9 @@ impl DeviceCtx {
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
-                    client_addr: None,
+                    root_certs_dir: root_certs_dir.to_path_buf(),
+                    device_cert: device_cert_path,
+                    device_key: device_key_path,
                 }),
             },
         };
@@ -291,8 +337,15 @@ impl DeviceCtx {
         })
     }
 
+    /// Returns the address for this device's QUIC sync server.
+    ///
+    /// Since we use IP addresses (127.0.0.1) in certificates, we can directly use
+    /// the daemon's reported local address which already contains the IP.
     pub async fn aranya_local_addr(&self) -> Result<Addr> {
-        Ok(self.client.local_addr().await?)
+        self.client
+            .local_addr()
+            .await
+            .context("failed to get local address")
     }
 
     fn get_shm_path(path: String) -> String {
