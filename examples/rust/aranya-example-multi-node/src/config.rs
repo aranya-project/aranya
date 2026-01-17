@@ -43,11 +43,12 @@ impl CertificateAuthority {
     }
 
     /// Generates a signed certificate.
-    pub fn generate_signed_cert(&self, name: &str, work_dir: &Path) -> Result<(PathBuf, PathBuf)> {
-        // CN is automatically added as DNS SAN by the new certgen API
+    pub fn generate_signed_cert(&self, _name: &str, work_dir: &Path) -> Result<(PathBuf, PathBuf)> {
+        // Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname).
+        // This ensures TLS verification works with the actual socket address.
         let signed = self
             .ca
-            .generate(&format!("{}.example.local", name), 365)
+            .generate("127.0.0.1", 365)
             .context("failed to generate signed cert")?;
 
         let device_prefix = work_dir.join("device");

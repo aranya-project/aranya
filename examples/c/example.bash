@@ -50,8 +50,8 @@ mkdir -p "${root_certs_dir}"
 # Build certgen tool
 cargo build -p aranya-certgen --bin aranya-certgen --release
 
-# Generate CA certificate
-"${release}/aranya-certgen" ca --cert "${root_certs_dir}/ca.pem" --key "${out}/ca-key.pem"
+# Generate CA certificate (saved to root_certs_dir so daemon can load it)
+"${release}/aranya-certgen" ca --cn "Aranya Example CA" --output "${root_certs_dir}/ca"
 
 port=10001
 for device in "${devices[@]}"; do
@@ -60,13 +60,11 @@ for device in "${devices[@]}"; do
     mkdir -p "${config_dir}"
 
     # Generate device certificate signed by CA
+    # Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname)
     "${release}/aranya-certgen" signed \
-        --ca-cert "${root_certs_dir}/ca.pem" \
-        --ca-key "${out}/ca-key.pem" \
-        --cn "${device}" \
-        --ip "127.0.0.1" \
-        --cert "${config_dir}/device.pem" \
-        --key "${config_dir}/device.key"
+        --ca "${root_certs_dir}/ca" \
+        --cn "127.0.0.1" \
+        --output "${config_dir}/device"
 
     cat <<EOF >"${example}/configs/${device}-config.toml"
 name = "${device}"
@@ -85,8 +83,8 @@ max_chans = 100
 enable = true
 addr = "127.0.0.1:${port}"
 root_certs_dir = "${root_certs_dir}"
-device_cert = "${config_dir}/device.pem"
-device_key = "${config_dir}/device.key"
+device_cert = "${config_dir}/device.crt.pem"
+device_key = "${config_dir}/device.key.pem"
 EOF
     port=$((port + 1))
 done

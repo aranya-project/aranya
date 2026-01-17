@@ -44,14 +44,16 @@ fn generate_ca(root_certs_dir: &Path) -> Result<String> {
 /// Generates a signed certificate using the CA.
 /// Returns the paths to the generated cert and key files.
 fn generate_signed_cert(
-    name: &str,
+    _name: &str,
     ca_prefix: &str,
     output_dir: &Path,
 ) -> Result<(PathBuf, PathBuf)> {
     let ca = CaCert::load(ca_prefix).context("failed to load CA")?;
 
+    // Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname).
+    // This ensures TLS verification works with the actual socket address.
     let signed = ca
-        .generate(name, 365)
+        .generate("127.0.0.1", 365)
         .context("failed to generate signed certificate")?;
 
     let device_prefix = output_dir.join("device");
