@@ -31,7 +31,7 @@ pub(crate) enum CreateSeedMode {
     #[default]
     Generate,
     /// Use the provided IKM (Input Keying Material).
-    IKM(Box<[u8; SEED_IKM_SIZE]>),
+    Ikm(Box<[u8; SEED_IKM_SIZE]>),
 }
 
 /// Mode for providing a PSK seed when adding a team.
@@ -39,7 +39,7 @@ pub(crate) enum CreateSeedMode {
 #[allow(dead_code)]
 pub(crate) enum AddSeedMode {
     /// Use the provided IKM (Input Keying Material).
-    IKM(Box<[u8; SEED_IKM_SIZE]>),
+    Ikm(Box<[u8; SEED_IKM_SIZE]>),
     /// Use a wrapped (encrypted) seed.
     Wrapped(Vec<u8>),
 }
@@ -121,7 +121,7 @@ impl CreateTeamQuicSyncConfigBuilder {
     /// Overwrites [`Self::gen_seed`].
     #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.mode = CreateSeedMode::IKM(ikm.into());
+        self.mode = CreateSeedMode::Ikm(ikm.into());
         self
     }
 
@@ -158,7 +158,7 @@ impl AddTeamQuicSyncConfigBuilder {
     /// Overwrites [`Self::wrapped_seed`].
     #[deprecated(note = "PSK-based sync replaced by mTLS. This config is ignored.")]
     pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.mode = Some(AddSeedMode::IKM(ikm.into()));
+        self.mode = Some(AddSeedMode::Ikm(ikm.into()));
         self
     }
 
