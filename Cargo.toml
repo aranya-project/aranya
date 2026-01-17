@@ -81,7 +81,7 @@ metrics-util = { version = "0.20" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
 quinn = { version = "0.11", default-features = false, features = ["rustls", "runtime-tokio", "log"] }
-rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "x509-parser", "ring"] }
+rcgen = { version = "0.14", features = ["x509-parser", "zeroize"] }
 rustix = { version = "1.1.2", features = ["shm"] }
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
 semver = { version = "1", features = ["serde"] }

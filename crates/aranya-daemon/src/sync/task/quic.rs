@@ -290,7 +290,7 @@ impl Syncer<State> {
             .conns
             .get_or_try_insert_with(key, async || {
                 let connecting = endpoint
-                    .connect_with(client_config, addr, &addr.ip().to_string())
+                    .connect_with(client_config, addr, peer.host())
                     .map_err(Error::from)?;
 
                 // Add timeout to connection attempt to avoid hanging on failed TLS handshakes

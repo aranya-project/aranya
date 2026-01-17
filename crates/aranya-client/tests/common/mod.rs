@@ -262,8 +262,12 @@ impl DeviceCtx {
 
         // Generate device certificate
         std::fs::create_dir_all(&work_dir)?;
+        // Use "127.0.0.1" as the CN - this will create an IP SAN that matches
+        // the actual socket address used by QUIC. This ensures that:
+        // 1. TLS server name verification passes (127.0.0.1 matches IP SAN)
+        // 2. Hello subscription peer lookups work (127.0.0.1:port matches exactly)
         let signed = ca
-            .generate(&format!("{}.test.local", name), 365)
+            .generate("127.0.0.1", 365)
             .context("failed to generate signed cert")?;
         let device_prefix = work_dir.join("device");
         signed
@@ -333,8 +337,15 @@ impl DeviceCtx {
         })
     }
 
+    /// Returns the address for this device's QUIC sync server.
+    ///
+    /// Since we use IP addresses (127.0.0.1) in certificates, we can directly use
+    /// the daemon's reported local address which already contains the IP.
     pub async fn aranya_local_addr(&self) -> Result<Addr> {
-        Ok(self.client.local_addr().await?)
+        self.client
+            .local_addr()
+            .await
+            .context("failed to get local address")
     }
 
     fn get_shm_path(path: String) -> String {
