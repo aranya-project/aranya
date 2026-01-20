@@ -6,9 +6,6 @@ services:
       dockerfile: examples/multirust/Dockerfile
       target: operator
     init: true
-    environment:
-      - ARANYA_MEMBER_A_NET_ID=member-a:2222
-      - ARANYA_MEMBER_B_NET_ID=member-b:2222
 
   member-a:
     image: aranya-multirust-member-a
@@ -17,8 +14,6 @@ services:
       dockerfile: examples/multirust/Dockerfile
       target: member-a
     init: true
-    environment:
-      - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
 
   member-b:
     image: aranya-multirust-member-b
@@ -27,5 +22,3 @@ services:
       dockerfile: examples/multirust/Dockerfile
       target: member-b
     init: true
-    environment:
-      - ARANYA_OPERATOR_SYNC_ADDR=operator:1111

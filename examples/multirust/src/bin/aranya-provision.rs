@@ -1,18 +1,15 @@
 use std::{
     env,
     fmt::Display,
-    net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use anyhow::{Context as _, Result};
-use aranya_client::{client::Client, SyncPeerConfig};
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, Role};
+use aranya_client::{client::Client, text, DeviceId, KeyBundle};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
-use tokio::{fs, process::Command, time::sleep};
+use tokio::{fs, process::Command};
 use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -80,7 +77,12 @@ impl ClientCtx {
                 cache_dir = {cache_dir:?}
                 logs_dir = {logs_dir:?}
                 config_dir = {config_dir:?}
-                aqc.enable = true
+
+                [afc]
+                enable = true
+                shm_path = "/{user_name}"
+                max_chans = 100
+
                 [sync.quic]
                 enable = true
                 addr = "127.0.0.1:0"
@@ -94,20 +96,10 @@ impl ClientCtx {
         // The path that the daemon will listen on.
         let uds_sock = runtime_dir.join("uds.sock");
 
-        // Give the daemon time to start up and write its public key.
-        sleep(Duration::from_millis(100)).await;
-
-        let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-
-        let client = (|| {
-            Client::builder()
-                .daemon_uds_path(&uds_sock)
-                .aqc_server_addr(&any_addr)
-                .connect()
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to initialize client")?;
+        let client = (|| Client::builder().with_daemon_uds_path(&uds_sock).connect())
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to initialize client")?;
 
         let pk = client
             .get_key_bundle()
@@ -127,7 +119,7 @@ impl ClientCtx {
         Ok(this)
     }
 
-    async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+    async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 
@@ -161,10 +153,6 @@ async fn main() -> Result<()> {
         DaemonPath(PathBuf::from(exe))
     };
 
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
-
     let root = env::current_dir()?.join("daemons");
     let owner = ClientCtx::new(&root, "owner", &daemon_path).await?;
     let admin = ClientCtx::new(&root, "admin", &daemon_path).await?;
@@ -172,11 +160,10 @@ async fn main() -> Result<()> {
     let membera = ClientCtx::new(&root, "member-a", &daemon_path).await?;
     let memberb = ClientCtx::new(&root, "member-b", &daemon_path).await?;
 
-    operator.write("member-a.id", membera.id).await?;
-    operator.write("member-b.id", memberb.id).await?;
-
-    membera.write("member-b.id", memberb.id).await?;
-    memberb.write("member-a.id", membera.id).await?;
+    for user in [&operator, &membera, &memberb] {
+        user.write("member-a.id", membera.id).await?;
+        user.write("member-b.id", memberb.id).await?;
+    }
 
     // Create the team config
     let seed_ikm = {
@@ -198,7 +185,6 @@ async fn main() -> Result<()> {
     let admin_addr = admin.aranya_local_addr().await?;
     let operator_addr = operator.aranya_local_addr().await?;
 
-    // Create a team.
     info!("creating team");
     let owner_team = owner
         .client
@@ -208,9 +194,54 @@ async fn main() -> Result<()> {
     let team_id = owner_team.team_id();
     info!(%team_id);
 
+    info!("writing team IDs");
     operator.write("team.id", team_id).await?;
     membera.write("team.id", team_id).await?;
     memberb.write("team.id", team_id).await?;
+
+    info!("creating default roles");
+    let owner_role = owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .into_iter()
+        .find(|role| role.name == "owner" && role.default)
+        .context("unable to find owner role")?;
+    let roles = owner_team.setup_default_roles(owner_role.id).await?;
+    let admin_role = roles
+        .iter()
+        .find(|r| r.name == "admin")
+        .context("no admin role")?
+        .clone();
+    let operator_role = roles
+        .iter()
+        .find(|r| r.name == "operator")
+        .context("no operator role")?
+        .clone();
+    let member_role = roles
+        .iter()
+        .find(|r| r.name == "member")
+        .context("no member role")?
+        .clone();
+
+    info!("adding admin to team");
+    owner_team.add_device(admin.pk, Some(admin_role.id)).await?;
+
+    info!("adding operator to team");
+    owner_team
+        .add_device(operator.pk, Some(operator_role.id))
+        .await?;
+
+    info!("adding membera to team");
+    owner_team
+        .add_device(membera.pk.clone(), Some(member_role.id))
+        .await?;
+
+    info!("adding memberb to team");
+    owner_team
+        .add_device(memberb.pk.clone(), Some(member_role.id))
+        .await?;
 
     let add_team_cfg = {
         let qs_cfg = aranya_client::AddTeamQuicSyncConfig::builder()
@@ -227,54 +258,18 @@ async fn main() -> Result<()> {
     let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
     let memberb_team = memberb.client.add_team(add_team_cfg.clone()).await?;
 
-    info!("adding sync peers");
-    owner_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+    admin_team.sync_now(owner_addr, None).await?;
+
+    info!("creating label");
+    let label = admin_team
+        .create_label(text!("mylabel"), operator_role.id)
         .await?;
-    admin_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
-        .await?;
-    operator_team
-        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
-        .await?;
-    membera_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
-        .await?;
-    memberb_team
-        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
-        .await?;
+    debug!(?label);
 
-    info!("adding admin to team");
-    owner_team.add_device_to_team(admin.pk).await?;
-    info!("assigning admin role");
-    owner_team.assign_role(admin.id, Role::Admin).await?;
+    operator_team.sync_now(admin_addr, None).await?;
 
-    info!("adding operator to team");
-    owner_team.add_device_to_team(operator.pk).await?;
-
-    sleep(sleep_interval).await;
-
-    info!("assigning operator role");
-    admin_team.assign_role(operator.id, Role::Operator).await?;
-
-    sleep(sleep_interval).await;
-
-    info!("adding membera to team");
-    operator_team.add_device_to_team(membera.pk.clone()).await?;
-
-    info!("adding memberb to team");
-    operator_team.add_device_to_team(memberb.pk.clone()).await?;
-
-    info!("creating aqc label");
-    let label = operator_team.create_label(text!("mylabel")).await?;
-    let op = ChanOp::SendRecv;
-    info!("assigning label to membera");
-    operator_team.assign_label(membera.id, label, op).await?;
-    info!("assigning label to memberb");
-    operator_team.assign_label(memberb.id, label, op).await?;
-
-    // wait for syncing.
-    sleep(sleep_interval * 5).await;
+    membera_team.sync_now(operator_addr, None).await?;
+    memberb_team.sync_now(operator_addr, None).await?;
 
     Ok(())
 }

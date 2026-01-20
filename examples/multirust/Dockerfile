@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 AS base
+FROM ubuntu:22.04 AS base
 
 
 FROM base AS build
@@ -18,6 +18,9 @@ COPY crates/aranya-daemon-api/ crates/aranya-daemon-api
 COPY crates/aranya-util/ crates/aranya-util
 COPY Cargo.toml .
 COPY Cargo.lock .
+
+# Remove examples from workspace so we don't have to copy them in.
+RUN sed -ie '\|"examples/rust/\*",|d' Cargo.toml
 
 
 FROM build AS build-daemon

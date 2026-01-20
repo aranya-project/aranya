@@ -8,11 +8,9 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, client::Queries, Client, SyncPeerConfig};
-use aranya_daemon_api::{DeviceId, NetIdentifier, TeamId, Text};
+use aranya_client::{ChanOp, Client, Device, DeviceId, Label, SyncPeerConfig, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
-use bytes::Bytes;
 use tokio::{fs, process::Command, time::sleep};
 use tracing::{debug, info, level_filters::LevelFilter, Metadata};
 use tracing_subscriber::{
@@ -97,7 +95,12 @@ impl ClientCtx {
                 cache_dir = {cache_dir:?}
                 logs_dir = {logs_dir:?}
                 config_dir = {config_dir:?}
-                aqc.enable = true
+
+                [afc]
+                enable = true
+                shm_path = "/afc_shm"
+                max_chans = 100
+
                 [sync.quic]
                 enable = true
                 addr = "{sync_addr}"
@@ -111,21 +114,10 @@ impl ClientCtx {
         // The path that the daemon will listen on.
         let uds_sock = runtime_dir.join("uds.sock");
 
-        let aqc_addr =
-            var_or::<Addr>("ARANYA_AQC_ADDR", Addr::from((Ipv4Addr::UNSPECIFIED, 2222)))?;
-
-        // Give the daemon time to start up and write its public key.
-        sleep(Duration::from_secs(1)).await;
-
-        let client = (|| {
-            Client::builder()
-                .daemon_uds_path(&uds_sock)
-                .aqc_server_addr(&aqc_addr)
-                .connect()
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to initialize client")?;
+        let client = (|| Client::builder().with_daemon_uds_path(&uds_sock).connect())
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to initialize client")?;
 
         Ok(Self { client, daemon })
     }
@@ -194,10 +186,10 @@ async fn main() -> Result<()> {
         ))
     };
 
-    let team_id = read::<TeamId>("team.id").await?;
+    let team_id = TeamId::from_api(read("team.id").await?);
     let operator_sync_addr = var::<Addr>("ARANYA_OPERATOR_SYNC_ADDR");
-    let member_a_device_id = read::<DeviceId>("member-a.id");
-    let member_b_device_id = read::<DeviceId>("member-b.id");
+    let member_a_device_id = DeviceId::from_api(read("member-a.id").await?);
+    let member_b_device_id = DeviceId::from_api(read("member-b.id").await?);
 
     let sync_interval = Duration::from_millis(100);
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
@@ -207,22 +199,7 @@ async fn main() -> Result<()> {
 
     match user.as_str() {
         "operator" => {
-            let member_a_net_id = NetIdentifier(var::<Text>("ARANYA_MEMBER_A_NET_ID")?);
-            let member_b_net_id = NetIdentifier(var::<Text>("ARANYA_MEMBER_B_NET_ID")?);
-            team.assign_aqc_net_identifier(member_a_device_id.await?, member_a_net_id)
-                .await?;
-            team.assign_aqc_net_identifier(member_b_device_id.await?, member_b_net_id)
-                .await?;
-            pending::<()>().await;
-        }
-        "member-a" => {
-            team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
-
-            // membera creates a bidirectional channel.
-            info!("membera creating acq bidi channel");
-
             let label = team
-                .queries()
                 .labels()
                 .await
                 .context("failed to get labels")?
@@ -232,54 +209,40 @@ async fn main() -> Result<()> {
                 .clone();
             debug!(?label.name);
 
-            let member_b_net_id = get_net_id(team.queries(), member_b_device_id.await?).await?;
-            debug!(?member_b_net_id);
+            let op = ChanOp::SendRecv;
+            info!("assigning label to membera");
+            team.device(member_a_device_id)
+                .assign_label(label.id, op)
+                .await?;
+            info!("assigning label to memberb");
+            team.device(member_b_device_id)
+                .assign_label(label.id, op)
+                .await?;
 
-            let mut aqc_chan = ctx
+            pending::<()>().await;
+        }
+        "member-a" => {
+            team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
+
+            let label = wait_for_assigned_label(team.device(member_a_device_id)).await?;
+
+            info!("membera creating AFC channel");
+            let (_chan, _ctrl) = ctx
                 .client
-                .aqc()
-                .create_bidi_channel(team_id, member_b_net_id, label.id)
+                .afc()
+                .create_channel(team_id, member_b_device_id, label.id)
                 .await
                 .context("Membera failed to create bidi channel")?;
 
-            // membera creates a new stream on the channel.
-            info!("membera creating aqc bidi stream");
-            let mut bidi1 = aqc_chan.create_bidi_stream().await?;
-
-            // membera sends data via the aqc stream.
-            let msg = Bytes::from_static(b"hello");
-            info!(?msg, "membera sending aqc data");
-            bidi1.send(msg.clone()).await?;
-
-            pending::<()>().await;
+            // TODO: Send and use AFC channel
         }
         "member-b" => {
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
 
-            let member_a_net_id = get_net_id(team.queries(), member_a_device_id.await?).await?;
-            debug!(?member_a_net_id);
+            let _label = wait_for_assigned_label(team.device(member_b_device_id)).await?;
 
-            // memberb receives a bidirectional channel.
-            info!("memberb receiving acq bidi channel");
-            let AqcPeerChannel::Bidi(mut received_aqc_chan) =
-                ctx.client.aqc().receive_channel().await?
-            else {
-                bail!("expected a bidirectional channel");
-            };
-
-            // memberb receives channel stream created by membera.
-            info!("memberb receiving aqc bidi stream");
-            let mut peer2 = received_aqc_chan
-                .receive_stream()
-                .await
-                .context("stream not received")?;
-
-            // memberb receives data from stream.
-            info!("memberb receiving acq data");
-            let msg = peer2.receive().await?.context("no data received")?;
-            assert_eq!(msg.as_ref(), b"hello");
-
-            info!(?msg, "received message from member a");
+            // TODO: Accept and use AFC channel
+            pending::<()>().await;
         }
         _ => bail!("unknown user {user:?}"),
     }
@@ -287,16 +250,13 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn get_net_id(q: Queries<'_>, peer: DeviceId) -> Result<NetIdentifier> {
+async fn wait_for_assigned_label(device: Device<'_>) -> Result<Label> {
     loop {
-        if let Some(net_id) = q
-            .aqc_net_identifier(peer)
-            .await
-            .context("failed to get net ID")?
-        {
-            return Ok(net_id);
+        let assignments = device.label_assignments().await?;
+        if let Some(label) = assignments.into_iter().next() {
+            return Ok(label);
         }
-        info!("waiting for net ID to be available...");
+        info!("waiting for assigned label to be available...");
         sleep(Duration::from_secs(1)).await;
     }
 }
