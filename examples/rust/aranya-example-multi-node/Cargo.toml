@@ -1,0 +1,85 @@
+[package]
+name = "aranya-example-multi-node"
+description = "Example of how to run each Aranya device on a different machine in a network"
+publish = false
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = [
+    "afc",
+    "aranya-client/default",
+]
+
+afc = ["aranya-client/afc"]
+preview = ["aranya-client/preview"]
+
+# Enable debugging.
+debug = []
+
+[dependencies]
+aranya-client = { path = "../../../crates/aranya-client", default-features = false }
+
+age = { version = "0.11.1" }
+anyhow = { workspace = true }
+backon = { workspace = true }
+clap = { workspace = true }
+postcard = { workspace = true }
+rustix = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "sync", "process"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+serial_test = { workspace = true }
+test-log = { workspace = true }
+
+[[bin]]
+name = "aranya-example-multi-node"
+path = "src/bin/main.rs"
+required-features = ["afc"]
+test = false
+
+[[bin]]
+name = "aranya-example-multi-node-owner"
+path = "src/owner/main.rs"
+required-features = ["afc"]
+test = false
+
+[[bin]]
+name = "aranya-example-multi-node-admin"
+path = "src/admin/main.rs"
+required-features = ["afc"]
+test = false
+
+[[bin]]
+name = "aranya-example-multi-node-operator"
+path = "src/operator/main.rs"
+required-features = ["afc"]
+test = false
+
+[[bin]]
+name = "aranya-example-multi-node-membera"
+path = "src/membera/main.rs"
+required-features = ["afc"]
+test = false
+
+[[bin]]
+name = "aranya-example-multi-node-memberb"
+path = "src/memberb/main.rs"
+required-features = ["afc"]
+test = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = [
+    "default", # TODO: remove in #448
+]

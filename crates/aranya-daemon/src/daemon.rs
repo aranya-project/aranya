@@ -7,38 +7,36 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_daemon_api::TeamId;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, StorageProvider,
+    ClientState, GraphId,
 };
-use aranya_util::Addr;
-use bimap::BiBTreeMap;
+use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     fs,
-    sync::{mpsc::Receiver, Mutex},
+    sync::{mpsc, Mutex},
     task::JoinSet,
 };
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(feature = "afc")]
+use crate::afc::Afc;
 use crate::{
-    actions::Actions,
-    api::{ApiKey, DaemonApiServer, QSData},
-    aqc::Aqc,
-    aranya,
+    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
+    aranya::{self, ClientWithState, PeerCacheMap},
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::{
-        quic::{PskStore, State as QuicSyncState},
-        Syncer,
+    sync::{
+        quic::{PskStore, QuicState, SyncParams},
+        SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
-    vm_policy::{PolicyEngine, TEST_POLICY_1},
+    vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
 // Use short names so that we can more easily add generics.
@@ -56,7 +54,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::quic::Server<EN, SP>;
 
 mod invalid_graphs {
     use std::{
@@ -110,7 +108,7 @@ impl DaemonHandle {
             Ok(()) => {}
             Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
             Err(err) => {
-                error!(%err, "tasks cancelled");
+                error!(error = %err, "tasks unexpectedly cancelled");
                 bug!("tasks cancelled");
             }
         }
@@ -123,7 +121,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncState>,
+    manager: SyncManager<QuicState, EN, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -140,12 +138,9 @@ impl Daemon {
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
-
-            // TODO: Make aqc optional.
-            let Toggle::Enabled(_) = &cfg.aqc else {
-                anyhow::bail!(
-                    "AQC is currently required, set `aqc.enable = true` in daemon config."
-                )
+            let qs_client_addr = match qs_config.client_addr {
+                None => Addr::new(qs_config.addr.host(), 0)?,
+                Some(v) => v,
             };
 
             Self::setup_env(&cfg).await?;
@@ -166,90 +161,75 @@ impl Daemon {
             let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
             let initial_keys =
                 load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
-            let (psk_store, active_team_rx) = PskStore::new(initial_keys);
-            let psk_store = Arc::new(psk_store);
+            let psk_store = Arc::new(PskStore::new(initial_keys));
 
-            // Initialize Aranya client.
-            let (client, sync_server) = Self::setup_aranya(
+            let invalid_graphs = InvalidGraphs::default();
+
+            // Create a shared PeerCacheMap
+            let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
+
+            // Initialize Aranya client, sync client,and sync server.
+            let (client, sync_server, manager, syncer, recv_effects) = Self::setup_aranya(
                 &cfg,
                 eng.clone(),
                 aranya_store
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                qs_config.addr,
-                Arc::clone(&psk_store),
-                active_team_rx,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    server_addr: qs_config.addr,
+                    caches: Arc::clone(&caches),
+                },
+                qs_client_addr,
+                invalid_graphs.clone(),
             )
             .await?;
-            let local_addr = sync_server.local_addr()?;
 
-            // Sync in the background at some specified interval.
-            let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-
-            let invalid_graphs = InvalidGraphs::default();
-            let state = QuicSyncState::new(psk_store.clone())?;
-            let (syncer, peers) =
-                Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
-
-            let graph_ids = client
-                .aranya
-                .lock()
-                .await
-                .provider()
-                .list_graph_ids()?
-                .flatten()
-                .collect::<Vec<_>>();
-
-            let aqc = {
-                let peers = {
-                    let mut peers = BTreeMap::new();
-                    for graph_id in &graph_ids {
-                        let graph_peers = BiBTreeMap::from_iter(
-                            client
-                                .actions(graph_id)
-                                .query_aqc_network_names_off_graph()
-                                .await?,
-                        );
-                        peers.insert(*graph_id, graph_peers);
-                    }
-                    peers
+            #[cfg(feature = "afc")]
+            let afc = {
+                let Toggle::Enabled(afc_cfg) = &cfg.afc else {
+                    anyhow::bail!(
+                        "AFC is currently required, set `afc.enable = true` in daemon config."
+                    )
                 };
-                Aqc::new(
+                Afc::new(
+                    client.clone(),
                     eng.clone(),
                     pks.ident_pk.id()?,
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
-                    peers,
-                )
+                    afc_cfg.clone(),
+                )?
             };
 
             let data = QSData { psk_store };
 
-            let crypto = crate::api::Crypto {
+            let crypto = api::Crypto {
                 engine: eng,
                 local_store,
                 aranya_store,
             };
 
-            let api = DaemonApiServer::new(
+            let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
-                local_addr,
-                cfg.uds_api_sock(),
-                api_sk,
-                pks,
-                peers,
+                local_addr: sync_server.local_addr(),
+                uds_path: cfg.uds_api_sock(),
+                sk: api_sk,
+                pk: pks,
+                syncer,
                 recv_effects,
-                invalid_graphs,
-                aqc,
+                invalid: invalid_graphs,
+                #[cfg(feature = "afc")]
+                afc,
                 crypto,
                 seed_id_dir,
-                Some(data),
-            )?;
+                quic: Some(data),
+            })?;
             Ok(Self {
                 sync_server,
-                syncer,
+                manager,
                 api,
                 span,
             })
@@ -259,26 +239,27 @@ impl Daemon {
     }
 
     /// The daemon's entrypoint.
-    pub fn spawn(mut self) -> DaemonHandle {
+    pub async fn spawn(self) -> Result<DaemonHandle, ready::WaitError> {
         let _guard = self.span.enter();
         let mut set = JoinSet::new();
+        let waiter = ready::Waiter::new(3);
         set.spawn(
             self.sync_server
-                .serve()
+                .serve(waiter.notifier())
                 .instrument(info_span!("sync-server")),
         );
+        set.spawn({
+            self.manager
+                .run(waiter.notifier())
+                .instrument(info_span!("syncer"))
+        });
         set.spawn(
-            async move {
-                loop {
-                    if let Err(err) = self.syncer.next().await {
-                        error!(?err, "unable to sync with peer");
-                    }
-                }
-            }
-            .instrument(info_span!("syncer")),
+            self.api
+                .serve(waiter.notifier())
+                .instrument(info_span!("api-server")),
         );
-        set.spawn(self.api.serve().instrument(info_span!("api-server")));
-        DaemonHandle { set }
+        waiter.wait().await?;
+        Ok(DaemonHandle { set })
     }
 
     /// Initializes the environment (creates directories, etc.).
@@ -323,20 +304,30 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and sync server.
+    /// Creates the Aranya client, sync client, and sync server.
     async fn setup_aranya(
         cfg: &Config,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
-        psk_store: Arc<PskStore>,
-        active_team_rx: Receiver<TeamId>,
-    ) -> Result<(Client, SyncServer)> {
+        SyncParams {
+            psk_store,
+            server_addr,
+            caches,
+        }: SyncParams,
+        client_addr: Addr,
+        invalid_graphs: InvalidGraphs,
+    ) -> Result<(
+        Client,
+        SyncServer,
+        SyncManager<QuicState, EN, SP, EF>,
+        SyncHandle,
+        mpsc::Receiver<(GraphId, Vec<EF>)>,
+    )> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(POLICY_SOURCE, eng, store, device_id)?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
@@ -344,19 +335,46 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
-        let server = SyncServer::new(
+        // Sync in the background at some specified interval.
+        let (send_effects, recv_effects) = mpsc::channel(256);
+
+        // Create shared hello subscriptions for both server and syncer
+        #[cfg(feature = "preview")]
+        let hello_subscriptions = Arc::default();
+
+        // Create the sync server
+        let client_with_state_for_server = ClientWithState::new(
             client.clone(),
-            &external_sync_addr,
-            psk_store,
-            active_team_rx,
+            Arc::clone(&caches),
+            #[cfg(feature = "preview")]
+            Arc::clone(&hello_subscriptions),
+        );
+        let (server, peers, conns, syncer_recv) = SyncServer::new(
+            client_with_state_for_server,
+            &server_addr,
+            Arc::clone(&psk_store),
         )
         .await
         .context("unable to initialize QUIC sync server")?;
 
-        info!(device_id = %device_id, "set up Aranya");
+        // Initialize the syncer
+        let client_with_state_for_syncer = ClientWithState::new(
+            client.clone(),
+            caches,
+            #[cfg(feature = "preview")]
+            server.hello_subscriptions(),
+        );
+        let syncer = SyncManager::new(
+            client_with_state_for_syncer,
+            send_effects,
+            invalid_graphs,
+            psk_store,
+            (server.local_addr().into(), client_addr),
+            syncer_recv,
+            conns,
+        )?;
 
-        Ok((client, server))
+        Ok((client, server, syncer, peers, recv_effects))
     }
 
     /// Loads the crypto engine.
@@ -468,18 +486,28 @@ mod tests {
 
     use std::time::Duration;
 
+    use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
+    use crate::config::{QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
     async fn test_daemon_run() {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
+
+        #[cfg(feature = "afc")]
+        let shm_path = {
+            let path = "/test_daemon_run\0"
+                .try_into()
+                .expect("should be able to parse AFC shared memory path");
+            let _ = aranya_fast_channels::shm::unlink(&path);
+            path
+        };
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
@@ -490,9 +518,16 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync: SyncConfig {
-                quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
+                quic: Toggle::Enabled(QuicSyncConfig {
+                    addr: any,
+                    client_addr: None,
+                }),
             },
-            aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "afc")]
+            afc: Toggle::Enabled(crate::config::AfcConfig {
+                shm_path,
+                max_chans: 100,
+            }),
         };
         for dir in [
             &cfg.runtime_dir,
@@ -510,8 +545,11 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        time::timeout(Duration::from_secs(1), daemon.spawn().join())
-            .await
-            .expect_err("`Timeout` should return Elapsed");
+        time::timeout(
+            Duration::from_secs(1),
+            daemon.spawn().await.expect("startup").join(),
+        )
+        .await
+        .expect_err("`Timeout` should return Elapsed");
     }
 }

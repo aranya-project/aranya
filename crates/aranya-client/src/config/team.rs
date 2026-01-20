@@ -11,9 +11,7 @@
 //!
 //! Both operations support optional transport configuration.
 
-use aranya_daemon_api::TeamId;
-
-use crate::{error::InvalidArg, ConfigError, Result};
+use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
 pub use quic_sync::{
@@ -121,7 +119,7 @@ impl AddTeamConfig {
 impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         Self {
-            team_id: value.id,
+            team_id: value.id.into_api(),
             quic_sync: value.quic_sync.map(Into::into),
         }
     }

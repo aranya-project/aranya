@@ -33,16 +33,19 @@
 pub mod actions;
 pub mod aranya;
 pub mod config;
-#[rustfmt::skip]
 pub mod policy;
 pub mod sync;
 pub mod vm_policy;
 
+#[cfg(feature = "afc")]
+mod afc;
 mod api;
-mod aqc;
 mod daemon;
 mod keystore;
 mod util;
+
+#[cfg(test)]
+mod test;
 
 pub use daemon::*;
 pub use keystore::AranyaStore;

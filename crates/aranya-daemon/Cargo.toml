@@ -14,23 +14,36 @@ workspace = true
 
 
 [features]
-default = []
+default = [
+    "afc",
+    "aranya-daemon-api/default",
+]
+
+# Preview features
+preview = ["aranya-daemon-api/preview"]
+# Aranya Fast Channels
+afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
+
+# Experimental features
+experimental = ["aranya-daemon-api/experimental"]
 
 
 [dependencies]
-aranya-daemon-api = { workspace = true }
+aranya-daemon-api = { workspace = true, default-features = false }
 aranya-keygen = { workspace = true }
 
-aranya-aqc-util = { workspace = true }
+aranya-afc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
 aranya-envelope-ffi = { workspace = true }
+aranya-fast-channels = { workspace = true, features = ["alloc", "posix", "libc"], optional = true }
 aranya-idam-ffi = { workspace = true }
 aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }
 aranya-policy-ifgen = { workspace = true }
 aranya-policy-lang = { workspace = true }
+aranya-policy-text = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
@@ -38,7 +51,6 @@ buggy = { workspace = true }
 
 
 anyhow = { workspace = true }
-bimap = "0.6"
 bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
@@ -59,15 +71,19 @@ tokio = { workspace = true, features = [
     "time",
 ] }
 tokio-util = { workspace = true, features = ["time"] }
-toml = { version = "0.9", default-features = false, features = ["std", "serde", "parse"] }
+toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+
 [dev-dependencies]
+aranya-crypto = { workspace = true, features = ["memstore"] }
+divan = { workspace = true }
 pretty_assertions = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
+
 
 [build-dependencies]
 aranya-policy-ifgen-build = { workspace = true }
@@ -77,3 +93,12 @@ aranya-policy-ifgen-build = { workspace = true }
 name = "aranya-daemon"
 path = "src/main.rs"
 test = false
+
+
+[[bench]]
+name = "metrics"
+harness = false
+
+
+[package.metadata.cargo-all-features]
+always_include_features = ["experimental", "preview"]

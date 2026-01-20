@@ -81,8 +81,10 @@ logs_dir = "/var/log/aranya"
 # `$XDG_CONFIG_HOME`.
 config_dir = "/etc/aranya"
 
-[aqc]
+[afc]
 enable = true
+shm_path = "/afc"
+max_chans = 100
 
 [sync.quic]
 enable = true

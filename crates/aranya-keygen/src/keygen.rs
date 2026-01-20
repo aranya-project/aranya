@@ -3,7 +3,7 @@ use core::fmt;
 use anyhow::{Context, Result};
 use aranya_crypto::{
     CipherSuite, DeviceId, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine,
-    IdentityKey, IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId,
+    IdentityKey, IdentityVerifyingKey, KeyStore, KeyStoreExt as _, SigningKey, SigningKeyId,
     VerifyingKey,
 };
 use serde::{Deserialize, Serialize};
@@ -139,16 +139,11 @@ impl KeyBundle {
         macro_rules! gen {
             ($key:ident) => {{
                 let sk = $key::<E::CS>::new(eng);
-                let id = sk.id()?;
-                let wrapped =
-                    eng.wrap(sk)
-                        .context(concat!("unable to wrap `", stringify!($key), "`"))?;
-                store.try_insert(id.into(), wrapped).context(concat!(
-                    "unable to insert wrapped `",
+                store.insert_key(eng, sk).context(concat!(
+                    "unable to insert `",
                     stringify!($key),
                     "`"
-                ))?;
-                id
+                ))?
             }};
         }
         Ok(Self {
@@ -202,17 +197,17 @@ impl KeyBundle {
     {
         Ok(PublicKeys {
             ident_pk: store
-                .get_key::<_, IdentityKey<E::CS>>(eng, self.device_id.into())
+                .get_key::<_, IdentityKey<E::CS>>(eng, self.device_id)
                 .context("unable to load `IdentityKey`")?
                 .context("unable to find `IdentityKey`")?
                 .public()?,
             enc_pk: store
-                .get_key::<_, EncryptionKey<E::CS>>(eng, self.enc_id.into())
+                .get_key::<_, EncryptionKey<E::CS>>(eng, self.enc_id)
                 .context("unable to load `EncryptionKey`")?
                 .context("unable to find `EncryptionKey`")?
                 .public()?,
             sign_pk: store
-                .get_key::<_, SigningKey<E::CS>>(eng, self.sign_id.into())
+                .get_key::<_, SigningKey<E::CS>>(eng, self.sign_id)
                 .context("unable to load `SigningKey`")?
                 .context("unable to find `SigningKey`")?
                 .public()?,

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use aranya_daemon_api::{AddSeedMode, CreateSeedMode, CreateTeamQuicSyncConfig};
 
 use super::*;
-use crate::sync::task::quic::PskStore;
+use crate::sync::quic::PskStore;
 
 /// Held by [`super::DaemonApiServer`] when the QUIC syncer is used
 #[derive(Debug)]
@@ -33,9 +33,7 @@ impl Api {
 
         for psk_res in seed.generate_psks(team_id) {
             let psk = psk_res.context("unable to generate psk")?;
-            psk_store
-                .insert(team_id, Arc::new(psk))
-                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            psk_store.insert(team_id, Arc::new(psk));
         }
 
         Ok(())
@@ -61,12 +59,12 @@ impl Api {
                     let crypto = &mut *self.crypto.lock().await;
                     crypto
                         .aranya_store
-                        .get_key(&mut crypto.engine, enc_id.into_id())
+                        .get_key(&mut crypto.engine, enc_id)
                         .context("keystore error")?
                         .context("missing enc_sk in add_team")?
                 };
 
-                let group = GroupId::from(team.into_id());
+                let group = GroupId::transmute(team);
                 let seed = enc_sk
                     .open_psk_seed(
                         &wrapped.encap_key,
@@ -83,9 +81,7 @@ impl Api {
 
         for psk_res in seed.generate_psks(team) {
             let psk = psk_res.context("unable to generate psk")?;
-            psk_store
-                .insert(team, Arc::new(psk))
-                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            psk_store.insert(team, Arc::new(psk));
         }
 
         Ok(())
@@ -96,10 +92,7 @@ impl Api {
         team: api::TeamId,
         data: &Data,
     ) -> anyhow::Result<()> {
-        data.psk_store
-            .remove(team)
-            .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?;
-
+        data.psk_store.remove(team);
         Ok(())
     }
 }

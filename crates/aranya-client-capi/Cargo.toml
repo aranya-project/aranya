@@ -15,23 +15,35 @@ workspace = true
 
 [lib]
 crate-type = ["rlib", "cdylib"]
+doctest = false
 
 
 [features]
-default = []
+default = [
+    "afc",
+    "aranya-client/default",
+    "aranya-daemon-api/default",
+]
+
+# Preview features
+preview = ["aranya-client/preview"]
+# Aranya Fast Channels
+afc = ["aranya-client/afc"]
+
+# Experimental features
+experimental = ["aranya-client/experimental"]
 
 
 [dependencies]
-aranya-client = { path = "../aranya-client" }
-aranya-daemon-api = { path = "../aranya-daemon-api" }
+aranya-client = { path = "../aranya-client", default-features = false }
+aranya-daemon-api = { path = "../aranya-daemon-api", default-features = false }
 aranya-util = { path = "../aranya-util" }
 
 aranya-capi-core = { workspace = true }
-aranya-crypto = { workspace = true }
+aranya-id = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
-bytes = { workspace = true }
 postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -43,5 +55,14 @@ tracing-subscriber = { workspace = true }
 aranya-capi-codegen = { workspace = true }
 
 anyhow = { workspace = true }
+cbindgen = "0.29"
 quote = "1"
 syn = "2"
+
+
+[package.metadata.cargo-all-features]
+always_include_features = [
+    "default", # TODO: remove in #448
+    "experimental",
+    "preview",
+]

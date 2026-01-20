@@ -1,9 +1,6 @@
 use core::mem::MaybeUninit;
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    Builder, InvalidArg,
-};
+use aranya_capi_core::{Builder, InvalidArg};
 use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
@@ -30,10 +27,6 @@ impl CreateTeamQuicSyncConfig {
     pub(crate) fn imp(&self) -> Self {
         self.clone()
     }
-}
-
-impl Typed for CreateTeamQuicSyncConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xADF0F971);
 }
 
 impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig {
@@ -65,10 +58,6 @@ impl AddTeamQuicSyncConfig {
     pub(crate) fn imp(&self) -> Self {
         self.clone()
     }
-}
-
-impl Typed for AddTeamQuicSyncConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
 }
 
 impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
@@ -127,10 +116,6 @@ impl Builder for CreateTeamQuicSyncConfigBuilder {
     }
 }
 
-impl Typed for CreateTeamQuicSyncConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
-}
-
 /// Builder for constructing an [`AddTeamQuicSyncConfig`].
 #[derive(Debug, Default)]
 pub struct AddTeamQuicSyncConfigBuilder {
@@ -158,17 +143,13 @@ impl AddTeamQuicSyncConfigBuilder {
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
         let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
-            error!(?err);
+            error!(error = %err, "could not deserialize wrapped_seed");
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
         self.mode = Some(AddSeedMode::Wrapped(wrapped));
 
         Ok(())
     }
-}
-
-impl Typed for AddTeamQuicSyncConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA48);
 }
 
 impl Builder for AddTeamQuicSyncConfigBuilder {

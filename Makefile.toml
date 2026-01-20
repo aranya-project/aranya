@@ -20,9 +20,32 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 # Build
 [tasks.build]
 category = "build"
-description = "Build Code"
+description = "Build Code with default features"
 command = "cargo"
-args = ["build", "--verbose", "--release", "${@}"]
+args = [
+    "build",
+    "--verbose",
+    "--release",
+    "--package=aranya-daemon",
+    "${@}",
+]
+
+[tasks.build-default]
+category = "build"
+description = "Build Code with default features"
+dependencies = ["build"]
+
+[tasks.build-experimental]
+category = "build"
+description = "Build Code with experimental features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview,experimental", "${@}"]
+
+[tasks.build-preview]
+category = "build"
+description = "Build Code with preview features"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--features=preview", "${@}"]
 
 [tasks.tgz-daemon]
 category = "build"
@@ -34,20 +57,9 @@ script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
 category = "build"
 description = "Build C API"
 run_task = { name = [
-    "build-capi-header",
     "build-capi-docs",
     "build-capi-lib",
 ] }
-
-# Build the `aranya-client-capi` C API `aranya-client.h` header file.
-[tasks.build-capi-header]
-category = "build"
-description = "Build C API header"
-toolchain = "${NIGHTLY}"
-cwd = "crates/aranya-client-capi"
-command = "cbindgen"
-args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
-dependencies = ["install-cbindgen", "install-nightly"]
 
 [tasks.build-capi-docs]
 category = "build"
@@ -62,11 +74,29 @@ script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/
 
 [tasks.build-capi-lib]
 category = "build"
-description = "Build C API shared library"
+description = "Build C API shared library with default features"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
 args = ["build", "--release"]
-dependencies = ["install-nightly"]
+
+[tasks.build-capi-lib-default]
+category = "build"
+description = "Build C API shared library with default features"
+dependencies = ["build-capi-lib"]
+
+[tasks.build-capi-lib-experimental]
+category = "build"
+description = "Build C API shared library with experimental features"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features=preview,experimental"]
+
+[tasks.build-capi-lib-preview]
+category = "build"
+description = "Build C API shared library with preview features"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build", "--release", "--features=preview"]
 
 [tasks.tgz-capi]
 category = "build"
@@ -83,11 +113,6 @@ cp crates/aranya-client-capi/output/aranya-client.h "${capi}"/include/
 tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 '''
 
-[tasks.install-cbindgen]
-private = true
-install_crate = { crate_name = "cbindgen", version = "0.29.0", binary = "cbindgen", test_arg = "-V" }
-
-
 # Test
 [tasks.test]
 category = "test"
@@ -96,6 +121,16 @@ workspace = true
 command = "cargo"
 args = ["--verbose", "test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
+
+[tasks.ctest]
+category = "test"
+description = "Run C Tests"
+script = '''
+cmake -B build -S .
+cd build
+cmake --build .
+ctest
+'''
 
 
 # Security
@@ -110,19 +145,22 @@ run_task = { name = [
 
 [tasks.cargo-audit]
 category = "security"
-install_crate = { crate_name = "cargo-audit", version = "0.21.2", binary = "cargo-audit", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-audit", version = "0.22.0", binary = "cargo-audit", test_arg = "-V" }
 command = "cargo"
 args = ["audit"]
 
 [tasks.cargo-deny]
 category = "security"
-install_crate = { crate_name = "cargo-deny", version = "0.18.2", binary = "cargo-deny", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-deny", version = "0.18.9", binary = "cargo-deny", test_arg = "-V" }
 command = "cargo"
 args = ["deny", "check"]
 
 [tasks.cargo-vet]
 category = "security"
-install_crate = { crate_name = "cargo-vet", version = "0.10.0", binary = "cargo-vet", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-vet", version = "0.10.1", binary = "cargo-vet", test_arg = "-V" }
 command = "cargo"
 args = ["vet", "check"]
 
@@ -138,11 +176,19 @@ run_task = { name = [
 ] }
 
 [tasks.check-fmt]
-dependencies = ["check-fmt-rust", "check-fmt-toml"]
+dependencies = [
+    "check-fmt-rust",
+    "check-fmt-toml",
+    "check-fmt-c",
+]
 description = "Check file formatting"
 
 [tasks.fmt]
-dependencies = ["fmt-rust", "fmt-toml"]
+dependencies = [
+    "fmt-rust",
+    "fmt-toml",
+    "fmt-c",
+]
 description = "Format files"
 
 [tasks.check-fmt-rust]
@@ -173,9 +219,20 @@ description = "Format toml"
 script = "git ls-files -z '*.toml' | xargs -0 taplo fmt"
 dependencies = ["install-taplo"]
 
+[tasks.check-fmt-c]
+category = "correctness"
+description = "Check C formatting"
+script = "git ls-files -z '*.c' '*.h' | xargs -0 -- clang-format --Werror --dry-run"
+
+[tasks.fmt-c]
+category = "correctness"
+description = "Format C"
+script = "git ls-files -z '*.c' '*.h' | xargs -0 -- clang-format --Werror -i"
+
 [tasks.install-taplo]
 private = true
-install_crate = { crate_name = "taplo-cli", version = "0.9.3", binary = "taplo", test_arg = ["-V"] }
+toolchain = "stable"
+install_crate = { crate_name = "taplo-cli", version = "0.10.0", binary = "taplo", test_arg = ["-V"] }
 
 [tasks.check-features]
 category = "correctness"
@@ -192,15 +249,16 @@ workspace = true
 script = '''
 cargo clippy
 cargo clippy --all-targets
-cargo clippy --no-default-features
+# cargo clippy --no-default-features (TODO: uncomment in #448)
 cargo clippy --all-targets --all-features
 '''
 install_crate = { rustup_component_name = "clippy" }
 
 [tasks.machete]
+toolchain = "stable"
 command = "cargo"
 args = ["machete"]
-install_crate = { crate_name = "cargo-machete", version = "0.8.0", binary = "cargo-machete", test_arg = "--version" }
+install_crate = { crate_name = "cargo-machete", version = "0.9.1", binary = "cargo-machete", test_arg = "--version" }
 
 
 # Docs
@@ -238,7 +296,8 @@ fi
 
 [tasks.install-cargo-all-features]
 private = true
-install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-all-features", version = "1.12.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
 
 
 # Examples
@@ -249,11 +308,37 @@ category = "examples"
 description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["build-capi-header", "build-capi-lib"]
+dependencies = ["build-capi-lib-experimental"]
 
 # Rust Example
 [tasks.run-rust-example]
 category = "examples"
 description = "Run Rust example application"
-cwd = "examples/rust"
+cwd = "examples/rust/aranya-example"
 script = "./run.bash"
+
+[tasks.run-rust-example-multi-node]
+category = "examples"
+description = "Run Rust example application on multiple nodes"
+cwd = "examples/rust/aranya-example-multi-node"
+script = "./run.bash"
+
+# Metrics
+
+# Run `aranya-metrics`
+[tasks.metrics]
+category = "metrics"
+description = "Run Metrics Crate"
+script = '''
+#!/usr/bin/env bash
+set -e
+cargo build --bin aranya-daemon --release --features=preview
+cargo build --bin aranya-metrics --release
+CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
+'''
+
+# Run `aranya-metrics` using prometheus
+[tasks.metrics-prometheus]
+category = "metrics"
+description = "Run aranya-metrics crate w/ Prometheus exporter and a Push Gateway"
+script = "crates/aranya-metrics/prometheus.bash"

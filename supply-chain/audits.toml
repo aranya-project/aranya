@@ -96,6 +96,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.1 -> 0.3.1"
 
+[[audits.hashbrown]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.16.0 -> 0.16.1"
+
 [[audits.heapless]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -136,10 +141,20 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.4.25 -> 0.4.26"
 
+[[audits.matchers]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.2.0"
+
 [[audits.miniz_oxide]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.8.4 -> 0.8.5"
+
+[[audits.nu-ansi-term]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.46.0 -> 0.50.1"
 
 [[audits.object]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -166,6 +181,18 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.15 -> 0.2.16"
 
+[[audits.postcard]]
+who = "nikki-aranya <npoelma@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.1.3"
+notes = "I have audited both the 1.1.1 codebase, as well as the 1.1.3 delta. Most changes were nominal, this crate does what it says on the tin with descriptive commits and a heaping of third party crates it allows de/serializing. There is a handful of unsafe, but to my knowledge it's both commented to explain the rationale and seems safe on first glance, mostly used to remove bounds checks to make it run faster since it's basically a compression library, it needs all the help it can get."
+
+[[audits.postcard-derive]]
+who = "nikki-aranya <npoelma@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.1.3"
+notes = "I have audited both the 1.1.1 codebase, as well as the 1.1.3 delta. Most changes were nominal, this crate does what it says on the tin with descriptive commits and a heaping of third party crates it allows de/serializing. There is a handful of unsafe, but to my knowledge it's both commented to explain the rationale and seems safe on first glance, mostly used to remove bounds checks to make it run faster since it's basically a compression library, it needs all the help it can get."
+
 [[audits.ppv-lite86]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -186,11 +213,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
 
-[[audits.redox_syscall]]
-who = "gknopf <gknopf@spideroak.com>"
-criteria = "safe-to-run"
-delta = "0.5.8 -> 0.5.10"
-
 [[audits.rfc6979]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -250,17 +272,26 @@ version = "0.4.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
+
+[[audits.rkyv]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.8.12 -> 0.8.13"
+
+[[audits.rkyv_derive]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.8.12 -> 0.8.13"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
 
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
-
-[[audits.rustls]]
-who = "Ben Zimmerman <bzimmerman@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.23.26@git:648a02550dd319360664f9af79862716be2879ff"
-importable = false
 
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -312,6 +343,11 @@ who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.3.1 -> 0.3.0"
 
+[[audits.signal-hook-registry]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.4.1 -> 1.4.5"
+
 [[audits.spideroak-base58]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -331,6 +367,12 @@ version = "0.1.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.90 -> 2.0.99"
+
+[[audits.sysinfo]]
+who = "nikki-aranya <npoelma@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.36.1"
+notes = "This crate does what it says, using a lot of system API calls (some unofficially documented; for example, Windows doesn't publicly provide a way to get info from other processes so it has to use ntapi to use the info that e.g. Task Manager uses), and any weird behavior is documented with a comment for the most part. It's segmented well so only the code for the platform being compiled for gets added, as well as it's easy to track down how exactly a piece of information is getting gathered. This does use a lot of unsafe for the above reason of needing to make a bunch of system API calls, some of which are calling into other languages like Objective-C, but I didn't see anything obviously malicious or incorrect."
 
 [[audits.tempfile]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -357,6 +399,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.6 -> 2.0.12"
 
+[[audits.tinyvec]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.9.0 -> 1.10.0"
+
 [[audits.tokio]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -376,6 +423,11 @@ delta = "2.4.0 -> 2.5.0"
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.7.13 -> 0.7.15"
+
+[[audits.tracing-subscriber]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.19 -> 0.3.20"
 
 [[audits.typenum]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -442,6 +494,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.1.6"
 
+[[audits.zerovec]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.3 -> 0.11.4"
+
 [[trusted.anstream]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
@@ -476,103 +533,103 @@ end = "2026-07-09"
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
-
-[[trusted.aranya-aqc-util]]
-criteria = "safe-to-deploy"
-user-id = 293722 # aranya-project-bot
-start = "2025-04-10"
-end = "2026-04-14"
+end = "2030-12-19"
 
 [[trusted.aranya-base58]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-buggy]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-capi-codegen]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-11-08"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-capi-core]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-11-08"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-capi-macro]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-11-08"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-client]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-crypto]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-crypto-derive]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-crypto-ffi]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-daemon]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-daemon-api]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-device-ffi]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-envelope-ffi]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-fast-channels]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
+
+[[trusted.aranya-id]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2025-10-17"
+end = "2026-10-17"
 
 [[trusted.aranya-idam-ffi]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-internal-rustls]]
 criteria = "safe-to-deploy"
@@ -596,67 +653,67 @@ end = "2026-06-13"
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-libc]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-11-08"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-perspective-ffi]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-ast]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-compiler]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-derive]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-ifgen]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-ifgen-build]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-ifgen-macro]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-lang]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-module]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-policy-text]]
 criteria = "safe-to-deploy"
@@ -674,25 +731,25 @@ end = "2026-06-23"
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-runtime]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-trouble]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.aranya-util]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-11-12"
-end = "2025-12-19"
+end = "2030-12-19"
 
 [[trusted.buggy]]
 criteria = "safe-to-deploy"
@@ -729,6 +786,19 @@ criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2023-04-13"
 end = "2026-07-09"
+
+[[trusted.cppwinrt]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2024-02-02"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.indexmap]]
+criteria = "safe-to-deploy"
+user-id = 539 # Josh Stone (cuviper)
+start = "2020-01-15"
+end = "2026-08-19"
 
 [[trusted.intrusive-collections]]
 criteria = "safe-to-deploy"
@@ -807,6 +877,188 @@ criteria = "safe-to-deploy"
 user-id = 6825 # Dan Gohman (sunfishcode)
 start = "2019-07-22"
 end = "2026-05-16"
+
+[[trusted.windows]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-01-15"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-bindgen]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-12-17"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-collections]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2025-02-06"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-core]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-11-15"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-future]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2025-02-10"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-implement]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2022-01-27"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-interface]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2022-02-18"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-link]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2024-07-17"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-metadata]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2022-01-27"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-numerics]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2023-05-15"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-registry]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2024-02-15"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-result]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2024-02-02"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-services]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-04-01"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-strings]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2024-02-02"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-sys]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-11-15"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-targets]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2022-09-09"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-threading]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2025-04-29"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows-version]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2023-03-07"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_aarch64_gnullvm]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2022-09-01"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_aarch64_msvc]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-11-05"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_i686_gnu]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-10-28"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_i686_gnullvm]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2024-04-02"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_i686_msvc]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-10-27"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_x86_64_gnu]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-10-28"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_x86_64_gnullvm]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2022-09-01"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
+
+[[trusted.windows_x86_64_msvc]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2021-10-27"
+end = "2026-07-28"
+notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
 
 [[trusted.winnow]]
 criteria = "safe-to-deploy"

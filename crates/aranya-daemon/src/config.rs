@@ -6,6 +6,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+#[cfg(feature = "afc")]
+use aranya_fast_channels::shm;
 use aranya_util::Addr;
 use serde::{
     de::{self, DeserializeOwned},
@@ -17,7 +19,6 @@ pub use toggle::Toggle;
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     /// The name of the daemon, used for logging and debugging
     /// purposes.
@@ -102,9 +103,11 @@ pub struct Config {
     #[serde(deserialize_with = "non_empty_path")]
     pub config_dir: PathBuf,
 
-    /// AQC configuration.
+    /// AFC configuration.
+    #[cfg(feature = "afc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
     #[serde(default)]
-    pub aqc: Toggle<AqcConfig>,
+    pub afc: Toggle<AfcConfig>,
 
     /// QUIC syncer config
     #[serde(default)]
@@ -193,10 +196,17 @@ pub struct SyncConfig {
     pub quic: Toggle<QuicSyncConfig>,
 }
 
-/// AQC configuration.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+/// AFC configuration.
+#[cfg(feature = "afc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "afc")))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AqcConfig {}
+pub struct AfcConfig {
+    /// Shared memory path.
+    pub shm_path: Box<shm::Path>,
+    /// Maximum number of channels AFC should support.
+    pub max_chans: usize,
+}
 
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -204,6 +214,8 @@ pub struct AqcConfig {}
 pub struct QuicSyncConfig {
     /// Network address of Aranya sync server.
     pub addr: Addr,
+    /// Client bind address.
+    pub client_addr: Option<Addr>,
 }
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -243,9 +255,16 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
+                    client_addr: None,
                 }),
             },
-            aqc: Toggle::Enabled(AqcConfig {}),
+            #[cfg(feature = "afc")]
+            afc: Toggle::Enabled(AfcConfig {
+                shm_path: "/afc\0"
+                    .try_into()
+                    .context("unable to parse AFC shared memory path")?,
+                max_chans: 100,
+            }),
         };
         assert_eq!(got, want);
 

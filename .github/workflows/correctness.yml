@@ -1,5 +1,8 @@
 name: "Correctness checks and linting"
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: ["main"]
@@ -16,7 +19,7 @@ env:
   REV: ${{ github.run_id }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ github.ref != 'refs/heads/main' || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -26,6 +29,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
+
+      - name: Install newer clang-format
+        run: |
+          sudo apt-get install -y lsb-release wget software-properties-common gnupg
+          sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+          sudo apt-get install -y clang-format-20
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-20 200
+          clang-format --version
 
       - name: Check formatting
         run: cargo make check-fmt
