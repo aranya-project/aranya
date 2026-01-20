@@ -8,8 +8,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{ChanOp, Client, Device, DeviceId, Label, SyncPeerConfig, TeamId};
-use aranya_util::Addr;
+use aranya_client::{Addr, ChanOp, Client, Device, DeviceId, Label, SyncPeerConfig, TeamId};
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, process::Command, time::sleep};
 use tracing::{debug, info, level_filters::LevelFilter, Metadata};

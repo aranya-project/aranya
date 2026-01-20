@@ -30,14 +30,10 @@ wildcard_imports = "warn"
 
 [dependencies]
 aranya-client = { path = "../../crates/aranya-client" }
-aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
-aranya-util = { path = "../../crates/aranya-util" }
 
 anyhow = { version = "1.0.97" }
 backon = { version = "1.4.0" }
-bytes = { version = "1.10.0" }
-postcard = { version = "1" }
 tempfile = { version = "3.17.1" }
 tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { version = "0.1.41" }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }

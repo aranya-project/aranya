@@ -5,8 +5,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use aranya_client::{client::Client, text, DeviceId, KeyBundle};
-use aranya_util::Addr;
+use aranya_client::{text, Addr, Client, DeviceId, KeyBundle};
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{fs, process::Command};
