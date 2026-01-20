@@ -15,12 +15,9 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server,
 };
 
-use crate::{
-    daemon::{CE, CS, KS},
-    keystore::LocalStore,
-};
+use crate::{keystore::LocalStore, CE, CS, KS};
 
-pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
+type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
 const QUIC_SYNC_PSK_CONTEXT: &[u8] = b"AranyaQuicSync-v1";
 
@@ -91,10 +88,10 @@ fn psk_to_rustls(psk: aranya_crypto::tls::Psk<CS>) -> Result<PresharedKey> {
     Ok(psk)
 }
 
-/// PSK store that's shared between [`super::Syncer`]
+/// PSK store that's shared between [`super::SyncManager`]
 /// and [`super::Server`]
 #[derive(Debug)]
-pub struct PskStore {
+pub(crate) struct PskStore {
     inner: SyncMutex<PskStoreInner>,
 }
 
@@ -147,7 +144,7 @@ impl PskStore {
         let _ = inner.active_team.replace(team_id);
     }
 
-    pub(crate) fn get_team_for_identity(&self, identity: &[u8]) -> Option<TeamId> {
+    pub(super) fn get_team_for_identity(&self, identity: &[u8]) -> Option<TeamId> {
         #[allow(clippy::expect_used, reason = "poison")]
         let inner = self.inner.lock().expect("poisoned");
         inner.identity_team.get(identity).copied()
