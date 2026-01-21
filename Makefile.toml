@@ -135,15 +135,28 @@ command = "cargo"
 args = ["--verbose", "test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
 
-[tasks.ctest]
-category = "test"
-description = "Run C Tests"
+[tasks.ctest-build]
+category = "build"
+description = "Build C API test suite"
 script = '''
 cmake -B build -S .
-cd build
-cmake --build .
-ctest
+cmake --build build
 '''
+
+[tasks.ctest]
+category = "test"
+description = "Run C API test suite"
+cwd = "build"
+command = "ctest"
+dependencies = ["ctest-build"]
+
+[tasks.ctest-verbose]
+category = "test"
+description = "Run C API test suite with verbose output"
+cwd = "build"
+command = "ctest"
+args = ["-V"]
+dependencies = ["ctest-build"]
 
 
 # Security

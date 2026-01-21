@@ -27,12 +27,11 @@ use tracing::{error, instrument, trace};
 
 use super::{PskStore, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
 use crate::{
-    aranya::ClientWithState,
+    aranya::Client,
     sync::{
         transport::quic, Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer,
         SyncResponse,
     },
-    InvalidGraphs,
 };
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -191,9 +190,8 @@ where
 {
     /// Creates a new [`SyncManager`].
     pub(crate) fn new(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
-        invalid: InvalidGraphs,
         psk_store: Arc<PskStore>,
         (server_addr, client_addr): (Addr, Addr),
         recv: mpsc::Receiver<Callback>,
@@ -207,7 +205,6 @@ where
             recv,
             queue: DelayQueue::new(),
             send_effects,
-            invalid,
             state,
             server_addr,
             #[cfg(feature = "preview")]

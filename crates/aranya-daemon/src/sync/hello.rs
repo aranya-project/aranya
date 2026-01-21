@@ -16,7 +16,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
-    aranya::ClientWithState,
+    aranya::Client,
     sync::{
         transport::quic::{self, QuicState},
         Addr, Error, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
@@ -55,7 +55,7 @@ where
 
         // Get all valid (non-expired) subscribers for this graph
         let subscribers = {
-            let mut subscriptions = self.client.hello_subscriptions().lock().await;
+            let mut subscriptions = self.client.lock_hello_subscriptions().await;
 
             // Remove expired subscriptions and collect valid ones
             let mut valid_subscribers = Vec::new();
@@ -93,7 +93,7 @@ where
             match self.send_hello_notification_to_subscriber(peer, head).await {
                 Ok(()) => {
                     // Update the last notified time
-                    let mut subscriptions = self.client.hello_subscriptions().lock().await;
+                    let mut subscriptions = self.client.lock_hello_subscriptions().await;
                     if let Some(sub) = subscriptions.get_mut(&peer) {
                         sub.last_notified = Some(now);
                     } else {
@@ -330,7 +330,7 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     expires_at: Instant,
     cancel_token: CancellationToken,
     handle: SyncHandle,
-    client: ClientWithState<EN, SP>,
+    client: Client<EN, SP>,
 ) where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + 'static,
@@ -343,7 +343,7 @@ fn spawn_scheduled_hello_sender<EN, SP>(
                 _ = tokio::time::sleep(schedule_delay) => {
                     // Get the current head address
                     let head = {
-                        let mut aranya = client.client().aranya.lock().await;
+                        let mut aranya = client.lock_aranya().await;
                         match aranya.provider().get_storage(peer.graph_id) {
                             Ok(storage) => match storage.get_head_address() {
                                 Ok(addr) => addr,
@@ -397,7 +397,7 @@ where
     #[instrument(skip_all)]
     pub(super) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         active_team: &TeamId,
         handle: SyncHandle,
     ) {
@@ -414,7 +414,7 @@ where
                 let expires_at = Instant::now() + duration;
 
                 // Check if there's an existing subscription and cancel its scheduled task
-                if let Some(subscription) = client.hello_subscriptions().lock().await.get(&peer) {
+                if let Some(subscription) = client.lock_hello_subscriptions().await.get(&peer) {
                     subscription.cancel_token.cancel();
                     debug!(?peer, "cancelled previous hello subscription");
                 }
@@ -431,8 +431,7 @@ where
 
                 // Store subscription (replaces any existing subscription for this peer+team)
                 client
-                    .hello_subscriptions()
-                    .lock()
+                    .lock_hello_subscriptions()
                     .await
                     .insert(peer, subscription);
 
@@ -459,7 +458,7 @@ where
                 debug!(?peer, "received message to unsubscribe from hello messages");
 
                 // Remove subscription for this peer and team
-                match client.hello_subscriptions().lock().await.remove(&peer) {
+                match client.lock_hello_subscriptions().await.remove(&peer) {
                     Some(subscription) => {
                         // Cancel the scheduled sending task
                         subscription.cancel_token.cancel();
@@ -474,13 +473,7 @@ where
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, ?head, "received hello notification message");
 
-                if !client
-                    .client()
-                    .aranya
-                    .lock()
-                    .await
-                    .command_exists(graph_id, head)
-                {
+                if !client.lock_aranya().await.command_exists(graph_id, head) {
                     match handle.sync_on_hello(peer).await {
                         Ok(()) => debug!(?peer, ?head, "sent sync_on_hello request"),
                         Err(error) => warn!(
