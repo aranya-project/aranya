@@ -40,7 +40,7 @@ use tokio::{
 
 use crate::{
     actions::Actions,
-    aranya::Client,
+    aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
     sync::{self, quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -48,7 +48,8 @@ use crate::{
 };
 
 // Aranya graph client for testing.
-type TestClient = Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+type TestClient =
+    aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 type TestState = sync::quic::QuicState;
 // Aranya sync client for testing.
@@ -218,7 +219,7 @@ impl TestCtx {
 
             let pk = bundle.public_keys(&mut eng, &store)?;
 
-            let client = Client::new(ClientState::new(
+            let client = aranya::Client::new(ClientState::new(
                 PolicyEngine::new(
                     POLICY_SOURCE,
                     eng,

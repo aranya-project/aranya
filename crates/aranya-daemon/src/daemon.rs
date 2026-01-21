@@ -23,7 +23,7 @@ use tracing::{error, info, info_span, Instrument as _};
 use crate::afc::Afc;
 use crate::{
     api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
-    aranya::{self},
+    aranya,
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
