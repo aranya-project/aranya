@@ -3,7 +3,7 @@
 # Usage: execute_test.sh <test_executable> <daemon_path> <daemon_names>
 #   daemon_names: comma-separated list of daemon names to spawn (e.g., "owner,member")
 
-set -e
+set -euo pipefail
 
 test_exec="$1"
 daemon_path="$2"
