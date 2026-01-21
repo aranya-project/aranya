@@ -50,7 +50,15 @@ audit-as-crates-io = false
 audit-as-crates-io = false
 criteria = "safe-to-run"
 
+[policy.aranya-common]
+audit-as-crates-io = false
+criteria = "safe-to-run"
+
 [policy.aranya-example-multi-node]
+audit-as-crates-io = false
+criteria = "safe-to-run"
+
+[policy.aranya-example-onboarding]
 audit-as-crates-io = false
 criteria = "safe-to-run"
 
