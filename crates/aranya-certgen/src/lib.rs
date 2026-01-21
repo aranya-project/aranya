@@ -33,16 +33,16 @@
 //!
 //! // Create a new CA and save
 //! let ca = CaCert::new("My Root CA", 365).unwrap();
-//! ca.save(&CertPaths::new("ca"), None).unwrap(); // Creates ./ca.crt.pem and ./ca.key.pem
+//! ca.save(&CertPaths::new("ca"), SaveOptions::default()).unwrap();
 //!
 //! // Generate a signed certificate and save
 //! let signed = ca.generate("my-server", 365).unwrap();
-//! signed.save(&CertPaths::new("server"), None).unwrap(); // Creates ./server.crt.pem
+//! signed.save(&CertPaths::new("server"), SaveOptions::default()).unwrap();
 //!
 //! // Save to a specific path with options
 //! ca.save(
 //!     &CertPaths::new("./certs/myca"),
-//!     Some(SaveOptions::default().create_parents()),
+//!     SaveOptions::default().create_parents(),
 //! )
 //! .unwrap();
 //! ```

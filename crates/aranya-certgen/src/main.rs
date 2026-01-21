@@ -48,10 +48,7 @@ struct OutputArgs {
 }
 
 impl OutputArgs {
-    fn save_options(&self) -> Option<SaveOptions> {
-        if !self.create_parents && !self.force {
-            return None;
-        }
+    fn save_options(&self) -> SaveOptions {
         let mut opts = SaveOptions::default();
         if self.create_parents {
             opts = opts.create_parents();
@@ -59,7 +56,7 @@ impl OutputArgs {
         if self.force {
             opts = opts.force();
         }
-        Some(opts)
+        opts
     }
 }
 

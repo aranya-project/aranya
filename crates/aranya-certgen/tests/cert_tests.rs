@@ -14,7 +14,7 @@ fn test_ca_cert_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let paths = CertPaths::new(dir.path().join("ca"));
 
-    ca.save(&paths, None).expect("should save");
+    ca.save(&paths, SaveOptions::default()).expect("should save");
     let loaded = CaCert::load(&paths).expect("should load");
 
     assert_eq!(ca.cert_pem(), loaded.cert_pem());
@@ -35,7 +35,7 @@ fn test_signed_cert_save() {
     let dir = tempfile::tempdir().unwrap();
     let paths = CertPaths::new(dir.path().join("server"));
 
-    cert.save(&paths, None).expect("should save");
+    cert.save(&paths, SaveOptions::default()).expect("should save");
 
     // Verify the files are named correctly
     assert!(paths.cert.exists());
@@ -87,7 +87,7 @@ fn test_save_fails_if_dir_not_exists() {
     let dir = tempfile::tempdir().unwrap();
     let paths = CertPaths::new(dir.path().join("nonexistent").join("ca"));
 
-    let result = ca.save(&paths, None);
+    let result = ca.save(&paths, SaveOptions::default());
 
     assert!(
         matches!(result, Err(CertGenError::DirNotFound(_))),
@@ -104,10 +104,10 @@ fn test_save_fails_if_file_exists() {
     let paths = CertPaths::new(dir.path().join("ca"));
 
     // Save once successfully
-    ca.save(&paths, None).expect("first save should succeed");
+    ca.save(&paths, SaveOptions::default()).expect("first save should succeed");
 
     // Second save should fail because files exist
-    let result = ca.save(&paths, None);
+    let result = ca.save(&paths, SaveOptions::default());
 
     assert!(
         matches!(result, Err(CertGenError::FileExists(_))),
@@ -124,7 +124,7 @@ fn test_save_with_create_parents() {
     let paths = CertPaths::new(dir.path().join("a").join("b").join("c").join("ca"));
 
     // Should succeed with create_parents option
-    ca.save(&paths, Some(SaveOptions::default().create_parents()))
+    ca.save(&paths, SaveOptions::default().create_parents())
         .expect("save with create_parents should succeed");
 
     assert!(paths.cert.exists());
@@ -139,10 +139,10 @@ fn test_save_with_force() {
     let paths = CertPaths::new(dir.path().join("ca"));
 
     // Save once
-    ca.save(&paths, None).expect("first save should succeed");
+    ca.save(&paths, SaveOptions::default()).expect("first save should succeed");
 
     // Second save with force should succeed
-    ca.save(&paths, Some(SaveOptions::default().force()))
+    ca.save(&paths, SaveOptions::default().force())
         .expect("save with force should succeed");
 }
 

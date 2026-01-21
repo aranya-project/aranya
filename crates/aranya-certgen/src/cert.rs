@@ -95,15 +95,15 @@ impl CertPaths {
 /// # Example
 ///
 /// ```no_run
-/// use aranya_certgen::{CaCert, CertPaths};
+/// use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 ///
 /// // Create a new CA and save
 /// let ca = CaCert::new("My CA", 365).unwrap();
-/// ca.save(&CertPaths::new("ca"), None).unwrap(); // Creates ./ca.crt.pem and ./ca.key.pem
+/// ca.save(&CertPaths::new("ca"), SaveOptions::default()).unwrap();
 ///
 /// // Generate a signed certificate
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save(&CertPaths::new("server"), None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
+/// signed.save(&CertPaths::new("server"), SaveOptions::default()).unwrap();
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -213,7 +213,7 @@ impl CaCert {
     /// # Arguments
     ///
     /// * `paths` - Paths to save the certificate and key files.
-    /// * `options` - Optional settings for directory creation and file overwriting.
+    /// * `options` - Settings for directory creation and file overwriting.
     ///
     /// # Errors
     ///
@@ -221,7 +221,7 @@ impl CaCert {
     /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
-    pub fn save(&self, paths: &CertPaths, options: Option<SaveOptions>) -> Result<(), CertGenError> {
+    pub fn save(&self, paths: &CertPaths, options: SaveOptions) -> Result<(), CertGenError> {
         save_cert_and_key(paths, &self.cert_pem, &self.key.serialize_pem(), options)
     }
 
@@ -249,11 +249,11 @@ impl CaCert {
 /// # Example
 ///
 /// ```no_run
-/// use aranya_certgen::{CaCert, CertPaths};
+/// use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 ///
 /// let ca = CaCert::new("My CA", 365).unwrap();
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save(&CertPaths::new("server"), None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
+/// signed.save(&CertPaths::new("server"), SaveOptions::default()).unwrap();
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -268,7 +268,7 @@ impl SignedCert {
     /// # Arguments
     ///
     /// * `paths` - Paths to save the certificate and key files.
-    /// * `options` - Optional settings for directory creation and file overwriting.
+    /// * `options` - Settings for directory creation and file overwriting.
     ///
     /// # Errors
     ///
@@ -276,7 +276,7 @@ impl SignedCert {
     /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
-    pub fn save(&self, paths: &CertPaths, options: Option<SaveOptions>) -> Result<(), CertGenError> {
+    pub fn save(&self, paths: &CertPaths, options: SaveOptions) -> Result<(), CertGenError> {
         save_cert_and_key(paths, &self.cert_pem, &self.key.serialize_pem(), options)
     }
 
@@ -300,9 +300,8 @@ fn save_cert_and_key(
     paths: &CertPaths,
     cert_pem: &str,
     key_pem: &str,
-    options: Option<SaveOptions>,
+    options: SaveOptions,
 ) -> Result<(), CertGenError> {
-    let options = options.unwrap_or_default();
 
     // Check/create parent directory
     if let Some(dir) = paths.cert.parent() {
