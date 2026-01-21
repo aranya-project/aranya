@@ -13,7 +13,7 @@ use rcgen::{
     IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType, SigningKey,
 };
 use time::{Duration, OffsetDateTime};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 use crate::error::CertGenError;
 
@@ -47,10 +47,10 @@ impl SaveOptions {
 ///
 /// # Security
 ///
-/// The private key is zeroized when this type is dropped to prevent key material
-/// from lingering in memory. The key is stored directly (not inside rcgen's `Issuer`)
-/// so we can zeroize it on drop. When signing certificates, an `Issuer` is created
-/// temporarily with a reference to the key - no copy is made.
+/// The private key is wrapped in [`Zeroizing`] and automatically zeroized when dropped
+/// to prevent key material from lingering in memory. The key is stored directly (not
+/// inside rcgen's `Issuer`). When signing certificates, an `Issuer` is created temporarily
+/// with a reference to the key - no copy is made.
 ///
 /// # Example
 ///
@@ -69,10 +69,15 @@ impl SaveOptions {
 #[allow(missing_debug_implementations)]
 pub struct CaCert {
     cert_pem: String,
-    key: KeyPair,
+    key: Zeroizing<KeyPair>,
 }
 
 impl CaCert {
+    /// Returns a reference to the inner key for use with rcgen APIs.
+    fn key_ref(&self) -> &KeyPair {
+        &self.key
+    }
+
     /// Creates a new Certificate Authority (CA) with a self-signed certificate.
     ///
     /// Generates a new P-256 ECDSA key pair and creates a self-signed CA certificate
@@ -95,7 +100,10 @@ impl CaCert {
         let (cert, key) = generate_root_ca(cn, days)?;
         let cert_pem = cert.pem();
 
-        Ok(Self { cert_pem, key })
+        Ok(Self {
+            cert_pem,
+            key: Zeroizing::new(key),
+        })
     }
 
     /// Generates a leaf certificate signed by this CA.
@@ -118,12 +126,14 @@ impl CaCert {
             return Err(CertGenError::InvalidDays);
         }
         // Create issuer on-demand using a reference to our key.
-        // This allows us to store the key directly for zeroization on drop.
-        let issuer = Issuer::from_ca_cert_pem(&self.cert_pem, &self.key)?;
+        let issuer = Issuer::from_ca_cert_pem(&self.cert_pem, self.key_ref())?;
         let (cert, key) = generate_signed_cert(cn, &issuer, days)?;
         let cert_pem = cert.pem();
 
-        Ok(SignedCert { cert_pem, key })
+        Ok(SignedCert {
+            cert_pem,
+            key: Zeroizing::new(key),
+        })
     }
 
     /// Loads a CA certificate and private key from PEM files.
@@ -153,10 +163,12 @@ impl CaCert {
             fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?,
         );
 
-        let key = KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?;
+        let key = Zeroizing::new(
+            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?,
+        );
 
         // Validate that the cert can be parsed (will be parsed again in generate())
-        Issuer::from_ca_cert_pem(&cert_pem, &key)
+        Issuer::from_ca_cert_pem(&cert_pem, &*key)
             .map_err(|e| CertGenError::parse_cert(&cert_path, e))?;
 
         Ok(Self { cert_pem, key })
@@ -192,13 +204,6 @@ impl CaCert {
     }
 }
 
-/// Zeroizes the private key when dropped to prevent key material from lingering in memory.
-impl Drop for CaCert {
-    fn drop(&mut self) {
-        self.key.zeroize();
-    }
-}
-
 /// A signed leaf certificate that cannot sign other certificates.
 ///
 /// `SignedCert` holds a certificate signed by a CA and its private key.
@@ -206,8 +211,8 @@ impl Drop for CaCert {
 ///
 /// # Security
 ///
-/// The private key is zeroized when this type is dropped to prevent key material
-/// from lingering in memory.
+/// The private key is wrapped in [`Zeroizing`] and automatically zeroized when dropped
+/// to prevent key material from lingering in memory.
 ///
 /// # Example
 ///
@@ -222,7 +227,7 @@ impl Drop for CaCert {
 #[allow(missing_debug_implementations)]
 pub struct SignedCert {
     cert_pem: String,
-    key: KeyPair,
+    key: Zeroizing<KeyPair>,
 }
 
 impl SignedCert {
@@ -253,13 +258,6 @@ impl SignedCert {
     /// Returns the private key as a PEM-encoded string.
     pub fn key_pem(&self) -> String {
         self.key.serialize_pem()
-    }
-}
-
-/// Zeroizes the private key when dropped to prevent key material from lingering in memory.
-impl Drop for SignedCert {
-    fn drop(&mut self) {
-        self.key.zeroize();
     }
 }
 
