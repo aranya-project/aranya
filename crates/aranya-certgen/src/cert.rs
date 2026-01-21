@@ -201,9 +201,9 @@ impl CaCert {
             KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&paths.key, e))?,
         );
 
-        // Validate that the cert can be parsed (will be parsed again in generate())
+        // Validate that the cert is a valid CA certificate
         Issuer::from_ca_cert_pem(&cert_pem, &*key)
-            .map_err(|e| CertGenError::parse_cert(&paths.cert, e))?;
+            .map_err(|e| CertGenError::not_ca_cert(&paths.cert, e))?;
 
         Ok(Self { cert_pem, key })
     }

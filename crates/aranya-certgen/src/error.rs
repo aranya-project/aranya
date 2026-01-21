@@ -49,6 +49,15 @@ pub enum CertGenError {
     /// File already exists.
     #[error("File already exists: {0}")]
     FileExists(String),
+
+    /// Certificate is not a valid CA certificate.
+    #[error("Certificate '{path}' is not a valid CA certificate: {source}")]
+    NotCaCert {
+        /// The path to the certificate file.
+        path: String,
+        /// The underlying error from rcgen.
+        source: rcgen::Error,
+    },
 }
 
 impl CertGenError {
@@ -71,6 +80,14 @@ impl CertGenError {
     /// Creates a new key parsing error with the given path and source error.
     pub fn parse_key(path: impl AsRef<Path>, source: rcgen::Error) -> Self {
         Self::ParseKey {
+            path: path.as_ref().display().to_string(),
+            source,
+        }
+    }
+
+    /// Creates a new error indicating the certificate is not a valid CA.
+    pub fn not_ca_cert(path: impl AsRef<Path>, source: rcgen::Error) -> Self {
+        Self::NotCaCert {
             path: path.as_ref().display().to_string(),
             source,
         }
