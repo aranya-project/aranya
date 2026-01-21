@@ -26,15 +26,11 @@ use s2n_quic::{
     stream::BidirectionalStream,
 };
 use tokio::sync::mpsc;
-#[cfg(feature = "preview")]
-use tokio::sync::Mutex;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
 use super::{ConnectionUpdate, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
-#[cfg(feature = "preview")]
-use crate::sync::hello::HelloSubscriptions;
 use crate::{
-    aranya::ClientWithState,
+    aranya::Client,
     sync::{
         transport::quic, Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
     },
@@ -46,7 +42,7 @@ use crate::{
 #[derive_where(Debug)]
 pub(crate) struct Server<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client: ClientWithState<EN, SP>,
+    client: Client<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
@@ -65,12 +61,6 @@ where
     EN: Engine + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
-    /// Returns a reference to the hello subscriptions for hello notification broadcasting.
-    #[cfg(feature = "preview")]
-    pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
-        Arc::clone(self.client.hello_subscriptions())
-    }
-
     pub(crate) fn local_addr(&self) -> SocketAddr {
         self.local_addr
     }
@@ -85,7 +75,7 @@ where
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
     ) -> Result<(
@@ -236,7 +226,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     async fn sync(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         stream: BidirectionalStream,
         active_team: TeamId,
         handle: SyncHandle,
@@ -280,7 +270,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         local_addr: Addr,
         request_data: &[u8],
         active_team: TeamId,
@@ -341,7 +331,7 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: ClientWithState<EN, SP>,
+        client: Client<EN, SP>,
         local_addr: Addr,
         peer_server_addr: Addr,
         active_team: &TeamId,
