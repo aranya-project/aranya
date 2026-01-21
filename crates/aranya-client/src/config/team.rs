@@ -11,7 +11,7 @@
 //!
 //! Both operations support optional transport configuration.
 
-use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
+use crate::{client::TeamId, error::InvalidArg, util::ApiConv as _, ConfigError, Result};
 
 pub mod quic_sync;
 pub use quic_sync::{

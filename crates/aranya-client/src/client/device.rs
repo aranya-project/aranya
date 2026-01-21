@@ -1,6 +1,7 @@
 use std::{slice, vec};
 
 use aranya_daemon_api as api;
+use aranya_id::custom_id;
 use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tracing::instrument;
@@ -8,7 +9,7 @@ use tracing::instrument;
 use crate::{
     client::{ChanOp, Client, Label, LabelId, Labels, Role, RoleId},
     error::{aranya_error, IpcError, Result},
-    util::{custom_id, impl_slice_iter_wrapper, impl_vec_into_iter_wrapper},
+    util::{impl_slice_iter_wrapper, impl_vec_into_iter_wrapper, ApiConv as _, ApiId},
 };
 
 /// A device's public key bundle.
@@ -37,6 +38,7 @@ custom_id! {
     /// Uniquely identifies a device.
     pub struct DeviceId;
 }
+impl ApiId<api::DeviceId> for DeviceId {}
 
 /// A list of [`DeviceId`].
 #[derive(Debug)]
