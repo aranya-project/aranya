@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use aranya_certgen::{CaCert, CertGenError, SaveOptions};
+use aranya_certgen::{CaCert, CertGenError, CertPaths, SaveOptions};
 use clap::{Args, Parser, Subcommand};
 
 /// Command-line arguments for the certgen tool.
@@ -105,27 +105,25 @@ fn main() -> Result<(), CertGenError> {
 
     match cli.command {
         Commands::Ca { args, output } => {
+            let paths = CertPaths::new(&output);
+
             println!("Generating root CA certificate...");
             let ca = CaCert::new(&args.cn, args.days)?;
+            ca.save(&paths, args.save_options())?;
 
-            let output_str = output.to_str().expect("invalid path");
-            ca.save(output_str, args.save_options())?;
-
-            let cert_path = output.with_extension("crt.pem");
-            println!("  Certificate: {}", cert_path.display());
+            println!("  Certificate: {}", paths.cert.display());
         }
         Commands::Signed { args, output, ca } => {
-            let ca_path = ca.to_str().expect("invalid CA path");
-            let ca = CaCert::load(ca_path)?;
+            let ca_paths = CertPaths::new(&ca);
+            let paths = CertPaths::new(&output);
+
+            let ca = CaCert::load(&ca_paths)?;
 
             println!("Generating certificate '{}'...", args.cn);
             let signed = ca.generate(&args.cn, args.days)?;
+            signed.save(&paths, args.save_options())?;
 
-            let output_str = output.to_str().expect("invalid path");
-            signed.save(output_str, args.save_options())?;
-
-            let cert_path = output.with_extension("crt.pem");
-            println!("  Certificate: {}", cert_path.display());
+            println!("  Certificate: {}", paths.cert.display());
         }
     }
 

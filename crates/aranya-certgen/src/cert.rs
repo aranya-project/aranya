@@ -5,7 +5,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use rcgen::{
@@ -40,6 +40,46 @@ impl SaveOptions {
     }
 }
 
+/// Paths for certificate and private key files.
+///
+/// Provides a single source of truth for path calculation, ensuring consistent
+/// naming conventions across save and load operations.
+///
+/// # Example
+///
+/// ```
+/// use aranya_certgen::CertPaths;
+///
+/// let paths = CertPaths::new("ca");
+/// assert_eq!(paths.cert.to_str().unwrap(), "ca.crt.pem");
+/// assert_eq!(paths.key.to_str().unwrap(), "ca.key.pem");
+///
+/// let paths = CertPaths::new("./certs/server");
+/// assert_eq!(paths.cert.to_str().unwrap(), "./certs/server.crt.pem");
+/// assert_eq!(paths.key.to_str().unwrap(), "./certs/server.key.pem");
+/// ```
+#[derive(Debug, Clone)]
+pub struct CertPaths {
+    /// Path to the certificate file (`.crt.pem`).
+    pub cert: PathBuf,
+    /// Path to the private key file (`.key.pem`).
+    pub key: PathBuf,
+}
+
+impl CertPaths {
+    /// Creates paths from a prefix.
+    ///
+    /// The prefix is used as the base path, with `.crt.pem` and `.key.pem`
+    /// extensions appended for the certificate and key files respectively.
+    pub fn new(prefix: impl AsRef<Path>) -> Self {
+        let prefix = prefix.as_ref();
+        Self {
+            cert: prefix.with_extension("crt.pem"),
+            key: prefix.with_extension("key.pem"),
+        }
+    }
+}
+
 /// A Certificate Authority (CA) certificate that can sign other certificates.
 ///
 /// `CaCert` holds a CA certificate and its private key, and can generate
@@ -55,15 +95,15 @@ impl SaveOptions {
 /// # Example
 ///
 /// ```no_run
-/// use aranya_certgen::CaCert;
+/// use aranya_certgen::{CaCert, CertPaths};
 ///
 /// // Create a new CA and save
 /// let ca = CaCert::new("My CA", 365).unwrap();
-/// ca.save("ca", None).unwrap(); // Creates ./ca.crt.pem and ./ca.key.pem
+/// ca.save(&CertPaths::new("ca"), None).unwrap(); // Creates ./ca.crt.pem and ./ca.key.pem
 ///
 /// // Generate a signed certificate
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save("server", None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
+/// signed.save(&CertPaths::new("server"), None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -140,9 +180,7 @@ impl CaCert {
     ///
     /// # Arguments
     ///
-    /// * `path` - Path prefix for the certificate and key files.
-    ///   - `"ca"` → loads `./ca.crt.pem` and `./ca.key.pem`
-    ///   - `"./certs/ca"` → loads `./certs/ca.crt.pem` and `./certs/ca.key.pem`
+    /// * `paths` - Paths to the certificate and key files.
     ///
     /// # Errors
     ///
@@ -150,26 +188,22 @@ impl CaCert {
     /// - The files cannot be read ([`CertGenError::Io`])
     /// - The certificate cannot be parsed ([`CertGenError::ParseCert`])
     /// - The private key cannot be parsed ([`CertGenError::ParseKey`])
-    pub fn load(path: &str) -> Result<Self, CertGenError> {
-        let path = Path::new(path);
-        let cert_path = path.with_extension("crt.pem");
-        let key_path = path.with_extension("key.pem");
-
+    pub fn load(paths: &CertPaths) -> Result<Self, CertGenError> {
         let cert_pem =
-            fs::read_to_string(&cert_path).map_err(|e| CertGenError::io(&cert_path, e))?;
+            fs::read_to_string(&paths.cert).map_err(|e| CertGenError::io(&paths.cert, e))?;
 
         // Wrap in Zeroizing to ensure the key PEM is zeroized on drop, even if parsing fails
         let key_pem = Zeroizing::new(
-            fs::read_to_string(&key_path).map_err(|e| CertGenError::io(&key_path, e))?,
+            fs::read_to_string(&paths.key).map_err(|e| CertGenError::io(&paths.key, e))?,
         );
 
         let key = Zeroizing::new(
-            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&key_path, e))?,
+            KeyPair::from_pem(&key_pem).map_err(|e| CertGenError::parse_key(&paths.key, e))?,
         );
 
         // Validate that the cert can be parsed (will be parsed again in generate())
         Issuer::from_ca_cert_pem(&cert_pem, &*key)
-            .map_err(|e| CertGenError::parse_cert(&cert_path, e))?;
+            .map_err(|e| CertGenError::parse_cert(&paths.cert, e))?;
 
         Ok(Self { cert_pem, key })
     }
@@ -178,9 +212,7 @@ impl CaCert {
     ///
     /// # Arguments
     ///
-    /// * `path` - Path prefix for the certificate and key files.
-    ///   - `"ca"` → saves to `./ca.crt.pem` and `./ca.key.pem`
-    ///   - `"./certs/ca"` → saves to `./certs/ca.crt.pem` and `./certs/ca.key.pem`
+    /// * `paths` - Paths to save the certificate and key files.
     /// * `options` - Optional settings for directory creation and file overwriting.
     ///
     /// # Errors
@@ -189,8 +221,8 @@ impl CaCert {
     /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
-    pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
-        save_cert_and_key(path, &self.cert_pem, &self.key.serialize_pem(), options)
+    pub fn save(&self, paths: &CertPaths, options: Option<SaveOptions>) -> Result<(), CertGenError> {
+        save_cert_and_key(paths, &self.cert_pem, &self.key.serialize_pem(), options)
     }
 
     /// Returns the certificate as a PEM-encoded string.
@@ -217,11 +249,11 @@ impl CaCert {
 /// # Example
 ///
 /// ```no_run
-/// use aranya_certgen::CaCert;
+/// use aranya_certgen::{CaCert, CertPaths};
 ///
 /// let ca = CaCert::new("My CA", 365).unwrap();
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save("server", None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
+/// signed.save(&CertPaths::new("server"), None).unwrap(); // Creates ./server.crt.pem and ./server.key.pem
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -235,9 +267,7 @@ impl SignedCert {
     ///
     /// # Arguments
     ///
-    /// * `path` - Path prefix for the certificate and key files.
-    ///   - `"server"` → saves to `./server.crt.pem` and `./server.key.pem`
-    ///   - `"./certs/server"` → saves to `./certs/server.crt.pem` and `./certs/server.key.pem`
+    /// * `paths` - Paths to save the certificate and key files.
     /// * `options` - Optional settings for directory creation and file overwriting.
     ///
     /// # Errors
@@ -246,8 +276,8 @@ impl SignedCert {
     /// - [`CertGenError::DirNotFound`] if directory doesn't exist and `create_parents` is false
     /// - [`CertGenError::FileExists`] if files exist and `force` is false
     /// - [`CertGenError::Io`] if writing files fails
-    pub fn save(&self, path: &str, options: Option<SaveOptions>) -> Result<(), CertGenError> {
-        save_cert_and_key(path, &self.cert_pem, &self.key.serialize_pem(), options)
+    pub fn save(&self, paths: &CertPaths, options: Option<SaveOptions>) -> Result<(), CertGenError> {
+        save_cert_and_key(paths, &self.cert_pem, &self.key.serialize_pem(), options)
     }
 
     /// Returns the certificate as a PEM-encoded string.
@@ -266,21 +296,16 @@ impl SignedCert {
 // ============================================================================
 
 /// Saves a certificate and private key to PEM files.
-///
-/// The path is used as a prefix: `path.crt.pem` and `path.key.pem`.
 fn save_cert_and_key(
-    path: impl AsRef<Path>,
+    paths: &CertPaths,
     cert_pem: &str,
     key_pem: &str,
     options: Option<SaveOptions>,
 ) -> Result<(), CertGenError> {
     let options = options.unwrap_or_default();
-    let path = path.as_ref();
-    let cert_path = path.with_extension("crt.pem");
-    let key_path = path.with_extension("key.pem");
 
     // Check/create parent directory
-    if let Some(dir) = path.parent() {
+    if let Some(dir) = paths.cert.parent() {
         if !dir.as_os_str().is_empty() && !dir.exists() {
             if options.create_parents {
                 fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
@@ -292,15 +317,15 @@ fn save_cert_and_key(
 
     // Check for existing files
     if !options.force {
-        if cert_path.exists() {
-            return Err(CertGenError::FileExists(cert_path.display().to_string()));
+        if paths.cert.exists() {
+            return Err(CertGenError::FileExists(paths.cert.display().to_string()));
         }
-        if key_path.exists() {
-            return Err(CertGenError::FileExists(key_path.display().to_string()));
+        if paths.key.exists() {
+            return Err(CertGenError::FileExists(paths.key.display().to_string()));
         }
     }
 
-    fs::write(&cert_path, cert_pem).map_err(|e| CertGenError::io(&cert_path, e))?;
+    fs::write(&paths.cert, cert_pem).map_err(|e| CertGenError::io(&paths.cert, e))?;
 
     // Write private key with restrictive permissions set at creation time
     // to prevent race condition where others could read the key before
@@ -310,11 +335,11 @@ fn save_cert_and_key(
     #[cfg(unix)]
     key_options.mode(0o600);
     let mut key_file = key_options
-        .open(&key_path)
-        .map_err(|e| CertGenError::io(&key_path, e))?;
+        .open(&paths.key)
+        .map_err(|e| CertGenError::io(&paths.key, e))?;
     key_file
         .write_all(key_pem.as_bytes())
-        .map_err(|e| CertGenError::io(&key_path, e))?;
+        .map_err(|e| CertGenError::io(&paths.key, e))?;
 
     Ok(())
 }
