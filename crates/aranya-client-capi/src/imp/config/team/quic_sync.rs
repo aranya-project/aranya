@@ -5,7 +5,7 @@ use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
-use crate::api::defs::{self};
+use crate::api::defs;
 
 /// QUIC syncer configuration for CreateTeam() operation.
 #[derive(Clone, Debug, Default)]

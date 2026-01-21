@@ -51,7 +51,7 @@ use super::{
     handle::{Callback, ManagerMessage},
     Addr, GraphId, Result, SyncPeer, SyncState,
 };
-use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
+use crate::{aranya::Client, vm_policy::VecSink};
 
 /// Syncs with each peer after the specified interval.
 ///
@@ -62,7 +62,7 @@ use crate::{aranya::ClientWithState, vm_policy::VecSink, InvalidGraphs};
 #[derive_where(Debug; ST)]
 pub(crate) struct SyncManager<ST, EN, SP, EF> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(super) client: ClientWithState<EN, SP>,
+    pub(super) client: Client<EN, SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
     /// Receives added/removed peers.
@@ -71,8 +71,6 @@ pub(crate) struct SyncManager<ST, EN, SP, EF> {
     pub(super) queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
-    /// Keeps track of invalid graphs due to finalization errors.
-    pub(super) invalid: InvalidGraphs,
     /// Additional state used by the syncer.
     pub(super) state: ST,
     /// Sync server address. Peers will make incoming connections to us on this address.
@@ -111,14 +109,14 @@ impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub(crate) fn client(&self) -> &crate::aranya::Client<EN, SP> {
-        self.client.client()
+    pub(crate) fn client(&self) -> &Client<EN, SP> {
+        &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub(crate) fn client_mut(&mut self) -> &mut crate::aranya::Client<EN, SP> {
-        self.client.client_mut()
+    pub(crate) fn client_mut(&mut self) -> &mut Client<EN, SP> {
+        &mut self.client
     }
 }
 
@@ -285,7 +283,7 @@ where
                         }
                         keep
                     });
-                    self.invalid.insert(peer.graph_id);
+                    self.client.invalid_graphs().insert(peer.graph_id);
                 }
             })
             .with_context(|| format!("peer addr: {}", peer.addr))?;
