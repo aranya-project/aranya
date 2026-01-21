@@ -135,11 +135,7 @@ where
     /// * `Ok(())` if the message was sent successfully
     /// * `Err(SyncError)` if there was an error
     #[instrument(skip_all)]
-    async fn send_hello_request(
-        &mut self,
-        peer: SyncPeer,
-        sync_type: SyncType<Addr>,
-    ) -> Result<()> {
+    async fn send_hello_request(&mut self, peer: SyncPeer, sync_type: SyncType) -> Result<()> {
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -196,16 +192,14 @@ where
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-        subscriber_server_addr: Addr,
     ) -> Result<()> {
         // Create the subscribe message
         let hello_msg = SyncHelloType::Subscribe {
             graph_change_delay,
             duration,
             schedule_delay,
-            address: subscriber_server_addr,
         };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+        let sync_type = SyncType::Hello(hello_msg);
 
         self.send_hello_request(peer, sync_type).await
     }
@@ -223,17 +217,11 @@ where
     /// * `Ok(())` if the unsubscribe request was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    pub(super) async fn send_hello_unsubscribe_request(
-        &mut self,
-        peer: SyncPeer,
-        subscriber_server_addr: Addr,
-    ) -> Result<()> {
+    pub(super) async fn send_hello_unsubscribe_request(&mut self, peer: SyncPeer) -> Result<()> {
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
-        let sync_type: SyncType<Addr> = SyncType::Hello(SyncHelloType::Unsubscribe {
-            address: subscriber_server_addr,
-        });
+        let sync_type: SyncType = SyncType::Hello(SyncHelloType::Unsubscribe {});
 
         self.send_hello_request(peer, sync_type).await
     }
@@ -262,11 +250,8 @@ where
         self.state.store().set_team(team_id);
 
         // Create the hello message
-        let hello_msg = SyncHelloType::Hello {
-            head,
-            address: self.server_addr,
-        };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+        let hello_msg = SyncHelloType::Hello { head };
+        let sync_type: SyncType = SyncType::Hello(hello_msg);
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -398,10 +383,11 @@ where
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
     pub(super) async fn process_hello_message(
-        hello_msg: SyncHelloType<Addr>,
+        hello_msg: SyncHelloType,
         client: ClientWithState<PS, SP>,
         active_team: &TeamId,
         handle: SyncHandle,
+        address: Addr,
     ) {
         let graph_id = GraphId::transmute(*active_team);
 
@@ -410,7 +396,6 @@ where
                 graph_change_delay,
                 duration,
                 schedule_delay,
-                address,
             } => {
                 let peer = SyncPeer::new(address, graph_id);
                 let expires_at = Instant::now() + duration;
@@ -456,7 +441,7 @@ where
                     "Created hello subscription and spawned scheduled sender"
                 );
             }
-            SyncHelloType::Unsubscribe { address } => {
+            SyncHelloType::Unsubscribe {} => {
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, "received message to unsubscribe from hello messages");
 
@@ -472,7 +457,7 @@ where
                     }
                 }
             }
-            SyncHelloType::Hello { head, address } => {
+            SyncHelloType::Hello { head } => {
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, ?head, "received hello notification message");
 
