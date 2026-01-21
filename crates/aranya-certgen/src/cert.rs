@@ -99,11 +99,14 @@ impl CertPaths {
 ///
 /// // Create a new CA and save
 /// let ca = CaCert::new("My CA", 365).unwrap();
-/// ca.save(&CertPaths::new("ca"), SaveOptions::default()).unwrap();
+/// ca.save(&CertPaths::new("ca"), SaveOptions::default())
+///     .unwrap();
 ///
 /// // Generate a signed certificate
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save(&CertPaths::new("server"), SaveOptions::default()).unwrap();
+/// signed
+///     .save(&CertPaths::new("server"), SaveOptions::default())
+///     .unwrap();
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -255,7 +258,9 @@ impl CaCert {
 ///
 /// let ca = CaCert::new("My CA", 365).unwrap();
 /// let signed = ca.generate("my-server", 365).unwrap();
-/// signed.save(&CertPaths::new("server"), SaveOptions::default()).unwrap();
+/// signed
+///     .save(&CertPaths::new("server"), SaveOptions::default())
+///     .unwrap();
 /// ```
 // Debug intentionally not implemented to avoid risk of exposing private keys.
 #[allow(missing_debug_implementations)]
@@ -306,7 +311,6 @@ fn save_cert_and_key(
     key_pem: &str,
     options: SaveOptions,
 ) -> Result<(), CertGenError> {
-
     // Check/create parent directory
     if let Some(dir) = paths.cert.parent() {
         if !dir.as_os_str().is_empty() && !dir.exists() {

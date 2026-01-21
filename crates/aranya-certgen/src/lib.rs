@@ -33,11 +33,14 @@
 //!
 //! // Create a new CA and save
 //! let ca = CaCert::new("My Root CA", 365).unwrap();
-//! ca.save(&CertPaths::new("ca"), SaveOptions::default()).unwrap();
+//! ca.save(&CertPaths::new("ca"), SaveOptions::default())
+//!     .unwrap();
 //!
 //! // Generate a signed certificate and save
 //! let signed = ca.generate("my-server", 365).unwrap();
-//! signed.save(&CertPaths::new("server"), SaveOptions::default()).unwrap();
+//! signed
+//!     .save(&CertPaths::new("server"), SaveOptions::default())
+//!     .unwrap();
 //!
 //! // Save to a specific path with options
 //! ca.save(
