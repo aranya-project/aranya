@@ -65,6 +65,36 @@ Generating certificate 'webserver'...
   Certificate: ./cert.crt.pem
 ```
 
+## Renewing Certificates
+
+To renew or reissue a device certificate, generate a new certificate using the same CA:
+
+```bash
+# Load existing CA and generate a new certificate
+aranya-certgen signed --cn webserver --days 365 -f
+```
+
+The `-f` (force) flag overwrites the existing certificate files. The new certificate will:
+- Have a new key pair (more secure than reusing keys)
+- Have a fresh validity period starting from now
+- Be signed by the same CA, so clients trusting the CA will accept the new certificate
+
+**Note:** If you need to preserve the existing private key (not recommended), this tool does not currently support that workflow. You would need to use OpenSSL or similar tools to create a CSR with the existing key.
+
+### Renewing the CA Certificate
+
+CA certificates can also be renewed, but this requires all device certificates to be reissued since they reference the CA:
+
+```bash
+# Generate new CA (will invalidate all existing device certs!)
+aranya-certgen ca --cn "My Company CA" --days 365 -f
+
+# Reissue all device certificates
+aranya-certgen signed --cn webserver --days 365 -f
+aranya-certgen signed --cn device1 -o device1 --days 365 -f
+# ... repeat for all devices
+```
+
 ## Comparison with OpenSSL
 
 This tool simplifies certificate generation compared to OpenSSL while guaranteeing use of expected P-256 ECDSA keys.
