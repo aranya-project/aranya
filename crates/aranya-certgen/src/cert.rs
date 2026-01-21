@@ -231,8 +231,10 @@ impl CaCert {
     }
 
     /// Returns the private key as a PEM-encoded string.
-    pub fn key_pem(&self) -> String {
-        self.key.serialize_pem()
+    ///
+    /// Returns [`Zeroizing<String>`] to ensure key material is zeroized when dropped.
+    pub fn key_pem(&self) -> Zeroizing<String> {
+        Zeroizing::new(self.key.serialize_pem())
     }
 }
 
@@ -286,8 +288,10 @@ impl SignedCert {
     }
 
     /// Returns the private key as a PEM-encoded string.
-    pub fn key_pem(&self) -> String {
-        self.key.serialize_pem()
+    ///
+    /// Returns [`Zeroizing<String>`] to ensure key material is zeroized when dropped.
+    pub fn key_pem(&self) -> Zeroizing<String> {
+        Zeroizing::new(self.key.serialize_pem())
     }
 }
 
