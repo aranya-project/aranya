@@ -16,7 +16,7 @@ use crate::{
     client::{
         Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
     },
-    config::SyncPeerConfig,
+    config::{SyncPeerConfig, MAX_SYNC_INTERVAL},
     error::{self, aranya_error, IpcError, Result},
     util::{ApiConv as _, ApiId},
 };
@@ -87,20 +87,10 @@ impl Team<'_> {
     ///
     /// If `config` is `None`, default values (including those from the daemon) will
     /// be used.
-    ///
-    /// If `timeout` is `None`, the defaut timeout (10 seconds) will
-    /// be used.
     #[instrument(skip(self))]
-    pub async fn sync_now(
-        &self,
-        addr: Addr,
-        cfg: Option<SyncPeerConfig>,
-        timeout: Option<Duration>,
-    ) -> Result<()> {
+    pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         let mut req_ctx = context::current();
-        if let Some(t) = timeout {
-            req_ctx.deadline = Instant::now() + t;
-        }
+        req_ctx.deadline = Instant::now() + MAX_SYNC_INTERVAL;
 
         self.client
             .daemon

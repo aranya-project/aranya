@@ -2769,7 +2769,7 @@ AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
  *
  * Default values for a sync config will be used if `config` is `NULL`
  *
- * The default timeout, 10 seconds, will be used if `timeout` is `NULL`.
+ * The default timeout, 1 year, will be used if `timeout` is `NULL`.
  *
  * @relates AranyaClient.
  */
@@ -2798,7 +2798,7 @@ AranyaError aranya_sync_now(const struct AranyaClient *client,
  *
  * Default values for a sync config will be used if `config` is `NULL`
  *
- * The default timeout, 10 seconds, will be used if `timeout` is `NULL`.
+ * The default timeout, 1 year, will be used if `timeout` is `NULL`.
  *
  * @relates AranyaClient.
  */

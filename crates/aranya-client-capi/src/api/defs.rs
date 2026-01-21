@@ -1943,7 +1943,7 @@ pub unsafe fn sync_hello_unsubscribe(
 ///
 /// Default values for a sync config will be used if `config` is `NULL`
 ///
-/// The default timeout, 10 seconds, will be used if `timeout` is `NULL`.
+/// The default timeout, 1 year, will be used if `timeout` is `NULL`.
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
@@ -1955,11 +1955,19 @@ pub unsafe fn sync_now(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(client.inner.team(team.into()).sync_now(
-        addr,
-        config.map(|config| (*config).clone().into()),
-        timeout.copied().map(Into::into),
-    ))?;
+
+    let timeout = timeout
+        .copied()
+        .map(Into::into)
+        .unwrap_or(MAX_SYNC_INTERVAL);
+
+    client.rt.block_on(tokio::time::timeout(
+        timeout,
+        client
+            .inner
+            .team(team.into())
+            .sync_now(addr, config.map(|config| (*config).clone().into())),
+    ))??;
     Ok(())
 }
 

@@ -34,9 +34,9 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     let memberb_team = devices.memberb.client.team(team_id);
 
     // Query team labels to show label has not been created yet.
-    membera_team.sync_now(owner_addr, None, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
     assert_eq!(membera_team.labels().await?.iter().count(), 0);
-    memberb_team.sync_now(owner_addr, None, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(memberb_team.labels().await?.iter().count(), 0);
 
     let label_id = owner_team
@@ -45,9 +45,9 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     let op = ChanOp::SendRecv;
 
     // Query team labels to confirm the label was created.
-    membera_team.sync_now(owner_addr, None, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
     assert_eq!(membera_team.labels().await?.iter().count(), 1);
-    memberb_team.sync_now(owner_addr, None, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(memberb_team.labels().await?.iter().count(), 1);
 
     // Assigning labels to devices with the "operator" role should fail since it does not have `CanUseAfc` permission.
@@ -69,7 +69,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
         .await?;
 
     // Query team labels to confirm they have been assigned to devices.
-    membera_team.sync_now(owner_addr, None, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
     assert_eq!(
         membera_team
             .device(devices.membera.id)
@@ -79,7 +79,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
             .count(),
         1
     );
-    memberb_team.sync_now(owner_addr, None, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(
         memberb_team
             .device(devices.memberb.id)
@@ -101,7 +101,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
         .await?;
 
     // Query team labels to confirm they have been revoked from devices.
-    membera_team.sync_now(owner_addr, None, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
     assert_eq!(
         membera_team
             .device(devices.membera.id)
@@ -111,7 +111,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
             .count(),
         0
     );
-    memberb_team.sync_now(owner_addr, None, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(
         memberb_team
             .device(devices.memberb.id)
@@ -126,9 +126,9 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     owner_team.delete_label(label_id).await?;
 
     // Query team labels to confirm the label has been deleted.
-    membera_team.sync_now(owner_addr, None, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
     assert_eq!(membera_team.labels().await?.iter().count(), 0);
-    memberb_team.sync_now(owner_addr, None, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(memberb_team.labels().await?.iter().count(), 0);
 
     // Verify deleted label can not be assigned to a device.
@@ -178,13 +178,13 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Create uni channel.
@@ -245,13 +245,13 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -322,13 +322,13 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -407,13 +407,13 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -453,13 +453,13 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Wait for channel to be deleted.
@@ -511,13 +511,13 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -552,7 +552,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .admin
         .client
         .team(team_id)
-        .sync_now(operator_addr, None, None)
+        .sync_now(operator_addr, None)
         .await?;
 
     // Delete label.
@@ -563,13 +563,13 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Wait for channel to be deleted.
@@ -621,13 +621,13 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -662,7 +662,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .admin
         .client
         .team(team_id)
-        .sync_now(operator_addr, None, None)
+        .sync_now(operator_addr, None)
         .await?;
 
     // Remove channel devices from team.
@@ -680,13 +680,13 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Wait for channel to be deleted.
@@ -740,13 +740,13 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -781,7 +781,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .admin
         .client
         .team(team_id)
-        .sync_now(operator_addr, None, None)
+        .sync_now(operator_addr, None)
         .await?;
 
     // Revoke roles from channel devices.
@@ -799,13 +799,13 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Wait for channel to be deleted.
@@ -857,13 +857,13 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
@@ -898,7 +898,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .admin
         .client
         .team(team_id)
-        .sync_now(operator_addr, None, None)
+        .sync_now(operator_addr, None)
         .await?;
 
     // Assign roles without `CanUseAfc` permission.
@@ -916,13 +916,13 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     // Wait for channel to be deleted.
@@ -991,13 +991,13 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .membera
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
     devices
         .memberb
         .client
         .team(team_id)
-        .sync_now(owner_addr, None, None)
+        .sync_now(owner_addr, None)
         .await?;
 
     let membera_afc = devices.membera.client.afc();
