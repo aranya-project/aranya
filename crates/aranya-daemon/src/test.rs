@@ -40,13 +40,9 @@ use tokio::{
 
 use crate::{
     actions::Actions,
-    api::EffectReceiver,
     aranya::Client,
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
-    sync::{
-        self,
-        task::{quic::PskStore, PeerCacheKey, SyncPeer},
-    },
+    sync::{self, quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
 };
@@ -54,15 +50,12 @@ use crate::{
 // Aranya graph client for testing.
 type TestClient = Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::task::quic::State;
+type TestState = sync::quic::QuicState;
 // Aranya sync client for testing.
-type TestSyncer = sync::task::Syncer<TestState>;
+type TestSyncer = sync::SyncManager<TestState, crate::EN, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
-type TestServer = sync::task::quic::Server<
-    PolicyEngine<DefaultEngine, Store>,
-    LinearStorageProvider<FileManager>,
->;
+type TestServer = sync::quic::Server<crate::EN, crate::SP>;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -81,14 +74,14 @@ struct TestDevice {
 impl TestDevice {
     pub fn new(
         server: TestServer,
-        sync_local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
         syncer: TestSyncer,
-        effect_recv: EffectReceiver,
+        effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
+        let sync_local_addr = server.local_addr().into();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
@@ -113,7 +106,7 @@ impl TestDevice {
     ) -> Result<Vec<Effect>> {
         let cmd_count = self
             .syncer
-            .sync(&SyncPeer::new(device.sync_local_addr, self.graph_id))
+            .sync(SyncPeer::new(device.sync_local_addr, self.graph_id))
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
         if let Some(must_receive) = must_receive {
@@ -210,7 +203,7 @@ impl TestCtx {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (syncer, server, local_addr, pk, psk_store, effects_recv) = {
+        let (syncer, server, pk, psk_store, effects_recv) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -242,7 +235,7 @@ impl TestCtx {
             let (send_effects, effects_recv) = mpsc::channel(1);
 
             // Create server first to get the actual listening address
-            let (server, _sync_peers, conn_map, syncer_recv, local_addr) =
+            let (server, _sync_peers, conn_map, syncer_recv) =
                 TestServer::new(client.clone(), &any_local_addr, psk_store.clone()).await?;
 
             // Create syncer with the actual server address
@@ -250,16 +243,16 @@ impl TestCtx {
                 client.clone(),
                 send_effects,
                 psk_store.clone(),
-                (local_addr.into(), any_local_addr),
+                (server.local_addr().into(), any_local_addr),
                 syncer_recv,
                 conn_map,
             )?;
 
-            (syncer, server, local_addr, pk, psk_store, effects_recv)
+            (syncer, server, pk, psk_store, effects_recv)
         };
 
         Ok((
-            TestDevice::new(server, local_addr.into(), pk, id, syncer, effects_recv)?,
+            TestDevice::new(server, pk, id, syncer, effects_recv)?,
             psk_store,
         ))
     }
@@ -390,10 +383,7 @@ impl TestCtx {
         admin.sync_expect(owner, None).await?;
 
         let admin_caches = admin.syncer.get_peer_caches();
-        let owner_key = PeerCacheKey {
-            addr: owner.sync_local_addr,
-            id: admin.graph_id,
-        };
+        let owner_key = SyncPeer::new(owner.sync_local_addr, admin.graph_id);
         let admin_cache_size = admin_caches
             .lock()
             .await

@@ -10,14 +10,14 @@ use derive_where::derive_where;
 use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "preview")]
-use crate::sync::task::quic::HelloSubscriptions;
-use crate::sync::task::PeerCacheKey;
+use crate::sync::HelloSubscriptions;
+use crate::sync::SyncPeer;
 
 /// Thread-safe map of peer caches.
 ///
 /// For a given peer, there should only be one cache. If separate caches are used
 /// for the server and state it will reduce the efficiency of the syncer.
-pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
+pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<SyncPeer, PeerCache>>>;
 
 mod invalid_graphs {
     use std::{collections::HashSet, sync::RwLock};
@@ -88,11 +88,11 @@ impl<EN, SP> Client<EN, SP> {
     ///
     /// This method ensures that the client (aranya) is always locked before the caches,
     /// preventing potential deadlocks. Returns a tuple of guards in the order (aranya, caches).
-    pub async fn lock_aranya_and_caches(
+    pub(crate) async fn lock_aranya_and_caches(
         &self,
     ) -> (
         MutexGuard<'_, ClientState<EN, SP>>,
-        MutexGuard<'_, BTreeMap<PeerCacheKey, PeerCache>>,
+        MutexGuard<'_, BTreeMap<SyncPeer, PeerCache>>,
     ) {
         let aranya = self.lock_aranya().await;
         let caches = self.caches.lock().await;
@@ -103,7 +103,7 @@ impl<EN, SP> Client<EN, SP> {
     ///
     /// Use this when you need to access or modify hello subscriptions.
     #[cfg(feature = "preview")]
-    pub async fn lock_hello_subscriptions(&self) -> MutexGuard<'_, HelloSubscriptions> {
+    pub(crate) async fn lock_hello_subscriptions(&self) -> MutexGuard<'_, HelloSubscriptions> {
         self.hello_subscriptions.lock().await
     }
 
