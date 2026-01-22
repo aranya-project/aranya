@@ -58,6 +58,7 @@ aranya-runtime = { version = "0.18.0", features = ["std", "libc"] }
 buggy = { version = "0.1.0" }
 spideroak-base58 = { version = "0.2.0" }
 
+aranya-certgen = { version = "4.1.0", path = "crates/aranya-certgen", default-features = false }
 aranya-client = { version = "4.1.0", path = "crates/aranya-client", default-features = false }
 aranya-daemon = { version = "4.1.0", path = "crates/aranya-daemon", default-features = false }
 aranya-daemon-api = { version = "4.1.0", path = "crates/aranya-daemon-api", default-features = false }
@@ -79,8 +80,9 @@ metrics = { version = "0.24" }
 metrics-util = { version = "0.20" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
+quinn = { version = "0.11", default-features = false, features = ["rustls", "runtime-tokio", "log"] }
 rustix = { version = "1.1.2", features = ["shm"] }
-s2n-quic = { version = "1.58.0-psk.2", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }

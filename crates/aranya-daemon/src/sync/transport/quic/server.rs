@@ -1,40 +1,33 @@
-use std::{future::Future, net::SocketAddr, sync::Arc};
+//! QUIC server for accepting sync requests from peers.
+
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Context as _;
-use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Engine, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
     MAX_SYNC_MESSAGE_SIZE,
 };
-use aranya_util::{
-    error::ReportExt as _, ready, rustls::NoCertResolver, s2n_quic::get_conn_identity, task::scope,
-};
+use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 use buggy::{bug, BugExt as _};
-use bytes::Bytes;
 use derive_where::derive_where;
-use futures_util::{AsyncReadExt as _, TryFutureExt as _};
-use s2n_quic::{
-    application,
-    connection::StreamAcceptor,
-    provider::{
-        congestion_controller::Bbr,
-        tls::rustls::{
-            self as rustls_provider,
-            rustls::{server::PresharedKeySelection, ServerConfig},
-        },
-    },
-    stream::BidirectionalStream,
-};
+use futures_util::TryFutureExt;
+use quinn::{Connection, Endpoint, RecvStream, SendStream};
+#[cfg(feature = "preview")]
+use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
+use tracing::{debug, error, info, info_span, instrument, trace, warn, Instrument as _};
 
-use super::{ConnectionUpdate, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
+use super::{
+    certs, keep_alive_transport_config, CertConfig, ConnectionKey, ConnectionUpdate, Error,
+    SharedConnectionMap, ALPN_QUIC_SYNC,
+};
 use crate::{
     aranya::Client,
-    sync::{
-        transport::quic, Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
-    },
+    sync::{Callback, Result, SyncHandle, SyncPeer, SyncResponse},
 };
+
+#[cfg(feature = "preview")]
+use crate::sync::HelloSubscriptions;
 
 /// The Aranya QUIC sync server.
 ///
@@ -43,46 +36,55 @@ use crate::{
 pub(crate) struct Server<EN, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     client: Client<EN, SP>,
-    /// QUIC server to handle sync requests and send sync responses.
-    server: s2n_quic::Server,
-    server_keys: Arc<PskStore>,
-    /// Connection map shared with [`super::SyncManager`]
+    /// QUIC endpoint for accepting connections.
+    endpoint: Endpoint,
+    /// Connection map shared with [`SyncManager`]
     conns: SharedConnectionMap,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Interface to trigger sync operations
-    handle: SyncHandle,
-    /// The address we're currently serving on.
-    local_addr: SocketAddr,
+    _sync_peers: SyncHandle,
 }
 
 impl<EN, SP> Server<EN, SP>
 where
     EN: Engine + Send + 'static,
-    SP: StorageProvider + Send + 'static,
+    SP: StorageProvider + Send + Sync + 'static,
 {
-    pub(crate) fn local_addr(&self) -> SocketAddr {
-        self.local_addr
+    /// Returns the local address the server is listening on.
+    pub(crate) fn local_addr(&self) -> std::io::Result<SocketAddr> {
+        self.endpoint.local_addr()
+    }
+
+    /// Returns a reference to the hello subscriptions for hello notification broadcasting.
+    #[cfg(feature = "preview")]
+    pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
+        Arc::clone(self.client.hello_subscriptions())
     }
 
     /// Creates a new `Server`.
     ///
+    /// Creates a unified QUIC endpoint that serves both as a server (accepting incoming
+    /// connections) and can be used by the SyncManager as a client (making outbound connections).
+    /// Using a single endpoint bound to the server address ensures that when we connect
+    /// to peers, our source address is our server address, enabling bidirectional
+    /// connection reuse.
+    ///
     /// # Panics
     ///
     /// Will panic if called outside tokio runtime.
-    ///
-    /// Will panic on poisoned internal mutexes.
-    #[inline]
-    #[allow(deprecated)]
     pub(crate) async fn new(
         client: Client<EN, SP>,
         addr: &Addr,
-        server_keys: Arc<PskStore>,
+        cert_config: &CertConfig,
     ) -> Result<(
         Self,
         SyncHandle,
         SharedConnectionMap,
         mpsc::Receiver<Callback>,
+        SocketAddr,
+        Endpoint,
+        quinn::ClientConfig,
     )> {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
@@ -91,49 +93,75 @@ where
         let (send, syncer_recv) = mpsc::channel::<Callback>(128);
         let sync_peers = SyncHandle::new(send);
 
-        // Create Server Config
-        let mut server_config = ServerConfig::builder()
-            .with_no_client_auth()
-            .with_cert_resolver(Arc::new(NoCertResolver::default()));
-        server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        server_config.preshared_keys =
-            PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
+        // Load certificates once for both client and server configs
+        let (root_store, device_certs, device_key) =
+            certs::load_certs(cert_config).map_err(Error::from)?;
 
-        let tls_server_provider = rustls_provider::Server::new(server_config);
+        // Build server TLS config for mTLS (requires client certs)
+        let mut server_tls_config = certs::build_server_config(
+            root_store.clone(),
+            device_certs.clone(),
+            device_key.clone_key(),
+        )
+        .map_err(Error::from)?;
+        server_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
 
-        let addr = tokio::net::lookup_host(addr.to_socket_addrs())
+        let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(
+            quinn::crypto::rustls::QuicServerConfig::try_from(server_tls_config)
+                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
+        ));
+
+        server_config.transport_config(keep_alive_transport_config());
+
+        // Build client TLS config for mTLS (for outbound connections)
+        let mut client_tls_config =
+            certs::build_client_config(root_store, device_certs, device_key)
+                .map_err(Error::from)?;
+        client_tls_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()];
+
+        let mut client_config = quinn::ClientConfig::new(Arc::new(
+            quinn::crypto::rustls::QuicClientConfig::try_from(client_tls_config)
+                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
+        ));
+
+        client_config.transport_config(keep_alive_transport_config());
+
+        let bind_addr = tokio::net::lookup_host(addr.to_socket_addrs())
             .await
-            .context("DNS lookup on for peer address")?
+            .context("DNS lookup for server address")?
             .next()
             .assume("invalid server address")?;
-        // Use the rustls server provider
-        let server = s2n_quic::Server::builder()
-            .with_tls(tls_server_provider)?
-            .with_io(addr)
-            .assume("can set sync server addr")?
-            .with_congestion_controller(Bbr::default())?
-            .start()
-            .map_err(quic::Error::ServerStart)?;
 
-        let local_addr = server
+        let endpoint = Endpoint::server(server_config, bind_addr)
+            .map_err(|e| Error::EndpointError(format!("failed to create server endpoint: {e}")))?;
+
+        let local_addr = endpoint
             .local_addr()
-            .context("unable to get server local address")?;
+            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
+
+        debug!("created unified QUIC endpoint with mTLS at {}", local_addr);
 
         let server_instance = Self {
             client,
-            server,
-            server_keys,
+            endpoint: endpoint.clone(),
             conns: conns.clone(),
             conn_rx: server_conn_rx,
-            handle: sync_peers.clone(),
-            local_addr,
+            _sync_peers: sync_peers.clone(),
         };
 
-        Ok((server_instance, sync_peers, conns, syncer_recv))
+        Ok((
+            server_instance,
+            sync_peers,
+            conns,
+            syncer_recv,
+            local_addr,
+            endpoint,
+            client_config,
+        ))
     }
 
     /// Begins accepting incoming requests.
-    #[instrument(skip_all, fields(addr = ?self.local_addr))]
+    #[instrument(skip_all, fields(addr = ?self.endpoint.local_addr().ok()))]
     #[allow(clippy::disallowed_macros, reason = "tokio::select! uses unreachable!")]
     pub(crate) async fn serve(mut self, ready: ready::Notifier) {
         info!("QUIC sync server listening for incoming connections");
@@ -144,12 +172,12 @@ where
             loop {
                 tokio::select! {
                     // Accept incoming QUIC connections.
-                    Some(conn) = self.server.accept() => {
-                        self.accept_connection(conn).await;
+                    Some(incoming) = self.endpoint.accept() => {
+                        self.accept_connection(incoming, s).await;
                     },
                     // Handle new connections inserted in the map
-                    Some((peer, acceptor)) = self.conn_rx.recv() => {
-                        s.spawn(self.serve_connection(peer, acceptor));
+                    Some((key, conn)) = self.conn_rx.recv() => {
+                        s.spawn(self.serve_connection(key, conn));
                     }
                     else => break,
                 }
@@ -160,91 +188,93 @@ where
         error!("server terminated");
     }
 
-    fn accept_connection(
+    async fn accept_connection(
         &mut self,
-        mut conn: s2n_quic::Connection,
-    ) -> impl Future<Output = ()> + use<'_, EN, SP> {
-        let handle = conn.handle();
-        async {
-            trace!("received incoming QUIC connection");
-            let identity = get_conn_identity(&mut conn)?;
-            let active_team = self
-                .server_keys
-                .get_team_for_identity(&identity)
-                .context("no active team for accepted connection")?;
-            let peer = conn
-                .remote_addr()
-                .context("unable to get peer address from connection")?;
-            conn.keep_alive(true)
-                .context("unable to keep connection alive")?;
-            let peer = SyncPeer::new(peer.into(), GraphId::transmute(active_team));
-            self.conns.insert(peer, conn).await;
-            anyhow::Ok(())
-        }
-        .unwrap_or_else(move |err| {
-            error!(error = ?err, "server unable to accept connection");
-            handle.close(application::Error::UNKNOWN);
-        })
+        incoming: quinn::Incoming,
+        s: &mut aranya_util::task::Scope,
+    ) {
+        let conns = self.conns.clone();
+        let client = self.client.clone();
+        let sync_peers = self._sync_peers.clone();
+
+        s.spawn(async move {
+            match incoming.await {
+                Ok(conn) => {
+                    trace!("received incoming QUIC connection");
+                    let peer = conn.remote_address();
+                    let key = ConnectionKey::new(peer);
+
+                    // Insert connection into map
+                    let mut conns = conns;
+                    let conn = conns.insert(key, conn).await;
+
+                    // Serve the connection
+                    Self::serve_connection_inner(key, conn, client, sync_peers).await;
+                }
+                Err(e) => {
+                    error!(error = %e, "failed to accept QUIC connection");
+                }
+            }
+        });
     }
 
     fn serve_connection(
         &mut self,
-        peer: SyncPeer,
-        mut acceptor: StreamAcceptor,
-    ) -> impl Future<Output = ()> {
-        let active_team = TeamId::transmute(peer.graph_id);
-        let conn_source = peer.addr;
+        key: ConnectionKey,
+        conn: Connection,
+    ) -> impl std::future::Future<Output = ()> {
         let client = self.client.clone();
-        let sync_peers = self.handle.clone();
-        let local_addr = self.local_addr.into();
+        let sync_peers = self._sync_peers.clone();
+        Self::serve_connection_inner(key, conn, client, sync_peers)
+    }
+
+    async fn serve_connection_inner(
+        key: ConnectionKey,
+        conn: Connection,
+        client: Client<EN, SP>,
+        sync_peers: SyncHandle,
+    ) {
+        let peer = key.addr;
         async move {
             // Accept incoming streams.
-            while let Some(stream) = acceptor
-                .accept_bidirectional_stream()
-                .await
-                .context("could not receive QUIC stream")?
-            {
+            while let Ok((send, recv)) = conn.accept_bi().await {
                 trace!("received incoming QUIC stream");
-                Self::sync(
-                    client.clone(),
-                    stream,
-                    active_team,
-                    sync_peers.clone(),
-                    local_addr,
-                )
-                .await
-                .context("failed to process sync request")?;
+                if let Err(e) =
+                    Self::sync(client.clone(), peer.into(), send, recv, sync_peers.clone()).await
+                {
+                    error!(error = %e.report(), "failed to process sync request");
+                }
             }
+            debug!("connection closed");
             anyhow::Ok(())
         }
-        .unwrap_or_else(|err| {
-            error!(error = ?err, "server unable to respond to sync request from peer");
+        .unwrap_or_else(|err: anyhow::Error| {
+            error!(error = %err, "server unable to respond to sync request from peer");
         })
-        .instrument(info_span!("serve_connection", %conn_source))
+        .instrument(info_span!("serve_connection", %peer))
+        .await
     }
 
     /// Responds to a sync.
     #[instrument(skip_all)]
-    async fn sync(
+    pub(crate) async fn sync(
         client: Client<EN, SP>,
-        stream: BidirectionalStream,
-        active_team: TeamId,
-        handle: SyncHandle,
-        local_addr: Addr,
+        peer: Addr,
+        mut send: SendStream,
+        mut recv: RecvStream,
+        sync_peers: SyncHandle,
     ) -> Result<()> {
         trace!("server received a sync request");
 
-        let mut recv_buf = Vec::new();
-        let (mut recv, mut send) = stream.split();
-        recv.read_to_end(&mut recv_buf)
+        let recv_buf = recv
+            .read_to_end(MAX_SYNC_MESSAGE_SIZE)
             .await
-            .context("failed to read sync request")?;
+            .map_err(Error::QuicReadError)?;
         trace!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res =
-            Self::sync_respond(client, local_addr, &recv_buf, active_team, handle).await;
-        let resp: SyncResponse = match sync_response_res {
+        let sync_response_res = Self::sync_respond(client, peer, &recv_buf, sync_peers).await;
+        let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 let error = err.report().to_string();
@@ -256,12 +286,10 @@ where
         let data_len = {
             let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
             let data_len = data.len();
-            send.send(Bytes::from(data))
-                .await
-                .context("Could not send sync response")?;
+            send.write_all(&data).await.map_err(Error::QuicWriteError)?;
             data_len
         };
-        send.close().await.ok();
+        send.finish().ok();
         trace!(n = data_len, "server sent sync response");
 
         Ok(())
@@ -271,10 +299,9 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: Client<EN, SP>,
-        local_addr: Addr,
+        addr: Addr,
         request_data: &[u8],
-        active_team: TeamId,
-        _handle: SyncHandle,
+        _sync_peers: SyncHandle,
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
@@ -282,7 +309,7 @@ where
             error!(
                 error = %e,
                 request_data_len = request_data.len(),
-                ?active_team,
+                ?addr,
                 "Failed to deserialize sync request"
             );
             anyhow::anyhow!(e)
@@ -292,16 +319,7 @@ where
             SyncType::Poll {
                 request: request_msg,
                 address: peer_server_addr,
-            } => {
-                Self::process_poll_message(
-                    request_msg,
-                    client,
-                    local_addr,
-                    peer_server_addr,
-                    &active_team,
-                )
-                .await
-            }
+            } => Self::process_poll_message(request_msg, client, addr, peer_server_addr).await,
             SyncType::Subscribe { .. } => {
                 bug!("Push subscribe messages are not implemented")
             }
@@ -314,9 +332,8 @@ where
             SyncType::Hello(_hello_msg) => {
                 #[cfg(feature = "preview")]
                 {
-                    Self::process_hello_message(_hello_msg, client, &active_team, _handle).await;
+                    Self::process_hello_message(_hello_msg, client, addr, _sync_peers).await;
                     // Hello messages are fire-and-forget, return empty response
-                    // Note: returning empty response which will be ignored by client
                     return Ok(Box::new([]));
                 }
                 #[cfg(not(feature = "preview"))]
@@ -332,13 +349,18 @@ where
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
         client: Client<EN, SP>,
-        local_addr: Addr,
+        peer_addr: Addr,
         peer_server_addr: Addr,
-        active_team: &TeamId,
     ) -> Result<Box<[u8]>> {
-        let mut resp = SyncResponder::new(local_addr);
-        let storage_id = check_request(*active_team, &request_msg)?;
-        let peer = SyncPeer::new(peer_server_addr, storage_id);
+        trace!("server responding to sync request");
+
+        // Extract the storage_id (GraphId) from the request
+        let SyncRequestMessage::SyncRequest { storage_id, .. } = &request_msg else {
+            bug!("Should be a SyncRequest")
+        };
+        let storage_id = *storage_id;
+
+        let mut resp = SyncResponder::new(peer_addr);
 
         resp.receive(request_msg).context("sync recv failed")?;
 
@@ -346,6 +368,10 @@ where
         let len = {
             // Lock both aranya and caches in the correct order.
             let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
+            let peer = SyncPeer {
+                addr: peer_server_addr,
+                graph_id: storage_id,
+            };
             let cache = caches.entry(peer).or_default();
 
             resp.poll(&mut buf, aranya.provider(), cache)
@@ -354,7 +380,7 @@ where
                         err,
                         aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
                     ) {
-                        warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
+                        warn!(storage_id = %storage_id, "missing requested graph, we likely have not synced yet");
                         Ok(0)
                     } else {
                         Err(err)
@@ -366,15 +392,55 @@ where
         buf.truncate(len);
         Ok(buf.into())
     }
-}
 
-fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
-    let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
-        bug!("Should be a SyncRequest")
-    };
-    if team_id.as_bytes() != storage_id.as_bytes() {
-        return Err(Error::QuicSync(quic::Error::InvalidPSK));
+    /// Processes a hello message for the preview feature.
+    #[cfg(feature = "preview")]
+    #[instrument(skip_all)]
+    async fn process_hello_message(
+        hello_msg: aranya_runtime::HelloMessage,
+        client: Client<EN, SP>,
+        peer_addr: Addr,
+        sync_peers: SyncHandle,
+    ) {
+        use aranya_runtime::HelloMessage;
+
+        match hello_msg {
+            HelloMessage::Subscribe {
+                graph_id,
+                address: peer_server_addr,
+                graph_change_delay,
+                duration,
+            } => {
+                trace!("received hello subscribe request");
+                let hello_subs = client.hello_subscriptions();
+                let mut subs = hello_subs.lock().await;
+                subs.add_subscriber(
+                    graph_id,
+                    peer_server_addr,
+                    peer_addr,
+                    graph_change_delay,
+                    duration,
+                );
+            }
+            HelloMessage::Unsubscribe {
+                graph_id,
+                address: peer_server_addr,
+            } => {
+                trace!("received hello unsubscribe request");
+                let hello_subs = client.hello_subscriptions();
+                let mut subs = hello_subs.lock().await;
+                subs.remove_subscriber(graph_id, peer_server_addr);
+            }
+            HelloMessage::Notify { graph_id, head } => {
+                trace!("received hello notification");
+                let peer = SyncPeer {
+                    addr: peer_addr,
+                    graph_id,
+                };
+                if let Err(e) = sync_peers.sync_on_hello(peer).await {
+                    warn!(error = %e, "failed to trigger sync on hello");
+                }
+            }
+        }
     }
-
-    Ok(*storage_id)
 }

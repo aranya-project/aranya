@@ -165,11 +165,6 @@ impl Config {
         self.state_dir.join("storage")
     }
 
-    /// Path to file containing the seed IDs.
-    pub(crate) fn seed_id_path(&self) -> PathBuf {
-        self.state_dir.join("seeds")
-    }
-
     /// Path to the daemon's UDS API socket.
     pub fn uds_api_sock(&self) -> PathBuf {
         self.runtime_dir.join("uds.sock")
@@ -214,8 +209,15 @@ pub struct AfcConfig {
 pub struct QuicSyncConfig {
     /// Network address of Aranya sync server.
     pub addr: Addr,
-    /// Client bind address.
-    pub client_addr: Option<Addr>,
+    /// Directory containing trusted root CA certificates (PEM format).
+    #[serde(deserialize_with = "non_empty_path")]
+    pub root_certs_dir: PathBuf,
+    /// Path to the device's certificate file (PEM format).
+    #[serde(deserialize_with = "non_empty_path")]
+    pub device_cert: PathBuf,
+    /// Path to the device's private key file (PEM format).
+    #[serde(deserialize_with = "non_empty_path")]
+    pub device_key: PathBuf,
 }
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -255,7 +257,9 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
-                    client_addr: None,
+                    root_certs_dir: "/etc/aranya/certs/ca".parse()?,
+                    device_cert: "/etc/aranya/certs/device.crt".parse()?,
+                    device_key: "/etc/aranya/certs/device.key".parse()?,
                 }),
             },
             #[cfg(feature = "afc")]
