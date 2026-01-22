@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use aranya_certgen::CaCert;
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
@@ -28,27 +28,19 @@ use tracing_subscriber::{
 };
 
 /// Generates a CA certificate using aranya-certgen library.
-/// Returns the path prefix for loading the CA later.
-fn generate_ca(root_certs_dir: &Path) -> Result<String> {
+/// Returns the CertPaths for loading the CA later.
+fn generate_ca(root_certs_dir: &Path) -> Result<CertPaths> {
     let ca = CaCert::new("Aranya Example CA", 365).context("failed to generate CA certificate")?;
-    let ca_prefix = root_certs_dir.join("ca");
-    let ca_prefix_str = ca_prefix
-        .to_str()
-        .context("CA path is not valid UTF-8")?
-        .to_string();
-    ca.save(&ca_prefix_str, None)
+    let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+    ca.save(&ca_paths, SaveOptions::default())
         .context("failed to write CA certificate/key")?;
-    Ok(ca_prefix_str)
+    Ok(ca_paths)
 }
 
 /// Generates a signed certificate using the CA.
-/// Returns the paths to the generated cert and key files.
-fn generate_signed_cert(
-    _name: &str,
-    ca_prefix: &str,
-    output_dir: &Path,
-) -> Result<(PathBuf, PathBuf)> {
-    let ca = CaCert::load(ca_prefix).context("failed to load CA")?;
+/// Returns the CertPaths for the generated cert and key files.
+fn generate_signed_cert(_name: &str, ca_paths: &CertPaths, output_dir: &Path) -> Result<CertPaths> {
+    let ca = CaCert::load(ca_paths).context("failed to load CA")?;
 
     // Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname).
     // This ensures TLS verification works with the actual socket address.
@@ -56,18 +48,12 @@ fn generate_signed_cert(
         .generate("127.0.0.1", 365)
         .context("failed to generate signed certificate")?;
 
-    let device_prefix = output_dir.join("device");
+    let device_paths = CertPaths::new(output_dir.join("device"));
     signed
-        .save(
-            device_prefix.to_str().context("path is not valid UTF-8")?,
-            None,
-        )
+        .save(&device_paths, SaveOptions::default())
         .context("failed to write signed certificate/key")?;
 
-    Ok((
-        output_dir.join("device.crt.pem"),
-        output_dir.join("device.key.pem"),
-    ))
+    Ok(device_paths)
 }
 
 #[derive(Clone, Debug)]
@@ -115,7 +101,7 @@ impl ClientCtx {
         user_name: &str,
         daemon_path: &DaemonPath,
         root_certs_dir: &Path,
-        ca_prefix: &str,
+        ca_paths: &CertPaths,
     ) -> Result<Self> {
         info!(team_name, user_name, "creating `ClientCtx`");
 
@@ -141,8 +127,9 @@ impl ClientCtx {
             }
 
             // Generate device certificate for this daemon
-            let (device_cert, device_key) =
-                generate_signed_cert(user_name, ca_prefix, &config_dir)?;
+            let device_paths = generate_signed_cert(user_name, &ca_paths, &config_dir)?;
+            let device_cert = &device_paths.cert;
+            let device_key = &device_paths.key;
 
             let buf = format!(
                 r#"
@@ -259,31 +246,19 @@ async fn main() -> Result<()> {
     let root_certs_dir = certs_dir.path().join("root_certs");
     fs::create_dir_all(&root_certs_dir).await?;
     info!("generating CA certificate");
-    let ca_prefix = generate_ca(&root_certs_dir)?;
+    let ca_paths = generate_ca(&root_certs_dir)?;
 
     let team_name = "rust_example";
-    let owner = ClientCtx::new(
-        team_name,
-        "owner",
-        &daemon_path,
-        &root_certs_dir,
-        &ca_prefix,
-    )
-    .await?;
-    let admin = ClientCtx::new(
-        team_name,
-        "admin",
-        &daemon_path,
-        &root_certs_dir,
-        &ca_prefix,
-    )
-    .await?;
+    let owner =
+        ClientCtx::new(team_name, "owner", &daemon_path, &root_certs_dir, &ca_paths).await?;
+    let admin =
+        ClientCtx::new(team_name, "admin", &daemon_path, &root_certs_dir, &ca_paths).await?;
     let operator = ClientCtx::new(
         team_name,
         "operator",
         &daemon_path,
         &root_certs_dir,
-        &ca_prefix,
+        &ca_paths,
     )
     .await?;
     let membera = ClientCtx::new(
@@ -291,7 +266,7 @@ async fn main() -> Result<()> {
         "member_a",
         &daemon_path,
         &root_certs_dir,
-        &ca_prefix,
+        &ca_paths,
     )
     .await?;
     let memberb = ClientCtx::new(
@@ -299,7 +274,7 @@ async fn main() -> Result<()> {
         "member_b",
         &daemon_path,
         &root_certs_dir,
-        &ca_prefix,
+        &ca_paths,
     )
     .await?;
 
@@ -478,7 +453,7 @@ async fn main() -> Result<()> {
             "custom",
             &daemon_path,
             &root_certs_dir,
-            &ca_prefix,
+            &ca_paths,
         )
         .await?;
         let custom_role = owner_team

@@ -34,10 +34,9 @@ use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::net::UnixListener;
 #[cfg(feature = "preview")]
 use tokio::sync::Mutex;
-use tokio::sync::mpsc;
+use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]

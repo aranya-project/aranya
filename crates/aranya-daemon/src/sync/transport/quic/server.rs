@@ -12,22 +12,21 @@ use buggy::{bug, BugExt as _};
 use derive_where::derive_where;
 use futures_util::TryFutureExt;
 use quinn::{Connection, Endpoint, RecvStream, SendStream};
+use tokio::sync::mpsc;
 #[cfg(feature = "preview")]
 use tokio::sync::Mutex;
-use tokio::sync::mpsc;
 use tracing::{debug, error, info, info_span, instrument, trace, warn, Instrument as _};
 
 use super::{
     certs, keep_alive_transport_config, CertConfig, ConnectionKey, ConnectionUpdate, Error,
     SharedConnectionMap, ALPN_QUIC_SYNC,
 };
+#[cfg(feature = "preview")]
+use crate::sync::HelloSubscriptions;
 use crate::{
     aranya::Client,
     sync::{Callback, Result, SyncHandle, SyncPeer, SyncResponse},
 };
-
-#[cfg(feature = "preview")]
-use crate::sync::HelloSubscriptions;
 
 /// The Aranya QUIC sync server.
 ///
@@ -393,5 +392,4 @@ where
         buf.truncate(len);
         Ok(buf.into())
     }
-
 }

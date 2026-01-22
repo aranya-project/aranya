@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
-use aranya_certgen::CaCert;
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::Addr;
 use tokio::fs;
 use tracing::info;
@@ -30,8 +30,8 @@ impl CertificateAuthority {
 
         // Generate CA certificate
         let ca = CaCert::new("Aranya Example CA", 365).context("failed to generate CA")?;
-        let ca_prefix = root_certs_dir.join("ca");
-        ca.save(ca_prefix.to_str().expect("valid UTF-8 path"), None)
+        let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+        ca.save(&ca_paths, SaveOptions::default())
             .context("failed to write CA cert/key")?;
 
         Ok(Self { ca, root_certs_dir })
@@ -43,7 +43,7 @@ impl CertificateAuthority {
     }
 
     /// Generates a signed certificate.
-    pub fn generate_signed_cert(&self, _name: &str, work_dir: &Path) -> Result<(PathBuf, PathBuf)> {
+    pub fn generate_signed_cert(&self, _name: &str, work_dir: &Path) -> Result<CertPaths> {
         // Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname).
         // This ensures TLS verification works with the actual socket address.
         let signed = self
@@ -51,15 +51,12 @@ impl CertificateAuthority {
             .generate("127.0.0.1", 365)
             .context("failed to generate signed cert")?;
 
-        let device_prefix = work_dir.join("device");
+        let device_paths = CertPaths::new(work_dir.join("device"));
         signed
-            .save(device_prefix.to_str().expect("valid UTF-8 path"), None)
+            .save(&device_paths, SaveOptions::default())
             .context("failed to write signed cert/key")?;
 
-        Ok((
-            work_dir.join("device.crt.pem"),
-            work_dir.join("device.key.pem"),
-        ))
+        Ok(device_paths)
     }
 }
 
@@ -92,7 +89,9 @@ pub async fn create_config(
     }
 
     // Generate signed certificate
-    let (device_cert, device_key) = ca.generate_signed_cert(&device, &work_dir)?;
+    let device_paths = ca.generate_signed_cert(&device, &work_dir)?;
+    let device_cert = &device_paths.cert;
+    let device_key = &device_paths.key;
     let root_certs_dir = ca.root_certs_dir();
 
     let buf = format!(

@@ -52,11 +52,13 @@ tracing = { workspace = true }
 
 
 [dev-dependencies]
+aranya-certgen = { workspace = true }
 aranya-client = { path = ".", features = ["preview"] }
 aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview"] }
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
+futures-util = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

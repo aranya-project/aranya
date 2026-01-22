@@ -102,24 +102,6 @@ when = "2026-01-06"
 user-id = 293722
 user-login = "aranya-project-bot"
 
-[[publisher.aranya-internal-rustls]]
-version = "0.23.26-psk.1"
-when = "2025-05-29"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-internal-s2n-quic]]
-version = "1.58.0-psk.2"
-when = "2025-08-04"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-internal-s2n-quic-rustls]]
-version = "0.58.0-psk.2"
-when = "2025-08-04"
-user-id = 293722
-user-login = "aranya-project-bot"
-
 [[publisher.aranya-libc]]
 version = "0.4.0"
 when = "2025-10-17"
@@ -245,13 +227,6 @@ when = "2025-06-26"
 user-id = 539
 user-login = "cuviper"
 user-name = "Josh Stone"
-
-[[publisher.intrusive-collections]]
-version = "0.9.7"
-when = "2024-09-05"
-user-id = 2915
-user-login = "Amanieu"
-user-name = "Amanieu d'Antras"
 
 [[publisher.is_terminal_polyfill]]
 version = "1.70.1"
@@ -1039,6 +1014,12 @@ delta = "0.2.1 -> 0.2.2"
 who = "Johan Andersson <opensource@embark-studios.com>"
 criteria = "safe-to-deploy"
 version = "1.0.58"
+
+[[audits.embark.audits.cfg_aliases]]
+who = "Johan Andersson <opensource@embark-studios.com>"
+criteria = "safe-to-deploy"
+version = "0.1.1"
+notes = "No unsafe usage or ambient capabilities"
 
 [[audits.embark.audits.thiserror]]
 who = "Johan Andersson <opensource@embark-studios.com>"
@@ -2365,6 +2346,13 @@ aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-c
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
 delta = "0.10.2 -> 0.10.3"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.cfg_aliases]]
+who = "Alex Franchuk <afranchuk@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.1 -> 0.2.1"
+notes = "Very minor changes."
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.crossbeam-channel]]

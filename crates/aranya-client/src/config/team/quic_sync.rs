@@ -5,15 +5,38 @@
 //! There are two main configuration types:
 //! - [`CreateTeamQuicSyncConfig`] - For creating new teams
 //! - [`AddTeamQuicSyncConfig`] - For adding members to existing teams
-
-use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
-use tracing::error;
+//!
+//! Note: With mTLS authentication, PSK seeds are no longer used.
+//! These types exist for backward compatibility but are ignored internally.
 
 use crate::{error::InvalidArg, ConfigError, Result};
+
+/// Size of the seed IKM (Input Keying Material) in bytes.
+pub const SEED_IKM_SIZE: usize = 32;
+
+/// Mode for creating a PSK seed when creating a team.
+#[derive(Clone, Debug, Default)]
+pub enum CreateSeedMode {
+    /// Generate a random seed.
+    #[default]
+    Generate,
+    /// Use the provided IKM (Input Keying Material).
+    IKM(Box<[u8; SEED_IKM_SIZE]>),
+}
+
+/// Mode for providing a PSK seed when adding a team.
+#[derive(Clone, Debug)]
+pub enum AddSeedMode {
+    /// Use the provided IKM (Input Keying Material).
+    IKM(Box<[u8; SEED_IKM_SIZE]>),
+    /// Use a wrapped (encrypted) seed.
+    Wrapped(Vec<u8>),
+}
 
 /// Configuration for creating a new team with QUIC synchronization.
 #[derive(Clone, Debug)]
 pub struct CreateTeamQuicSyncConfig {
+    #[allow(dead_code)]
     mode: CreateSeedMode,
 }
 
@@ -27,6 +50,7 @@ impl CreateTeamQuicSyncConfig {
 /// Configuration for adding members to an existing team with QUIC synchronization.
 #[derive(Clone, Debug)]
 pub struct AddTeamQuicSyncConfig {
+    #[allow(dead_code)]
     mode: AddSeedMode,
 }
 
@@ -99,11 +123,7 @@ impl AddTeamQuicSyncConfigBuilder {
     ///
     /// Overwrites [`Self::seed_ikm`].
     pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
-        let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
-            error!(error = %err, "could not deserialize wrapped_seed");
-            ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
-        })?;
-        self.mode = Some(AddSeedMode::Wrapped(wrapped));
+        self.mode = Some(AddSeedMode::Wrapped(wrapped_seed.to_vec()));
         Ok(self)
     }
 
@@ -118,21 +138,5 @@ impl AddTeamQuicSyncConfigBuilder {
         };
 
         Ok(AddTeamQuicSyncConfig { mode })
-    }
-}
-
-impl From<CreateTeamQuicSyncConfig> for aranya_daemon_api::CreateTeamQuicSyncConfig {
-    fn from(value: CreateTeamQuicSyncConfig) -> Self {
-        aranya_daemon_api::CreateTeamQuicSyncConfig {
-            seed_mode: value.mode,
-        }
-    }
-}
-
-impl From<AddTeamQuicSyncConfig> for aranya_daemon_api::AddTeamQuicSyncConfig {
-    fn from(value: AddTeamQuicSyncConfig) -> Self {
-        aranya_daemon_api::AddTeamQuicSyncConfig {
-            seed_mode: value.mode,
-        }
     }
 }

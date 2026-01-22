@@ -1,8 +1,7 @@
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};
-use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
-use tracing::error;
+use aranya_client::config::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 
 use super::Error;
 use crate::api::defs;
@@ -142,12 +141,7 @@ impl AddTeamQuicSyncConfigBuilder {
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
-        let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
-            error!(error = %err, "could not deserialize wrapped_seed");
-            InvalidArg::new("wrapped_seed", "could not deserialize")
-        })?;
-        self.mode = Some(AddSeedMode::Wrapped(wrapped));
-
+        self.mode = Some(AddSeedMode::Wrapped(encap_seed.to_vec()));
         Ok(())
     }
 }

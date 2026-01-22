@@ -442,7 +442,10 @@ mod tests {
         let ca_cert = aranya_certgen::CaCert::new("Test CA", 365)
             .expect("should be able to generate CA cert");
         ca_cert
-            .save(&ca_paths, aranya_certgen::SaveOptions::default().create_parents())
+            .save(
+                &ca_paths,
+                aranya_certgen::SaveOptions::default().create_parents(),
+            )
             .expect("should be able to save CA cert");
 
         // Generate device certificate signed by CA
@@ -450,7 +453,10 @@ mod tests {
             .generate("localhost", 365)
             .expect("should be able to generate device cert");
         device_cert
-            .save(&device_paths, aranya_certgen::SaveOptions::default().create_parents())
+            .save(
+                &device_paths,
+                aranya_certgen::SaveOptions::default().create_parents(),
+            )
             .expect("should be able to save device cert");
 
         let cfg = Config {

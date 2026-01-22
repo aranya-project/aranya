@@ -255,6 +255,7 @@ name = "aranya-client"
 version = "4.1.0"
 dependencies = [
  "anyhow",
+ "aranya-certgen",
  "aranya-client",
  "aranya-crypto",
  "aranya-daemon",
@@ -438,6 +439,7 @@ name = "aranya-example"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aranya-certgen",
  "aranya-client",
  "backon",
  "rustix 1.1.2",
@@ -453,6 +455,7 @@ version = "0.0.0"
 dependencies = [
  "age",
  "anyhow",
+ "aranya-certgen",
  "aranya-client",
  "backon",
  "clap",

@@ -11,11 +11,12 @@
 //!
 //! Both operations support optional transport configuration.
 
-use crate::{client::TeamId, error::InvalidArg, util::ApiConv as _, ConfigError, Result};
+use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
 pub use quic_sync::{
-    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+    AddSeedMode, AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateSeedMode,
+    CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder, SEED_IKM_SIZE,
 };
 
 /// Builder for [`CreateTeamConfig`].
@@ -82,8 +83,9 @@ impl AddTeamConfigBuilder {
 }
 
 /// Configuration for creating a new team.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CreateTeamConfig {
+    #[allow(dead_code)]
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
@@ -94,18 +96,11 @@ impl CreateTeamConfig {
     }
 }
 
-impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
-    fn from(value: CreateTeamConfig) -> Self {
-        Self {
-            quic_sync: value.quic_sync.map(Into::into),
-        }
-    }
-}
-
 /// Configuration for joining an existing team.
 #[derive(Clone, Debug)]
 pub struct AddTeamConfig {
-    id: TeamId,
+    pub(crate) id: TeamId,
+    #[allow(dead_code)]
     quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
@@ -113,14 +108,5 @@ impl AddTeamConfig {
     /// Creates a default [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
         AddTeamConfigBuilder::default()
-    }
-}
-
-impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
-    fn from(value: AddTeamConfig) -> Self {
-        Self {
-            team_id: value.id.into_api(),
-            quic_sync: value.quic_sync.map(Into::into),
-        }
     }
 }
