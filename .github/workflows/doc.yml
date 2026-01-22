@@ -52,4 +52,4 @@ jobs:
         env:
           RUSTDOCFLAGS: "-Dwarnings"
         run: |
-          cargo make gen-docs-nightly
+          cargo make gen-docs
