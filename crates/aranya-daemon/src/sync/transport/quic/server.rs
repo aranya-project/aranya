@@ -43,7 +43,7 @@ pub(crate) struct Server<EN, SP> {
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Interface to trigger sync operations
-    _sync_peers: SyncHandle,
+    sync_peers: SyncHandle,
 }
 
 impl<EN, SP> Server<EN, SP>
@@ -146,7 +146,7 @@ where
             endpoint: endpoint.clone(),
             conns: conns.clone(),
             conn_rx: server_conn_rx,
-            _sync_peers: sync_peers.clone(),
+            sync_peers: sync_peers.clone(),
         };
 
         Ok((
@@ -195,7 +195,7 @@ where
     ) {
         let conns = self.conns.clone();
         let client = self.client.clone();
-        let sync_peers = self._sync_peers.clone();
+        let sync_peers = self.sync_peers.clone();
 
         s.spawn(async move {
             match incoming.await {
@@ -224,7 +224,7 @@ where
         conn: Connection,
     ) -> impl std::future::Future<Output = ()> {
         let client = self.client.clone();
-        let sync_peers = self._sync_peers.clone();
+        let sync_peers = self.sync_peers.clone();
         Self::serve_connection_inner(key, conn, client, sync_peers)
     }
 
