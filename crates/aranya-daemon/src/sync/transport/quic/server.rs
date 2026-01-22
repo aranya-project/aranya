@@ -58,6 +58,7 @@ where
 
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     #[cfg(feature = "preview")]
+    #[allow(dead_code)]
     pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         self.client.hello_subscriptions()
     }

@@ -1,3 +1,7 @@
+// Allow deprecated types in this module - it contains the deprecated PSK sync types
+// that are kept for backward compatibility during the mTLS migration.
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};

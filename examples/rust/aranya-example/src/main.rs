@@ -127,7 +127,7 @@ impl ClientCtx {
             }
 
             // Generate device certificate for this daemon
-            let device_paths = generate_signed_cert(user_name, &ca_paths, &config_dir)?;
+            let device_paths = generate_signed_cert(user_name, ca_paths, &config_dir)?;
             let device_cert = &device_paths.cert;
             let device_key = &device_paths.key;
 

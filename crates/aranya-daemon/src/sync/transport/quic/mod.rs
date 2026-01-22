@@ -34,6 +34,7 @@ fn keep_alive_transport_config() -> Arc<TransportConfig> {
 
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum Error {
     /// QUIC Connection error
     #[error("QUIC connection error: {0}")]

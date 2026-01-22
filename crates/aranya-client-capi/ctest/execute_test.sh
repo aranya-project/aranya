@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Wrapper script to run C tests and ensure daemon cleanup
-# Usage: execute_test.sh <test_executable> <daemon_path> <daemon_names>
+# Usage: execute_test.sh <test_executable> <daemon_path> <certgen_path> <daemon_names>
 #   daemon_names: comma-separated list of daemon names to spawn (e.g., "owner,member")
 
 set -xeuo pipefail
 
 test_exec="$1"
 daemon_path="$2"
-daemon_names="$3"
+certgen_path="$3"
+daemon_names="$4"
 test_name=$(basename "$test_exec")
 
 # PIDs to track spawned daemons
@@ -55,11 +56,13 @@ spawn_daemon() {
     local daemon_name="$2"
     local shm_path="$3"
     local sync_port="$4"
-    
+    local root_certs_dir="$5"
+    local config_dir="$6"
+
     # Create run directory and subdirectories
     mkdir -p "$run_dir/state" "$run_dir/cache" "$run_dir/logs" "$run_dir/config"
-    
-    # Create daemon config
+
+    # Create daemon config with mTLS settings
     cat > "$run_dir/daemon.toml" <<EOF
 name = "$daemon_name"
 runtime_dir = "$run_dir"
@@ -76,12 +79,15 @@ max_chans = 100
 [sync.quic]
 enable = true
 addr = "127.0.0.1:$sync_port"
+root_certs_dir = "$root_certs_dir"
+device_cert = "$config_dir/device.crt.pem"
+device_key = "$config_dir/device.key.pem"
 EOF
-    
+
     # Spawn daemon
     ARANYA_DAEMON=aranya_daemon::aranya_daemon::api=debug \
         "$daemon_path" --config "$run_dir/daemon.toml" &
-    
+
     local pid=$!
     daemon_pids+=($pid)
     echo "Spawned daemon '$daemon_name' (PID: $pid) at $run_dir"
@@ -91,20 +97,36 @@ tmpdir=""
 # Spawn daemons if daemon names are provided
 if [ -n "$daemon_names" ]; then
     echo "=== Spawning daemons: $daemon_names ==="
-    
+
     # Create unique temp directory
     tmpdir=$(mktemp -d)
     echo "Using temp directory: $tmpdir"
-    
+
+    # Create certificate directory
+    root_certs_dir="$tmpdir/root_certs"
+    mkdir -p "$root_certs_dir"
+
+    # Generate CA certificate
+    echo "Generating CA certificate..."
+    "$certgen_path" ca --cn "Test CA" --output "$root_certs_dir/ca"
+
     # Parse comma-separated daemon names
     IFS=',' read -ra names <<< "$daemon_names"
     port=40001
-    
+
     for name in "${names[@]}"; do
-        spawn_daemon "$tmpdir/$name" "test-daemon-$test_name-$name" "/$test_name-$name" "$port"
+        config_dir="$tmpdir/$name/config"
+        mkdir -p "$config_dir"
+
+        # Generate device certificate signed by CA
+        # Use 127.0.0.1 as CN to create IP SAN
+        echo "Generating certificate for $name..."
+        "$certgen_path" signed --ca "$root_certs_dir/ca" --cn "127.0.0.1" --output "$config_dir/device"
+
+        spawn_daemon "$tmpdir/$name" "test-daemon-$test_name-$name" "/$test_name-$name" "$port" "$root_certs_dir" "$config_dir"
         port=$((port + 1))
     done
-    
+
     # Wait for daemons to initialize
     echo "Waiting 2 seconds for daemons to initialize..."
     sleep 2

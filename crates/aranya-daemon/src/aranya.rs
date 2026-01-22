@@ -103,6 +103,7 @@ impl<EN, SP> Client<EN, SP> {
     ///
     /// Use this when you need to share the subscriptions across tasks.
     #[cfg(feature = "preview")]
+    #[allow(dead_code)]
     pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
         Arc::clone(&self.hello_subscriptions)
     }

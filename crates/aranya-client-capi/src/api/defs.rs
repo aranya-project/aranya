@@ -1,4 +1,7 @@
 #![allow(rustdoc::broken_intra_doc_links)]
+// Allow deprecated types in this module - it contains the deprecated PSK sync types
+// that are kept for backward compatibility during the mTLS migration.
+#![allow(deprecated)]
 use core::{
     ffi::{c_char, CStr},
     ops::Deref,
@@ -302,8 +305,6 @@ impl From<aranya_id::BaseId> for Id {
 /// This constant exists for backward compatibility but will be removed in a future release.
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 pub const ARANYA_SEED_IKM_LEN: usize = 32;
-
-#[allow(deprecated)]
 
 /// Team ID.
 #[repr(C)]

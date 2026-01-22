@@ -122,7 +122,7 @@ for device in "${devices[@]}"; do
         --config "${cfg_path}" &
 done
 # give the daemons time to startup
-sleep 1
+sleep 3
 
 # start the example app.
 ASAN_OPTIONS=detect_leaks=0 \

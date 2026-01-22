@@ -268,7 +268,6 @@ dependencies = [
  "buggy",
  "derive-where",
  "futures-util",
- "postcard",
  "serde",
  "serial_test",
  "spideroak-base58",
@@ -757,7 +756,6 @@ version = "4.1.0"
 dependencies = [
  "anyhow",
  "buggy",
- "bytes",
  "futures-util",
  "serde",
  "thiserror 2.0.12",

@@ -284,7 +284,7 @@ impl TestCtx {
             (syncer, server, pk, effects_recv)
         };
 
-        Ok(TestDevice::new(server, pk, id, syncer, effects_recv)?)
+        TestDevice::new(server, pk, id, syncer, effects_recv)
     }
 
     /// Creates `n` members.

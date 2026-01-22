@@ -1312,7 +1312,13 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Initialize malicious device on team.
     let work_dir = tempfile::tempdir()?;
     let work_dir_path = work_dir.path();
-    let device = DeviceCtx::new(team_name, "malicious", work_dir_path.join("malicious"), devices.ca.clone()).await?;
+    let device = DeviceCtx::new(
+        team_name,
+        "malicious",
+        work_dir_path.join("malicious"),
+        devices.ca.clone(),
+    )
+    .await?;
     owner_team.add_device(device.pk.clone(), None).await?;
     let device_seed = owner_team
         .encrypt_psk_seed_for_peer(device.pk.encryption())

@@ -1,10 +1,12 @@
-use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, sync::Arc, time::Duration,
+};
 
 use anyhow::{anyhow, Context, Result};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
-    config::CreateTeamConfig,
+    config::{CreateTeamConfig, SEED_IKM_SIZE},
     AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
@@ -12,7 +14,6 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_client::config::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
