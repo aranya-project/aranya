@@ -42,8 +42,9 @@ pub(crate) struct Server<EN, SP> {
     conns: SharedConnectionMap,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
-    /// Interface to trigger sync operations
-    sync_peers: SyncHandle,
+    /// Handle for triggering sync on hello notifications.
+    /// Only used when the "preview" feature is enabled for hello sync protocol.
+    hello_sync_handle: SyncHandle,
 }
 
 impl<EN, SP> Server<EN, SP>
@@ -146,7 +147,7 @@ where
             endpoint: endpoint.clone(),
             conns: conns.clone(),
             conn_rx: server_conn_rx,
-            sync_peers: sync_peers.clone(),
+            hello_sync_handle: sync_peers.clone(),
         };
 
         Ok((
@@ -195,7 +196,7 @@ where
     ) {
         let conns = self.conns.clone();
         let client = self.client.clone();
-        let sync_peers = self.sync_peers.clone();
+        let sync_peers = self.hello_sync_handle.clone();
 
         s.spawn(async move {
             match incoming.await {
@@ -224,7 +225,7 @@ where
         conn: Connection,
     ) -> impl std::future::Future<Output = ()> {
         let client = self.client.clone();
-        let sync_peers = self.sync_peers.clone();
+        let sync_peers = self.hello_sync_handle.clone();
         Self::serve_connection_inner(key, conn, client, sync_peers)
     }
 
