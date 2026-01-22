@@ -79,6 +79,16 @@
     #endif
 #endif /* ARANYA_PACKED */
 
+#if !defined(ARANYA_DEPRECATED)
+    #if __has_attribute(deprecated)
+        #define ARANYA_DEPRECATED __attribute__((deprecated))
+        #define ARANYA_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+    #else
+        #define ARANYA_DEPRECATED
+        #define ARANYA_DEPRECATED_MSG(msg)
+    #endif
+#endif /* ARANYA_DEPRECATED */
+
 
 #define ARANYA_DURATION_SECONDS (1000 * ARANYA_DURATION_MILLISECONDS)
 
@@ -100,6 +110,11 @@
 
 /**
  * The size in bytes of a PSK seed IKM.
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This constant exists for backward compatibility but will be removed in a future release.
  */
 #define ARANYA_SEED_IKM_LEN 32
 
@@ -462,6 +477,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
  *
  * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
     /**
@@ -476,6 +496,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
  * A builder for initializing a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
  *
  * The [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig) is an optional part of initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
     /**
@@ -488,8 +513,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
 
 /**
  * Raw PSK seed IKM for QUIC syncer.
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This type exists for backward compatibility but will be removed in a future release.
  */
-typedef struct AranyaSeedIkm {
+typedef struct ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication") AranyaSeedIkm {
     uint8_t bytes[ARANYA_SEED_IKM_LEN];
 } AranyaSeedIkm;
 
@@ -497,6 +527,11 @@ typedef struct AranyaSeedIkm {
  * QUIC syncer configuration.
  *
  * Use a [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder) to construct this object.
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
     /**
@@ -511,6 +546,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
  * QUIC syncer configuration.
  *
  * Use an [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder) to construct this object.
+ *
+ * # Deprecation Notice
+ *
+ * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
+ * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfig {
     /**

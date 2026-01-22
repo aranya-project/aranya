@@ -43,8 +43,29 @@ trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
 rm -rf "${out}"
 
+# Create certificate directory structure
+root_certs_dir="${out}/root_certs"
+mkdir -p "${root_certs_dir}"
+
+# Build certgen tool
+cargo build -p aranya-certgen --bin aranya-certgen --release
+
+# Generate CA certificate (saved to root_certs_dir so daemon can load it)
+"${release}/aranya-certgen" ca --cn "Aranya Example CA" --output "${root_certs_dir}/ca"
+
 port=10001
 for device in "${devices[@]}"; do
+    device_dir="${out}/${device}"
+    config_dir="${device_dir}/config"
+    mkdir -p "${config_dir}"
+
+    # Generate device certificate signed by CA
+    # Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname)
+    "${release}/aranya-certgen" signed \
+        --ca "${root_certs_dir}/ca" \
+        --cn "127.0.0.1" \
+        --output "${config_dir}/device"
+
     cat <<EOF >"${example}/configs/${device}-config.toml"
 name = "${device}"
 runtime_dir = "${out}/${device}/run"
@@ -61,6 +82,9 @@ max_chans = 100
 [sync.quic]
 enable = true
 addr = "127.0.0.1:${port}"
+root_certs_dir = "${root_certs_dir}"
+device_cert = "${config_dir}/device.crt.pem"
+device_key = "${config_dir}/device.key.pem"
 EOF
     port=$((port + 1))
 done
