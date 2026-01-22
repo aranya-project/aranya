@@ -63,7 +63,7 @@ mod imp {
     pub struct False;
     impl<'de> Deserialize<'de> for False {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            if bool::deserialize(deserializer)? {
+            if !bool::deserialize(deserializer)? {
                 Ok(Self)
             } else {
                 Err(de::Error::invalid_value(
@@ -115,5 +115,76 @@ mod imp {
                 E::Disabled { enable: False } => Toggle::Disabled,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::disallowed_macros, reason = "unreachable in toml macro")]
+
+    use serde::{Deserialize, Serialize};
+    use toml::toml;
+
+    use super::Toggle;
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct Thing {
+        field: i64,
+    }
+
+    #[test]
+    fn test_enabled_with_field() {
+        let table = toml! {
+            enable = true
+            field = 42
+        };
+        assert_eq!(
+            table.try_into::<Toggle<Thing>>(),
+            Ok(Toggle::Enabled(Thing { field: 42 }))
+        );
+    }
+
+    #[test]
+    fn test_enabled_without_field() {
+        let table = toml! {
+            enable = true
+        };
+        let err = table.try_into::<Toggle<Thing>>().unwrap_err();
+        // TODO(jdygert): Improve error.
+        assert_eq!(
+            err,
+            serde::de::Error::custom("data did not match any variant of untagged enum E")
+        );
+    }
+
+    #[test]
+    fn test_enabled_with_unknown_field() {
+        // TODO(jdygert): Deny unknown fields?
+        let table = toml! {
+            enable = true
+            field = 42
+            unknown = 0
+        };
+        assert_eq!(
+            table.try_into::<Toggle<Thing>>(),
+            Ok(Toggle::Enabled(Thing { field: 42 }))
+        );
+    }
+
+    #[test]
+    fn test_disabled_with_field() {
+        let table = toml! {
+            enable = false
+            field = 42
+        };
+        assert_eq!(table.try_into::<Toggle<Thing>>(), Ok(Toggle::Disabled));
+    }
+
+    #[test]
+    fn test_disabled_without_field() {
+        let table = toml! {
+            enable = false
+        };
+        assert_eq!(table.try_into::<Toggle<Thing>>(), Ok(Toggle::Disabled));
     }
 }
