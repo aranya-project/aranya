@@ -70,13 +70,10 @@ where
         peer: SyncPeer,
         sink: &mut S,
     ) -> Result<usize> {
-        let (send, recv) = syncer
+        let (mut send, mut recv) = syncer
             .connect(peer)
             .await
             .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
-
-        let mut send = send;
-        let mut recv = recv;
 
         let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, syncer.server_addr);
 
