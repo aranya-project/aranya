@@ -1,8 +1,6 @@
 //! QUIC client for syncing Aranya graph commands with peers.
 
-#[cfg(feature = "preview")]
-use std::time::Duration;
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context as _;
 use aranya_crypto::Rng;
@@ -207,7 +205,7 @@ where
                     .map_err(Error::from)?;
 
                 // Add timeout to connection attempt to avoid hanging on failed TLS handshakes
-                let conn = tokio::time::timeout(std::time::Duration::from_secs(5), connecting)
+                let conn = tokio::time::timeout(Duration::from_secs(5), connecting)
                     .await
                     .map_err(|_| Error::QuicConnectionTimeout)?
                     .map_err(Error::from)?;

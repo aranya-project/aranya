@@ -60,7 +60,7 @@ where
     /// Returns a reference to the hello subscriptions for hello notification broadcasting.
     #[cfg(feature = "preview")]
     pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
-        Arc::clone(self.client.hello_subscriptions())
+        self.client.hello_subscriptions()
     }
 
     /// Creates a new `Server`.
@@ -394,54 +394,4 @@ where
         Ok(buf.into())
     }
 
-    /// Processes a hello message for the preview feature.
-    #[cfg(feature = "preview")]
-    #[instrument(skip_all)]
-    async fn process_hello_message(
-        hello_msg: aranya_runtime::HelloMessage,
-        client: Client<EN, SP>,
-        peer_addr: Addr,
-        sync_peers: SyncHandle,
-    ) {
-        use aranya_runtime::HelloMessage;
-
-        match hello_msg {
-            HelloMessage::Subscribe {
-                graph_id,
-                address: peer_server_addr,
-                graph_change_delay,
-                duration,
-            } => {
-                trace!("received hello subscribe request");
-                let hello_subs = client.hello_subscriptions();
-                let mut subs = hello_subs.lock().await;
-                subs.add_subscriber(
-                    graph_id,
-                    peer_server_addr,
-                    peer_addr,
-                    graph_change_delay,
-                    duration,
-                );
-            }
-            HelloMessage::Unsubscribe {
-                graph_id,
-                address: peer_server_addr,
-            } => {
-                trace!("received hello unsubscribe request");
-                let hello_subs = client.hello_subscriptions();
-                let mut subs = hello_subs.lock().await;
-                subs.remove_subscriber(graph_id, peer_server_addr);
-            }
-            HelloMessage::Notify { graph_id, head } => {
-                trace!("received hello notification");
-                let peer = SyncPeer {
-                    addr: peer_addr,
-                    graph_id,
-                };
-                if let Err(e) = sync_peers.sync_on_hello(peer).await {
-                    warn!(error = %e, "failed to trigger sync on hello");
-                }
-            }
-        }
-    }
 }
