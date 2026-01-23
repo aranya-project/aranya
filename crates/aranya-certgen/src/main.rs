@@ -48,7 +48,7 @@ struct OutputArgs {
 }
 
 impl OutputArgs {
-    fn save_options(&self) -> SaveOptions {
+    fn get_save_options(&self) -> SaveOptions {
         let mut opts = SaveOptions::default();
         if self.create_parents {
             opts = opts.create_parents();
@@ -107,7 +107,7 @@ fn main() -> Result<(), CertGenError> {
 
             println!("Generating root CA certificate...");
             let ca = CaCert::new(&args.cn, args.days)?;
-            ca.save(&paths, args.save_options())?;
+            ca.save(&paths, args.get_save_options())?;
 
             println!("  Certificate: {}", paths.cert().display());
         }
@@ -119,7 +119,7 @@ fn main() -> Result<(), CertGenError> {
 
             println!("Generating certificate '{}'...", args.cn);
             let signed = ca.generate(&args.cn, args.days)?;
-            signed.save(&paths, args.save_options())?;
+            signed.save(&paths, args.get_save_options())?;
 
             println!("  Certificate: {}", paths.cert().display());
         }
