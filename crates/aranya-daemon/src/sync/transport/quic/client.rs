@@ -113,7 +113,6 @@ where
         let (mut recv, mut send) = stream.split();
 
         let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
-        // TODO: send syncer.server_addr
 
         // send sync request.
         syncer
