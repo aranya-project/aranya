@@ -281,9 +281,8 @@ AranyaError init_team(Team *t) {
 
     err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` "
-                "generate mode\n");
+        fprintf(stderr, "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` "
+                        "generate mode\n");
         return err;
     }
 
@@ -453,58 +452,10 @@ AranyaError init_team(Team *t) {
     }
 
     // add_team() for each non-owner device
+    // With mTLS authentication, PSK seeds are no longer needed.
+    // Devices authenticate via mTLS certificates configured in the daemon.
     for (int i = 1; i < NUM_CLIENTS; i++) {
         printf("add_team() client: %s\n", client_names[i]);
-
-        // Setup team config for non-owner devices.
-        // QUIC syncer PSK must be set.
-        AranyaAddTeamQuicSyncConfigBuilder quic_build;
-        err = aranya_add_team_quic_sync_config_builder_init(&quic_build);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to init `AranyaAddTeamQuicSyncConfigBuilder`\n");
-            return err;
-        }
-
-        AranyaTeamId team_id_from_peer = t->id;
-        printf("encrypting PSK seed for peer\n");
-        size_t wrapped_seed_len = 100;
-        uint8_t *wrapped_seed = calloc(wrapped_seed_len, 1);
-        err = aranya_encrypt_psk_seed_for_peer(
-            &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
-            t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
-        if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-            printf("handling buffer too small error\n");
-            wrapped_seed = realloc(wrapped_seed, wrapped_seed_len);
-            err = aranya_encrypt_psk_seed_for_peer(
-                &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
-                t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
-        }
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to encrypt psk seed for peer, seed_len=%zu\n",
-                    wrapped_seed_len);
-            return err;
-        }
-
-        // Note: this is where the team owner will send the encrypted PSK
-        // seed to the peer.
-
-        err = aranya_add_team_quic_sync_config_wrapped_seed(
-            &quic_build, wrapped_seed, wrapped_seed_len);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
-                    "wrapped seed\n");
-            return err;
-        }
-
-        AranyaAddTeamQuicSyncConfig quic_cfg;
-        err = aranya_add_team_quic_sync_config_build(&quic_build, &quic_cfg);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaAddTeamQuicSyncConfig`\n");
-            return err;
-        }
 
         AranyaAddTeamConfigBuilder build;
         err = aranya_add_team_config_builder_init(&build);
@@ -513,14 +464,7 @@ AranyaError init_team(Team *t) {
             return err;
         }
 
-        err = aranya_add_team_config_builder_set_quic_syncer(&build, &quic_cfg);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to set `QuicSyncConfig` for "
-                            "`AranyaAddTeamConfigBuilder`\n");
-            return err;
-        }
-
-        err = aranya_add_team_config_builder_set_id(&build, &team_id_from_peer);
+        err = aranya_add_team_config_builder_set_id(&build, &t->id);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `Id` for `AranyaAddTeamConfigBuilder`\n");
