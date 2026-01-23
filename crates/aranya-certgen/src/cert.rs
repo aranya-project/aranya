@@ -5,6 +5,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
+    ops::Deref,
     path::{Path, PathBuf},
 };
 
@@ -60,7 +61,9 @@ impl SaveOptions {
 /// ```
 #[derive(Debug, Clone)]
 pub struct CertPaths {
+    /// Path to the certificate file (`.crt.pem`).
     cert: PathBuf,
+    /// Path to the private key file (`.key.pem`).
     key: PathBuf,
 }
 
@@ -124,11 +127,6 @@ pub struct CaCert {
 }
 
 impl CaCert {
-    /// Returns a reference to the inner key for use with rcgen APIs.
-    fn key_ref(&self) -> &KeyPair {
-        &self.key
-    }
-
     /// Creates a new Certificate Authority (CA) with a self-signed certificate.
     ///
     /// Generates a new P-256 ECDSA key pair and creates a self-signed CA certificate
@@ -177,7 +175,7 @@ impl CaCert {
             return Err(CertGenError::InvalidDays);
         }
         // Create issuer on-demand using a reference to our key.
-        let issuer = Issuer::from_ca_cert_pem(&self.cert_pem, self.key_ref())?;
+        let issuer = Issuer::from_ca_cert_pem(&self.cert_pem, self.key.deref())?;
         let (cert, key) = generate_signed_cert(cn, &issuer, days)?;
         let cert_pem = cert.pem();
 
@@ -240,13 +238,6 @@ impl CaCert {
     pub fn cert_pem(&self) -> &str {
         &self.cert_pem
     }
-
-    /// Returns the private key as a PEM-encoded string.
-    ///
-    /// Returns [`Zeroizing<String>`] to ensure key material is zeroized when dropped.
-    pub fn key_pem(&self) -> Zeroizing<String> {
-        Zeroizing::new(self.key.serialize_pem())
-    }
 }
 
 /// A signed leaf certificate that cannot sign other certificates.
@@ -299,13 +290,6 @@ impl SignedCert {
     pub fn cert_pem(&self) -> &str {
         &self.cert_pem
     }
-
-    /// Returns the private key as a PEM-encoded string.
-    ///
-    /// Returns [`Zeroizing<String>`] to ensure key material is zeroized when dropped.
-    pub fn key_pem(&self) -> Zeroizing<String> {
-        Zeroizing::new(self.key.serialize_pem())
-    }
 }
 
 // ============================================================================
@@ -330,23 +314,33 @@ fn save_cert_and_key(
         }
     }
 
-    // Check for existing files
-    if !options.force {
-        if paths.cert.exists() {
-            return Err(CertGenError::FileExists(paths.cert.display().to_string()));
-        }
-        if paths.key.exists() {
-            return Err(CertGenError::FileExists(paths.key.display().to_string()));
-        }
+    // Write certificate file using OpenOptions to avoid TOCTOU race condition.
+    // Use create_new when force is false to atomically fail if file exists.
+    let mut cert_options = OpenOptions::new();
+    cert_options.write(true);
+    if options.force {
+        cert_options.create(true).truncate(true);
+    } else {
+        cert_options.create_new(true);
     }
-
-    fs::write(&paths.cert, cert_pem).map_err(|e| CertGenError::io(&paths.cert, e))?;
+    let mut cert_file = cert_options
+        .open(&paths.cert)
+        .map_err(|e| CertGenError::io(&paths.cert, e))?;
+    cert_file
+        .write_all(cert_pem.as_bytes())
+        .map_err(|e| CertGenError::io(&paths.cert, e))?;
 
     // Write private key with restrictive permissions set at creation time
     // to prevent race condition where others could read the key before
     // permissions are set.
     let mut key_options = OpenOptions::new();
-    key_options.write(true).create(true).truncate(true);
+    key_options.write(true);
+    if options.force {
+        key_options.create(true).truncate(true);
+    } else {
+        key_options.create_new(true);
+    }
+    // Set restrictive permissions on Unix. Windows uses ACLs which require different APIs.
     #[cfg(unix)]
     key_options.mode(0o600);
     let mut key_file = key_options

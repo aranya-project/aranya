@@ -181,6 +181,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 ///     }
 ///     \endcode
 #[allow(rustdoc::invalid_rust_codeblocks)]
+#[allow(clippy::doc_overindented_list_items)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 96, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;

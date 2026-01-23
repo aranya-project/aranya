@@ -2,7 +2,8 @@
 
 A CLI tool for generating root CA certificates and signed certificates.
 
-All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
+All generated keys currently use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
+The crypto implementation may change in the future based on best practices (e.g. switching to HPKE).
 
 ## Building
 
@@ -23,7 +24,7 @@ aranya-certgen ca --cn "My Company CA"
 ### Create a Signed Certificate
 
 ```bash
-aranya-certgen signed --cn webserver
+aranya-certgen signed ca --cn webserver
 ```
 
 ## Commands
@@ -40,15 +41,17 @@ Create a new root Certificate Authority (CA) with a P-256 ECDSA private key.
 | `-p` | Create parent directories if they don't exist | — |
 | `-f, --force` | Overwrite existing files | — |
 
-### `aranya-certgen signed`
+### `aranya-certgen signed <CA>`
 
 Create a new certificate signed by an existing root CA with a P-256 ECDSA private key.
 
-| Option | Description | Default |
-|--------|-------------|---------|
+The CA path prefix is required to ensure the expected CA certificate is used for signing.
+
+| Argument/Option | Description | Default |
+|-----------------|-------------|---------|
+| `<CA>` | Path prefix for CA files (loads {CA}.crt.pem and {CA}.key.pem) | required |
 | `--cn <NAME>` | Common Name (CN) for the certificate | required |
 | `-o, --output <PATH>` | Output path prefix (creates {output}.crt.pem and {output}.key.pem) | `cert` |
-| `--ca <PATH>` | Path prefix for CA files (loads {ca}.crt.pem and {ca}.key.pem) | `ca` |
 | `--days <DAYS>` | Validity period in days | `365` |
 | `-p` | Create parent directories if they don't exist | — |
 | `-f, --force` | Overwrite existing files | — |
@@ -60,7 +63,7 @@ $ aranya-certgen ca --cn "My Company CA"
 Generating root CA certificate...
   Certificate: ./ca.crt.pem
 
-$ aranya-certgen signed --cn webserver
+$ aranya-certgen signed ca --cn webserver
 Generating certificate 'webserver'...
   Certificate: ./cert.crt.pem
 ```
@@ -71,7 +74,7 @@ To renew or reissue a device certificate, generate a new certificate using the s
 
 ```bash
 # Load existing CA and generate a new certificate
-aranya-certgen signed --cn webserver --days 365 -f
+aranya-certgen signed ca --cn webserver --days 365 -f
 ```
 
 The `-f` (force) flag overwrites the existing certificate files. The new certificate will:
@@ -86,12 +89,12 @@ The `-f` (force) flag overwrites the existing certificate files. The new certifi
 CA certificates can also be renewed, but this requires all device certificates to be reissued since they reference the CA:
 
 ```bash
-# Generate new CA (will invalidate all existing device certs!)
+# Generate new CA (will invalidate existing device certs once daemon reloads new CA)
 aranya-certgen ca --cn "My Company CA" --days 365 -f
 
 # Reissue all device certificates
-aranya-certgen signed --cn webserver --days 365 -f
-aranya-certgen signed --cn device1 -o device1 --days 365 -f
+aranya-certgen signed ca --cn webserver --days 365 -f
+aranya-certgen signed ca --cn device1 -o device1 --days 365 -f
 # ... repeat for all devices
 ```
 
@@ -103,7 +106,7 @@ certgen:
 ```
 aranya-certgen ca --cn "My Company CA" --days 365
 
-aranya-certgen signed --cn webserver --days 365
+aranya-certgen signed ca --cn webserver --days 365
 ```
 
 openssl:

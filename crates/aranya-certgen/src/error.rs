@@ -62,11 +62,14 @@ pub enum CertGenError {
 
 impl CertGenError {
     /// Creates a new I/O error with the given path and source error.
+    ///
+    /// If the error is `AlreadyExists`, returns [`CertGenError::FileExists`] instead.
     pub fn io(path: impl AsRef<Path>, source: std::io::Error) -> Self {
-        Self::Io {
-            path: path.as_ref().display().to_string(),
-            source,
+        let path = path.as_ref().display().to_string();
+        if source.kind() == std::io::ErrorKind::AlreadyExists {
+            return Self::FileExists(path);
         }
+        Self::Io { path, source }
     }
 
     /// Creates a new certificate parsing error with the given path and source error.

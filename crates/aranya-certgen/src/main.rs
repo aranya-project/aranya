@@ -1,6 +1,6 @@
 //! CLI tool for generating root CA certificates and signed certificates.
 //!
-//! All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
+//! All generated keys currently use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 //!
 //! # Usage
 //!
@@ -9,7 +9,7 @@
 //! aranya-certgen ca --cn "My CA"
 //!
 //! # Create a signed certificate with P-256 ECDSA key (creates ./cert.crt.pem and ./cert.key.pem)
-//! aranya-certgen signed --cn server
+//! aranya-certgen signed ca --cn server
 //! ```
 
 use std::path::PathBuf;
@@ -48,7 +48,7 @@ struct OutputArgs {
 }
 
 impl OutputArgs {
-    fn save_options(&self) -> SaveOptions {
+    fn get_save_options(&self) -> SaveOptions {
         let mut opts = SaveOptions::default();
         if self.create_parents {
             opts = opts.create_parents();
@@ -82,7 +82,12 @@ enum Commands {
     ///
     /// Generates a certificate and P-256 ECDSA private key, signed by the specified CA.
     /// Files are saved as `{output}.crt.pem` and `{output}.key.pem`.
+    ///
+    /// The CA path prefix is required to ensure the expected CA certificate is used for signing.
     Signed {
+        /// Path prefix for the CA files (loads <CA>.crt.pem and <CA>.key.pem).
+        ca: PathBuf,
+
         /// Output file arguments.
         #[command(flatten)]
         args: OutputArgs,
@@ -90,10 +95,6 @@ enum Commands {
         /// Output path prefix (creates {output}.crt.pem and {output}.key.pem).
         #[arg(long, short, default_value = "cert")]
         output: PathBuf,
-
-        /// Path prefix for the CA files (loads {ca}.crt.pem and {ca}.key.pem).
-        #[arg(long, default_value = "ca")]
-        ca: PathBuf,
     },
 }
 
@@ -106,7 +107,7 @@ fn main() -> Result<(), CertGenError> {
 
             println!("Generating root CA certificate...");
             let ca = CaCert::new(&args.cn, args.days)?;
-            ca.save(&paths, args.save_options())?;
+            ca.save(&paths, args.get_save_options())?;
 
             println!("  Certificate: {}", paths.cert().display());
         }
@@ -118,7 +119,7 @@ fn main() -> Result<(), CertGenError> {
 
             println!("Generating certificate '{}'...", args.cn);
             let signed = ca.generate(&args.cn, args.days)?;
-            signed.save(&paths, args.save_options())?;
+            signed.save(&paths, args.get_save_options())?;
 
             println!("  Certificate: {}", paths.cert().display());
         }
