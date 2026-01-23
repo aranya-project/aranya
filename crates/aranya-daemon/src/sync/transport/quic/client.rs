@@ -185,14 +185,23 @@ where
     pub(crate) async fn connect(&mut self, peer: SyncPeer) -> Result<(SendStream, RecvStream)> {
         trace!("client connecting to QUIC sync server");
 
+        let endpoint = &self.state.endpoint;
+
+        // Get the local address to determine IP version (IPv4 vs IPv6).
+        // We need to filter DNS results to match the endpoint's IP version
+        // because QUIC can't connect to IPv6 from an IPv4-bound endpoint.
+        let local_addr = endpoint
+            .local_addr()
+            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
+        let local_is_ipv4 = local_addr.is_ipv4();
+
         let addr = tokio::net::lookup_host(peer.addr.to_socket_addrs())
             .await
             .context("DNS lookup for peer address")?
-            .next()
-            .context("could not resolve peer address")?;
+            .find(|addr| addr.is_ipv4() == local_is_ipv4)
+            .context("could not resolve peer address to matching IP version")?;
 
         let key = ConnectionKey::new(addr);
-        let endpoint = &self.state.endpoint;
         let client_config = self.state.client_config.clone();
         let peer_host = peer.addr.host().to_string();
 
