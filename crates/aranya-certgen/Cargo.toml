@@ -13,8 +13,8 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
 cli = ["dep:clap"]
+default = []
 
 [lib]
 name = "aranya_certgen"
