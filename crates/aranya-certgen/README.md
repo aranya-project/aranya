@@ -86,7 +86,7 @@ The `-f` (force) flag overwrites the existing certificate files. The new certifi
 CA certificates can also be renewed, but this requires all device certificates to be reissued since they reference the CA:
 
 ```bash
-# Generate new CA (will invalidate all existing device certs!)
+# Generate new CA (will invalidate existing device certs once daemon reloads new CA)
 aranya-certgen ca --cn "My Company CA" --days 365 -f
 
 # Reissue all device certificates
