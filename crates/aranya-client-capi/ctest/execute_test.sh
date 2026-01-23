@@ -121,7 +121,7 @@ if [ -n "$daemon_names" ]; then
         # Generate device certificate signed by CA
         # Use 127.0.0.1 as CN to create IP SAN
         echo "Generating certificate for $name..."
-        "$certgen_path" signed --ca "$root_certs_dir/ca" --cn "127.0.0.1" --output "$config_dir/device"
+        "$certgen_path" signed "$root_certs_dir/ca" --cn 127.0.0.1 --output "$config_dir/device"
 
         spawn_daemon "$tmpdir/$name" "test-daemon-$test_name-$name" "/$test_name-$name" "$port" "$root_certs_dir" "$config_dir"
         port=$((port + 1))
