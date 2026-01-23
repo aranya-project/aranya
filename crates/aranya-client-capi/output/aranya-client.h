@@ -514,12 +514,15 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
 /**
  * Raw PSK seed IKM for QUIC syncer.
  *
+ * PSK seed Input Key Material.
+ *
  * # Deprecation Notice
  *
  * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
  * This type exists for backward compatibility but will be removed in a future release.
+ * The functions using this type are deprecated.
  */
-typedef struct ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication") AranyaSeedIkm {
+typedef struct AranyaSeedIkm {
     uint8_t bytes[ARANYA_SEED_IKM_LEN];
 } AranyaSeedIkm;
 

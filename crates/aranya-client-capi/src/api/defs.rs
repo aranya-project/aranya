@@ -862,11 +862,13 @@ pub fn add_team_quic_sync_config_wrapped_seed(
 
 /// Raw PSK seed IKM for QUIC syncer.
 ///
+/// PSK seed Input Key Material.
+///
 /// # Deprecation Notice
 ///
 /// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
 /// This type exists for backward compatibility but will be removed in a future release.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+/// The functions using this type are deprecated.
 #[allow(deprecated)]
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
