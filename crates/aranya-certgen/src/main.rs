@@ -9,7 +9,7 @@
 //! aranya-certgen ca --cn "My CA"
 //!
 //! # Create a signed certificate with P-256 ECDSA key (creates ./cert.crt.pem and ./cert.key.pem)
-//! aranya-certgen signed --cn server
+//! aranya-certgen signed ca --cn "server"
 //! ```
 
 use std::path::PathBuf;
@@ -82,7 +82,12 @@ enum Commands {
     ///
     /// Generates a certificate and P-256 ECDSA private key, signed by the specified CA.
     /// Files are saved as `{output}.crt.pem` and `{output}.key.pem`.
+    ///
+    /// The CA path prefix is required to ensure the expected CA certificate is used for signing.
     Signed {
+        /// Path prefix for the CA files (loads <CA>.crt.pem and <CA>.key.pem).
+        ca: PathBuf,
+
         /// Output file arguments.
         #[command(flatten)]
         args: OutputArgs,
@@ -90,10 +95,6 @@ enum Commands {
         /// Output path prefix (creates {output}.crt.pem and {output}.key.pem).
         #[arg(long, short, default_value = "cert")]
         output: PathBuf,
-
-        /// Path prefix for the CA files (loads {ca}.crt.pem and {ca}.key.pem).
-        #[arg(long, default_value = "ca")]
-        ca: PathBuf,
     },
 }
 
