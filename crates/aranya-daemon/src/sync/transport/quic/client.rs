@@ -20,7 +20,6 @@ use s2n_quic::{
     provider::tls::rustls::{self as rustls_provider, rustls::ClientConfig},
     stream::{BidirectionalStream, ReceiveStream, SendStream},
 };
-use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
 use tracing::{error, instrument, trace};
@@ -113,7 +112,8 @@ where
         // TODO: spawn a task for send/recv?
         let (mut recv, mut send) = stream.split();
 
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, syncer.server_addr);
+        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
+        // TODO: send syncer.server_addr
 
         // send sync request.
         syncer
@@ -145,13 +145,7 @@ where
             .store()
             .set_team(TeamId::transmute(peer.graph_id));
         syncer
-            .send_sync_hello_subscribe_request(
-                peer,
-                graph_change_delay,
-                duration,
-                schedule_delay,
-                syncer.server_addr,
-            )
+            .send_sync_hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
             .await
     }
 
@@ -166,9 +160,7 @@ where
             .state
             .store()
             .set_team(TeamId::transmute(peer.graph_id));
-        syncer
-            .send_hello_unsubscribe_request(peer, syncer.server_addr)
-            .await
+        syncer.send_hello_unsubscribe_request(peer).await
     }
 
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -199,6 +191,9 @@ where
     ) -> Result<Self> {
         let state = QuicState::new(psk_store, conns.clone(), client_addr)?;
 
+        let return_address =
+            Bytes::from(postcard::to_allocvec(&server_addr).assume("can serialize addr")?);
+
         Ok(Self {
             client,
             peers: HashMap::new(),
@@ -206,7 +201,7 @@ where
             queue: DelayQueue::new(),
             send_effects,
             state,
-            server_addr,
+            return_address,
             #[cfg(feature = "preview")]
             hello_tasks: tokio::task::JoinSet::new(),
         })
@@ -246,6 +241,10 @@ where
                     .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
                     .await?;
                 conn.keep_alive(true)?;
+                conn.open_send_stream()
+                    .await?
+                    .send(self.return_address.clone())
+                    .await?;
                 Ok(conn)
             })
             .await?;
@@ -289,15 +288,12 @@ where
     /// * `Ok(())` if the sync request was sent successfully
     /// * `Err(SyncError)` if there was an error generating or sending the request
     #[instrument(skip_all)]
-    async fn send_sync_request<A>(
+    async fn send_sync_request(
         &self,
         send: &mut SendStream,
-        syncer: &mut SyncRequester<A>,
+        syncer: &mut SyncRequester,
         peer: SyncPeer,
-    ) -> Result<()>
-    where
-        A: Serialize + DeserializeOwned + Clone,
-    {
+    ) -> Result<()> {
         trace!("client sending sync request to QUIC sync server");
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
@@ -326,16 +322,15 @@ where
     /// Receives and processes a sync response from the server.
     ///
     /// Returns the number of commands that were received and successfully processed.
-    async fn receive_sync_response<S, A>(
+    async fn receive_sync_response<S>(
         &self,
         recv: &mut ReceiveStream,
-        syncer: &mut SyncRequester<A>,
+        syncer: &mut SyncRequester,
         sink: &mut S,
         peer: SyncPeer,
     ) -> Result<usize>
     where
         S: Sink<PS::Effect>,
-        A: Serialize + DeserializeOwned + Clone,
     {
         trace!("client receiving sync response from QUIC sync server");
 
