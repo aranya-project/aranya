@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::Context as _;
+use anyhow::{ensure, Context as _};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
@@ -198,6 +198,7 @@ where
             graph_change_delay,
             duration,
             schedule_delay,
+            graph_id: peer.graph_id,
         };
         let sync_type = SyncType::Hello(hello_msg);
 
@@ -221,7 +222,9 @@ where
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
-        let sync_type: SyncType = SyncType::Hello(SyncHelloType::Unsubscribe {});
+        let sync_type: SyncType = SyncType::Hello(SyncHelloType::Unsubscribe {
+            graph_id: peer.graph_id,
+        });
 
         self.send_hello_request(peer, sync_type).await
     }
@@ -250,7 +253,10 @@ where
         self.state.store().set_team(team_id);
 
         // Create the hello message
-        let hello_msg = SyncHelloType::Hello { head };
+        let hello_msg = SyncHelloType::Hello {
+            head,
+            graph_id: peer.graph_id,
+        };
         let sync_type: SyncType = SyncType::Hello(hello_msg);
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
@@ -388,15 +394,18 @@ where
         active_team: &TeamId,
         handle: SyncHandle,
         address: Addr,
-    ) {
-        let graph_id = GraphId::transmute(*active_team);
+    ) -> anyhow::Result<()> {
+        let active_graph_id = GraphId::transmute(*active_team);
 
         match hello_msg {
             SyncHelloType::Subscribe {
                 graph_change_delay,
                 duration,
                 schedule_delay,
+                graph_id,
             } => {
+                ensure!(graph_id == active_graph_id);
+
                 let peer = SyncPeer::new(address, graph_id);
                 let expires_at = Instant::now() + duration;
 
@@ -440,7 +449,9 @@ where
                     "Created hello subscription and spawned scheduled sender"
                 );
             }
-            SyncHelloType::Unsubscribe {} => {
+            SyncHelloType::Unsubscribe { graph_id } => {
+                ensure!(graph_id == active_graph_id);
+
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, "received message to unsubscribe from hello messages");
 
@@ -456,7 +467,9 @@ where
                     }
                 }
             }
-            SyncHelloType::Hello { head } => {
+            SyncHelloType::Hello { head, graph_id } => {
+                ensure!(graph_id == active_graph_id);
+
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, ?head, "received hello notification message");
 
@@ -488,5 +501,7 @@ where
                 }
             }
         }
+
+        Ok(())
     }
 }

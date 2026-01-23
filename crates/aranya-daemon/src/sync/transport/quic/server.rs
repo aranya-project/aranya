@@ -311,14 +311,18 @@ where
             SyncType::Hello(_hello_msg) => {
                 #[cfg(feature = "preview")]
                 {
-                    Self::process_hello_message(
+                    if let Err(error) = Self::process_hello_message(
                         _hello_msg,
                         client,
                         &active_team,
                         _handle,
                         peer_server_addr,
                     )
-                    .await;
+                    .await
+                    {
+                        // TODO: Respond with error or don't respond?
+                        error!(%error, "Failed to process hello message");
+                    }
                     // Hello messages are fire-and-forget, return empty response
                     // Note: returning empty response which will be ignored by client
                     return Ok(Box::new([]));
@@ -372,12 +376,12 @@ where
 }
 
 fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
-    let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
+    let SyncRequestMessage::SyncRequest { graph_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };
-    if team_id.as_bytes() != storage_id.as_bytes() {
+    if team_id.as_bytes() != graph_id.as_bytes() {
         return Err(Error::QuicSync(quic::Error::InvalidPSK));
     }
 
-    Ok(*storage_id)
+    Ok(*graph_id)
 }
