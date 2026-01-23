@@ -20,7 +20,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Toggle<T> {
     where
         D: de::Deserializer<'de>,
     {
-        imp::E::deserialize(deserializer).map(Self::from)
+        imp::ToggleRepr::deserialize(deserializer).map(Self::from)
     }
 }
 
@@ -29,12 +29,16 @@ impl<T: Serialize> Serialize for Toggle<T> {
     where
         S: ser::Serializer,
     {
-        imp::E::from(self).serialize(serializer)
+        imp::ToggleRepr::from(self).serialize(serializer)
     }
 }
 
 mod imp {
-    #![allow(missing_debug_implementations)]
+    #![expect(
+        missing_debug_implementations,
+        reason = "Types are only used for serialization"
+    )]
+    #![expect(clippy::use_self, reason = "Explicit True/False is more clear")]
 
     use serde::{de, ser, Deserialize, Serialize};
 
@@ -43,13 +47,12 @@ mod imp {
     pub struct True;
     impl<'de> Deserialize<'de> for True {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            if bool::deserialize(deserializer)? {
-                Ok(Self)
-            } else {
-                Err(de::Error::invalid_value(
+            match bool::deserialize(deserializer)? {
+                true => Ok(True),
+                false => Err(de::Error::invalid_value(
                     de::Unexpected::Bool(false),
                     &"the `true` boolean",
-                ))
+                )),
             }
         }
     }
@@ -63,13 +66,12 @@ mod imp {
     pub struct False;
     impl<'de> Deserialize<'de> for False {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            if !bool::deserialize(deserializer)? {
-                Ok(Self)
-            } else {
-                Err(de::Error::invalid_value(
+            match bool::deserialize(deserializer)? {
+                false => Ok(False),
+                true => Err(de::Error::invalid_value(
                     de::Unexpected::Bool(true),
                     &"the `false` boolean",
-                ))
+                )),
             }
         }
     }
@@ -81,7 +83,7 @@ mod imp {
 
     #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
-    pub enum E<T> {
+    pub enum ToggleRepr<T> {
         Enabled {
             enable: True,
             #[serde(flatten)]
@@ -93,8 +95,8 @@ mod imp {
         },
     }
 
-    impl<'a, T> From<&'a Toggle<T>> for E<&'a T> {
-        fn from(toggle: &'a Toggle<T>) -> E<&'a T> {
+    impl<'a, T> From<&'a Toggle<T>> for ToggleRepr<&'a T> {
+        fn from(toggle: &'a Toggle<T>) -> Self {
             match toggle {
                 Toggle::Enabled(fields) => Self::Enabled {
                     enable: True,
@@ -105,14 +107,14 @@ mod imp {
         }
     }
 
-    impl<T> From<E<T>> for Toggle<T> {
-        fn from(value: E<T>) -> Self {
+    impl<T> From<ToggleRepr<T>> for Toggle<T> {
+        fn from(value: ToggleRepr<T>) -> Self {
             match value {
-                E::Enabled {
+                ToggleRepr::Enabled {
                     enable: True,
                     fields,
-                } => Toggle::Enabled(fields),
-                E::Disabled { enable: False } => Toggle::Disabled,
+                } => Self::Enabled(fields),
+                ToggleRepr::Disabled { enable: False } => Self::Disabled,
             }
         }
     }
@@ -120,7 +122,7 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::disallowed_macros, reason = "unreachable in toml macro")]
+    #![expect(clippy::disallowed_macros, reason = "unreachable in toml macro")]
 
     use serde::{Deserialize, Serialize};
     use toml::toml;
@@ -153,7 +155,7 @@ mod tests {
         // TODO(jdygert): Improve error.
         assert_eq!(
             err,
-            serde::de::Error::custom("data did not match any variant of untagged enum E")
+            serde::de::Error::custom("data did not match any variant of untagged enum ToggleRepr")
         );
     }
 
@@ -184,6 +186,20 @@ mod tests {
     fn test_disabled_without_field() {
         let table = toml! {
             enable = false
+        };
+        assert_eq!(table.try_into::<Toggle<Thing>>(), Ok(Toggle::Disabled));
+    }
+
+    #[test]
+    fn test_empty() {
+        let table = toml::Table::default();
+        assert_eq!(table.try_into::<Toggle<Thing>>(), Ok(Toggle::Disabled));
+    }
+
+    #[test]
+    fn test_no_enable_with_field() {
+        let table = toml! {
+            unknown = 0
         };
         assert_eq!(table.try_into::<Toggle<Thing>>(), Ok(Toggle::Disabled));
     }
