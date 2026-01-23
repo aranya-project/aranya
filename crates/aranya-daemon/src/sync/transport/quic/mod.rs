@@ -8,7 +8,7 @@
 
 use std::{convert::Infallible, sync::Arc};
 
-use s2n_quic::{connection, provider::StartError, stream};
+use s2n_quic::provider::StartError;
 use tracing::error;
 
 use super::SyncState;
@@ -18,11 +18,13 @@ mod client;
 mod connections;
 mod psk;
 mod server;
+mod stream;
 
 pub(crate) use client::QuicState;
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::{PskSeed, PskStore};
 pub(crate) use server::Server;
+pub(crate) use stream::QuicStream;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -32,10 +34,10 @@ const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 pub(crate) enum Error {
     /// QUIC Connection error
     #[error(transparent)]
-    QuicConnection(#[from] connection::Error),
+    QuicConnection(#[from] s2n_quic::connection::Error),
     /// QUIC Stream error
     #[error(transparent)]
-    QuicStream(#[from] stream::Error),
+    QuicStream(#[from] s2n_quic::stream::Error),
     /// Invalid PSK used for syncing
     #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
@@ -45,6 +47,13 @@ pub(crate) enum Error {
     /// QUIC server endpoint start error
     #[error("could not start QUIC server")]
     ServerStart(#[source] StartError),
+
+    #[error(transparent)]
+    Send(s2n_quic::stream::Error),
+    #[error(transparent)]
+    Receive(std::io::Error),
+    #[error(transparent)]
+    Finish(s2n_quic::stream::Error),
 }
 
 impl From<Infallible> for Error {

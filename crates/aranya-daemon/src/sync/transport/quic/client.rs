@@ -13,12 +13,11 @@ use aranya_runtime::{
 use aranya_util::{error::ReportExt as _, rustls::SkipServerVerification};
 use buggy::BugExt as _;
 use bytes::Bytes;
-use futures_util::AsyncReadExt as _;
 use s2n_quic::{
     client::Connect,
     connection,
     provider::tls::rustls::{self as rustls_provider, rustls::ClientConfig},
-    stream::{BidirectionalStream, ReceiveStream, SendStream},
+    stream::BidirectionalStream,
 };
 use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
@@ -28,8 +27,9 @@ use super::{PskStore, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic, Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer,
-        SyncResponse,
+        quic::QuicStream,
+        transport::{quic, SyncStream as _},
+        Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer, SyncResponse,
     },
 };
 
@@ -109,20 +109,19 @@ where
             .connect(peer)
             .await
             .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
-        // TODO: spawn a task for send/recv?
-        let (mut recv, mut send) = stream.split();
+        let mut stream = QuicStream::new(peer, stream);
 
         let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
 
         // send sync request.
         syncer
-            .send_sync_request(&mut send, &mut sync_requester, peer)
+            .send_sync_request(&mut stream, &mut sync_requester, peer)
             .await
             .map_err(|e| Error::SendSyncRequest(e.into()))?;
 
         // receive sync response.
         let cmd_count = syncer
-            .receive_sync_response(&mut recv, &mut sync_requester, sink, peer)
+            .receive_sync_response(&mut stream, &mut sync_requester, sink, peer)
             .await
             .map_err(|e| Error::ReceiveSyncResponse(e.into()))?;
 
@@ -289,7 +288,7 @@ where
     #[instrument(skip_all)]
     async fn send_sync_request(
         &self,
-        send: &mut SendStream,
+        stream: &mut QuicStream,
         syncer: &mut SyncRequester,
         peer: SyncPeer,
     ) -> Result<()> {
@@ -308,10 +307,8 @@ where
         };
         send_buf.truncate(len);
 
-        send.send(Bytes::from(send_buf))
-            .await
-            .map_err(quic::Error::from)?;
-        send.close().await.map_err(quic::Error::from)?;
+        stream.send(&send_buf).await?;
+        stream.finish().await?;
         trace!("sent sync request");
 
         Ok(())
@@ -323,7 +320,7 @@ where
     /// Returns the number of commands that were received and successfully processed.
     async fn receive_sync_response<S>(
         &self,
-        recv: &mut ReceiveStream,
+        stream: &mut QuicStream,
         syncer: &mut SyncRequester,
         sink: &mut S,
         peer: SyncPeer,
@@ -334,9 +331,7 @@ where
         trace!("client receiving sync response from QUIC sync server");
 
         let mut recv_buf = Vec::new();
-        recv.read_to_end(&mut recv_buf)
-            .await
-            .context("failed to read sync response")?;
+        stream.receive(&mut recv_buf).await?;
         trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.

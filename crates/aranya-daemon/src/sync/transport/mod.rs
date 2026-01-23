@@ -10,7 +10,7 @@ use aranya_runtime::{PolicyStore, Sink, StorageProvider};
 
 #[cfg(feature = "preview")]
 use super::GraphId;
-use super::{Result, SyncManager, SyncPeer};
+use super::{SyncManager, SyncPeer};
 
 pub(crate) mod quic;
 
@@ -27,7 +27,7 @@ where
         syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         sink: &mut S,
-    ) -> impl Future<Output = Result<usize>>;
+    ) -> impl Future<Output = Result<usize, super::Error>>;
 
     /// Subscribe to hello notifications from a sync peer.
     #[cfg(feature = "preview")]
@@ -37,14 +37,14 @@ where
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-    ) -> impl Future<Output = Result<()>>;
+    ) -> impl Future<Output = Result<(), super::Error>>;
 
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     fn sync_hello_unsubscribe_impl(
         syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
-    ) -> impl Future<Output = Result<()>>;
+    ) -> impl Future<Output = Result<(), super::Error>>;
 
     /// Broadcast hello notifications to all subscribers of a graph.
     #[cfg(feature = "preview")]
@@ -52,5 +52,16 @@ where
         syncer: &mut SyncManager<Self, PS, SP, EF>,
         graph_id: GraphId,
         head: Address,
-    ) -> impl Future<Output = Result<()>>;
+    ) -> impl Future<Output = Result<(), super::Error>>;
+}
+
+#[async_trait::async_trait]
+pub(crate) trait SyncStream: Send + 'static {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    fn peer(&self) -> SyncPeer;
+
+    async fn send(&mut self, data: &[u8]) -> Result<(), Self::Error>;
+    async fn receive(&mut self, buffer: &mut Vec<u8>) -> Result<(), Self::Error>;
+    async fn finish(&mut self) -> Result<(), Self::Error>;
 }

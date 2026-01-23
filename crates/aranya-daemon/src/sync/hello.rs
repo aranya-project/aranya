@@ -13,14 +13,17 @@ use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
 };
-use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic::{self, QuicState},
+        quic::QuicStream,
+        transport::{
+            quic::{self, QuicState},
+            SyncStream as _,
+        },
         Addr, Error, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
     },
 };
@@ -141,32 +144,19 @@ where
 
         // Connect to the peer
         let stream = self.connect(peer).await?;
-        let (mut recv, mut send) = stream.split();
+        let mut stream = QuicStream::new(peer, stream);
 
         // Send the message
-        send.send(bytes::Bytes::from(data))
-            .await
-            .map_err(quic::Error::from)?;
-        send.close().await.map_err(quic::Error::from)?;
+        stream.send(&data).await?;
+        stream.finish().await?;
 
-        // Determine operation name from sync_type
-        let operation_name = match &sync_type {
-            SyncType::Hello(hello_type) => match hello_type {
-                SyncHelloType::Subscribe { .. } => "subscribe",
-                SyncHelloType::Unsubscribe { .. } => "unsubscribe",
-                SyncHelloType::Hello { .. } => "hello",
-            },
-            _ => "unknown",
-        };
         // Read the response to avoid race condition with server
         let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
-            .await
-            .with_context(|| format!("failed to read hello {} response", operation_name))?;
-        if response_buf.is_empty() {
-            return Err(Error::EmptyResponse);
+        stream.receive(&mut response_buf).await?;
+        match response_buf.is_empty() {
+            true => Err(Error::EmptyResponse),
+            false => Ok(()),
         }
-        Ok(())
     }
 
     /// Sends a subscribe request to a peer for hello notifications.
@@ -269,12 +259,11 @@ where
             );
             error
         })?;
+        let mut stream = QuicStream::new(peer, stream);
 
         // Spawn async task to send the notification
         self.hello_tasks.spawn(async move {
-            let (mut recv, mut send) = stream.split();
-
-            if let Err(error) = send.send(bytes::Bytes::from(data)).await {
+            if let Err(error) = stream.send(&data).await {
                 warn!(
                     ?peer,
                     %error,
@@ -283,7 +272,7 @@ where
                 return;
             }
 
-            if let Err(error) = send.close().await {
+            if let Err(error) = stream.finish().await {
                 warn!(
                     ?peer,
                     %error,
@@ -294,7 +283,7 @@ where
 
             // Read the response to avoid race condition with server
             let mut response_buf = Vec::new();
-            if let Err(e) = recv.read_to_end(&mut response_buf).await {
+            if let Err(e) = stream.receive(&mut response_buf).await {
                 warn!(
                     error = %e,
                     ?peer,

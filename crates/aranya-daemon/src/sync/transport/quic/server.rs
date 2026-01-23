@@ -10,9 +10,8 @@ use aranya_util::{
     error::ReportExt as _, ready, rustls::NoCertResolver, s2n_quic::get_conn_identity, task::scope,
 };
 use buggy::{bug, BugExt as _};
-use bytes::Bytes;
 use derive_where::derive_where;
-use futures_util::{AsyncReadExt as _, TryFutureExt as _};
+use futures_util::TryFutureExt as _;
 use s2n_quic::{
     application,
     connection::StreamAcceptor,
@@ -23,7 +22,6 @@ use s2n_quic::{
             rustls::{server::PresharedKeySelection, ServerConfig},
         },
     },
-    stream::BidirectionalStream,
 };
 use tokio::sync::mpsc;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
@@ -32,7 +30,9 @@ use super::{ConnectionUpdate, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic, Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
+        quic::QuicStream,
+        transport::{quic, SyncStream as _},
+        Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
     },
 };
 
@@ -209,6 +209,7 @@ where
                 .context("could not receive QUIC stream")?
             {
                 trace!("received incoming QUIC stream");
+                let stream = QuicStream::new(peer, stream);
                 Self::sync(
                     client.clone(),
                     stream,
@@ -231,7 +232,7 @@ where
     #[instrument(skip_all)]
     async fn sync(
         client: Client<PS, SP>,
-        stream: BidirectionalStream,
+        mut stream: QuicStream,
         active_team: TeamId,
         handle: SyncHandle,
         peer_server_addr: Addr,
@@ -239,10 +240,7 @@ where
         trace!("server received a sync request");
 
         let mut recv_buf = Vec::new();
-        let (mut recv, mut send) = stream.split();
-        recv.read_to_end(&mut recv_buf)
-            .await
-            .context("failed to read sync request")?;
+        stream.receive(&mut recv_buf).await?;
         trace!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
@@ -260,12 +258,13 @@ where
         let data_len = {
             let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
             let data_len = data.len();
-            send.send(Bytes::from(data))
+            stream
+                .send(&data)
                 .await
                 .context("Could not send sync response")?;
             data_len
         };
-        send.close().await.ok();
+        stream.finish().await.ok();
         trace!(n = data_len, "server sent sync response");
 
         Ok(())
