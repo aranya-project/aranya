@@ -43,9 +43,11 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use crate::actions::SessionData;
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
+#[cfg(feature = "afc")]
+use crate::daemon::{CE, KS};
 use crate::{
     actions::Actions,
-    daemon::{CE, CS, KS},
+    daemon::CS,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
     sync::{SyncHandle, SyncPeer},
     Client, EF,
