@@ -238,13 +238,6 @@ impl CaCert {
     pub fn cert_pem(&self) -> &str {
         &self.cert_pem
     }
-
-    /// Returns the private key as a PEM-encoded string.
-    ///
-    /// Returns [`Zeroizing<String>`] to ensure key material is zeroized when dropped.
-    pub fn key_pem(&self) -> Zeroizing<String> {
-        Zeroizing::new(self.key.serialize_pem())
-    }
 }
 
 /// A signed leaf certificate that cannot sign other certificates.
@@ -297,13 +290,6 @@ impl SignedCert {
     pub fn cert_pem(&self) -> &str {
         &self.cert_pem
     }
-
-    /// Returns the private key as a PEM-encoded string.
-    ///
-    /// Returns [`Zeroizing<String>`] to ensure key material is zeroized when dropped.
-    pub fn key_pem(&self) -> Zeroizing<String> {
-        Zeroizing::new(self.key.serialize_pem())
-    }
 }
 
 // ============================================================================
@@ -354,6 +340,7 @@ fn save_cert_and_key(
     } else {
         key_options.create_new(true);
     }
+    // Set restrictive permissions on Unix. Windows uses ACLs which require different APIs.
     #[cfg(unix)]
     key_options.mode(0o600);
     let mut key_file = key_options
