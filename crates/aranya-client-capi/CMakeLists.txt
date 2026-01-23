@@ -37,6 +37,7 @@ corrosion_import_crate(
     MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../aranya-certgen/Cargo.toml
     CRATES aranya-certgen
     CRATE_TYPE bin
+    FEATURES cli
 )
 
 add_executable(Aranya::Certgen ALIAS aranya-certgen)

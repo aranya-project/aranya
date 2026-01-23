@@ -51,19 +51,17 @@ impl SaveOptions {
 /// use aranya_certgen::CertPaths;
 ///
 /// let paths = CertPaths::new("ca");
-/// assert_eq!(paths.cert.to_str().unwrap(), "ca.crt.pem");
-/// assert_eq!(paths.key.to_str().unwrap(), "ca.key.pem");
+/// assert_eq!(paths.cert().to_str().unwrap(), "ca.crt.pem");
+/// assert_eq!(paths.key().to_str().unwrap(), "ca.key.pem");
 ///
 /// let paths = CertPaths::new("./certs/server");
-/// assert_eq!(paths.cert.to_str().unwrap(), "./certs/server.crt.pem");
-/// assert_eq!(paths.key.to_str().unwrap(), "./certs/server.key.pem");
+/// assert_eq!(paths.cert().to_str().unwrap(), "./certs/server.crt.pem");
+/// assert_eq!(paths.key().to_str().unwrap(), "./certs/server.key.pem");
 /// ```
 #[derive(Debug, Clone)]
 pub struct CertPaths {
-    /// Path to the certificate file (`.crt.pem`).
-    pub cert: PathBuf,
-    /// Path to the private key file (`.key.pem`).
-    pub key: PathBuf,
+    cert: PathBuf,
+    key: PathBuf,
 }
 
 impl CertPaths {
@@ -77,6 +75,16 @@ impl CertPaths {
             cert: prefix.with_extension("crt.pem"),
             key: prefix.with_extension("key.pem"),
         }
+    }
+
+    /// Returns the path to the certificate file.
+    pub fn cert(&self) -> &Path {
+        &self.cert
+    }
+
+    /// Returns the path to the private key file.
+    pub fn key(&self) -> &Path {
+        &self.key
     }
 }
 

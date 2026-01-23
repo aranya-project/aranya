@@ -259,8 +259,8 @@ impl TestCtx {
 
             let cert_config = CertConfig {
                 root_certs_dir: self.root_certs_dir.clone(),
-                device_cert: device_paths.cert.clone(),
-                device_key: device_paths.key.clone(),
+                device_cert: device_paths.cert().to_path_buf(),
+                device_key: device_paths.key().to_path_buf(),
             };
 
             let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));

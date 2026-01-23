@@ -69,8 +69,8 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                     quic: Toggle::Enabled(QuicSyncConfig {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
                         root_certs_dir,
-                        device_cert: device_paths.cert,
-                        device_key: device_paths.key,
+                        device_cert: device_paths.cert().to_path_buf(),
+                        device_key: device_paths.key().to_path_buf(),
                     }),
                 },
                 #[cfg(feature = "afc")]

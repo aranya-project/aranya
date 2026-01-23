@@ -15,9 +15,14 @@ path = "src/lib.rs"
 [[bin]]
 name = "aranya-certgen"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+cli = ["dep:clap"]
+default = []
 
 [dependencies]
-clap = { workspace = true }
+clap = { workspace = true, optional = true }
 rcgen = { version = "0.14", features = ["x509-parser", "zeroize"] }
 thiserror = { workspace = true }
 time = "0.3"

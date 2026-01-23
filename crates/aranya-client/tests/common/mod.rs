@@ -311,8 +311,8 @@ impl DeviceCtx {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
                     root_certs_dir: ca.root_certs_dir().clone(),
-                    device_cert: device_paths.cert,
-                    device_key: device_paths.key,
+                    device_cert: device_paths.cert().to_path_buf(),
+                    device_key: device_paths.key().to_path_buf(),
                 }),
             },
         };

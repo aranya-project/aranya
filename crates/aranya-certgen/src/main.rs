@@ -108,7 +108,7 @@ fn main() -> Result<(), CertGenError> {
             let ca = CaCert::new(&args.cn, args.days)?;
             ca.save(&paths, args.save_options())?;
 
-            println!("  Certificate: {}", paths.cert.display());
+            println!("  Certificate: {}", paths.cert().display());
         }
         Commands::Signed { args, output, ca } => {
             let ca_paths = CertPaths::new(&ca);
@@ -120,7 +120,7 @@ fn main() -> Result<(), CertGenError> {
             let signed = ca.generate(&args.cn, args.days)?;
             signed.save(&paths, args.save_options())?;
 
-            println!("  Certificate: {}", paths.cert.display());
+            println!("  Certificate: {}", paths.cert().display());
         }
     }
 

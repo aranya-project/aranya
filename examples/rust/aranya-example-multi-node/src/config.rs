@@ -90,8 +90,8 @@ pub async fn create_config(
 
     // Generate signed certificate
     let device_paths = ca.generate_signed_cert(&device, &work_dir)?;
-    let device_cert = &device_paths.cert;
-    let device_key = &device_paths.key;
+    let device_cert = device_paths.cert();
+    let device_key = device_paths.key();
     let root_certs_dir = ca.root_certs_dir();
 
     let buf = format!(

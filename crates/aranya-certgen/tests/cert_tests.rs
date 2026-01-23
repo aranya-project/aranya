@@ -21,8 +21,8 @@ fn test_ca_cert_roundtrip() {
     assert_eq!(ca.cert_pem(), loaded.cert_pem());
 
     // Verify the files are named correctly
-    assert!(paths.cert.exists());
-    assert!(paths.key.exists());
+    assert!(paths.cert().exists());
+    assert!(paths.key().exists());
 }
 
 #[test]
@@ -40,8 +40,8 @@ fn test_signed_cert_save() {
         .expect("should save");
 
     // Verify the files are named correctly
-    assert!(paths.cert.exists());
-    assert!(paths.key.exists());
+    assert!(paths.cert().exists());
+    assert!(paths.key().exists());
 }
 
 #[test]
@@ -130,8 +130,8 @@ fn test_save_with_create_parents() {
     ca.save(&paths, SaveOptions::default().create_parents())
         .expect("save with create_parents should succeed");
 
-    assert!(paths.cert.exists());
-    assert!(paths.key.exists());
+    assert!(paths.cert().exists());
+    assert!(paths.key().exists());
 }
 
 #[test]
