@@ -776,39 +776,18 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// QUIC syncer configuration.
 ///
 /// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
-///
-/// # Deprecation Notice
-///
-/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
-/// This type exists for backward compatibility but will be removed in a future release.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
 ///
 /// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
-///
-/// # Deprecation Notice
-///
-/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
-/// This type exists for backward compatibility but will be removed in a future release.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
 
 /// A builder for initializing an [`AddTeamQuicSyncConfig`].
 ///
 /// The [`AddTeamQuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`].
-///
-/// # Deprecation Notice
-///
-/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
-/// This type exists for backward compatibility but will be removed in a future release.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
@@ -816,13 +795,6 @@ pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 /// A builder for initializing a [`CreateTeamQuicSyncConfig`].
 ///
 /// The [`CreateTeamQuicSyncConfig`] is an optional part of initializing a [`CreateTeamConfig`].
-///
-/// # Deprecation Notice
-///
-/// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
-/// This type exists for backward compatibility but will be removed in a future release.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
@@ -922,8 +894,6 @@ pub fn add_team_quic_sync_config_raw_seed_ikm(
 /// @param[out] out a pointer to write the QUIC sync config to
 ///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 pub fn create_team_quic_sync_config_build(
     cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
     out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
@@ -942,8 +912,6 @@ pub fn create_team_quic_sync_config_build(
 /// @param[out] out a pointer to write the QUIC sync config to
 ///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 pub fn add_team_quic_sync_config_build(
     cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
     out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
@@ -983,8 +951,6 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 /// @param[in] quic set the QUIC syncer config
 ///
 /// @relates AranyaAddTeamConfigBuilder.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 pub fn add_team_config_builder_set_quic_syncer(
     cfg: &mut AddTeamConfigBuilder,
     quic: OwnedPtr<AddTeamQuicSyncConfig>,
@@ -1032,8 +998,6 @@ pub fn add_team_config_build(
 /// @param[in] quic set the QUIC syncer config
 ///
 /// @relates AranyaCreateTeamConfigBuilder.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 pub fn create_team_config_builder_set_quic_syncer(
     cfg: &mut CreateTeamConfigBuilder,
     quic: OwnedPtr<CreateTeamQuicSyncConfig>,
