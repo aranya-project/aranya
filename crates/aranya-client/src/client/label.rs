@@ -1,4 +1,4 @@
-use std::{slice, vec};
+use std::vec;
 
 use aranya_daemon_api as api;
 use aranya_id::custom_id;
@@ -6,7 +6,7 @@ use aranya_policy_text::Text;
 
 use crate::{
     client::DeviceId,
-    util::{impl_slice_iter_wrapper, impl_vec_into_iter_wrapper, ApiConv as _, ApiId},
+    util::{impl_vec_into_iter_wrapper, ApiConv as _, ApiId},
 };
 
 custom_id! {
@@ -68,12 +68,6 @@ impl IntoIterator for Labels {
         IntoIterLabels(self.labels.into_vec().into_iter())
     }
 }
-
-/// An iterator over [`Label`]s.
-#[derive(Clone, Debug)]
-pub struct IterLabels<'a>(slice::Iter<'a, Label>);
-
-impl_slice_iter_wrapper!(IterLabels<'a> for Label);
 
 /// An owning iterator over [`Label`]s.
 #[derive(Clone, Debug)]
