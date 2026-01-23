@@ -803,11 +803,7 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
-#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
-#[allow(deprecated)]
 pub fn create_team_quic_sync_config_generate(
     cfg: &mut CreateTeamQuicSyncConfigBuilder,
 ) -> Result<(), imp::Error> {
