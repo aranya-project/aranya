@@ -1,6 +1,6 @@
 //! Library for generating root CA certificates and signed certificates.
 //!
-//! All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
+//! All generated keys currently use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 //!
 //! # Future Work
 //!
@@ -17,9 +17,10 @@
 //!   - HPKE (Hybrid Public Key Encryption) keys for use with MLS or other protocols
 //!   - Post-quantum algorithms (e.g., ML-KEM, ML-DSA)
 //!
-//! - **Subject Alternative Names (SANs)**: Currently, only the Common Name (CN) is added
-//!   as a DNS SAN. Explicit SAN support could be added via `--dns` and `--ip` flags to
-//!   allow multiple DNS names and IP addresses in a single certificate.
+//! - **Subject Alternative Names (SANs)**: The Common Name (CN) is automatically added
+//!   as either a DNS SAN (for hostnames) or IP SAN (for IP addresses). Explicit SAN
+//!   support could be added in the future via `--dns` and `--ip` flags to allow additional
+//!   SANs beyond the CN.
 //!
 //! - **Certificate extensions**: Support for additional X.509 extensions such as
 //!   custom OIDs and extension values.

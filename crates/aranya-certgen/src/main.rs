@@ -1,6 +1,6 @@
 //! CLI tool for generating root CA certificates and signed certificates.
 //!
-//! All generated keys use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
+//! All generated keys currently use **P-256 ECDSA** (NIST P-256 / secp256r1 curve with ECDSA signatures).
 //!
 //! # Usage
 //!
