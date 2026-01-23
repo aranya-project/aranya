@@ -86,6 +86,7 @@ pub struct DevicesCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
+    #[allow(dead_code)] // Used in test_privilege_escalation_rejected
     pub ca: Arc<TestCertAuthority>,
     _work_dir: TempDir,
 }

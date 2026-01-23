@@ -107,18 +107,11 @@ typedef struct {
     AranyaDeviceId id;
 } Client;
 
-// Which PSK seed mode to use for example.
-typedef enum {
-    GENERATE,
-    RAW_IKM,
-} PskSeedMode;
-
 // Aranya team.
 //
 // Contains the team ID and all Aranya clients for the devices on this example's
 // team.
 typedef struct {
-    PskSeedMode seed_mode;
     AranyaTeamId id;
     union {
         struct {
@@ -286,30 +279,12 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    AranyaSeedIkm ikm;
-    if (t->seed_mode == RAW_IKM) {
-        err =
-            aranya_rand(&t->clients.owner.client, ikm.bytes, sizeof(ikm.bytes));
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to generate random bytes\n");
-            return err;
-        }
-        err = aranya_create_team_quic_sync_config_raw_seed_ikm(
-            &owner_quic_build, &ikm);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` raw "
-                    "IKM seed mode\n");
-            return err;
-        }
-    } else {
-        err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` "
-                    "generate mode\n");
-            return err;
-        }
+    err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` "
+                "generate mode\n");
+        return err;
     }
 
     AranyaCreateTeamQuicSyncConfig owner_quic_cfg;
@@ -492,47 +467,36 @@ AranyaError init_team(Team *t) {
         }
 
         AranyaTeamId team_id_from_peer = t->id;
-        if (t->seed_mode == RAW_IKM) {
-            err = aranya_add_team_quic_sync_config_raw_seed_ikm(&quic_build,
-                                                                &ikm);
-            if (err != ARANYA_ERROR_SUCCESS) {
-                fprintf(stderr,
-                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
-                        "raw IKM seed\n");
-                return err;
-            }
-        } else {
-            printf("encrypting PSK seed for peer\n");
-            size_t wrapped_seed_len = 100;
-            uint8_t *wrapped_seed = calloc(wrapped_seed_len, 1);
+        printf("encrypting PSK seed for peer\n");
+        size_t wrapped_seed_len = 100;
+        uint8_t *wrapped_seed = calloc(wrapped_seed_len, 1);
+        err = aranya_encrypt_psk_seed_for_peer(
+            &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
+            t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
+        if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+            printf("handling buffer too small error\n");
+            wrapped_seed = realloc(wrapped_seed, wrapped_seed_len);
             err = aranya_encrypt_psk_seed_for_peer(
                 &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
                 t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
-            if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-                printf("handling buffer too small error\n");
-                wrapped_seed = realloc(wrapped_seed, wrapped_seed_len);
-                err = aranya_encrypt_psk_seed_for_peer(
-                    &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
-                    t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
-            }
-            if (err != ARANYA_ERROR_SUCCESS) {
-                fprintf(stderr,
-                        "unable to encrypt psk seed for peer, seed_len=%zu\n",
-                        wrapped_seed_len);
-                return err;
-            }
+        }
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to encrypt psk seed for peer, seed_len=%zu\n",
+                    wrapped_seed_len);
+            return err;
+        }
 
-            // Note: this is where the team owner will send the encrypted PSK
-            // seed to the peer.
+        // Note: this is where the team owner will send the encrypted PSK
+        // seed to the peer.
 
-            err = aranya_add_team_quic_sync_config_wrapped_seed(
-                &quic_build, wrapped_seed, wrapped_seed_len);
-            if (err != ARANYA_ERROR_SUCCESS) {
-                fprintf(stderr,
-                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
-                        "wrapped seed\n");
-                return err;
-            }
+        err = aranya_add_team_quic_sync_config_wrapped_seed(
+            &quic_build, wrapped_seed, wrapped_seed_len);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
+                    "wrapped seed\n");
+            return err;
         }
 
         AranyaAddTeamQuicSyncConfig quic_cfg;
@@ -1213,25 +1177,11 @@ typedef struct {
 } channel_context_t;
 
 int main(int argc, char *argv[]) {
+    (void)argc;
+    (void)argv;
+
     Team team = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
-
-    // parse arguments.
-    team.seed_mode = GENERATE;
-    if (argc >= 2) {
-        char *seed_mode_arg = argv[1];
-        if (!strncmp(seed_mode_arg, "raw_seed_ikm", 10)) {
-            team.seed_mode = RAW_IKM;
-        }
-    }
-    switch (team.seed_mode) {
-    case GENERATE:
-        printf("PSK generate seed mode\n");
-        break;
-    case RAW_IKM:
-        printf("Raw PSK IKM seed mode\n");
-        break;
-    }
 
     // TODO: take work_dirs, shm_paths, daemon_socks, IP addresses as input?
 
