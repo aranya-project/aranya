@@ -9,7 +9,7 @@
 //! aranya-certgen ca --cn "My CA"
 //!
 //! # Create a signed certificate with P-256 ECDSA key (creates ./cert.crt.pem and ./cert.key.pem)
-//! aranya-certgen signed ca --cn "server"
+//! aranya-certgen signed ca --cn server
 //! ```
 
 use std::path::PathBuf;

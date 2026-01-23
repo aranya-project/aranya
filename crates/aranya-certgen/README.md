@@ -24,7 +24,7 @@ aranya-certgen ca --cn "My Company CA"
 ### Create a Signed Certificate
 
 ```bash
-aranya-certgen signed ca --cn "webserver"
+aranya-certgen signed ca --cn webserver
 ```
 
 ## Commands
@@ -63,7 +63,7 @@ $ aranya-certgen ca --cn "My Company CA"
 Generating root CA certificate...
   Certificate: ./ca.crt.pem
 
-$ aranya-certgen signed ca --cn "webserver"
+$ aranya-certgen signed ca --cn webserver
 Generating certificate 'webserver'...
   Certificate: ./cert.crt.pem
 ```
@@ -74,7 +74,7 @@ To renew or reissue a device certificate, generate a new certificate using the s
 
 ```bash
 # Load existing CA and generate a new certificate
-aranya-certgen signed ca --cn "webserver" --days 365 -f
+aranya-certgen signed ca --cn webserver --days 365 -f
 ```
 
 The `-f` (force) flag overwrites the existing certificate files. The new certificate will:
@@ -93,8 +93,8 @@ CA certificates can also be renewed, but this requires all device certificates t
 aranya-certgen ca --cn "My Company CA" --days 365 -f
 
 # Reissue all device certificates
-aranya-certgen signed ca --cn "webserver" --days 365 -f
-aranya-certgen signed ca --cn "device1" -o device1 --days 365 -f
+aranya-certgen signed ca --cn webserver --days 365 -f
+aranya-certgen signed ca --cn device1 -o device1 --days 365 -f
 # ... repeat for all devices
 ```
 
@@ -106,7 +106,7 @@ certgen:
 ```
 aranya-certgen ca --cn "My Company CA" --days 365
 
-aranya-certgen signed ca --cn "webserver" --days 365
+aranya-certgen signed ca --cn webserver --days 365
 ```
 
 openssl:
