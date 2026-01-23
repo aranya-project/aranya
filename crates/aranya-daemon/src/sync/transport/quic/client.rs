@@ -8,7 +8,7 @@ use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use aranya_runtime::{
-    Command as _, Engine, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
+    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, rustls::SkipServerVerification};
 use buggy::BugExt as _;
@@ -86,17 +86,17 @@ impl QuicState {
     }
 }
 
-impl<EN, SP, EF> SyncState<EN, SP, EF> for QuicState
+impl<PS, SP, EF> SyncState<PS, SP, EF> for QuicState
 where
-    EN: Engine,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Syncs with the peer.
     ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    async fn sync_impl<S: Sink<EN::Effect>>(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+    async fn sync_impl<S: Sink<PS::Effect>>(
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         sink: &mut S,
     ) -> Result<usize> {
@@ -134,7 +134,7 @@ where
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_subscribe_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
@@ -159,7 +159,7 @@ where
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_unsubscribe_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
     ) -> Result<()> {
         syncer
@@ -175,7 +175,7 @@ where
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn broadcast_hello_notifications_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         graph_id: GraphId,
         head: Address,
     ) -> Result<()> {
@@ -183,14 +183,14 @@ where
     }
 }
 
-impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+impl<PS, SP, EF> SyncManager<QuicState, PS, SP, EF>
 where
-    EN: Engine,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Creates a new [`SyncManager`].
     pub(crate) fn new(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
         psk_store: Arc<PskStore>,
         (server_addr, client_addr): (Addr, Addr),
@@ -334,7 +334,7 @@ where
         peer: SyncPeer,
     ) -> Result<usize>
     where
-        S: Sink<EN::Effect>,
+        S: Sink<PS::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
         trace!("client receiving sync response from QUIC sync server");

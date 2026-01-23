@@ -10,7 +10,9 @@ use std::{
 
 use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, Storage as _, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{
+    Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
+};
 use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
@@ -39,9 +41,9 @@ pub(crate) struct HelloSubscription {
 /// Type alias to map a unique [`SyncPeer`] to their associated subscription.
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
 
-impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+impl<PS, SP, EF> SyncManager<QuicState, PS, SP, EF>
 where
-    EN: Engine,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -324,15 +326,15 @@ where
 /// The task will periodically send hello notifications to the subscriber at the specified interval,
 /// regardless of whether the graph has changed. The task will exit when the subscription expires
 /// or the cancellation token is triggered.
-fn spawn_scheduled_hello_sender<EN, SP>(
+fn spawn_scheduled_hello_sender<PS, SP>(
     peer: SyncPeer,
     schedule_delay: Duration,
     expires_at: Instant,
     cancel_token: CancellationToken,
     handle: SyncHandle,
-    client: Client<EN, SP>,
+    client: Client<PS, SP>,
 ) where
-    EN: Engine + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
@@ -386,9 +388,9 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     });
 }
 
-impl<EN, SP> quic::Server<EN, SP>
+impl<PS, SP> quic::Server<PS, SP>
 where
-    EN: Engine + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     /// Processes a hello message.
@@ -397,7 +399,7 @@ where
     #[instrument(skip_all)]
     pub(super) async fn process_hello_message(
         hello_msg: SyncHelloType<Addr>,
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         active_team: &TeamId,
         handle: SyncHandle,
     ) {
