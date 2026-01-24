@@ -25,7 +25,7 @@ use crate::{
     api::{ApiKey, DaemonApiServer, DaemonApiServerArgs},
     aranya,
     config::{Config, Toggle},
-    keystore::{AranyaStore, LocalStore},
+    keystore::AranyaStore,
     policy,
     sync::{
         quic::{CertConfig, QuicState, SyncParams},
@@ -104,8 +104,6 @@ impl Daemon {
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
             let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
-
-            let _local_store = Self::load_local_keystore(&cfg).await?;
 
             // Generate a fresh API key at startup.
             let api_sk = ApiKey::generate(&mut eng);
@@ -308,18 +306,6 @@ impl Daemon {
         KS::open(&dir)
             .context("unable to open Aranya keystore")
             .map(AranyaStore::new)
-    }
-
-    /// Loads the local keystore.
-    ///
-    /// The local keystore contains key material for the daemon.
-    /// E.g., its API key.
-    async fn load_local_keystore(cfg: &Config) -> Result<LocalStore<KS>> {
-        let dir = cfg.local_keystore_path();
-        aranya_util::create_dir_all(&dir).await?;
-        KS::open(&dir)
-            .context("unable to open local keystore")
-            .map(LocalStore::new)
     }
 
     /// Loads the daemon's [`PublicKeys`].

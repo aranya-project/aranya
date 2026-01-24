@@ -152,14 +152,6 @@ impl Config {
         self.keystore_path().join("aranya")
     }
 
-    /// The directory where the local keystore exists.
-    ///
-    /// The local keystore contains key material for the daemon.
-    /// E.g., its API key.
-    pub(crate) fn local_keystore_path(&self) -> PathBuf {
-        self.keystore_path().join("local")
-    }
-
     /// Path to the runtime's storage.
     pub(crate) fn storage_path(&self) -> PathBuf {
         self.state_dir.join("storage")
