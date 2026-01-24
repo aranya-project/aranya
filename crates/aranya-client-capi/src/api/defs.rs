@@ -816,8 +816,6 @@ pub fn create_team_quic_sync_config_generate(
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 #[allow(deprecated)]
@@ -850,8 +848,6 @@ pub struct SeedIkm {
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 #[allow(deprecated)]
@@ -867,8 +863,6 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
@@ -1720,8 +1714,6 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[in] keybundle_len the length of the keybundle
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
-///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaClient.
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]

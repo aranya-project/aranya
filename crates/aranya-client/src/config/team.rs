@@ -14,12 +14,14 @@
 use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
+#[allow(deprecated)]
 pub use quic_sync::{
     AddSeedMode, AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateSeedMode,
     CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder, SEED_IKM_SIZE,
 };
 
 /// Builder for [`CreateTeamConfig`].
+#[allow(deprecated)]
 #[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
@@ -44,6 +46,7 @@ impl CreateTeamConfigBuilder {
 }
 
 /// Builder for [`AddTeamConfig`].
+#[allow(deprecated)]
 #[derive(Debug, Default)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
@@ -83,6 +86,7 @@ impl AddTeamConfigBuilder {
 }
 
 /// Configuration for creating a new team.
+#[allow(deprecated)]
 #[derive(Clone, Debug, Default)]
 pub struct CreateTeamConfig {
     #[allow(dead_code)]
@@ -97,6 +101,7 @@ impl CreateTeamConfig {
 }
 
 /// Configuration for joining an existing team.
+#[allow(deprecated)]
 #[derive(Clone, Debug)]
 pub struct AddTeamConfig {
     pub(crate) id: TeamId,

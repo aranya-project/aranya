@@ -477,11 +477,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
  *
  * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
- *
- * # Deprecation Notice
- *
- * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
- * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
     /**
@@ -496,11 +491,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
  * A builder for initializing a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
  *
  * The [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig) is an optional part of initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
- *
- * # Deprecation Notice
- *
- * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
- * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
     /**
@@ -530,11 +520,6 @@ typedef struct AranyaSeedIkm {
  * QUIC syncer configuration.
  *
  * Use a [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder) to construct this object.
- *
- * # Deprecation Notice
- *
- * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
- * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
     /**
@@ -549,11 +534,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
  * QUIC syncer configuration.
  *
  * Use an [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder) to construct this object.
- *
- * # Deprecation Notice
- *
- * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
- * This type exists for backward compatibility but will be removed in a future release.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfig {
     /**
@@ -1132,8 +1112,6 @@ AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCre
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
- *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg);
@@ -1142,8 +1120,6 @@ AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeam
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
- *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1156,8 +1132,6 @@ AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreate
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
- *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
@@ -1169,8 +1143,6 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQu
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
- *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
@@ -1185,8 +1157,6 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTe
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
- *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
@@ -1197,8 +1167,6 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreate
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
- *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1212,8 +1180,6 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCr
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
- *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
@@ -1224,8 +1190,6 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQu
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] ikm a pointer the raw PSK seed IKM
- *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
@@ -2467,8 +2431,6 @@ AranyaError aranya_rand_ext(const struct AranyaClient *client,
  * @param[out] seed the serialized, encrypted PSK seed.
  * @param[in,out] seed_len the number of bytes written to the seed buffer.
  *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
- *
  * @relates AranyaClient.
  */
 AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
@@ -2493,8 +2455,6 @@ AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
  * @param[in] keybundle_len the length of the keybundle
  * @param[out] seed the serialized, encrypted PSK seed.
  * @param[in,out] seed_len the number of bytes written to the seed buffer.
- *
- * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaClient.
  */
