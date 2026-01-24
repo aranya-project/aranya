@@ -174,6 +174,11 @@ impl DevicesCtx {
         Ok(())
     }
 
+    /// Creates a team and adds it to all devices using deprecated PSK-based APIs.
+    ///
+    /// This function uses deprecated `add_team()`, `CreateTeamQuicSyncConfig`, and
+    /// `AddTeamQuicSyncConfig` APIs to test backward compatibility.
+    #[allow(deprecated)]
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         let seed_ikm = {

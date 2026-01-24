@@ -206,7 +206,11 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 /// Tests creating/assigning/revoking a role.
 /// Verifies query indicates correct role assignment status.
 /// Verifies device is only allowed to perform operation when role with permission is assigned to it.
+///
+/// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
+/// to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
+#[allow(deprecated)]
 async fn test_role_create_assign_revoke() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_role_create_assign_revoke").await?;
@@ -1294,7 +1298,11 @@ async fn test_add_perm_to_created_role() -> Result<()> {
 }
 
 /// Tests that privilege escalation attempt is rejected.
+///
+/// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
+/// to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
+#[allow(deprecated)]
 async fn test_privilege_escalation_rejected() -> Result<()> {
     let team_name = "test_privilege_escalation_rejected";
     let mut devices = DevicesCtx::new(team_name).await?;
