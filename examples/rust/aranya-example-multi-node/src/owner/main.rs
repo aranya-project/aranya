@@ -87,9 +87,7 @@ async fn main() -> Result<()> {
 
         // Send team ID to device.
         info!("owner: sending team info to {}", device.name);
-        onboard
-            .send(&TeamInfo { team_id }, device.tcp_addr)
-            .await?;
+        onboard.send(&TeamInfo { team_id }, device.tcp_addr).await?;
         info!("owner: sent team info to {}", device.name);
 
         // Receive device info from device.

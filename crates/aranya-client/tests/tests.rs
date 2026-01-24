@@ -16,8 +16,12 @@ use std::{ptr, time::Duration};
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::{ChanOp, Permission, RoleId, RoleManagementPermission},
-    config::{CreateTeamConfig, SyncPeerConfig},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    config::SyncPeerConfig,
+};
+// These deprecated types are only used in test_add_team for backward compatibility testing.
+#[allow(deprecated)]
+use aranya_client::{
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::text;
 use test_log::test;
@@ -206,11 +210,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 /// Tests creating/assigning/revoking a role.
 /// Verifies query indicates correct role assignment status.
 /// Verifies device is only allowed to perform operation when role with permission is assigned to it.
-///
-/// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
-/// to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
-#[allow(deprecated)]
 async fn test_role_create_assign_revoke() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_role_create_assign_revoke").await?;
@@ -222,11 +222,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     let owner = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(Default::default())
         .await
         .expect("expected to create team");
     let team_id = owner.team_id();
@@ -255,26 +251,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     info!("adding admin to team");
     owner.add_device(devices.admin.pk.clone(), None).await?;
 
-    // Add team to admin device.
-    let admin_seed = owner
-        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
-        .await?;
-    devices
-        .admin
-        .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
-        .await?;
-
-    // Admin sync with owner.
+    // Admin sync with owner (with mTLS, no add_team call needed).
     admin_team
         .sync_now(owner_addr, None)
         .await
@@ -790,7 +767,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team1 = devices
         .owner
         .client
-        .create_team(CreateTeamConfig::default())
+        .create_team(Default::default())
         .await
         .expect("expected to create team1");
     let team_id1 = team1.team_id();
@@ -800,7 +777,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team2 = devices
         .owner
         .client
-        .create_team(CreateTeamConfig::default())
+        .create_team(Default::default())
         .await
         .expect("expected to create team2");
     let team_id2 = team2.team_id();
@@ -1379,11 +1356,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
 }
 
 /// Tests that privilege escalation attempt is rejected.
-///
-/// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
-/// to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
-#[allow(deprecated)]
 async fn test_privilege_escalation_rejected() -> Result<()> {
     let team_name = "test_privilege_escalation_rejected";
     let mut devices = DevicesCtx::new(team_name).await?;
@@ -1409,22 +1382,6 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     )
     .await?;
     owner_team.add_device(device.pk.clone(), None).await?;
-    let device_seed = owner_team
-        .encrypt_psk_seed_for_peer(device.pk.encryption())
-        .await?;
-    device
-        .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&device_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
-        .await?;
 
     // Owner creates malicious role on team:
     let role = owner_team

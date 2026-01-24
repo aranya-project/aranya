@@ -421,9 +421,9 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // With mTLS authentication, add_team() is no longer needed for non-owner devices.
-    // Devices authenticate via mTLS certificates configured in the daemon,
-    // and can use the team ID directly for operations.
+    // With mTLS authentication, add_team() is no longer needed for non-owner
+    // devices. Devices authenticate via mTLS certificates configured in the
+    // daemon, and can use the team ID directly for operations.
 
     // assign role management permissions.
     err = aranya_assign_role_management_permission(

@@ -39,6 +39,13 @@ pub use aranya_util::Addr;
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
 pub use crate::client::{Permission, RoleManagementPermission};
+// Re-export deprecated config types for backward compatibility
+#[allow(deprecated)]
+#[doc(inline)]
+pub use crate::config::{
+    AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+};
 #[doc(inline)]
 pub use crate::{
     client::{
@@ -47,11 +54,4 @@ pub use crate::{
     },
     config::{SyncPeerConfig, SyncPeerConfigBuilder},
     error::{ConfigError, Error, Result},
-};
-// Re-export deprecated config types for backward compatibility
-#[allow(deprecated)]
-#[doc(inline)]
-pub use crate::config::{
-    AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
 };

@@ -6,8 +6,13 @@ use anyhow::{anyhow, Context, Result};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
+    Addr, SyncPeerConfig,
+};
+// These deprecated types are only used in create_and_add_team for backward compatibility testing.
+#[allow(deprecated)]
+use aranya_client::{
     config::{CreateTeamConfig, SEED_IKM_SIZE},
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
