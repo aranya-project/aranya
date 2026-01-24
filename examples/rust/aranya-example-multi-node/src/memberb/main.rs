@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{afc::Channels, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     get_member_peer,
@@ -55,21 +55,10 @@ async fn main() -> Result<()> {
     let team_info: TeamInfo = onboard.recv().await?;
     info!("memberb: received team info from owner");
 
-    // Add team.
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(team_info.seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_info.team_id)
-            .build()?
-    };
-    let team = client
-        .add_team(add_team_cfg.clone())
-        .await
-        .expect("expected to add team");
-    info!("memberb: added team");
+    // Get team handle.
+    // With mTLS authentication, devices authenticate via certificates configured in the daemon.
+    let team = client.team(team_info.team_id);
+    info!("memberb: got team handle");
 
     // Send device info to owner.
     info!("memberb: sending device info to owner");
