@@ -39,36 +39,59 @@ pub enum AddSeedMode {
 }
 
 /// Configuration for creating a new team with QUIC synchronization.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[allow(deprecated)]
 #[derive(Clone, Debug)]
 pub struct CreateTeamQuicSyncConfig {
+    // Field is unused because PSK seeds are deprecated with mTLS authentication.
+    // Kept for backward compatibility with existing API consumers.
     #[allow(dead_code)]
     mode: CreateSeedMode,
 }
 
+#[allow(deprecated)]
 impl CreateTeamQuicSyncConfig {
     /// Creates a new builder for team creation configuration.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
         CreateTeamQuicSyncConfigBuilder::default()
     }
 }
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[allow(deprecated)]
 #[derive(Clone, Debug)]
 pub struct AddTeamQuicSyncConfig {
+    // Field is unused because PSK seeds are deprecated with mTLS authentication.
+    // Kept for backward compatibility with existing API consumers.
     #[allow(dead_code)]
     mode: AddSeedMode,
 }
 
+#[allow(deprecated)]
 impl AddTeamQuicSyncConfig {
     /// Creates a new builder for team member addition configuration.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         AddTeamQuicSyncConfigBuilder::default()
     }
 }
 
 /// Builder for [`CreateTeamQuicSyncConfig`]
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[allow(deprecated)]
 #[derive(Debug, Default)]
 pub struct CreateTeamQuicSyncConfigBuilder {
@@ -110,6 +133,11 @@ impl CreateTeamQuicSyncConfigBuilder {
 }
 
 /// Builder for [`AddTeamQuicSyncConfig`]
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[allow(deprecated)]
 #[derive(Debug, Default)]
 pub struct AddTeamQuicSyncConfigBuilder {

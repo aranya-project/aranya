@@ -1,3 +1,7 @@
+// Allow deprecated types in this module - it provides backward compatibility
+// for the deprecated team config types during the mTLS migration.
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};

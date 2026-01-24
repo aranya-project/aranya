@@ -776,18 +776,33 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// QUIC syncer configuration.
 ///
 /// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
 ///
 /// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
 
 /// A builder for initializing an [`AddTeamQuicSyncConfig`].
 ///
 /// The [`AddTeamQuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`].
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
@@ -795,6 +810,11 @@ pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 /// A builder for initializing a [`CreateTeamQuicSyncConfig`].
 ///
 /// The [`CreateTeamQuicSyncConfig`] is an optional part of initializing a [`CreateTeamConfig`].
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
@@ -803,7 +823,13 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
+///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[allow(deprecated)]
 pub fn create_team_quic_sync_config_generate(
     cfg: &mut CreateTeamQuicSyncConfigBuilder,
 ) -> Result<(), imp::Error> {
@@ -883,7 +909,13 @@ pub fn add_team_quic_sync_config_raw_seed_ikm(
 /// @param[in] cfg a pointer to the QUIC sync config builder
 /// @param[out] out a pointer to write the QUIC sync config to
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
+///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[allow(deprecated)]
 pub fn create_team_quic_sync_config_build(
     cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
     out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
@@ -901,7 +933,13 @@ pub fn create_team_quic_sync_config_build(
 /// @param[in] cfg a pointer to the QUIC sync config builder
 /// @param[out] out a pointer to write the QUIC sync config to
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
+///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[allow(deprecated)]
 pub fn add_team_quic_sync_config_build(
     cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
     out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
@@ -914,10 +952,22 @@ pub fn add_team_quic_sync_config_build(
 /// Team configuration used when joining a team.
 ///
 /// Use an [`AddTeamConfigBuilder`] to construct this object.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, use the team ID directly
+/// instead of this config type.
+#[deprecated(note = "Use team ID directly - config types are no longer needed with mTLS")]
 #[aranya_capi_core::opaque(size = 320, align = 8)]
 pub type AddTeamConfig = Safe<imp::AddTeamConfig>;
 
 /// A builder for initializing an [`AddTeamConfig`].
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, use the team ID directly
+/// instead of this config type.
+#[deprecated(note = "Use team ID directly - config types are no longer needed with mTLS")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 328, align = 8)]
 pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
@@ -925,10 +975,20 @@ pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
 /// Team configuration used when creating a team.
 ///
 /// Use a [`CreateTeamConfigBuilder`] to construct this object.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, config types are no longer needed.
+#[deprecated(note = "Config types are no longer needed with mTLS authentication")]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
 
 /// A builder for initializing a [`CreateTeamConfig`].
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, config types are no longer needed.
+#[deprecated(note = "Config types are no longer needed with mTLS authentication")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
@@ -940,7 +1000,13 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 /// @param[in,out] cfg a pointer to the builder for a team config
 /// @param[in] quic set the QUIC syncer config
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
+///
 /// @relates AranyaAddTeamConfigBuilder.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[allow(deprecated)]
 pub fn add_team_config_builder_set_quic_syncer(
     cfg: &mut AddTeamConfigBuilder,
     quic: OwnedPtr<AddTeamQuicSyncConfig>,
@@ -957,7 +1023,13 @@ pub fn add_team_config_builder_set_quic_syncer(
 /// @param[in,out] cfg a pointer to the builder for a team config
 /// @param[in] id a pointer to a
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, use the team ID directly.
+///
 /// @relates AranyaAddTeamConfigBuilder.
+#[deprecated(note = "Use team ID directly - config types are no longer needed with mTLS")]
+#[allow(deprecated)]
 pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &TeamId) {
     cfg.id(*team_id);
 }
@@ -970,7 +1042,13 @@ pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &
 /// @param[in] cfg a pointer to the team config builder
 /// @param[out] out a pointer to write the team config to
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, use the team ID directly.
+///
 /// @relates AranyaAddTeamConfigBuilder.
+#[deprecated(note = "Use team ID directly - config types are no longer needed with mTLS")]
+#[allow(deprecated)]
 pub fn add_team_config_build(
     cfg: OwnedPtr<AddTeamConfigBuilder>,
     out: &mut MaybeUninit<AddTeamConfig>,
@@ -987,7 +1065,13 @@ pub fn add_team_config_build(
 /// @param[in,out] cfg a pointer to the builder for a team config
 /// @param[in] quic set the QUIC syncer config
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
+///
 /// @relates AranyaCreateTeamConfigBuilder.
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[allow(deprecated)]
 pub fn create_team_config_builder_set_quic_syncer(
     cfg: &mut CreateTeamConfigBuilder,
     quic: OwnedPtr<CreateTeamQuicSyncConfig>,
@@ -1005,7 +1089,13 @@ pub fn create_team_config_builder_set_quic_syncer(
 /// @param[in] cfg a pointer to the team config builder
 /// @param[out] out a pointer to write the team config to
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, config types are no longer needed.
+///
 /// @relates AranyaCreateTeamConfigBuilder.
+#[deprecated(note = "Config types are no longer needed with mTLS authentication")]
+#[allow(deprecated)]
 pub fn create_team_config_build(
     cfg: OwnedPtr<CreateTeamConfigBuilder>,
     out: &mut MaybeUninit<CreateTeamConfig>,
@@ -1752,7 +1842,14 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// @param[in] client the Aranya Client
 /// @param[in] cfg the Team Configuration
 ///
+/// # Deprecated
+///
+/// This function is deprecated. With mTLS authentication, use the team ID directly
+/// instead of adding teams via config.
+///
 /// @relates AranyaClient.
+#[deprecated(note = "Use team ID directly - add_team is no longer needed with mTLS")]
+#[allow(deprecated)]
 pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
     let cfg: &imp::AddTeamConfig = cfg.deref();
     client.rt.block_on(client.inner.add_team(cfg.into()))?;

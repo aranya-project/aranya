@@ -271,41 +271,11 @@ AranyaError init_team(Team *t) {
     }
 
     // Setup team config for owner device.
-    AranyaCreateTeamQuicSyncConfigBuilder owner_quic_build;
-    err = aranya_create_team_quic_sync_config_builder_init(&owner_quic_build);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to init `AranyaCreateTeamQuicSyncConfigBuilder`\n");
-        return err;
-    }
-
-    err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` "
-                        "generate mode\n");
-        return err;
-    }
-
-    AranyaCreateTeamQuicSyncConfig owner_quic_cfg;
-    err = aranya_create_team_quic_sync_config_build(&owner_quic_build,
-                                                    &owner_quic_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaCreateTeamQuicSyncConfig`\n");
-        return err;
-    }
-
+    // With mTLS authentication, QUIC sync config is no longer needed.
     AranyaCreateTeamConfigBuilder owner_build;
     err = aranya_create_team_config_builder_init(&owner_build);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to init `AranyaCreateTeamConfigBuilder`\n");
-        return err;
-    }
-
-    err = aranya_create_team_config_builder_set_quic_syncer(&owner_build,
-                                                            &owner_quic_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set `CreateQuicSyncConfig` for "
-                        "`AranyaTeamConfigBuilder`\n");
         return err;
     }
 
@@ -451,43 +421,9 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add_team() for each non-owner device
-    // With mTLS authentication, PSK seeds are no longer needed.
-    // Devices authenticate via mTLS certificates configured in the daemon.
-    for (int i = 1; i < NUM_CLIENTS; i++) {
-        printf("add_team() client: %s\n", client_names[i]);
-
-        AranyaAddTeamConfigBuilder build;
-        err = aranya_add_team_config_builder_init(&build);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder`\n");
-            return err;
-        }
-
-        err = aranya_add_team_config_builder_set_id(&build, &t->id);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `Id` for `AranyaAddTeamConfigBuilder`\n");
-            return err;
-        }
-
-        // NB: A builder's "_build" method consumes the builder, so
-        // do _not_ call "_cleanup" afterward.
-        AranyaAddTeamConfig cfg;
-        err = aranya_add_team_config_build(&build, &cfg);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaAddTeamConfig`\n");
-            return err;
-        }
-
-        Client *client = &t->clients_arr[i];
-        err = aranya_add_team(&client->client, &cfg);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to add_team() for client: %s\n",
-                    client_names[i]);
-            return err;
-        }
-    }
+    // With mTLS authentication, add_team() is no longer needed for non-owner devices.
+    // Devices authenticate via mTLS certificates configured in the daemon,
+    // and can use the team ID directly for operations.
 
     // assign role management permissions.
     err = aranya_assign_role_management_permission(
@@ -1120,10 +1056,7 @@ typedef struct {
     AranyaError result;
 } channel_context_t;
 
-int main(int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
-
+int main(void) {
     Team team = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
 

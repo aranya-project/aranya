@@ -477,6 +477,10 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
  *
  * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
     /**
@@ -491,6 +495,10 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
  * A builder for initializing a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
  *
  * The [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig) is an optional part of initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
     /**
@@ -520,6 +528,10 @@ typedef struct AranyaSeedIkm {
  * QUIC syncer configuration.
  *
  * Use a [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder) to construct this object.
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
     /**
@@ -534,6 +546,10 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
  * QUIC syncer configuration.
  *
  * Use an [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder) to construct this object.
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfig {
     /**
@@ -546,6 +562,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfig {
 
 /**
  * A builder for initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, use the team ID directly
+ * instead of this config type.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfigBuilder {
     /**
@@ -558,6 +579,10 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfigBuilder {
 
 /**
  * A builder for initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, config types are no longer needed.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfigBuilder {
     /**
@@ -579,6 +604,11 @@ typedef struct AranyaTeamId {
  * Team configuration used when joining a team.
  *
  * Use an [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder) to construct this object.
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, use the team ID directly
+ * instead of this config type.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfig {
     /**
@@ -593,6 +623,10 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfig {
  * Team configuration used when creating a team.
  *
  * Use a [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder) to construct this object.
+ *
+ * # Deprecated
+ *
+ * This type is deprecated. With mTLS authentication, config types are no longer needed.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfig {
     /**
@@ -1112,6 +1146,10 @@ AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCre
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg);
@@ -1120,6 +1158,10 @@ AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeam
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1206,6 +1248,10 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTe
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
@@ -1219,6 +1265,10 @@ AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQui
  *
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1235,6 +1285,10 @@ AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTea
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
@@ -1248,6 +1302,10 @@ AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncC
  *
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
@@ -1301,6 +1359,10 @@ AranyaError aranya_create_team_config_builder_cleanup(struct AranyaCreateTeamCon
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
+ *
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamConfigBuilder *cfg,
@@ -1313,6 +1375,10 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  *
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1328,6 +1394,10 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddT
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] id a pointer to a
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, use the team ID directly.
+ *
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuilder *cfg,
@@ -1340,6 +1410,10 @@ AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuil
  *
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] id a pointer to a
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, use the team ID directly.
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1356,6 +1430,10 @@ AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfig
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, use the team ID directly.
+ *
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
@@ -1369,6 +1447,10 @@ AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
  *
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, use the team ID directly.
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1384,6 +1466,10 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
+ *
  * @relates AranyaCreateTeamConfigBuilder.
  */
 AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreateTeamConfigBuilder *cfg,
@@ -1396,6 +1482,10 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  *
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1412,6 +1502,10 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaC
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, config types are no longer needed.
+ *
  * @relates AranyaCreateTeamConfigBuilder.
  */
 AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder *cfg,
@@ -1425,6 +1519,10 @@ AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder
  *
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, config types are no longer needed.
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -2472,6 +2570,11 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(const struct AranyaClient *clie
  * @param[in] client the Aranya Client
  * @param[in] cfg the Team Configuration
  *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, use the team ID directly
+ * instead of adding teams via config.
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team(const struct AranyaClient *client,
@@ -2482,6 +2585,11 @@ AranyaError aranya_add_team(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] cfg the Team Configuration
+ *
+ * # Deprecated
+ *
+ * This function is deprecated. With mTLS authentication, use the team ID directly
+ * instead of adding teams via config.
  *
  * @relates AranyaClient.
  */

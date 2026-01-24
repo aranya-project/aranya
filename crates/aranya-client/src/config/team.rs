@@ -21,23 +21,31 @@ pub use quic_sync::{
 };
 
 /// Builder for [`CreateTeamConfig`].
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, config types are no longer needed.
+#[deprecated(note = "Config types are no longer needed with mTLS authentication")]
 #[allow(deprecated)]
 #[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
+#[allow(deprecated)]
 impl CreateTeamConfigBuilder {
     /// Configures the quic_sync config..
     ///
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
         self.quic_sync = Some(cfg);
         self
     }
 
     /// Builds the configuration for creating a new team.
+    #[deprecated(note = "Config types are no longer needed with mTLS authentication")]
     pub fn build(self) -> Result<CreateTeamConfig> {
         Ok(CreateTeamConfig {
             quic_sync: self.quic_sync,
@@ -46,6 +54,12 @@ impl CreateTeamConfigBuilder {
 }
 
 /// Builder for [`AddTeamConfig`].
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, use the team ID directly
+/// instead of this config type.
+#[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
 #[allow(deprecated)]
 #[derive(Debug, Default)]
 pub struct AddTeamConfigBuilder {
@@ -53,8 +67,10 @@ pub struct AddTeamConfigBuilder {
     quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
+#[allow(deprecated)]
 impl AddTeamConfigBuilder {
     /// Sets the ID of the team to add.
+    #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
     pub fn team_id(mut self, id: TeamId) -> Self {
         self.id = Some(id);
         self
@@ -64,12 +80,14 @@ impl AddTeamConfigBuilder {
     ///
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn quic_sync(mut self, cfg: AddTeamQuicSyncConfig) -> Self {
         self.quic_sync = Some(cfg);
         self
     }
 
     /// Attempts to build an [`AddTeamConfig`] using the provided parameters.
+    #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
     pub fn build(self) -> Result<AddTeamConfig> {
         let id = self.id.ok_or_else(|| {
             ConfigError::InvalidArg(InvalidArg::new(
@@ -86,31 +104,50 @@ impl AddTeamConfigBuilder {
 }
 
 /// Configuration for creating a new team.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, config types are no longer needed.
+#[deprecated(note = "Config types are no longer needed with mTLS authentication")]
 #[allow(deprecated)]
 #[derive(Clone, Debug, Default)]
 pub struct CreateTeamConfig {
+    // Field is unused because PSK seeds are deprecated with mTLS authentication.
+    // Kept for backward compatibility with existing API consumers.
     #[allow(dead_code)]
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
+#[allow(deprecated)]
 impl CreateTeamConfig {
     /// Creates a default [`CreateTeamConfigBuilder`].
+    #[deprecated(note = "Config types are no longer needed with mTLS authentication")]
     pub fn builder() -> CreateTeamConfigBuilder {
         CreateTeamConfigBuilder::default()
     }
 }
 
 /// Configuration for joining an existing team.
+///
+/// # Deprecated
+///
+/// This type is deprecated. With mTLS authentication, use the team ID directly
+/// instead of this config type.
+#[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
 #[allow(deprecated)]
 #[derive(Clone, Debug)]
 pub struct AddTeamConfig {
     pub(crate) id: TeamId,
+    // Field is unused because PSK seeds are deprecated with mTLS authentication.
+    // Kept for backward compatibility with existing API consumers.
     #[allow(dead_code)]
     quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
+#[allow(deprecated)]
 impl AddTeamConfig {
     /// Creates a default [`AddTeamConfigBuilder`].
+    #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
     pub fn builder() -> AddTeamConfigBuilder {
         AddTeamConfigBuilder::default()
     }
