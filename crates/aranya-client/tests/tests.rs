@@ -631,6 +631,87 @@ async fn test_query_functions() -> Result<()> {
     Ok(())
 }
 
+/// Tests add_team() by demonstrating that syncing can only occur after
+/// a peer calls the add_team() API.
+///
+/// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
+/// to verify backward compatibility.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[allow(deprecated)]
+async fn test_add_team() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let devices = DevicesCtx::new("test_add_team").await?;
+
+    // Grab the shorthand for our address.
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+
+    // Create the initial team, and get our TeamId.
+    let owner = devices
+        .owner
+        .client
+        .create_team({
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
+                .build()?
+        })
+        .await
+        .expect("expected to create team");
+    let team_id = owner.team_id();
+    info!(?team_id);
+
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    // Add the admin as a new device.
+    info!("adding admin to team");
+    owner.add_device(devices.admin.pk.clone(), None).await?;
+
+    // Add the operator as a new device.
+    info!("adding operator to team");
+    owner.add_device(devices.operator.pk.clone(), None).await?;
+
+    // Give the admin its role.
+    owner
+        .device(devices.admin.id)
+        .assign_role(roles.admin().id)
+        .await?;
+
+    // Note: With mTLS, sync_now will succeed even without add_team() being called,
+    // because authentication is handled via certificates. However, the admin won't
+    // have the PSK seed needed for the deprecated PSK-based sync flow.
+    // This test verifies the deprecated add_team() API still works for backward compatibility.
+
+    let admin_seed = owner
+        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
+        .await?;
+    devices
+        .admin
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&admin_seed)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+    {
+        let admin = devices.admin.client.team(team_id);
+        admin.sync_now(owner_addr, None).await?;
+
+        // Now we should be able to successfully assign a role.
+        admin
+            .device(devices.operator.id)
+            .assign_role(roles.operator().id)
+            .await
+            .context("Assigning a role should not fail here!")?;
+    }
+
+    Ok(())
+}
+
 /// Tests that devices can be removed from the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_team() -> Result<()> {
