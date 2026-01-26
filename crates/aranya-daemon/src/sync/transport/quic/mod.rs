@@ -7,9 +7,9 @@
 //! If a QUIC connection does not exist with a certain peer, a new QUIC connection will be created.
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
-use std::{convert::Infallible, path::PathBuf, sync::Arc};
+use std::{convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
 
-use quinn::TransportConfig;
+use quinn::{IdleTimeout, TransportConfig};
 
 mod certs;
 mod client;
@@ -23,12 +23,21 @@ pub(crate) use server::Server;
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 
-/// Creates a QUIC transport configuration that keeps connections alive indefinitely.
+/// Creates a QUIC transport configuration with keep-alive enabled.
 ///
-/// Disables idle timeout so connections can be reused across multiple sync operations.
+/// Sends keep-alive pings every 30 seconds with a 90-second idle timeout. This allows
+/// 2-3 missed pings before the connection is considered dead, while still enabling
+/// connection reuse across multiple sync operations.
 fn keep_alive_transport_config() -> Arc<TransportConfig> {
     let mut transport_config = TransportConfig::default();
-    transport_config.max_idle_timeout(None);
+    // Send keep-alive pings to prevent connections from timing out during idle periods.
+    let keep_alive_interval = Duration::from_secs(30);
+    transport_config.keep_alive_interval(Some(keep_alive_interval));
+    // Idle timeout is 3x the keep-alive interval so a single dropped ping
+    // won't close the connection, but several in a row will.
+    transport_config.max_idle_timeout(Some(
+        IdleTimeout::try_from(keep_alive_interval * 3).expect("valid idle timeout"),
+    ));
     Arc::new(transport_config)
 }
 
