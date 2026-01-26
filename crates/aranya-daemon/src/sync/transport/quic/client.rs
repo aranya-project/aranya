@@ -25,6 +25,31 @@ use crate::{
     },
 };
 
+/// Finds a resolved address that matches the IP version of the local endpoint.
+///
+/// QUIC connections require both endpoints to use the same IP version - an IPv4-bound
+/// endpoint cannot connect to an IPv6 address and vice versa. When a hostname resolves
+/// to multiple addresses (both A and AAAA records), we must select one that matches
+/// our local endpoint's IP version.
+///
+/// # Arguments
+/// * `addrs` - List of resolved socket addresses from DNS lookup
+/// * `local_addr` - The local endpoint's bound address
+///
+/// # Returns
+/// * `Some(SocketAddr)` - A resolved address matching the local IP version
+/// * `None` - No matching address found
+fn find_matching_ip_version(
+    addrs: impl IntoIterator<Item = std::net::SocketAddr>,
+    local_addr: std::net::SocketAddr,
+) -> Option<std::net::SocketAddr> {
+    if local_addr.is_ipv4() {
+        addrs.into_iter().find(|a| a.is_ipv4())
+    } else {
+        addrs.into_iter().find(|a| a.is_ipv6())
+    }
+}
+
 /// QUIC syncer state used for sending sync requests and processing sync responses
 #[derive(Debug)]
 pub(crate) struct QuicState {
@@ -188,19 +213,16 @@ where
 
         let endpoint = &self.state.endpoint;
 
-        // Get the local address to determine IP version (IPv4 vs IPv6).
-        // We need to filter DNS results to match the endpoint's IP version
-        // because QUIC can't connect to IPv6 from an IPv4-bound endpoint.
         let local_addr = endpoint
             .local_addr()
             .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
-        let local_is_ipv4 = local_addr.is_ipv4();
 
-        let addr = tokio::net::lookup_host(peer.addr.to_socket_addrs())
+        let addrs = tokio::net::lookup_host(peer.addr.to_socket_addrs())
             .await
-            .context("DNS lookup for peer address")?
-            .find(|addr| addr.is_ipv4() == local_is_ipv4)
-            .context("could not resolve peer address to matching IP version")?;
+            .context("DNS lookup for peer address")?;
+
+        let addr = find_matching_ip_version(addrs, local_addr)
+            .context("no resolved address matches local endpoint IP version")?;
 
         let key = ConnectionKey::new(addr);
         let client_config = self.state.client_config.clone();
