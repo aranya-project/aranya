@@ -49,7 +49,21 @@ args = ["build", "--verbose", "--release", "--package=aranya-daemon", "--feature
 [tasks.tgz-daemon]
 category = "build"
 description = "Archive daemon"
+dependencies = ["build"]
 script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
+
+# Build aranya-certgen
+[tasks.build-certgen]
+category = "build"
+description = "Build aranya-certgen CLI tool"
+command = "cargo"
+args = ["build", "--verbose", "--release", "--package=aranya-certgen", "--features=cli", "${@}"]
+
+[tasks.tgz-certgen]
+category = "build"
+description = "Archive aranya-certgen"
+dependencies = ["build-certgen"]
+script = "tar -czf aranya-certgen.tar.gz -C target/release aranya-certgen"
 
 # Build the `aranya-client-capi` C API.
 [tasks.build-capi]
