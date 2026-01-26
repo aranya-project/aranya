@@ -272,7 +272,7 @@ impl Daemon {
         let (send_effects, recv_effects) = mpsc::channel(256);
 
         // Create the sync server with mTLS
-        let (server, peers, conns, syncer_recv, local_addr, endpoint, client_config) =
+        let (server, peers, conns, syncer_recv, endpoint, client_config) =
             SyncServer::new(client.clone(), &server_addr, &cert_config)
                 .await
                 .context("unable to initialize QUIC sync server")?;
@@ -281,7 +281,6 @@ impl Daemon {
         let syncer = SyncManager::new(
             client.clone(),
             send_effects,
-            local_addr.into(),
             syncer_recv,
             conns,
             endpoint,

@@ -78,6 +78,14 @@ impl QuicState {
             conns,
         }
     }
+
+    /// Returns the local address of the QUIC endpoint.
+    ///
+    /// Since we use the same endpoint for both client and server operations,
+    /// this address serves as both our client source address and our server address.
+    pub(super) fn local_addr(&self) -> std::result::Result<Addr, std::io::Error> {
+        self.endpoint.local_addr().map(Addr::from)
+    }
 }
 
 impl<EN, SP, EF> SyncState<EN, SP, EF> for QuicState
@@ -99,7 +107,11 @@ where
             .await
             .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
 
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, syncer.server_addr);
+        let local_addr = syncer
+            .state
+            .local_addr()
+            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
+        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, local_addr);
 
         // send sync request.
         syncer
@@ -126,13 +138,17 @@ where
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
+        let local_addr = syncer
+            .state
+            .local_addr()
+            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
         syncer
             .send_sync_hello_subscribe_request(
                 peer,
                 graph_change_delay,
                 duration,
                 schedule_delay,
-                syncer.server_addr,
+                local_addr,
             )
             .await
     }
@@ -144,8 +160,12 @@ where
         syncer: &mut SyncManager<Self, EN, SP, EF>,
         peer: SyncPeer,
     ) -> Result<()> {
+        let local_addr = syncer
+            .state
+            .local_addr()
+            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
         syncer
-            .send_hello_unsubscribe_request(peer, syncer.server_addr)
+            .send_hello_unsubscribe_request(peer, local_addr)
             .await
     }
 
@@ -174,7 +194,6 @@ where
     pub(crate) fn new(
         client: Client<EN, SP>,
         send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
-        server_addr: Addr,
         recv: mpsc::Receiver<Callback>,
         conns: SharedConnectionMap,
         endpoint: Endpoint,
@@ -189,7 +208,6 @@ where
             queue: DelayQueue::new(),
             send_effects,
             state,
-            server_addr,
             #[cfg(feature = "preview")]
             hello_tasks: tokio::task::JoinSet::new(),
         }

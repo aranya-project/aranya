@@ -49,7 +49,7 @@ use tracing::{error, info, instrument, warn};
 
 use super::{
     handle::{Callback, ManagerMessage},
-    Addr, GraphId, Result, SyncPeer, SyncState,
+    GraphId, Result, SyncPeer, SyncState,
 };
 use crate::{aranya::Client, vm_policy::VecSink};
 
@@ -73,8 +73,6 @@ pub(crate) struct SyncManager<ST, EN, SP, EF> {
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Additional state used by the syncer.
     pub(super) state: ST,
-    /// Sync server address. Peers will make incoming connections to us on this address.
-    pub(super) server_addr: Addr,
     /// Tracks spawned hello notification tasks for lifecycle management.
     #[cfg(feature = "preview")]
     pub(super) hello_tasks: JoinSet<()>,

@@ -264,10 +264,15 @@ where
         peer: SyncPeer,
         head: Address,
     ) -> Result<()> {
+        let local_addr = self
+            .state
+            .local_addr()
+            .map_err(|e| quic::Error::EndpointError(format!("unable to get local address: {e}")))?;
+
         // Create the hello message
         let hello_msg = SyncHelloType::Hello {
             head,
-            address: self.server_addr,
+            address: local_addr,
         };
         let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
 

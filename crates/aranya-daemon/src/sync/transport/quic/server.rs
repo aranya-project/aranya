@@ -83,7 +83,6 @@ where
         SyncHandle,
         SharedConnectionMap,
         mpsc::Receiver<Callback>,
-        SocketAddr,
         Endpoint,
         quinn::ClientConfig,
     )> {
@@ -155,7 +154,6 @@ where
             sync_peers,
             conns,
             syncer_recv,
-            local_addr,
             endpoint,
             client_config,
         ))

@@ -267,14 +267,13 @@ impl TestCtx {
             let (send_effects, effects_recv) = mpsc::channel(1);
 
             // Create server first to get the actual listening address
-            let (server, _sync_peers, conn_map, syncer_recv, local_addr, endpoint, client_config) =
+            let (server, _sync_peers, conn_map, syncer_recv, endpoint, client_config) =
                 TestServer::new(client.clone(), &any_local_addr, &cert_config).await?;
 
             // Create syncer with the actual server address
             let syncer = TestSyncer::new(
                 client.clone(),
                 send_effects,
-                local_addr.into(),
                 syncer_recv,
                 conn_map,
                 endpoint,
