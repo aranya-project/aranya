@@ -8,7 +8,6 @@
 
 use std::{convert::Infallible, sync::Arc};
 
-use s2n_quic::provider::StartError;
 use tracing::error;
 
 use super::SyncState;
@@ -19,6 +18,7 @@ mod connections;
 mod psk;
 mod server;
 mod stream;
+mod transport;
 
 pub(crate) use client::QuicState;
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
@@ -41,12 +41,9 @@ pub(crate) enum Error {
     /// Invalid PSK used for syncing
     #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
-    /// QUIC client endpoint start error
-    #[error("could not start QUIC client")]
-    ClientStart(#[source] StartError),
     /// QUIC server endpoint start error
     #[error("could not start QUIC server")]
-    ServerStart(#[source] StartError),
+    ServerStart(#[source] s2n_quic::provider::StartError),
 
     #[error(transparent)]
     Send(s2n_quic::stream::Error),
@@ -54,6 +51,18 @@ pub(crate) enum Error {
     Receive(std::io::Error),
     #[error(transparent)]
     Finish(s2n_quic::stream::Error),
+
+    /// QUIC client endpoint start error
+    #[error("could not start QUIC client")]
+    ClientStart(#[source] s2n_quic::provider::StartError),
+
+    /// Encountered a bug in the program.
+    #[error(transparent)]
+    Bug(#[from] buggy::Bug),
+
+    /// Something has gone wrong.
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 impl From<Infallible> for Error {

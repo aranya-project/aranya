@@ -65,3 +65,11 @@ pub(crate) trait SyncStream: Send + 'static {
     async fn receive(&mut self, buffer: &mut Vec<u8>) -> Result<(), Self::Error>;
     async fn finish(&mut self) -> Result<(), Self::Error>;
 }
+
+#[async_trait::async_trait]
+pub(crate) trait SyncTransport: Send + 'static {
+    type Error: std::error::Error + Send + Sync + 'static;
+    type Stream: SyncStream<Error = Self::Error>;
+
+    async fn connect(&self, peer: SyncPeer) -> Result<Self::Stream, Self::Error>;
+}
