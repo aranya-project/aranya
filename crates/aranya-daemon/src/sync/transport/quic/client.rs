@@ -261,7 +261,7 @@ where
     /// # Returns
     /// * `Ok(())` if the sync request was sent successfully
     /// * `Err(SyncError)` if there was an error generating or sending the request
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(peer = ?peer))]
     async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
@@ -302,7 +302,7 @@ where
     /// Receives and processes a sync response from the server.
     ///
     /// Returns the number of commands that were received and successfully processed.
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(peer = ?peer))]
     async fn receive_sync_response<S, A>(
         &self,
         recv: &mut RecvStream,
