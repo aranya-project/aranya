@@ -61,15 +61,15 @@ impl SharedConnectionMap {
     /// If the connection does not match the one in the map (by stable_id),
     /// it has been replaced and does not need to be removed.
     pub(super) async fn remove(&mut self, key: ConnectionKey, conn: Connection) {
-        let mut guard = self.connections.lock().await;
-        let Entry::Occupied(entry) = guard.entry(key) else {
-            return;
-        };
-        if entry.get().stable_id() != conn.stable_id() {
-            return;
+        match self.connections.lock().await.entry(key) {
+            Entry::Vacant(_) => {}
+            Entry::Occupied(entry) => {
+                if entry.get().stable_id() == conn.stable_id() {
+                    entry.remove();
+                    conn.close(0u32.into(), b"connection closed");
+                }
+            }
         }
-        entry.remove();
-        conn.close(0u32.into(), b"connection closed");
     }
 
     /// Gets an existing connection or creates a new one using the provided closure.
