@@ -997,6 +997,8 @@ async fn test_hello_subscription() -> Result<()> {
             admin_addr,
             HelloSubscriptionConfig::builder()
                 .graph_change_delay(Duration::from_millis(100))
+                .expiration(Duration::from_secs(120))
+                .periodic_interval(Duration::from_secs(60))
                 .build()?,
         )
         .await?;
@@ -1082,6 +1084,8 @@ async fn test_hello_subscription() -> Result<()> {
             owner_addr,
             HelloSubscriptionConfig::builder()
                 .graph_change_delay(Duration::from_millis(1000))
+                .expiration(Duration::from_secs(120))
+                .periodic_interval(Duration::from_secs(60))
                 .build()?,
         )
         .await?;
@@ -1093,6 +1097,8 @@ async fn test_hello_subscription() -> Result<()> {
             owner_addr,
             HelloSubscriptionConfig::builder()
                 .graph_change_delay(Duration::from_millis(2000))
+                .expiration(Duration::from_secs(120))
+                .periodic_interval(Duration::from_secs(60))
                 .build()?,
         )
         .await?;
@@ -1101,6 +1107,8 @@ async fn test_hello_subscription() -> Result<()> {
             admin_addr,
             HelloSubscriptionConfig::builder()
                 .graph_change_delay(Duration::from_millis(1500))
+                .expiration(Duration::from_secs(120))
+                .periodic_interval(Duration::from_secs(60))
                 .build()?,
         )
         .await?;
@@ -1119,6 +1127,8 @@ async fn test_hello_subscription() -> Result<()> {
             owner_addr,
             HelloSubscriptionConfig::builder()
                 .graph_change_delay(Duration::from_millis(100))
+                .expiration(Duration::from_secs(120))
+                .periodic_interval(Duration::from_secs(60))
                 .build()?,
         )
         .await?;
