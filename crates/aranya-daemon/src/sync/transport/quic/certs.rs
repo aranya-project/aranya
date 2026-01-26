@@ -191,7 +191,9 @@ pub fn load_device_cert(
         certs.len()
     );
 
-    // Load private key
+    // Load private key.
+    // With the `alloc` feature enabled on rustls-pki-types, PrivateKeyDer uses
+    // Zeroizing<Vec<u8>> internally, ensuring key bytes are zeroized on drop.
     let key_file = File::open(key_path).map_err(|e| CertError::OpenFile {
         path: key_path.to_path_buf(),
         source: e,
