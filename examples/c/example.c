@@ -717,14 +717,14 @@ AranyaError run(Team *t) {
 #ifdef ENABLE_ARANYA_PREVIEW
     printf("demonstrating hello subscription\n");
 
-    // Admin subscribes to hello notifications from Owner with 2-second delay
+    // Admin subscribes to hello notifications from Owner with 1-second delay
     printf("admin subscribing to hello notifications from owner\n");
     AranyaHelloSubscriptionConfigBuilder hello_cfg_builder;
     AranyaHelloSubscriptionConfig hello_cfg;
     err = aranya_hello_subscription_config_builder_init(&hello_cfg_builder);
     EXPECT("error initializing hello subscription config builder", err);
     aranya_hello_subscription_config_builder_set_graph_change_delay(
-        &hello_cfg_builder, ARANYA_DURATION_SECONDS * 2ULL);
+        &hello_cfg_builder, ARANYA_DURATION_SECONDS * 1ULL);
     aranya_hello_subscription_config_builder_set_expiration(
         &hello_cfg_builder, ARANYA_DURATION_SECONDS * 30ULL);
     aranya_hello_subscription_config_builder_set_periodic_interval(
