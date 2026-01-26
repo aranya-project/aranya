@@ -52,24 +52,24 @@ pub(crate) use invalid_graphs::InvalidGraphs;
 
 /// Shared Aranya client and related state.
 #[derive_where(Clone)]
-pub struct Client<EN, SP> {
+pub struct Client<PS, SP> {
     /// Thread-safe Aranya client reference.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    aranya: Arc<Mutex<ClientState<PS, SP>>>,
     caches: PeerCacheMap,
     #[cfg(feature = "preview")]
     hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     invalid_graphs: Arc<InvalidGraphs>,
 }
 
-impl<EN, SP> fmt::Debug for Client<EN, SP> {
+impl<PS, SP> fmt::Debug for Client<PS, SP> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 
-impl<EN, SP> Client<EN, SP> {
+impl<PS, SP> Client<PS, SP> {
     /// Creates a new [`Client`].
-    pub fn new(aranya: ClientState<EN, SP>) -> Self {
+    pub fn new(aranya: ClientState<PS, SP>) -> Self {
         Self {
             aranya: Arc::new(Mutex::new(aranya)),
             caches: Arc::default(),
@@ -80,7 +80,7 @@ impl<EN, SP> Client<EN, SP> {
     }
 
     /// Lock the aranya client.
-    pub async fn lock_aranya(&self) -> MutexGuard<'_, ClientState<EN, SP>> {
+    pub async fn lock_aranya(&self) -> MutexGuard<'_, ClientState<PS, SP>> {
         self.aranya.lock().await
     }
 
@@ -91,7 +91,7 @@ impl<EN, SP> Client<EN, SP> {
     pub(crate) async fn lock_aranya_and_caches(
         &self,
     ) -> (
-        MutexGuard<'_, ClientState<EN, SP>>,
+        MutexGuard<'_, ClientState<PS, SP>>,
         MutexGuard<'_, BTreeMap<SyncPeer, PeerCache>>,
     ) {
         let aranya = self.lock_aranya().await;

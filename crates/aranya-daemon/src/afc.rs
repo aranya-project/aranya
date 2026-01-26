@@ -30,14 +30,14 @@ use crate::{
 };
 
 /// AFC shared memory.
-pub struct AfcShm<C> {
+pub struct AfcShm<CS> {
     cfg: AfcConfig,
-    write: WriteState<C, Rng>,
+    write: WriteState<CS, Rng>,
 }
 
-impl<C> AfcShm<C>
+impl<CS> AfcShm<CS>
 where
-    C: CipherSuite,
+    CS: CipherSuite,
 {
     fn new(cfg: AfcConfig) -> Result<Self> {
         debug!("setting up afc shm write side: {:?}", cfg.shm_path);
@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<E> Debug for AfcShm<E> {
+impl<CS> Debug for AfcShm<CS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // TODO: debug write field.
         f.debug_struct("AfcShm").field("cfg", &self.cfg).finish()
@@ -79,27 +79,27 @@ impl<E> Debug for AfcShm<E> {
 }
 
 #[derive_where(Debug)]
-pub(crate) struct Afc<E, C, KS> {
+pub(crate) struct Afc<CE, CS, KS> {
     client: Client,
     #[derive_where(skip(Debug))]
     handler: Mutex<Handler<AranyaStore<KS>>>,
     #[derive_where(skip(Debug))]
-    eng: Mutex<E>,
+    eng: Mutex<CE>,
     /// AFC shared memory.
-    shm: Mutex<AfcShm<C>>,
+    shm: Mutex<AfcShm<CS>>,
 }
 
-impl<E, C, KS> Afc<E, C, KS> {
+impl<CE, CS, KS> Afc<CE, CS, KS> {
     pub(crate) fn new(
         client: Client,
-        eng: E,
+        eng: CE,
         device_id: DeviceId,
         store: AranyaStore<KS>,
         cfg: AfcConfig,
     ) -> Result<Self>
     where
-        E: Engine,
-        C: CipherSuite,
+        CE: Engine,
+        CS: CipherSuite,
     {
         let shm = AfcShm::new(cfg)?;
         Ok(Self {
@@ -112,7 +112,7 @@ impl<E, C, KS> Afc<E, C, KS> {
 
     async fn while_locked<'a, F, R>(&'a self, f: F) -> R
     where
-        F: for<'b> FnOnce(&'b mut Handler<AranyaStore<KS>>, &'b mut E) -> R,
+        F: for<'b> FnOnce(&'b mut Handler<AranyaStore<KS>>, &'b mut CE) -> R,
     {
         let mut handler = self.handler.lock().await;
         let mut eng = self.eng.lock().await;
@@ -120,10 +120,10 @@ impl<E, C, KS> Afc<E, C, KS> {
     }
 }
 
-impl<E, C, KS> Afc<E, C, KS>
+impl<CE, CS, KS> Afc<CE, CS, KS>
 where
-    E: Engine,
-    C: CipherSuite,
+    CE: Engine,
+    CS: CipherSuite,
     KS: KeyStore,
 {
     /// Handles the [`AfcUniChannelCreated`] effect, returning
@@ -134,7 +134,7 @@ where
         e: &AfcUniChannelCreated,
     ) -> Result<(AfcLocalChannelId, AfcChannelId)>
     where
-        E: Engine<CS = C>,
+        CE: Engine<CS = CS>,
     {
         let info = UniChannelCreated {
             key_id: e.channel_key_id.into(),
@@ -167,7 +167,7 @@ where
         e: &AfcUniChannelReceived,
     ) -> Result<(AfcLocalChannelId, AfcChannelId)>
     where
-        E: Engine<CS = C>,
+        CE: Engine<CS = CS>,
     {
         let info = UniChannelReceived {
             parent_cmd_id: CmdId::from_base(e.parent_cmd_id),
@@ -196,7 +196,7 @@ where
     /// Delete a channel.
     pub(crate) async fn delete_channel(&self, channel_id: AfcLocalChannelId) -> Result<()>
     where
-        E: Engine<CS = C>,
+        CE: Engine<CS = CS>,
     {
         self.shm
             .lock()
