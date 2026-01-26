@@ -2,7 +2,7 @@
 //!
 //! The [connection map][SharedConnectionMap] allows the sync client and server to share existing
 //! connections. With mTLS authentication, a single connection can be used for syncing any team
-//! since authentication is based on device certificates rather than team-specific PSKs.
+//! since authentication is based on device certificates.
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
