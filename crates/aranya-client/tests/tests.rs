@@ -996,9 +996,9 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             admin_addr,
             Duration::from_millis(100),
-            Duration::from_millis(1000),
-            Duration::from_secs(60), // Schedule delay for periodic sends
-        ) // Short delay for faster testing
+            Duration::from_secs(120), // Duration long enough for test to complete
+            Duration::from_secs(60),  // Schedule delay for periodic sends
+        )
         .await?;
     info!("membera subscribed to hello notifications from admin");
 
@@ -1081,8 +1081,8 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             owner_addr,
             Duration::from_millis(1000),
-            Duration::from_millis(1000),
-            Duration::from_secs(60), // Schedule delay for periodic sends
+            Duration::from_secs(120), // Duration long enough for test to complete
+            Duration::from_secs(60),  // Schedule delay for periodic sends
         )
         .await?;
     info!("admin subscribed to hello notifications from owner");
@@ -1092,16 +1092,16 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             owner_addr,
             Duration::from_millis(2000),
-            Duration::from_millis(1000),
-            Duration::from_secs(60), // Schedule delay for periodic sends
+            Duration::from_secs(120), // Duration long enough for test to complete
+            Duration::from_secs(60),  // Schedule delay for periodic sends
         )
         .await?;
     operator_team
         .sync_hello_subscribe(
             admin_addr,
             Duration::from_millis(1500),
-            Duration::from_millis(1000),
-            Duration::from_secs(60), // Schedule delay for periodic sends
+            Duration::from_secs(120), // Duration long enough for test to complete
+            Duration::from_secs(60),  // Schedule delay for periodic sends
         )
         .await?;
     info!("operator subscribed to both owner and admin");
@@ -1118,8 +1118,8 @@ async fn test_hello_subscription() -> Result<()> {
         .sync_hello_subscribe(
             owner_addr,
             Duration::from_millis(100),
-            Duration::from_millis(1000),
-            Duration::from_secs(60), // Schedule delay for periodic sends
+            Duration::from_secs(120), // Duration long enough for test to complete
+            Duration::from_secs(60),  // Schedule delay for periodic sends
         )
         .await?;
     admin_team.sync_hello_unsubscribe(owner_addr).await?;
