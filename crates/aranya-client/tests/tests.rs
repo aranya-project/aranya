@@ -615,9 +615,9 @@ async fn test_query_functions() -> Result<()> {
 /// to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[allow(deprecated)]
-async fn test_add_team() -> Result<()> {
+async fn test_deprecated_create_and_add_team() -> Result<()> {
     // Set up our team context so we can run the test.
-    let devices = DevicesCtx::new("test_add_team").await?;
+    let devices = DevicesCtx::new("test_deprecated_create_and_add_team").await?;
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
