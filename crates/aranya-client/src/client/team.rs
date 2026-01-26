@@ -1,5 +1,5 @@
 #[cfg(feature = "preview")]
-use std::time::{Duration};
+use std::time::Duration;
 
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
@@ -17,7 +17,7 @@ use crate::{
         create_ctx, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role,
         RoleId, Roles,
     },
-    config::{SyncPeerConfig},
+    config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
     util::{ApiConv as _, ApiId},
 };
