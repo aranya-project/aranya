@@ -1968,12 +1968,12 @@ pub unsafe fn sync_hello_subscribe(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).sync_hello_subscribe(
-            addr,
-            (*config).clone().into(),
-        ))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .sync_hello_subscribe(addr, (*config).clone().into()),
+    )?;
     Ok(())
 }
 

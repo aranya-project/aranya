@@ -260,7 +260,7 @@ AranyaError init_team(Team *t) {
 
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
@@ -443,8 +443,9 @@ AranyaError init_team(Team *t) {
     }
 
     // add operator to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, operator->pk,
-                                    operator->pk_len, &operator_role_id);
+    err = aranya_add_device_to_team(&owner->client,
+                                    &t->id, operator->pk, operator->pk_len,
+                                    &operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -671,7 +672,7 @@ AranyaError run(Team *t) {
     AranyaDeviceId *devices = NULL;
 
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *memberb = &t->clients.memberb;
 
     // initialize logging.
@@ -729,7 +730,8 @@ AranyaError run(Team *t) {
         &hello_cfg_builder, ARANYA_DURATION_SECONDS * 30ULL);
     aranya_hello_subscription_config_builder_set_periodic_interval(
         &hello_cfg_builder, ARANYA_DURATION_SECONDS * 5ULL);
-    err = aranya_hello_subscription_config_build(&hello_cfg_builder, &hello_cfg);
+    err =
+        aranya_hello_subscription_config_build(&hello_cfg_builder, &hello_cfg);
     EXPECT("error building hello subscription config", err);
     err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
                                       &hello_cfg);
@@ -745,7 +747,8 @@ AranyaError run(Team *t) {
         &hello_cfg_builder, ARANYA_DURATION_SECONDS * 30ULL);
     aranya_hello_subscription_config_builder_set_periodic_interval(
         &hello_cfg_builder, ARANYA_DURATION_SECONDS * 5ULL);
-    err = aranya_hello_subscription_config_build(&hello_cfg_builder, &hello_cfg);
+    err =
+        aranya_hello_subscription_config_build(&hello_cfg_builder, &hello_cfg);
     EXPECT("error building hello subscription config", err);
     err = aranya_sync_hello_subscribe(&operator->client, &t->id,
                                       sync_addrs[ADMIN], &hello_cfg);
