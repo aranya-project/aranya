@@ -119,3 +119,100 @@ impl Default for SyncPeerConfigBuilder {
         }
     }
 }
+
+/// Configuration for hello subscription.
+///
+/// This configures how a device subscribes to hello notifications from a sync peer.
+/// Hello notifications inform subscribers when the peer's graph has changed,
+/// enabling reactive syncing.
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[derive(Clone, Debug)]
+pub struct HelloSubscriptionConfig {
+    /// Minimum delay after a graph change before sending a hello notification.
+    /// This helps batch rapid changes into fewer notifications.
+    pub graph_change_delay: Duration,
+    /// How long the subscription remains active before expiring.
+    pub expiration: Duration,
+    /// Interval between periodic hello messages (rate limiting).
+    pub periodic_interval: Duration,
+}
+
+#[cfg(feature = "preview")]
+impl HelloSubscriptionConfig {
+    /// Creates a default [`HelloSubscriptionConfigBuilder`].
+    pub fn builder() -> HelloSubscriptionConfigBuilder {
+        Default::default()
+    }
+}
+
+/// Builder for a [`HelloSubscriptionConfig`].
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[derive(Debug)]
+pub struct HelloSubscriptionConfigBuilder {
+    graph_change_delay: Duration,
+    expiration: Duration,
+    periodic_interval: Duration,
+}
+
+#[cfg(feature = "preview")]
+impl HelloSubscriptionConfigBuilder {
+    /// Creates a new builder for [`HelloSubscriptionConfig`].
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Attempts to build a [`HelloSubscriptionConfig`] using the provided parameters.
+    pub fn build(self) -> Result<HelloSubscriptionConfig> {
+        if self.expiration > MAX_SYNC_INTERVAL {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "expiration",
+                "must not exceed 1 year to prevent overflow",
+            ))
+            .into());
+        }
+
+        Ok(HelloSubscriptionConfig {
+            graph_change_delay: self.graph_change_delay,
+            expiration: self.expiration,
+            periodic_interval: self.periodic_interval,
+        })
+    }
+
+    /// Sets the minimum delay after a graph change before sending a hello notification.
+    ///
+    /// This helps batch rapid changes into fewer notifications. Default is 100ms.
+    pub fn graph_change_delay(mut self, delay: Duration) -> Self {
+        self.graph_change_delay = delay;
+        self
+    }
+
+    /// Sets how long the subscription remains active before expiring.
+    ///
+    /// After this duration, the subscription will automatically end and no more
+    /// hello notifications will be sent. Default is 120 seconds.
+    pub fn expiration(mut self, duration: Duration) -> Self {
+        self.expiration = duration;
+        self
+    }
+
+    /// Sets the interval between periodic hello messages.
+    ///
+    /// This rate-limits how frequently hello messages are sent. Default is 60 seconds.
+    pub fn periodic_interval(mut self, interval: Duration) -> Self {
+        self.periodic_interval = interval;
+        self
+    }
+}
+
+#[cfg(feature = "preview")]
+impl Default for HelloSubscriptionConfigBuilder {
+    fn default() -> Self {
+        Self {
+            graph_change_delay: Duration::from_millis(100),
+            expiration: Duration::from_secs(120),
+            periodic_interval: Duration::from_secs(60),
+        }
+    }
+}
