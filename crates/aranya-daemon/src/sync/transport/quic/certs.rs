@@ -293,8 +293,8 @@ mod tests {
 
     use super::*;
 
-    // Helper to create a test PEM file with dummy content
-    fn create_pem_file(dir: &Path, name: &str, content: &str) -> std::io::Result<()> {
+    // Helper to create a file and write string content to it
+    fn create_file_from_str(dir: &Path, name: &str, content: &str) -> std::io::Result<()> {
         let path = dir.join(name);
         let mut file = File::create(path)?;
         file.write_all(content.as_bytes())?;
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_load_root_certs_no_pem_files() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        create_pem_file(temp_dir.path(), "not-a-cert.txt", "hello world")
+        create_file_from_str(temp_dir.path(), "not-a-cert.txt", "hello world")
             .expect("failed to create file");
         let err = load_root_certs(temp_dir.path()).unwrap_err();
         assert!(matches!(err, CertError::NoRootCertsFound(_)));
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_load_root_certs_invalid_pem() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        create_pem_file(temp_dir.path(), "invalid.pem", "not a valid certificate")
+        create_file_from_str(temp_dir.path(), "invalid.pem", "not a valid certificate")
             .expect("failed to create file");
         let err = load_root_certs(temp_dir.path()).unwrap_err();
         assert!(matches!(err, CertError::NoCertsInFile(_)));
@@ -338,8 +338,8 @@ mod tests {
     #[test]
     fn test_load_device_cert_empty_cert_file() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        create_pem_file(temp_dir.path(), "cert.pem", "").expect("failed to create cert file");
-        create_pem_file(temp_dir.path(), "key.pem", "").expect("failed to create key file");
+        create_file_from_str(temp_dir.path(), "cert.pem", "").expect("failed to create cert file");
+        create_file_from_str(temp_dir.path(), "key.pem", "").expect("failed to create key file");
 
         let cert_path = temp_dir.path().join("cert.pem");
         let key_path = temp_dir.path().join("key.pem");
