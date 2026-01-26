@@ -8,10 +8,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{
-    afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
-};
+use aranya_client::{afc, text, Addr, ChanOp, Client, DeviceId, KeyBundle};
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::{
@@ -252,26 +249,12 @@ async fn setup_demo(team_name: &str) -> Result<(Vec<Pid>, DemoContext)> {
 }
 
 async fn run_demo_body(ctx: DemoContext) -> Result<()> {
-    // Define our constants and other accessors
-    let seed_ikm = {
-        let mut buf = [0; 32];
-        ctx.owner.client.rand(&mut buf).await;
-        buf
-    };
-
-    let owner_cfg = {
-        let qs_cfg = CreateTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-
     // Create a team.
     info!("creating team");
     let owner = ctx
         .owner
         .client
-        .create_team(owner_cfg)
+        .create_team(Default::default())
         .await
         .context("expected to create team")?;
     let team_id = owner.team_id();
@@ -302,21 +285,12 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no member role"))?
         .clone();
 
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_id)
-            .build()?
-    };
-
+    // With mTLS, devices can use the team ID directly without add_team.
     // TODO: Delegate to admin and operator.
-    let _admin = ctx.admin.client.add_team(add_team_cfg.clone()).await?;
-    let _operator = ctx.operator.client.add_team(add_team_cfg.clone()).await?;
-    let membera = ctx.membera.client.add_team(add_team_cfg.clone()).await?;
-    let memberb = ctx.memberb.client.add_team(add_team_cfg).await?;
+    let _admin = ctx.admin.client.team(team_id);
+    let _operator = ctx.operator.client.team(team_id);
+    let membera = ctx.membera.client.team(team_id);
+    let memberb = ctx.memberb.client.team(team_id);
 
     // get sync addresses.
     let owner_addr = ctx.owner.aranya_local_addr().await?;
