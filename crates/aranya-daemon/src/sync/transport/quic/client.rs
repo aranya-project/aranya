@@ -20,7 +20,8 @@ use super::{ConnectionKey, Error, SharedConnectionMap};
 use crate::{
     aranya::Client,
     sync::{
-        transport::SyncState, Addr, Callback, GraphId, Result, SyncManager, SyncPeer, SyncResponse,
+        transport::SyncState, Addr, Callback, Error as SyncError, GraphId, Result, SyncManager,
+        SyncPeer, SyncResponse,
     },
 };
 
@@ -79,13 +80,13 @@ where
         syncer
             .send_sync_request(&mut send, &mut sync_requester, peer)
             .await
-            .map_err(|e| crate::sync::Error::SendSyncRequest(e.into()))?;
+            .map_err(|e| SyncError::SendSyncRequest(e.into()))?;
 
         // receive sync response.
         let cmd_count = syncer
             .receive_sync_response(&mut recv, &mut sync_requester, sink, peer)
             .await
-            .map_err(|e| crate::sync::Error::ReceiveSyncResponse(e.into()))?;
+            .map_err(|e| SyncError::ReceiveSyncResponse(e.into()))?;
 
         Ok(cmd_count)
     }
@@ -240,7 +241,7 @@ where
                         conns.remove(key, conn_clone).await;
                     });
                 }
-                crate::sync::Error::QuicSync(Error::QuicConnectionError(e))
+                SyncError::QuicSync(Error::QuicConnectionError(e))
             })?;
 
         trace!("client opened bidi stream with QUIC sync server");
