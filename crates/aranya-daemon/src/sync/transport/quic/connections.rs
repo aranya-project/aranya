@@ -3,6 +3,12 @@
 //! The [connection map][SharedConnectionMap] allows the sync client and server to share existing
 //! connections. With mTLS authentication, a single connection can be used for syncing any team
 //! since authentication is based on device certificates.
+// TODO: Avoid opening duplicate connections that are immediately discarded.
+// In `get_or_try_insert_with`, the lock is released while creating a new connection,
+// allowing multiple tasks to simultaneously decide "no connection exists" and all
+// create connections. Only one is kept; the rest are discarded. Consider using
+// `tokio::sync::OnceCell` per peer so the first task creates the connection while
+// others wait on the same future. This was existing behavior prior to mTLS changes.
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
