@@ -92,6 +92,7 @@ pub(crate) struct SyncParams {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Duration};
 
