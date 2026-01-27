@@ -1970,7 +1970,8 @@ pub unsafe fn sync_hello_unsubscribe(
 /// @param[in] team the team's ID
 /// @param[in] addr the peer's Aranya network address
 /// @param[in] config configuration values for syncing with a peer.
-/// @param[in] timeout the maximum amount of time this request can take.
+///
+/// Default values for a sync config will be used if `config` is `NULL`
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
