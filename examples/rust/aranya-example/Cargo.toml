@@ -24,7 +24,7 @@ preview = ["aranya-client/preview"]
 debug = []
 
 [dependencies]
-aranya-client = { workspace = true, default-features = false }
+aranya-client = { path = "../../../crates/aranya-client", default-features = false }
 
 anyhow = { workspace = true }
 backon = { workspace = true }

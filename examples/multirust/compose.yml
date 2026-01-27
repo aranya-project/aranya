@@ -1,0 +1,24 @@
+services:
+  operator:
+    image: aranya-multirust-operator
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: operator
+    init: true
+
+  member-a:
+    image: aranya-multirust-member-a
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: member-a
+    init: true
+
+  member-b:
+    image: aranya-multirust-member-b
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: member-b
+    init: true
