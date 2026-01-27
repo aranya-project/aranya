@@ -52,22 +52,22 @@ impl fmt::Display for SimplePerm {
 }
 
 /// Engine using policy from [`policy.md`].
-pub struct PolicyEngine<E, KS> {
+pub struct PolicyEngine<CE, KS> {
     /// The underlying policy.
-    pub(crate) policy: VmPolicy<E>,
-    _eng: PhantomData<E>,
+    pub(crate) policy: VmPolicy<CE>,
+    _eng: PhantomData<CE>,
     _ks: PhantomData<KS>,
 }
 
-impl<E, KS> PolicyEngine<E, KS>
+impl<CE, KS> PolicyEngine<CE, KS>
 where
-    E: aranya_crypto::Engine,
+    CE: aranya_crypto::Engine,
     KS: KeyStore + TryClone + Send + 'static,
 {
     /// Creates a `PolicyEngine` from a policy document.
     pub fn new(
         policy_doc: &str,
-        eng: E,
+        eng: CE,
         store: AranyaStore<KS>,
         device_id: DeviceId,
     ) -> Result<Self> {
@@ -87,7 +87,7 @@ where
         let machine = Machine::from_module(module).context("should be able to create machine")?;
 
         // select which FFI modules to use.
-        let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
+        let ffis: Vec<Box<dyn FfiCallable<CE> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
@@ -106,11 +106,11 @@ where
     }
 }
 
-impl<E, KS> PolicyStore for PolicyEngine<E, KS>
+impl<CE, KS> PolicyStore for PolicyEngine<CE, KS>
 where
-    E: aranya_crypto::Engine,
+    CE: aranya_crypto::Engine,
 {
-    type Policy = VmPolicy<E>;
+    type Policy = VmPolicy<CE>;
     type Effect = VmEffect;
 
     fn add_policy(&mut self, policy: &[u8]) -> Result<PolicyId, PolicyError> {
@@ -125,9 +125,9 @@ where
     }
 }
 
-impl<E, KS> fmt::Debug for PolicyEngine<E, KS>
+impl<CE, KS> fmt::Debug for PolicyEngine<CE, KS>
 where
-    E: fmt::Debug,
+    CE: fmt::Debug,
     KS: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
