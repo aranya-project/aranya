@@ -61,11 +61,10 @@ pub(crate) enum Error {
     EndpointError(String),
     /// QUIC connection timeout
     ///
-    /// This occurs when the TLS handshake takes too long, which can happen
-    /// when connecting to a server with mismatched certificates. Quinn doesn't
-    /// provide a built-in handshake timeout, so we wrap connections with
-    /// tokio::time::timeout.
-    #[error("QUIC connection timed out during TLS handshake")]
+    /// This occurs when the connection attempt takes too long, typically due to
+    /// an unresponsive peer or network issues. Quinn doesn't provide a built-in
+    /// handshake timeout, so we wrap connections with tokio::time::timeout.
+    #[error("QUIC connection timed out")]
     QuicConnectionTimeout,
 }
 
@@ -325,30 +324,45 @@ mod tests {
         }
     }
 
-    /// Tests that TLS handshake hangs with mismatched certificates when using
-    /// production transport config (no idle timeout).
+    /// Tests that mTLS verification fails when certificates are signed by different
+    /// CAs that don't trust each other.
     ///
-    /// When mTLS verification fails due to mismatched CAs, quinn's TLS handshake
-    /// hangs indefinitely without an explicit timeout. This test verifies that:
-    /// 1. The connection hangs (doesn't complete within timeout) with mismatched certs
-    /// 2. Our production code correctly uses an explicit timeout to prevent hanging
-    ///
-    /// See: https://github.com/quinn-rs/quinn/issues/2298
+    /// When the server cannot verify the client's certificate (signed by a different CA),
+    /// the TLS handshake fails and the connection is closed with an error.
     #[tokio::test]
-    async fn test_tls_handshake_hangs_with_mismatched_certs() {
+    async fn test_tls_handshake_fails_with_mismatched_certs() {
         let setup = QuicTestSetup::with_mismatched_cas();
 
-        // With production transport config (no idle timeout), the TLS handshake
-        // hangs indefinitely when certificates are mismatched. We use a short
-        // timeout here to verify this behavior without waiting forever.
-        let connect_result = tokio::time::timeout(Duration::from_secs(2), setup.connect()).await;
+        // Spawn server task to accept connections
+        let server_endpoint = setup.server_endpoint.clone();
+        let server_handle = tokio::spawn(async move {
+            // Accept the incoming connection - this will fail during TLS handshake
+            // because the server can't verify the client's certificate
+            let incoming = server_endpoint.accept().await;
+            match incoming {
+                Some(conn) => {
+                    let result = conn.await;
+                    // The connection should fail due to certificate verification
+                    result.err()
+                }
+                None => None,
+            }
+        });
 
-        // The connection should timeout because the TLS handshake hangs with mismatched certs.
-        // This validates that we need the explicit timeout wrapper in our production code
-        // (see client.rs connect method).
+        // Client attempts to connect - should fail because certs are mismatched
+        let connect_result = setup.connect().await;
+
+        // The connection should fail due to mTLS verification failure
         assert!(
             connect_result.is_err(),
-            "expected timeout - TLS handshake should hang with mismatched certs and no idle timeout"
+            "connection should fail with mismatched certificates"
+        );
+
+        // Server should also see an error
+        let server_result = server_handle.await.expect("server task panicked");
+        assert!(
+            server_result.is_some(),
+            "server should have received a connection error"
         );
     }
 

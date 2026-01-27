@@ -225,11 +225,12 @@ where
                     .connect_with(client_config, addr, &peer_host)
                     .map_err(Error::from)?;
 
-                // Add timeout to connection attempt to avoid hanging on failed TLS handshakes.
-                // Quinn does not provide a built-in handshake timeout, and mTLS verification
-                // failures can cause the connection to hang indefinitely without this.
-                // See: https://github.com/quinn-rs/quinn/issues/2298
-                let conn = tokio::time::timeout(Duration::from_secs(30), connecting)
+                // Add timeout to prevent hanging on unresponsive peers or network issues.
+                // Quinn does not provide a built-in handshake timeout, so without this
+                // the connection attempt could hang indefinitely if the peer is unreachable
+                // or not responding. Note: mTLS verification failures fail fast and don't
+                // require this timeout.
+                let conn = tokio::time::timeout(Duration::from_secs(5), connecting)
                     .await
                     .map_err(|_| Error::QuicConnectionTimeout)?
                     .map_err(Error::from)?;
