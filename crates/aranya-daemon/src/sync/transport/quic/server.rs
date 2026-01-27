@@ -353,7 +353,7 @@ where
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
-        // Extract the storage_id (GraphId) from the request
+        // Extract the graph ID from the request
         let SyncRequestMessage::SyncRequest { storage_id, .. } = &request_msg else {
             bug!("Should be a SyncRequest")
         };
