@@ -41,8 +41,9 @@ pub use crate::client::{
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };
+#[allow(deprecated)]
+use crate::config::{AddTeamConfig, CreateTeamConfig};
 use crate::{
-    config::{AddTeamConfig, CreateTeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
     util::ApiConv as _,
 };
@@ -224,10 +225,11 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
+    #[allow(deprecated)]
+    pub async fn create_team(&self, _cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
-            .create_team(context::current(), cfg.into())
+            .create_team(context::current())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -253,15 +255,15 @@ impl Client {
     }
 
     /// Add a team to local device storage.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. With mTLS authentication, PSK seeds are no longer
+    /// needed for QUIC sync. Use [`Client::team`] instead to get a team handle.
+    #[deprecated(note = "Use `Client::team` instead - PSK seeds are no longer used with mTLS")]
+    #[allow(deprecated)]
     pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
-        let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
-        let team_id = TeamId::from_api(cfg.team_id);
-
-        self.daemon
-            .add_team(context::current(), cfg)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+        let team_id = cfg.id;
         Ok(Team {
             client: self,
             id: team_id.into_api(),

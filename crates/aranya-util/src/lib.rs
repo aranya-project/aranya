@@ -15,8 +15,6 @@
 pub mod addr;
 pub mod error;
 pub mod ready;
-pub mod rustls;
-pub mod s2n_quic;
 pub mod task;
 pub mod util;
 
