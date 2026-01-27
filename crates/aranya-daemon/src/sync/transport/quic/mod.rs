@@ -35,9 +35,11 @@ fn keep_alive_transport_config() -> Arc<TransportConfig> {
     transport_config.keep_alive_interval(Some(keep_alive_interval));
     // Idle timeout is 3x the keep-alive interval so a single dropped ping
     // won't close the connection, but several in a row will.
-    transport_config.max_idle_timeout(Some(
-        IdleTimeout::try_from(keep_alive_interval * 3).expect("valid idle timeout"),
-    ));
+    // IdleTimeout::try_from only fails if duration exceeds VarInt::MAX milliseconds
+    // (~580 million years), so 90 seconds is always valid.
+    #[allow(clippy::expect_used)]
+    let idle_timeout = IdleTimeout::try_from(keep_alive_interval * 3).expect("90s < VarInt::MAX");
+    transport_config.max_idle_timeout(Some(idle_timeout));
     Arc::new(transport_config)
 }
 
