@@ -105,3 +105,8 @@ harness = false
 
 [package.metadata.cargo-all-features]
 always_include_features = ["experimental", "preview"]
+
+[package.metadata.cargo-machete]
+# rustls-pki-types is needed for its `alloc` feature which enables automatic
+# zeroization of private key bytes on drop, even though it's not directly imported.
+ignored = ["rustls-pki-types"]
