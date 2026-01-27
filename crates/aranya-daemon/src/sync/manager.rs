@@ -33,8 +33,12 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::Context as _;
+use aranya_crypto::Rng;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{PolicyStore, StorageProvider};
+use aranya_runtime::{
+    Address, Command as _, PolicyStore, Sink, StorageProvider, SyncHelloType, SyncRequester,
+    SyncType, MAX_SYNC_MESSAGE_SIZE,
+};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use bytes::Bytes;
@@ -46,13 +50,20 @@ use tokio::{sync::mpsc, time::Instant};
 use tokio_util::time::{delay_queue, DelayQueue};
 #[cfg(feature = "preview")]
 use tracing::trace;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use super::{
     handle::{Callback, ManagerMessage},
-    GraphId, Result, SyncPeer, SyncState,
+    GraphId, Result, SyncPeer,
 };
-use crate::{aranya::Client, vm_policy::VecSink};
+use crate::{
+    aranya::Client,
+    sync::{
+        transport::{SyncStream as _, SyncTransport},
+        Error, SyncResponse,
+    },
+    vm_policy::VecSink,
+};
 
 /// Syncs with each peer after the specified interval.
 ///
@@ -73,7 +84,7 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
     /// Used to send effects to the API to be processed.
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Additional state used by the syncer.
-    pub(super) state: ST,
+    pub(super) transport: ST,
     /// Sync server address. Peers will make incoming connections to us on this address.
     pub(super) return_address: Bytes,
     /// Tracks spawned hello notification tasks for lifecycle management.
@@ -123,7 +134,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
 
 impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
 where
-    ST: SyncState<PS, SP, EF>,
+    ST: SyncTransport,
     PS: PolicyStore,
     SP: StorageProvider,
 {
@@ -138,8 +149,16 @@ where
         schedule_delay: Duration,
     ) -> Result<()> {
         trace!("subscribing to hello notifications from peer");
-        ST::sync_hello_subscribe_impl(self, peer, graph_change_delay, duration, schedule_delay)
-            .await
+        // Create the subscribe message
+        let hello_msg = SyncHelloType::Subscribe {
+            graph_change_delay,
+            duration,
+            schedule_delay,
+            graph_id: peer.graph_id,
+        };
+        let sync_type = SyncType::Hello(hello_msg);
+
+        self.send_hello_request(peer, sync_type).await
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
@@ -147,13 +166,20 @@ where
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     async fn sync_hello_unsubscribe(&mut self, peer: SyncPeer) -> Result<()> {
         trace!("unsubscribing from hello notifications from peer");
-        ST::sync_hello_unsubscribe_impl(self, peer).await
+        debug!("client sending unsubscribe request to QUIC sync server");
+
+        // Create the unsubscribe message
+        let sync_type: SyncType = SyncType::Hello(SyncHelloType::Unsubscribe {
+            graph_id: peer.graph_id,
+        });
+
+        self.send_hello_request(peer, sync_type).await
     }
 }
 
 impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
 where
-    ST: SyncState<PS, SP, EF>,
+    ST: SyncTransport,
     PS: PolicyStore,
     SP: StorageProvider,
     EF: Send + Sync + 'static + TryFrom<PS::Effect>,
@@ -233,9 +259,75 @@ where
                         }
                     }
                     #[cfg(feature = "preview")]
-                    ManagerMessage::BroadcastHello { graph_id, head } => {
-                        ST::broadcast_hello_notifications_impl(self, graph_id, head).await
-                    }
+                    ManagerMessage::BroadcastHello { graph_id, head } => async {
+                        let now = Instant::now();
+
+                        // Get all valid (non-expired) subscribers for this graph
+                        let subscribers = {
+                            let mut subscriptions = self.client.lock_hello_subscriptions().await;
+
+                            // Remove expired subscriptions and collect valid ones
+                            let mut valid_subscribers = Vec::new();
+                            subscriptions.retain(|peer, subscription| {
+                                if peer.graph_id == graph_id {
+                                    if now >= subscription.expires_at {
+                                        // Subscription has expired, remove it
+                                        debug!(?peer, "Removed expired subscription");
+                                        false
+                                    } else {
+                                        // Subscription is valid, collect it
+                                        valid_subscribers.push((*peer, subscription.clone()));
+                                        true
+                                    }
+                                } else {
+                                    // Keep subscriptions for other graphs
+                                    true
+                                }
+                            });
+
+                            valid_subscribers
+                        };
+                        let subscriber_count = subscribers.len();
+
+                        // Send hello notification to each valid subscriber
+                        for (peer, subscription) in subscribers {
+                            // Check if enough time has passed since last notification
+                            if let Some(last_notified) = subscription.last_notified {
+                                if now - last_notified < subscription.graph_change_delay {
+                                    continue;
+                                }
+                            }
+
+                            // Send the notification
+                            match self.send_hello_notification_to_subscriber(peer, head).await {
+                                Ok(()) => {
+                                    // Update the last notified time
+                                    let mut subscriptions = self.client.lock_hello_subscriptions().await;
+                                    if let Some(sub) = subscriptions.get_mut(&peer) {
+                                        sub.last_notified = Some(now);
+                                    } else {
+                                        warn!(?peer, "Failed to find subscription to update last_notified");
+                                    }
+                                }
+                                Err(error) => {
+                                    warn!(
+                                        ?peer,
+                                        ?head,
+                                        %error,
+                                        "Failed to send hello notification"
+                                    );
+                                }
+                            }
+                        }
+
+                        trace!(
+                            ?graph_id,
+                            ?head,
+                            subscriber_count,
+                            "Completed broadcast_hello_notifications"
+                        );
+                        Ok(())
+                    }.await
                 };
                 if let Err(reply) = tx.send(reply) {
                     warn!("syncer operation did not wait for reply");
@@ -260,34 +352,56 @@ where
     pub(crate) async fn sync(&mut self, peer: SyncPeer) -> Result<usize> {
         let mut sink = VecSink::new();
 
-        let cmd_count = ST::sync_impl(self, peer, &mut sink)
-            .await
-            .inspect_err(|err| {
+        let cmd_count = async {
+            let mut stream = self
+                .transport
+                .connect(peer)
+                .await
+                .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))
+                .map_err(|e| Error::Transport(e.into()))?;
+
+            let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
+
+            // send sync request.
+            self.send_sync_request(&mut stream, &mut sync_requester, peer)
+                .await
+                .map_err(|e| Error::SendSyncRequest(e.into()))?;
+
+            // receive sync response.
+            let cmd_count = self
+                .receive_sync_response(&mut stream, &mut sync_requester, &mut sink, peer)
+                .await
+                .map_err(|e| Error::ReceiveSyncResponse(e.into()))?;
+
+            Ok(cmd_count)
+        }
+        .await
+        .inspect_err(|err: &Error| {
+            warn!(
+                error = %err,
+                ?peer,
+                "ST::sync_impl failed"
+            );
+            // If a finalization error has occurred, remove all sync peers for that team.
+            if err.is_parallel_finalize() {
                 warn!(
-                    error = %err,
                     ?peer,
-                    "ST::sync_impl failed"
+                    "Parallel finalize error, removing sync peers for graph"
                 );
-                // If a finalization error has occurred, remove all sync peers for that team.
-                if err.is_parallel_finalize() {
-                    warn!(
-                        ?peer,
-                        "Parallel finalize error, removing sync peers for graph"
-                    );
-                    // Remove sync peers for graph that had finalization error.
-                    self.peers.retain(|p, (_, key)| {
-                        let keep = p.graph_id != peer.graph_id;
-                        if !keep {
-                            if let Some(k) = key {
-                                self.queue.remove(k);
-                            }
+                // Remove sync peers for graph that had finalization error.
+                self.peers.retain(|p, (_, key)| {
+                    let keep = p.graph_id != peer.graph_id;
+                    if !keep {
+                        if let Some(k) = key {
+                            self.queue.remove(k);
                         }
-                        keep
-                    });
-                    self.client.invalid_graphs().insert(peer.graph_id);
-                }
-            })
-            .with_context(|| format!("peer addr: {}", peer.addr))?;
+                    }
+                    keep
+                });
+                self.client.invalid_graphs().insert(peer.graph_id);
+            }
+        })
+        .with_context(|| format!("peer addr: {}", peer.addr))?;
 
         let effects = sink
             .collect()
@@ -306,5 +420,251 @@ where
             "Sync completed successfully"
         );
         Ok(cmd_count)
+    }
+}
+
+impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
+where
+    ST: SyncTransport,
+    PS: PolicyStore,
+    SP: StorageProvider,
+{
+    /// Sends a sync request to a peer over an established QUIC stream.
+    ///
+    /// This method uses the SyncRequester to generate the sync request data,
+    /// serializes it, and sends it over the provided QUIC send stream.
+    ///
+    /// # Arguments
+    /// * `send` - The QUIC send stream to use for sending the request
+    /// * `syncer` - The SyncRequester instance that generates the sync request
+    /// * `peer` - The unique identifier of the peer to send the message to
+    ///
+    /// # Returns
+    /// * `Ok(())` if the sync request was sent successfully
+    /// * `Err(SyncError)` if there was an error generating or sending the request
+    #[instrument(skip_all)]
+    async fn send_sync_request(
+        &self,
+        stream: &mut ST::Stream,
+        syncer: &mut SyncRequester,
+        peer: SyncPeer,
+    ) -> Result<()> {
+        trace!("client sending sync request to QUIC sync server");
+        let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+
+        let len = {
+            // Lock both aranya and caches in the correct order.
+            let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+            let cache = caches.entry(peer).or_default();
+            let (len, _) = syncer
+                .poll(&mut send_buf, aranya.provider(), cache)
+                .context("sync poll failed")?;
+            trace!(?len, "sync poll finished");
+            len
+        };
+        send_buf.truncate(len);
+
+        stream
+            .send(&send_buf)
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+        stream
+            .finish()
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+        trace!("sent sync request");
+
+        Ok(())
+    }
+
+    #[instrument(skip_all)]
+    /// Receives and processes a sync response from the server.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
+    async fn receive_sync_response<S>(
+        &self,
+        stream: &mut ST::Stream,
+        syncer: &mut SyncRequester,
+        sink: &mut S,
+        peer: SyncPeer,
+    ) -> Result<usize>
+    where
+        S: Sink<PS::Effect>,
+    {
+        trace!("client receiving sync response from QUIC sync server");
+
+        let mut recv_buf = Vec::new();
+        stream
+            .receive(&mut recv_buf)
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+        trace!(n = recv_buf.len(), "received sync response");
+
+        // process the sync response.
+        let resp = postcard::from_bytes(&recv_buf)
+            .context("postcard unable to deserialize sync response")?;
+        let data = match resp {
+            SyncResponse::Ok(data) => data,
+            SyncResponse::Err(msg) => return Err(anyhow::anyhow!("sync error: {msg}").into()),
+        };
+        if data.is_empty() {
+            trace!("nothing to sync");
+            return Ok(0);
+        }
+        if let Some(cmds) = syncer.receive(&data)? {
+            trace!(num = cmds.len(), "received commands");
+            if !cmds.is_empty() {
+                // Lock both aranya and caches in the correct order.
+                let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+                let mut trx = aranya.transaction(peer.graph_id);
+                aranya
+                    .add_commands(&mut trx, sink, &cmds)
+                    .context("unable to add received commands")?;
+                aranya.commit(&mut trx, sink).context("commit failed")?;
+                trace!("committed");
+                let cache = caches.entry(peer).or_default();
+                aranya
+                    .update_heads(
+                        peer.graph_id,
+                        cmds.iter().filter_map(|cmd| cmd.address().ok()),
+                        cache,
+                    )
+                    .context("failed to update cache heads")?;
+                return Ok(cmds.len());
+            }
+        }
+
+        Ok(0)
+    }
+
+    /// Send a hello message to a peer and wait for a response.
+    ///
+    /// This is a helper method that handles the common logic for sending hello messages,
+    /// including serialization, connection management, and response handling.
+    ///
+    /// # Arguments
+    /// * `peer` - The unique identifier of the peer to send the message to
+    /// * `sync_type` - The hello message to send
+    ///
+    /// # Returns
+    /// * `Ok(())` if the message was sent successfully
+    /// * `Err(SyncError)` if there was an error
+    #[instrument(skip_all)]
+    pub(super) async fn send_hello_request(
+        &mut self,
+        peer: SyncPeer,
+        sync_type: SyncType,
+    ) -> Result<()> {
+        // Serialize the message
+        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
+
+        // Connect to the peer
+        let mut stream = self
+            .transport
+            .connect(peer)
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+
+        // Send the message
+        stream
+            .send(&data)
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+        stream
+            .finish()
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+
+        // Read the response to avoid race condition with server
+        let mut response_buf = Vec::new();
+        stream
+            .receive(&mut response_buf)
+            .await
+            .map_err(|e| Error::Transport(e.into()))?;
+        match response_buf.is_empty() {
+            true => Err(Error::EmptyResponse),
+            false => Ok(()),
+        }
+    }
+
+    /// Sends a hello notification to a specific subscriber.
+    ///
+    /// This method sends a `SyncHelloType::Hello` message to the specified subscriber,
+    /// notifying them that the graph head has changed. Uses the existing connection
+    /// infrastructure to efficiently reuse connections.
+    ///
+    /// # Arguments
+    /// * `peer` - The unique identifier of the peer to send the message to
+    /// * `head` - The new head address to include in the notification
+    ///
+    /// # Returns
+    /// * `Ok(())` if the notification was sent successfully
+    /// * `Err(SyncError)` if there was an error connecting or sending the message
+    #[instrument(skip_all)]
+    pub(super) async fn send_hello_notification_to_subscriber(
+        &mut self,
+        peer: SyncPeer,
+        head: Address,
+    ) -> Result<()> {
+        // Create the hello message
+        let hello_msg = SyncHelloType::Hello {
+            head,
+            graph_id: peer.graph_id,
+        };
+        let sync_type: SyncType = SyncType::Hello(hello_msg);
+
+        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
+
+        let mut stream = self
+            .transport
+            .connect(peer)
+            .await
+            .map_err(|error| {
+                warn!(
+                    ?peer,
+                    %error,
+                    "Failed to connect to peer"
+                );
+                error
+            })
+            .map_err(|e| Error::Transport(e.into()))?;
+
+        // Spawn async task to send the notification
+        self.hello_tasks.spawn(async move {
+            if let Err(error) = stream.send(&data).await {
+                warn!(
+                    ?peer,
+                    %error,
+                    "Failed to send hello message"
+                );
+                return;
+            }
+
+            if let Err(error) = stream.finish().await {
+                warn!(
+                    ?peer,
+                    %error,
+                    "Failed to close send stream"
+                );
+                return;
+            }
+
+            // Read the response to avoid race condition with server
+            let mut response_buf = Vec::new();
+            if let Err(e) = stream.receive(&mut response_buf).await {
+                warn!(
+                    error = %e,
+                    ?peer,
+                    "Failed to read hello notification response"
+                );
+                return;
+            }
+            debug!(
+                response_len = response_buf.len(),
+                "received hello notification response"
+            );
+        });
+
+        Ok(())
     }
 }

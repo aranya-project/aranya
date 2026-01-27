@@ -51,9 +51,9 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::quic::QuicState;
+type TestTransport = sync::quic::QuicTransport;
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<TestState, crate::PS, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<TestTransport, crate::PS, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
 type TestServer = sync::quic::Server<crate::PS, crate::SP>;

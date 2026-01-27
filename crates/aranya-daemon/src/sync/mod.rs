@@ -13,21 +13,16 @@ use aranya_util::Addr;
 #[cfg(feature = "preview")]
 pub(crate) use self::hello::HelloSubscriptions;
 pub(super) use self::{handle::Callback, types::SyncResponse};
-pub(crate) use self::{
-    handle::SyncHandle,
-    manager::SyncManager,
-    transport::{quic, SyncState},
-    types::SyncPeer,
-};
+pub(crate) use self::{handle::SyncHandle, manager::SyncManager, transport::quic, types::SyncPeer};
 
 /// The error type which is returned from syncing with peers.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub(crate) enum Error {
-    // TODO(nikki): generalize for generic transport support.
-    /// Something went wrong inside the QUIC Syncer.
+    // TODO(nikki): decide if we want to add a generic.
+    /// Something went wrong with the transport layer.
     #[error(transparent)]
-    QuicSync(#[from] quic::Error),
+    Transport(Box<dyn std::error::Error + Send + Sync + 'static>),
 
     /// Something went wrong in the Aranya Runtime.
     #[error(transparent)]

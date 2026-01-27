@@ -10,7 +10,6 @@ use std::{convert::Infallible, sync::Arc};
 
 use tracing::error;
 
-use super::SyncState;
 use crate::sync::Addr;
 
 mod client;
@@ -20,11 +19,11 @@ mod server;
 mod stream;
 mod transport;
 
-pub(crate) use client::QuicState;
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::{PskSeed, PskStore};
 pub(crate) use server::Server;
 pub(crate) use stream::QuicStream;
+pub(crate) use transport::QuicTransport;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";

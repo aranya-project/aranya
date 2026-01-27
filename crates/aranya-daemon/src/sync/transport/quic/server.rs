@@ -26,13 +26,12 @@ use s2n_quic::{
 use tokio::sync::mpsc;
 use tracing::{error, info, info_span, instrument, trace, warn, Instrument as _};
 
-use super::{ConnectionUpdate, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
+use super::{ConnectionUpdate, Error, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
 use crate::{
     aranya::Client,
     sync::{
-        quic::QuicStream,
-        transport::{quic, SyncStream as _},
-        Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
+        quic::QuicStream, transport::SyncStream as _, Addr, Callback, GraphId, SyncHandle,
+        SyncPeer, SyncResponse,
     },
 };
 
@@ -78,12 +77,15 @@ where
         client: Client<PS, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
-    ) -> Result<(
-        Self,
-        SyncHandle,
-        SharedConnectionMap,
-        mpsc::Receiver<Callback>,
-    )> {
+    ) -> Result<
+        (
+            Self,
+            SyncHandle,
+            SharedConnectionMap,
+            mpsc::Receiver<Callback>,
+        ),
+        Error,
+    > {
         // Create shared connection map and channel for connection updates
         let (conns, server_conn_rx) = SharedConnectionMap::new();
 
@@ -113,7 +115,7 @@ where
             .assume("can set sync server addr")?
             .with_congestion_controller(Bbr::default())?
             .start()
-            .map_err(quic::Error::ServerStart)?;
+            .map_err(Error::ServerStart)?;
 
         let local_addr = server
             .local_addr()
@@ -236,7 +238,7 @@ where
         active_team: TeamId,
         handle: SyncHandle,
         peer_server_addr: Addr,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         trace!("server received a sync request");
 
         let mut recv_buf = Vec::new();
@@ -278,7 +280,7 @@ where
         active_team: TeamId,
         _handle: SyncHandle,
         peer_server_addr: Addr,
-    ) -> Result<Box<[u8]>> {
+    ) -> Result<Box<[u8]>, Error> {
         trace!("server responding to sync request");
 
         let sync_type: SyncType = postcard::from_bytes(request_data).map_err(|e| {
@@ -341,7 +343,7 @@ where
         client: Client<PS, SP>,
         peer_server_addr: Addr,
         active_team: &TeamId,
-    ) -> Result<Box<[u8]>> {
+    ) -> Result<Box<[u8]>, Error> {
         let mut resp = SyncResponder::new();
         let storage_id = check_request(*active_team, &request_msg)?;
         let peer = SyncPeer::new(peer_server_addr, storage_id);
@@ -374,12 +376,12 @@ where
     }
 }
 
-fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
+fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId, Error> {
     let SyncRequestMessage::SyncRequest { graph_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };
     if team_id.as_bytes() != graph_id.as_bytes() {
-        return Err(Error::QuicSync(quic::Error::InvalidPSK));
+        return Err(Error::InvalidPSK);
     }
 
     Ok(*graph_id)

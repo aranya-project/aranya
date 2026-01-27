@@ -28,7 +28,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicState, SyncParams},
+        quic::{PskStore, QuicTransport, SyncParams},
         SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -83,7 +83,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicState, PS, SP, EF>,
+    manager: SyncManager<QuicTransport, PS, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -272,7 +272,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicState, PS, SP, EF>,
+        SyncManager<QuicTransport, PS, SP, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {

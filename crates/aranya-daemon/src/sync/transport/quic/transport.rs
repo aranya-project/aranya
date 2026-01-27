@@ -91,7 +91,20 @@ impl SyncTransport for QuicTransport {
 
         trace!("client connected to QUIC sync server");
 
-        let stream = handle.open_bidirectional_stream().await?;
+        let stream = match handle.open_bidirectional_stream().await {
+            Ok(stream) => stream,
+            // Retry for these errors?
+            Err(e @ s2n_quic::connection::Error::StatelessReset { .. })
+            | Err(e @ s2n_quic::connection::Error::StreamIdExhausted { .. })
+            | Err(e @ s2n_quic::connection::Error::MaxHandshakeDurationExceeded { .. }) => {
+                return Err(Error::QuicConnection(e));
+            }
+            // Other errors means the stream has closed
+            Err(e) => {
+                self.conns.remove(peer, handle).await;
+                return Err(Error::QuicConnection(e));
+            }
+        };
 
         trace!("client opened bidi stream with QUIC sync server");
 
