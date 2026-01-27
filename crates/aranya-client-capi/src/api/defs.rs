@@ -1961,13 +1961,16 @@ pub unsafe fn sync_now(
         .map(Into::into)
         .unwrap_or(MAX_SYNC_INTERVAL);
 
-    client.rt.block_on(tokio::time::timeout(
-        timeout,
-        client
-            .inner
-            .team(team.into())
-            .sync_now(addr, config.map(|config| (*config).clone().into())),
-    ))??;
+    client.rt.block_on(async {
+        tokio::time::timeout(
+            timeout,
+            client
+                .inner
+                .team(team.into())
+                .sync_now(addr, config.map(|config| (*config).clone().into())),
+        )
+        .await
+    })??;
     Ok(())
 }
 
