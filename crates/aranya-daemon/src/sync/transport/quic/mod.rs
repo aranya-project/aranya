@@ -100,8 +100,10 @@ mod tests {
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
     use tempfile::TempDir;
 
-    use super::certs::{build_client_config, build_server_config, load_device_cert, load_root_certs};
-    use super::transport_config;
+    use super::{
+        certs::{build_client_config, build_server_config, load_device_cert, load_root_certs},
+        transport_config,
+    };
     use crate::sync::SyncResponse;
 
     /// Test infrastructure for QUIC/TLS tests.
@@ -363,7 +365,10 @@ mod tests {
         // Spawn server task to accept connection and echo data
         let server_endpoint = setup.server_endpoint.clone();
         let server_handle = tokio::spawn(async move {
-            let incoming = server_endpoint.accept().await.expect("no incoming connection");
+            let incoming = server_endpoint
+                .accept()
+                .await
+                .expect("no incoming connection");
             let connection = incoming.await.expect("failed to accept connection");
 
             // Accept a bidirectional stream
@@ -412,10 +417,7 @@ mod tests {
             .await
             .expect("failed to read response");
 
-        assert_eq!(
-            response, test_data,
-            "server should echo back the same data"
-        );
+        assert_eq!(response, test_data, "server should echo back the same data");
 
         // Verify server received the correct data
         let server_received = server_handle.await.expect("server task panicked");
@@ -444,7 +446,10 @@ mod tests {
         // Spawn server task that receives a request and sends a SyncResponse
         let server_endpoint = setup.server_endpoint.clone();
         let server_handle = tokio::spawn(async move {
-            let incoming = server_endpoint.accept().await.expect("no incoming connection");
+            let incoming = server_endpoint
+                .accept()
+                .await
+                .expect("no incoming connection");
             let connection = incoming.await.expect("failed to accept connection");
 
             // Accept a bidirectional stream
@@ -487,7 +492,8 @@ mod tests {
 
         // Send a serialized request message
         let request_msg = "sync_request_data".to_string();
-        let request_data = postcard::to_allocvec(&request_msg).expect("failed to serialize request");
+        let request_data =
+            postcard::to_allocvec(&request_msg).expect("failed to serialize request");
         send.write_all(&request_data)
             .await
             .expect("failed to write request");
@@ -505,7 +511,10 @@ mod tests {
         match response {
             SyncResponse::Ok(data) => {
                 let echoed = String::from_utf8(data.into_vec()).expect("invalid UTF-8");
-                assert_eq!(echoed, request_msg, "server should echo request in response");
+                assert_eq!(
+                    echoed, request_msg,
+                    "server should echo request in response"
+                );
             }
             SyncResponse::Err(e) => panic!("unexpected error response: {}", e),
         }
