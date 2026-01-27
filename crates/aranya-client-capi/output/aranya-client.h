@@ -1047,7 +1047,9 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaCl
                                                                  struct AranyaExtError *__ext_err);
 
 /**
- * Sets IPC timeout for all Client APIs.
+ * Sets IPC timeout for `AranyaClient` APIs.
+ *
+ * By default, the IPC timeout is set to 1 year.
  *
  * @param[in,out] cfg a pointer to the client config builder
  * @param[in] duration the IPC timeout
@@ -1058,7 +1060,9 @@ AranyaError aranya_client_config_builder_set_ipc_timeout(struct AranyaClientConf
                                                          AranyaDuration duration);
 
 /**
- * Sets IPC timeout for all Client APIs.
+ * Sets IPC timeout for `AranyaClient` APIs.
+ *
+ * By default, the IPC timeout is set to 1 year.
  *
  * @param[in,out] cfg a pointer to the client config builder
  * @param[in] duration the IPC timeout

@@ -17,6 +17,21 @@ use tracing::{debug, error};
 
 use crate::imp;
 
+/// Uses the client config to determine whether `fut` should be timed.
+macro_rules! timed_future {
+    ($client:expr, $fut:expr) => {{
+        let client_cfg: &imp::ClientConfig = &$client.cfg;
+
+        match client_cfg.ipc_timeout() {
+            Some(timeout) => {
+                let timed_fut = async { tokio::time::timeout(timeout, $fut).await };
+                $client.rt.block_on(timed_fut)??
+            }
+            None => $client.rt.block_on($fut)?,
+        }
+    }};
+}
+
 /// An error code.
 ///
 /// For extended error information, see [`ExtError`].
@@ -769,20 +784,18 @@ pub fn client_config_builder_set_daemon_uds_path(
     cfg.daemon_addr(address);
 }
 
-// TODO: Only `sync_now` uses this currently.
-/// Sets IPC timeout for all Client APIs.
+// TODO: Only `sync_now` and `create_team` use this currently.
+/// Sets IPC timeout for `AranyaClient` APIs.
+///
+/// By default, the IPC timeout is set to 1 year.
 ///
 /// @param[in,out] cfg a pointer to the client config builder
 /// @param[in] duration the IPC timeout
 ///
 /// @relates AranyaClientConfigBuilder.
-pub fn client_config_builder_set_ipc_timeout(
-    cfg: &mut ClientConfigBuilder,
-    duration: Duration,
-) {
+pub fn client_config_builder_set_ipc_timeout(cfg: &mut ClientConfigBuilder, duration: Duration) {
     cfg.ipc_timeout(duration);
 }
-
 
 /// QUIC syncer configuration.
 ///
@@ -1679,10 +1692,7 @@ pub fn add_label_managing_role(
 /// @relates AranyaClient.
 pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
     let cfg: &imp::CreateTeamConfig = cfg.deref();
-    let team_id = client
-        .rt
-        .block_on(client.inner.create_team(cfg.into()))?
-        .team_id();
+    let team_id = timed_future!(client, client.inner.create_team(cfg.into())).team_id();
 
     Ok(team_id.into())
 }
@@ -1970,18 +1980,12 @@ pub unsafe fn sync_now(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-
-    let cfg: &imp::ClientConfig = &client.cfg;
     let team = client.inner.team(team.into());
-    let fut = team.sync_now(addr, config.map(|config| (*config).clone().into()));
 
-    match cfg.ipc_timeout() {
-        Some(timeout) => {
-            let timed_fut = async { tokio::time::timeout(timeout, fut).await };
-            client.rt.block_on(timed_fut)??
-        }
-        None => client.rt.block_on(fut)?,
-    }
+    timed_future!(
+        client,
+        team.sync_now(addr, config.map(|config| (*config).clone().into()))
+    );
 
     Ok(())
 }
