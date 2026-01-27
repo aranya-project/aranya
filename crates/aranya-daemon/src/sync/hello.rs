@@ -9,7 +9,9 @@ use std::{
 };
 
 use anyhow::Context as _;
-use aranya_runtime::{Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{
+    Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
+};
 use quinn::{ConnectionError, WriteError};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
@@ -143,11 +145,7 @@ where
     /// * `Ok(())` if the message was sent successfully
     /// * `Err(SyncError)` if there was an error
     #[instrument(skip_all)]
-    async fn send_hello_request(
-        &mut self,
-        peer: SyncPeer,
-        sync_type: SyncType,
-    ) -> Result<()> {
+    async fn send_hello_request(&mut self, peer: SyncPeer, sync_type: SyncType) -> Result<()> {
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -227,10 +225,7 @@ where
     /// * `Ok(())` if the unsubscribe request was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    pub(super) async fn send_hello_unsubscribe_request(
-        &mut self,
-        peer: SyncPeer,
-    ) -> Result<()> {
+    pub(super) async fn send_hello_unsubscribe_request(&mut self, peer: SyncPeer) -> Result<()> {
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message

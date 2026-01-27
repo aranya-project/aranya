@@ -10,9 +10,9 @@ use aranya_crypto::{
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_text::Text;
+use aranya_runtime::{GraphId, PolicyStore, StorageProvider, VmPolicy};
 #[cfg(feature = "afc")]
 use aranya_runtime::{NullSink, Session};
-use aranya_runtime::{GraphId, PolicyStore, StorageProvider, VmPolicy};
 use futures_util::TryFutureExt as _;
 use tracing::{debug, instrument, warn, Instrument};
 

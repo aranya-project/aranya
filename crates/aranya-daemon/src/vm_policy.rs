@@ -16,9 +16,7 @@ use aranya_perspective_ffi::FfiPerspective as PerspectiveFfi;
 use aranya_policy_compiler::Compiler;
 use aranya_policy_lang::lang::parse_policy_document;
 use aranya_policy_vm::{ffi::FfiModule, Machine};
-use aranya_runtime::{
-    FfiCallable, PolicyError, PolicyId, PolicyStore, Sink, VmEffect, VmPolicy,
-};
+use aranya_runtime::{FfiCallable, PolicyError, PolicyId, PolicyStore, Sink, VmEffect, VmPolicy};
 use tracing::instrument;
 
 use crate::{
