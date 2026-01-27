@@ -129,13 +129,9 @@ impl Default for SyncPeerConfigBuilder {
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[derive(Clone, Debug)]
 pub struct HelloSubscriptionConfig {
-    /// Minimum delay after a graph change before sending a hello notification.
-    /// This helps batch rapid changes into fewer notifications.
-    pub graph_change_delay: Duration,
-    /// How long the subscription remains active before expiring.
-    pub expiration: Duration,
-    /// Interval between periodic hello messages (rate limiting).
-    pub periodic_interval: Duration,
+    graph_change_delay: Duration,
+    expiration: Duration,
+    periodic_interval: Duration,
 }
 
 #[cfg(feature = "preview")]
@@ -143,6 +139,21 @@ impl HelloSubscriptionConfig {
     /// Creates a default [`HelloSubscriptionConfigBuilder`].
     pub fn builder() -> HelloSubscriptionConfigBuilder {
         Default::default()
+    }
+
+    /// Returns the minimum delay after a graph change before sending a hello notification.
+    pub fn graph_change_delay(&self) -> Duration {
+        self.graph_change_delay
+    }
+
+    /// Returns how long the subscription remains active before expiring.
+    pub fn expiration(&self) -> Duration {
+        self.expiration
+    }
+
+    /// Returns the interval between periodic hello messages.
+    pub fn periodic_interval(&self) -> Duration {
+        self.periodic_interval
     }
 }
 

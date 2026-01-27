@@ -179,9 +179,9 @@ impl Team<'_> {
                 context::current(),
                 peer,
                 self.id,
-                config.graph_change_delay,
-                config.expiration,
-                config.periodic_interval,
+                config.graph_change_delay(),
+                config.expiration(),
+                config.periodic_interval(),
             )
             .await
             .map_err(IpcError::new)?
