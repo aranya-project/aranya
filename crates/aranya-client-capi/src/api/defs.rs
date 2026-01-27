@@ -252,7 +252,12 @@ pub unsafe fn client_init(
             .connect()
     })?;
 
-    Client::init(client, imp::Client { rt, inner });
+    let cfg = {
+        let cfg_ref: &imp::ClientConfig = config.deref();
+        cfg_ref.clone()
+    };
+
+    Client::init(client, imp::Client { rt, inner, cfg });
     Ok(())
 }
 
@@ -763,6 +768,21 @@ pub fn client_config_builder_set_daemon_uds_path(
 ) {
     cfg.daemon_addr(address);
 }
+
+// TODO: Only `sync_now` uses this currently.
+/// Sets IPC timeout for all Client APIs.
+///
+/// @param[in,out] cfg a pointer to the client config builder
+/// @param[in] duration the IPC timeout
+///
+/// @relates AranyaClientConfigBuilder.
+pub fn client_config_builder_set_ipc_timeout(
+    cfg: &mut ClientConfigBuilder,
+    duration: Duration,
+) {
+    cfg.ipc_timeout(duration);
+}
+
 
 /// QUIC syncer configuration.
 ///
@@ -1941,36 +1961,28 @@ pub unsafe fn sync_hello_unsubscribe(
 /// @param[in] config configuration values for syncing with a peer.
 /// @param[in] timeout the maximum amount of time this request can take.
 ///
-/// Default values for a sync config will be used if `config` is `NULL`
-///
-/// The default timeout, 1 year, will be used if `timeout` is `NULL`.
-///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
     client: &Client,
     team: &TeamId,
     addr: Addr,
     config: Option<&SyncPeerConfig>,
-    timeout: Option<&Duration>,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
 
-    let timeout = timeout
-        .copied()
-        .map(Into::into)
-        .unwrap_or(MAX_SYNC_INTERVAL);
+    let cfg: &imp::ClientConfig = &client.cfg;
+    let team = client.inner.team(team.into());
+    let fut = team.sync_now(addr, config.map(|config| (*config).clone().into()));
 
-    client.rt.block_on(async {
-        tokio::time::timeout(
-            timeout,
-            client
-                .inner
-                .team(team.into())
-                .sync_now(addr, config.map(|config| (*config).clone().into())),
-        )
-        .await
-    })??;
+    match cfg.ipc_timeout() {
+        Some(timeout) => {
+            let timed_fut = async { tokio::time::timeout(timeout, fut).await };
+            client.rt.block_on(timed_fut)??
+        }
+        None => client.rt.block_on(fut)?,
+    }
+
     Ok(())
 }
 

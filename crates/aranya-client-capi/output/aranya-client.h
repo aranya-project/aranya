@@ -459,6 +459,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
 } AranyaClientConfigBuilder;
 
 /**
+ * A type to represent a span of time in nanoseconds.
+ */
+typedef uint64_t AranyaDuration;
+
+/**
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
  *
  * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
@@ -605,11 +610,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
      */
     uint8_t __for_size_only[40];
 } AranyaSyncPeerConfig;
-
-/**
- * A type to represent a span of time in nanoseconds.
- */
-typedef uint64_t AranyaDuration;
 
 /**
  * A role name.
@@ -1045,6 +1045,29 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path(struct AranyaClient
 AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaClientConfigBuilder *cfg,
                                                                  const char *address,
                                                                  struct AranyaExtError *__ext_err);
+
+/**
+ * Sets IPC timeout for all Client APIs.
+ *
+ * @param[in,out] cfg a pointer to the client config builder
+ * @param[in] duration the IPC timeout
+ *
+ * @relates AranyaClientConfigBuilder.
+ */
+AranyaError aranya_client_config_builder_set_ipc_timeout(struct AranyaClientConfigBuilder *cfg,
+                                                         AranyaDuration duration);
+
+/**
+ * Sets IPC timeout for all Client APIs.
+ *
+ * @param[in,out] cfg a pointer to the client config builder
+ * @param[in] duration the IPC timeout
+ *
+ * @relates AranyaClientConfigBuilder.
+ */
+AranyaError aranya_client_config_builder_set_ipc_timeout_ext(struct AranyaClientConfigBuilder *cfg,
+                                                             AranyaDuration duration,
+                                                             struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaAddTeamQuicSyncConfigBuilder`.
@@ -2767,17 +2790,12 @@ AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
  * @param[in] config configuration values for syncing with a peer.
  * @param[in] timeout the maximum amount of time this request can take.
  *
- * Default values for a sync config will be used if `config` is `NULL`
- *
- * The default timeout, 1 year, will be used if `timeout` is `NULL`.
- *
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now(const struct AranyaClient *client,
                             const struct AranyaTeamId *team,
                             AranyaAddr addr,
-                            const struct AranyaSyncPeerConfig *config,
-                            const AranyaDuration *timeout);
+                            const struct AranyaSyncPeerConfig *config);
 
 /**
  * Sync with peer immediately.
@@ -2796,17 +2814,12 @@ AranyaError aranya_sync_now(const struct AranyaClient *client,
  * @param[in] config configuration values for syncing with a peer.
  * @param[in] timeout the maximum amount of time this request can take.
  *
- * Default values for a sync config will be used if `config` is `NULL`
- *
- * The default timeout, 1 year, will be used if `timeout` is `NULL`.
- *
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now_ext(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaAddr addr,
                                 const struct AranyaSyncPeerConfig *config,
-                                const AranyaDuration *timeout,
                                 struct AranyaExtError *__ext_err);
 
 /**
