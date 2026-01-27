@@ -52,10 +52,10 @@ type TestClient =
 
 type TestState = sync::quic::QuicState;
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<TestState, crate::EN, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<TestState, crate::PS, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
-type TestServer = sync::quic::Server<crate::EN, crate::SP>;
+type TestServer = sync::quic::Server<crate::PS, crate::SP>;
 
 struct TestDevice {
     /// Aranya sync client.

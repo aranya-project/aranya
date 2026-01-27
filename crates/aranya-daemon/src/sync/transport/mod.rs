@@ -6,7 +6,7 @@ use std::{fmt, future::Future};
 
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{Engine, Sink, StorageProvider};
+use aranya_runtime::{PolicyStore, Sink, StorageProvider};
 
 #[cfg(feature = "preview")]
 use super::GraphId;
@@ -15,16 +15,16 @@ use super::{Result, SyncManager, SyncPeer};
 pub(crate) mod quic;
 
 /// Types that contain additional data that are part of a [`SyncManager`] object.
-pub(crate) trait SyncState<EN, SP, EF>: Sized + fmt::Debug
+pub(crate) trait SyncState<PS, SP, EF>: Sized + fmt::Debug
 where
-    EN: Engine,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Syncs with the peer.
     ///
     /// Returns the number of commands that were received and successfully processed.
-    fn sync_impl<S: Sink<EN::Effect>>(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+    fn sync_impl<S: Sink<PS::Effect>>(
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         sink: &mut S,
     ) -> impl Future<Output = Result<usize>>;
@@ -32,7 +32,7 @@ where
     /// Subscribe to hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     fn sync_hello_subscribe_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
@@ -42,14 +42,14 @@ where
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     fn sync_hello_unsubscribe_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
     ) -> impl Future<Output = Result<()>>;
 
     /// Broadcast hello notifications to all subscribers of a graph.
     #[cfg(feature = "preview")]
     fn broadcast_hello_notifications_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         graph_id: GraphId,
         head: Address,
     ) -> impl Future<Output = Result<()>>;
