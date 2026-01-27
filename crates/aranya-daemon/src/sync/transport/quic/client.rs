@@ -79,17 +79,17 @@ impl QuicState {
     }
 }
 
-impl<EN, SP, EF> SyncState<EN, SP, EF> for QuicState
+impl<PS, SP, EF> SyncState<PS, SP, EF> for QuicState
 where
-    EN: PolicyStore,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Syncs with the peer.
     ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    async fn sync_impl<S: Sink<EN::Effect>>(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+    async fn sync_impl<S: Sink<PS::Effect>>(
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         sink: &mut S,
     ) -> Result<usize> {
@@ -119,7 +119,7 @@ where
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_subscribe_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
@@ -134,7 +134,7 @@ where
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn sync_hello_unsubscribe_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
     ) -> Result<()> {
         syncer.send_hello_unsubscribe_request(peer).await
@@ -144,7 +144,7 @@ where
     #[cfg(feature = "preview")]
     #[instrument(skip_all)]
     async fn broadcast_hello_notifications_impl(
-        syncer: &mut SyncManager<Self, EN, SP, EF>,
+        syncer: &mut SyncManager<Self, PS, SP, EF>,
         graph_id: GraphId,
         head: Address,
     ) -> Result<()> {
@@ -152,9 +152,9 @@ where
     }
 }
 
-impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+impl<PS, SP, EF> SyncManager<QuicState, PS, SP, EF>
 where
-    EN: PolicyStore,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Creates a new [`SyncManager`].
@@ -163,7 +163,7 @@ where
     /// that outbound connections use the same endpoint as the server, enabling
     /// bidirectional connection reuse.
     pub(crate) fn new(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
         recv: mpsc::Receiver<Callback>,
         conns: SharedConnectionMap,
@@ -322,7 +322,7 @@ where
         peer: SyncPeer,
     ) -> Result<usize>
     where
-        S: Sink<EN::Effect>,
+        S: Sink<PS::Effect>,
     {
         trace!("client receiving sync response from QUIC sync server");
 

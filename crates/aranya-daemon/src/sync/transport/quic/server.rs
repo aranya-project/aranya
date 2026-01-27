@@ -32,9 +32,9 @@ use crate::{
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
-pub(crate) struct Server<EN, SP> {
+pub(crate) struct Server<PS, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client: Client<EN, SP>,
+    client: Client<PS, SP>,
     /// QUIC endpoint for accepting connections.
     endpoint: Endpoint,
     /// Connection map shared with [`SyncManager`]
@@ -46,9 +46,9 @@ pub(crate) struct Server<EN, SP> {
     hello_sync_handle: SyncHandle,
 }
 
-impl<EN, SP> Server<EN, SP>
+impl<PS, SP> Server<PS, SP>
 where
-    EN: PolicyStore + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Returns the local address the server is listening on.
@@ -75,7 +75,7 @@ where
     ///
     /// Will panic if called outside tokio runtime.
     pub(crate) async fn new(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         addr: &Addr,
         cert_config: &CertConfig,
     ) -> Result<(
@@ -230,7 +230,7 @@ where
     async fn serve_connection_inner(
         key: ConnectionKey,
         conn: Connection,
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         sync_peers: SyncHandle,
     ) {
         let peer = key.addr;
@@ -257,7 +257,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     pub(crate) async fn sync(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         peer: Addr,
         mut send: SendStream,
         mut recv: RecvStream,
@@ -297,7 +297,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         addr: Addr,
         request_data: &[u8],
         _sync_peers: SyncHandle,
@@ -346,7 +346,7 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         peer_addr: Addr,
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");

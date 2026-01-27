@@ -49,9 +49,9 @@ pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
 /// allocations from malicious peers.
 const MAX_HELLO_RESPONSE_SIZE: usize = 64 * 1024;
 
-impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+impl<PS, SP, EF> SyncManager<QuicState, PS, SP, EF>
 where
-    EN: PolicyStore,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -325,15 +325,15 @@ where
 /// The task will periodically send hello notifications to the subscriber at the specified interval,
 /// regardless of whether the graph has changed. The task will exit when the subscription expires
 /// or the cancellation token is triggered.
-fn spawn_scheduled_hello_sender<EN, SP>(
+fn spawn_scheduled_hello_sender<PS, SP>(
     peer: SyncPeer,
     schedule_delay: Duration,
     expires_at: Instant,
     cancel_token: CancellationToken,
     handle: SyncHandle,
-    client: Client<EN, SP>,
+    client: Client<PS, SP>,
 ) where
-    EN: PolicyStore + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
@@ -387,9 +387,9 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     });
 }
 
-impl<EN, SP> quic::Server<EN, SP>
+impl<PS, SP> quic::Server<PS, SP>
 where
-    EN: PolicyStore + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     /// Processes a hello message.
@@ -399,7 +399,7 @@ where
     #[instrument(skip_all)]
     pub(super) async fn process_hello_message(
         hello_msg: SyncHelloType,
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         peer_addr: Addr,
         sync_peers: SyncHandle,
     ) {
