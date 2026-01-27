@@ -226,10 +226,10 @@ where
                     .map_err(Error::from)?;
 
                 // Add timeout to connection attempt to avoid hanging on failed TLS handshakes.
-                // Quinn does not provide a built-in handshake timeout (only max_idle_timeout),
-                // so we wrap the connection attempt with tokio::time::timeout.
+                // Quinn does not provide a built-in handshake timeout, and mTLS verification
+                // failures can cause the connection to hang indefinitely without this.
                 // See: https://github.com/quinn-rs/quinn/issues/2298
-                let conn = tokio::time::timeout(Duration::from_secs(5), connecting)
+                let conn = tokio::time::timeout(Duration::from_secs(30), connecting)
                     .await
                     .map_err(|_| Error::QuicConnectionTimeout)?
                     .map_err(Error::from)?;

@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, info, info_span, instrument, trace, warn, Instrument as _};
 
 use super::{
-    certs, keep_alive_transport_config, CertConfig, ConnectionKey, ConnectionUpdate, Error,
+    certs, transport_config, CertConfig, ConnectionKey, ConnectionUpdate, Error,
     SharedConnectionMap, ALPN_QUIC_SYNC,
 };
 #[cfg(feature = "preview")]
@@ -111,7 +111,7 @@ where
                 .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
         ));
 
-        server_config.transport_config(keep_alive_transport_config());
+        server_config.transport_config(transport_config());
 
         // Build client TLS config for mTLS (for outbound connections)
         let mut client_tls_config =
@@ -124,7 +124,7 @@ where
                 .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
         ));
 
-        client_config.transport_config(keep_alive_transport_config());
+        client_config.transport_config(transport_config());
 
         let bind_addr = tokio::net::lookup_host(addr.to_socket_addrs())
             .await
