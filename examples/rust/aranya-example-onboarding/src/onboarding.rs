@@ -3,11 +3,9 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use aranya_client::{
-    client::{DeviceId, KeyBundle, TeamId},
-    Addr,
-};
+use aranya_client::client::{DeviceId, KeyBundle, TeamId};
 use aranya_example_common::{AgeEncryptor, SecretString};
+use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 
 use crate::tcp::{TcpClient, TcpServer};
