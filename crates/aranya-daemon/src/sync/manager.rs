@@ -34,7 +34,7 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{Engine, StorageProvider};
+use aranya_runtime::{PolicyStore, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use derive_where::derive_where;
@@ -121,7 +121,7 @@ impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF> {
 impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
 where
     ST: SyncState<EN, SP, EF>,
-    EN: Engine,
+    EN: PolicyStore,
     SP: StorageProvider,
 {
     /// Subscribe to hello notifications from a sync peer.
@@ -151,7 +151,7 @@ where
 impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
 where
     ST: SyncState<EN, SP, EF>,
-    EN: Engine,
+    EN: PolicyStore,
     SP: StorageProvider,
     EF: Send + Sync + 'static + TryFrom<EN::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,

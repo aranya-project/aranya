@@ -17,8 +17,7 @@ use aranya_policy_compiler::Compiler;
 use aranya_policy_lang::lang::parse_policy_document;
 use aranya_policy_vm::{ffi::FfiModule, Machine};
 use aranya_runtime::{
-    policy::{PolicyError, PolicyId, PolicyStore},
-    FfiCallable, Sink, VmEffect, VmPolicy,
+    FfiCallable, PolicyError, PolicyId, PolicyStore, Sink, VmEffect, VmPolicy,
 };
 use tracing::instrument;
 
@@ -53,22 +52,22 @@ impl fmt::Display for SimplePerm {
 }
 
 /// Engine using policy from [`policy.md`].
-pub struct PolicyEngine<CE, KS> {
+pub struct PolicyEngine<E, KS> {
     /// The underlying policy.
-    pub(crate) policy: VmPolicy<CE>,
-    _eng: PhantomData<CE>,
+    pub(crate) policy: VmPolicy<E>,
+    _eng: PhantomData<E>,
     _ks: PhantomData<KS>,
 }
 
-impl<CE, KS> PolicyEngine<CE, KS>
+impl<E, KS> PolicyEngine<E, KS>
 where
-    CE: aranya_crypto::Engine,
+    E: aranya_crypto::Engine,
     KS: KeyStore + TryClone + Send + 'static,
 {
     /// Creates a `PolicyEngine` from a policy document.
     pub fn new(
         policy_doc: &str,
-        eng: CE,
+        eng: E,
         store: AranyaStore<KS>,
         device_id: DeviceId,
     ) -> Result<Self> {
@@ -88,7 +87,7 @@ where
         let machine = Machine::from_module(module).context("should be able to create machine")?;
 
         // select which FFI modules to use.
-        let ffis: Vec<Box<dyn FfiCallable<CE> + Send + 'static>> = vec![
+        let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
@@ -107,11 +106,11 @@ where
     }
 }
 
-impl<CE, KS> PolicyStore for PolicyEngine<CE, KS>
+impl<E, KS> PolicyStore for PolicyEngine<E, KS>
 where
-    CE: aranya_crypto::Engine,
+    E: aranya_crypto::Engine,
 {
-    type Policy = VmPolicy<CE>;
+    type Policy = VmPolicy<E>;
     type Effect = VmEffect;
 
     fn add_policy(&mut self, policy: &[u8]) -> Result<PolicyId, PolicyError> {
@@ -126,9 +125,9 @@ where
     }
 }
 
-impl<CE, KS> fmt::Debug for PolicyEngine<CE, KS>
+impl<E, KS> fmt::Debug for PolicyEngine<E, KS>
 where
-    CE: fmt::Debug,
+    E: fmt::Debug,
     KS: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -138,12 +137,12 @@ where
 
 /// Sink for effects.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct VecSink<Eff> {
+pub struct VecSink<E> {
     /// Effects from executing a policy action.
-    pub(crate) effects: Vec<Eff>,
+    pub(crate) effects: Vec<E>,
 }
 
-impl<Eff> VecSink<Eff> {
+impl<E> VecSink<E> {
     /// Creates a new `VecSink`.
     pub(crate) const fn new() -> Self {
         Self {
@@ -152,20 +151,20 @@ impl<Eff> VecSink<Eff> {
     }
 
     /// Returns the collected effects.
-    pub(crate) fn collect<T>(self) -> Result<Vec<T>, <T as TryFrom<Eff>>::Error>
+    pub(crate) fn collect<T>(self) -> Result<Vec<T>, <T as TryFrom<E>>::Error>
     where
-        T: TryFrom<Eff>,
+        T: TryFrom<E>,
     {
         self.effects.into_iter().map(T::try_from).collect()
     }
 }
 
-impl<Eff> Sink<Eff> for VecSink<Eff> {
+impl<E> Sink<E> for VecSink<E> {
     #[instrument(skip_all)]
     fn begin(&mut self) {}
 
     #[instrument(skip_all)]
-    fn consume(&mut self, effect: Eff) {
+    fn consume(&mut self, effect: E) {
         self.effects.push(effect);
     }
 

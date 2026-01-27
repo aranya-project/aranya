@@ -7,11 +7,10 @@ use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use aranya_runtime::{
-    Command as _, Engine, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
+    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::error::ReportExt as _;
 use quinn::{Endpoint, RecvStream, SendStream};
-use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
 use tracing::{debug, error, instrument, trace};
@@ -20,8 +19,8 @@ use super::{ConnectionKey, Error, SharedConnectionMap};
 use crate::{
     aranya::Client,
     sync::{
-        transport::SyncState, Addr, Callback, Error as SyncError, GraphId, Result, SyncManager,
-        SyncPeer, SyncResponse,
+        transport::SyncState, Callback, Error as SyncError, GraphId, Result, SyncManager, SyncPeer,
+        SyncResponse,
     },
 };
 
@@ -78,19 +77,11 @@ impl QuicState {
             conns,
         }
     }
-
-    /// Returns the local address of the QUIC endpoint.
-    ///
-    /// Since we use the same endpoint for both client and server operations,
-    /// this address serves as both our client source address and our server address.
-    pub(super) fn local_addr(&self) -> std::result::Result<Addr, std::io::Error> {
-        self.endpoint.local_addr().map(Addr::from)
-    }
 }
 
 impl<EN, SP, EF> SyncState<EN, SP, EF> for QuicState
 where
-    EN: Engine,
+    EN: PolicyStore,
     SP: StorageProvider,
 {
     /// Syncs with the peer.
@@ -107,11 +98,7 @@ where
             .await
             .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
 
-        let local_addr = syncer
-            .state
-            .local_addr()
-            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng, local_addr);
+        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
 
         // send sync request.
         syncer
@@ -138,18 +125,8 @@ where
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
-        let local_addr = syncer
-            .state
-            .local_addr()
-            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
         syncer
-            .send_sync_hello_subscribe_request(
-                peer,
-                graph_change_delay,
-                duration,
-                schedule_delay,
-                local_addr,
-            )
+            .send_sync_hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
             .await
     }
 
@@ -160,13 +137,7 @@ where
         syncer: &mut SyncManager<Self, EN, SP, EF>,
         peer: SyncPeer,
     ) -> Result<()> {
-        let local_addr = syncer
-            .state
-            .local_addr()
-            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
-        syncer
-            .send_hello_unsubscribe_request(peer, local_addr)
-            .await
+        syncer.send_hello_unsubscribe_request(peer).await
     }
 
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -183,7 +154,7 @@ where
 
 impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
 where
-    EN: Engine,
+    EN: PolicyStore,
     SP: StorageProvider,
 {
     /// Creates a new [`SyncManager`].
@@ -305,15 +276,12 @@ where
     /// * `Ok(())` if the sync request was sent successfully
     /// * `Err(SyncError)` if there was an error generating or sending the request
     #[instrument(skip_all, fields(peer = ?peer))]
-    async fn send_sync_request<A>(
+    async fn send_sync_request(
         &self,
         send: &mut SendStream,
-        syncer: &mut SyncRequester<A>,
+        syncer: &mut SyncRequester,
         peer: SyncPeer,
-    ) -> Result<()>
-    where
-        A: Serialize + DeserializeOwned + Clone,
-    {
+    ) -> Result<()> {
         trace!("client sending sync request to QUIC sync server");
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
@@ -346,16 +314,15 @@ where
     ///
     /// Returns the number of commands that were received and successfully processed.
     #[instrument(skip_all, fields(peer = ?peer))]
-    async fn receive_sync_response<S, A>(
+    async fn receive_sync_response<S>(
         &self,
         recv: &mut RecvStream,
-        syncer: &mut SyncRequester<A>,
+        syncer: &mut SyncRequester,
         sink: &mut S,
         peer: SyncPeer,
     ) -> Result<usize>
     where
         S: Sink<EN::Effect>,
-        A: Serialize + DeserializeOwned + Clone,
     {
         trace!("client receiving sync response from QUIC sync server");
 

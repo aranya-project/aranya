@@ -4,7 +4,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Context as _;
 use aranya_runtime::{
-    Engine, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
+    PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
     MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
@@ -48,7 +48,7 @@ pub(crate) struct Server<EN, SP> {
 
 impl<EN, SP> Server<EN, SP>
 where
-    EN: Engine + Send + 'static,
+    EN: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Returns the local address the server is listening on.
@@ -304,7 +304,7 @@ where
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
-        let sync_type: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| {
+        let sync_type: SyncType = postcard::from_bytes(request_data).map_err(|e| {
             error!(
                 error = %e,
                 request_data_len = request_data.len(),
@@ -317,8 +317,7 @@ where
         match sync_type {
             SyncType::Poll {
                 request: request_msg,
-                address: peer_server_addr,
-            } => Self::process_poll_message(request_msg, client, addr, peer_server_addr).await,
+            } => Self::process_poll_message(request_msg, client, addr).await,
             SyncType::Subscribe { .. } => {
                 bug!("Push subscribe messages are not implemented")
             }
@@ -349,17 +348,16 @@ where
         request_msg: SyncRequestMessage,
         client: Client<EN, SP>,
         peer_addr: Addr,
-        peer_server_addr: Addr,
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
         // Extract the graph ID from the request
-        let SyncRequestMessage::SyncRequest { storage_id, .. } = &request_msg else {
+        let SyncRequestMessage::SyncRequest { graph_id, .. } = &request_msg else {
             bug!("Should be a SyncRequest")
         };
-        let storage_id = *storage_id;
+        let graph_id = *graph_id;
 
-        let mut resp = SyncResponder::new(peer_addr);
+        let mut resp = SyncResponder::new();
 
         resp.receive(request_msg).context("sync recv failed")?;
 
@@ -368,8 +366,8 @@ where
             // Lock both aranya and caches in the correct order.
             let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
             let peer = SyncPeer {
-                addr: peer_server_addr,
-                graph_id: storage_id,
+                addr: peer_addr,
+                graph_id,
             };
             let cache = caches.entry(peer).or_default();
 
@@ -379,7 +377,7 @@ where
                         err,
                         aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
                     ) {
-                        warn!(storage_id = %storage_id, "missing requested graph, we likely have not synced yet");
+                        warn!(graph_id = %graph_id, "missing requested graph, we likely have not synced yet");
                         Ok(0)
                     } else {
                         Err(err)
