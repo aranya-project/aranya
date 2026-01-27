@@ -12,7 +12,7 @@ use aranya_client::{
     SyncPeerConfig,
 };
 #[cfg(feature = "preview")]
-use aranya_client::{Permission, RoleManagementPermission};
+use aranya_client::{HelloSubscriptionConfig, Permission, RoleManagementPermission};
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{
@@ -293,17 +293,28 @@ async fn main() -> Result<()> {
 
         // Admin subscribes to hello notifications from Owner with 2-second delay
         info!("admin subscribing to hello notifications from owner");
-        let duration = Duration::from_secs(30);
-        let graph_change_delay = Duration::from_millis(1000);
-        let schedule_delay = Duration::from_secs(5);
         admin_team
-            .sync_hello_subscribe(owner_addr, graph_change_delay * 2, duration, schedule_delay)
+            .sync_hello_subscribe(
+                owner_addr,
+                HelloSubscriptionConfig::builder()
+                    .graph_change_delay(Duration::from_millis(2000))
+                    .expiration(Duration::from_secs(30))
+                    .periodic_interval(Duration::from_secs(5))
+                    .build()?,
+            )
             .await?;
 
         // Operator subscribes to hello notifications from Admin with 1-second delay
         info!("operator subscribing to hello notifications from admin");
         operator_team
-            .sync_hello_subscribe(admin_addr, graph_change_delay, duration, schedule_delay)
+            .sync_hello_subscribe(
+                admin_addr,
+                HelloSubscriptionConfig::builder()
+                    .graph_change_delay(Duration::from_millis(1000))
+                    .expiration(Duration::from_secs(30))
+                    .periodic_interval(Duration::from_secs(5))
+                    .build()?,
+            )
             .await?;
 
         sleep(sleep_interval).await;
