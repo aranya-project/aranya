@@ -17,6 +17,21 @@ use tracing::{debug, error};
 
 use crate::imp;
 
+/// Uses the client config to determine whether `fut` should be timed.
+macro_rules! timed_future {
+    ($client:expr, $fut:expr) => {{
+        let client_cfg: &imp::ClientConfig = &$client.cfg;
+
+        match client_cfg.ipc_timeout() {
+            Some(timeout) => {
+                let timed_fut = async { tokio::time::timeout(timeout, $fut).await };
+                $client.rt.block_on(timed_fut)??
+            }
+            None => $client.rt.block_on($fut)?,
+        }
+    }};
+}
+
 /// An error code.
 ///
 /// For extended error information, see [`ExtError`].
@@ -252,7 +267,12 @@ pub unsafe fn client_init(
             .connect()
     })?;
 
-    Client::init(client, imp::Client { rt, inner });
+    let cfg = {
+        let cfg_ref: &imp::ClientConfig = config.deref();
+        cfg_ref.clone()
+    };
+
+    Client::init(client, imp::Client { rt, inner, cfg });
     Ok(())
 }
 
@@ -666,7 +686,7 @@ pub unsafe fn get_key_bundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let keys = client.rt.block_on(client.inner.get_key_bundle())?;
+    let keys = timed_future!(client, client.inner.get_key_bundle());
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
 
@@ -718,7 +738,7 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 ///
 /// @relates AranyaClient.
 pub fn get_device_id(client: &Client) -> Result<DeviceId, imp::Error> {
-    let id = client.rt.block_on(client.inner.get_device_id())?;
+    let id = timed_future!(client, client.inner.get_device_id());
     Ok(id.into())
 }
 
@@ -762,6 +782,20 @@ pub fn client_config_builder_set_daemon_uds_path(
     address: *const c_char,
 ) {
     cfg.daemon_addr(address);
+}
+
+// The 1 year default comes from `create_ctx` in "crates/aranya-client/src/client.rs".
+// TODO: Only `sync_now` and `create_team` use this currently.
+/// Sets IPC timeout for `AranyaClient` APIs.
+///
+/// By default, the IPC timeout is set to 1 year.
+///
+/// @param[in,out] cfg a pointer to the client config builder
+/// @param[in] duration the IPC timeout
+///
+/// @relates AranyaClientConfigBuilder.
+pub fn client_config_builder_set_ipc_timeout(cfg: &mut ClientConfigBuilder, duration: Duration) {
+    cfg.ipc_timeout(duration);
 }
 
 /// QUIC syncer configuration.
@@ -1128,15 +1162,14 @@ pub unsafe fn setup_default_roles(
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let default_roles = client
-        .rt
-        .block_on(
-            client
-                .inner
-                .team(team.into())
-                .setup_default_roles(owning_role.into()),
-        )?
-        .__into_data();
+    let default_roles = timed_future!(
+        client,
+        client
+            .inner
+            .team(team.into())
+            .setup_default_roles(owning_role.into())
+    )
+    .__into_data();
 
     debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
 
@@ -1169,12 +1202,13 @@ pub fn add_role_owner(
     role: &RoleId,
     owning_role: &RoleId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .add_role_owner(role.into(), owning_role.into()),
-    )?;
+            .add_role_owner(role.into(), owning_role.into())
+    );
 
     Ok(())
 }
@@ -1194,12 +1228,13 @@ pub fn remove_role_owner(
     role: &RoleId,
     owning_role: &RoleId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .remove_role_owner(role.into(), owning_role.into()),
-    )?;
+            .remove_role_owner(role.into(), owning_role.into())
+    );
 
     Ok(())
 }
@@ -1224,10 +1259,11 @@ pub unsafe fn role_owners(
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let owning_roles = client
-        .rt
-        .block_on(client.inner.team(team.into()).role_owners(role.into()))?
-        .__into_data();
+    let owning_roles = timed_future!(
+        client,
+        client.inner.team(team.into()).role_owners(role.into())
+    )
+    .__into_data();
 
     if *roles_len < owning_roles.len() {
         *roles_len = owning_roles.len();
@@ -1260,12 +1296,13 @@ pub fn assign_role_management_permission(
     managing_role: &RoleId,
     perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .assign_role_management_permission(role.into(), managing_role.into(), perm.into()),
-    )?;
+            .assign_role_management_permission(role.into(), managing_role.into(), perm.into())
+    );
 
     Ok(())
 }
@@ -1287,12 +1324,13 @@ pub fn revoke_role_management_permission(
     managing_role: &RoleId,
     perm: RoleManagementPermission,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .revoke_role_management_permission(role.into(), managing_role.into(), perm.into()),
-    )?;
+            .revoke_role_management_permission(role.into(), managing_role.into(), perm.into())
+    );
 
     Ok(())
 }
@@ -1317,13 +1355,14 @@ pub fn change_role(
     old_role: &RoleId,
     new_role: &RoleId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .change_role(old_role.into(), new_role.into()),
-    )?;
+            .change_role(old_role.into(), new_role.into())
+    );
 
     Ok(())
 }
@@ -1346,10 +1385,7 @@ pub unsafe fn team_roles(
     roles_out: *mut MaybeUninit<Role>,
     roles_out_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let roles = client
-        .rt
-        .block_on(client.inner.team(team.into()).roles())?
-        .__into_data();
+    let roles = timed_future!(client, client.inner.team(team.into()).roles()).__into_data();
 
     if *roles_out_len < roles.len() {
         *roles_out_len = roles.len();
@@ -1388,12 +1424,13 @@ pub fn create_role(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `name` is a valid C String.
     let role_name = unsafe { role_name.as_underlying() }?;
-    let role = client.rt.block_on(
+    let role = timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .create_role(role_name, owning_role.into()),
-    )?;
+            .create_role(role_name, owning_role.into())
+    );
     Role::init(role_out, role);
     Ok(())
 }
@@ -1659,10 +1696,7 @@ pub fn add_label_managing_role(
 /// @relates AranyaClient.
 pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
     let cfg: &imp::CreateTeamConfig = cfg.deref();
-    let team_id = client
-        .rt
-        .block_on(client.inner.create_team(cfg.into()))?
-        .team_id();
+    let team_id = timed_future!(client, client.inner.create_team(cfg.into())).team_id();
 
     Ok(team_id.into())
 }
@@ -1951,12 +1985,13 @@ pub unsafe fn sync_now(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .sync_now(addr, config.map(|config| (*config).clone().into())),
-    )?;
+    let team = client.inner.team(team.into());
+
+    timed_future!(
+        client,
+        team.sync_now(addr, config.map(|config| (*config).clone().into()))
+    );
+
     Ok(())
 }
 
@@ -1974,9 +2009,7 @@ pub unsafe fn team_devices(
     devices: *mut MaybeUninit<DeviceId>,
     devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let data = client
-        .rt
-        .block_on(client.inner.team(team.into()).devices())?;
+    let data = timed_future!(client, client.inner.team(team.into()).devices());
     let data = data.__data();
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     if *devices_len < data.len() {
