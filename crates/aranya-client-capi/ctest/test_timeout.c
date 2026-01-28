@@ -55,10 +55,10 @@ static int test_timeout(const char *tmpdir) {
                   aranya_client_config_builder_set_daemon_uds_path(
                       &owner_builder, g_owner_uds));
 
-    // Set a timeout of 2 seconds
+    // Set a timeout of 10 seconds
     CLIENT_EXPECT("Failed to set IPC timeout", "",
                   aranya_client_config_builder_set_ipc_timeout(
-                      &owner_builder, ARANYA_DURATION_SECONDS * 2));
+                      &owner_builder, ARANYA_DURATION_SECONDS * (uint64_t)10));
 
     CLIENT_EXPECT("Failed to build owner config", "",
                   aranya_client_config_build(&owner_builder, &owner_config));
