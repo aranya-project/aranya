@@ -172,17 +172,19 @@ where
                 .server_keys
                 .get_team_for_identity(&identity)
                 .context("no active team for accepted connection")?;
-            let peer_addr: Addr = {
+            let peer_port: u16 = {
                 let mut recv = conn
                     .accept_receive_stream()
                     .await?
                     .context("no stream for peer address")?;
                 let bytes = recv.receive().await?.context("no peer address sent")?;
-                postcard::from_bytes(&bytes).context("bad peer address")?
+                u16::from_be_bytes(bytes.as_ref().try_into().context("bad peer address")?)
             };
+            let mut peer_addr = conn.remote_addr()?;
+            peer_addr.set_port(peer_port);
+            let peer = SyncPeer::new(peer_addr.into(), GraphId::transmute(active_team));
             conn.keep_alive(true)
                 .context("unable to keep connection alive")?;
-            let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
             self.conns.insert(peer, conn).await;
             anyhow::Ok(())
         }
