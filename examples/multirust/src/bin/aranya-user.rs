@@ -185,10 +185,10 @@ async fn main() -> Result<()> {
         ))
     };
 
-    let team_id = TeamId::from_api(read("team.id").await?);
+    let team_id = read::<TeamId>("team.id").await?;
     let operator_sync_addr = var::<Addr>("ARANYA_OPERATOR_SYNC_ADDR");
-    let member_a_device_id = DeviceId::from_api(read("member-a.id").await?);
-    let member_b_device_id = DeviceId::from_api(read("member-b.id").await?);
+    let member_a_device_id = read::<DeviceId>("member-a.id").await?;
+    let member_b_device_id = read::<DeviceId>("member-b.id").await?;
 
     let sync_interval = Duration::from_millis(100);
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;

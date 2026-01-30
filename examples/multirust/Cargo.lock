@@ -66,6 +66,7 @@ dependencies = [
  "aranya-crypto",
  "aranya-daemon-api",
  "aranya-fast-channels",
+ "aranya-id",
  "aranya-policy-text",
  "aranya-util",
  "buggy",
