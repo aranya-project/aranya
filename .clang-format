@@ -1,4 +1,8 @@
 ---
+Language: Cpp
 BasedOnStyle: LLVM
 IndentWidth: 4
-...
+---
+Language: C
+BasedOnStyle: LLVM
+IndentWidth: 4

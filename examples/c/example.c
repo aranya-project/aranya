@@ -717,26 +717,25 @@ AranyaError run(Team *t) {
 #ifdef ENABLE_ARANYA_PREVIEW
     printf("demonstrating hello subscription\n");
 
-    // Admin subscribes to hello notifications from Owner with 2-second delay
+    // Admin subscribes to hello notifications from Owner using defaults
     printf("admin subscribing to hello notifications from owner\n");
-    AranyaDuration graph_change_delay = ARANYA_DURATION_SECONDS * 1ULL;
-    AranyaDuration duration = ARANYA_DURATION_SECONDS * 30ULL;
-    AranyaDuration schedule_delay = ARANYA_DURATION_SECONDS * 5ULL;
+    AranyaHelloSubscriptionConfig hello_cfg;
+    err = aranya_hello_subscription_config_default(&hello_cfg);
+    EXPECT("error getting default hello subscription config", err);
     err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
-                                      graph_change_delay * 2, duration,
-                                      schedule_delay);
+                                      &hello_cfg);
     EXPECT("error subscribing admin to owner hello notifications", err);
 
-    // Operator subscribes to hello notifications from Admin with 1-second delay
+    // Operator subscribes to hello notifications from Admin using defaults
     printf("operator subscribing to hello notifications from admin\n");
+    err = aranya_hello_subscription_config_default(&hello_cfg);
+    EXPECT("error getting default hello subscription config", err);
     err = aranya_sync_hello_subscribe(&operator->client, &t->id,
-                                      sync_addrs[ADMIN], graph_change_delay,
-                                      duration, schedule_delay);
+                                      sync_addrs[ADMIN], &hello_cfg);
     EXPECT("error subscribing operator to admin hello notifications", err);
 
     sleep(1);
 #endif
-
     // Queries
     printf("running factdb queries\n");
 
