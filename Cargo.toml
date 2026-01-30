@@ -83,6 +83,7 @@ rustix = { version = "1.1.2", features = ["shm"] }
 s2n-quic = { version = "1.58.0-psk.2", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
+serde_json = "1"
 serial_test = { version = "3" }
 sysinfo = { version = "0.36" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }

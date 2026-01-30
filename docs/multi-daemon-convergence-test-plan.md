@@ -127,27 +127,6 @@ duvet report --ci
 open .duvet/reports/report.html
 ```
 
-### CI Integration
-
-Add to `.github/workflows/ci.yml`:
-
-```yaml
-duvet:
-  name: Requirements Coverage
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - name: Install duvet
-      run: cargo install duvet --locked
-    - name: Check requirements coverage
-      run: duvet report --ci
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v4
-      with:
-        name: duvet-report
-        path: .duvet/reports/
-```
-
 ### Requirement Coverage Tracking
 
 The specification contains 47 requirements across these categories:
