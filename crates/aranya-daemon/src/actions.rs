@@ -1,6 +1,6 @@
 //! Aranya graph actions/effects API.
 
-use std::{future::Future, marker::PhantomData, sync::Arc};
+use std::{future::Future, marker::PhantomData};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -12,9 +12,8 @@ use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_text::Text;
 #[cfg(feature = "afc")]
 use aranya_runtime::NullSink;
-use aranya_runtime::{ClientState, Engine, GraphId, Session, StorageProvider, VmPolicy};
+use aranya_runtime::{GraphId, PolicyStore, Session, StorageProvider, VmPolicy};
 use futures_util::TryFutureExt as _;
-use tokio::sync::Mutex;
 use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
@@ -34,9 +33,9 @@ pub(crate) struct SessionData {
 }
 
 /// Functions related to Aranya actions
-impl<EN, SP, CE> Client<EN, SP>
+impl<PS, SP, CE> Client<PS, SP>
 where
-    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
+    PS: PolicyStore<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
@@ -56,7 +55,7 @@ where
             nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()).to_vec(),
         );
         let id = {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.lock_aranya().await;
             act.with_action(|act| client.new_graph(policy_data, act, &mut sink))
                 .context("unable to create new team")?
         };
@@ -66,9 +65,9 @@ where
     /// Returns an implementation of [`Actions`] for a particular
     /// storage.
     #[instrument(skip_all, fields(%graph_id))]
-    pub fn actions(&self, graph_id: GraphId) -> impl Actions<EN, SP, CE> {
+    pub fn actions(&self, graph_id: GraphId) -> impl Actions<PS, SP, CE> {
         ActionsImpl {
-            aranya: Arc::clone(&self.aranya),
+            client: self.clone(),
             graph_id,
             _eng: PhantomData,
         }
@@ -77,8 +76,8 @@ where
     /// Create new ephemeral Session.
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
     #[instrument(skip_all, fields(%graph_id))]
-    pub(crate) async fn session_new(&self, graph_id: GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(graph_id)?;
+    pub(crate) async fn session_new(&self, graph_id: GraphId) -> Result<Session<SP, PS>> {
+        let session = self.lock_aranya().await.session(graph_id)?;
         Ok(session)
     }
 
@@ -87,10 +86,10 @@ where
     #[instrument(skip_all)]
     pub(crate) async fn session_receive(
         &self,
-        session: &mut Session<SP, EN>,
+        session: &mut Session<SP, PS>,
         command: &[u8],
     ) -> Result<Vec<Effect>> {
-        let client = self.aranya.lock().await;
+        let client = self.lock_aranya().await;
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
         Ok(sink.collect()?)
@@ -98,18 +97,18 @@ where
 }
 
 /// Implements [`Actions`] for a particular storage.
-struct ActionsImpl<EN, SP, CE> {
+struct ActionsImpl<PS, SP, CE> {
     /// Aranya client graph state.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    client: Client<PS, SP>,
     /// Aranya graph ID.
     graph_id: GraphId,
     /// Crypto engine.
     _eng: PhantomData<CE>,
 }
 
-impl<EN, SP, CE> Actions<EN, SP, CE> for ActionsImpl<EN, SP, CE>
+impl<PS, SP, CE> Actions<PS, SP, CE> for ActionsImpl<PS, SP, CE>
 where
-    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
+    PS: PolicyStore<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
@@ -120,7 +119,7 @@ where
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
         {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.client.lock_aranya().await;
             act.with_action(|act| client.action(self.graph_id, &mut sink, act))?;
         }
 
@@ -139,7 +138,7 @@ where
         let mut sink = VecSink::new();
         let mut msg_sink = MsgSink::new();
         {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.client.lock_aranya().await;
             let mut session = client.session(self.graph_id)?;
             act.with_action(|act| session.action(&client, &mut sink, &mut msg_sink, act))?;
         }
@@ -152,9 +151,9 @@ where
 }
 
 /// A programmatic API for policy actions.
-pub trait Actions<EN, SP, CE>
+pub trait Actions<PS, SP, CE>
 where
-    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
+    PS: PolicyStore<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
@@ -538,15 +537,15 @@ impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
 }
 
 #[cfg(feature = "afc")]
-pub(crate) fn query_afc_channel_is_valid<EN, SP, CE>(
-    aranya: &mut ClientState<EN, SP>,
+pub(crate) fn query_afc_channel_is_valid<PS, SP, CE>(
+    aranya: &mut aranya_runtime::ClientState<PS, SP>,
     graph_id: GraphId,
     sender_id: DeviceId,
     receiver_id: DeviceId,
     label_id: LabelId,
 ) -> Result<bool>
 where
-    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect>,
+    PS: PolicyStore<Policy = VmPolicy<CE>, Effect = VmEffect>,
     SP: StorageProvider,
     CE: aranya_crypto::Engine,
 {
