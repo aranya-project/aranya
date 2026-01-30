@@ -96,22 +96,22 @@ endif()
 
 enable_testing()
 
-add_executable(TestSimple test_simple.c)
-target_link_libraries(TestSimple PRIVATE Aranya::Client)
-add_test(NAME TestSimple COMMAND TestSimple $<TARGET_FILE:Aranya::Daemon>)
+add_library(utils INTERFACE)
+target_link_libraries(utils INTERFACE Aranya::Client)
+target_include_directories(utils INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-# Some examples of fixtures and env vars used previously.
+# --- Helper function for test executables ---
+function(add_capi_test TEST_NAME SOURCE_FILE)
+    cmake_parse_arguments(ARG "" "DAEMON_NAMES" "" ${ARGN})
 
-# add_test(NAME TestSetup
-#     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/accounts")
-# add_test(NAME TestCleanup
-#     COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_BINARY_DIR}/accounts")
+    add_executable(${TEST_NAME} ${SOURCE_FILE})
+    target_link_libraries(${TEST_NAME} PRIVATE Aranya::Client utils)
 
-# add_executable(TestIntegration test_integration.cpp)
-# target_link_libraries(TestIntegration PRIVATE APS Aranya::Aranya)
-# add_test(NAME TestIntegration COMMAND TestIntegration "${CMAKE_BINARY_DIR}/accounts")
-# set_tests_properties(TestIntegration PROPERTIES
-#     FIXTURES_REQUIRED APS ENVIRONMENT "${CERT_ENV_VARS};ARANYA_LOG_BASE_CONFIG=development;ARANYA_LOG_LEVEL=info")
+    # Always use wrapper script for uniform test execution
+    add_test(NAME ${TEST_NAME}
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/execute_test.sh
+        $<TARGET_FILE:${TEST_NAME}> $<TARGET_FILE:Aranya::Daemon> "${ARG_DAEMON_NAMES}")
+endfunction()
 
-# set_tests_properties(TestSetup PROPERTIES FIXTURES_SETUP APS)
-# set_tests_properties(TestCleanup PROPERTIES FIXTURES_CLEANUP APS)
+# --- Test Executables ---
+add_capi_test(TestOnboarding test_onboarding.c DAEMON_NAMES "owner,member")

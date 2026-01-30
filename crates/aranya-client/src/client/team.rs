@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
+use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
 use buggy::BugExt as _;
@@ -18,13 +19,14 @@ use crate::{
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
-    util::custom_id,
+    util::{ApiConv as _, ApiId},
 };
 
 custom_id! {
     /// Uniquely identifies an Aranya team.
     pub struct TeamId;
 }
+impl ApiId<api::TeamId> for TeamId {}
 
 /// Represents an Aranya Team.
 #[derive(Debug)]

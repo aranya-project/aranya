@@ -12,7 +12,7 @@ use s2n_quic::{connection, provider::StartError, stream};
 use tracing::error;
 
 use super::SyncState;
-use crate::{aranya::PeerCacheMap, sync::Addr};
+use crate::sync::Addr;
 
 mod client;
 mod connections;
@@ -57,5 +57,4 @@ impl From<Infallible> for Error {
 pub(crate) struct SyncParams {
     pub(crate) psk_store: Arc<PskStore>,
     pub(crate) server_addr: Addr,
-    pub(crate) caches: PeerCacheMap,
 }
