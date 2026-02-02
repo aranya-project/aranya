@@ -167,24 +167,19 @@ where
         let handle = conn.handle();
         async {
             trace!("received incoming QUIC connection");
+            conn.keep_alive(true)
+                .context("unable to keep connection alive")?;
             let identity = get_conn_identity(&mut conn)?;
             let active_team = self
                 .server_keys
                 .get_team_for_identity(&identity)
                 .context("no active team for accepted connection")?;
-            let peer_port: u16 = {
-                let mut recv = conn
-                    .accept_receive_stream()
-                    .await?
-                    .context("no stream for peer address")?;
-                let bytes = recv.receive().await?.context("no peer address sent")?;
-                u16::from_be_bytes(bytes.as_ref().try_into().context("bad peer address")?)
-            };
-            let mut peer_addr = conn.remote_addr()?;
-            peer_addr.set_port(peer_port);
-            let peer = SyncPeer::new(peer_addr.into(), GraphId::transmute(active_team));
-            conn.keep_alive(true)
-                .context("unable to keep connection alive")?;
+            let peer = SyncPeer::new(
+                extract_return_address(&mut conn)
+                    .await
+                    .context("could not get peer's return address")?,
+                GraphId::transmute(active_team),
+            );
             self.conns.insert(peer, conn).await;
             anyhow::Ok(())
         }
@@ -375,6 +370,27 @@ where
         buf.truncate(len);
         Ok(buf.into())
     }
+}
+
+async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Result<Addr> {
+    let ip = conn
+        .remote_addr()
+        .context("cannot get remote address")?
+        .ip();
+    let port = {
+        let mut recv = conn
+            .accept_receive_stream()
+            .await?
+            .context("no stream for return port")?;
+        let bytes = recv.receive().await?.context("no return port sent")?;
+        u16::from_be_bytes(
+            bytes
+                .as_ref()
+                .try_into()
+                .context("bad return port message")?,
+        )
+    };
+    Ok(Addr::from((ip, port)))
 }
 
 fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
