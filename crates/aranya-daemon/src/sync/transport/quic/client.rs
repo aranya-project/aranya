@@ -190,8 +190,7 @@ where
     ) -> Result<Self> {
         let state = QuicState::new(psk_store, conns.clone(), client_addr)?;
 
-        let return_address =
-            Bytes::from(postcard::to_allocvec(&server_addr).assume("can serialize addr")?);
+        let return_port = Bytes::copy_from_slice(&server_addr.port().to_be_bytes());
 
         Ok(Self {
             client,
@@ -200,7 +199,7 @@ where
             queue: DelayQueue::new(),
             send_effects,
             state,
-            return_address,
+            return_port,
             #[cfg(feature = "preview")]
             hello_tasks: tokio::task::JoinSet::new(),
         })
@@ -242,7 +241,7 @@ where
                 conn.keep_alive(true)?;
                 conn.open_send_stream()
                     .await?
-                    .send(self.return_address.clone())
+                    .send(self.return_port.clone())
                     .await?;
                 Ok(conn)
             })
