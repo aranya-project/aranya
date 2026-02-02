@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check)",
+      "Bash(cargo build)",
+      "Bash(cargo make)",
+      "Bash(cargo test)",
+      "Bash(find)",
+      "Bash(cat)",
+      "Bash(head)",
+      "Bash(cmake)",
+      "Bash(ctest)",
+      "Bash(tail)"
+    ],
+    "deny": [
+      "WebFetch",
+      "Bash(git push)"
+    ]
+  },
+  "env": {
+  },
+  "companyAnnouncements": [
+  ]
+}
