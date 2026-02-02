@@ -716,6 +716,106 @@ For example, a command author with rank 10 would be allowed to assign a label of
 
 It is recommended to never grant a role of lower rank a permission that a device of higher rank does not have (see [Privilege Escalation Attempt Scenario 2](#Privilege-Escalation-Attempt-Scenario-2)). If this scenario were to occur, the device of higher rank could onboard a pawn device to the team and assign the higher privilege but lower rank role to the pawn device in order to escalate its own privileges.
 
+### Default Hierarchy
+
+When a team is created, the default ranks are:
+
+| Object | Rank |
+|--------|------|
+| Creator Device | i64::MAX (9223372036854775807) |
+| Owner Role | i64::MAX - 1 |
+| Admin Role | 800 |
+| Operator Role | 700 |
+| Member Role | 600 |
+
+### Rank Examples
+
+#### Example 1: Simple Role Assignment (2 objects)
+
+**Scenario:** Admin device assigns Member role to a new device.
+
+```
+Admin Device (rank 800) → assigns → Member Role (rank 600) to New Device (rank 500)
+```
+
+**Checks:**
+1. Admin outranks Member Role: 800 > 600 ✓
+2. Admin outranks New Device: 800 > 500 ✓
+3. Member Role rank >= New Device rank: 600 >= 500 ✓
+
+**Result:** Allowed
+
+#### Example 2: Label Assignment (3 objects)
+
+**Scenario:** Operator assigns a label to a device.
+
+```
+Operator Device (rank 700) → assigns → Label (rank 400) → to → Target Device (rank 300)
+```
+
+**Checks:**
+1. Operator outranks Label: 700 > 400 ✓
+2. Operator outranks Target Device: 700 > 300 ✓
+
+**Result:** Allowed
+
+#### Example 3: Failed Operation - Equal Rank
+
+**Scenario:** Device tries to modify another device of equal rank.
+
+```
+Device A (rank 500) → tries to assign label to → Device B (rank 500)
+```
+
+**Checks:**
+1. Device A outranks Device B: 500 > 500 ✗
+
+**Result:** Denied (strict `>` comparison required)
+
+#### Example 4: Self-Administration Prevention
+
+**Scenario:** Device tries to upgrade its own rank.
+
+```
+Device (rank 500) → tries to change own rank to → 600
+```
+
+**Checks:**
+1. Device rank >= new rank: 500 >= 600 ✗
+
+**Result:** Denied (prevents self-promotion)
+
+#### Example 5: Privilege Escalation Prevention (3+ objects)
+
+**Scenario:** Malicious device tries to escalate privileges via a pawn device.
+
+```
+Malicious Device (rank 500)
+  → onboards Pawn Device (rank 400)
+  → tries to assign High-Privilege Role (rank 600) to Pawn
+```
+
+**Checks:**
+1. Malicious outranks Pawn: 500 > 400 ✓
+2. Malicious outranks High-Privilege Role: 500 > 600 ✗
+
+**Result:** Denied (device cannot assign roles that outrank it)
+
+#### Example 6: Role-Device Rank Constraint
+
+**Scenario:** Admin tries to assign a low-rank role to a high-rank device.
+
+```
+Admin (rank 800) → assigns → Low Role (rank 300) → to → Device (rank 500)
+```
+
+**Checks:**
+1. Admin outranks Low Role: 800 > 300 ✓
+2. Admin outranks Device: 800 > 500 ✓
+3. Low Role rank >= Device rank: 300 >= 500 ✗
+
+**Result:** Denied (role must be >= device rank to prevent device from modifying its own role)
+
 ### Rank Fact
 
 Each object in Aranya's RBAC system has at most one rank associated with its Aranya ID.
@@ -824,6 +924,46 @@ function object_exists(object_id id) bool {
 
 Command for changing the rank of an object.
 
+If the target object is a device with an assigned role, the new rank must not
+exceed the role's rank. This maintains the invariant that `role_rank >= device_rank`
+which was established at role assignment time. To promote a device above its
+current role's rank, first change the device's role to one with a higher rank.
+
+#### Role Rank Changes and the Device-Role Invariant
+
+The policy enforces `role_rank >= device_rank` at assignment time and when
+promoting devices. However, the policy does not prevent demoting a role's rank
+below devices that hold it. Enforcing this would require iterating over all
+devices assigned to the role, which the policy language does not support.
+
+**Why this limitation exists:** Changing role ranks is an infrequent
+administrative operation, and blocking it entirely when any device holds the
+role would be overly restrictive. The tradeoff accepts that role demotion is
+an advanced operation requiring care.
+
+**Risk:** If a role's rank is demoted below a device that holds it, the device
+could potentially modify permissions on its own role (if it has `ChangeRolePerms`),
+since it would then outrank the role.
+
+**Application mitigations:**
+
+1. **Unassign, change, reassign.** Before changing a role's rank, unassign the
+   role from all devices it is assigned to, change the rank, then reassign the
+   role to devices where the new rank >= the device rank. This ensures the
+   invariant is upheld.
+
+2. **Create a new role instead.** If a different rank is needed, create a new
+   role with the desired rank and permissions, migrate devices to it, then
+   delete the old role to clean up.
+
+3. **Audit before role rank changes.** Before demoting a role's rank, query
+   all devices assigned to that role and verify the new rank will still be
+   >= the rank of every assigned device.
+
+4. **Separate permission-modification roles.** Do not grant `ChangeRolePerms`
+   to roles that may be demoted. This limits the blast radius if the invariant
+   is violated.
+
 ```policy
 // Maximum rank an object can have: i64::MAX.
 let MAX_RANK = 9223372036854775807
@@ -892,6 +1032,15 @@ command ChangeRank {
         // If the author is the current device, this prevents a device from upgrading its own rank.
         let author_rank = get_object_rank(author.device_id)
         check author_rank >= this.new_rank
+
+        // If the target is a device with an assigned role, the new rank
+        // must not exceed the role's rank. This maintains the invariant
+        // that role_rank >= device_rank after assignment.
+        let assigned_role = query AssignedRole[device_id: this.object_id]
+        if assigned_role is Some {
+            let role_rank = get_object_rank((unwrap assigned_role).role_id)
+            check this.new_rank <= role_rank
+        }
 
         // Check that old_rank matches the object's current rank.
         // Implicitly checks that the rank exists before modifying it.
