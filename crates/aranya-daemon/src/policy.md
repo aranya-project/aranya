@@ -730,7 +730,7 @@ When a team is created, the default ranks are:
 
 ### Rank Examples
 
-#### Example 1: Simple Role Assignment (2 objects)
+#### Example 1: Simple Role Assignment (3 objects)
 
 **Scenario:** Admin device assigns Member role to a new device.
 
