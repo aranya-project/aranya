@@ -75,7 +75,7 @@ A complete list of examples can be found at [examples](examples/):
 CICD checks:
 - `cargo make security` - runs security checks such as `cargo-audit`, `cargo-deny` and `cargo-vet`
 - `cargo make correctness` - runs correctness checks such as `cargo fmt`, `cargo clippy`, and `cargo-machete`
-- `cargo make gen-docs-nightly` - generates `rustdocs` with Rust nightly
+- `cargo make gen-docs` - generates `rustdocs`
 
 Performance metrics:
 - `cargo make metrics`

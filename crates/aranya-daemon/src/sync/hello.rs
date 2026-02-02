@@ -8,9 +8,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::Context as _;
+use anyhow::{ensure, Context as _};
 use aranya_daemon_api::TeamId;
-use aranya_runtime::{Address, Engine, Storage as _, StorageProvider, SyncHelloType, SyncType};
+use aranya_runtime::{
+    Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
+};
 use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
@@ -39,9 +41,9 @@ pub(crate) struct HelloSubscription {
 /// Type alias to map a unique [`SyncPeer`] to their associated subscription.
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
 
-impl<EN, SP, EF> SyncManager<QuicState, EN, SP, EF>
+impl<PS, SP, EF> SyncManager<QuicState, PS, SP, EF>
 where
-    EN: Engine,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Broadcast hello notifications to all subscribers of a graph.
@@ -133,11 +135,7 @@ where
     /// * `Ok(())` if the message was sent successfully
     /// * `Err(SyncError)` if there was an error
     #[instrument(skip_all)]
-    async fn send_hello_request(
-        &mut self,
-        peer: SyncPeer,
-        sync_type: SyncType<Addr>,
-    ) -> Result<()> {
+    async fn send_hello_request(&mut self, peer: SyncPeer, sync_type: SyncType) -> Result<()> {
         // Serialize the message
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -194,16 +192,15 @@ where
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-        subscriber_server_addr: Addr,
     ) -> Result<()> {
         // Create the subscribe message
         let hello_msg = SyncHelloType::Subscribe {
             graph_change_delay,
             duration,
             schedule_delay,
-            address: subscriber_server_addr,
+            graph_id: peer.graph_id,
         };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+        let sync_type = SyncType::Hello(hello_msg);
 
         self.send_hello_request(peer, sync_type).await
     }
@@ -221,16 +218,12 @@ where
     /// * `Ok(())` if the unsubscribe request was sent successfully
     /// * `Err(SyncError)` if there was an error connecting or sending the message
     #[instrument(skip_all)]
-    pub(super) async fn send_hello_unsubscribe_request(
-        &mut self,
-        peer: SyncPeer,
-        subscriber_server_addr: Addr,
-    ) -> Result<()> {
+    pub(super) async fn send_hello_unsubscribe_request(&mut self, peer: SyncPeer) -> Result<()> {
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
-        let sync_type: SyncType<Addr> = SyncType::Hello(SyncHelloType::Unsubscribe {
-            address: subscriber_server_addr,
+        let sync_type: SyncType = SyncType::Hello(SyncHelloType::Unsubscribe {
+            graph_id: peer.graph_id,
         });
 
         self.send_hello_request(peer, sync_type).await
@@ -262,9 +255,9 @@ where
         // Create the hello message
         let hello_msg = SyncHelloType::Hello {
             head,
-            address: self.server_addr,
+            graph_id: peer.graph_id,
         };
-        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+        let sync_type: SyncType = SyncType::Hello(hello_msg);
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
@@ -324,15 +317,15 @@ where
 /// The task will periodically send hello notifications to the subscriber at the specified interval,
 /// regardless of whether the graph has changed. The task will exit when the subscription expires
 /// or the cancellation token is triggered.
-fn spawn_scheduled_hello_sender<EN, SP>(
+fn spawn_scheduled_hello_sender<PS, SP>(
     peer: SyncPeer,
     schedule_delay: Duration,
     expires_at: Instant,
     cancel_token: CancellationToken,
     handle: SyncHandle,
-    client: Client<EN, SP>,
+    client: Client<PS, SP>,
 ) where
-    EN: Engine + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     #[allow(clippy::disallowed_macros)] // tokio::select! uses unreachable! internally
@@ -386,9 +379,9 @@ fn spawn_scheduled_hello_sender<EN, SP>(
     });
 }
 
-impl<EN, SP> quic::Server<EN, SP>
+impl<PS, SP> quic::Server<PS, SP>
 where
-    EN: Engine + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     /// Processes a hello message.
@@ -396,20 +389,23 @@ where
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
     pub(super) async fn process_hello_message(
-        hello_msg: SyncHelloType<Addr>,
-        client: Client<EN, SP>,
+        hello_msg: SyncHelloType,
+        client: Client<PS, SP>,
         active_team: &TeamId,
         handle: SyncHandle,
-    ) {
-        let graph_id = GraphId::transmute(*active_team);
+        address: Addr,
+    ) -> anyhow::Result<()> {
+        let active_graph_id = GraphId::transmute(*active_team);
 
         match hello_msg {
             SyncHelloType::Subscribe {
                 graph_change_delay,
                 duration,
                 schedule_delay,
-                address,
+                graph_id,
             } => {
+                ensure!(graph_id == active_graph_id);
+
                 let peer = SyncPeer::new(address, graph_id);
                 let expires_at = Instant::now() + duration;
 
@@ -453,7 +449,9 @@ where
                     "Created hello subscription and spawned scheduled sender"
                 );
             }
-            SyncHelloType::Unsubscribe { address } => {
+            SyncHelloType::Unsubscribe { graph_id } => {
+                ensure!(graph_id == active_graph_id);
+
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, "received message to unsubscribe from hello messages");
 
@@ -469,7 +467,9 @@ where
                     }
                 }
             }
-            SyncHelloType::Hello { head, address } => {
+            SyncHelloType::Hello { head, graph_id } => {
+                ensure!(graph_id == active_graph_id);
+
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, ?head, "received hello notification message");
 
@@ -501,5 +501,7 @@ where
                 }
             }
         }
+
+        Ok(())
     }
 }
