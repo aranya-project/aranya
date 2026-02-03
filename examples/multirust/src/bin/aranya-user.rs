@@ -10,7 +10,13 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{Addr, ChanOp, Client, Device, DeviceId, Label, SyncPeerConfig, TeamId};
 use backon::{ExponentialBuilder, Retryable as _};
-use tokio::{fs, process::Command, time::sleep};
+use tokio::{
+    fs,
+    io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader, BufWriter},
+    net::{TcpListener, TcpStream},
+    process::Command,
+    time::sleep,
+};
 use tracing::{debug, info, level_filters::LevelFilter, Metadata};
 use tracing_subscriber::{
     layer::{Context, Filter},
@@ -189,6 +195,7 @@ async fn main() -> Result<()> {
     let operator_sync_addr = var::<Addr>("ARANYA_OPERATOR_SYNC_ADDR");
     let member_a_device_id = read::<DeviceId>("member-a.id").await?;
     let member_b_device_id = read::<DeviceId>("member-b.id").await?;
+    let member_b_afc_addr = var::<Addr>("ARANYA_MEMBER_B_AFC_ADDR");
 
     let sync_interval = Duration::from_millis(100);
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
@@ -224,24 +231,62 @@ async fn main() -> Result<()> {
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
 
             let label = wait_for_assigned_label(team.device(member_a_device_id)).await?;
+            info!(label.name = label.name.as_str(), %label.id, "found assigned label");
 
-            info!("membera creating AFC channel");
-            let (_chan, _ctrl) = ctx
+            info!("creating AFC channel");
+            let (mut chan, ctrl) = ctx
                 .client
                 .afc()
                 .create_channel(team_id, member_b_device_id, label.id)
                 .await
-                .context("Membera failed to create bidi channel")?;
+                .context("Failed to create bidi channel")?;
 
-            // TODO: Send and use AFC channel
+            let stream = TcpStream::connect(member_b_afc_addr?.to_socket_addrs()).await?;
+
+            let mut writer = BufWriter::new(stream);
+
+            write_message(&mut writer, ctrl.as_bytes()).await?;
+            info!("sent control message");
+
+            let plaintext = "Hello to member B from member A!";
+            let mut ciphertext = vec![0; plaintext.len() + aranya_client::afc::Channels::OVERHEAD];
+            chan.seal(&mut ciphertext, plaintext.as_bytes())?;
+            write_message(&mut writer, &ciphertext).await?;
+
+            info!(plaintext, "sent data message");
+
+            pending::<()>().await;
         }
         "member-b" => {
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
 
-            let _label = wait_for_assigned_label(team.device(member_b_device_id)).await?;
+            let label = wait_for_assigned_label(team.device(member_b_device_id)).await?;
+            info!(label.name = label.name.as_str(), %label.id, "found assigned label");
 
-            // TODO: Accept and use AFC channel
-            pending::<()>().await;
+            let tcp = TcpListener::bind(member_b_afc_addr?.to_socket_addrs()).await?;
+            let (stream, addr) = tcp.accept().await?;
+            info!(%addr, "accepted stream");
+
+            let mut reader = BufReader::new(stream);
+
+            let ctrl = read_message(&mut reader).await?;
+            let chan = ctx
+                .client
+                .afc()
+                .accept_channel(team_id, ctrl.into())
+                .await?;
+
+            assert_eq!(label.id, chan.label_id());
+
+            let data = read_message(&mut reader).await?;
+            let mut plaintext = vec![0; data.len() - aranya_client::afc::Channels::OVERHEAD];
+            chan.open(&mut plaintext, &data)?;
+
+            let plaintext = str::from_utf8(&plaintext)?;
+
+            info!(plaintext, "recv data message");
+
+            info!("SUCCESS");
         }
         _ => bail!("unknown user {user:?}"),
     }
@@ -258,4 +303,25 @@ async fn wait_for_assigned_label(device: Device<'_>) -> Result<Label> {
         info!("waiting for assigned label to be available...");
         sleep(Duration::from_secs(1)).await;
     }
+}
+
+async fn write_message<W>(writer: &mut W, msg: &[u8]) -> Result<()>
+where
+    W: AsyncWrite + Unpin,
+{
+    let len = u16::try_from(msg.len()).context("ctrl too large")?;
+    writer.write_u16(len).await?;
+    writer.write_all(msg).await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn read_message<R>(reader: &mut R) -> Result<Box<[u8]>>
+where
+    R: AsyncRead + Unpin,
+{
+    let len = reader.read_u16().await?;
+    let mut buf = vec![0; len.into()].into_boxed_slice();
+    reader.read_exact(&mut buf).await?;
+    Ok(buf)
 }

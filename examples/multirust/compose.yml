@@ -16,6 +16,7 @@ services:
     init: true
     environment:
       - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
+      - ARANYA_MEMBER_B_AFC_ADDR=member-b:1234
 
   member-b:
     image: aranya-multirust-member-b
@@ -26,3 +27,4 @@ services:
     init: true
     environment:
       - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
+      - ARANYA_MEMBER_B_AFC_ADDR=0.0.0.0:1234

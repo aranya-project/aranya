@@ -4,16 +4,10 @@
 
 From `examples/multirust` directory.
 
-Build images:
+Build and run:
 
 ```sh
-docker buildx bake --allow=fs.read="$(realpath ../../)"
-```
-
-Run the containers:
-
-```sh
-docker compose up --abort-on-container-exit
+docker compose up --build --force-recreate --abort-on-container-exit
 ```
 
 ## Saving images for sharing
