@@ -64,6 +64,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.9.0 -> 1.10.0"
 
+[[audits.bytes]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.10.1 -> 1.11.1"
+
 [[audits.cc]]
 who = "Ben Zimmerman <bzimmerman@spideroak.com>"
 criteria = "safe-to-deploy"
