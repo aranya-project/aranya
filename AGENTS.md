@@ -23,7 +23,9 @@ cargo make build
 cargo make build-capi
 
 cargo make test
-cargo test
+
+# Run tests in memory to avoid slow fsync
+TMPDIR=/dev/shm cargo test
 
 cargo make correctness   # fmt + clippy + feature checks
 cargo make fmt
