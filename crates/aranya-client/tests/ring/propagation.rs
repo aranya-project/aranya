@@ -7,7 +7,7 @@ use crate::ring::RingCtx;
 
 impl RingCtx {
     /// Verifies that propagation occurred through both ring directions.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-001
+    //= docs/multi-daemon-convergence-test.md#prop-001
     //# A command issued at node 0 MUST propagate through the ring in both directions.
     pub fn verify_bidirectional_propagation(&self) -> Result<()> {
         let n = self.nodes.len();
@@ -30,12 +30,12 @@ impl RingCtx {
             })
             .collect();
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-002
+        //= docs/multi-daemon-convergence-test.md#prop-002
         //# The maximum propagation distance in a ring of N nodes MUST be ceil(N/2) hops.
         let max_distance = (n + 1) / 2;
         info!(max_hops = max_distance, "Maximum propagation distance");
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-003
+        //= docs/multi-daemon-convergence-test.md#prop-003
         //# The node at index `(source + ceil(N/2)) % N` MUST be the last to receive the command (equidistant from source in both directions).
 
         // Calculate the node that should be furthest from source
@@ -82,7 +82,7 @@ impl RingCtx {
             }
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-004
+        //= docs/multi-daemon-convergence-test.md#prop-004
         //# The test MUST verify that propagation occurs through both ring directions.
 
         // Analyze whether both directions were used by checking if nodes on opposite

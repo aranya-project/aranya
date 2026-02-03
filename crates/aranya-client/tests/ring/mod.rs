@@ -34,27 +34,27 @@ mod topology;
 #[derive(Clone, Debug)]
 pub struct RingTestConfig {
     /// Number of nodes in the ring.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-001
+    //= docs/multi-daemon-convergence-test.md#conf-001
     //# The test MUST support configuring the number of nodes in the ring.
     pub node_count: usize,
 
     /// Sync interval between peers.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-004
+    //= docs/multi-daemon-convergence-test.md#conf-004
     //# The test MUST support configuring the sync interval between peers.
     pub sync_interval: Duration,
 
     /// Maximum test duration timeout.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-006
+    //= docs/multi-daemon-convergence-test.md#conf-006
     //# The test MUST support configuring a maximum test duration timeout.
     pub max_duration: Duration,
 
     /// Convergence polling interval.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-003
+    //= docs/multi-daemon-convergence-test.md#verify-003
     //# The polling interval MUST be configurable (default: 250 milliseconds).
     pub poll_interval: Duration,
 
     /// Node initialization timeout per batch.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-005
+    //= docs/multi-daemon-convergence-test.md#init-005
     //# Node initialization MUST complete within a configurable timeout (default: 60 seconds per node batch).
     pub init_timeout: Duration,
 
@@ -65,15 +65,15 @@ pub struct RingTestConfig {
 impl Default for RingTestConfig {
     fn default() -> Self {
         Self {
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-002
+            //= docs/multi-daemon-convergence-test.md#conf-002
             //# The default node count MUST be 100 nodes.
             node_count: 100,
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-005
+            //= docs/multi-daemon-convergence-test.md#conf-005
             //# The default sync interval MUST be 100 milliseconds.
-            sync_interval: Duration::from_millis(100),
+            sync_interval: Duration::from_secs(1),
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-007
+            //= docs/multi-daemon-convergence-test.md#conf-007
             //# The default maximum test duration MUST be 300 seconds (5 minutes).
             max_duration: Duration::from_secs(300),
 
@@ -91,7 +91,7 @@ impl RingTestConfig {
     }
 
     /// Validates the configuration.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-003
+    //= docs/multi-daemon-convergence-test.md#conf-003
     //# The test MUST support a minimum of 3 nodes (the minimum for a valid ring).
     pub fn validate(&self) -> Result<()> {
         if self.node_count < 3 {
@@ -274,7 +274,7 @@ impl ConvergenceTracker {
             self.node_status[node_index].converged = true;
             self.node_status[node_index].convergence_time = Some(Instant::now());
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-003
+            //= docs/multi-daemon-convergence-test.md#conv-003
             //# The test MUST track when each node receives the issued command.
             if self.timestamps.first_convergence.is_none() && node_index != self.source_node {
                 self.timestamps.first_convergence = Some(Instant::now());
@@ -283,14 +283,14 @@ impl ConvergenceTracker {
     }
 
     /// Returns true if all nodes have converged.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-004
+    //= docs/multi-daemon-convergence-test.md#conv-004
     //# Convergence MUST be defined as all nodes having received all expected commands.
     pub fn all_converged(&self) -> bool {
         self.node_status.iter().all(|s| s.converged)
     }
 
     /// Returns indices of nodes that have not converged.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-007
+    //= docs/multi-daemon-convergence-test.md#conv-007
     //# The test MUST report which nodes failed to converge if the timeout is reached.
     pub fn get_unconverged_nodes(&self) -> Vec<usize> {
         self.node_status

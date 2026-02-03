@@ -25,7 +25,7 @@ use crate::ring::{RingCtx, RingTestConfig};
 /// Tests ring convergence with 10 nodes.
 ///
 /// This is a smaller test suitable for CI with reasonable execution time.
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-001
+//= docs/multi-daemon-convergence-test.md#conf-001
 //= type=test
 //# The test MUST support configuring the number of nodes in the ring.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -38,12 +38,12 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 
     info!(node_count = config.node_count, "Starting 10-node ring test");
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-001
+    //= docs/multi-daemon-convergence-test.md#init-001
     //= type=test
     //# Each node MUST be initialized with a unique daemon instance.
     let mut ring = RingCtx::new(config).await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-001
+    //= docs/multi-daemon-convergence-test.md#team-001
     //= type=test
     //# A single team MUST be created by node 0 (the designated owner).
     ring.setup_team().await?;
@@ -51,33 +51,33 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
     // Sync team configuration before setting up ring topology
     ring.sync_team_from_owner().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#sync-001
+    //= docs/multi-daemon-convergence-test.md#sync-001
     //= type=test
     //# Each node MUST add its two ring neighbors as sync peers.
     ring.configure_ring_topology().await?;
     ring.verify_topology()?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-006
+    //= docs/multi-daemon-convergence-test.md#team-006
     //= type=test
     //# The test MUST verify that all nodes have received the team configuration.
     ring.verify_team_propagation().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-002
+    //= docs/multi-daemon-convergence-test.md#conv-002
     //= type=test
     //# The default source node for command issuance MUST be node 0.
     ring.issue_test_command(0).await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-005
+    //= docs/multi-daemon-convergence-test.md#conv-005
     //= type=test
     //# The test MUST measure the total convergence time from command issuance to full convergence.
     ring.wait_for_convergence().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-003
+    //= docs/multi-daemon-convergence-test.md#perf-003
     //= type=test
     //# The test MUST calculate and report the following metrics.
     ring.report_metrics();
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-001
+    //= docs/multi-daemon-convergence-test.md#prop-001
     //= type=test
     //# A command issued at node 0 MUST propagate through the ring in both directions.
     ring.verify_bidirectional_propagation()?;
@@ -89,7 +89,7 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 /// Tests ring convergence with the minimum 3 nodes.
 ///
 /// This tests the edge case of the smallest valid ring.
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-003
+//= docs/multi-daemon-convergence-test.md#conf-003
 //= type=test
 //# The test MUST support a minimum of 3 nodes (the minimum for a valid ring).
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -123,7 +123,7 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
 ///
 /// This is the full-scale test as specified in the requirements.
 /// Marked as ignored by default due to resource requirements.
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-002
+//= docs/multi-daemon-convergence-test.md#conf-002
 //= type=test
 //# The default node count MUST be 100 nodes.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -151,6 +151,46 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
     ring.verify_bidirectional_propagation()?;
 
     info!("100-node ring convergence test completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 70 nodes.
+///
+/// This is a large-scale test that exercises convergence behavior with
+/// significant graph size while remaining somewhat lighter than the full
+/// 100-node test.
+/// Marked as ignored by default due to resource requirements.
+//= docs/multi-daemon-convergence-test.md#conf-001
+//= type=test
+//# The test MUST support configuring the number of nodes in the ring.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_70_nodes -- --ignored"]
+async fn test_ring_convergence_70_nodes() -> Result<()> {
+    let config = RingTestConfig::builder()
+        .node_count(70)
+        .max_duration(std::time::Duration::from_secs(600))
+        .build()?;
+
+    info!(
+        node_count = config.node_count,
+        "Starting 70-node ring test"
+    );
+
+    let mut ring = RingCtx::new(config).await?;
+
+    ring.setup_team().await?;
+    ring.sync_team_from_owner().await?;
+    ring.configure_ring_topology().await?;
+    ring.verify_topology()?;
+    ring.verify_team_propagation().await?;
+
+    ring.issue_test_command(0).await?;
+    ring.wait_for_convergence().await?;
+    ring.report_metrics();
+    ring.verify_bidirectional_propagation()?;
+
+    info!("70-node ring convergence test completed successfully");
     Ok(())
 }
 

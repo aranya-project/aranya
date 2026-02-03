@@ -23,13 +23,13 @@ impl RingCtx {
     }
 
     /// Creates a team with node 0 as the owner.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-001
+    //= docs/multi-daemon-convergence-test.md#team-001
     //# A single team MUST be created by node 0 (the designated owner).
     #[instrument(skip(self))]
     pub async fn create_team(&mut self) -> Result<TeamId> {
         info!("Creating team with node 0 as owner");
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-003
+        //= docs/multi-daemon-convergence-test.md#team-003
         //# A shared QUIC sync seed MUST be distributed to all nodes during team setup.
         let owner_cfg = CreateTeamConfig::builder()
             .quic_sync(
@@ -84,7 +84,7 @@ impl RingCtx {
     }
 
     /// Adds all nodes to the team as members.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-002
+    //= docs/multi-daemon-convergence-test.md#team-002
     //# All nodes MUST be added to the team before convergence testing begins.
     #[instrument(skip(self))]
     pub async fn add_all_nodes_to_team(&mut self) -> Result<()> {
@@ -96,7 +96,7 @@ impl RingCtx {
             "Adding all nodes to team as members"
         );
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-004
+        //= docs/multi-daemon-convergence-test.md#team-004
         //# Each non-owner node MUST be added as a team member by the owner.
         for node in &self.nodes[1..] {
             owner_team
@@ -110,10 +110,10 @@ impl RingCtx {
     }
 
     /// Verifies that all nodes have received the team configuration.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-005
+    //= docs/multi-daemon-convergence-test.md#team-005
     //# Team configuration MUST be synchronized to all nodes before the convergence test phase.
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-006
+    //= docs/multi-daemon-convergence-test.md#team-006
     //# The test MUST verify that all nodes have received the team configuration.
     #[instrument(skip(self))]
     pub async fn verify_team_propagation(&self) -> Result<()> {
@@ -152,8 +152,17 @@ impl RingCtx {
     /// Performs a manual sync from all nodes to ensure team configuration propagates.
     ///
     /// This is used during setup before the ring topology is configured.
+    /// Sync failures are expected and retried - Aranya syncs can occasionally fail
+    /// and that's normal behavior.
     #[instrument(skip(self))]
     pub async fn sync_team_from_owner(&self) -> Result<()> {
+        use std::time::Duration;
+        use tokio::time::sleep;
+        use tracing::warn;
+
+        const MAX_RETRIES: usize = 100;
+        const RETRY_DELAY: Duration = Duration::from_millis(500);
+
         let team_id = self.team_id.context("Team not created")?;
         let owner_addr = self.nodes[0].aranya_local_addr().await?;
 
@@ -162,13 +171,34 @@ impl RingCtx {
             "Syncing team configuration from owner"
         );
 
-        // Sync all non-owner nodes with the owner
+        // Sync all non-owner nodes with the owner, with retries for transient failures
         for node in &self.nodes[1..] {
-            node.client
-                .team(team_id)
-                .sync_now(owner_addr, None)
-                .await
-                .with_context(|| format!("node {} unable to sync with owner", node.index))?;
+            let mut last_err = None;
+            for attempt in 1..=MAX_RETRIES {
+                match node.client.team(team_id).sync_now(owner_addr, None).await {
+                    Ok(_) => {
+                        last_err = None;
+                        break;
+                    }
+                    Err(e) => {
+                        warn!(
+                            node = node.index,
+                            attempt,
+                            max_retries = MAX_RETRIES,
+                            error = %e,
+                            "Sync failed, will retry"
+                        );
+                        last_err = Some(e);
+                        if attempt < MAX_RETRIES {
+                            sleep(RETRY_DELAY).await;
+                        }
+                    }
+                }
+            }
+            if let Some(e) = last_err {
+                return Err(e)
+                    .with_context(|| format!("node {} unable to sync with owner after {MAX_RETRIES} attempts", node.index));
+            }
         }
 
         info!("Team sync completed");

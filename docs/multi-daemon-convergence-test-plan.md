@@ -42,7 +42,7 @@ type = "test"
 
 # Specification document
 [[specification]]
-source = "https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md"
+source = "https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md"
 format = "markdown"
 
 # Report configuration
@@ -70,7 +70,7 @@ Duvet uses a two-part comment structure:
 **Correct annotation format:**
 
 ```rust
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-002
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-002
 //# The default node count MUST be 100 nodes.
 const DEFAULT_NODE_COUNT: usize = 100;
 ```
@@ -78,7 +78,7 @@ const DEFAULT_NODE_COUNT: usize = 100;
 **With annotation type (for tests):**
 
 ```rust
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-002
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-002
 //= type=test
 //# The default node count MUST be 100 nodes.
 #[test]
@@ -90,7 +90,7 @@ fn test_default_node_count() {
 **For exceptions (intentionally not implementing):**
 
 ```rust
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-005
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#perf-005
 //= type=exception
 //= reason=Memory usage reporting requires platform-specific APIs not available in test environment
 //# The test SHOULD report memory usage per node if available.
@@ -99,7 +99,7 @@ fn test_default_node_count() {
 **For TODOs (planned but not yet implemented):**
 
 ```rust
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-004
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#prop-004
 //= type=todo
 //= tracking-issue=123
 //# The test MUST verify that propagation occurs through both ring directions.
@@ -115,7 +115,7 @@ cargo install duvet --locked
 duvet extract \
   --format markdown \
   --out .duvet/requirements \
-  https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md
+  https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md
 
 # Generate coverage report
 duvet report
@@ -169,7 +169,7 @@ The implementation will build on the existing test infrastructure in `crates/ara
 
 ```rust
 // Spec base URL for duvet annotations
-const SPEC: &str = "https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md";
+const SPEC: &str = "https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md";
 
 /// Configuration for ring convergence tests
 pub struct RingTestConfig {
@@ -190,32 +190,32 @@ pub struct RingTestConfig {
 impl Default for RingTestConfig {
     fn default() -> Self {
         Self {
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-001
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-001
             //# The test MUST support configuring the number of nodes in the ring.
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-002
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-002
             //# The default node count MUST be 100 nodes.
             node_count: 100,
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-004
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-004
             //# The test MUST support configuring the sync interval between peers.
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-005
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-005
             //# The default sync interval MUST be 100 milliseconds.
             sync_interval: Duration::from_millis(100),
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-006
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-006
             //# The test MUST support configuring a maximum test duration timeout.
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-007
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-007
             //# The default maximum test duration MUST be 300 seconds (5 minutes).
             max_duration: Duration::from_secs(300),
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-003
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#verify-003
             //# The polling interval MUST be configurable (default: 250 milliseconds).
             poll_interval: Duration::from_millis(250),
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-005
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#init-005
             //# Node initialization MUST complete within a configurable timeout (default: 60 seconds per node batch).
             init_timeout: Duration::from_secs(60),
 
@@ -505,7 +505,7 @@ impl RingCtx {
         let team_id = self.team_id.ok_or_else(|| anyhow!("Team not created"))?;
         let n = self.nodes.len();
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#sync-002
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#sync-002
         //# Sync peer configuration MUST specify the sync interval.
         let config = SyncPeerConfig::builder()
             .interval(self.config.sync_interval)
@@ -513,25 +513,25 @@ impl RingCtx {
 
         // Configure each node's peers
         for i in 0..n {
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#topo-002
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#topo-002
             //# For node at index `i` in a ring of size `N`:
             //# - The clockwise neighbor MUST be at index `(i + 1) % N`
             //# - The counter-clockwise neighbor MUST be at index `(i + N - 1) % N`
             let clockwise = (i + 1) % n;
             let counter_clockwise = (i + n - 1) % n;
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#topo-001
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#topo-001
             //# Each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#topo-005
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#topo-005
             //# No node MUST have more than 2 sync peers in the ring topology.
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#sync-003
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#sync-003
             //# The sync peer address MUST be obtained from the neighbor node's local address.
             let cw_addr = self.nodes[clockwise].aranya_local_addr().await?;
             let ccw_addr = self.nodes[counter_clockwise].aranya_local_addr().await?;
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#sync-001
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#sync-001
             //# Each node MUST add its two ring neighbors as sync peers.
             self.nodes[i].client.team(team_id)
                 .add_sync_peer(cw_addr, config.clone())
@@ -544,7 +544,7 @@ impl RingCtx {
             self.nodes[i].peers = vec![clockwise, counter_clockwise];
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#sync-004
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#sync-004
         //# Sync peer configuration MUST complete before the convergence test phase.
         tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -555,7 +555,7 @@ impl RingCtx {
     fn verify_topology(&self) -> Result<()> {
         let n = self.nodes.len();
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#topo-003
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#topo-003
         //# Sync peers MUST be configured bidirectionally, meaning if node A syncs with node B, node B MUST also sync with node A.
         for i in 0..n {
             let expected_cw = (i + 1) % n;
@@ -569,7 +569,7 @@ impl RingCtx {
                     "Node {} missing counter-clockwise peer {}", i, expected_ccw);
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#topo-004
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#topo-004
         //# The topology MUST form a single connected ring with no partitions.
         // BFS from node 0 should reach all nodes
         let mut visited = vec![false; n];
@@ -653,21 +653,21 @@ impl RingCtx {
         let team_id = self.team_id.ok_or_else(|| anyhow!("Team not created"))?;
 
         loop {
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-006
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-006
             //# The test MUST fail if convergence is not achieved within the maximum test duration.
             if start.elapsed() > self.config.max_duration {
-                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-007
+                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-007
                 //# The test MUST report which nodes failed to converge if the timeout is reached.
                 let unconverged = self.tracker.get_unconverged_nodes();
                 bail!("Convergence timeout after {:?}: nodes {:?} did not converge",
                       start.elapsed(), unconverged);
             }
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-002
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#verify-002
             //# The test MUST poll nodes periodically to check convergence status.
             self.check_all_nodes_convergence(team_id).await?;
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-004
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-004
             //# Convergence MUST be defined as all nodes having received all expected commands.
             if self.tracker.all_converged() {
                 self.tracker.timestamps.full_convergence = Some(Instant::now());
@@ -688,7 +688,7 @@ impl RingCtx {
                 continue;  // Skip already converged nodes
             }
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-001
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#verify-001
             //# Each node's graph state MUST be queryable to determine received commands.
             let labels = node.client.team(team_id).labels().await?;
 
@@ -697,12 +697,12 @@ impl RingCtx {
                 .any(|l| /* matches expected command */);
 
             if has_expected {
-                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-004
+                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#verify-004
                 //# A node MUST be considered converged when it has received all expected commands.
                 self.tracker.node_status[i].converged = true;
                 self.tracker.node_status[i].convergence_time = Some(Instant::now());
 
-                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-003
+                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-003
                 //# The test MUST track when each node receives the issued command.
                 if self.tracker.timestamps.first_convergence.is_none() {
                     self.tracker.timestamps.first_convergence = Some(Instant::now());
@@ -712,7 +712,7 @@ impl RingCtx {
             }
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-005
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#verify-005
         //# The test MUST verify that merged graphs are consistent (no conflicting commands).
         // Consistency is verified by successful convergence - if labels match, graphs are consistent
 
@@ -905,7 +905,7 @@ impl Drop for RingCtx {
 #### 10.1 Main Test
 
 ```rust
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-002
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-002
 //= type=test
 //# The default node count MUST be 100 nodes.
 #[tokio::test(flavor = "multi_thread")]
@@ -914,50 +914,50 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
 
     let config = RingTestConfig::default();
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#init-001
     //= type=test
     //# Each node MUST be initialized with a unique daemon instance.
     let mut ring = RingCtx::new(config).await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#team-001
     //= type=test
     //# A single team MUST be created by node 0 (the designated owner).
     let team_id = ring.create_team().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-002
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#team-002
     //= type=test
     //# All nodes MUST be added to the team before convergence testing begins.
     ring.add_all_nodes_to_team().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#sync-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#sync-001
     //= type=test
     //# Each node MUST add its two ring neighbors as sync peers.
     ring.configure_ring_topology().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-005
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#team-005
     //= type=test
     //# Team configuration MUST be synchronized to all nodes before the convergence test phase.
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#team-006
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#team-006
     //= type=test
     //# The test MUST verify that all nodes have received the team configuration.
     ring.verify_team_propagation().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-001
     //= type=test
     //# The test MUST issue a command from a designated source node.
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-002
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-002
     //= type=test
     //# The default source node for command issuance MUST be node 0.
     ring.issue_test_command(0).await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-005
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conv-005
     //= type=test
     //# The test MUST measure the total convergence time from command issuance to full convergence.
     ring.wait_for_convergence().await?;
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-003
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#perf-003
     //= type=test
     //# The test MUST calculate and report the following metrics:
     //# - Minimum convergence time (fastest node)
@@ -967,7 +967,7 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
     //# - Standard deviation of convergence times
     ring.report_metrics();
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#prop-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#prop-001
     //= type=test
     //# A command issued at node 0 MUST propagate through the ring in both directions.
     ring.verify_bidirectional_propagation()?;
@@ -975,7 +975,7 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
     Ok(())
 }
 
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conf-003
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-003
 //= type=test
 //# The test MUST support a minimum of 3 nodes (the minimum for a valid ring).
 #[tokio::test(flavor = "multi_thread")]

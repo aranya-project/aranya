@@ -14,10 +14,10 @@ impl RingCtx {
     /// Issues a test command from the specified source node.
     ///
     /// Creates a label as the observable command that will propagate through the ring.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-001
+    //= docs/multi-daemon-convergence-test.md#conv-001
     //# The test MUST issue a command from a designated source node.
 
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-002
+    //= docs/multi-daemon-convergence-test.md#conv-002
     //# The default source node for command issuance MUST be node 0.
     #[instrument(skip(self), fields(source_node))]
     pub async fn issue_test_command(&mut self, source_node: usize) -> Result<()> {
@@ -40,7 +40,7 @@ impl RingCtx {
             "Issuing test command"
         );
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-001
+        //= docs/multi-daemon-convergence-test.md#perf-001
         //# The test MUST record the timestamp when the command is issued.
         self.tracker.timestamps.command_issued = Instant::now();
         self.tracker.source_node = source_node;
@@ -74,7 +74,7 @@ impl RingCtx {
     }
 
     /// Waits for all nodes to converge by receiving the test command.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-005
+    //= docs/multi-daemon-convergence-test.md#conv-005
     //# The test MUST measure the total convergence time from command issuance to full convergence.
     #[instrument(skip(self))]
     pub async fn wait_for_convergence(&mut self) -> Result<()> {
@@ -88,7 +88,7 @@ impl RingCtx {
         );
 
         loop {
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#conv-006
+            //= docs/multi-daemon-convergence-test.md#conv-006
             //# The test MUST fail if convergence is not achieved within the maximum test duration.
             if start.elapsed() > self.config.max_duration {
                 let unconverged = self.tracker.get_unconverged_nodes();
@@ -100,7 +100,7 @@ impl RingCtx {
                 );
             }
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-002
+            //= docs/multi-daemon-convergence-test.md#verify-002
             //# The test MUST poll nodes periodically to check convergence status.
             self.check_all_nodes_convergence(team_id).await?;
 
@@ -133,7 +133,7 @@ impl RingCtx {
     }
 
     /// Checks convergence status for all nodes.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-001
+    //= docs/multi-daemon-convergence-test.md#verify-001
     //# Each node's graph state MUST be queryable to determine received commands.
     async fn check_all_nodes_convergence(&mut self, team_id: TeamId) -> Result<()> {
         let expected_label = self
@@ -160,14 +160,14 @@ impl RingCtx {
             let has_expected = labels.iter().any(|l| l.name.as_str() == expected_label);
 
             if has_expected {
-                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-004
+                //= docs/multi-daemon-convergence-test.md#verify-004
                 //# A node MUST be considered converged when it has received all expected commands.
                 self.tracker.mark_converged(i);
                 debug!(node = i, "Node converged");
             }
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#verify-005
+        //= docs/multi-daemon-convergence-test.md#verify-005
         //# The test MUST verify that merged graphs are consistent (no conflicting commands).
         // Consistency is verified by successful convergence - if labels match, graphs are consistent
 

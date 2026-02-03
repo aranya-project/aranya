@@ -29,9 +29,9 @@ pub struct ConvergenceMetrics {
 
 impl RingCtx {
     /// Calculates and reports performance metrics.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-002
+    //= docs/multi-daemon-convergence-test.md#perf-002
     //# The test MUST record the timestamp when each node achieves convergence.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-003
+    //= docs/multi-daemon-convergence-test.md#perf-003
     //# The test MUST calculate and report the following metrics:
     //# - Minimum convergence time (fastest node)
     //# - Maximum convergence time (slowest node)
@@ -89,7 +89,7 @@ impl RingCtx {
             .full_convergence
             .map(|fc| fc.duration_since(command_issued));
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-004
+        //= docs/multi-daemon-convergence-test.md#perf-004
         //# The test MUST report the total number of sync operations performed.
         let sync_count = self.tracker.sync_count.load(Ordering::Relaxed);
 
@@ -121,7 +121,7 @@ impl RingCtx {
                 }
                 println!("Sync operations:         {}", metrics.sync_count);
 
-                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#perf-005
+                //= docs/multi-daemon-convergence-test.md#perf-005
                 //# The test SHOULD report memory usage per node if available.
                 #[cfg(target_os = "linux")]
                 if let Some(mem) = get_process_memory_kb() {

@@ -21,14 +21,14 @@ impl NodeCtx {
     ///
     /// This follows the `DeviceCtx::new()` pattern but uses a unique index
     /// for identification and AFC shared memory path generation.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-001
+    //= docs/multi-daemon-convergence-test.md#init-001
     //# Each node MUST be initialized with a unique daemon instance.
     #[instrument(skip(work_dir), fields(node_index = index))]
     pub(crate) async fn new(index: usize, work_dir: PathBuf, team_name: &str) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Generate unique AFC shm path per node
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-002
+        //= docs/multi-daemon-convergence-test.md#init-002
         //# Each node MUST have its own cryptographic keys.
         let afc_shm_path = {
             use aranya_daemon_api::shm;
@@ -90,7 +90,7 @@ impl NodeCtx {
             .await
             .context("unable to init client")?;
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-003
+        //= docs/multi-daemon-convergence-test.md#init-003
         //# All nodes MUST have unique device IDs.
         let pk = client
             .get_key_bundle()
@@ -118,7 +118,7 @@ impl RingCtx {
     ///
     /// Nodes are initialized in parallel batches to avoid resource exhaustion
     /// while still providing reasonable startup performance.
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-004
+    //= docs/multi-daemon-convergence-test.md#init-004
     //# Node initialization MUST occur in parallel batches to avoid resource exhaustion.
     #[instrument(skip(config), fields(node_count = config.node_count))]
     pub async fn new(config: RingTestConfig) -> Result<Self> {
@@ -155,7 +155,7 @@ impl RingCtx {
                 })
                 .collect();
 
-            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-005
+            //= docs/multi-daemon-convergence-test.md#init-005
             //# Node initialization MUST complete within a configurable timeout (default: 60 seconds per node batch).
             let batch_results = tokio::time::timeout(
                 config.init_timeout,
@@ -168,7 +168,7 @@ impl RingCtx {
             nodes.extend(batch_results);
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/main/docs/multi-daemon-convergence-test.md#init-006
+        //= docs/multi-daemon-convergence-test.md#init-006
         //# The test MUST verify that all nodes started successfully.
         if nodes.len() != config.node_count {
             bail!(
