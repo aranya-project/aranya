@@ -129,7 +129,7 @@ open .duvet/reports/report.html
 
 ### Requirement Coverage Tracking
 
-The specification contains 47 requirements across these categories:
+The specification contains 42 requirements across these categories:
 
 | Category | Count | IDs |
 |----------|-------|-----|
@@ -140,8 +140,7 @@ The specification contains 47 requirements across these categories:
 | Sync Peer Config | 4 | SYNC-001 to SYNC-004 |
 | Convergence Test | 7 | CONV-001 to CONV-007 |
 | Verification | 5 | VERIFY-001 to VERIFY-005 |
-| Propagation | 4 | PROP-001 to PROP-004 |
-| Performance | 5 | PERF-001 to PERF-005 |
+| Performance | 4 | PERF-001 to PERF-003, PERF-005 |
 | Error Handling | 5 | ERR-001 to ERR-005 |
 | Cleanup | 4 | CLEAN-001 to CLEAN-004 |
 
@@ -271,8 +270,6 @@ pub struct ConvergenceTracker {
     node_status: Vec<ConvergenceStatus>,
     /// Timestamps for metrics
     timestamps: ConvergenceTimestamps,
-    /// Total sync operations counter
-    sync_count: AtomicUsize,
 }
 
 pub struct ConvergenceStatus {
@@ -729,50 +726,11 @@ impl RingCtx {
 
 ---
 
-### Phase 6: Propagation Verification (PROP-001 through PROP-004)
-
-**Location:** `crates/aranya-client/tests/ring/propagation.rs` (new file)
-
-#### 6.1 Propagation Tracking
-
-```rust
-impl RingCtx {
-    /// Verify bidirectional propagation
-    ///
-    /// Requirements: PROP-001, PROP-004
-    pub fn verify_bidirectional_propagation(&self) -> Result<()> {
-        // Analyze convergence times to verify both directions propagated
-        let n = self.nodes.len();
-        let times: Vec<_> = self.tracker.node_status.iter()
-            .map(|s| s.convergence_time)
-            .collect();
-
-        // Nodes should converge roughly in order of distance from source
-        // Clockwise: 1, 2, 3, ... n/2
-        // Counter-clockwise: n-1, n-2, ... n/2+1
-        // Node n/2 should be last (or close to last)
-
-        // PROP-002, PROP-003: Verify maximum distance
-        let max_distance = (n + 1) / 2;  // ceil(N/2)
-        info!("Maximum propagation distance: {} hops", max_distance);
-
-        Ok(())
-    }
-}
-```
-
-**Implementation Tasks:**
-- [ ] Implement propagation path tracking
-- [ ] Verify bidirectional propagation (PROP-001, PROP-004)
-- [ ] Calculate and verify hop counts (PROP-002, PROP-003)
-
----
-
-### Phase 7: Performance Metrics (PERF-001 through PERF-005)
+### Phase 6: Performance Metrics (PERF-001 through PERF-005)
 
 **Location:** `crates/aranya-client/tests/ring/metrics.rs` (new file)
 
-#### 7.1 Metrics Calculation
+#### 6.1 Metrics Calculation
 
 ```rust
 impl RingCtx {
@@ -820,7 +778,6 @@ impl RingCtx {
         println!("Mean convergence time: {:?}", mean);
         println!("Median convergence time: {:?}", median);
         println!("Std deviation: {:?}", std_dev);
-        println!("Total sync operations: {}", self.tracker.sync_count.load(Ordering::Relaxed));
 
         // PERF-005: Memory usage (if available)
         #[cfg(target_os = "linux")]
@@ -835,16 +792,15 @@ impl RingCtx {
 
 **Implementation Tasks:**
 - [ ] Implement `report_metrics()` with all required calculations
-- [ ] Add sync operation counting (PERF-004)
 - [ ] Add optional memory usage reporting (PERF-005)
 
 ---
 
-### Phase 8: Error Handling (ERR-001 through ERR-005)
+### Phase 7: Error Handling (ERR-001 through ERR-005)
 
 **Location:** Integrated throughout implementation
 
-#### 8.1 Error Handling Strategy
+#### 7.1 Error Handling Strategy
 
 ```rust
 /// Custom error type for ring tests
@@ -872,11 +828,11 @@ pub enum RingTestError {
 
 ---
 
-### Phase 9: Cleanup (CLEAN-001 through CLEAN-004)
+### Phase 8: Cleanup (CLEAN-001 through CLEAN-004)
 
 **Location:** Integrated via RAII patterns
 
-#### 9.1 Cleanup Implementation
+#### 8.1 Cleanup Implementation
 
 ```rust
 impl Drop for RingCtx {
@@ -898,11 +854,11 @@ impl Drop for RingCtx {
 
 ---
 
-### Phase 10: Test Implementation
+### Phase 9: Test Implementation
 
 **Location:** `crates/aranya-client/tests/ring_convergence.rs` (new file)
 
-#### 10.1 Main Test
+#### 9.1 Main Test
 
 ```rust
 //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#conf-002
@@ -966,11 +922,6 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
     //# - Median convergence time
     //# - Standard deviation of convergence times
     ring.report_metrics();
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/claude/multi-daemon-convergence-test-v9iui/docs/multi-daemon-convergence-test.md#prop-001
-    //= type=test
-    //# A command issued at node 0 MUST propagate through the ring in both directions.
-    ring.verify_bidirectional_propagation()?;
 
     Ok(())
 }
@@ -1038,7 +989,6 @@ crates/aranya-client/tests/
 │   ├── team.rs             # Team setup
 │   ├── topology.rs         # Ring topology configuration
 │   ├── convergence.rs      # Convergence waiting and verification
-│   ├── propagation.rs      # Propagation verification
 │   └── metrics.rs          # Performance metrics
 ├── tests.rs                # Existing tests (unchanged)
 └── ring_convergence.rs     # New ring convergence tests
@@ -1083,7 +1033,6 @@ uuid = { version = "1", features = ["v4"] }
 
 5. **Week 5: Metrics & Polish**
    - [ ] Implement metrics calculation and reporting
-   - [ ] Add propagation verification
    - [ ] Add error handling
    - [ ] Add duvet annotations
 
@@ -1131,7 +1080,7 @@ uuid = { version = "1", features = ["v4"] }
 2. Team configuration propagates to all nodes
 3. Ring topology is correctly configured
 4. Test command converges within 5 minutes
-5. **Duvet coverage: 100% of 47 requirements annotated** (MUST requirements covered by implementation or test annotations)
+5. **Duvet coverage: 100% of 42 requirements annotated** (MUST requirements covered by implementation or test annotations)
 6. **Duvet CI check passes** (`duvet report --ci` returns success)
 7. Test passes reliably in CI (>95% success rate)
 

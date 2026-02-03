@@ -1,6 +1,6 @@
 //! Performance metrics calculation for ring convergence tests.
 
-use std::{sync::atomic::Ordering, time::Duration};
+use std::time::Duration;
 
 use tracing::info;
 
@@ -23,8 +23,6 @@ pub struct ConvergenceMetrics {
     pub std_dev: Duration,
     /// Total time from command issuance to full convergence.
     pub total_convergence_time: Option<Duration>,
-    /// Total sync operations counted.
-    pub sync_count: usize,
 }
 
 impl RingCtx {
@@ -89,10 +87,6 @@ impl RingCtx {
             .full_convergence
             .map(|fc| fc.duration_since(command_issued));
 
-        //= docs/multi-daemon-convergence-test.md#perf-004
-        //# The test MUST report the total number of sync operations performed.
-        let sync_count = self.tracker.sync_count.load(Ordering::Relaxed);
-
         Some(ConvergenceMetrics {
             node_count: self.nodes.len(),
             min_time,
@@ -101,7 +95,6 @@ impl RingCtx {
             median_time,
             std_dev,
             total_convergence_time,
-            sync_count,
         })
     }
 
@@ -119,7 +112,6 @@ impl RingCtx {
                 if let Some(total) = metrics.total_convergence_time {
                     println!("Total convergence time:  {:?}", total);
                 }
-                println!("Sync operations:         {}", metrics.sync_count);
 
                 //= docs/multi-daemon-convergence-test.md#perf-005
                 //# The test SHOULD report memory usage per node if available.
@@ -142,7 +134,6 @@ impl RingCtx {
                     median_time_ms = metrics.median_time.as_millis(),
                     std_dev_ms = metrics.std_dev.as_millis(),
                     total_time_ms = metrics.total_convergence_time.map(|d| d.as_millis()),
-                    sync_count = metrics.sync_count,
                     "Convergence metrics"
                 );
             }

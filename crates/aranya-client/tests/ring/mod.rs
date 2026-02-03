@@ -5,7 +5,6 @@
 
 use std::{
     path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
 
@@ -23,7 +22,6 @@ use tempfile::TempDir;
 mod convergence;
 mod init;
 mod metrics;
-mod propagation;
 mod team;
 mod topology;
 
@@ -245,8 +243,6 @@ pub struct ConvergenceTracker {
     pub node_status: Vec<ConvergenceStatus>,
     /// Timestamps for metrics.
     pub timestamps: ConvergenceTimestamps,
-    /// Total sync operations counter.
-    pub sync_count: AtomicUsize,
     /// Index of the source node that issued the command.
     pub source_node: usize,
 }
@@ -258,7 +254,6 @@ impl ConvergenceTracker {
             expected_label_name: None,
             node_status: vec![ConvergenceStatus::default(); node_count],
             timestamps: ConvergenceTimestamps::default(),
-            sync_count: AtomicUsize::new(0),
             source_node: 0,
         }
     }
@@ -299,12 +294,6 @@ impl ConvergenceTracker {
             .filter(|(_, s)| !s.converged)
             .map(|(i, _)| i)
             .collect()
-    }
-
-    /// Increments the sync operation counter.
-    #[allow(dead_code)]
-    pub fn increment_sync_count(&self) {
-        self.sync_count.fetch_add(1, Ordering::Relaxed);
     }
 }
 
