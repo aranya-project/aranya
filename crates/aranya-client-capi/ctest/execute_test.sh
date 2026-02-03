@@ -58,6 +58,9 @@ spawn_daemon() {
     
     # Create run directory and subdirectories
     mkdir -p "$run_dir/state" "$run_dir/cache" "$run_dir/logs" "$run_dir/config"
+
+    # Remove the file if it exists from a previous test 
+    rm -f "$shm_path"
     
     # Create daemon config
     cat > "$run_dir/daemon.toml" <<EOF
