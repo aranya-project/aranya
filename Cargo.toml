@@ -105,7 +105,7 @@ lto = true
 panic = "abort"
 
 [workspace.metadata.release]
-allow-branch = ["main"]
+allow-branch = ["release-4.1.0-base"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
