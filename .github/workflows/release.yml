@@ -9,7 +9,6 @@ permissions:
 on:
   push:
     branches:
-      - main
       - release-4.1.0-base
 
 jobs:
