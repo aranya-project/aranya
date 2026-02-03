@@ -116,3 +116,15 @@ jobs:
       - name: Rust Multi-node Example Application
         run: |
           cargo make run-rust-example-multi-node
+
+  rust-example-docker-provision:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust Multi-node Example Application
+        working-directory: examples/multirust
+        run: |
+          docker compose up --build --force-recreate --abort-on-container-exit
