@@ -35,9 +35,9 @@ experimental = ["aranya-client/experimental"]
 
 
 [dependencies]
-aranya-client = { path = "../aranya-client", default-features = false }
-aranya-daemon-api = { path = "../aranya-daemon-api", default-features = false }
-aranya-util = { path = "../aranya-util" }
+aranya-client = { workspace = true, default-features = false }
+aranya-daemon-api = { workspace = true, default-features = false }
+aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }
 aranya-id = { workspace = true }

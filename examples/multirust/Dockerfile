@@ -19,8 +19,8 @@ COPY crates/aranya-util/ crates/aranya-util
 COPY Cargo.toml .
 COPY Cargo.lock .
 
-# Remove examples from workspace so we don't have to copy them in.
-RUN sed -ie '\|"examples/rust/\*",|d' Cargo.toml
+# Remove examples from workspace and client/daemon from workspace deps so we don't have to copy them in.
+RUN sed -i -e '\|"examples/rust/\*",|d' -e '/aranya-client =/d' -e '/aranya-daemon =/d' Cargo.toml
 
 
 FROM build AS build-daemon
