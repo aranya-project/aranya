@@ -722,8 +722,8 @@ When a team is created, the default ranks are:
 
 | Object | Rank |
 |--------|------|
-| Creator Device | i64::MAX (9223372036854775807) |
-| Owner Role | i64::MAX - 1 |
+| Creator Device | 1000000 |
+| Owner Role | 999999 |
 | Admin Role | 800 |
 | Operator Role | 700 |
 | Member Role | 600 |
@@ -965,8 +965,8 @@ since it would then outrank the role.
    is violated.
 
 ```policy
-// Maximum rank an object can have: i64::MAX.
-let MAX_RANK = 9223372036854775807
+// Default maximum rank for the team creator device.
+let MAX_RANK = 1000000
 
 // Change the rank of an object.
 //
