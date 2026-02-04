@@ -10,7 +10,7 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
+    CreateTeamQuicSyncConfig, DeviceId, PubKeyBundle,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -127,7 +127,7 @@ impl Daemon {
 #[clippy::has_significant_drop]
 struct ClientCtx {
     client: Client,
-    pk: KeyBundle,
+    pk: PubKeyBundle,
     id: DeviceId,
     /// This needs to be stored so it lasts for the same lifetime as `Daemon`.
     _work_dir: TempDir,

@@ -135,7 +135,7 @@ impl Config {
         self.state_dir.join("key_wrap_key")
     }
 
-    /// Path to the [`KeyBundle`].
+    /// Path to the [`PubKeyBundle`].
     pub(crate) fn key_bundle_path(&self) -> PathBuf {
         self.state_dir.join("key_bundle")
     }

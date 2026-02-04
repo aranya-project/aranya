@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::D
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
+    client::{Client, DeviceId, PubKeyBundle, Role, RoleManagementPermission, TeamId},
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
@@ -209,7 +209,7 @@ impl DevicesCtx {
 
 pub struct DeviceCtx {
     pub client: Client,
-    pub pk: KeyBundle,
+    pub pk: PubKeyBundle,
     pub id: DeviceId,
     #[expect(unused, reason = "manages tasks")]
     pub daemon: DaemonHandle,
