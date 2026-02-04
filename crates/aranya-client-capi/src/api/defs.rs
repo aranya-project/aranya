@@ -1449,9 +1449,10 @@ pub fn create_role(
 /// @relates AranyaClient
 #[cfg(feature = "preview")]
 pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).delete_role(role.into()))?;
+    timed_future!(
+        client,
+        client.inner.team(team.into()).delete_role(role.into())
+    );
     Ok(())
 }
 
@@ -1472,12 +1473,13 @@ pub fn add_perm_to_role(
     role: &RoleId,
     perm: Permission,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .add_perm_to_role(role.into(), perm.into()),
-    )?;
+            .add_perm_to_role(role.into(), perm.into())
+    );
     Ok(())
 }
 
@@ -1498,12 +1500,13 @@ pub fn remove_perm_from_role(
     role: &RoleId,
     perm: Permission,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .remove_perm_from_role(role.into(), perm.into()),
-    )?;
+            .remove_perm_from_role(role.into(), perm.into())
+    );
     Ok(())
 }
 
@@ -1529,13 +1532,14 @@ pub fn assign_role(
     device: &DeviceId,
     role_id: &RoleId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .assign_role(role_id.into()),
-    )?;
+            .assign_role(role_id.into())
+    );
     Ok(())
 }
 
@@ -1555,13 +1559,14 @@ pub fn revoke_role(
     device: &DeviceId,
     role_id: &RoleId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .revoke_role(role_id.into()),
-    )?;
+            .revoke_role(role_id.into())
+    );
     Ok(())
 }
 
@@ -1583,12 +1588,13 @@ pub fn create_label(
 ) -> Result<LabelId, imp::Error> {
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
-    let label_id = client.rt.block_on(
+    let label_id = timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .create_label(name, managing_role_id.into()),
-    )?;
+            .create_label(name, managing_role_id.into())
+    );
     Ok(label_id.into())
 }
 
@@ -1602,9 +1608,10 @@ pub fn create_label(
 ///
 /// @relates AranyaClient.
 pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
+    timed_future!(
+        client,
+        client.inner.team(team.into()).delete_label(label_id.into())
+    );
     Ok(())
 }
 
@@ -1625,13 +1632,14 @@ pub fn assign_label(
     label_id: &LabelId,
     op: ChanOp,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .assign_label(label_id.into(), op.into()),
-    )?;
+            .assign_label(label_id.into(), op.into())
+    );
     Ok(())
 }
 
@@ -1651,13 +1659,14 @@ pub fn revoke_label(
     device: &DeviceId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .revoke_label(label_id.into()),
-    )?;
+            .revoke_label(label_id.into())
+    );
     Ok(())
 }
 
@@ -1678,12 +1687,13 @@ pub fn add_label_managing_role(
     label_id: &LabelId,
     managing_role_id: &RoleId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .add_label_managing_role(label_id.into(), managing_role_id.into()),
-    )?;
+            .add_label_managing_role(label_id.into(), managing_role_id.into())
+    );
     Ok(())
 }
 
@@ -1745,12 +1755,13 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 ) -> Result<(), imp::Error> {
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
-    let wrapped_seed = client.rt.block_on(
+    let wrapped_seed = timed_future!(
+        client,
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(keybundle.encryption()),
-    )?;
+            .encrypt_psk_seed_for_peer(keybundle.encryption())
+    );
 
     if *seed_len < wrapped_seed.len() {
         *seed_len = wrapped_seed.len();
@@ -1773,7 +1784,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// @relates AranyaClient.
 pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
     let cfg: &imp::AddTeamConfig = cfg.deref();
-    client.rt.block_on(client.inner.add_team(cfg.into()))?;
+    timed_future!(client, client.inner.add_team(cfg.into()));
     Ok(())
 }
 
@@ -1784,7 +1795,7 @@ pub fn add_team(client: &Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> 
 ///
 /// @relates AranyaClient.
 pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
-    client.rt.block_on(client.inner.remove_team(team.into()))?;
+    timed_future!(client, client.inner.remove_team(team.into()));
     Ok(())
 }
 
@@ -1795,9 +1806,7 @@ pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// @relates AranyaClient.
 pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).close_team())?;
+    timed_future!(client, client.inner.team(team.into()).close_team());
     Ok(())
 }
 
@@ -1820,12 +1829,13 @@ pub unsafe fn add_device_to_team(
 ) -> Result<(), imp::Error> {
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .add_device(keybundle, role_id.map(Into::into)),
-    )?;
+            .add_device(keybundle, role_id.map(Into::into))
+    );
     Ok(())
 }
 
@@ -1843,13 +1853,14 @@ pub fn remove_device_from_team(
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .remove_from_team(),
-    )?;
+            .remove_from_team()
+    );
     Ok(())
 }
 
@@ -1873,12 +1884,13 @@ pub unsafe fn add_sync_peer(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(
+    timed_future!(
+        client,
         client
             .inner
             .team(team.into())
-            .add_sync_peer(addr, (*config).clone().into()),
-    )?;
+            .add_sync_peer(addr, (*config).clone().into())
+    );
     Ok(())
 }
 
@@ -1896,9 +1908,10 @@ pub unsafe fn remove_sync_peer(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
+    timed_future!(
+        client,
+        client.inner.team(team.into()).remove_sync_peer(addr)
+    );
     Ok(())
 }
 
@@ -1925,14 +1938,15 @@ pub unsafe fn sync_hello_subscribe(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).sync_hello_subscribe(
+    timed_future!(
+        client,
+        client.inner.team(team.into()).sync_hello_subscribe(
             addr,
             graph_change_delay.into(),
             duration.into(),
             schedule_delay.into(),
-        ))?;
+        )
+    );
     Ok(())
 }
 
@@ -1953,9 +1967,8 @@ pub unsafe fn sync_hello_unsubscribe(
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).sync_hello_unsubscribe(addr))?;
+    let team = client.inner.team(team.into());
+    timed_future!(client, team.sync_hello_unsubscribe(addr));
     Ok(())
 }
 
@@ -2040,9 +2053,10 @@ pub fn team_device_role(
     role_out: &mut MaybeUninit<Role>,
     has_role: &mut MaybeUninit<bool>,
 ) -> Result<(), imp::Error> {
-    let maybe_role = client
-        .rt
-        .block_on(client.inner.team(team.into()).device(device.into()).role())?;
+    let maybe_role = timed_future!(
+        client,
+        client.inner.team(team.into()).device(device.into()).role()
+    );
 
     match maybe_role {
         Some(role) => {
@@ -2074,13 +2088,14 @@ pub unsafe fn team_device_keybundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let keys = client.rt.block_on(
+    let keys = timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .keybundle(),
-    )?;
+            .keybundle()
+    );
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
     Ok(())
@@ -2106,13 +2121,14 @@ pub unsafe fn team_device_label_assignments(
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let data = client.rt.block_on(
+    let data = timed_future!(
+        client,
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .label_assignments(),
-    )?;
+            .label_assignments()
+    );
     let data = data.__data();
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     if *labels_len < data.len() {
@@ -2144,9 +2160,7 @@ pub unsafe fn team_labels(
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let data = client
-        .rt
-        .block_on(client.inner.team(team.into()).labels())?;
+    let data = timed_future!(client, client.inner.team(team.into()).labels());
     let data = data.__data();
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -2174,9 +2188,7 @@ pub unsafe fn team_label_exists(
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
-    let label_result = client
-        .rt
-        .block_on(client.inner.team(team.into()).label(label.into()))?;
+    let label_result = timed_future!(client, client.inner.team(team.into()).label(label.into()));
     let exists = label_result.is_some();
     Ok(exists)
 }
@@ -2249,11 +2261,13 @@ pub fn afc_create_channel(
     channel: &mut MaybeUninit<AfcSendChannel>,
     control: &mut MaybeUninit<AfcCtrlMsg>,
 ) -> Result<(), imp::Error> {
-    let (chan, ctrl) = client.rt.block_on(client.inner.afc().create_channel(
-        team_id.into(),
-        peer_id.into(),
-        label_id.into(),
-    ))?;
+    let (chan, ctrl) = timed_future!(
+        client,
+        client
+            .inner
+            .afc()
+            .create_channel(team_id.into(), peer_id.into(), label_id.into(),)
+    );
 
     AfcSendChannel::init(channel, chan);
     AfcCtrlMsg::init(control, ctrl);
@@ -2277,12 +2291,13 @@ pub fn afc_accept_channel(
     channel: &mut MaybeUninit<AfcReceiveChannel>,
 ) -> Result<(), imp::Error> {
     let ctrl = Vec::from(control).into_boxed_slice();
-    let chan = client.rt.block_on(
+    let chan = timed_future!(
+        client,
         client
             .inner
             .afc()
-            .accept_channel(team_id.into(), ctrl.into()),
-    )?;
+            .accept_channel(team_id.into(), ctrl.into())
+    );
     AfcReceiveChannel::init(channel, chan);
     Ok(())
 }
@@ -2456,7 +2471,7 @@ pub fn afc_send_channel_delete(
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcSendChannel` pointer.
     let channel = unsafe { channel.read().into_inner().into_inner() };
-    client.rt.block_on(channel.delete())?;
+    timed_future!(client, channel.delete());
     Ok(())
 }
 
@@ -2476,6 +2491,6 @@ pub fn afc_receive_channel_delete(
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid `AfcReceiveChannel` pointer.
     let channel = unsafe { channel.read().into_inner().into_inner() };
-    client.rt.block_on(channel.delete())?;
+    timed_future!(client, channel.delete());
     Ok(())
 }
