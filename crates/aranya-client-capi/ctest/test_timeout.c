@@ -42,7 +42,8 @@ static int test_timeout(const char *tmpdir) {
     // Create team as owner
     AranyaTeamId team_id;
     CLIENT_EXPECT_ERR("Expected team creation to time out",
-                      create_team(&owner_client, &team_id));
+                      create_team(&owner_client, &team_id),
+                      ARANYA_ERROR_TIMEOUT);
 
     printf("Team creation timed out \n");
     aranya_client_cleanup(&owner_client);

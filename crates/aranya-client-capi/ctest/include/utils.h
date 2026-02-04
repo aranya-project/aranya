@@ -132,13 +132,13 @@ static inline AranyaError get_role_id_by_name(const AranyaRole *role_list,
         }                                                                      \
     } while (0)
 
-// Macro for printing an error message when to stderr.
-// Does nothing if error value is not ARANYA_SUCCESS.
-#define CLIENT_EXPECT_ERR(M, E)                                                \
+// Macro for comparing two error values and printing an error message to stderr.
+// Does nothing if the values are the same.
+#define CLIENT_EXPECT_ERR(M, E, A)                                             \
     do {                                                                       \
-        err = (E);                                                             \
-        if (err == ARANYA_ERROR_SUCCESS) {                                     \
-            fprintf(stderr, "%s\n", (M));                                      \
+        if ((E) != (A)) {                                                      \
+            fprintf(stderr, "%s - found: %s, expected: %s\n", (M),             \
+                    aranya_error_to_str((A)), aranya_error_to_str((E)));       \
             goto exit;                                                         \
         }                                                                      \
     } while (0)
