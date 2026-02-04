@@ -161,7 +161,6 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .add_all_device_roles(team_id, &default_roles)
         .await?;
 
-    // Verify all devices are on the team
     let _all_devices = devices.devices();
 
     let owner_team = devices.owner.client.team(team_id);
