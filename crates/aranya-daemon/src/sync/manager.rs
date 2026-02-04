@@ -74,8 +74,8 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Additional state used by the syncer.
     pub(super) state: ST,
-    /// Sync server address. Peers will make incoming connections to us on this address.
-    pub(super) return_address: Bytes,
+    /// Sync server port. Peers will make incoming connections to us on this port.
+    pub(super) return_port: Bytes,
     /// Tracks spawned hello notification tasks for lifecycle management.
     #[cfg(feature = "preview")]
     pub(super) hello_tasks: JoinSet<()>,
