@@ -57,7 +57,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Unit Tests
-        run: cargo make ctest
+        run: cargo make ctest-verbose
 
   c-example-application:
     permissions:

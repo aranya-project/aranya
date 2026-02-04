@@ -14,11 +14,16 @@ pub(crate) use team::*;
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     daemon_addr: *const c_char,
+    ipc_timeout: Option<core::time::Duration>,
 }
 
 impl ClientConfig {
     pub(crate) fn daemon_addr(&self) -> *const c_char {
         self.daemon_addr
+    }
+
+    pub(crate) fn ipc_timeout(&self) -> Option<core::time::Duration> {
+        self.ipc_timeout
     }
 }
 
@@ -26,12 +31,18 @@ impl ClientConfig {
 #[derive(Clone, Debug)]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
+    ipc_timeout: Option<Duration>,
 }
 
 impl ClientConfigBuilder {
     /// Set the address for the daemon
     pub fn daemon_addr(&mut self, addr: *const c_char) {
         self.daemon_addr = addr;
+    }
+
+    /// Set the timeout for IPC calls
+    pub fn ipc_timeout(&mut self, duration: Duration) {
+        self.ipc_timeout = Some(duration);
     }
 }
 
@@ -49,6 +60,7 @@ impl Builder for ClientConfigBuilder {
 
         let cfg = ClientConfig {
             daemon_addr: self.daemon_addr,
+            ipc_timeout: self.ipc_timeout.map(Into::into),
         };
         Self::Output::init(out, cfg);
         Ok(())
@@ -59,6 +71,7 @@ impl Default for ClientConfigBuilder {
     fn default() -> Self {
         Self {
             daemon_addr: ptr::null(),
+            ipc_timeout: None,
         }
     }
 }
