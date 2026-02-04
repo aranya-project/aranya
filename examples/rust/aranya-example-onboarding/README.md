@@ -1,6 +1,7 @@
 # Aranya Onboarding Example
 
 An example that runs each Aranya device as a stand-alone executable (Owner and Admin) and demonstrates the onboarding procedure.
+Note: The onboarding servers in this example are not part of Aranya and exist only to support the example.
 
 # How To Run The Example
 
