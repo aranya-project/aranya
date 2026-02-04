@@ -807,30 +807,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aranya-scale-tests"
-version = "4.1.0"
-dependencies = [
- "anyhow",
- "aranya-client",
- "aranya-crypto",
- "aranya-daemon",
- "aranya-daemon-api",
- "aranya-util",
- "backon",
- "futures-util",
- "serde",
- "serde_json",
- "serial_test",
- "spideroak-base58",
- "tempfile",
- "test-log",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "aranya-util"
 version = "4.1.0"
 dependencies = [
