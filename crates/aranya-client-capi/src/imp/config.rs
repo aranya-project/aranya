@@ -154,3 +154,110 @@ impl Default for SyncPeerConfigBuilder {
         }
     }
 }
+
+/// Configuration for hello subscription.
+#[cfg(feature = "preview")]
+#[derive(Clone, Debug)]
+pub struct HelloSubscriptionConfig {
+    /// Debounce interval for hello notifications after sending one.
+    pub graph_change_debounce: Duration,
+    /// How long the subscription remains active before expiring.
+    pub expiration: Duration,
+    /// Interval between periodic hello messages.
+    pub periodic_interval: Duration,
+}
+
+#[cfg(feature = "preview")]
+impl From<aranya_client::HelloSubscriptionConfig> for HelloSubscriptionConfig {
+    fn from(value: aranya_client::HelloSubscriptionConfig) -> Self {
+        Self {
+            graph_change_debounce: value.graph_change_debounce().into(),
+            expiration: value.expiration().into(),
+            periodic_interval: value.periodic_interval().into(),
+        }
+    }
+}
+
+#[cfg(feature = "preview")]
+impl From<HelloSubscriptionConfig> for aranya_client::HelloSubscriptionConfig {
+    fn from(value: HelloSubscriptionConfig) -> Self {
+        aranya_client::HelloSubscriptionConfig::builder()
+            .graph_change_debounce(value.graph_change_debounce.into())
+            .expiration(value.expiration.into())
+            .periodic_interval(value.periodic_interval.into())
+            .build()
+            .expect("All values are set")
+    }
+}
+
+#[cfg(feature = "preview")]
+impl From<&HelloSubscriptionConfig> for aranya_client::HelloSubscriptionConfig {
+    fn from(value: &HelloSubscriptionConfig) -> Self {
+        value.clone().into()
+    }
+}
+
+#[cfg(feature = "preview")]
+impl Default for HelloSubscriptionConfig {
+    fn default() -> Self {
+        aranya_client::HelloSubscriptionConfig::default().into()
+    }
+}
+
+/// Builder for a [`HelloSubscriptionConfig`].
+#[cfg(feature = "preview")]
+#[derive(Clone, Debug)]
+pub struct HelloSubscriptionConfigBuilder {
+    graph_change_debounce: Duration,
+    expiration: Duration,
+    periodic_interval: Duration,
+}
+
+#[cfg(feature = "preview")]
+impl HelloSubscriptionConfigBuilder {
+    /// Sets the graph_change_debounce interval for hello notifications.
+    pub fn graph_change_debounce(&mut self, duration: Duration) {
+        self.graph_change_debounce = duration;
+    }
+
+    /// Sets how long the subscription remains active before expiring.
+    pub fn expiration(&mut self, duration: Duration) {
+        self.expiration = duration;
+    }
+
+    /// Sets the interval between periodic hello messages.
+    pub fn periodic_interval(&mut self, interval: Duration) {
+        self.periodic_interval = interval;
+    }
+}
+
+#[cfg(feature = "preview")]
+impl Builder for HelloSubscriptionConfigBuilder {
+    type Output = defs::HelloSubscriptionConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        let cfg = HelloSubscriptionConfig {
+            graph_change_debounce: self.graph_change_debounce,
+            expiration: self.expiration,
+            periodic_interval: self.periodic_interval,
+        };
+        Self::Output::init(out, cfg);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "preview")]
+impl Default for HelloSubscriptionConfigBuilder {
+    fn default() -> Self {
+        let config = HelloSubscriptionConfig::default();
+        Self {
+            graph_change_debounce: config.graph_change_debounce,
+            expiration: config.expiration,
+            periodic_interval: config.periodic_interval,
+        }
+    }
+}
