@@ -785,7 +785,6 @@ pub fn client_config_builder_set_daemon_uds_path(
 }
 
 // The 1 year default comes from `create_ctx` in "crates/aranya-client/src/client.rs".
-// TODO: Only `sync_now` and `create_team` use this currently.
 /// Sets IPC timeout for `AranyaClient` APIs.
 ///
 /// By default, the IPC timeout is set to 1 year.
