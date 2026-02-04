@@ -3,7 +3,7 @@ use std::{future::Future, net::SocketAddr, sync::Arc};
 use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
+    PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
     MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -40,9 +40,9 @@ use crate::{
 ///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
-pub(crate) struct Server<EN, SP> {
+pub(crate) struct Server<PS, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    client: Client<EN, SP>,
+    client: Client<PS, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
@@ -56,9 +56,9 @@ pub(crate) struct Server<EN, SP> {
     local_addr: SocketAddr,
 }
 
-impl<EN, SP> Server<EN, SP>
+impl<PS, SP> Server<PS, SP>
 where
-    EN: Engine + Send + 'static,
+    PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
     pub(crate) fn local_addr(&self) -> SocketAddr {
@@ -75,7 +75,7 @@ where
     #[inline]
     #[allow(deprecated)]
     pub(crate) async fn new(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         addr: &Addr,
         server_keys: Arc<PskStore>,
     ) -> Result<(
@@ -163,21 +163,23 @@ where
     fn accept_connection(
         &mut self,
         mut conn: s2n_quic::Connection,
-    ) -> impl Future<Output = ()> + use<'_, EN, SP> {
+    ) -> impl Future<Output = ()> + use<'_, PS, SP> {
         let handle = conn.handle();
         async {
             trace!("received incoming QUIC connection");
+            conn.keep_alive(true)
+                .context("unable to keep connection alive")?;
             let identity = get_conn_identity(&mut conn)?;
             let active_team = self
                 .server_keys
                 .get_team_for_identity(&identity)
                 .context("no active team for accepted connection")?;
-            let peer = conn
-                .remote_addr()
-                .context("unable to get peer address from connection")?;
-            conn.keep_alive(true)
-                .context("unable to keep connection alive")?;
-            let peer = SyncPeer::new(peer.into(), GraphId::transmute(active_team));
+            let peer = SyncPeer::new(
+                extract_return_address(&mut conn)
+                    .await
+                    .context("could not get peer's return address")?,
+                GraphId::transmute(active_team),
+            );
             self.conns.insert(peer, conn).await;
             anyhow::Ok(())
         }
@@ -196,7 +198,6 @@ where
         let conn_source = peer.addr;
         let client = self.client.clone();
         let sync_peers = self.handle.clone();
-        let local_addr = self.local_addr.into();
         async move {
             // Accept incoming streams.
             while let Some(stream) = acceptor
@@ -210,7 +211,7 @@ where
                     stream,
                     active_team,
                     sync_peers.clone(),
-                    local_addr,
+                    conn_source,
                 )
                 .await
                 .context("failed to process sync request")?;
@@ -226,11 +227,11 @@ where
     /// Responds to a sync.
     #[instrument(skip_all)]
     async fn sync(
-        client: Client<EN, SP>,
+        client: Client<PS, SP>,
         stream: BidirectionalStream,
         active_team: TeamId,
         handle: SyncHandle,
-        local_addr: Addr,
+        peer_server_addr: Addr,
     ) -> Result<()> {
         trace!("server received a sync request");
 
@@ -243,7 +244,7 @@ where
 
         // Generate a sync response for a sync request.
         let sync_response_res =
-            Self::sync_respond(client, local_addr, &recv_buf, active_team, handle).await;
+            Self::sync_respond(client, &recv_buf, active_team, handle, peer_server_addr).await;
         let resp: SyncResponse = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
@@ -270,15 +271,15 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: Client<EN, SP>,
-        local_addr: Addr,
+        client: Client<PS, SP>,
         request_data: &[u8],
         active_team: TeamId,
         _handle: SyncHandle,
+        peer_server_addr: Addr,
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
-        let sync_type: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| {
+        let sync_type: SyncType = postcard::from_bytes(request_data).map_err(|e| {
             error!(
                 error = %e,
                 request_data_len = request_data.len(),
@@ -291,16 +292,9 @@ where
         match sync_type {
             SyncType::Poll {
                 request: request_msg,
-                address: peer_server_addr,
             } => {
-                Self::process_poll_message(
-                    request_msg,
-                    client,
-                    local_addr,
-                    peer_server_addr,
-                    &active_team,
-                )
-                .await
+                Self::process_poll_message(request_msg, client, peer_server_addr, &active_team)
+                    .await
             }
             SyncType::Subscribe { .. } => {
                 bug!("Push subscribe messages are not implemented")
@@ -314,7 +308,18 @@ where
             SyncType::Hello(_hello_msg) => {
                 #[cfg(feature = "preview")]
                 {
-                    Self::process_hello_message(_hello_msg, client, &active_team, _handle).await;
+                    if let Err(error) = Self::process_hello_message(
+                        _hello_msg,
+                        client,
+                        &active_team,
+                        _handle,
+                        peer_server_addr,
+                    )
+                    .await
+                    {
+                        // TODO: Respond with error or don't respond?
+                        error!(%error, "Failed to process hello message");
+                    }
                     // Hello messages are fire-and-forget, return empty response
                     // Note: returning empty response which will be ignored by client
                     return Ok(Box::new([]));
@@ -331,12 +336,11 @@ where
     #[instrument(skip_all)]
     async fn process_poll_message(
         request_msg: SyncRequestMessage,
-        client: Client<EN, SP>,
-        local_addr: Addr,
+        client: Client<PS, SP>,
         peer_server_addr: Addr,
         active_team: &TeamId,
     ) -> Result<Box<[u8]>> {
-        let mut resp = SyncResponder::new(local_addr);
+        let mut resp = SyncResponder::new();
         let storage_id = check_request(*active_team, &request_msg)?;
         let peer = SyncPeer::new(peer_server_addr, storage_id);
 
@@ -368,13 +372,34 @@ where
     }
 }
 
+async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Result<Addr> {
+    let ip = conn
+        .remote_addr()
+        .context("cannot get remote address")?
+        .ip();
+    let port = {
+        let mut recv = conn
+            .accept_receive_stream()
+            .await?
+            .context("no stream for return port")?;
+        let bytes = recv.receive().await?.context("no return port sent")?;
+        u16::from_be_bytes(
+            bytes
+                .as_ref()
+                .try_into()
+                .context("bad return port message")?,
+        )
+    };
+    Ok(Addr::from((ip, port)))
+}
+
 fn check_request(team_id: TeamId, request: &SyncRequestMessage) -> Result<GraphId> {
-    let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
+    let SyncRequestMessage::SyncRequest { graph_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };
-    if team_id.as_bytes() != storage_id.as_bytes() {
+    if team_id.as_bytes() != graph_id.as_bytes() {
         return Err(Error::QuicSync(quic::Error::InvalidPSK));
     }
 
-    Ok(*storage_id)
+    Ok(*graph_id)
 }

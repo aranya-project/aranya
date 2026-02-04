@@ -34,9 +34,10 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{Engine, StorageProvider};
+use aranya_runtime::{PolicyStore, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
+use bytes::Bytes;
 use derive_where::derive_where;
 use futures_util::StreamExt as _;
 #[cfg(feature = "preview")]
@@ -49,7 +50,7 @@ use tracing::{error, info, instrument, warn};
 
 use super::{
     handle::{Callback, ManagerMessage},
-    Addr, GraphId, Result, SyncPeer, SyncState,
+    GraphId, Result, SyncPeer, SyncState,
 };
 use crate::{aranya::Client, vm_policy::VecSink};
 
@@ -60,9 +61,9 @@ use crate::{aranya::Client, vm_policy::VecSink};
 ///
 /// [`SyncHandle`]: super::SyncHandle
 #[derive_where(Debug; ST)]
-pub(crate) struct SyncManager<ST, EN, SP, EF> {
+pub(crate) struct SyncManager<ST, PS, SP, EF> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
-    pub(super) client: Client<EN, SP>,
+    pub(super) client: Client<PS, SP>,
     /// Keeps track of peer info. The Key is None if the peer has no interval configured.
     pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
     /// Receives added/removed peers.
@@ -73,14 +74,14 @@ pub(crate) struct SyncManager<ST, EN, SP, EF> {
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Additional state used by the syncer.
     pub(super) state: ST,
-    /// Sync server address. Peers will make incoming connections to us on this address.
-    pub(super) server_addr: Addr,
+    /// Sync server port. Peers will make incoming connections to us on this port.
+    pub(super) return_port: Bytes,
     /// Tracks spawned hello notification tasks for lifecycle management.
     #[cfg(feature = "preview")]
     pub(super) hello_tasks: JoinSet<()>,
 }
 
-impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF> {
+impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
@@ -109,21 +110,21 @@ impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub(crate) fn client(&self) -> &Client<EN, SP> {
+    pub(crate) fn client(&self) -> &Client<PS, SP> {
         &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub(crate) fn client_mut(&mut self) -> &mut Client<EN, SP> {
+    pub(crate) fn client_mut(&mut self) -> &mut Client<PS, SP> {
         &mut self.client
     }
 }
 
-impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
+impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
 where
-    ST: SyncState<EN, SP, EF>,
-    EN: Engine,
+    ST: SyncState<PS, SP, EF>,
+    PS: PolicyStore,
     SP: StorageProvider,
 {
     /// Subscribe to hello notifications from a sync peer.
@@ -150,12 +151,12 @@ where
     }
 }
 
-impl<ST, EN, SP, EF> SyncManager<ST, EN, SP, EF>
+impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
 where
-    ST: SyncState<EN, SP, EF>,
-    EN: Engine,
+    ST: SyncState<PS, SP, EF>,
+    PS: PolicyStore,
     SP: StorageProvider,
-    EF: Send + Sync + 'static + TryFrom<EN::Effect>,
+    EF: Send + Sync + 'static + TryFrom<PS::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,
 {
     /// Run the main syncer loop, which will handle syncing with peers.
