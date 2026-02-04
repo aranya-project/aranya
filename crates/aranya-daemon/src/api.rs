@@ -467,14 +467,14 @@ impl DaemonApi for Api {
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer
-            .sync_hello_subscribe(peer, graph_change_delay, duration, schedule_delay)
+            .sync_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay)
             .await?;
         Ok(())
     }

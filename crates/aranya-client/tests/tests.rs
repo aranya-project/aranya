@@ -16,7 +16,7 @@ use std::{ptr, time::Duration};
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::{ChanOp, Permission, RoleId, RoleManagementPermission},
-    config::SyncPeerConfig,
+    config::{HelloSubscriptionConfig, SyncPeerConfig},
 };
 // These deprecated types are only used in test_add_team for backward compatibility testing.
 #[allow(deprecated)]
@@ -877,12 +877,13 @@ async fn test_hello_subscription() -> Result<()> {
     info!("membera added admin as sync peer with sync_on_hello=true");
 
     // MemberA subscribes to hello notifications from Admin
+    // Use a long periodic_interval to ensure sync is triggered by graph change, not periodic send
     membera_team
         .sync_hello_subscribe(
             admin_addr,
-            Duration::from_millis(100),
-            Duration::from_secs(120), // Duration long enough for test to complete
-            Duration::from_secs(60),  // Schedule delay for periodic sends
+            HelloSubscriptionConfig::builder()
+                .periodic_interval(Duration::from_secs(60))
+                .build()?,
         )
         .await?;
     info!("membera subscribed to hello notifications from admin");
@@ -963,31 +964,16 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Admin subscribes to hello notifications from Owner
     admin_team
-        .sync_hello_subscribe(
-            owner_addr,
-            Duration::from_millis(1000),
-            Duration::from_secs(120), // Duration long enough for test to complete
-            Duration::from_secs(60),  // Schedule delay for periodic sends
-        )
+        .sync_hello_subscribe(owner_addr, HelloSubscriptionConfig::default())
         .await?;
     info!("admin subscribed to hello notifications from owner");
 
     // Test multiple subscriptions
     operator_team
-        .sync_hello_subscribe(
-            owner_addr,
-            Duration::from_millis(2000),
-            Duration::from_secs(120), // Duration long enough for test to complete
-            Duration::from_secs(60),  // Schedule delay for periodic sends
-        )
+        .sync_hello_subscribe(owner_addr, HelloSubscriptionConfig::default())
         .await?;
     operator_team
-        .sync_hello_subscribe(
-            admin_addr,
-            Duration::from_millis(1500),
-            Duration::from_secs(120), // Duration long enough for test to complete
-            Duration::from_secs(60),  // Schedule delay for periodic sends
-        )
+        .sync_hello_subscribe(admin_addr, HelloSubscriptionConfig::default())
         .await?;
     info!("operator subscribed to both owner and admin");
 
@@ -1000,12 +986,7 @@ async fn test_hello_subscription() -> Result<()> {
 
     // Test edge cases
     admin_team
-        .sync_hello_subscribe(
-            owner_addr,
-            Duration::from_millis(100),
-            Duration::from_secs(120), // Duration long enough for test to complete
-            Duration::from_secs(60),  // Schedule delay for periodic sends
-        )
+        .sync_hello_subscribe(owner_addr, HelloSubscriptionConfig::default())
         .await?;
     admin_team.sync_hello_unsubscribe(owner_addr).await?;
     info!("tested immediate subscribe/unsubscribe");
@@ -1049,13 +1030,14 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
     info!("membera added admin as sync peer with sync_on_hello=true");
 
     // Phase 1: Test with high schedule_delay (60s) - should only see first graph change
-    info!("Phase 1: Testing with high schedule_delay (60s) and high graph_change_delay (60s)");
+    info!("Phase 1: Testing with high schedule_delay (60s) and high graph_change_debounce (60s)");
     membera_team
         .sync_hello_subscribe(
             admin_addr,
-            Duration::from_secs(60),  // graph_change_delay
-            Duration::from_secs(120), // duration
-            Duration::from_secs(60),  // schedule_delay - high
+            HelloSubscriptionConfig::builder()
+                .graph_change_debounce(Duration::from_secs(60))
+                .periodic_interval(Duration::from_secs(60))
+                .build()?,
         )
         .await?;
     info!("membera subscribed to hello notifications from admin with high schedule_delay");
@@ -1156,12 +1138,13 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
     membera_team
         .sync_hello_subscribe(
             admin_addr,
-            Duration::from_secs(60),   // graph_change_delay
-            Duration::from_secs(120),  // duration
-            Duration::from_millis(10), // schedule_delay - low
+            HelloSubscriptionConfig::builder()
+                .graph_change_debounce(Duration::from_secs(60))
+                .periodic_interval(Duration::from_millis(10))
+                .build()?,
         )
         .await?;
-    info!("membera subscribed to hello notifications from admin with low schedule_delay");
+    info!("membera subscribed to hello notifications from admin with low periodic_interval");
 
     // Wait for both labels to be seen (scheduled send should pick up pending changes)
     info!("waiting for both labels to be seen via scheduled periodic send...");

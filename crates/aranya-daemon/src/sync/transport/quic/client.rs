@@ -121,12 +121,17 @@ where
     async fn sync_hello_subscribe_impl(
         syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
         syncer
-            .send_sync_hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
+            .send_sync_hello_subscribe_request(
+                peer,
+                graph_change_debounce,
+                duration,
+                schedule_delay,
+            )
             .await
     }
 

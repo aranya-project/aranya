@@ -120,3 +120,119 @@ impl Default for SyncPeerConfigBuilder {
         }
     }
 }
+
+/// Configuration for hello subscription.
+///
+/// This configures how a device subscribes to hello notifications from a sync peer.
+/// Hello notifications inform subscribers when the peer's graph has changed,
+/// enabling reactive syncing.
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[derive(Clone, Debug)]
+pub struct HelloSubscriptionConfig {
+    graph_change_debounce: Duration,
+    expiration: Duration,
+    periodic_interval: Duration,
+}
+
+#[cfg(feature = "preview")]
+impl HelloSubscriptionConfig {
+    /// Creates a default [`HelloSubscriptionConfigBuilder`].
+    pub fn builder() -> HelloSubscriptionConfigBuilder {
+        Default::default()
+    }
+
+    /// Debounce interval for hello notifications after sending one.
+    ///
+    /// After sending a hello notification, no further notification will be sent
+    /// for graph changes within this interval. Default is 100ms.
+    pub fn graph_change_debounce(&self) -> Duration {
+        self.graph_change_debounce
+    }
+
+    /// How long the subscription remains active.
+    pub fn expiration(&self) -> Duration {
+        self.expiration
+    }
+
+    /// Interval between periodic hello messages.
+    pub fn periodic_interval(&self) -> Duration {
+        self.periodic_interval
+    }
+}
+
+#[cfg(feature = "preview")]
+impl Default for HelloSubscriptionConfig {
+    fn default() -> Self {
+        Self {
+            graph_change_debounce: Duration::from_millis(100),
+            expiration: MAX_SYNC_INTERVAL,
+            periodic_interval: Duration::from_secs(10),
+        }
+    }
+}
+
+/// Builder for a [`HelloSubscriptionConfig`].
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[derive(Debug)]
+pub struct HelloSubscriptionConfigBuilder {
+    graph_change_debounce: Duration,
+    expiration: Duration,
+    periodic_interval: Duration,
+}
+
+#[cfg(feature = "preview")]
+impl HelloSubscriptionConfigBuilder {
+    /// Creates a new builder for [`HelloSubscriptionConfig`].
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Attempts to build a [`HelloSubscriptionConfig`] using the provided parameters.
+    pub fn build(self) -> Result<HelloSubscriptionConfig> {
+        Ok(HelloSubscriptionConfig {
+            graph_change_debounce: self.graph_change_debounce,
+            expiration: self.expiration,
+            periodic_interval: self.periodic_interval,
+        })
+    }
+
+    /// Sets the graph_change_debounce interval for hello notifications.
+    ///
+    /// After sending a hello notification, no further notification will be sent
+    /// for graph changes within this interval. Default is 100ms.
+    pub fn graph_change_debounce(mut self, duration: Duration) -> Self {
+        self.graph_change_debounce = duration;
+        self
+    }
+
+    /// Sets how long the subscription remains active before expiring.
+    ///
+    /// After this duration, the subscription will automatically end and no more
+    /// hello notifications will be sent. Default is `MAX_SYNC_INTERVAL` (1 year).
+    pub fn expiration(mut self, duration: Duration) -> Self {
+        self.expiration = duration;
+        self
+    }
+
+    /// Sets the interval between periodic hello messages.
+    ///
+    /// Periodic hello messages are sent at this interval regardless of graph changes. Default is 10 seconds.
+    pub fn periodic_interval(mut self, interval: Duration) -> Self {
+        self.periodic_interval = interval;
+        self
+    }
+}
+
+#[cfg(feature = "preview")]
+impl Default for HelloSubscriptionConfigBuilder {
+    fn default() -> Self {
+        let config = HelloSubscriptionConfig::default();
+        Self {
+            graph_change_debounce: config.graph_change_debounce,
+            expiration: config.expiration,
+            periodic_interval: config.periodic_interval,
+        }
+    }
+}

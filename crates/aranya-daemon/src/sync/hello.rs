@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(crate) struct HelloSubscription {
     /// Rate limiting on how often to notify when a graph changes.
-    graph_change_delay: Duration,
+    graph_change_debounce: Duration,
     /// The last time we notified a peer about our current graph.
     last_notified: Option<Instant>,
     /// How long until the subscription is no longer valid.
@@ -96,7 +96,7 @@ where
         for (peer, subscription) in subscribers {
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
-                if now - last_notified < subscription.graph_change_delay {
+                if now - last_notified < subscription.graph_change_debounce {
                     continue;
                 }
             }
@@ -186,7 +186,7 @@ where
     ///
     /// # Arguments
     /// * `peer` - The unique identifier of the peer to send the message to
-    /// * `graph_change_delay` - Rate limiting on how often to notify when a graph changes
+    /// * `graph_change_debounce` - Rate limiting on how often to notify when a graph changes
     /// * `duration` - How long the subscription should last
     /// * `schedule_delay` - Interval to send hello notifications, regardless of graph changes
     ///
@@ -197,14 +197,14 @@ where
     pub(super) async fn send_sync_hello_subscribe_request(
         &mut self,
         peer: SyncPeer,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
         // Create the subscribe message
         let hello_msg = SyncHelloType::Subscribe {
             graph_id: peer.graph_id,
-            graph_change_delay,
+            graph_change_delay: graph_change_debounce,
             duration,
             schedule_delay,
         };
@@ -401,7 +401,7 @@ where
         match hello_msg {
             SyncHelloType::Subscribe {
                 graph_id,
-                graph_change_delay,
+                graph_change_delay: graph_change_debounce,
                 duration,
                 schedule_delay,
             } => {
@@ -418,7 +418,7 @@ where
                 let cancel_token = CancellationToken::new();
 
                 let subscription = HelloSubscription {
-                    graph_change_delay,
+                    graph_change_debounce,
                     last_notified: None,
                     expires_at,
                     cancel_token: cancel_token.clone(),
@@ -442,7 +442,7 @@ where
 
                 debug!(
                     ?peer,
-                    ?graph_change_delay,
+                    ?graph_change_debounce,
                     ?schedule_delay,
                     ?expires_at,
                     "Created hello subscription and spawned scheduled sender"
