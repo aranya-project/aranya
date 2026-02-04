@@ -90,3 +90,9 @@ max_chans = 100
 enable = true
 # Aranya sync server address.
 addr = "0.0.0.0:4321"
+# Directory containing trusted root CA certificates (PEM format).
+root_certs_dir = "/etc/aranya/certs/ca"
+# Path to the device's certificate file (PEM format).
+device_cert = "/etc/aranya/certs/device.crt"
+# Path to the device's private key file (PEM format).
+device_key = "/etc/aranya/certs/device.key"

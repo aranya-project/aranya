@@ -1,3 +1,7 @@
+// Allow deprecated types in this module - it provides backward compatibility
+// for the deprecated team config types during the mTLS migration.
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};
@@ -116,13 +120,10 @@ impl Builder for AddTeamConfigBuilder {
 
 impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
-        let mut builder = Self::builder();
+        let mut builder = Self::builder().team_id((&value.team_id).into());
         if let Some(cfg) = value.quic_sync {
-            builder = builder
-                .quic_sync(cfg.into())
-                .team_id((&value.team_id).into());
+            builder = builder.quic_sync(cfg.into());
         }
-
         builder.build().expect("All fields set")
     }
 }

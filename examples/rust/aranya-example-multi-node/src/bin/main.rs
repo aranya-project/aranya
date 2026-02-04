@@ -7,7 +7,11 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_example_multi_node::{config::create_config, env::EnvVars, tracing::init_tracing};
+use aranya_example_multi_node::{
+    config::{create_config, CertificateAuthority},
+    env::EnvVars,
+    tracing::init_tracing,
+};
 use tempfile::tempdir;
 use tokio::{
     process::{Child, Command},
@@ -45,11 +49,15 @@ async fn main() -> Result<()> {
 
     // Start a daemon for each device.
     let tmp = tempdir()?;
+
+    // Create CA for mTLS certificates
+    let ca = CertificateAuthority::new(tmp.path()).context("failed to create CA")?;
+
     let mut daemons = Vec::with_capacity(env.devices().count());
     for device in env.devices() {
         // Generate config file.
         info!("generating daemon config file for {}", device.name);
-        let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path())
+        let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path(), &ca)
             .await
             .expect("expected to generate daemon config file");
 

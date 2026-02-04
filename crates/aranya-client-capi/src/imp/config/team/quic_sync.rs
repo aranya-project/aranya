@@ -1,8 +1,11 @@
+// Allow deprecated types in this module - it contains the deprecated PSK sync types
+// that are kept for backward compatibility during the mTLS migration.
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use aranya_capi_core::{Builder, InvalidArg};
-use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
-use tracing::error;
+use aranya_client::config::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 
 use super::Error;
 use crate::api::defs;
@@ -77,16 +80,12 @@ pub struct CreateTeamQuicSyncConfigBuilder {
 
 impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: CreateSeedMode) {
         self.mode = mode;
     }
 
     /// Sets the seed to be generated.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     ///
     /// Overwrites [`Self::seed_ikm`].
     pub fn generate(&mut self) {
@@ -95,9 +94,8 @@ impl CreateTeamQuicSyncConfigBuilder {
 
     /// Sets the seed mode to 'IKM'.
     ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
-    ///
     /// Overwrites [`Self::gen_seed`].
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
         self.mode = CreateSeedMode::IKM(ikm.into());
     }
@@ -124,30 +122,21 @@ pub struct AddTeamQuicSyncConfigBuilder {
 
 impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: AddSeedMode) {
         self.mode = Some(mode);
     }
 
     /// Sets raw PSK seed IKM.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
         self.mode = Some(AddSeedMode::IKM(ikm.into()));
     }
 
     /// Sets wrapped PSK seed.
-    ///
-    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
     pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
-        let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
-            error!(error = %err, "could not deserialize wrapped_seed");
-            InvalidArg::new("wrapped_seed", "could not deserialize")
-        })?;
-        self.mode = Some(AddSeedMode::Wrapped(wrapped));
-
+        self.mode = Some(AddSeedMode::Wrapped(encap_seed.to_vec()));
         Ok(())
     }
 }
