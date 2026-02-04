@@ -45,6 +45,7 @@ static int test_timeout(const char *tmpdir) {
                       create_team(&owner_client, &team_id));
 
     printf("Team creation timed out \n");
+    aranya_client_cleanup(&owner_client);
 
     /* **Retry the team creation steps with a longer timeout** */
     // Initialize owner client
