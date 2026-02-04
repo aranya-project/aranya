@@ -1120,28 +1120,6 @@ pub type HelloSubscriptionConfig = Safe<imp::HelloSubscriptionConfig>;
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type HelloSubscriptionConfigBuilder = Safe<imp::HelloSubscriptionConfigBuilder>;
 
-/// Returns a [`HelloSubscriptionConfig`] with sensible defaults.
-///
-/// This is a convenience function for C API consumers who want defaults
-/// without using the full builder pattern.
-///
-/// Defaults:
-/// - graph_change_delay: 100ms
-/// - expiration: 1 year
-/// - periodic_interval: 10 seconds
-///
-/// @param[out] out a pointer to write the config to
-///
-/// @relates AranyaHelloSubscriptionConfig.
-#[cfg(feature = "preview")]
-pub fn hello_subscription_config_default(
-    out: &mut MaybeUninit<HelloSubscriptionConfig>,
-) -> Result<(), imp::Error> {
-    let builder = imp::HelloSubscriptionConfigBuilder::default();
-    // SAFETY: No special considerations.
-    unsafe { builder.build(out) }
-}
-
 /// Attempts to build a [`HelloSubscriptionConfig`].
 ///
 /// This function consumes and releases any resources associated
@@ -1161,20 +1139,21 @@ pub fn hello_subscription_config_build(
     Ok(())
 }
 
-/// Sets the minimum delay after a graph change before sending a hello notification.
+/// Sets the debounce interval for hello notifications after graph changes.
 ///
-/// This helps batch rapid changes into fewer notifications. Default is 100ms.
+/// After sending a hello notification, no further notification will be sent
+/// for graph changes within this interval. Default is 100ms.
 ///
 /// @param[in,out] cfg a pointer to the builder for a hello subscription config
-/// @param[in] delay the minimum delay after a graph change
+/// @param[in] duration the debounce interval
 ///
 /// @relates AranyaHelloSubscriptionConfigBuilder.
 #[cfg(feature = "preview")]
-pub fn hello_subscription_config_builder_set_graph_change_delay(
+pub fn hello_subscription_config_builder_set_graph_change_debounce(
     cfg: &mut HelloSubscriptionConfigBuilder,
-    delay: Duration,
+    duration: Duration,
 ) {
-    cfg.graph_change_delay(delay);
+    cfg.graph_change_debounce(duration);
 }
 
 /// Sets how long the subscription remains active before expiring.
@@ -1986,7 +1965,7 @@ pub unsafe fn remove_sync_peer(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] peer the peer's Aranya network address [`Addr`].
-/// @param[in] config the hello subscription configuration [`HelloSubscriptionConfig`].
+/// @param[in] config the hello subscription configuration [`HelloSubscriptionConfig`], or null to use defaults.
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "preview")]
@@ -1994,15 +1973,19 @@ pub unsafe fn sync_hello_subscribe(
     client: &Client,
     team: &TeamId,
     peer: Addr,
-    config: &HelloSubscriptionConfig,
+    config: Option<&HelloSubscriptionConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { peer.as_underlying() }?;
+    let config: aranya_client::HelloSubscriptionConfig = match config {
+        Some(cfg) => (*cfg).clone().into(),
+        None => aranya_client::HelloSubscriptionConfig::default(),
+    };
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .sync_hello_subscribe(addr, (*config).clone().into()),
+            .sync_hello_subscribe(addr, config),
     )?;
     Ok(())
 }

@@ -129,7 +129,7 @@ impl Default for SyncPeerConfigBuilder {
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[derive(Clone, Debug)]
 pub struct HelloSubscriptionConfig {
-    graph_change_delay: Duration,
+    graph_change_debounce: Duration,
     expiration: Duration,
     periodic_interval: Duration,
 }
@@ -141,9 +141,12 @@ impl HelloSubscriptionConfig {
         Default::default()
     }
 
-    /// Minimum delay after a graph change before sending a hello notification.
-    pub fn graph_change_delay(&self) -> Duration {
-        self.graph_change_delay
+    /// Debounce interval for hello notifications after sending one.
+    ///
+    /// After sending a hello notification, no further notification will be sent
+    /// for graph changes within this interval. Default is 100ms.
+    pub fn graph_change_debounce(&self) -> Duration {
+        self.graph_change_debounce
     }
 
     /// How long the subscription remains active.
@@ -161,7 +164,7 @@ impl HelloSubscriptionConfig {
 impl Default for HelloSubscriptionConfig {
     fn default() -> Self {
         Self {
-            graph_change_delay: Duration::from_millis(100),
+            graph_change_debounce: Duration::from_millis(100),
             expiration: MAX_SYNC_INTERVAL,
             periodic_interval: Duration::from_secs(10),
         }
@@ -173,7 +176,7 @@ impl Default for HelloSubscriptionConfig {
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[derive(Debug)]
 pub struct HelloSubscriptionConfigBuilder {
-    graph_change_delay: Duration,
+    graph_change_debounce: Duration,
     expiration: Duration,
     periodic_interval: Duration,
 }
@@ -188,17 +191,18 @@ impl HelloSubscriptionConfigBuilder {
     /// Attempts to build a [`HelloSubscriptionConfig`] using the provided parameters.
     pub fn build(self) -> Result<HelloSubscriptionConfig> {
         Ok(HelloSubscriptionConfig {
-            graph_change_delay: self.graph_change_delay,
+            graph_change_debounce: self.graph_change_debounce,
             expiration: self.expiration,
             periodic_interval: self.periodic_interval,
         })
     }
 
-    /// Sets the minimum delay after a graph change before sending a hello notification.
+    /// Sets the graph_change_debounce interval for hello notifications.
     ///
-    /// This helps batch rapid changes into fewer notifications. Default is 100ms.
-    pub fn graph_change_delay(mut self, delay: Duration) -> Self {
-        self.graph_change_delay = delay;
+    /// After sending a hello notification, no further notification will be sent
+    /// for graph changes within this interval. Default is 100ms.
+    pub fn graph_change_debounce(mut self, duration: Duration) -> Self {
+        self.graph_change_debounce = duration;
         self
     }
 
@@ -225,7 +229,7 @@ impl Default for HelloSubscriptionConfigBuilder {
     fn default() -> Self {
         let config = HelloSubscriptionConfig::default();
         Self {
-            graph_change_delay: config.graph_change_delay,
+            graph_change_debounce: config.graph_change_debounce,
             expiration: config.expiration,
             periodic_interval: config.periodic_interval,
         }

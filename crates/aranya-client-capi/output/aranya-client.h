@@ -1644,45 +1644,6 @@ AranyaError aranya_hello_subscription_config_builder_cleanup(struct AranyaHelloS
 
 #if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Returns a [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig) with sensible defaults.
- *
- * This is a convenience function for C API consumers who want defaults
- * without using the full builder pattern.
- *
- * Defaults:
- * - graph_change_delay: 100ms
- * - expiration: 1 year
- * - periodic_interval: 10 seconds
- *
- * @param[out] out a pointer to write the config to
- *
- * @relates AranyaHelloSubscriptionConfig.
- */
-AranyaError aranya_hello_subscription_config_default(struct AranyaHelloSubscriptionConfig *out);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Returns a [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig) with sensible defaults.
- *
- * This is a convenience function for C API consumers who want defaults
- * without using the full builder pattern.
- *
- * Defaults:
- * - graph_change_delay: 100ms
- * - expiration: 1 year
- * - periodic_interval: 10 seconds
- *
- * @param[out] out a pointer to write the config to
- *
- * @relates AranyaHelloSubscriptionConfig.
- */
-AranyaError aranya_hello_subscription_config_default_ext(struct AranyaHelloSubscriptionConfig *out,
-                                                         struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
  * Attempts to build a [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig).
  *
  * This function consumes and releases any resources associated
@@ -1716,33 +1677,35 @@ AranyaError aranya_hello_subscription_config_build_ext(struct AranyaHelloSubscri
 
 #if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Sets the minimum delay after a graph change before sending a hello notification.
+ * Sets the debounce interval for hello notifications after graph changes.
  *
- * This helps batch rapid changes into fewer notifications. Default is 100ms.
+ * After sending a hello notification, no further notification will be sent
+ * for graph changes within this interval. Default is 100ms.
  *
  * @param[in,out] cfg a pointer to the builder for a hello subscription config
- * @param[in] delay the minimum delay after a graph change
+ * @param[in] duration the debounce interval
  *
  * @relates AranyaHelloSubscriptionConfigBuilder.
  */
-AranyaError aranya_hello_subscription_config_builder_set_graph_change_delay(struct AranyaHelloSubscriptionConfigBuilder *cfg,
-                                                                            AranyaDuration delay);
+AranyaError aranya_hello_subscription_config_builder_set_graph_change_debounce(struct AranyaHelloSubscriptionConfigBuilder *cfg,
+                                                                               AranyaDuration duration);
 #endif
 
 #if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Sets the minimum delay after a graph change before sending a hello notification.
+ * Sets the debounce interval for hello notifications after graph changes.
  *
- * This helps batch rapid changes into fewer notifications. Default is 100ms.
+ * After sending a hello notification, no further notification will be sent
+ * for graph changes within this interval. Default is 100ms.
  *
  * @param[in,out] cfg a pointer to the builder for a hello subscription config
- * @param[in] delay the minimum delay after a graph change
+ * @param[in] duration the debounce interval
  *
  * @relates AranyaHelloSubscriptionConfigBuilder.
  */
-AranyaError aranya_hello_subscription_config_builder_set_graph_change_delay_ext(struct AranyaHelloSubscriptionConfigBuilder *cfg,
-                                                                                AranyaDuration delay,
-                                                                                struct AranyaExtError *__ext_err);
+AranyaError aranya_hello_subscription_config_builder_set_graph_change_debounce_ext(struct AranyaHelloSubscriptionConfigBuilder *cfg,
+                                                                                   AranyaDuration duration,
+                                                                                   struct AranyaExtError *__ext_err);
 #endif
 
 #if defined(ENABLE_ARANYA_PREVIEW)
@@ -2897,7 +2860,7 @@ AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param[in] config the hello subscription configuration [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig).
+ * @param[in] config the hello subscription configuration [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig), or null to use defaults.
  *
  * @relates AranyaClient.
  */
@@ -2916,7 +2879,7 @@ AranyaError aranya_sync_hello_subscribe(const struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] peer the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param[in] config the hello subscription configuration [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig).
+ * @param[in] config the hello subscription configuration [`AranyaHelloSubscriptionConfig`](@ref AranyaHelloSubscriptionConfig), or null to use defaults.
  *
  * @relates AranyaClient.
  */

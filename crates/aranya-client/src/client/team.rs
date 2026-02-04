@@ -171,7 +171,7 @@ impl Team<'_> {
         peer: Addr,
         config: crate::config::HelloSubscriptionConfig,
     ) -> Result<()> {
-        // TODO: Pass the config type directly into the daemon IPC and internal
+        // TODO(#709): Pass the config type directly into the daemon IPC and internal
         // daemon implementation instead of extracting individual fields here.
         self.client
             .daemon
@@ -179,7 +179,7 @@ impl Team<'_> {
                 context::current(),
                 peer,
                 self.id,
-                config.graph_change_delay(),
+                config.graph_change_debounce(),
                 config.expiration(),
                 config.periodic_interval(),
             )

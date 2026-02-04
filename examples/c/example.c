@@ -718,20 +718,16 @@ AranyaError run(Team *t) {
     printf("demonstrating hello subscription\n");
 
     // Admin subscribes to hello notifications from Owner using defaults
+    // Pass NULL for config to use defaults
     printf("admin subscribing to hello notifications from owner\n");
-    AranyaHelloSubscriptionConfig hello_cfg;
-    err = aranya_hello_subscription_config_default(&hello_cfg);
-    EXPECT("error getting default hello subscription config", err);
     err = aranya_sync_hello_subscribe(&admin->client, &t->id, sync_addrs[OWNER],
-                                      &hello_cfg);
+                                      NULL);
     EXPECT("error subscribing admin to owner hello notifications", err);
 
     // Operator subscribes to hello notifications from Admin using defaults
     printf("operator subscribing to hello notifications from admin\n");
-    err = aranya_hello_subscription_config_default(&hello_cfg);
-    EXPECT("error getting default hello subscription config", err);
     err = aranya_sync_hello_subscribe(&operator->client, &t->id,
-                                      sync_addrs[ADMIN], &hello_cfg);
+                                      sync_addrs[ADMIN], NULL);
     EXPECT("error subscribing operator to admin hello notifications", err);
 
     sleep(1);

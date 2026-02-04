@@ -159,8 +159,8 @@ impl Default for SyncPeerConfigBuilder {
 #[cfg(feature = "preview")]
 #[derive(Clone, Debug)]
 pub struct HelloSubscriptionConfig {
-    /// Minimum delay after a graph change before sending a hello notification.
-    pub graph_change_delay: Duration,
+    /// Debounce interval for hello notifications after sending one.
+    pub graph_change_debounce: Duration,
     /// How long the subscription remains active before expiring.
     pub expiration: Duration,
     /// Interval between periodic hello messages.
@@ -171,7 +171,7 @@ pub struct HelloSubscriptionConfig {
 impl From<aranya_client::HelloSubscriptionConfig> for HelloSubscriptionConfig {
     fn from(value: aranya_client::HelloSubscriptionConfig) -> Self {
         Self {
-            graph_change_delay: value.graph_change_delay().into(),
+            graph_change_debounce: value.graph_change_debounce().into(),
             expiration: value.expiration().into(),
             periodic_interval: value.periodic_interval().into(),
         }
@@ -182,7 +182,7 @@ impl From<aranya_client::HelloSubscriptionConfig> for HelloSubscriptionConfig {
 impl From<HelloSubscriptionConfig> for aranya_client::HelloSubscriptionConfig {
     fn from(value: HelloSubscriptionConfig) -> Self {
         aranya_client::HelloSubscriptionConfig::builder()
-            .graph_change_delay(value.graph_change_delay.into())
+            .graph_change_debounce(value.graph_change_debounce.into())
             .expiration(value.expiration.into())
             .periodic_interval(value.periodic_interval.into())
             .build()
@@ -208,16 +208,16 @@ impl Default for HelloSubscriptionConfig {
 #[cfg(feature = "preview")]
 #[derive(Clone, Debug)]
 pub struct HelloSubscriptionConfigBuilder {
-    graph_change_delay: Duration,
+    graph_change_debounce: Duration,
     expiration: Duration,
     periodic_interval: Duration,
 }
 
 #[cfg(feature = "preview")]
 impl HelloSubscriptionConfigBuilder {
-    /// Sets the minimum delay after a graph change before sending a hello notification.
-    pub fn graph_change_delay(&mut self, delay: Duration) {
-        self.graph_change_delay = delay;
+    /// Sets the graph_change_debounce interval for hello notifications.
+    pub fn graph_change_debounce(&mut self, duration: Duration) {
+        self.graph_change_debounce = duration;
     }
 
     /// Sets how long the subscription remains active before expiring.
@@ -241,7 +241,7 @@ impl Builder for HelloSubscriptionConfigBuilder {
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
         let cfg = HelloSubscriptionConfig {
-            graph_change_delay: self.graph_change_delay,
+            graph_change_debounce: self.graph_change_debounce,
             expiration: self.expiration,
             periodic_interval: self.periodic_interval,
         };
@@ -255,7 +255,7 @@ impl Default for HelloSubscriptionConfigBuilder {
     fn default() -> Self {
         let config = HelloSubscriptionConfig::default();
         Self {
-            graph_change_delay: config.graph_change_delay,
+            graph_change_debounce: config.graph_change_debounce,
             expiration: config.expiration,
             periodic_interval: config.periodic_interval,
         }

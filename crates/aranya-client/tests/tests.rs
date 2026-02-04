@@ -1145,12 +1145,12 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
     info!("membera added admin as sync peer with sync_on_hello=true");
 
     // Phase 1: Test with high schedule_delay (60s) - should only see first graph change
-    info!("Phase 1: Testing with high schedule_delay (60s) and high graph_change_delay (60s)");
+    info!("Phase 1: Testing with high schedule_delay (60s) and high graph_change_debounce (60s)");
     membera_team
         .sync_hello_subscribe(
             admin_addr,
             HelloSubscriptionConfig::builder()
-                .graph_change_delay(Duration::from_secs(60))
+                .graph_change_debounce(Duration::from_secs(60))
                 .periodic_interval(Duration::from_secs(60))
                 .build()?,
         )
@@ -1254,12 +1254,12 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
         .sync_hello_subscribe(
             admin_addr,
             HelloSubscriptionConfig::builder()
-                .graph_change_delay(Duration::from_secs(60))
+                .graph_change_debounce(Duration::from_secs(60))
                 .periodic_interval(Duration::from_millis(10))
                 .build()?,
         )
         .await?;
-    info!("membera subscribed to hello notifications from admin with low schedule_delay");
+    info!("membera subscribed to hello notifications from admin with low periodic_interval");
 
     // Wait for both labels to be seen (scheduled send should pick up pending changes)
     info!("waiting for both labels to be seen via scheduled periodic send...");
