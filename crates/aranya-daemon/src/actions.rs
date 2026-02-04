@@ -18,7 +18,7 @@ use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, KeyBundle, RoleManagementPerm, SimplePerm},
+    policy::{self, ChanOp, Effect, PubKeyBundle, RoleManagementPerm, SimplePerm},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -45,7 +45,7 @@ where
     #[instrument(skip_all)]
     pub async fn create_team(
         &self,
-        owner_keys: KeyBundle,
+        owner_keys: PubKeyBundle,
         nonce: Option<&[u8]>,
     ) -> Result<(GraphId, Vec<Effect>)> {
         let mut sink = VecSink::new();
@@ -174,7 +174,7 @@ where
     #[instrument(skip_all)]
     fn add_device(
         &self,
-        keys: KeyBundle,
+        keys: PubKeyBundle,
         initial_role_id: Option<RoleId>,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::add_device(
@@ -525,7 +525,7 @@ where
     }
 }
 
-impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
+impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for PubKeyBundle {
     type Error = postcard::Error;
     fn try_from(pk: &PublicKeys<CS>) -> Result<Self, Self::Error> {
         Ok(Self {

@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
-    client::{ChanOp, Client, DeviceId, KeyBundle},
+    client::{ChanOp, Client, DeviceId, PubKeyBundle},
     text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
@@ -59,7 +59,7 @@ impl Daemon {
 /// An Aranya device.
 struct ClientCtx {
     client: Client,
-    pk: KeyBundle,
+    pk: PubKeyBundle,
     id: DeviceId,
     // NB: These have important drop side effects.
     _work_dir: TempDir,

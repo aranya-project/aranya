@@ -35,6 +35,9 @@ mod util;
 pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
+#[doc(inline)]
+#[expect(deprecated)]
+pub use crate::client::KeyBundle;
 #[cfg(feature = "preview")]
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
@@ -42,8 +45,8 @@ pub use crate::client::{Permission, RoleManagementPermission};
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId,
-        Roles, Team, TeamId,
+        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PubKeyBundle, Role,
+        RoleId, Roles, Team, TeamId,
     },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,

@@ -15,7 +15,8 @@ use tracing::instrument;
 use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
+        Client, Device, DeviceId, Devices, Label, LabelId, Labels, PubKeyBundle, Role, RoleId,
+        Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -56,7 +57,7 @@ impl Team<'_> {
 impl Team<'_> {
     /// Encrypts the team's QUIC syncer PSK seed for a peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
-    /// See [`KeyBundle::encryption`].
+    /// See [`PubKeyBundle::encryption`].
     #[instrument(skip(self))]
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
@@ -113,7 +114,7 @@ impl Team<'_> {
 impl Team<'_> {
     /// Adds a device to the team with an optional initial role.
     #[instrument(skip(self))]
-    pub async fn add_device(&self, keys: KeyBundle, initial_role: Option<RoleId>) -> Result<()> {
+    pub async fn add_device(&self, keys: PubKeyBundle, initial_role: Option<RoleId>) -> Result<()> {
         self.client
             .daemon
             .add_device_to_team(

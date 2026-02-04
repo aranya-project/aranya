@@ -5,7 +5,7 @@ use std::time::Duration;
 use age::secrecy::SecretString;
 use anyhow::Result;
 use aranya_client::{
-    client::{DeviceId, KeyBundle, TeamId},
+    client::{DeviceId, PubKeyBundle, TeamId},
     Addr,
 };
 use serde::{Deserialize, Serialize};
@@ -37,7 +37,7 @@ pub struct DeviceInfo {
     /// Device ID.
     pub device_id: DeviceId,
     /// Device public key bundle.
-    pub pk: KeyBundle,
+    pub pk: PubKeyBundle,
 }
 
 /// Object for simplifying Aranya team onboarding.

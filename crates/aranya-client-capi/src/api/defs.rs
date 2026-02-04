@@ -657,8 +657,8 @@ pub fn init_logging() -> Result<(), imp::Error> {
 /// Gets the public key bundle for this device.
 ///
 /// @param[in] client the Aranya Client
-/// @param[out] keybundle keybundle byte buffer `KeyBundle`.
-/// @param[in,out] keybundle_len returns the length of the serialized keybundle.
+/// @param[out] keybundle key bundle byte buffer
+/// @param[in,out] keybundle_len returns the length of the serialized key bundle.
 ///
 /// @relates AranyaClient.
 pub unsafe fn get_key_bundle(
@@ -1694,8 +1694,8 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team_id the team's ID
-/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param[in] keybundle_len the length of the keybundle
+/// @param[in] keybundle serialized key bundle bytes
+/// @param[in] keybundle_len the length of the key bundle
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
 ///
@@ -1773,7 +1773,7 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param[in] keybundle serialized key bundle bytes
 /// @param[in] keybundle_len is the length of the serialized keybundle.
 /// @param[in] role_id (optional) the ID of the role to assign to the device.
 ///
@@ -2030,7 +2030,7 @@ pub fn team_device_role(
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] device the device's ID
-/// @param[out] keybundle keybundle byte buffer `KeyBundle`.
+/// @param[out] keybundle key bundle byte buffer
 /// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
