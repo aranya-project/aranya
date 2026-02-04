@@ -1,5 +1,5 @@
 //! Utilities for encrypting/decrypting with `age` tool and a passphrase.
-
+// NOTE: This is not a production ready implementation, nothing is currently done to protect password memory.
 use std::{
     io::{Read, Write},
     iter,
