@@ -7,9 +7,9 @@ use aranya_client::{
 };
 use tracing::{info, instrument};
 
-use crate::ring::RingCtx;
+use crate::ring::TestCtx;
 
-impl RingCtx {
+impl TestCtx {
     /// Creates a team with node 0 as owner and adds all other nodes.
     ///
     /// This is the main entry point for team setup that combines team creation,
@@ -154,13 +154,15 @@ impl RingCtx {
     /// This is used during setup before the ring topology is configured.
     /// Sync failures are expected and retried - Aranya syncs can occasionally fail
     /// and that's normal behavior.
+    //= docs/multi-daemon-convergence-test.md#err-003
+    //# The test MUST handle sync failures between nodes.
     #[instrument(skip(self))]
     pub async fn sync_team_from_owner(&self) -> Result<()> {
         use std::time::Duration;
         use tokio::time::sleep;
         use tracing::warn;
 
-        const MAX_RETRIES: usize = 100;
+        const MAX_RETRIES: usize = 25;
         const RETRY_DELAY: Duration = Duration::from_millis(500);
 
         let team_id = self.team_id.context("Team not created")?;
@@ -181,6 +183,8 @@ impl RingCtx {
                         break;
                     }
                     Err(e) => {
+                        //= docs/multi-daemon-convergence-test.md#err-004
+                        //# The test MUST log all errors with sufficient context for debugging.
                         warn!(
                             node = node.index,
                             attempt,

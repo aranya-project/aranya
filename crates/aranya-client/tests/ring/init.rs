@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use tokio::fs;
 use tracing::{info, instrument};
 
-use crate::ring::{ConvergenceTracker, NodeCtx, RingCtx, RingTestConfig};
+use crate::ring::{ConvergenceTracker, NodeCtx, TestCtx, TestConfig};
 
 impl NodeCtx {
     /// Creates a new node context.
@@ -113,7 +113,7 @@ impl NodeCtx {
     }
 }
 
-impl RingCtx {
+impl TestCtx {
     /// Creates a new ring context with all nodes initialized.
     ///
     /// Nodes are initialized in parallel batches to avoid resource exhaustion
@@ -121,7 +121,7 @@ impl RingCtx {
     //= docs/multi-daemon-convergence-test.md#init-004
     //# Node initialization MUST occur in parallel batches to avoid resource exhaustion.
     #[instrument(skip(config), fields(node_count = config.node_count))]
-    pub async fn new(config: RingTestConfig) -> Result<Self> {
+    pub async fn new(config: TestConfig) -> Result<Self> {
         config.validate()?;
 
         let work_dir = TempDir::new().context("unable to create temp dir")?;
@@ -170,7 +170,12 @@ impl RingCtx {
 
         //= docs/multi-daemon-convergence-test.md#init-006
         //# The test MUST verify that all nodes started successfully.
+
+        //= docs/multi-daemon-convergence-test.md#err-001
+        //# The test MUST fail if any node fails to initialize.
         if nodes.len() != config.node_count {
+            //= docs/multi-daemon-convergence-test.md#err-002
+            //# If a node fails to initialize, the test MUST report which node failed and the cause of the failure.
             bail!(
                 "Expected {} nodes but only {} initialized",
                 config.node_count,
@@ -198,6 +203,7 @@ impl RingCtx {
 
         Ok(Self {
             nodes,
+            topology: super::Topology::Ring,
             config: config.clone(),
             team_id: None,
             tracker: ConvergenceTracker::new(config.node_count),

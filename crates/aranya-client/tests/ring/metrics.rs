@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use tracing::info;
 
-use crate::ring::RingCtx;
+use crate::ring::TestCtx;
 
 /// Performance metrics from a convergence test run.
 #[derive(Clone, Debug)]
@@ -25,7 +25,7 @@ pub struct ConvergenceMetrics {
     pub total_convergence_time: Option<Duration>,
 }
 
-impl RingCtx {
+impl TestCtx {
     /// Calculates and reports performance metrics.
     //= docs/multi-daemon-convergence-test.md#perf-002
     //# The test MUST record the timestamp when each node achieves convergence.
@@ -113,7 +113,7 @@ impl RingCtx {
                     println!("Total convergence time:  {:?}", total);
                 }
 
-                //= docs/multi-daemon-convergence-test.md#perf-005
+                //= docs/multi-daemon-convergence-test.md#perf-004
                 //# The test SHOULD report memory usage per node if available.
                 #[cfg(target_os = "linux")]
                 if let Some(mem) = get_process_memory_kb() {

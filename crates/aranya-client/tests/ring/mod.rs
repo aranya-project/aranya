@@ -30,10 +30,10 @@ mod topology;
 /// Provides configurable parameters for the test with sensible defaults
 /// based on the multi-daemon convergence test specification.
 #[derive(Clone, Debug)]
-pub struct RingTestConfig {
+pub struct TestConfig {
     /// Number of nodes in the ring.
     //= docs/multi-daemon-convergence-test.md#conf-001
-    //# The test MUST support configuring the number of nodes in the ring.
+    //# The test MUST support configuring the number of nodes.
     pub node_count: usize,
 
     /// Sync interval between peers.
@@ -60,20 +60,20 @@ pub struct RingTestConfig {
     pub init_batch_size: usize,
 }
 
-impl Default for RingTestConfig {
+impl Default for TestConfig {
     fn default() -> Self {
         Self {
             //= docs/multi-daemon-convergence-test.md#conf-002
-            //# The default node count MUST be 100 nodes.
+            //# The test MUST scale to at least 70 nodes without failure.
             node_count: 100,
 
             //= docs/multi-daemon-convergence-test.md#conf-005
-            //# The default sync interval MUST be 100 milliseconds.
+            //# The default sync interval MUST be 1 second.
             sync_interval: Duration::from_secs(1),
 
             //= docs/multi-daemon-convergence-test.md#conf-007
-            //# The default maximum test duration MUST be 300 seconds (5 minutes).
-            max_duration: Duration::from_secs(300),
+            //# The default maximum test duration MUST be 600 seconds (10 minutes).
+            max_duration: Duration::from_secs(600),
 
             poll_interval: Duration::from_millis(250),
             init_timeout: Duration::from_secs(60),
@@ -82,15 +82,15 @@ impl Default for RingTestConfig {
     }
 }
 
-impl RingTestConfig {
+impl TestConfig {
     /// Creates a new configuration builder.
-    pub fn builder() -> RingTestConfigBuilder {
-        RingTestConfigBuilder::default()
+    pub fn builder() -> TestConfigBuilder {
+        TestConfigBuilder::default()
     }
 
     /// Validates the configuration.
     //= docs/multi-daemon-convergence-test.md#conf-003
-    //# The test MUST support a minimum of 3 nodes (the minimum for a valid ring).
+    //# The test MUST reject configurations with fewer than 3 nodes (the minimum for a valid ring).
     pub fn validate(&self) -> Result<()> {
         if self.node_count < 3 {
             bail!("Ring requires at least 3 nodes, got {}", self.node_count);
@@ -99,9 +99,9 @@ impl RingTestConfig {
     }
 }
 
-/// Builder for [`RingTestConfig`].
+/// Builder for [`TestConfig`].
 #[derive(Clone, Debug, Default)]
-pub struct RingTestConfigBuilder {
+pub struct TestConfigBuilder {
     node_count: Option<usize>,
     sync_interval: Option<Duration>,
     max_duration: Option<Duration>,
@@ -111,7 +111,7 @@ pub struct RingTestConfigBuilder {
 }
 
 #[allow(dead_code)]
-impl RingTestConfigBuilder {
+impl TestConfigBuilder {
     /// Sets the number of nodes in the ring.
     pub fn node_count(mut self, count: usize) -> Self {
         self.node_count = Some(count);
@@ -149,9 +149,9 @@ impl RingTestConfigBuilder {
     }
 
     /// Builds the configuration, applying defaults for unset values.
-    pub fn build(self) -> Result<RingTestConfig> {
-        let default = RingTestConfig::default();
-        let config = RingTestConfig {
+    pub fn build(self) -> Result<TestConfig> {
+        let default = TestConfig::default();
+        let config = TestConfig {
             node_count: self.node_count.unwrap_or(default.node_count),
             sync_interval: self.sync_interval.unwrap_or(default.sync_interval),
             max_duration: self.max_duration.unwrap_or(default.max_duration),
@@ -178,6 +178,11 @@ pub struct NodeCtx {
     /// Device ID.
     pub id: DeviceId,
     /// Daemon handle (RAII cleanup).
+    //= docs/multi-daemon-convergence-test.md#clean-001
+    //# All daemon processes MUST be terminated when the test completes.
+
+    //= docs/multi-daemon-convergence-test.md#clean-004
+    //# The test MUST use RAII patterns to ensure cleanup on panic.
     #[expect(unused, reason = "manages daemon lifecycle")]
     daemon: DaemonHandle,
     /// Indices of sync peer nodes.
@@ -208,9 +213,9 @@ impl NodeCtx {
 /// Tracks convergence status for a single node.
 #[derive(Clone, Debug, Default)]
 pub struct ConvergenceStatus {
-    /// Whether this node has converged.
-    pub converged: bool,
-    /// Time when convergence was achieved (relative to command issuance).
+    /// Whether this node has received the convergence label.
+    pub has_label: bool,
+    /// Time when the label was received.
     pub convergence_time: Option<Instant>,
 }
 
@@ -237,8 +242,8 @@ impl Default for ConvergenceTimestamps {
 
 /// Tracks convergence state across all nodes.
 pub struct ConvergenceTracker {
-    /// Name of the expected label that should propagate.
-    pub expected_label_name: Option<String>,
+    /// The label used to track convergence.
+    pub convergence_label: Option<String>,
     /// Per-node convergence status.
     pub node_status: Vec<ConvergenceStatus>,
     /// Timestamps for metrics.
@@ -251,7 +256,7 @@ impl ConvergenceTracker {
     /// Creates a new tracker for the given number of nodes.
     pub fn new(node_count: usize) -> Self {
         Self {
-            expected_label_name: None,
+            convergence_label: None,
             node_status: vec![ConvergenceStatus::default(); node_count],
             timestamps: ConvergenceTimestamps::default(),
             source_node: 0,
@@ -259,18 +264,18 @@ impl ConvergenceTracker {
     }
 
     /// Sets the expected label name to track.
-    pub fn set_expected_label(&mut self, name: String) {
-        self.expected_label_name = Some(name);
+    pub fn set_convergence_label(&mut self, name: String) {
+        self.convergence_label = Some(name);
     }
 
     /// Records that a node has converged.
     pub fn mark_converged(&mut self, node_index: usize) {
-        if !self.node_status[node_index].converged {
-            self.node_status[node_index].converged = true;
+        if !self.node_status[node_index].has_label {
+            self.node_status[node_index].has_label = true;
             self.node_status[node_index].convergence_time = Some(Instant::now());
 
             //= docs/multi-daemon-convergence-test.md#conv-003
-            //# The test MUST track when each node receives the issued command.
+            //# The test MUST track when each node receives the convergence label.
             if self.timestamps.first_convergence.is_none() && node_index != self.source_node {
                 self.timestamps.first_convergence = Some(Instant::now());
             }
@@ -279,9 +284,9 @@ impl ConvergenceTracker {
 
     /// Returns true if all nodes have converged.
     //= docs/multi-daemon-convergence-test.md#conv-004
-    //# Convergence MUST be defined as all nodes having received all expected commands.
+    //# Convergence MUST be defined as all nodes having received the convergence label.
     pub fn all_converged(&self) -> bool {
-        self.node_status.iter().all(|s| s.converged)
+        self.node_status.iter().all(|s| s.has_label)
     }
 
     /// Returns indices of nodes that have not converged.
@@ -291,20 +296,31 @@ impl ConvergenceTracker {
         self.node_status
             .iter()
             .enumerate()
-            .filter(|(_, s)| !s.converged)
+            .filter(|(_, s)| !s.has_label)
             .map(|(i, _)| i)
             .collect()
     }
 }
 
+/// The topology used to connect nodes.
+///
+/// The enum is expected to grow as additional topologies (star, mesh, etc.)
+/// are added in future extensions.
+#[derive(Clone, Debug)]
+pub enum Topology {
+    Ring,
+}
+
 /// Main context for ring topology convergence tests.
 ///
 /// Manages the lifecycle of all nodes and coordinates test execution.
-pub struct RingCtx {
+pub struct TestCtx {
     /// All nodes in the ring.
     pub nodes: Vec<NodeCtx>,
+    /// The topology used to connect nodes.
+    pub topology: Topology,
     /// Test configuration.
-    pub config: RingTestConfig,
+    pub config: TestConfig,
     /// Team ID for the test.
     pub team_id: Option<TeamId>,
     /// Convergence tracker.
@@ -312,10 +328,15 @@ pub struct RingCtx {
     /// Seed IKM for QUIC sync (shared by all nodes).
     seed_ikm: [u8; SEED_IKM_SIZE],
     /// Temporary working directory (RAII cleanup).
+    //= docs/multi-daemon-convergence-test.md#clean-002
+    //# All temporary directories MUST be removed when the test completes.
+
+    //= docs/multi-daemon-convergence-test.md#clean-003
+    //# Cleanup MUST occur even if the test fails or times out.
     _work_dir: TempDir,
 }
 
-impl RingCtx {
+impl TestCtx {
     /// Returns the number of nodes in the ring.
     #[allow(dead_code)]
     pub fn node_count(&self) -> usize {

@@ -1,0 +1,5 @@
+# Generated reports (not committed)
+reports/
+
+# Requirements extraction output
+requirements/

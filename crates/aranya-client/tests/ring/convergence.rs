@@ -8,17 +8,17 @@ use aranya_daemon_api::Text;
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use crate::ring::RingCtx;
+use crate::ring::TestCtx;
 
-impl RingCtx {
+impl TestCtx {
     /// Issues a test command from the specified source node.
     ///
     /// Creates a label as the observable command that will propagate through the ring.
     //= docs/multi-daemon-convergence-test.md#conv-001
-    //# The test MUST issue a command from a designated source node.
+    //# The test MUST assign a label to the source node's graph to mark the start of convergence testing.
 
     //= docs/multi-daemon-convergence-test.md#conv-002
-    //# The default source node for command issuance MUST be node 0.
+    //# The default source node for label assignment MUST be node 0.
     #[instrument(skip(self), fields(source_node))]
     pub async fn issue_test_command(&mut self, source_node: usize) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;
@@ -41,10 +41,10 @@ impl RingCtx {
         );
 
         //= docs/multi-daemon-convergence-test.md#perf-001
-        //# The test MUST record the timestamp when the command is issued.
+        //# The test MUST record the timestamp when the convergence label is assigned.
         self.tracker.timestamps.command_issued = Instant::now();
         self.tracker.source_node = source_node;
-        self.tracker.set_expected_label(label_name.clone());
+        self.tracker.set_convergence_label(label_name.clone());
 
         // Get the owner role for label creation
         let owner_role = self.nodes[source_node]
@@ -75,7 +75,7 @@ impl RingCtx {
 
     /// Waits for all nodes to converge by receiving the test command.
     //= docs/multi-daemon-convergence-test.md#conv-005
-    //# The test MUST measure the total convergence time from command issuance to full convergence.
+    //# The test MUST measure the total convergence time from label assignment to full convergence.
     #[instrument(skip(self))]
     pub async fn wait_for_convergence(&mut self) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;
@@ -118,7 +118,7 @@ impl RingCtx {
                 .tracker
                 .node_status
                 .iter()
-                .filter(|s| s.converged)
+                .filter(|s| s.has_label)
                 .count();
             debug!(
                 converged = converged_count,
@@ -134,18 +134,18 @@ impl RingCtx {
 
     /// Checks convergence status for all nodes.
     //= docs/multi-daemon-convergence-test.md#verify-001
-    //# Each node's graph state MUST be queryable to determine received commands.
+    //# Each node's graph state MUST be queryable to determine whether it has received the convergence label.
     async fn check_all_nodes_convergence(&mut self, team_id: TeamId) -> Result<()> {
         let expected_label = self
             .tracker
-            .expected_label_name
+            .convergence_label
             .as_ref()
             .context("No expected label set")?
             .clone();
 
         for i in 0..self.nodes.len() {
             // Skip already converged nodes
-            if self.tracker.node_status[i].converged {
+            if self.tracker.node_status[i].has_label {
                 continue;
             }
 
@@ -161,15 +161,11 @@ impl RingCtx {
 
             if has_expected {
                 //= docs/multi-daemon-convergence-test.md#verify-004
-                //# A node MUST be considered converged when it has received all expected commands.
+                //# A node MUST be considered converged when it has received the convergence label.
                 self.tracker.mark_converged(i);
                 debug!(node = i, "Node converged");
             }
         }
-
-        //= docs/multi-daemon-convergence-test.md#verify-005
-        //# The test MUST verify that merged graphs are consistent (no conflicting commands).
-        // Consistency is verified by successful convergence - if labels match, graphs are consistent
 
         Ok(())
     }
