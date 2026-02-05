@@ -133,12 +133,12 @@ where
     async fn sync_hello_subscribe(
         &mut self,
         peer: SyncPeer,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
         trace!("subscribing to hello notifications from peer");
-        ST::sync_hello_subscribe_impl(self, peer, graph_change_delay, duration, schedule_delay)
+        ST::sync_hello_subscribe_impl(self, peer, graph_change_debounce, duration, schedule_delay)
             .await
     }
 
@@ -192,11 +192,11 @@ where
                     #[cfg(feature = "preview")]
                     ManagerMessage::HelloSubscribe {
                         peer,
-                        graph_change_delay,
+                        graph_change_debounce,
                         duration,
                         schedule_delay,
                     } => {
-                        self.sync_hello_subscribe(peer, graph_change_delay, duration, schedule_delay)
+                        self.sync_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay)
                             .await
                     }
                     #[cfg(feature = "preview")]
