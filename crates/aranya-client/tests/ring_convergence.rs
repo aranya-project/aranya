@@ -13,14 +13,14 @@
     rust_2018_idioms
 )]
 
-mod ring;
+mod scale;
 
 use anyhow::Result;
 use serial_test::serial;
 use test_log::test;
 use tracing::info;
 
-use crate::ring::{TestConfig, TestCtx};
+use crate::scale::{TestConfig, TestCtx, Topology};
 
 /// Tests ring convergence with 10 nodes.
 ///
@@ -41,7 +41,7 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
     //= docs/multi-daemon-convergence-test.md#init-001
     //= type=test
     //# Each node MUST be initialized with a unique daemon instance.
-    let mut ring = TestCtx::new(config).await?;
+    let mut ring = TestCtx::new(config, Topology::Ring).await?;
 
     //= docs/multi-daemon-convergence-test.md#team-001
     //= type=test
@@ -96,7 +96,7 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
 
     info!(node_count = config.node_count, "Starting 3-node ring test");
 
-    let mut ring = TestCtx::new(config).await?;
+    let mut ring = TestCtx::new(config, Topology::Ring).await?;
 
     ring.setup_team().await?;
     ring.sync_team_from_owner().await?;
@@ -129,7 +129,7 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
         "Starting 100-node ring test"
     );
 
-    let mut ring = TestCtx::new(config).await?;
+    let mut ring = TestCtx::new(config, Topology::Ring).await?;
 
     ring.setup_team().await?;
     ring.sync_team_from_owner().await?;
@@ -164,7 +164,7 @@ async fn test_ring_convergence_70_nodes() -> Result<()> {
 
     info!(node_count = config.node_count, "Starting 70-node ring test");
 
-    let mut ring = TestCtx::new(config).await?;
+    let mut ring = TestCtx::new(config, Topology::Ring).await?;
 
     ring.setup_team().await?;
     ring.sync_team_from_owner().await?;

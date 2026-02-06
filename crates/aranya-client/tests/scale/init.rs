@@ -1,4 +1,4 @@
-//! Node initialization for ring convergence tests.
+//! Node initialization for scale convergence tests.
 
 use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf};
 
@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use tokio::fs;
 use tracing::{info, instrument};
 
-use crate::ring::{ConvergenceTracker, NodeCtx, TestConfig, TestCtx};
+use crate::scale::{ConvergenceTracker, NodeCtx, TestConfig, TestCtx, Topology};
 
 impl NodeCtx {
     /// Creates a new node context.
@@ -114,24 +114,24 @@ impl NodeCtx {
 }
 
 impl TestCtx {
-    /// Creates a new ring context with all nodes initialized.
+    /// Creates a new test context with all nodes initialized.
     ///
     /// Nodes are initialized in parallel batches to avoid resource exhaustion
     /// while still providing reasonable startup performance.
     //= docs/multi-daemon-convergence-test.md#init-004
     //# Node initialization MUST occur in parallel batches to avoid resource exhaustion.
     #[instrument(skip(config), fields(node_count = config.node_count))]
-    pub async fn new(config: TestConfig) -> Result<Self> {
+    pub async fn new(config: TestConfig, topology: Topology) -> Result<Self> {
         config.validate()?;
 
         let work_dir = TempDir::new().context("unable to create temp dir")?;
         let mut nodes = Vec::with_capacity(config.node_count);
-        let team_name = "ring_test";
+        let team_name = "scale_test";
 
         info!(
             node_count = config.node_count,
             batch_size = config.init_batch_size,
-            "Initializing ring nodes"
+            "Initializing nodes"
         );
 
         // Initialize nodes in batches
@@ -202,7 +202,7 @@ impl TestCtx {
 
         Ok(Self {
             nodes,
-            topology: super::Topology::Ring,
+            topology,
             config: config.clone(),
             team_id: None,
             tracker: ConvergenceTracker::new(config.node_count),

@@ -1,4 +1,4 @@
-//! Convergence testing for ring topology.
+//! Convergence testing for scale topology tests.
 
 use std::time::Instant;
 
@@ -7,7 +7,7 @@ use aranya_client::client::TeamId;
 use aranya_daemon_api::Text;
 use tracing::{debug, info, instrument};
 
-use crate::ring::TestCtx;
+use crate::scale::TestCtx;
 
 impl TestCtx {
     /// Issues a test command from the specified source node.

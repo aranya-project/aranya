@@ -1,4 +1,4 @@
-//! Ring topology configuration for convergence tests.
+//! Ring topology configuration for scale convergence tests.
 
 use std::collections::VecDeque;
 
@@ -6,20 +6,9 @@ use anyhow::{bail, Context, Result};
 use aranya_client::SyncPeerConfig;
 use tracing::{debug, info, instrument};
 
-use crate::ring::TestCtx;
+use crate::scale::TestCtx;
 
 impl TestCtx {
-    /// Configures the topology based on `self.topology` and verifies correctness.
-    pub async fn configure_topology(&mut self) -> Result<()> {
-        match self.topology {
-            super::Topology::Ring => {
-                self.configure_ring_topology().await?;
-                self.verify_topology()?;
-            }
-        }
-        Ok(())
-    }
-
     /// Configures the bidirectional ring topology.
     ///
     /// Each node is connected to its clockwise and counter-clockwise neighbors,
@@ -100,7 +89,7 @@ impl TestCtx {
     //= docs/multi-daemon-convergence-test.md#topo-003
     //# The ring topology MUST form a single connected ring with no partitions.
     #[instrument(skip(self))]
-    pub fn verify_topology(&self) -> Result<()> {
+    pub fn verify_ring_topology(&self) -> Result<()> {
         let n = self.nodes.len();
 
         info!(node_count = n, "Verifying ring topology");

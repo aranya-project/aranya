@@ -1,4 +1,4 @@
-//! Team setup for ring convergence tests.
+//! Team setup for scale convergence tests.
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
@@ -7,7 +7,7 @@ use aranya_client::{
 };
 use tracing::{info, instrument};
 
-use crate::ring::TestCtx;
+use crate::scale::TestCtx;
 
 impl TestCtx {
     /// Creates a team with node 0 as owner and adds all other nodes.

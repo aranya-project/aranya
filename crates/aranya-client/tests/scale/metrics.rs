@@ -1,15 +1,15 @@
-//! Performance metrics calculation for ring convergence tests.
+//! Performance metrics calculation for scale convergence tests.
 
 use std::time::Duration;
 
 use tracing::info;
 
-use crate::ring::TestCtx;
+use crate::scale::TestCtx;
 
 /// Performance metrics from a convergence test run.
 #[derive(Clone, Debug)]
 pub struct ConvergenceMetrics {
-    /// Number of nodes in the ring.
+    /// Number of nodes in the test.
     pub node_count: usize,
     /// Minimum convergence time (fastest node).
     pub min_time: Duration,
@@ -103,7 +103,7 @@ impl TestCtx {
     pub fn report_metrics(&self) {
         match self.calculate_metrics() {
             Some(metrics) => {
-                println!("\n=== Ring Convergence Metrics ===");
+                println!("\n=== Convergence Metrics ===");
                 println!("Nodes: {}", metrics.node_count);
                 println!("Min convergence time:    {:?}", metrics.min_time);
                 println!("Max convergence time:    {:?}", metrics.max_time);
@@ -139,7 +139,7 @@ impl TestCtx {
                 );
             }
             None => {
-                println!("\n=== Ring Convergence Metrics ===");
+                println!("\n=== Convergence Metrics ===");
                 println!("No convergence data available");
                 println!("================================\n");
             }

@@ -1,7 +1,7 @@
-//! Ring topology convergence test infrastructure.
+//! Scale convergence test infrastructure.
 //!
 //! This module provides test infrastructure for validating Aranya daemon convergence
-//! behavior with nodes arranged in a bidirectional ring topology.
+//! behavior across configurable topologies.
 
 use std::{
     path::PathBuf,
@@ -22,16 +22,17 @@ use tempfile::TempDir;
 mod convergence;
 mod init;
 mod metrics;
+mod ring;
 mod team;
 mod topology;
 
-/// Configuration for ring convergence tests.
+/// Configuration for scale convergence tests.
 ///
 /// Provides configurable parameters for the test with sensible defaults
 /// based on the multi-daemon convergence test specification.
 #[derive(Clone, Debug)]
 pub struct TestConfig {
-    /// Number of nodes in the ring.
+    /// Number of nodes in the test.
     //= docs/multi-daemon-convergence-test.md#conf-001
     //# The test MUST support configuring the number of nodes.
     pub node_count: usize,
@@ -112,7 +113,7 @@ pub struct TestConfigBuilder {
 
 #[allow(dead_code)]
 impl TestConfigBuilder {
-    /// Sets the number of nodes in the ring.
+    /// Sets the number of nodes in the test.
     pub fn node_count(mut self, count: usize) -> Self {
         self.node_count = Some(count);
         self
@@ -164,10 +165,10 @@ impl TestConfigBuilder {
     }
 }
 
-/// Context for a single node in the ring.
+/// Context for a single node in the test.
 ///
-/// Based on `DeviceCtx` but with ring-specific fields for tracking
-/// topology and convergence state.
+/// Based on `DeviceCtx` but with fields for tracking topology
+/// and convergence state.
 pub struct NodeCtx {
     /// Unique node index (0 to N-1).
     pub index: usize,
@@ -311,11 +312,11 @@ pub enum Topology {
     Ring,
 }
 
-/// Main context for ring topology convergence tests.
+/// Main context for scale convergence tests.
 ///
 /// Manages the lifecycle of all nodes and coordinates test execution.
 pub struct TestCtx {
-    /// All nodes in the ring.
+    /// All nodes in the test.
     pub nodes: Vec<NodeCtx>,
     /// The topology used to connect nodes.
     pub topology: Topology,
@@ -337,7 +338,7 @@ pub struct TestCtx {
 }
 
 impl TestCtx {
-    /// Returns the number of nodes in the ring.
+    /// Returns the number of nodes in the test.
     #[allow(dead_code)]
     pub fn node_count(&self) -> usize {
         self.nodes.len()
