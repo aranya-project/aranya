@@ -138,8 +138,7 @@ impl TestCtx {
         for batch_start in (0..config.node_count).step_by(config.init_batch_size) {
             let batch_end = (batch_start + config.init_batch_size).min(config.node_count);
             let batch_num = batch_start / config.init_batch_size + 1;
-            let total_batches =
-                (config.node_count + config.init_batch_size - 1) / config.init_batch_size;
+            let total_batches = config.node_count.div_ceil(config.init_batch_size);
 
             info!(
                 batch = batch_num,

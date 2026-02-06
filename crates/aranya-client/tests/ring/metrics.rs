@@ -62,7 +62,7 @@ impl TestCtx {
         let sum: Duration = times.iter().sum();
         let mean_time = sum / times.len() as u32;
 
-        let median_time = if times.len() % 2 == 0 {
+        let median_time = if times.len().is_multiple_of(2) {
             let mid = times.len() / 2;
             (times[mid - 1] + times[mid]) / 2
         } else {
@@ -70,16 +70,17 @@ impl TestCtx {
         };
 
         // Standard deviation
-        let mean_nanos = mean_time.as_nanos() as f64;
+        let n = u32::try_from(times.len()).expect("node count fits in u32");
+        let mean_secs = mean_time.as_secs_f64();
         let variance: f64 = times
             .iter()
             .map(|t| {
-                let diff = t.as_nanos() as f64 - mean_nanos;
+                let diff = t.as_secs_f64() - mean_secs;
                 diff * diff
             })
             .sum::<f64>()
-            / times.len() as f64;
-        let std_dev = Duration::from_nanos(variance.sqrt() as u64);
+            / f64::from(n);
+        let std_dev = Duration::from_secs_f64(variance.sqrt());
 
         let total_convergence_time = self
             .tracker
