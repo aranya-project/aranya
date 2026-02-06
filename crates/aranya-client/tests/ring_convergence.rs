@@ -15,14 +15,16 @@
 
 mod scale;
 
+use std::time::Duration;
+
 use anyhow::Result;
 use serial_test::serial;
 use test_log::test;
 use tracing::info;
 
-use crate::scale::{TestConfig, TestCtx, Topology};
+use crate::scale::{SyncMode, TestConfig, TestCtx, Topology};
 
-/// Tests ring convergence with 10 nodes.
+/// Tests ring convergence with 10 nodes using poll sync mode.
 ///
 /// This is a smaller test suitable for CI with reasonable execution time.
 //= docs/multi-daemon-convergence-test.md#conf-001
@@ -32,11 +34,15 @@ use crate::scale::{TestConfig, TestCtx, Topology};
 #[serial]
 async fn test_ring_convergence_10_nodes() -> Result<()> {
     let config = TestConfig::builder()
+        .test_name("10-node ring (poll)")
         .node_count(10)
-        .max_duration(std::time::Duration::from_secs(120))
+        .max_duration(Duration::from_secs(120))
         .build()?;
 
-    info!(node_count = config.node_count, "Starting 10-node ring test");
+    info!(
+        node_count = config.node_count,
+        "Starting 10-node ring test (poll mode)"
+    );
 
     //= docs/multi-daemon-convergence-test.md#init-001
     //= type=test
@@ -76,7 +82,57 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
     //# The test MUST calculate and report the following metrics.
     ring.report_metrics();
 
-    info!("10-node ring convergence test completed successfully");
+    info!("10-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 10 nodes using hello sync mode.
+///
+/// Validates that hello-based reactive syncing works for convergence.
+//= docs/multi-daemon-convergence-test.md#conf-008
+//= type=test
+//# The test MUST support configuring the sync mode (poll or hello).
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
+    //= docs/multi-daemon-convergence-test.md#conf-010
+    //= type=test
+    //# In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
+
+    //= docs/multi-daemon-convergence-test.md#conf-011
+    //= type=test
+    //# In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
+    let config = TestConfig::builder()
+        .test_name("10-node ring (hello)")
+        .node_count(10)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(120))
+        .build()?;
+
+    info!(
+        node_count = config.node_count,
+        "Starting 10-node ring test (hello mode)"
+    );
+
+    let mut ring = TestCtx::new(config, Topology::Ring).await?;
+
+    ring.setup_team().await?;
+    ring.sync_team_from_owner().await?;
+
+    //= docs/multi-daemon-convergence-test.md#sync-006
+    //= type=test
+    //# In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+    ring.configure_topology().await?;
+    ring.verify_team_propagation().await?;
+
+    ring.issue_test_command(0).await?;
+    ring.wait_for_convergence().await?;
+    ring.report_metrics();
+
+    info!("10-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
 
@@ -90,8 +146,9 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 #[serial]
 async fn test_ring_minimum_3_nodes() -> Result<()> {
     let config = TestConfig::builder()
+        .test_name("3-node ring (poll)")
         .node_count(3)
-        .max_duration(std::time::Duration::from_secs(60))
+        .max_duration(Duration::from_secs(60))
         .build()?;
 
     info!(node_count = config.node_count, "Starting 3-node ring test");
@@ -111,7 +168,7 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
     Ok(())
 }
 
-/// Tests ring convergence with 100 nodes.
+/// Tests ring convergence with 100 nodes using poll sync mode.
 ///
 /// This is the full-scale test as specified in the requirements.
 /// Marked as ignored by default due to resource requirements.
@@ -122,7 +179,10 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
 #[serial]
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_100_nodes -- --ignored"]
 async fn test_ring_convergence_100_nodes() -> Result<()> {
-    let config = TestConfig::default();
+    let config = TestConfig {
+        test_name: String::from("100-node ring (poll)"),
+        ..TestConfig::default()
+    };
 
     info!(
         node_count = config.node_count,
@@ -158,8 +218,9 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_70_nodes -- --ignored"]
 async fn test_ring_convergence_70_nodes() -> Result<()> {
     let config = TestConfig::builder()
+        .test_name("70-node ring (poll)")
         .node_count(70)
-        .max_duration(std::time::Duration::from_secs(600))
+        .max_duration(Duration::from_secs(600))
         .build()?;
 
     info!(node_count = config.node_count, "Starting 70-node ring test");
@@ -192,6 +253,15 @@ async fn test_ring_config_validation() -> Result<()> {
     // Test that >= 3 nodes is accepted
     let result = TestConfig::builder().node_count(3).build();
     assert!(result.is_ok(), "Should accept node_count >= 3");
+
+    //= docs/multi-daemon-convergence-test.md#conf-009
+    //= type=test
+    //# The default sync mode MUST be poll.
+    let config = TestConfig::default();
+    assert!(
+        matches!(config.sync_mode, SyncMode::Poll { .. }),
+        "Default sync mode should be Poll"
+    );
 
     Ok(())
 }

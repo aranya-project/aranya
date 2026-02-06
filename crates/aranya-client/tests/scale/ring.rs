@@ -3,10 +3,10 @@
 use std::collections::VecDeque;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::SyncPeerConfig;
+use aranya_client::{HelloSubscriptionConfig, SyncPeerConfig};
 use tracing::{debug, info, instrument};
 
-use crate::scale::TestCtx;
+use crate::scale::{SyncMode, TestCtx};
 
 impl TestCtx {
     /// Configures the bidirectional ring topology.
@@ -20,13 +20,33 @@ impl TestCtx {
         let team_id = self.team_id.context("Team not created")?;
         let n = self.nodes.len();
 
-        info!(node_count = n, "Configuring bidirectional ring topology");
+        info!(
+            node_count = n,
+            sync_mode = ?self.sync_mode,
+            "Configuring bidirectional ring topology"
+        );
 
+        // Build SyncPeerConfig based on the sync mode
         //= docs/multi-daemon-convergence-test.md#sync-002
         //# Sync peer configuration MUST specify the sync interval.
-        let config = SyncPeerConfig::builder()
-            .interval(self.config.sync_interval)
-            .build()?;
+        let peer_config = match &self.sync_mode {
+            SyncMode::Poll { interval } => SyncPeerConfig::builder().interval(*interval).build()?,
+            SyncMode::Hello { .. } => SyncPeerConfig::builder().sync_on_hello(true).build()?,
+        };
+
+        // Build HelloSubscriptionConfig if in hello mode
+        let hello_config = match &self.sync_mode {
+            SyncMode::Hello {
+                debounce,
+                subscription_duration,
+            } => Some(
+                HelloSubscriptionConfig::builder()
+                    .graph_change_debounce(*debounce)
+                    .expiration(*subscription_duration)
+                    .build()?,
+            ),
+            SyncMode::Poll { .. } => None,
+        };
 
         // Configure each node's peers
         for i in 0..n {
@@ -42,21 +62,39 @@ impl TestCtx {
 
             //= docs/multi-daemon-convergence-test.md#sync-001
             //# Each node MUST add its two ring neighbors as sync peers.
-            self.nodes[i]
-                .client
-                .team(team_id)
-                .add_sync_peer(cw_addr, config.clone())
+            let node_team = self.nodes[i].client.team(team_id);
+            node_team
+                .add_sync_peer(cw_addr, peer_config.clone())
                 .await
                 .with_context(|| format!("node {i} unable to add clockwise peer {clockwise}"))?;
 
-            self.nodes[i]
-                .client
-                .team(team_id)
-                .add_sync_peer(ccw_addr, config.clone())
+            node_team
+                .add_sync_peer(ccw_addr, peer_config.clone())
                 .await
                 .with_context(|| {
                     format!("node {i} unable to add counter-clockwise peer {counter_clockwise}")
                 })?;
+
+            // In hello mode, subscribe to hello notifications from each peer
+            //= docs/multi-daemon-convergence-test.md#sync-006
+            //# In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+            if let Some(ref hello_cfg) = hello_config {
+                node_team
+                    .sync_hello_subscribe(cw_addr, hello_cfg.clone())
+                    .await
+                    .with_context(|| {
+                        format!("node {i} unable to subscribe to hello from peer {clockwise}")
+                    })?;
+
+                node_team
+                    .sync_hello_subscribe(ccw_addr, hello_cfg.clone())
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "node {i} unable to subscribe to hello from peer {counter_clockwise}"
+                        )
+                    })?;
+            }
 
             //= docs/multi-daemon-convergence-test.md#topo-004
             //# In the ring topology, no node MUST have more than 2 sync peers.

@@ -26,21 +26,63 @@ mod ring;
 mod team;
 mod topology;
 
+/// The sync mode used for this test run.
+//= docs/multi-daemon-convergence-test.md#conf-008
+//# The test MUST support configuring the sync mode (poll or hello).
+#[derive(Clone, Debug)]
+pub enum SyncMode {
+    /// All nodes use interval-based polling to discover new commands.
+    //= docs/multi-daemon-convergence-test.md#sync-005
+    //# In poll sync mode, each node MUST poll its sync peers at the configured sync interval.
+    Poll {
+        /// How frequently each node polls its sync peers.
+        //= docs/multi-daemon-convergence-test.md#conf-004
+        //# In poll sync mode, the test MUST support configuring the sync interval between peers.
+        interval: Duration,
+    },
+    /// All nodes use hello notifications to trigger sync on graph changes.
+    //= docs/multi-daemon-convergence-test.md#sync-006
+    //# In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+    Hello {
+        /// Minimum time between hello notifications to the same peer.
+        //= docs/multi-daemon-convergence-test.md#conf-010
+        //# In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
+        debounce: Duration,
+        /// How long a hello subscription remains valid before expiring.
+        //= docs/multi-daemon-convergence-test.md#conf-011
+        //# In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
+        subscription_duration: Duration,
+    },
+}
+
+//= docs/multi-daemon-convergence-test.md#conf-009
+//# The default sync mode MUST be poll.
+impl Default for SyncMode {
+    fn default() -> Self {
+        //= docs/multi-daemon-convergence-test.md#conf-005
+        //# In poll sync mode, the default sync interval MUST be 1 second.
+        Self::Poll {
+            interval: Duration::from_secs(1),
+        }
+    }
+}
+
 /// Configuration for scale convergence tests.
 ///
 /// Provides configurable parameters for the test with sensible defaults
 /// based on the multi-daemon convergence test specification.
 #[derive(Clone, Debug)]
 pub struct TestConfig {
+    /// Human-readable name for this test run (shown in metrics output).
+    pub test_name: String,
+
     /// Number of nodes in the test.
     //= docs/multi-daemon-convergence-test.md#conf-001
     //# The test MUST support configuring the number of nodes.
     pub node_count: usize,
 
-    /// Sync interval between peers.
-    //= docs/multi-daemon-convergence-test.md#conf-004
-    //# The test MUST support configuring the sync interval between peers.
-    pub sync_interval: Duration,
+    /// The sync mode used for this test run.
+    pub sync_mode: SyncMode,
 
     /// Maximum test duration timeout.
     //= docs/multi-daemon-convergence-test.md#conf-006
@@ -64,13 +106,13 @@ pub struct TestConfig {
 impl Default for TestConfig {
     fn default() -> Self {
         Self {
+            test_name: String::from("default"),
+
             //= docs/multi-daemon-convergence-test.md#conf-002
             //# The test MUST scale to at least 70 nodes without failure.
             node_count: 100,
 
-            //= docs/multi-daemon-convergence-test.md#conf-005
-            //# The default sync interval MUST be 1 second.
-            sync_interval: Duration::from_secs(1),
+            sync_mode: SyncMode::default(),
 
             //= docs/multi-daemon-convergence-test.md#conf-007
             //# The default maximum test duration MUST be 600 seconds (10 minutes).
@@ -103,8 +145,9 @@ impl TestConfig {
 /// Builder for [`TestConfig`].
 #[derive(Clone, Debug, Default)]
 pub struct TestConfigBuilder {
+    test_name: Option<String>,
     node_count: Option<usize>,
-    sync_interval: Option<Duration>,
+    sync_mode: Option<SyncMode>,
     max_duration: Option<Duration>,
     poll_interval: Option<Duration>,
     init_timeout: Option<Duration>,
@@ -113,15 +156,21 @@ pub struct TestConfigBuilder {
 
 #[allow(dead_code)]
 impl TestConfigBuilder {
+    /// Sets a human-readable name for this test run.
+    pub fn test_name(mut self, name: impl Into<String>) -> Self {
+        self.test_name = Some(name.into());
+        self
+    }
+
     /// Sets the number of nodes in the test.
     pub fn node_count(mut self, count: usize) -> Self {
         self.node_count = Some(count);
         self
     }
 
-    /// Sets the sync interval between peers.
-    pub fn sync_interval(mut self, interval: Duration) -> Self {
-        self.sync_interval = Some(interval);
+    /// Sets the sync mode (poll or hello).
+    pub fn sync_mode(mut self, mode: SyncMode) -> Self {
+        self.sync_mode = Some(mode);
         self
     }
 
@@ -153,8 +202,9 @@ impl TestConfigBuilder {
     pub fn build(self) -> Result<TestConfig> {
         let default = TestConfig::default();
         let config = TestConfig {
+            test_name: self.test_name.unwrap_or(default.test_name),
             node_count: self.node_count.unwrap_or(default.node_count),
-            sync_interval: self.sync_interval.unwrap_or(default.sync_interval),
+            sync_mode: self.sync_mode.unwrap_or(default.sync_mode),
             max_duration: self.max_duration.unwrap_or(default.max_duration),
             poll_interval: self.poll_interval.unwrap_or(default.poll_interval),
             init_timeout: self.init_timeout.unwrap_or(default.init_timeout),
@@ -320,6 +370,8 @@ pub struct TestCtx {
     pub nodes: Vec<NodeCtx>,
     /// The topology used to connect nodes.
     pub topology: Topology,
+    /// The sync mode used for this test run.
+    pub sync_mode: SyncMode,
     /// Test configuration.
     pub config: TestConfig,
     /// Team ID for the test.

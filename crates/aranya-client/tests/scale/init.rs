@@ -203,6 +203,7 @@ impl TestCtx {
         Ok(Self {
             nodes,
             topology,
+            sync_mode: config.sync_mode.clone(),
             config: config.clone(),
             team_id: None,
             tracker: ConvergenceTracker::new(config.node_count),
