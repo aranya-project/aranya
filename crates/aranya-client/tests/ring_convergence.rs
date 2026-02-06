@@ -20,7 +20,7 @@ use serial_test::serial;
 use test_log::test;
 use tracing::info;
 
-use crate::ring::{TestCtx, TestConfig};
+use crate::ring::{TestConfig, TestCtx};
 
 /// Tests ring convergence with 10 nodes.
 ///
@@ -162,10 +162,7 @@ async fn test_ring_convergence_70_nodes() -> Result<()> {
         .max_duration(std::time::Duration::from_secs(600))
         .build()?;
 
-    info!(
-        node_count = config.node_count,
-        "Starting 70-node ring test"
-    );
+    info!(node_count = config.node_count, "Starting 70-node ring test");
 
     let mut ring = TestCtx::new(config).await?;
 

@@ -159,6 +159,7 @@ impl TestCtx {
     #[instrument(skip(self))]
     pub async fn sync_team_from_owner(&self) -> Result<()> {
         use std::time::Duration;
+
         use tokio::time::sleep;
         use tracing::warn;
 
@@ -200,8 +201,12 @@ impl TestCtx {
                 }
             }
             if let Some(e) = last_err {
-                return Err(e)
-                    .with_context(|| format!("node {} unable to sync with owner after {MAX_RETRIES} attempts", node.index));
+                return Err(e).with_context(|| {
+                    format!(
+                        "node {} unable to sync with owner after {MAX_RETRIES} attempts",
+                        node.index
+                    )
+                });
             }
         }
 

@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use tokio::fs;
 use tracing::{info, instrument};
 
-use crate::ring::{ConvergenceTracker, NodeCtx, TestCtx, TestConfig};
+use crate::ring::{ConvergenceTracker, NodeCtx, TestConfig, TestCtx};
 
 impl NodeCtx {
     /// Creates a new node context.
