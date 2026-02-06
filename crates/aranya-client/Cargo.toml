@@ -60,7 +60,6 @@ backon = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
-uuid = { version = "1", features = ["v4"] }
 
 
 [[test]]

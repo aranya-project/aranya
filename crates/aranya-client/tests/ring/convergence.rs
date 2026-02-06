@@ -6,7 +6,6 @@ use anyhow::{bail, Context, Result};
 use aranya_client::client::TeamId;
 use aranya_daemon_api::Text;
 use tracing::{debug, info, instrument};
-use uuid::Uuid;
 
 use crate::ring::TestCtx;
 
@@ -31,8 +30,13 @@ impl TestCtx {
             );
         }
 
-        // Generate unique label name for this test run
-        let label_name = format!("convergence_test_{}", Uuid::new_v4());
+        // Generate unique label name for this test run using Aranya's CSPRNG
+        let rand_hex = {
+            let mut buf = [0u8; 16];
+            self.nodes[source_node].client.rand(&mut buf).await;
+            buf.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        };
+        let label_name = format!("convergence_test_{rand_hex}");
 
         info!(
             source_node,
