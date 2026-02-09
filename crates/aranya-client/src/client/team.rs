@@ -1,6 +1,3 @@
-#[cfg(feature = "preview")]
-use std::time::Duration;
-
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
@@ -164,9 +161,7 @@ impl Team<'_> {
     /// # Parameters
     ///
     /// * `peer` - The address of the sync peer to subscribe to.
-    /// * `graph_change_delay` - The minimum delay between notifications after a graph head change.
-    /// * `duration` - How long the subscription should last.
-    /// * `schedule_delay` - The delay between sending hello messages to the subscriber (rate limiting).
+    /// * `config` - Configuration for the hello subscription including delays and expiration.
     ///
     /// To automatically sync when receiving a hello message, call [`Self::add_sync_peer`] with
     /// [`crate::config::SyncPeerConfigBuilder::sync_on_hello`] set to `true`.
@@ -175,19 +170,19 @@ impl Team<'_> {
     pub async fn sync_hello_subscribe(
         &self,
         peer: Addr,
-        graph_change_delay: Duration,
-        duration: Duration,
-        schedule_delay: Duration,
+        config: crate::config::HelloSubscriptionConfig,
     ) -> Result<()> {
+        // TODO(#709): Pass the config type directly into the daemon IPC and internal
+        // daemon implementation instead of extracting individual fields here.
         self.client
             .daemon
             .sync_hello_subscribe(
                 context::current(),
                 peer,
                 self.id,
-                graph_change_delay,
-                duration,
-                schedule_delay,
+                config.graph_change_debounce(),
+                config.expiration(),
+                config.periodic_interval(),
             )
             .await
             .map_err(IpcError::new)?
