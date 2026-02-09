@@ -44,6 +44,7 @@ pub use crate::client::{
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
+    util::ApiConv as _,
 };
 
 /// Builds a [`Client`].
