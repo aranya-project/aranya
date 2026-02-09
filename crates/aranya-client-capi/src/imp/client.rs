@@ -12,12 +12,12 @@ pub struct Client {
 }
 
 /// Serializes a [`PublicKeyBundle`] into the output buffer.
-pub unsafe fn key_bundle_serialize(
-    keybundle: &PublicKeyBundle,
+pub unsafe fn public_key_bundle_serialize(
+    public_key_bundle: &PublicKeyBundle,
     buf: *mut MaybeUninit<u8>,
     buf_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let data = postcard::to_allocvec(&keybundle)?;
+    let data = postcard::to_allocvec(&public_key_bundle)?;
 
     if *buf_len < data.len() {
         *buf_len = data.len();
@@ -34,6 +34,6 @@ pub unsafe fn key_bundle_serialize(
 }
 
 /// Deserializes key bundle buffer into a [`PublicKeyBundle`].
-pub fn key_bundle_deserialize(buf: &[u8]) -> Result<PublicKeyBundle, imp::Error> {
+pub fn public_key_bundle_deserialize(buf: &[u8]) -> Result<PublicKeyBundle, imp::Error> {
     Ok(postcard::from_bytes(buf)?)
 }
