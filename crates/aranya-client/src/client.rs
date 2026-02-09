@@ -206,8 +206,14 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Gets the public key bundle for this device.
+    /// See [`Self::get_public_key_bundle`].
+    #[deprecated(note = "Use `get_public_key_bundle`")]
     pub async fn get_key_bundle(&self) -> Result<PublicKeyBundle> {
+        self.get_public_key_bundle().await
+    }
+
+    /// Gets the public key bundle for this device.
+    pub async fn get_public_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.daemon
             .get_public_key_bundle(context::current())
             .await

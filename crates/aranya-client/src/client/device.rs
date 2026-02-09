@@ -82,8 +82,14 @@ impl Device<'_> {
         DeviceId::from_api(self.id)
     }
 
-    /// Returns device's key bundle.
+    /// See [`Self::public_key_bundle`].
+    #[deprecated(note = "Use `public_key_bundle`.")]
     pub async fn keybundle(&self) -> Result<PublicKeyBundle> {
+        self.public_key_bundle().await
+    }
+
+    /// Returns device's key bundle.
+    pub async fn public_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.client
             .daemon
             .device_public_key_bundle(context::current(), self.team_id, self.id)

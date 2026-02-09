@@ -37,7 +37,7 @@ async fn test_get_keybundle_device_id() -> Result<()> {
         devices.owner.id
     );
     assert_eq!(
-        devices.owner.client.get_key_bundle().await?,
+        devices.owner.client.get_public_key_bundle().await?,
         devices.owner.pk
     );
 
@@ -592,7 +592,10 @@ async fn test_query_functions() -> Result<()> {
     debug!("membera role: {:?}", dev_role);
 
     // Make sure that we have the correct keybundle.
-    let keybundle = memberb.device(devices.membera.id).keybundle().await?;
+    let keybundle = memberb
+        .device(devices.membera.id)
+        .public_key_bundle()
+        .await?;
     debug!("membera keybundle: {:?}", keybundle);
 
     // Make sure membera can query labels assigned to it.

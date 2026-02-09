@@ -674,7 +674,7 @@ pub unsafe fn get_key_bundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let keys = client.rt.block_on(client.inner.get_key_bundle())?;
+    let keys = client.rt.block_on(client.inner.get_public_key_bundle())?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
 
@@ -2134,7 +2134,7 @@ pub unsafe fn team_device_keybundle(
             .inner
             .team(team.into())
             .device(device.into())
-            .keybundle(),
+            .public_key_bundle(),
     )?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
