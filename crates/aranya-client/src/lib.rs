@@ -39,6 +39,10 @@ pub use aranya_util::Addr;
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
 pub use crate::client::{Permission, RoleManagementPermission};
+#[cfg(feature = "preview")]
+#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+#[doc(inline)]
+pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder};
 #[doc(inline)]
 pub use crate::{
     client::{

@@ -16,6 +16,24 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.94 -> 1.0.97"
 
+[[audits.asn1-rs]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.7.1"
+notes = "Parser/encoder for ASN.1 BER/DER data. Unsafe code is forbidden. No networking code. Reader/writer interface provided for serializing/deserializing types to/from files."
+
+[[audits.asn1-rs-derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.6.0"
+notes = "Derive macros for asn1-rs. No unsafe, networking, or file I/O code."
+
+[[audits.asn1-rs-impl]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.2.0"
+notes = "Proc macro code. No networking, file I/O, or unsafe code."
+
 [[audits.async-trait]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -45,6 +63,12 @@ version = "0.1.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.9.0 -> 1.10.0"
+
+[[audits.bytes]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.10.1 -> 1.11.1"
+notes = "Code updates align with release notes. Replaced instances of unchecked arithmetic. New tests added to verify fixes."
 
 [[audits.cc]]
 who = "Ben Zimmerman <bzimmerman@spideroak.com>"
@@ -80,6 +104,24 @@ delta = "0.2.16 -> 0.2.17"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.2 -> 0.2.3"
+
+[[audits.data-encoding]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "2.9.0"
+notes = "Data encoding such as base64. No network or file I/O code. Unsafe is used for direct buffer manipulation when encoding."
+
+[[audits.der-parser]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "10.0.0"
+notes = "Parser/encoder for ASN.1 BER/DER. Not currently used by certgen tool which only supports PEM. Unsafe code is forbidden. No networking or file I/O code."
+
+[[audits.deranged]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.0 -> 0.5.5"
+notes = "Adds additional testing to ranged conversion. Documented use of unsafe code. No network or file I/O code."
 
 [[audits.dunce]]
 who = "Declan Johnson <djohnson@spideroak.com>"
@@ -156,15 +198,42 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.46.0 -> 0.50.1"
 
+[[audits.num-bigint]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.5 -> 0.4.6"
+notes = "Fixes compilation on x86_64-unknown-linux-gnux32 target. No file I/O or networking code. Limited use of unsafe is well-documented."
+
+[[audits.num-conv]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.2.0"
+notes = """
+This update is mainly for the removal of items (traits and macros).
+Cargo.toml changes.
+"""
+
 [[audits.object]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.36.5 -> 0.36.7"
 
+[[audits.oid-registry]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.8.1"
+notes = "OID database for TLS cert extensions. No unsafe code allowed. No networking code. File I/O for loading OIDs from a formatted file."
+
 [[audits.p384]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.13.0 -> 0.13.1"
+
+[[audits.pem]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "3.0.6"
+notes = "Library for parsing/encoding PEM formatted certs. No unsafe, network, or file I/O code. Assumes PEM is a string, so file I/O is left for the caller of the library."
 
 [[audits.pin-project]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -212,6 +281,12 @@ delta = "1.0.93 -> 1.0.94"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
+
+[[audits.rcgen]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.14.6"
+notes = "X.509 certificate generator. Unsafe code is forbidden. No networking code. Caller is responsible for file I/O needed to save/load certs."
 
 [[audits.rfc6979]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -282,6 +357,12 @@ delta = "0.8.12 -> 0.8.13"
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.8.12 -> 0.8.13"
+
+[[audits.rusticata-macros]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "4.1.0"
+notes = "Helper macros for rusticata. No unsafe code allowed. No unstable features allowed. No networking or file I/O code."
 
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -399,6 +480,56 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.6 -> 2.0.12"
 
+[[audits.time]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.3.44"
+notes = "Date & time library compatible with the standard libarary. No networking code. Documented use of unsafe. No file I/O except for reading timezone from libc."
+
+[[audits.time]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.44 -> 0.3.46"
+notes = """
+New 'unsafe' blocks were not added.
+Updates to existing 'unsafe' blocks seem to align with the corresponding comments.
+"""
+
+[[audits.time]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.46 -> 0.3.47"
+notes = """
+Resolves RUSTSEC-2026-0009.
+
+New 'unsafe' blocks are reasonable with 'SAFETY' comments describing invariants that must be upheld or why the code is
+safe to execute.
+"""
+
+[[audits.time-core]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.4 -> 0.1.6"
+notes = "Improvements to API ergonomics. Adds a DefaultOutput trait. No networking, unsafe, or file I/O code."
+
+[[audits.time-core]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.6 -> 0.1.8"
+notes = "Minor changes for performance improvements. No 'unsafe' blocks"
+
+[[audits.time-macros]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.22 -> 0.2.24"
+notes = "Updates time macros. Renames TokenTree to TokenStream. Appears to rename some things and clean up some tech debt. No unsafe, networking, or file I/O code."
+
+[[audits.time-macros]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.24 -> 0.2.27"
+notes = "No 'unsafe' blocks added."
+
 [[audits.tinyvec]]
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -483,6 +614,18 @@ version = "0.4.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
+
+[[audits.x509-parser]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.18.0"
+notes = "X.509 parser. Unsafe code forbidden. We rely on PEM parsing for the certgen tool. No networking or file I/O code."
+
+[[audits.yasna]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.5.2"
+notes = "ASN.1 library for Rust. DER and BER format not currently used since our certgen tool only supports PEM right now. Unsafe code is forbidden. No networking code. Provides reader/writer interface for caller to manage file I/O."
 
 [[audits.zerofrom]]
 who = "gknopf <gknopf@spideroak.com>"

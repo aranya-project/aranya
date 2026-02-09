@@ -23,6 +23,7 @@ use tracing::debug;
 
 use crate::{
     error::{aranya_error, IpcError},
+    util::ApiConv as _,
     DeviceId, LabelId, Result, TeamId,
 };
 

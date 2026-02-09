@@ -51,9 +51,9 @@ use crate::{
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
-    sync::task::{quic as qs, SyncPeers},
+    sync::{quic as qs, SyncHandle, SyncPeer},
     util::SeedDir,
-    AranyaStore, Client, InvalidGraphs, EF,
+    AranyaStore, Client, EF,
 };
 
 mod quic_sync;
@@ -68,8 +68,6 @@ macro_rules! find_effect {
     }
 }
 
-pub(crate) type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
-
 /// Daemon API Server.
 #[derive(Debug)]
 pub(crate) struct DaemonApiServer {
@@ -81,7 +79,7 @@ pub(crate) struct DaemonApiServer {
     listener: UnixListener,
 
     /// Channel for receiving effects from the syncer.
-    recv_effects: EffectReceiver,
+    recv_effects: mpsc::Receiver<(GraphId, Vec<EF>)>,
 
     /// Api Handler.
     api: Api,
@@ -93,9 +91,8 @@ pub(crate) struct DaemonApiServerArgs {
     pub(crate) uds_path: PathBuf,
     pub(crate) sk: ApiKey<CS>,
     pub(crate) pk: PublicKeys<CS>,
-    pub(crate) peers: SyncPeers,
-    pub(crate) recv_effects: EffectReceiver,
-    pub(crate) invalid: InvalidGraphs,
+    pub(crate) syncer: SyncHandle,
+    pub(crate) recv_effects: mpsc::Receiver<(GraphId, Vec<EF>)>,
     #[cfg(feature = "afc")]
     pub(crate) afc: Afc<CE, CS, KS>,
     pub(crate) crypto: Crypto,
@@ -113,9 +110,8 @@ impl DaemonApiServer {
             uds_path,
             sk,
             pk,
-            peers,
+            syncer,
             recv_effects,
-            invalid,
             #[cfg(feature = "afc")]
             afc,
             crypto,
@@ -137,7 +133,7 @@ impl DaemonApiServer {
             #[cfg(feature = "preview")]
             client: client.clone(),
             #[cfg(feature = "preview")]
-            peers: peers.clone(),
+            syncer: syncer.clone(),
             #[cfg(feature = "preview")]
             prev_head_addresses: Arc::default(),
         };
@@ -145,9 +141,8 @@ impl DaemonApiServer {
             client,
             local_addr,
             pk: std::sync::Mutex::new(pk),
-            peers,
+            syncer,
             effect_handler,
-            invalid,
             #[cfg(feature = "afc")]
             afc,
             crypto: Mutex::new(crypto),
@@ -227,7 +222,7 @@ struct EffectHandler {
     #[cfg(feature = "preview")]
     client: Client,
     #[cfg(feature = "preview")]
-    peers: SyncPeers,
+    syncer: SyncHandle,
     /// Stores the previous head address for each graph to detect changes
     #[cfg(feature = "preview")]
     prev_head_addresses: Arc<Mutex<HashMap<GraphId, Address>>>,
@@ -327,7 +322,7 @@ impl EffectHandler {
     async fn get_graph_head_address(&self, graph_id: GraphId) -> Option<Address> {
         let client = &self.client;
 
-        let mut aranya = client.aranya.lock().await;
+        let mut aranya = client.lock_aranya().await;
         let storage = aranya.provider().get_storage(graph_id).ok()?;
 
         storage.get_head_address().ok()
@@ -338,9 +333,9 @@ impl EffectHandler {
     #[instrument(skip(self))]
     async fn broadcast_hello_notifications(&self, graph_id: GraphId, head: Address) {
         // TODO: Don't fire off a spawn here.
-        let peers = self.peers.clone();
+        let syncer = self.syncer.clone();
         drop(tokio::spawn(async move {
-            if let Err(e) = peers.broadcast_hello(graph_id, head).await {
+            if let Err(e) = syncer.broadcast_hello(graph_id, head).await {
                 warn!(
                     error = %e,
                     ?graph_id,
@@ -363,12 +358,11 @@ struct ApiInner {
     local_addr: SocketAddr,
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
-    /// Aranya sync peers,
-    peers: SyncPeers,
+    /// Handle to talk with the syncer.
+    syncer: SyncHandle,
     /// Handles graph effects from the syncer.
+    #[derive_where(skip(Debug))]
     effect_handler: EffectHandler,
-    /// Keeps track of which graphs are invalid due to a finalization error.
-    invalid: InvalidGraphs,
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
     #[derive_where(skip(Debug))]
@@ -412,7 +406,11 @@ impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<GraphId> {
-        if self.invalid.contains(GraphId::transmute(team)) {
+        if self
+            .client
+            .invalid_graphs()
+            .contains(GraphId::transmute(team))
+        {
             // TODO: return custom daemon error type
             anyhow::bail!("team {team} invalid due to graph finalization error")
         }
@@ -467,8 +465,8 @@ impl DaemonApi for Api {
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers.add_peer(peer, graph, cfg).await?;
+        let peer = SyncPeer::new(peer, graph);
+        self.syncer.add_peer(peer, cfg).await?;
         Ok(())
     }
 
@@ -481,8 +479,8 @@ impl DaemonApi for Api {
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers.sync_now(peer, graph, cfg).await?;
+        let peer = SyncPeer::new(peer, graph);
+        self.syncer.sync_now(peer, cfg).await?;
         Ok(())
     }
 
@@ -493,14 +491,14 @@ impl DaemonApi for Api {
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers
-            .sync_hello_subscribe(peer, graph, graph_change_delay, duration, schedule_delay)
+        let peer = SyncPeer::new(peer, graph);
+        self.syncer
+            .sync_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay)
             .await?;
         Ok(())
     }
@@ -514,8 +512,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers.sync_hello_unsubscribe(peer, graph).await?;
+        let peer = SyncPeer::new(peer, graph);
+        self.syncer.sync_hello_unsubscribe(peer).await?;
         Ok(())
     }
 
@@ -527,9 +525,9 @@ impl DaemonApi for Api {
         team: api::TeamId,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-
-        self.peers
-            .remove_peer(peer, graph)
+        let peer = SyncPeer::new(peer, graph);
+        self.syncer
+            .remove_peer(peer)
             .await
             .context("unable to remove sync peer")?;
         Ok(())
@@ -559,8 +557,7 @@ impl DaemonApi for Api {
         self.seed_id_dir.remove(team).await?;
 
         self.client
-            .aranya
-            .lock()
+            .lock_aranya()
             .await
             .remove_graph(GraphId::transmute(team))
             .context("unable to remove graph from storage")?;
