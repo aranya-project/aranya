@@ -24,6 +24,79 @@ use tracing::info;
 
 use crate::scale::{SyncMode, TestConfig, TestCtx, Topology};
 
+// ---------------------------------------------------------------------------
+// Helper: run a ring convergence test with the given config
+// ---------------------------------------------------------------------------
+
+async fn run_ring_convergence(config: TestConfig) -> Result<()> {
+    let mut ring = TestCtx::new(config, Topology::Ring).await?;
+
+    ring.setup_team().await?;
+    ring.sync_team_from_owner().await?;
+    ring.configure_topology().await?;
+    ring.verify_team_propagation().await?;
+
+    ring.issue_test_command(0).await?;
+    ring.wait_for_convergence().await?;
+    ring.report_metrics();
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 3-node edge-case tests (minimum valid ring)
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with the minimum 3 nodes.
+///
+/// This tests the edge case of the smallest valid ring.
+//= docs/multi-daemon-convergence-test.md#conf-003
+//= type=test
+//# The test MUST reject configurations with fewer than 3 nodes (the minimum for a valid ring).
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_ring_minimum_3_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("3-node ring (poll)")
+        .node_count(3)
+        .max_duration(Duration::from_secs(60))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 3-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("3-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with the minimum 3 nodes using hello sync mode.
+///
+/// This tests the edge case of the smallest valid ring with reactive syncing.
+//= docs/multi-daemon-convergence-test.md#conf-008
+//= type=test
+//# The test MUST support configuring the sync mode (poll or hello).
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_ring_minimum_3_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("3-node ring (hello)")
+        .node_count(3)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(60))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 3-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("3-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 10-node tests (CI-friendly, not ignored)
+// ---------------------------------------------------------------------------
+
 /// Tests ring convergence with 10 nodes using poll sync mode.
 ///
 /// This is a smaller test suitable for CI with reasonable execution time.
@@ -39,10 +112,7 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
         .max_duration(Duration::from_secs(120))
         .build()?;
 
-    info!(
-        node_count = config.node_count,
-        "Starting 10-node ring test (poll mode)"
-    );
+    info!(node_count = config.node_count, "Starting 10-node ring test (poll mode)");
 
     //= docs/multi-daemon-convergence-test.md#init-001
     //= type=test
@@ -112,10 +182,7 @@ async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
         .max_duration(Duration::from_secs(120))
         .build()?;
 
-    info!(
-        node_count = config.node_count,
-        "Starting 10-node ring test (hello mode)"
-    );
+    info!(node_count = config.node_count, "Starting 10-node ring test (hello mode)");
 
     let mut ring = TestCtx::new(config, Topology::Ring).await?;
 
@@ -136,83 +203,224 @@ async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
     Ok(())
 }
 
-/// Tests ring convergence with the minimum 3 nodes.
-///
-/// This tests the edge case of the smallest valid ring.
-//= docs/multi-daemon-convergence-test.md#conf-003
-//= type=test
-//# The test MUST reject configurations with fewer than 3 nodes (the minimum for a valid ring).
+// ---------------------------------------------------------------------------
+// 20-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 20 nodes using poll sync mode.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_ring_minimum_3_nodes() -> Result<()> {
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_20_nodes -- --ignored"]
+async fn test_ring_convergence_20_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("3-node ring (poll)")
-        .node_count(3)
-        .max_duration(Duration::from_secs(60))
+        .test_name("20-node ring (poll)")
+        .node_count(20)
+        .max_duration(Duration::from_secs(200))
         .build()?;
 
-    info!(node_count = config.node_count, "Starting 3-node ring test");
-
-    let mut ring = TestCtx::new(config, Topology::Ring).await?;
-
-    ring.setup_team().await?;
-    ring.sync_team_from_owner().await?;
-    ring.configure_topology().await?;
-    ring.verify_team_propagation().await?;
-
-    ring.issue_test_command(0).await?;
-    ring.wait_for_convergence().await?;
-    ring.report_metrics();
-
-    info!("3-node ring convergence test completed successfully");
+    info!(node_count = config.node_count, "Starting 20-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("20-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
 
-/// Tests ring convergence with 100 nodes using poll sync mode.
-///
-/// This is the full-scale test as specified in the requirements.
-/// Marked as ignored by default due to resource requirements.
+/// Tests ring convergence with 20 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_20_nodes_hello -- --ignored"]
+async fn test_ring_convergence_20_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("20-node ring (hello)")
+        .node_count(20)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(200))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 20-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("20-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 30-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 30 nodes using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_30_nodes -- --ignored"]
+async fn test_ring_convergence_30_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("30-node ring (poll)")
+        .node_count(30)
+        .max_duration(Duration::from_secs(300))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 30-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("30-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 30 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_30_nodes_hello -- --ignored"]
+async fn test_ring_convergence_30_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("30-node ring (hello)")
+        .node_count(30)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(300))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 30-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("30-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 40-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 40 nodes using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_40_nodes -- --ignored"]
+async fn test_ring_convergence_40_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("40-node ring (poll)")
+        .node_count(40)
+        .max_duration(Duration::from_secs(400))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 40-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("40-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 40 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_40_nodes_hello -- --ignored"]
+async fn test_ring_convergence_40_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("40-node ring (hello)")
+        .node_count(40)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(400))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 40-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("40-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 50-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 50 nodes using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_50_nodes -- --ignored"]
+async fn test_ring_convergence_50_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("50-node ring (poll)")
+        .node_count(50)
+        .max_duration(Duration::from_secs(400))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 50-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("50-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 50 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_50_nodes_hello -- --ignored"]
+async fn test_ring_convergence_50_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("50-node ring (hello)")
+        .node_count(50)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(400))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 50-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("50-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 60-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 60 nodes using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_60_nodes -- --ignored"]
+async fn test_ring_convergence_60_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("60-node ring (poll)")
+        .node_count(60)
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 60-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("60-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 60 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_60_nodes_hello -- --ignored"]
+async fn test_ring_convergence_60_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("60-node ring (hello)")
+        .node_count(60)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 60-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("60-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 70-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 70 nodes using poll sync mode.
 //= docs/multi-daemon-convergence-test.md#conf-002
 //= type=test
 //# The test MUST scale to at least 70 nodes without failure.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_100_nodes -- --ignored"]
-async fn test_ring_convergence_100_nodes() -> Result<()> {
-    let config = TestConfig {
-        test_name: String::from("100-node ring (poll)"),
-        ..TestConfig::default()
-    };
-
-    info!(
-        node_count = config.node_count,
-        "Starting 100-node ring test"
-    );
-
-    let mut ring = TestCtx::new(config, Topology::Ring).await?;
-
-    ring.setup_team().await?;
-    ring.sync_team_from_owner().await?;
-    ring.configure_topology().await?;
-    ring.verify_team_propagation().await?;
-
-    ring.issue_test_command(0).await?;
-    ring.wait_for_convergence().await?;
-    ring.report_metrics();
-
-    info!("100-node ring convergence test completed successfully");
-    Ok(())
-}
-
-/// Tests ring convergence with 70 nodes.
-///
-/// This is a large-scale test that exercises convergence behavior with
-/// significant graph size while remaining somewhat lighter than the full
-/// 100-node test.
-/// Marked as ignored by default due to resource requirements.
-//= docs/multi-daemon-convergence-test.md#conf-001
-//= type=test
-//# The test MUST support configuring the number of nodes.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_70_nodes -- --ignored"]
@@ -223,22 +431,167 @@ async fn test_ring_convergence_70_nodes() -> Result<()> {
         .max_duration(Duration::from_secs(600))
         .build()?;
 
-    info!(node_count = config.node_count, "Starting 70-node ring test");
-
-    let mut ring = TestCtx::new(config, Topology::Ring).await?;
-
-    ring.setup_team().await?;
-    ring.sync_team_from_owner().await?;
-    ring.configure_topology().await?;
-    ring.verify_team_propagation().await?;
-
-    ring.issue_test_command(0).await?;
-    ring.wait_for_convergence().await?;
-    ring.report_metrics();
-
-    info!("70-node ring convergence test completed successfully");
+    info!(node_count = config.node_count, "Starting 70-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("70-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
+
+/// Tests ring convergence with 70 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_70_nodes_hello -- --ignored"]
+async fn test_ring_convergence_70_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("70-node ring (hello)")
+        .node_count(70)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 70-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("70-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 80-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 80 nodes using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_80_nodes -- --ignored"]
+async fn test_ring_convergence_80_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("80-node ring (poll)")
+        .node_count(80)
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 80-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("80-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 80 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_80_nodes_hello -- --ignored"]
+async fn test_ring_convergence_80_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("80-node ring (hello)")
+        .node_count(80)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 80-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("80-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 90-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 90 nodes using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_90_nodes -- --ignored"]
+async fn test_ring_convergence_90_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("90-node ring (poll)")
+        .node_count(90)
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 90-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("90-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 90 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_90_nodes_hello -- --ignored"]
+async fn test_ring_convergence_90_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("90-node ring (hello)")
+        .node_count(90)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 90-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("90-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 100-node tests
+// ---------------------------------------------------------------------------
+
+/// Tests ring convergence with 100 nodes using poll sync mode.
+///
+/// This is the full-scale test as specified in the requirements.
+//= docs/multi-daemon-convergence-test.md#conf-002
+//= type=test
+//# The test MUST scale to at least 70 nodes without failure.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_100_nodes -- --ignored"]
+async fn test_ring_convergence_100_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("100-node ring (poll)")
+        .node_count(100)
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 100-node ring test (poll mode)");
+    run_ring_convergence(config).await?;
+    info!("100-node ring convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests ring convergence with 100 nodes using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+#[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_100_nodes_hello -- --ignored"]
+async fn test_ring_convergence_100_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("100-node ring (hello)")
+        .node_count(100)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(600))
+        .build()?;
+
+    info!(node_count = config.node_count, "Starting 100-node ring test (hello mode)");
+    run_ring_convergence(config).await?;
+    info!("100-node ring convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Configuration validation
+// ---------------------------------------------------------------------------
 
 /// Tests that invalid configurations are rejected.
 #[test(tokio::test(flavor = "multi_thread"))]

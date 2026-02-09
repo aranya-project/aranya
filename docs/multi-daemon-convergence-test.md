@@ -57,6 +57,8 @@ struct TestCtx {
     nodes: Vec<NodeCtx>,
     /// The topology used to connect nodes
     topology: Topology,
+    /// The sync mode used for this test run
+    sync_mode: SyncMode,
     /// Team ID for the test
     team_id: TeamId,
     /// Convergence tracker
@@ -66,9 +68,26 @@ struct TestCtx {
 enum Topology {
     Ring,
 }
+
+enum SyncMode {
+    /// All nodes use interval-based polling to discover new commands
+    Poll {
+        /// How frequently each node polls its sync peers
+        interval: Duration,
+    },
+    /// All nodes use hello notifications to trigger sync on graph changes
+    Hello {
+        /// Minimum time between hello notifications to the same peer
+        debounce: Duration,
+        /// How long a hello subscription remains valid before expiring
+        subscription_duration: Duration,
+    },
+}
 ```
 
 The `Topology` enum is expected to grow as additional topologies (star, mesh, etc.) are added in future extensions.
+
+The `SyncMode` enum is expected to grow (e.g., `Mixed` mode) as additional sync strategies are validated.
 
 ### Convergence Tracker
 
@@ -110,11 +129,11 @@ The test MUST reject configurations with fewer than 3 nodes (the minimum for a v
 
 #### CONF-004
 
-The test MUST support configuring the sync interval between peers.
+In poll sync mode, the test MUST support configuring the sync interval between peers.
 
 #### CONF-005
 
-The default sync interval MUST be 1 second.
+In poll sync mode, the default sync interval MUST be 1 second.
 
 #### CONF-006
 
@@ -123,6 +142,22 @@ The test MUST support configuring a maximum test duration timeout.
 #### CONF-007
 
 The default maximum test duration MUST be 600 seconds (10 minutes).
+
+#### CONF-008
+
+The test MUST support configuring the sync mode (poll or hello).
+
+#### CONF-009
+
+The default sync mode MUST be poll.
+
+#### CONF-010
+
+In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
+
+#### CONF-011
+
+In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
 
 ### Ring Topology Requirements
 
@@ -212,6 +247,14 @@ The sync peer address MUST be obtained from the neighbor node's local address.
 
 Sync peer configuration MUST complete before the convergence test phase.
 
+#### SYNC-005
+
+In poll sync mode, each node MUST poll its sync peers at the configured sync interval.
+
+#### SYNC-006
+
+In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+
 ### Convergence Test Requirements
 
 #### CONV-001
@@ -277,11 +320,22 @@ The test MUST calculate and report the following metrics:
 - Maximum convergence time (slowest node)
 - Mean convergence time
 - Median convergence time
+- Mode convergence time (convergence times SHOULD be bucketed to produce a meaningful mode)
+- 95th percentile convergence time (p95)
+- 99th percentile convergence time (p99)
 - Standard deviation of convergence times
 
 #### PERF-004
 
 The test SHOULD report memory usage per node if available.
+
+#### PERF-005
+
+When a CSV export feature flag is enabled, the test MUST output raw convergence data as a CSV file after each test run.
+
+#### PERF-006
+
+The CSV output MUST include one row per node with the following columns: node index, label assignment time (T0), node convergence time, and convergence duration (time from T0 to node convergence).
 
 ### Error Handling Requirements
 
@@ -297,9 +351,6 @@ If a node fails to initialize, the test MUST report which node failed and the ca
 
 The test MUST handle sync failures between nodes.
 
-#### ERR-004
-
-The test MUST log all errors with sufficient context for debugging.
 
 ### Cleanup Requirements
 
@@ -328,18 +379,35 @@ In a bidirectional ring of N nodes:
 1. Node 0 assigns the convergence label at time T0
 2. The label propagates in both directions (clockwise and counter-clockwise)
 3. The antipode node receives the label last from both directions
-4. Merge commands are created when paths converge
+
+**Poll sync mode:** Each node discovers new commands from its neighbors on the next poll cycle. Propagation speed is bounded by the sync interval.
+
+**Hello sync mode:** When a node receives new commands, it sends hello notifications to its peers, which trigger immediate syncs. Propagation speed is bounded by network latency and processing time rather than the sync interval.
 
 ### Theoretical Convergence Time
 
+#### Poll Sync Mode
+
 For a ring of N nodes with sync interval S:
 - Minimum hops to reach the farthest node: ceil(N/2)
-- Theoretical minimum convergence time: ceil(N/2) * S
+- Each hop takes on average S/2 (the average delay between a command arriving at a node and the next poll discovering it)
+- Theoretical average convergence time: ceil(N/2) * (S/2)
 
 Actual convergence time will be higher due to:
 - Sync timing variability
 - Label processing time
-- Merge command creation and propagation
+
+#### Hello Sync Mode
+
+For a ring of N nodes with hello sync:
+- Minimum hops to reach the farthest node: ceil(N/2)
+- Each hop is triggered by a hello notification and subsequent sync
+- Theoretical convergence time approaches: ceil(N/2) * L (where L is the per-hop latency including notification delivery, sync execution, and processing)
+
+Actual convergence time depends on:
+- Hello notification debounce settings
+- Network latency
+- Label processing time
 
 ### Success Criteria
 
@@ -374,6 +442,10 @@ The test passes when:
    - Multiple simultaneous command sources
    - Conflict resolution verification
    - Merge behavior validation
+
+5. **Mixed Sync Modes**
+   - Heterogeneous sync mode configurations (some nodes poll, some use hello)
+   - Performance comparison between sync modes under identical topologies
 
 ## Appendix
 
