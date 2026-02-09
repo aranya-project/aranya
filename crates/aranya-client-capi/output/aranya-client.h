@@ -459,11 +459,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
 } AranyaClientConfigBuilder;
 
 /**
- * A type to represent a span of time in nanoseconds.
- */
-typedef uint64_t AranyaDuration;
-
-/**
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
  *
  * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
@@ -610,6 +605,11 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
      */
     uint8_t __for_size_only[40];
 } AranyaSyncPeerConfig;
+
+/**
+ * A type to represent a span of time in nanoseconds.
+ */
+typedef uint64_t AranyaDuration;
 
 /**
  * A role name.
@@ -1045,33 +1045,6 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path(struct AranyaClient
 AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaClientConfigBuilder *cfg,
                                                                  const char *address,
                                                                  struct AranyaExtError *__ext_err);
-
-/**
- * Sets IPC timeout for `AranyaClient` APIs.
- *
- * By default, the IPC timeout is set to 1 year.
- *
- * @param[in,out] cfg a pointer to the client config builder
- * @param[in] duration the IPC timeout
- *
- * @relates AranyaClientConfigBuilder.
- */
-AranyaError aranya_client_config_builder_set_ipc_timeout(struct AranyaClientConfigBuilder *cfg,
-                                                         AranyaDuration duration);
-
-/**
- * Sets IPC timeout for `AranyaClient` APIs.
- *
- * By default, the IPC timeout is set to 1 year.
- *
- * @param[in,out] cfg a pointer to the client config builder
- * @param[in] duration the IPC timeout
- *
- * @relates AranyaClientConfigBuilder.
- */
-AranyaError aranya_client_config_builder_set_ipc_timeout_ext(struct AranyaClientConfigBuilder *cfg,
-                                                             AranyaDuration duration,
-                                                             struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaAddTeamQuicSyncConfigBuilder`.

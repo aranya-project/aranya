@@ -132,17 +132,6 @@ static inline AranyaError get_role_id_by_name(const AranyaRole *role_list,
         }                                                                      \
     } while (0)
 
-// Macro for comparing two error values and printing an error message to stderr.
-// Does nothing if the values are the same.
-#define CLIENT_EXPECT_ERR(M, E, A)                                             \
-    do {                                                                       \
-        if ((E) != (A)) {                                                      \
-            fprintf(stderr, "%s - found: %s, expected: %s\n", (M),             \
-                    aranya_error_to_str((A)), aranya_error_to_str((E)));       \
-            goto exit;                                                         \
-        }                                                                      \
-    } while (0)
-
 // Helper function to create a team
 static inline AranyaError create_team(AranyaClient *client,
                                       AranyaTeamId *team_id) {

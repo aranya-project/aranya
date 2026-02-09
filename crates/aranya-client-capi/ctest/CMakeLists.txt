@@ -115,4 +115,3 @@ endfunction()
 
 # --- Test Executables ---
 add_capi_test(TestOnboarding test_onboarding.c DAEMON_NAMES "owner,member")
-add_capi_test(TestTimeout test_timeout.c DAEMON_NAMES "owner")

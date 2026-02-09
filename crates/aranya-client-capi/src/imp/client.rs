@@ -9,7 +9,6 @@ use crate::imp;
 pub struct Client {
     pub(crate) inner: aranya_client::Client,
     pub(crate) rt: tokio::runtime::Runtime,
-    pub(crate) cfg: super::config::ClientConfig,
 }
 
 /// Serializes a [`KeyBundle`] into the output buffer.
