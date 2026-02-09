@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use tokio::time::{Duration, Instant};
+
 /// The unique identifier for a sync peer.
 ///
 /// Contains the info needed to uniquely identify a peer:
@@ -24,3 +28,19 @@ pub(crate) enum SyncResponse {
     /// Failure.
     Err(String),
 }
+
+/// Storage for a subscription to hello messages.
+#[derive(Debug, Clone)]
+pub(crate) struct HelloSubscription {
+    /// Rate limiting on how often to notify when a graph changes.
+    pub(super) graph_change_delay: Duration,
+    /// The last time we notified a peer about our current graph.
+    pub(super) last_notified: Option<Instant>,
+    /// How far apart to space notifications on a schedule.
+    pub(super) schedule_delay: Duration,
+    /// How long until the subscription is no longer valid.
+    pub(super) expires_at: Instant,
+}
+
+/// Type alias to map a unique [`SyncPeer`] to their associated subscription.
+pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;

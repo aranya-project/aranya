@@ -42,7 +42,11 @@ use crate::{
     actions::Actions,
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
-    sync::{self, quic::PskStore, SyncPeer},
+    sync::{
+        self,
+        quic::{PskStore, QuicListener, QuicTransport},
+        SyncPeer,
+    },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
 };
@@ -51,12 +55,11 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestTransport = sync::quic::QuicTransport;
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<TestTransport, crate::PS, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<QuicTransport, crate::PS, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
-type TestServer = sync::quic::Server<crate::PS, crate::SP>;
+type TestServer = sync::SyncServer<QuicListener, crate::PS, crate::SP>;
 
 struct TestDevice {
     /// Aranya sync client.

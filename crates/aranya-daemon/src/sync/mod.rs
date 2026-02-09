@@ -1,9 +1,8 @@
 //! Aranya syncer used to send/receive graph commands to other peers.
 
 mod handle;
-#[cfg(feature = "preview")]
-mod hello;
 mod manager;
+mod server;
 mod transport;
 mod types;
 
@@ -11,9 +10,11 @@ use aranya_runtime::GraphId;
 use aranya_util::Addr;
 
 #[cfg(feature = "preview")]
-pub(crate) use self::hello::HelloSubscriptions;
+pub(crate) use self::types::{HelloSubscription, HelloSubscriptions};
 pub(super) use self::{handle::Callback, types::SyncResponse};
-pub(crate) use self::{handle::SyncHandle, manager::SyncManager, transport::quic, types::SyncPeer};
+pub(crate) use self::{
+    handle::SyncHandle, manager::SyncManager, server::SyncServer, transport::quic, types::SyncPeer,
+};
 
 /// The error type which is returned from syncing with peers.
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +41,9 @@ pub(crate) enum Error {
     #[cfg(feature = "preview")]
     #[error("peer sent empty response")]
     EmptyResponse,
+
+    #[error(transparent)]
+    AranyaClient(#[from] aranya_runtime::ClientError),
 
     /// Encountered a bug in the program.
     #[error(transparent)]

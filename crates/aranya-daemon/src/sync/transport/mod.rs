@@ -20,3 +20,13 @@ pub(crate) trait SyncTransport: Send + 'static {
 
     async fn connect(&self, peer: super::SyncPeer) -> Result<Self::Stream, Self::Error>;
 }
+
+#[async_trait::async_trait]
+pub(crate) trait SyncListener: Send + 'static {
+    type Error: std::error::Error + Send + Sync + 'static;
+    type Stream: SyncStream<Error = Self::Error>;
+
+    fn local_addr(&self) -> std::net::SocketAddr;
+
+    async fn accept(&mut self) -> Option<Result<Self::Stream, Self::Error>>;
+}

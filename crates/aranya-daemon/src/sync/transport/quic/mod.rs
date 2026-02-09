@@ -14,14 +14,14 @@ use crate::sync::Addr;
 
 mod client;
 mod connections;
+mod listener;
 mod psk;
-mod server;
 mod stream;
 mod transport;
 
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
+pub(crate) use listener::QuicListener;
 pub(crate) use psk::{PskSeed, PskStore};
-pub(crate) use server::Server;
 pub(crate) use stream::QuicStream;
 pub(crate) use transport::QuicTransport;
 

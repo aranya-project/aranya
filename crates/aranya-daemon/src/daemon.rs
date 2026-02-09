@@ -28,7 +28,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicTransport, SyncParams},
+        quic::{PskStore, QuicListener, QuicTransport, SyncParams},
         SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -50,7 +50,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<PS, SP>;
-pub(crate) type SyncServer = crate::sync::quic::Server<PS, SP>;
+pub(crate) type SyncServer = crate::sync::SyncServer<QuicListener, PS, SP>;
 
 /// Handle for the spawned daemon.
 ///
