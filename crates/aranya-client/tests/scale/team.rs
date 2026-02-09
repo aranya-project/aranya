@@ -184,8 +184,6 @@ impl TestCtx {
                         break;
                     }
                     Err(e) => {
-                        //= docs/multi-daemon-convergence-test.md#err-004
-                        //# The test MUST log all errors with sufficient context for debugging.
                         warn!(
                             node = node.index,
                             attempt,

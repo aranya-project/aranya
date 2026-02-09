@@ -609,11 +609,11 @@ async fn test_ring_config_validation() -> Result<()> {
 
     //= docs/multi-daemon-convergence-test.md#conf-009
     //= type=test
-    //# The default sync mode MUST be poll.
+    //# The default sync mode MUST be hello.
     let config = TestConfig::default();
     assert!(
-        matches!(config.sync_mode, SyncMode::Poll { .. }),
-        "Default sync mode should be Poll"
+        matches!(config.sync_mode, SyncMode::Hello { .. }),
+        "Default sync mode should be Hello"
     );
 
     Ok(())

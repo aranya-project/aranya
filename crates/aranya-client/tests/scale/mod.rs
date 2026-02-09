@@ -56,13 +56,12 @@ pub enum SyncMode {
 }
 
 //= docs/multi-daemon-convergence-test.md#conf-009
-//# The default sync mode MUST be poll.
+//# The default sync mode MUST be hello.
 impl Default for SyncMode {
     fn default() -> Self {
-        //= docs/multi-daemon-convergence-test.md#conf-005
-        //# In poll sync mode, the default sync interval MUST be 1 second.
-        Self::Poll {
-            interval: Duration::from_secs(1),
+        Self::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
         }
     }
 }

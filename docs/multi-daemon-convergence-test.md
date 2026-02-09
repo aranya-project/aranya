@@ -149,7 +149,7 @@ The test MUST support configuring the sync mode (poll or hello).
 
 #### CONF-009
 
-The default sync mode MUST be poll.
+The default sync mode MUST be hello.
 
 #### CONF-010
 
@@ -454,7 +454,7 @@ The test passes when:
 This specification is designed for use with duvet. Requirements are marked with unique identifiers (e.g., `CONF-001`, `TOPO-002`) that can be referenced in implementation code using duvet annotations:
 
 ```rust
-//= https://github.com/aranya-project/aranya-docs/docs/multi-daemon-convergence-test.md#CONF-002
+//= docs/multi-daemon-convergence-test.md#conf-002
 //# The test MUST scale to at least 70 nodes without failure.
 const MIN_SUPPORTED_NODE_COUNT: usize = 70;
 ```
@@ -462,7 +462,7 @@ const MIN_SUPPORTED_NODE_COUNT: usize = 70;
 To generate a requirements coverage report:
 
 ```bash
-duvet report --spec docs/multi-daemon-convergence-test.md --source crates/aranya-client/tests/
+duvet report --config-path .duvet/config.toml
 ```
 
 ### Related Documents

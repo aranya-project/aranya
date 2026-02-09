@@ -2,7 +2,7 @@
 
 # Source files to scan for annotations
 [[source]]
-pattern = "crates/aranya-client/tests/ring/**/*.rs"
+pattern = "crates/aranya-client/tests/scale/**/*.rs"
 type = "implementation"
 
 [[source]]

@@ -9,16 +9,28 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
     TEXT[!MUST,implementation,test]: The test MUST reject configurations with fewer than 3 nodes (the minimum for a valid ring).
 
   SECTION: [CONF-004](#conf-004)
-    TEXT[!MUST,implementation]: The test MUST support configuring the sync interval between peers.
+    TEXT[!MUST,implementation]: In poll sync mode, the test MUST support configuring the sync interval between peers.
 
   SECTION: [CONF-005](#conf-005)
-    TEXT[!MUST,implementation]: The default sync interval MUST be 1 second.
+    TEXT[!MUST]: In poll sync mode, the default sync interval MUST be 1 second.
 
   SECTION: [CONF-006](#conf-006)
     TEXT[!MUST,implementation]: The test MUST support configuring a maximum test duration timeout.
 
   SECTION: [CONF-007](#conf-007)
     TEXT[!MUST,implementation]: The default maximum test duration MUST be 600 seconds (10 minutes).
+
+  SECTION: [CONF-008](#conf-008)
+    TEXT[!MUST,implementation,test]: The test MUST support configuring the sync mode (poll or hello).
+
+  SECTION: [CONF-009](#conf-009)
+    TEXT[!MUST,implementation,test]: The default sync mode MUST be hello.
+
+  SECTION: [CONF-010](#conf-010)
+    TEXT[!MUST,implementation,test]: In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
+
+  SECTION: [CONF-011](#conf-011)
+    TEXT[!MUST,implementation,test]: In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
 
   SECTION: [TOPO-001](#topo-001)
     TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
@@ -80,6 +92,12 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
   SECTION: [SYNC-004](#sync-004)
     TEXT[!MUST,implementation]: Sync peer configuration MUST complete before the convergence test phase.
 
+  SECTION: [SYNC-005](#sync-005)
+    TEXT[!MUST,implementation]: In poll sync mode, each node MUST poll its sync peers at the configured sync interval.
+
+  SECTION: [SYNC-006](#sync-006)
+    TEXT[!MUST,implementation,test]: In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+
   SECTION: [CONV-001](#conv-001)
     TEXT[!MUST,implementation]: The test MUST assign a label to the source node's graph to mark the start of convergence testing.
 
@@ -125,10 +143,19 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
     TEXT[implementation]: - Maximum convergence time (slowest node)
     TEXT[implementation]: - Mean convergence time
     TEXT[implementation]: - Median convergence time
+    TEXT[!SHOULD,implementation]: - Mode convergence time (convergence times SHOULD be bucketed to produce a meaningful mode)
+    TEXT[implementation]: - 95th percentile convergence time (p95)
+    TEXT[implementation]: - 99th percentile convergence time (p99)
     TEXT[implementation]: - Standard deviation of convergence times
 
   SECTION: [PERF-004](#perf-004)
     TEXT[!SHOULD,implementation]: The test SHOULD report memory usage per node if available.
+
+  SECTION: [PERF-005](#perf-005)
+    TEXT[!MUST,implementation]: When a CSV export feature flag is enabled, the test MUST output raw convergence data as a CSV file after each test run.
+
+  SECTION: [PERF-006](#perf-006)
+    TEXT[!MUST,implementation]: The CSV output MUST include one row per node with the following columns: node index, label assignment time (T0), node convergence time, and convergence duration (time from T0 to node convergence).
 
   SECTION: [ERR-001](#err-001)
     TEXT[!MUST,implementation]: The test MUST fail if any node fails to initialize.
@@ -138,9 +165,6 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
 
   SECTION: [ERR-003](#err-003)
     TEXT[!MUST,implementation]: The test MUST handle sync failures between nodes.
-
-  SECTION: [ERR-004](#err-004)
-    TEXT[!MUST,implementation]: The test MUST log all errors with sufficient context for debugging.
 
   SECTION: [CLEAN-001](#clean-001)
     TEXT[!MUST,implementation]: All daemon processes MUST be terminated when the test completes.
@@ -156,5 +180,5 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
 
   SECTION: [Duvet Integration](#duvet-integration)
     TEXT[!MUST]: ```rust
-    TEXT[!MUST]: //= https://github.com/aranya-project/aranya-docs/docs/multi-daemon-convergence-test.md#CONF-002
+    TEXT[!MUST]: //= docs/multi-daemon-convergence-test.md#conf-002
     TEXT[!MUST]: //# The test MUST scale to at least 70 nodes without failure.
