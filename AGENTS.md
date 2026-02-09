@@ -72,8 +72,8 @@ On **every other device** (runs on sync):
 
 ### Ordering and recall
 
-- The DAG stores commands with parent pointers forming a causal graph. A deterministic **weave** algorithm produces a total ordering of all commands, respecting causality and using command **priority** to break ties between concurrent (non-causal) commands.
-- A command can be **recalled** if it was accepted in one ordering but fails when a new command arrives and changes the weave. The `recall` block (if defined) handles this by emitting compensating effects and/or adjusting facts. Check failures fall to recall; runtime exceptions use a default handler.
+- The DAG stores commands with parent pointers forming a causal graph. A deterministic **braid** algorithm produces a total ordering of all commands, respecting causality and using command **priority** to break ties between concurrent (non-causal) commands.
+- A command can be **recalled** if it was accepted in one ordering but fails when a new command arrives and changes the braid. The `recall` block (if defined) handles this by emitting compensating effects and/or adjusting facts. Check failures fall to recall; runtime exceptions use a default handler.
 - Policy writers must design commands so that concurrent mutations to the same facts don't create unresolvable conflicts.
 
 ### Language restrictions
