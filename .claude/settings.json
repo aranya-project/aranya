@@ -1,20 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo check)",
-      "Bash(cargo build)",
-      "Bash(cargo make)",
-      "Bash(cargo test)",
-      "Bash(find)",
-      "Bash(cat)",
-      "Bash(head)",
-      "Bash(cmake)",
-      "Bash(ctest)",
-      "Bash(tail)"
+      "WebFetch(domain:aranya-project.github.io)",
+      "WebFetch(domain:github.com/aranya-project/aranya-docs/)",
+      "WebFetch(domain:raw.githubusercontent.com/aranya-project/aranya-docs/)",
+      "WebFetch(domain:github.com/aranya-project/aranya-core/)",
+      "WebFetch(domain:raw.githubusercontent.com/aranya-project/aranya-core/)",
+      "WebFetch(domain:github.com/aranya-project/aranya/)",
+      "WebFetch(domain:raw.githubusercontent.com/aranya-project/aranya/)",
+      "Bash(cargo check *)",
+      "Bash(cargo build *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)"
     ],
     "deny": [
-      "WebFetch",
-      "Bash(git push)"
+      "Bash(git push *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
     ]
   },
   "env": {
