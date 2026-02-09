@@ -15,20 +15,20 @@ use crate::{
 /// A device's public key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
-pub struct PubKeyBundle(api::PubKeyBundle);
+pub struct PublicKeyBundle(api::PublicKeyBundle);
 
-/// See [`PubKeyBundle`].
-#[deprecated(note = "use `PubKeyBundle`")]
-pub type KeyBundle = PubKeyBundle;
+/// See [`PublicKeyBundle`].
+#[deprecated(note = "use `PublicKeyBundle`")]
+pub type KeyBundle = PublicKeyBundle;
 
-impl PubKeyBundle {
+impl PublicKeyBundle {
     #[doc(hidden)]
-    pub fn from_api(api: api::PubKeyBundle) -> Self {
+    pub fn from_api(api: api::PublicKeyBundle) -> Self {
         Self(api)
     }
 
     #[doc(hidden)]
-    pub fn into_api(self) -> api::PubKeyBundle {
+    pub fn into_api(self) -> api::PublicKeyBundle {
         self.0
     }
 
@@ -83,14 +83,14 @@ impl Device<'_> {
     }
 
     /// Returns device's key bundle.
-    pub async fn keybundle(&self) -> Result<PubKeyBundle> {
+    pub async fn keybundle(&self) -> Result<PublicKeyBundle> {
         self.client
             .daemon
             .device_keybundle(context::current(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-            .map(PubKeyBundle::from_api)
+            .map(PublicKeyBundle::from_api)
     }
 
     /// Removes `device` from the team.

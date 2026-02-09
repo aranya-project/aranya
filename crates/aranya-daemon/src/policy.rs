@@ -16,9 +16,9 @@ use aranya_policy_ifgen::{
 pub enum Persistent {}
 #[derive(Debug)]
 pub enum Ephemeral {}
-/// PubKeyBundle policy struct.
+/// PublicKeyBundle policy struct.
 #[value]
-pub struct PubKeyBundle {
+pub struct PublicKeyBundle {
     pub ident_key: Vec<u8>,
     pub sign_key: Vec<u8>,
     pub enc_key: Vec<u8>,
@@ -130,7 +130,7 @@ pub struct CheckValidAfcChannels {}
 #[effect]
 pub struct DeviceAdded {
     pub device_id: BaseId,
-    pub device_keys: PubKeyBundle,
+    pub device_keys: PublicKeyBundle,
 }
 /// DeviceRemoved policy effect.
 #[effect]
@@ -202,7 +202,7 @@ pub struct QueryAfcChannelIsValidResult {
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
 pub struct QueryDeviceKeyBundleResult {
-    pub device_keys: PubKeyBundle,
+    pub device_keys: PublicKeyBundle,
 }
 /// QueryDeviceRoleResult policy effect.
 #[effect]
@@ -476,7 +476,7 @@ pub struct query_role_owners {
 /// create_team policy action.
 #[action(interface = Persistent)]
 pub struct create_team {
-    pub owner_keys: PubKeyBundle,
+    pub owner_keys: PublicKeyBundle,
     pub nonce: Vec<u8>,
 }
 /// terminate_team policy action.
@@ -487,7 +487,7 @@ pub struct terminate_team {
 /// add_device policy action.
 #[action(interface = Persistent)]
 pub struct add_device {
-    pub device_keys: PubKeyBundle,
+    pub device_keys: PublicKeyBundle,
     pub initial_role_id: Option<BaseId>,
 }
 /// remove_device policy action.

@@ -50,7 +50,7 @@ use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{ChanOp, Effect, PubKeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
+    policy::{ChanOp, Effect, PublicKeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
     sync::{quic as qs, SyncHandle, SyncPeer},
     util::SeedDir,
     AranyaStore, Client, EF,
@@ -378,9 +378,9 @@ pub(crate) struct Crypto {
 }
 
 impl ApiInner {
-    fn get_pk(&self) -> api::Result<PubKeyBundle> {
+    fn get_pk(&self) -> api::Result<PublicKeyBundle> {
         let pk = self.pk.lock().expect("poisoned");
-        Ok(PubKeyBundle::try_from(&*pk).context("bad key bundle")?)
+        Ok(PublicKeyBundle::try_from(&*pk).context("bad key bundle")?)
     }
 
     fn device_id(&self) -> api::Result<DeviceId> {
@@ -434,7 +434,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn get_key_bundle(self, _: context::Context) -> api::Result<api::PubKeyBundle> {
+    async fn get_key_bundle(self, _: context::Context) -> api::Result<api::PublicKeyBundle> {
         Ok(self
             .get_pk()
             .context("unable to get device public keys")?
@@ -651,7 +651,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        keys: api::PubKeyBundle,
+        keys: api::PublicKeyBundle,
         initial_role: Option<api::RoleId>,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
@@ -720,7 +720,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-    ) -> api::Result<api::PubKeyBundle> {
+    ) -> api::Result<api::PublicKeyBundle> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -732,7 +732,7 @@ impl DaemonApi for Api {
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
-            Ok(api::PubKeyBundle::from(e.device_keys))
+            Ok(api::PublicKeyBundle::from(e.device_keys))
         } else {
             Err(anyhow!("unable to query device keybundle").into())
         }
@@ -1481,9 +1481,9 @@ impl Api {
     }
 }
 
-impl From<api::PubKeyBundle> for PubKeyBundle {
-    fn from(value: api::PubKeyBundle) -> Self {
-        PubKeyBundle {
+impl From<api::PublicKeyBundle> for PublicKeyBundle {
+    fn from(value: api::PublicKeyBundle) -> Self {
+        PublicKeyBundle {
             ident_key: value.identity,
             sign_key: value.signing,
             enc_key: value.encryption,
@@ -1491,9 +1491,9 @@ impl From<api::PubKeyBundle> for PubKeyBundle {
     }
 }
 
-impl From<PubKeyBundle> for api::PubKeyBundle {
-    fn from(value: PubKeyBundle) -> Self {
-        api::PubKeyBundle {
+impl From<PublicKeyBundle> for api::PublicKeyBundle {
+    fn from(value: PublicKeyBundle) -> Self {
+        api::PublicKeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
             encryption: value.enc_key,

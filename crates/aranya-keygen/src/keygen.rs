@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// A bundle of cryptographic keys for secure communication in Aranya.
 ///
-/// A PubKeyBundle contains identifiers for three types of keys:
+/// A PublicKeyBundle contains identifiers for three types of keys:
 /// - Device identity key: Used to identify a device in an Aranya team. A device's ID
 ///   is derived from the public portion of the device identity key. The device key is
 ///   used for digital signatures allowing others to verify signatures created with this key.
@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 /// # use anyhow::Result;
 /// # use aranya_crypto::{Engine, KeyStore};
-/// # use aranya_keygen::PubKeyBundle;
+/// # use aranya_keygen::PublicKeyBundle;
 /// #
 /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
 /// # where
@@ -36,13 +36,13 @@ use serde::{Deserialize, Serialize};
 /// #     KS: KeyStore,
 /// # {
 /// // Generate a new key bundle and store the keys in the keystore
-/// let key_bundle = PubKeyBundle::generate(engine, store)?;
+/// let key_bundle = PublicKeyBundle::generate(engine, store)?;
 /// # Ok(())
 /// # }
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
-pub struct PubKeyBundle {
+pub struct PublicKeyBundle {
     /// Device identifier derived from the identity key.
     ///
     /// This ID uniquely identifies the device in the Aranya team.
@@ -68,9 +68,9 @@ pub struct PubKeyBundle {
     pub sign_id: SigningKeyId,
 }
 
-/// Collection of public keys derived from a [`PubKeyBundle`].
+/// Collection of public keys derived from a [`PublicKeyBundle`].
 ///
-/// This structure contains the public portions of the keys referenced in a PubKeyBundle.
+/// This structure contains the public portions of the keys referenced in a PublicKeyBundle.
 /// These public keys can be shared with other devices for secure communication.
 ///
 /// - `ident_pk`: Public identity key for device identification
@@ -93,11 +93,11 @@ pub struct PublicKeys<CS: CipherSuite> {
     pub sign_pk: VerifyingKey<CS>,
 }
 
-impl PubKeyBundle {
+impl PublicKeyBundle {
     /// Generates a new key bundle with fresh cryptographic keys.
     ///
     /// This method creates new identity, encryption, and signing keys using the provided
-    /// engine, wraps them, and stores them in the provided key store. It returns a PubKeyBundle
+    /// engine, wraps them, and stores them in the provided key store. It returns a PublicKeyBundle
     /// that contains references to these stored keys.
     ///
     /// # Type Parameters
@@ -112,7 +112,7 @@ impl PubKeyBundle {
     ///
     /// # Returns
     ///
-    /// A Result containing the new PubKeyBundle if successful, or an error if key generation,
+    /// A Result containing the new PublicKeyBundle if successful, or an error if key generation,
     /// wrapping, or storage fails.
     ///
     /// # Example
@@ -120,14 +120,14 @@ impl PubKeyBundle {
     /// ```
     /// # use anyhow::Result;
     /// # use aranya_crypto::{Engine, KeyStore};
-    /// # use aranya_keygen::PubKeyBundle;
+    /// # use aranya_keygen::PublicKeyBundle;
     /// #
     /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
     /// # where
     /// #     CE: Engine,
     /// #     KS: KeyStore,
     /// # {
-    /// let key_bundle = PubKeyBundle::generate(engine, store)?;
+    /// let key_bundle = PublicKeyBundle::generate(engine, store)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -155,7 +155,7 @@ impl PubKeyBundle {
 
     /// Loads the public keys associated with this key bundle.
     ///
-    /// This method loads the keys referenced by this PubKeyBundle from the provided key store,
+    /// This method loads the keys referenced by this PublicKeyBundle from the provided key store,
     /// extracts their public portions, and returns them in a PublicKeys structure.
     ///
     /// # Type Parameters
@@ -178,14 +178,14 @@ impl PubKeyBundle {
     /// ```
     /// # use anyhow::Result;
     /// # use aranya_crypto::{Engine, KeyStore};
-    /// # use aranya_keygen::PubKeyBundle;
+    /// # use aranya_keygen::PublicKeyBundle;
     /// #
     /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
     /// # where
     /// #     CE: Engine,
     /// #     KS: KeyStore,
     /// # {
-    /// let key_bundle = PubKeyBundle::generate(engine, store)?;
+    /// let key_bundle = PublicKeyBundle::generate(engine, store)?;
     /// let public_keys = key_bundle.public_keys(engine, store)?;
     /// # Ok(())
     /// # }

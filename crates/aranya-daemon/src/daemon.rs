@@ -7,7 +7,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_keygen::{PubKeyBundle, PublicKeys};
+use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
@@ -350,12 +350,12 @@ impl Daemon {
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,
             None => {
-                let bundle =
-                    PubKeyBundle::generate(eng, store).context("unable to generate key bundle")?;
+                let bundle = PublicKeyBundle::generate(eng, store)
+                    .context("unable to generate key bundle")?;
                 info!("generated key bundle");
                 write_cbor(&path, &bundle)
                     .await
-                    .context("unable to write `PubKeyBundle` to disk")?;
+                    .context("unable to write `PublicKeyBundle` to disk")?;
                 bundle
             }
         };

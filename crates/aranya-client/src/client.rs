@@ -39,7 +39,7 @@ use {
 pub use self::device::KeyBundle;
 #[doc(inline)]
 pub use self::{
-    device::{Device, DeviceId, Devices, PubKeyBundle},
+    device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
@@ -207,13 +207,13 @@ impl Client {
     }
 
     /// Gets the public key bundle for this device.
-    pub async fn get_key_bundle(&self) -> Result<PubKeyBundle> {
+    pub async fn get_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.daemon
             .get_key_bundle(context::current())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-            .map(PubKeyBundle::from_api)
+            .map(PublicKeyBundle::from_api)
     }
 
     /// Gets the public device ID for this device.

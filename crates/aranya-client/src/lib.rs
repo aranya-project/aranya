@@ -49,7 +49,7 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PubKeyBundle, Role,
+        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle, Role,
         RoleId, Roles, Team, TeamId,
     },
     config::{

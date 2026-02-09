@@ -30,7 +30,7 @@ The `aranya-keygen` crate simplifies the process of generating and managing cryp
 ```rust
 use anyhow::Result;
 use aranya_crypto::{Engine, KeyStore};
-use aranya_keygen::PubKeyBundle;
+use aranya_keygen::PublicKeyBundle;
 
 fn generate_keys<E, S>(engine: &mut E, store: &mut S) -> Result<()>
 where
@@ -38,7 +38,7 @@ where
     S: KeyStore,
 {
     // Generate a new key bundle
-    let key_bundle = PubKeyBundle::generate(engine, store)?;
+    let key_bundle = PublicKeyBundle::generate(engine, store)?;
 
     // Load the public keys from the bundle
     let public_keys = key_bundle.public_keys(engine, store)?;

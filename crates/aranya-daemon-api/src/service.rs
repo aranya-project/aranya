@@ -119,15 +119,15 @@ pub struct Role {
 
 /// A device's public key bundle.
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct PubKeyBundle {
+pub struct PublicKeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
     pub encryption: Vec<u8>,
 }
 
-impl fmt::Debug for PubKeyBundle {
+impl fmt::Debug for PublicKeyBundle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PubKeyBundle")
+        f.debug_struct("PublicKeyBundle")
             .field("identity", &Hex::new(&*self.identity))
             .field("signing", &Hex::new(&*self.signing))
             .field("encryption", &Hex::new(&*self.encryption))
@@ -361,7 +361,7 @@ pub trait DaemonApi {
     async fn aranya_local_addr() -> Result<Addr>;
 
     /// Gets the public key bundle for this device
-    async fn get_key_bundle() -> Result<PubKeyBundle>;
+    async fn get_key_bundle() -> Result<PublicKeyBundle>;
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
 
@@ -414,7 +414,7 @@ pub trait DaemonApi {
     /// Adds a device to the team with optional initial roles.
     async fn add_device_to_team(
         team: TeamId,
-        keys: PubKeyBundle,
+        keys: PublicKeyBundle,
         initial_role: Option<RoleId>,
     ) -> Result<()>;
     /// Remove device from the team.
@@ -422,7 +422,7 @@ pub trait DaemonApi {
     /// Returns all the devices on the team.
     async fn devices_on_team(team: TeamId) -> Result<Box<[DeviceId]>>;
     /// Returns the device's key bundle.
-    async fn device_keybundle(team: TeamId, device: DeviceId) -> Result<PubKeyBundle>;
+    async fn device_keybundle(team: TeamId, device: DeviceId) -> Result<PublicKeyBundle>;
 
     //
     // Role creation
