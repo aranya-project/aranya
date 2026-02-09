@@ -88,7 +88,7 @@ impl Device<'_> {
         self.public_key_bundle().await
     }
 
-    /// Returns device's key bundle.
+    /// Returns device's public key bundle.
     pub async fn public_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.client
             .daemon

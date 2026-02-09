@@ -421,7 +421,7 @@ pub trait DaemonApi {
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
     /// Returns all the devices on the team.
     async fn devices_on_team(team: TeamId) -> Result<Box<[DeviceId]>>;
-    /// Returns the device's key bundle.
+    /// Returns the device's public key bundle.
     async fn device_public_key_bundle(team: TeamId, device: DeviceId) -> Result<PublicKeyBundle>;
 
     //

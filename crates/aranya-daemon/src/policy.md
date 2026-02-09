@@ -359,7 +359,7 @@ struct PublicKeyBundle {
     enc_key bytes,
 }
 
-// Returns the device's key bundle.
+// Returns the device's public key bundle.
 //
 // # Caveats
 //
@@ -651,7 +651,7 @@ ephemeral action query_device_public_key_bundle(device_id id) {
     }
 }
 
-// Emitted when a device's key bundle is queried by
+// Emitted when a device's public key bundle is queried by
 // `query_device_public_key_bundle`.
 effect QueryDeviceKeyBundleResult {
     // NB: We don't include the device ID here since the caller
