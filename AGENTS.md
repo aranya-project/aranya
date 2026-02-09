@@ -6,12 +6,14 @@ Aranya is a zero-trust security framework for decentralized applications.
 
 - Devices form a **team**, sharing a CRDT-backed DAG (directed acyclic graph).
 - Every mutation is a **command**. Commands are synced to all devices and each device independently enforces the policy before accepting a command into its local graph (endpoint enforcement).
-- The policy defines RBAC roles (owner / admin / operator / member), device lifecycle, label-based access control, and AFC (Aranya Fast Channels) permissions.
-- There is no central authority -- every device stores the full graph and enforces the same policy. Devices converge via CRDT sync.
+- The policy defines RBAC roles (owner / admin / operator / member plus application-defined custom roles), device lifecycle, label-based access control, and AFC (Aranya Fast Channels) permissions.
+- There is no central authority -- every device stores a copy of the graph containing all commands it has generated or synced so far, and independently enforces the same policy. When all devices sync without generating new commands they converge to the same full graph, but at any point in time a device may have only a partial view. Devices converge via CRDT sync.
 - Separation of duties is enforced: no device can self-promote or bypass the role hierarchy.
 - The system has two planes:
   - **Control plane (on-graph):** commands stored in the DAG, broadcast to all devices via sync. Used for access-control operations (add device, assign role, manage labels). Low throughput (~100s msgs/sec), high resilience.
   - **Data plane (off-graph/AFC):** encrypted point-to-point channels between devices, governed by labels in policy. High throughput, low latency. Keys are negotiated on-graph but data flows off-graph.
+
+For full documentation see <https://github.com/aranya-project/aranya-docs/> (includes guides, architecture deep-dives, and API reference; clone the repo for offline access).
 
 ## How It Fits Together
 
@@ -20,6 +22,7 @@ Application -> Client lib (tarpc RPC) -> Daemon -> Policy engine / Keystore / Sy
 ```
 
 - One daemon per device; it owns crypto, policy enforcement, and graph sync.
+- The daemon runs background sync continuously, exchanging commands with peers over QUIC so each device's graph stays up to date.
 - Client libraries (Rust + C bindings) issue RPCs to the local daemon.
 - Sync uses QUIC transport; CRDT semantics ensure all devices converge.
 - Keys are managed by the daemon's keystore (`crates/aranya-daemon/src/keystore.rs`).
@@ -60,12 +63,12 @@ On the **authoring device** (runs once):
 2. The action runs locally: it can do sensitive work, iterate facts, and `publish` zero or more **commands**.
 3. For each command, the `seal` block serializes it into an envelope.
 4. The `policy` block runs: it queries facts, runs `check` statements, and terminates with a `finish` block.
-5. The `finish` block performs fact mutations (`create`/`update`/`delete`) and `emit`s effects.
+5. The `finish` block performs fact mutations (`create`/`update`/`delete`) and `emit`s **effects**. Effects are the mechanism for communicating outcomes back to the application -- e.g. `RoleCreated`, `LabelDeleted`, `AfcUniChannelCreated`. The application subscribes to effects and reacts accordingly.
 6. If all commands succeed, the action is committed atomically. If any command fails, the entire action is rolled back.
 
 On **every other device** (runs on sync):
 7. The command envelope arrives via sync. The `open` block deserializes it.
-8. The `policy` block runs again -- same checks, same finish logic. The receiving device must be able to fully evaluate the command with only the command fields and its local FactDB. This is why command fields cannot contain plaintext secrets.
+8. The `policy` block runs again -- same checks, same finish logic. Effects are emitted on the receiving device too, so every device can react to the outcome. The receiving device must be able to fully evaluate the command with only the command fields and its local FactDB. This is why command fields cannot contain plaintext secrets.
 
 ### Ordering and recall
 
@@ -95,6 +98,16 @@ Changing the policy regenerates Rust bindings during build. Validate with:
 cargo test -p aranya-client
 ```
 This spins up daemons and exercises the integration suite against the new policy.
+
+### AFC (Aranya Fast Channels)
+
+AFC provides **high-throughput, low-latency encrypted channels** between devices on the data plane. Key concepts:
+
+- Channels are **unidirectional** (one sender, one receiver). Created via the `create_afc_uni_channel(receiver_id, label_id)` ephemeral action.
+- Access is governed by **labels**. A label is a named topic with a unique `label_id`; each label has one or more managing roles. Devices are assigned a `ChanOp` per label: `SendOnly`, `RecvOnly`, or `SendRecv`.
+- Channel creation is **ephemeral** -- it does not persist to the DAG or mutate the FactDB. The sender generates a key (RFC 9180 KEM), encapsulates it for the receiver, and both sides store the key in shared memory.
+- Both peers validate the channel: the label must exist, sender must have send permission, receiver must have receive permission, and both must have `CanUseAfc`.
+- When role or label changes could invalidate existing channels, the policy emits a `CheckValidAfcChannels` signal effect so applications can re-validate.
 
 ## Build & Test
 
