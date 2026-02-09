@@ -86,7 +86,7 @@ impl Device<'_> {
     pub async fn keybundle(&self) -> Result<PublicKeyBundle> {
         self.client
             .daemon
-            .device_keybundle(context::current(), self.team_id, self.id)
+            .device_public_key_bundle(context::current(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

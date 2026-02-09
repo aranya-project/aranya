@@ -346,7 +346,7 @@ impl Daemon {
         CE: Engine,
         KS: KeyStore,
     {
-        let path = cfg.key_bundle_path();
+        let path = cfg.public_key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,
             None => {

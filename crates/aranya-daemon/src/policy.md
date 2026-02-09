@@ -368,7 +368,7 @@ struct PublicKeyBundle {
 // between devices and keys so it would be a very significant
 // violation if a device's key existed without the device also
 // existing. See `valid_device_invariants`.
-function get_device_keybundle(device_id id) struct PublicKeyBundle {
+function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
     // This function is a little too expensive to call every
     // time we need to get a device, so only uncomment this when
     // debugging/developing.
@@ -638,21 +638,21 @@ ephemeral command QueryDeviceRole {
 }
 ```
 
-### `query_device_keybundle`
+### `query_device_public_key_bundle`
 
 Returns a device's `PublicKeyBundle`.
 
 ```policy
 // Emits `QueryDeviceKeyBundleResult` with the device's key
 // bundle.
-ephemeral action query_device_keybundle(device_id id) {
+ephemeral action query_device_public_key_bundle(device_id id) {
     publish QueryDeviceKeyBundle {
         device_id: device_id,
     }
 }
 
 // Emitted when a device's key bundle is queried by
-// `query_device_keybundle`.
+// `query_device_public_key_bundle`.
 effect QueryDeviceKeyBundleResult {
     // NB: We don't include the device ID here since the caller
     // must already know it as it was provided to the action.
@@ -676,7 +676,7 @@ ephemeral command QueryDeviceKeyBundle {
         // NB: A device's keys exist iff `fact Device` exists, so
         // we don't need to use `get_device` or anything
         // like that.
-        let device_keys = get_device_keybundle(this.device_id)
+        let device_keys = get_device_public_key_bundle(this.device_id)
 
         finish {
             emit QueryDeviceKeyBundleResult {

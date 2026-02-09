@@ -364,7 +364,7 @@ pub enum EphemeralAction {
     query_devices_on_team(query_devices_on_team),
     query_afc_channel_is_valid(query_afc_channel_is_valid),
     query_device_role(query_device_role),
-    query_device_keybundle(query_device_keybundle),
+    query_device_public_key_bundle(query_device_public_key_bundle),
     query_team_roles(query_team_roles),
     query_role_owners(query_role_owners),
     query_label(query_label),
@@ -387,9 +387,9 @@ pub struct query_afc_channel_is_valid {
 pub struct query_device_role {
     pub device_id: BaseId,
 }
-/// query_device_keybundle policy action.
+/// query_device_public_key_bundle policy action.
 #[action(interface = Ephemeral)]
-pub struct query_device_keybundle {
+pub struct query_device_public_key_bundle {
     pub device_id: BaseId,
 }
 /// add_perm_to_role policy action.

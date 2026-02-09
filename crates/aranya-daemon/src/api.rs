@@ -434,7 +434,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn get_key_bundle(self, _: context::Context) -> api::Result<api::PublicKeyBundle> {
+    async fn get_public_key_bundle(self, _: context::Context) -> api::Result<api::PublicKeyBundle> {
         Ok(self
             .get_pk()
             .context("unable to get device public keys")?
@@ -715,7 +715,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn device_keybundle(
+    async fn device_public_key_bundle(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -726,15 +726,15 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(graph)
-            .query_device_keybundle(DeviceId::transmute(device))
+            .query_device_public_key_bundle(DeviceId::transmute(device))
             .await
-            .context("unable to query device keybundle")?;
+            .context("unable to query device public key bundle")?;
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
             Ok(api::PublicKeyBundle::from(e.device_keys))
         } else {
-            Err(anyhow!("unable to query device keybundle").into())
+            Err(anyhow!("unable to query device public key bundle").into())
         }
     }
 

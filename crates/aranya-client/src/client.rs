@@ -209,7 +209,7 @@ impl Client {
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.daemon
-            .get_key_bundle(context::current())
+            .get_public_key_bundle(context::current())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

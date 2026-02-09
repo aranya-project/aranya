@@ -361,7 +361,7 @@ pub trait DaemonApi {
     async fn aranya_local_addr() -> Result<Addr>;
 
     /// Gets the public key bundle for this device
-    async fn get_key_bundle() -> Result<PublicKeyBundle>;
+    async fn get_public_key_bundle() -> Result<PublicKeyBundle>;
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
 
@@ -422,7 +422,7 @@ pub trait DaemonApi {
     /// Returns all the devices on the team.
     async fn devices_on_team(team: TeamId) -> Result<Box<[DeviceId]>>;
     /// Returns the device's key bundle.
-    async fn device_keybundle(team: TeamId, device: DeviceId) -> Result<PublicKeyBundle>;
+    async fn device_public_key_bundle(team: TeamId, device: DeviceId) -> Result<PublicKeyBundle>;
 
     //
     // Role creation
