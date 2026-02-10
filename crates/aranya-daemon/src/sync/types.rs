@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use tokio::time::{Duration, Instant};
+use tokio_util::time::delay_queue;
 
 /// The unique identifier for a sync peer.
 ///
@@ -40,6 +41,8 @@ pub(crate) struct HelloSubscription {
     pub(super) schedule_delay: Duration,
     /// How long until the subscription is no longer valid.
     pub(super) expires_at: Instant,
+    /// The key to access the entry in the `DelayQueue`.
+    pub(super) queue_key: delay_queue::Key,
 }
 
 /// Type alias to map a unique [`SyncPeer`] to their associated subscription.

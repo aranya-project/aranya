@@ -9,8 +9,6 @@ use aranya_runtime::{ClientState, PeerCache};
 use derive_where::derive_where;
 use tokio::sync::{Mutex, MutexGuard};
 
-#[cfg(feature = "preview")]
-use crate::sync::HelloSubscriptions;
 use crate::sync::SyncPeer;
 
 /// Thread-safe map of peer caches.
@@ -56,8 +54,6 @@ pub struct Client<PS, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<PS, SP>>>,
     caches: PeerCacheMap,
-    #[cfg(feature = "preview")]
-    hello_subscriptions: Arc<Mutex<HelloSubscriptions>>,
     invalid_graphs: Arc<InvalidGraphs>,
 }
 
@@ -73,8 +69,6 @@ impl<PS, SP> Client<PS, SP> {
         Self {
             aranya: Arc::new(Mutex::new(aranya)),
             caches: Arc::default(),
-            #[cfg(feature = "preview")]
-            hello_subscriptions: Arc::default(),
             invalid_graphs: Arc::default(),
         }
     }
@@ -97,14 +91,6 @@ impl<PS, SP> Client<PS, SP> {
         let aranya = self.lock_aranya().await;
         let caches = self.caches.lock().await;
         (aranya, caches)
-    }
-
-    /// Returns a reference to the hello subscriptions.
-    ///
-    /// Use this when you need to access or modify hello subscriptions.
-    #[cfg(feature = "preview")]
-    pub(crate) async fn lock_hello_subscriptions(&self) -> MutexGuard<'_, HelloSubscriptions> {
-        self.hello_subscriptions.lock().await
     }
 
     pub(crate) fn invalid_graphs(&self) -> &InvalidGraphs {

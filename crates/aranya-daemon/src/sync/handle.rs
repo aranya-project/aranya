@@ -66,18 +66,41 @@ pub(crate) enum ManagerMessage {
         peer: SyncPeer,
     },
 
-    /// Trigger sync with a peer based on a hello message.
-    #[cfg(feature = "preview")]
-    SyncOnHello {
-        /// The unique [`SyncPeer`] to send a message to.
-        peer: SyncPeer,
-    },
-
     /// Broadcast hello notifications to all subscribers of a graph.
     #[cfg(feature = "preview")]
     BroadcastHello {
         /// The [`GraphId`] to send a broadcast about.
         graph_id: GraphId,
+        /// The current head to notify subscribers about.
+        head: Address,
+    },
+
+    // === Internal Use, Sending Data From Server ===
+    /// A peer has requested to subscribe to hello notifications.
+    #[cfg(feature = "preview")]
+    HelloSubscribeRequest {
+        /// The unique [`SyncPeer`] to send a message to.
+        peer: SyncPeer,
+        /// Rate limiting on how often to notify when a graph changes.
+        graph_change_delay: Duration,
+        /// How long the subscription should last.
+        duration: Duration,
+        /// Interval to send hello notifications, regardless of graph changes.
+        schedule_delay: Duration,
+    },
+
+    /// A peer has requested to unsubscribe from hello notifications.
+    #[cfg(feature = "preview")]
+    HelloUnsubscribeRequest {
+        /// The unique [`SyncPeer`] to send a message to.
+        peer: SyncPeer,
+    },
+
+    /// Trigger sync with a peer based on a hello message.
+    #[cfg(feature = "preview")]
+    SyncOnHello {
+        /// The unique [`SyncPeer`] to send a message to.
+        peer: SyncPeer,
         /// The current head to notify subscribers about.
         head: Address,
     },
@@ -134,18 +157,43 @@ impl SyncHandle {
         self.send(ManagerMessage::HelloUnsubscribe { peer }).await
     }
 
-    /// Trigger sync with a peer based on a hello message.
-    /// Will be ignored if [`SyncPeerConfig::sync_on_hello`] is false.
-    #[cfg(feature = "preview")]
-    pub(crate) async fn sync_on_hello(&self, peer: SyncPeer) -> Response {
-        self.send(ManagerMessage::SyncOnHello { peer }).await
-    }
-
     /// Broadcast hello notifications to all subscribers of a graph.
     #[cfg(feature = "preview")]
     pub(crate) async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Response {
         self.send(ManagerMessage::BroadcastHello { graph_id, head })
             .await
+    }
+
+    /// Tell the [`SyncManager`] to add this peer to their subscriptions.
+    #[cfg(feature = "preview")]
+    pub(super) async fn hello_subscribe_request(
+        &self,
+        peer: SyncPeer,
+        graph_change_delay: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+    ) -> Response {
+        self.send(ManagerMessage::HelloSubscribeRequest {
+            peer,
+            graph_change_delay,
+            duration,
+            schedule_delay,
+        })
+        .await
+    }
+
+    /// Tell the [`SyncManager`] to add this peer to their subscriptions.
+    #[cfg(feature = "preview")]
+    pub(super) async fn hello_unsubscribe_request(&self, peer: SyncPeer) -> Response {
+        self.send(ManagerMessage::HelloUnsubscribeRequest { peer })
+            .await
+    }
+
+    /// Trigger sync with a peer based on a hello message.
+    /// Will be ignored if [`SyncPeerConfig::sync_on_hello`] is false.
+    #[cfg(feature = "preview")]
+    pub(super) async fn sync_on_hello(&self, peer: SyncPeer, head: Address) -> Response {
+        self.send(ManagerMessage::SyncOnHello { peer, head }).await
     }
 
     /// Helper method for sending a message via the channel.
