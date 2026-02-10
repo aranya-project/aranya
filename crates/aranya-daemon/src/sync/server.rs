@@ -71,33 +71,31 @@ where
     async fn handle_stream<S: SyncStream>(&self, mut stream: S) -> Result<(), Error> {
         trace!("received sync request");
 
-        let mut recv_buf = Vec::new();
-        stream
-            .receive(&mut recv_buf)
-            .await
-            .map_err(Error::transport)?;
-        trace!(n = recv_buf.len(), "received request bytes");
+        let mut buf = Vec::with_capacity(MAX_SYNC_MESSAGE_SIZE);
+        stream.receive(&mut buf).await.map_err(Error::transport)?;
+        trace!(n = buf.len(), "received request bytes");
 
         let peer = stream.peer();
-
-        let sync_type: SyncType = postcard::from_bytes(&recv_buf).map_err(|error| {
+        let sync_type: SyncType = postcard::from_bytes(&buf).map_err(|error| {
             error!(
                 %error,
                 ?peer,
-                request_len = recv_buf.len(),
+                request_len = buf.len(),
                 "Failed to deserialize sync request"
             );
             anyhow::anyhow!(error)
         })?;
 
         let response: SyncResponse = match sync_type {
-            SyncType::Poll { request } => match self.process_poll_message(peer, request).await {
-                Ok(data) => SyncResponse::Ok(data),
-                Err(e) => {
-                    error!(error = %e.report(), "error processing poll message");
-                    SyncResponse::Err(e.report().to_string())
+            SyncType::Poll { request } => {
+                match self.process_poll_message(peer, request, &mut buf).await {
+                    Ok(data) => SyncResponse::Ok(data),
+                    Err(e) => {
+                        error!(error = %e.report(), "error processing poll message");
+                        SyncResponse::Err(e.report().to_string())
+                    }
                 }
-            },
+            }
             SyncType::Hello(hello_msg) => {
                 #[cfg(not(feature = "preview"))]
                 {
@@ -126,11 +124,12 @@ where
             }
         };
 
-        let data = postcard::to_allocvec(&response).context("postcard serialization failed")?;
-        stream.send(&data).await.map_err(Error::transport)?;
+        buf.clear();
+        postcard::to_io(&response, &mut buf).context("postcard serialization failed")?;
+        stream.send(&buf).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
-        trace!(n = data.len(), "sent response");
+        trace!(n = buf.len(), "sent response");
         Ok(())
     }
 
@@ -142,6 +141,7 @@ where
         &self,
         peer: SyncPeer,
         request: SyncRequestMessage,
+        buf: &mut Vec<u8>,
     ) -> Result<Box<[u8]>, Error> {
         match request {
             SyncRequestMessage::SyncRequest { graph_id, .. } => {
@@ -150,12 +150,13 @@ where
                 let mut resp = SyncResponder::new();
                 resp.receive(request).context("sync recv failed")?;
 
-                let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+                buf.clear();
+                buf.resize(MAX_SYNC_MESSAGE_SIZE, 0);
                 let len = {
                     let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
                     let cache = caches.entry(peer).or_default();
 
-                    resp.poll(&mut buf, aranya.provider(), cache)
+                    resp.poll(buf, aranya.provider(), cache)
                         .or_else(|err| {
                             if matches!(
                                 err,
@@ -170,7 +171,7 @@ where
                         .context("sync resp poll failed")?
                 };
                 buf.truncate(len);
-                Ok(buf.into())
+                Ok(buf.split_off(0).into_boxed_slice())
             }
             SyncRequestMessage::RequestMissing { .. } => bug!("Should be a SyncRequest"),
             SyncRequestMessage::SyncResume { .. } => bug!("Should be a SyncRequest"),
