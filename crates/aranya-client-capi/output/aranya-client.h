@@ -630,9 +630,7 @@ typedef struct AranyaLabelId {
 } AranyaLabelId;
 
 /**
- * A generic object ID that can refer to a device, role, or label.
- *
- * Used with [`aranya_change_rank`](@ref aranya_change_rank) and [`aranya_query_rank`](@ref aranya_query_rank).
+ * An identifier for any object defined in the Aranya policy.
  */
 typedef struct AranyaObjectId {
     struct AranyaId id;
@@ -1837,7 +1835,7 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_setup_default_roles_no_owner(struct AranyaClient *client,
+AranyaError aranya_setup_default_roles_no_owning_role(struct AranyaClient *client,
                                                 const struct AranyaTeamId *team,
                                                 struct AranyaRole *roles_out,
                                                 size_t *roles_len);
@@ -1864,23 +1862,20 @@ AranyaError aranya_setup_default_roles_no_owner(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_setup_default_roles_no_owner_ext(struct AranyaClient *client,
+AranyaError aranya_setup_default_roles_no_owning_role_ext(struct AranyaClient *client,
                                                     const struct AranyaTeamId *team,
                                                     struct AranyaRole *roles_out,
                                                     size_t *roles_len,
                                                     struct AranyaExtError *__ext_err);
 
 /**
- * Returns the roles that own a given role.
- *
- * Role ownership has been replaced by rank-based authorization.
- * This function always returns an empty list.
+ * Deprecated: always returns an empty list. Use `aranya_query_rank` instead.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
- * @param[out] roles_out returns a list of roles that own `role`
- * @param[in,out] roles_len the number of roles written to the buffer.
+ * @param[out] roles_out unused, always returns an empty list
+ * @param[in,out] roles_len set to 0 on return
  *
  * @relates AranyaClient.
  */
@@ -1891,16 +1886,13 @@ AranyaError aranya_role_owners(const struct AranyaClient *client,
                                size_t *roles_len);
 
 /**
- * Returns the roles that own a given role.
- *
- * Role ownership has been replaced by rank-based authorization.
- * This function always returns an empty list.
+ * Deprecated: always returns an empty list. Use `aranya_query_rank` instead.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
- * @param[out] roles_out returns a list of roles that own `role`
- * @param[in,out] roles_len the number of roles written to the buffer.
+ * @param[out] roles_out unused, always returns an empty list
+ * @param[in,out] roles_len set to 0 on return
  *
  * @relates AranyaClient.
  */
@@ -2339,12 +2331,18 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
- * Change the rank of an object (device, role, or label).
+ * Change the rank of an object.
  *
- * The caller must know the current rank of the object. The caller's
- * rank must be strictly greater than both the old and new rank.
+ * The caller must provide the current rank of the object (`old_rank`)
+ * to guard against concurrent changes by other devices. If another
+ * device changes the rank before this command is applied, the
+ * operation will fail rather than silently overwriting the new value.
+ * This preserves the caller's intent to only change the rank under
+ * expected conditions.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * The caller's rank must be strictly greater than both the old and
+ * new rank. Permission to perform this operation is checked against
+ * the Aranya policy.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2361,12 +2359,18 @@ AranyaError aranya_change_rank(const struct AranyaClient *client,
                                int64_t new_rank);
 
 /**
- * Change the rank of an object (device, role, or label).
+ * Change the rank of an object.
  *
- * The caller must know the current rank of the object. The caller's
- * rank must be strictly greater than both the old and new rank.
+ * The caller must provide the current rank of the object (`old_rank`)
+ * to guard against concurrent changes by other devices. If another
+ * device changes the rank before this command is applied, the
+ * operation will fail rather than silently overwriting the new value.
+ * This preserves the caller's intent to only change the rank under
+ * expected conditions.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * The caller's rank must be strictly greater than both the old and
+ * new rank. Permission to perform this operation is checked against
+ * the Aranya policy.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2384,7 +2388,7 @@ AranyaError aranya_change_rank_ext(const struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Query the rank of an object (device, role, or label).
+ * Query the rank of an object.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2399,7 +2403,7 @@ AranyaError aranya_query_rank(const struct AranyaClient *client,
                               int64_t *__output);
 
 /**
- * Query the rank of an object (device, role, or label).
+ * Query the rank of an object.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID

@@ -106,8 +106,29 @@ custom_id! {
 }
 
 custom_id! {
-    /// A generic object ID that can refer to a device, role, or label.
+    /// An identifier for any object defined in the Aranya policy.
     pub struct ObjectId;
+}
+
+impl From<DeviceId> for ObjectId {
+    fn from(id: DeviceId) -> Self {
+        let bytes: [u8; 32] = id.into();
+        bytes.into()
+    }
+}
+
+impl From<RoleId> for ObjectId {
+    fn from(id: RoleId) -> Self {
+        let bytes: [u8; 32] = id.into();
+        bytes.into()
+    }
+}
+
+impl From<LabelId> for ObjectId {
+    fn from(id: LabelId) -> Self {
+        let bytes: [u8; 32] = id.into();
+        bytes.into()
+    }
 }
 
 /// A numerical rank used for authorization in the rank-based hierarchy.
@@ -142,11 +163,6 @@ pub struct Role {
     pub name: Text,
     /// The author of the role.
     pub author_id: DeviceId,
-    /// The role's rank in the authorization hierarchy.
-    ///
-    /// Populated when available (e.g., on creation). Use `query_rank`
-    /// to retrieve the rank for roles returned by queries.
-    pub rank: Option<Rank>,
     /// Is this a default role?
     pub default: bool,
 }
@@ -189,11 +205,6 @@ pub struct CreateTeamConfig {
 pub struct Label {
     pub id: LabelId,
     pub name: Text,
-    /// The label's rank in the authorization hierarchy.
-    ///
-    /// Populated when available (e.g., on creation). Use `query_rank`
-    /// to retrieve the rank for labels returned by queries.
-    pub rank: Option<Rank>,
     pub author_id: DeviceId,
 }
 
@@ -303,7 +314,7 @@ pub enum ChanOp {
 
 /// Permissions that can be granted to a role.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum SimplePerm {
+pub enum Perm {
     // # Team management
     //
     // The role can add a device to the team.
@@ -463,17 +474,17 @@ pub trait DaemonApi {
     //
 
     /// Adds a permission to a role.
-    async fn add_perm_to_role(team: TeamId, role: RoleId, perm: SimplePerm) -> Result<()>;
+    async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
     /// Removes a permission from a role.
-    async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: SimplePerm) -> Result<()>;
-    /// Changes the rank of an object (device, role, or label).
+    async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
+    /// Changes the rank of an object.
     async fn change_rank(
         team: TeamId,
         object_id: ObjectId,
         old_rank: Rank,
         new_rank: Rank,
     ) -> Result<()>;
-    /// Queries the rank of an object (device, role, or label).
+    /// Queries the rank of an object.
     async fn query_rank(team: TeamId, object_id: ObjectId) -> Result<Rank>;
 
     //

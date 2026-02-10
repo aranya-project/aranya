@@ -12,7 +12,7 @@ use aranya_crypto::{Csprng, Rng};
 #[doc(inline)]
 pub use aranya_daemon_api::ChanOp;
 #[doc(inline)]
-pub use aranya_daemon_api::SimplePerm as Permission;
+pub use aranya_daemon_api::Perm as Permission;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},

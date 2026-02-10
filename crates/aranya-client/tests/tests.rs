@@ -234,11 +234,10 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     // Query to show admin role exists.
     let roles_on_team = owner_team.roles().await?;
     assert_eq!(roles_on_team.iter().count(), 4);
-    let _admin_role = roles_on_team
+    roles_on_team
         .iter()
         .find(|r| r.name == "admin")
-        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
-        .clone();
+        .ok_or_else(|| anyhow::anyhow!("no admin role"))?;
 
     // Show that admin cannot create a label.
     admin_team
@@ -1387,13 +1386,13 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
     let mut devices = DevicesCtx::new("test_setup_default_roles_single_use").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let _roles = devices
+    devices
         .setup_default_roles(team_id)
         .await
         .context("unable to setup default roles")?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team.setup_default_roles_no_owner().await {
+    match owner_team.setup_default_roles_no_owning_role().await {
         Ok(_) => bail!("expected replayed setup_default_roles to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected error re-running setup_default_roles: {err:?}"),
@@ -1707,7 +1706,7 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let _roles = devices.setup_default_roles(team_id).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_id = devices.owner.id;
     let owner_team = devices.owner.client.team(team_id);
@@ -1758,17 +1757,17 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
 async fn test_create_role_with_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role_with_rank").await?;
     let team_id = devices.create_and_add_team().await?;
-    let _roles = devices.setup_default_roles(team_id).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let expected_rank = Rank::new(50);
     let role = owner_team
-        .create_role(text!("ranked_role"), Rank::new(50))
+        .create_role(text!("ranked_role"), expected_rank)
         .await?;
 
-    let role_bytes: [u8; 32] = role.id.into();
-    let role_obj: ObjectId = role_bytes.into();
+    let role_obj: ObjectId = role.id.into();
     let rank = owner_team.query_rank(role_obj).await?;
-    assert_eq!(rank, Rank::new(50));
+    assert_eq!(rank, expected_rank);
 
     Ok(())
 }
@@ -1779,17 +1778,17 @@ async fn test_create_role_with_rank() -> Result<()> {
 async fn test_create_label_with_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_label_with_rank").await?;
     let team_id = devices.create_and_add_team().await?;
-    let _roles = devices.setup_default_roles(team_id).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let expected_rank = Rank::new(50);
     let label_id = owner_team
-        .create_label_with_rank(text!("ranked_label"), Rank::new(50))
+        .create_label_with_rank(text!("ranked_label"), expected_rank)
         .await?;
 
-    let label_bytes: [u8; 32] = label_id.into();
-    let label_obj: ObjectId = label_bytes.into();
+    let label_obj: ObjectId = label_id.into();
     let rank = owner_team.query_rank(label_obj).await?;
-    assert_eq!(rank, Rank::new(50));
+    assert_eq!(rank, expected_rank);
 
     Ok(())
 }
@@ -1799,22 +1798,23 @@ async fn test_create_label_with_rank() -> Result<()> {
 async fn test_change_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank").await?;
     let team_id = devices.create_and_add_team().await?;
-    let _roles = devices.setup_default_roles(team_id).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let initial_rank = Rank::new(50);
+    let updated_rank = Rank::new(75);
     let role = owner_team
-        .create_role(text!("mutable_role"), Rank::new(50))
+        .create_role(text!("mutable_role"), initial_rank)
         .await?;
 
-    let role_bytes: [u8; 32] = role.id.into();
-    let role_obj: ObjectId = role_bytes.into();
+    let role_obj: ObjectId = role.id.into();
 
     owner_team
-        .change_rank(role_obj, Rank::new(50), Rank::new(75))
+        .change_rank(role_obj, initial_rank, updated_rank)
         .await?;
 
     let new_rank = owner_team.query_rank(role_obj).await?;
-    assert_eq!(new_rank, Rank::new(75));
+    assert_eq!(new_rank, updated_rank);
 
     Ok(())
 }
@@ -1830,9 +1830,11 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
-    // Create a role with rank 750 (higher than operator device rank 699)
+    // Create a role with rank higher than the operator device rank
+    let high_role_rank = Rank::new(750);
+    let operator_device_rank = Rank::new(699);
     let high_role = owner_team
-        .create_role(text!("high_role"), Rank::new(750))
+        .create_role(text!("high_role"), high_role_rank)
         .await?;
 
     // Add operator device and sync
@@ -1840,7 +1842,7 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
         .add_device_with_rank(
             devices.operator.pk.clone(),
             Some(roles.operator().id),
-            Rank::new(699),
+            operator_device_rank,
         )
         .await?;
 
@@ -1852,12 +1854,11 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let role_bytes: [u8; 32] = high_role.id.into();
-    let role_obj: ObjectId = role_bytes.into();
+    let role_obj: ObjectId = high_role.id.into();
 
-    // Operator (rank 699) tries to change rank of object with rank 750 -- should fail
+    // Operator tries to change rank of object ranked above it -- should fail
     match operator_team
-        .change_rank(role_obj, Rank::new(750), Rank::new(600))
+        .change_rank(role_obj, high_role_rank, Rank::new(600))
         .await
     {
         Ok(_) => bail!("expected change_rank to fail when author rank < object rank"),
@@ -1941,22 +1942,21 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
 
-    // Add admin with member role (rank 600) and device rank 599
+    // Add admin with member role and device rank below the role rank
+    let device_rank = Rank::new(599);
     owner_team
         .add_device_with_rank(
             devices.admin.pk.clone(),
             Some(roles.member().id),
-            Rank::new(599),
+            device_rank,
         )
         .await?;
 
-    let device_bytes: [u8; 32] = devices.admin.id.into();
-    let device_obj: ObjectId = device_bytes.into();
+    let device_obj: ObjectId = devices.admin.id.into();
 
-    // Try to change device rank to 700 (above member role rank 600)
-    // Should fail: role_rank (600) >= new_device_rank (700) is false
+    // Try to change device rank above its role rank -- should fail
     match owner_team
-        .change_rank(device_obj, Rank::new(599), Rank::new(700))
+        .change_rank(device_obj, device_rank, Rank::new(700))
         .await
     {
         Ok(_) => bail!("expected change_rank to fail when new rank > role rank"),
@@ -2040,17 +2040,20 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
-    // Owner creates a role at rank 50
+    let low_role_rank = Rank::new(50);
+    let operator_device_rank = Rank::new(699);
+
+    // Owner creates a role at low rank
     let role = owner_team
-        .create_role(text!("low_role"), Rank::new(50))
+        .create_role(text!("low_role"), low_role_rank)
         .await?;
 
-    // Add operator (rank 699) with ChangeRank perm
+    // Add operator with ChangeRank perm
     owner_team
         .add_device_with_rank(
             devices.operator.pk.clone(),
             Some(roles.operator().id),
-            Rank::new(699),
+            operator_device_rank,
         )
         .await?;
     owner_team
@@ -2060,12 +2063,11 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let role_bytes: [u8; 32] = role.id.into();
-    let role_obj: ObjectId = role_bytes.into();
+    let role_obj: ObjectId = role.id.into();
 
-    // Operator (rank 699) tries to change role rank from 50 to 800 (above operator's rank)
+    // Operator tries to change role rank to above operator's rank -- should fail
     match operator_team
-        .change_rank(role_obj, Rank::new(50), Rank::new(800))
+        .change_rank(role_obj, low_role_rank, Rank::new(800))
         .await
     {
         Ok(_) => bail!("expected change_rank to fail when new_rank > author_rank"),
@@ -2082,24 +2084,25 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
 async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_stale_old_rank_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
-    let _roles = devices.setup_default_roles(team_id).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
 
+    let initial_rank = Rank::new(50);
+    let updated_rank = Rank::new(75);
     let role = owner_team
-        .create_role(text!("versioned_role"), Rank::new(50))
+        .create_role(text!("versioned_role"), initial_rank)
         .await?;
-    let role_bytes: [u8; 32] = role.id.into();
-    let role_obj: ObjectId = role_bytes.into();
+    let role_obj: ObjectId = role.id.into();
 
-    // Change rank from 50 to 75
+    // Change rank from initial to updated
     owner_team
-        .change_rank(role_obj, Rank::new(50), Rank::new(75))
+        .change_rank(role_obj, initial_rank, updated_rank)
         .await?;
 
-    // Try to change rank using stale old_rank (50 instead of current 75)
+    // Try to change rank using stale old_rank (initial instead of current updated)
     match owner_team
-        .change_rank(role_obj, Rank::new(50), Rank::new(100))
+        .change_rank(role_obj, initial_rank, Rank::new(100))
         .await
     {
         Ok(_) => bail!("expected change_rank to fail with stale old_rank"),
@@ -2121,24 +2124,25 @@ async fn test_change_rank_self_demotion() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let admin_team = devices.admin.client.team(team_id);
 
-    // Add admin (rank 799) -- admin default role already has ChangeRank
+    // Add admin -- admin default role already has ChangeRank
+    let admin_rank = Rank::new(799);
+    let demoted_rank = Rank::new(500);
     owner_team
         .add_device_with_rank(
             devices.admin.pk.clone(),
             Some(roles.admin().id),
-            Rank::new(799),
+            admin_rank,
         )
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    let device_bytes: [u8; 32] = devices.admin.id.into();
-    let device_obj: ObjectId = device_bytes.into();
+    let device_obj: ObjectId = devices.admin.id.into();
 
-    // Admin demotes itself from rank 799 to 500
+    // Admin demotes itself
     admin_team
-        .change_rank(device_obj, Rank::new(799), Rank::new(500))
+        .change_rank(device_obj, admin_rank, demoted_rank)
         .await
         .context("device should be able to demote its own rank")?;
 
@@ -2148,7 +2152,7 @@ async fn test_change_rank_self_demotion() -> Result<()> {
         .sync_now(devices.admin.aranya_local_addr().await?, None)
         .await?;
     let new_rank = owner_team.query_rank(device_obj).await?;
-    assert_eq!(new_rank, Rank::new(500));
+    assert_eq!(new_rank, demoted_rank);
 
     Ok(())
 }
@@ -2339,8 +2343,7 @@ async fn test_deprecated_add_device() -> Result<()> {
     assert!(team_devices.iter().any(|d| *d == devices.admin.id));
 
     // Verify default rank is role_rank - 1 (admin role rank 800 - 1 = 799)
-    let device_bytes: [u8; 32] = devices.admin.id.into();
-    let device_obj: ObjectId = device_bytes.into();
+    let device_obj: ObjectId = devices.admin.id.into();
     let rank = owner_team.query_rank(device_obj).await?;
     assert_eq!(
         rank,
@@ -2399,8 +2402,7 @@ async fn test_deprecated_create_label() -> Result<()> {
     assert!(label.is_some(), "label should exist");
 
     // Verify default rank is author_rank - 1 (owner device rank 1000000 - 1 = 999999)
-    let label_bytes: [u8; 32] = label_id.into();
-    let label_obj: ObjectId = label_bytes.into();
+    let label_obj: ObjectId = label_id.into();
     let rank = owner_team.query_rank(label_obj).await?;
     assert_eq!(
         rank,

@@ -1,6 +1,6 @@
 use std::vec;
 
-use aranya_daemon_api::{self as api, Rank};
+use aranya_daemon_api::{self as api};
 use aranya_id::custom_id;
 use aranya_policy_text::Text;
 
@@ -15,6 +15,13 @@ custom_id! {
 }
 impl ApiId<api::LabelId> for LabelId {}
 
+impl From<LabelId> for aranya_daemon_api::ObjectId {
+    fn from(id: LabelId) -> Self {
+        let bytes: [u8; 32] = id.into();
+        bytes.into()
+    }
+}
+
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[non_exhaustive]
@@ -23,12 +30,6 @@ pub struct Label {
     pub id: LabelId,
     /// The human-readable label name.
     pub name: Text,
-    /// The label's rank in the authorization hierarchy.
-    ///
-    /// Populated when available (e.g., on creation). Use
-    /// [`Team::query_rank`](crate::client::team::Team::query_rank)
-    /// to retrieve the rank for labels returned by queries.
-    pub rank: Option<Rank>,
     /// The device that created the label.
     pub author_id: DeviceId,
 }
@@ -38,7 +39,6 @@ impl Label {
         Self {
             id: LabelId::from_api(v.id),
             name: v.name,
-            rank: v.rank,
             author_id: DeviceId::from_api(v.author_id),
         }
     }

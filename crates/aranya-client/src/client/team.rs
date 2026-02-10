@@ -236,20 +236,20 @@ impl Team<'_> {
     ///
     /// The `owning_role` parameter is accepted for backward
     /// compatibility but is ignored in the rank-based authorization
-    /// model. Use [`Self::setup_default_roles_no_owner`] instead.
+    /// model. Use [`Self::setup_default_roles_no_owning_role`] instead.
     ///
     /// It returns the roles that were created.
-    #[deprecated(note = "use `setup_default_roles_no_owner` instead")]
+    #[deprecated(note = "use `setup_default_roles_no_owning_role` instead")]
     #[instrument(skip(self))]
     pub async fn setup_default_roles(&self, _owning_role: RoleId) -> Result<Roles> {
-        self.setup_default_roles_no_owner().await
+        self.setup_default_roles_no_owning_role().await
     }
 
     /// Sets up the default team roles.
     ///
     /// It returns the roles that were created.
     #[instrument(skip(self))]
-    pub async fn setup_default_roles_no_owner(&self) -> Result<Roles> {
+    pub async fn setup_default_roles_no_owning_role(&self) -> Result<Roles> {
         let roles = self
             .client
             .daemon
@@ -321,7 +321,7 @@ impl Team<'_> {
         Ok(())
     }
 
-    /// Changes the rank of an object (device, role, or label).
+    /// Changes the rank of an object.
     #[instrument(skip(self))]
     pub async fn change_rank(
         &self,
@@ -337,7 +337,7 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Queries the rank of an object (device, role, or label).
+    /// Queries the rank of an object.
     #[instrument(skip(self))]
     pub async fn query_rank(&self, object_id: ObjectId) -> Result<Rank> {
         self.client
@@ -368,15 +368,12 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
-    /// Returns the roles that own the given role.
-    ///
-    /// Role ownership has been replaced by rank-based authorization.
-    /// This method always returns an empty list. Use
-    /// [`Self::query_rank`] instead.
-    #[deprecated(note = "role ownership replaced by rank-based authorization; use `query_rank`")]
+    /// Deprecated: the `role` parameter is ignored and the returned
+    /// [`Roles`] is always empty. Use [`Self::query_rank`] instead.
+    #[deprecated(note = "use `query_rank` instead")]
     pub async fn role_owners(&self, _role: RoleId) -> Result<Roles> {
         tracing::warn!(
-            "role_owners is deprecated and always returns empty; use query_rank instead"
+            "role_owners is deprecated; use query_rank instead"
         );
         Ok(Roles {
             roles: Vec::new().into(),

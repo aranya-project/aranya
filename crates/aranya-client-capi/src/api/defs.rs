@@ -458,9 +458,7 @@ impl From<&LabelId> for aranya_client::LabelId {
     }
 }
 
-/// A generic object ID that can refer to a device, role, or label.
-///
-/// Used with [`change_rank`] and [`query_rank`].
+/// An identifier for any object defined in the Aranya policy.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ObjectId {
@@ -480,24 +478,6 @@ impl From<aranya_client::ObjectId> for ObjectId {
 impl From<&ObjectId> for aranya_client::ObjectId {
     fn from(value: &ObjectId) -> Self {
         value.id.bytes.into()
-    }
-}
-
-impl From<&DeviceId> for ObjectId {
-    fn from(value: &DeviceId) -> Self {
-        Self { id: value.id }
-    }
-}
-
-impl From<&RoleId> for ObjectId {
-    fn from(value: &RoleId) -> Self {
-        Self { id: value.id }
-    }
-}
-
-impl From<&LabelId> for ObjectId {
-    fn from(value: &LabelId) -> Self {
-        Self { id: value.id }
     }
 }
 
@@ -1220,7 +1200,7 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-#[deprecated(note = "use `setup_default_roles_no_owner` instead")]
+#[deprecated(note = "use `setup_default_roles_no_owning_role` instead")]
 #[allow(deprecated)]
 pub unsafe fn setup_default_roles(
     client: &mut Client,
@@ -1275,7 +1255,7 @@ pub unsafe fn setup_default_roles(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub unsafe fn setup_default_roles_no_owner(
+pub unsafe fn setup_default_roles_no_owning_role(
     client: &mut Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
@@ -1287,7 +1267,7 @@ pub unsafe fn setup_default_roles_no_owner(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles_no_owner(),
+                .setup_default_roles_no_owning_role(),
         )?
         .__into_data();
 
@@ -1307,43 +1287,24 @@ pub unsafe fn setup_default_roles_no_owner(
     Ok(())
 }
 
-/// Returns the roles that own a given role.
-///
-/// Role ownership has been replaced by rank-based authorization.
-/// This function always returns an empty list.
+/// Deprecated: always returns an empty list. Use [`query_rank`] instead.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] role the ID of the subject role
-/// @param[out] roles_out returns a list of roles that own `role`
-/// @param[in,out] roles_len the number of roles written to the buffer.
+/// @param[out] roles_out unused, always returns an empty list
+/// @param[in,out] roles_len set to 0 on return
 ///
 /// @relates AranyaClient.
-#[deprecated(note = "role ownership replaced by rank-based authorization; use `query_rank`")]
-#[allow(deprecated)]
+#[deprecated(note = "use `query_rank` instead")]
 pub unsafe fn role_owners(
-    client: &Client,
-    team: &TeamId,
-    role: &RoleId,
-    roles_out: *mut MaybeUninit<Role>,
+    _client: &Client,
+    _team: &TeamId,
+    _role: &RoleId,
+    _roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let owning_roles = client
-        .rt
-        .block_on(client.inner.team(team.into()).role_owners(role.into()))?
-        .__into_data();
-
-    if *roles_len < owning_roles.len() {
-        *roles_len = owning_roles.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *roles_len = owning_roles.len();
-    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
-
-    for (dst, src) in out.iter_mut().zip(owning_roles) {
-        Role::init(dst, src);
-    }
-
+    *roles_len = 0;
     Ok(())
 }
 
@@ -1650,12 +1611,18 @@ pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Resul
     Ok(())
 }
 
-/// Change the rank of an object (device, role, or label).
+/// Change the rank of an object.
 ///
-/// The caller must know the current rank of the object. The caller's
-/// rank must be strictly greater than both the old and new rank.
+/// The caller must provide the current rank of the object (`old_rank`)
+/// to guard against concurrent changes by other devices. If another
+/// device changes the rank before this command is applied, the
+/// operation will fail rather than silently overwriting the new value.
+/// This preserves the caller's intent to only change the rank under
+/// expected conditions.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// The caller's rank must be strictly greater than both the old and
+/// new rank. Permission to perform this operation is checked against
+/// the Aranya policy.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1681,7 +1648,7 @@ pub fn change_rank(
     Ok(())
 }
 
-/// Query the rank of an object (device, role, or label).
+/// Query the rank of an object.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID

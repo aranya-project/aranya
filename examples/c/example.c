@@ -401,7 +401,7 @@ AranyaError init_team(Team *t) {
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.
-    err = aranya_setup_default_roles_no_owner(&owner->client, &t->id,
+    err = aranya_setup_default_roles_no_owning_role(&owner->client, &t->id,
                                               default_roles, &default_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
@@ -1014,9 +1014,11 @@ AranyaError run_custom_roles_example(Team *t) {
         goto exit;
     }
 
-    // Create a custom role with rank 50.
+    // Create a custom role.
+    const int64_t buddy_initial_rank = 50;
+    const int64_t buddy_updated_rank = 75;
     AranyaRole buddy_role;
-    err = aranya_create_role(&owner->client, &t->id, "buddy", 50, &buddy_role);
+    err = aranya_create_role(&owner->client, &t->id, "buddy", buddy_initial_rank, &buddy_role);
     EXPECT("unable to create role", err);
     AranyaRoleId buddy_role_id;
     err = aranya_role_get_id(&buddy_role, &buddy_role_id);
@@ -1029,7 +1031,7 @@ AranyaError run_custom_roles_example(Team *t) {
     EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
-    // Demo change_rank/query_rank: change the buddy role's rank from 50 to 75.
+    // Demo change_rank/query_rank: change the buddy role's rank.
     AranyaObjectId buddy_object_id;
     memcpy(buddy_object_id.id.bytes, buddy_role_id.id.bytes, ARANYA_ID_LEN);
 
@@ -1038,15 +1040,17 @@ AranyaError run_custom_roles_example(Team *t) {
                             &current_rank);
     EXPECT("unable to query rank of 'buddy' role", err);
     printf("buddy role rank before change: %lld\n", (long long)current_rank);
-    if (current_rank != 50) {
-        fprintf(stderr, "expected buddy role rank to be 50, got %lld\n",
-                (long long)current_rank);
+    if (current_rank != buddy_initial_rank) {
+        fprintf(stderr, "expected buddy role rank to be %lld, got %lld\n",
+                (long long)buddy_initial_rank, (long long)current_rank);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
 
-    printf("changing buddy role rank from 50 to 75\n");
-    err = aranya_change_rank(&owner->client, &t->id, &buddy_object_id, 50, 75);
+    printf("changing buddy role rank from %lld to %lld\n",
+           (long long)buddy_initial_rank, (long long)buddy_updated_rank);
+    err = aranya_change_rank(&owner->client, &t->id, &buddy_object_id,
+                             buddy_initial_rank, buddy_updated_rank);
     EXPECT("unable to change rank of 'buddy' role", err);
 
     int64_t new_rank = 0;
@@ -1054,9 +1058,9 @@ AranyaError run_custom_roles_example(Team *t) {
         aranya_query_rank(&owner->client, &t->id, &buddy_object_id, &new_rank);
     EXPECT("unable to query new rank of 'buddy' role", err);
     printf("buddy role rank after change: %lld\n", (long long)new_rank);
-    if (new_rank != 75) {
-        fprintf(stderr, "expected buddy role rank to be 75, got %lld\n",
-                (long long)new_rank);
+    if (new_rank != buddy_updated_rank) {
+        fprintf(stderr, "expected buddy role rank to be %lld, got %lld\n",
+                (long long)buddy_updated_rank, (long long)new_rank);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }

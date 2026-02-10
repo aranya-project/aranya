@@ -783,7 +783,6 @@ impl DaemonApi for Api {
                 labels.push(api::Label {
                     id: api::LabelId::from_base(e.label_id),
                     name: e.label_name,
-                    rank: None,
                     author_id: api::DeviceId::from_base(e.label_author_id),
                 });
             }
@@ -813,7 +812,6 @@ impl DaemonApi for Api {
                 id: api::RoleId::from_base(e.role_id),
                 name: e.name.clone(),
                 author_id: api::DeviceId::from_base(e.author_id),
-                rank: None,
                 default: e.default,
             }))
         } else {
@@ -844,7 +842,6 @@ impl DaemonApi for Api {
                 id: api::RoleId::from_base(e.role_id),
                 name: e.name.clone(),
                 author_id: api::DeviceId::from_base(e.author_id),
-                rank: Some(api::Rank::new(e.rank)),
                 default: e.default,
             })
         } else {
@@ -1169,7 +1166,6 @@ impl DaemonApi for Api {
             Ok(Some(api::Label {
                 id: api::LabelId::from_base(e.label_id),
                 name: e.label_name.clone(),
-                rank: None,
                 author_id: api::DeviceId::from_base(e.label_author_id),
             }))
         } else {
@@ -1194,7 +1190,6 @@ impl DaemonApi for Api {
                 labels.push(api::Label {
                     id: api::LabelId::from_base(e.label_id),
                     name: e.label_name.clone(),
-                    rank: None,
                     author_id: api::DeviceId::from_base(e.label_author_id),
                 });
             }
@@ -1226,7 +1221,6 @@ impl DaemonApi for Api {
                         id: api::RoleId::from_base(e.role_id),
                         name: e.name,
                         author_id: api::DeviceId::from_base(e.author_id),
-                        rank: Some(api::Rank::new(e.rank)),
                         default: e.default,
                     })
                 } else {
@@ -1260,7 +1254,6 @@ impl DaemonApi for Api {
                         id: api::RoleId::from_base(e.role_id),
                         name: e.name,
                         author_id: api::DeviceId::from_base(e.author_id),
-                        rank: None,
                         default: e.default,
                     })
                 } else {
@@ -1282,7 +1275,7 @@ impl DaemonApi for Api {
         context: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        perm: api::SimplePerm,
+        perm: api::Perm,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
@@ -1303,7 +1296,7 @@ impl DaemonApi for Api {
         context: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        perm: api::SimplePerm,
+        perm: api::Perm,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
@@ -1465,48 +1458,48 @@ impl From<ChanOp> for api::ChanOp {
     }
 }
 
-impl From<api::SimplePerm> for Perm {
-    fn from(value: api::SimplePerm) -> Self {
+impl From<api::Perm> for Perm {
+    fn from(value: api::Perm) -> Self {
         match value {
-            api::SimplePerm::AddDevice => Perm::AddDevice,
-            api::SimplePerm::RemoveDevice => Perm::RemoveDevice,
-            api::SimplePerm::TerminateTeam => Perm::TerminateTeam,
-            api::SimplePerm::ChangeRank => Perm::ChangeRank,
-            api::SimplePerm::CreateRole => Perm::CreateRole,
-            api::SimplePerm::DeleteRole => Perm::DeleteRole,
-            api::SimplePerm::AssignRole => Perm::AssignRole,
-            api::SimplePerm::RevokeRole => Perm::RevokeRole,
-            api::SimplePerm::ChangeRolePerms => Perm::ChangeRolePerms,
-            api::SimplePerm::SetupDefaultRole => Perm::SetupDefaultRole,
-            api::SimplePerm::CreateLabel => Perm::CreateLabel,
-            api::SimplePerm::DeleteLabel => Perm::DeleteLabel,
-            api::SimplePerm::AssignLabel => Perm::AssignLabel,
-            api::SimplePerm::RevokeLabel => Perm::RevokeLabel,
-            api::SimplePerm::CanUseAfc => Perm::CanUseAfc,
-            api::SimplePerm::CreateAfcUniChannel => Perm::CreateAfcUniChannel,
+            api::Perm::AddDevice => Perm::AddDevice,
+            api::Perm::RemoveDevice => Perm::RemoveDevice,
+            api::Perm::TerminateTeam => Perm::TerminateTeam,
+            api::Perm::ChangeRank => Perm::ChangeRank,
+            api::Perm::CreateRole => Perm::CreateRole,
+            api::Perm::DeleteRole => Perm::DeleteRole,
+            api::Perm::AssignRole => Perm::AssignRole,
+            api::Perm::RevokeRole => Perm::RevokeRole,
+            api::Perm::ChangeRolePerms => Perm::ChangeRolePerms,
+            api::Perm::SetupDefaultRole => Perm::SetupDefaultRole,
+            api::Perm::CreateLabel => Perm::CreateLabel,
+            api::Perm::DeleteLabel => Perm::DeleteLabel,
+            api::Perm::AssignLabel => Perm::AssignLabel,
+            api::Perm::RevokeLabel => Perm::RevokeLabel,
+            api::Perm::CanUseAfc => Perm::CanUseAfc,
+            api::Perm::CreateAfcUniChannel => Perm::CreateAfcUniChannel,
         }
     }
 }
 
-impl From<Perm> for api::SimplePerm {
+impl From<Perm> for api::Perm {
     fn from(value: Perm) -> Self {
         match value {
-            Perm::AddDevice => api::SimplePerm::AddDevice,
-            Perm::RemoveDevice => api::SimplePerm::RemoveDevice,
-            Perm::TerminateTeam => api::SimplePerm::TerminateTeam,
-            Perm::ChangeRank => api::SimplePerm::ChangeRank,
-            Perm::CreateRole => api::SimplePerm::CreateRole,
-            Perm::DeleteRole => api::SimplePerm::DeleteRole,
-            Perm::AssignRole => api::SimplePerm::AssignRole,
-            Perm::RevokeRole => api::SimplePerm::RevokeRole,
-            Perm::ChangeRolePerms => api::SimplePerm::ChangeRolePerms,
-            Perm::SetupDefaultRole => api::SimplePerm::SetupDefaultRole,
-            Perm::CreateLabel => api::SimplePerm::CreateLabel,
-            Perm::DeleteLabel => api::SimplePerm::DeleteLabel,
-            Perm::AssignLabel => api::SimplePerm::AssignLabel,
-            Perm::RevokeLabel => api::SimplePerm::RevokeLabel,
-            Perm::CanUseAfc => api::SimplePerm::CanUseAfc,
-            Perm::CreateAfcUniChannel => api::SimplePerm::CreateAfcUniChannel,
+            Perm::AddDevice => api::Perm::AddDevice,
+            Perm::RemoveDevice => api::Perm::RemoveDevice,
+            Perm::TerminateTeam => api::Perm::TerminateTeam,
+            Perm::ChangeRank => api::Perm::ChangeRank,
+            Perm::CreateRole => api::Perm::CreateRole,
+            Perm::DeleteRole => api::Perm::DeleteRole,
+            Perm::AssignRole => api::Perm::AssignRole,
+            Perm::RevokeRole => api::Perm::RevokeRole,
+            Perm::ChangeRolePerms => api::Perm::ChangeRolePerms,
+            Perm::SetupDefaultRole => api::Perm::SetupDefaultRole,
+            Perm::CreateLabel => api::Perm::CreateLabel,
+            Perm::DeleteLabel => api::Perm::DeleteLabel,
+            Perm::AssignLabel => api::Perm::AssignLabel,
+            Perm::RevokeLabel => api::Perm::RevokeLabel,
+            Perm::CanUseAfc => api::Perm::CanUseAfc,
+            Perm::CreateAfcUniChannel => api::Perm::CreateAfcUniChannel,
         }
     }
 }

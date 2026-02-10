@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
             panic!("unexpected roles");
         }
         assert_eq!(owner_role.name, "owner");
-        team.setup_default_roles_no_owner()
+        team.setup_default_roles_no_owning_role()
             .await
             .expect("could not set up default roles");
     }

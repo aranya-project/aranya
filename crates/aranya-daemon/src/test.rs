@@ -314,8 +314,6 @@ impl TestCtx {
         let memberb = team.memberb;
 
         // team setup - first setup default roles
-        let _team_id = TeamId::from(*owner.graph_id.as_array());
-
         // Get owner role ID from existing roles
         let role_effects = owner.actions().query_team_roles().await?;
         let roles: Vec<_> = role_effects
@@ -327,14 +325,13 @@ impl TestCtx {
                         name: result.name,
                         author_id: aranya_daemon_api::DeviceId::from_base(result.author_id),
                         default: result.default,
-                        rank: None, // Rank not included in QueryTeamRolesResult, use query_rank separately if needed
                     })
                 } else {
                     None
                 }
             })
             .collect();
-        let _owner_role = roles
+        roles
             .into_iter()
             .find(|role| role.name.as_str() == "owner" && role.default)
             .context("owner role not found")?;
@@ -357,7 +354,6 @@ impl TestCtx {
                         name: result.name,
                         author_id: aranya_daemon_api::DeviceId::from_base(result.author_id),
                         default: result.default,
-                        rank: None, // Rank not included in QueryTeamRolesResult, use query_rank separately if needed
                     })
                 } else {
                     None
@@ -795,7 +791,7 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
     let operator = team.operator;
 
     let roles = load_default_roles(owner).await?;
-    let _owner_role = role_id_by_name(&roles, "owner");
+    role_id_by_name(&roles, "owner");
 
     let effects = owner
         .actions()

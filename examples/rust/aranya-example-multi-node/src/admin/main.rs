@@ -111,8 +111,7 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let _label1 = team
-        .create_label_with_rank(text!("label1"), aranya_client::Rank::new(100))
+    team.create_label_with_rank(text!("label1"), aranya_client::Rank::new(100))
         .await?;
     info!("admin: created label");
 

@@ -197,7 +197,7 @@ impl DevicesCtx {
     }
 
     /// NB: This includes the owner role, which is not returned
-    /// by [`Client::setup_default_roles_no_owner`].
+    /// by [`Client::setup_default_roles_no_owning_role`].
     #[instrument(skip(self))]
     pub async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
         self.owner.setup_default_roles(team_id).await
@@ -315,7 +315,7 @@ impl DeviceCtx {
         let setup_roles = self
             .client
             .team(team_id)
-            .setup_default_roles_no_owner()
+            .setup_default_roles_no_owning_role()
             .await?;
 
         let roles = setup_roles

@@ -237,7 +237,7 @@ async fn main() -> Result<()> {
 
     // Create default roles
     info!("creating default roles");
-    let _owner_role = owner
+    owner
         .client
         .team(team_id)
         .roles()
@@ -245,7 +245,7 @@ async fn main() -> Result<()> {
         .into_iter()
         .find(|role| role.name == "owner" && role.default)
         .context("unable to find owner role")?;
-    let roles = owner_team.setup_default_roles_no_owner().await?;
+    let roles = owner_team.setup_default_roles_no_owning_role().await?;
     let admin_role = roles
         .iter()
         .find(|r| r.name == "admin")
@@ -396,14 +396,15 @@ async fn main() -> Result<()> {
     // Create a custom role.
     info!("creating a custom role");
     let custom = ClientCtx::new(team_name, "custom", &daemon_path).await?;
+    let custom_role_rank = Rank::new(50);
     let custom_role = owner_team
-        .create_role(text!("custom_role"), Rank::new(50))
+        .create_role(text!("custom_role"), custom_role_rank)
         .await?;
 
     // Add device to team to assign custom role to.
     info!("adding device to team to assign custom role to");
     owner_team
-        .add_device_with_rank(custom.pk.clone(), None, Rank::new(50))
+        .add_device_with_rank(custom.pk.clone(), None, custom_role_rank)
         .await?;
 
     // Add `CanUseAfc` permission to the custom role.
@@ -418,21 +419,22 @@ async fn main() -> Result<()> {
         .assign_role(custom_role.id)
         .await?;
 
-    // Demo change_rank/query_rank: change the custom role's rank from 50 to 75.
-    let role_bytes: [u8; 32] = custom_role.id.into();
-    let role_object_id: ObjectId = role_bytes.into();
+    // Demo change_rank/query_rank: verify the role has the rank it was created with,
+    // then change it.
+    let role_object_id: ObjectId = custom_role.id.into();
     let current_rank = owner_team.query_rank(role_object_id).await?;
     info!("custom role rank before change: {}", current_rank);
-    assert_eq!(current_rank, Rank::new(50));
+    assert_eq!(current_rank, custom_role_rank);
 
-    info!("changing custom role rank from 50 to 75");
+    let updated_role_rank = Rank::new(75);
+    info!("changing custom role rank from {} to {}", custom_role_rank, updated_role_rank);
     owner_team
-        .change_rank(role_object_id, Rank::new(50), Rank::new(75))
+        .change_rank(role_object_id, custom_role_rank, updated_role_rank)
         .await?;
 
     let new_rank = owner_team.query_rank(role_object_id).await?;
     info!("custom role rank after change: {}", new_rank);
-    assert_eq!(new_rank, Rank::new(75));
+    assert_eq!(new_rank, updated_role_rank);
 
     // Revoke custom role from a device.
     info!("revoking custom role from a device");
