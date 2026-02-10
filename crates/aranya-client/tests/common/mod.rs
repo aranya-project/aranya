@@ -303,10 +303,7 @@ impl DeviceCtx {
     }
 
     #[instrument(skip(self))]
-    pub(crate) async fn setup_default_roles(
-        &self,
-        team_id: TeamId,
-    ) -> Result<DefaultRoles> {
+    pub(crate) async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
         let owner_role = self
             .client
             .team(team_id)

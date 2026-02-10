@@ -11,6 +11,8 @@ use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
 #[doc(inline)]
 pub use aranya_daemon_api::ChanOp;
+#[doc(inline)]
+pub use aranya_daemon_api::SimplePerm as Permission;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
@@ -18,8 +20,6 @@ use aranya_daemon_api::{
     },
     DaemonApiClient, Version, CS,
 };
-#[doc(inline)]
-pub use aranya_daemon_api::SimplePerm as Permission;
 use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};

@@ -399,7 +399,11 @@ async fn test_add_devices() -> Result<()> {
     // Add the initial admin who should be allowed to add
     // devices.
     owner
-        .add_device_with_rank(team.admin.pk.clone(), Some(roles.admin().id), Rank::new(799))
+        .add_device_with_rank(
+            team.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(799),
+        )
         .await
         .context("owner should be able to add admin to team")?;
 
@@ -479,7 +483,11 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
 
     // Add admin with rank 799 (outranks member role at rank 600).
     owner_team
-        .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), Rank::new(799))
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(799),
+        )
         .await
         .context("owner should be able to add admin to team")?;
 
@@ -491,17 +499,27 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
     // Admin (rank 799) should succeed at adding membera with member role
     // because admin outranks the member role and has both AddDevice and AssignRole perms.
     admin_team
-        .add_device_with_rank(devices.membera.pk.clone(), Some(roles.member().id), Rank::new(599))
+        .add_device_with_rank(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            Rank::new(599),
+        )
         .await
         .context("admin should be able to add device with member role (admin outranks member)")?;
 
     // Admin (rank 799) should fail when trying to add a device with the owner role
     // because admin does not outrank the owner role.
     match admin_team
-        .add_device_with_rank(devices.memberb.pk.clone(), Some(roles.owner().id), Rank::new(900))
+        .add_device_with_rank(
+            devices.memberb.pk.clone(),
+            Some(roles.owner().id),
+            Rank::new(900),
+        )
         .await
     {
-        Ok(_) => bail!("expected add_device with owner role to fail (admin does not outrank owner)"),
+        Ok(_) => {
+            bail!("expected add_device with owner role to fail (admin does not outrank owner)")
+        }
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected error: {err:?}"),
     }
@@ -1390,9 +1408,7 @@ async fn test_create_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
 
@@ -1411,7 +1427,11 @@ async fn test_create_role() -> Result<()> {
     // Set up another device, sync it, and make sure they can see the
     // role.
     owner_team
-        .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), Rank::new(799))
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(799),
+        )
         .await?;
     let admin_team = devices.admin.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -1540,9 +1560,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -1577,9 +1595,7 @@ async fn test_delete_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     owner_team
@@ -1596,9 +1612,7 @@ async fn test_assign_role_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
@@ -1620,9 +1634,7 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     match owner_team
@@ -1749,7 +1761,9 @@ async fn test_create_role_with_rank() -> Result<()> {
     let _roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let role = owner_team.create_role(text!("ranked_role"), Rank::new(50)).await?;
+    let role = owner_team
+        .create_role(text!("ranked_role"), Rank::new(50))
+        .await?;
 
     let role_bytes: [u8; 32] = role.id.into();
     let role_obj: ObjectId = role_bytes.into();
@@ -1768,7 +1782,9 @@ async fn test_create_label_with_rank() -> Result<()> {
     let _roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let label_id = owner_team.create_label_with_rank(text!("ranked_label"), Rank::new(50)).await?;
+    let label_id = owner_team
+        .create_label_with_rank(text!("ranked_label"), Rank::new(50))
+        .await?;
 
     let label_bytes: [u8; 32] = label_id.into();
     let label_obj: ObjectId = label_bytes.into();
@@ -1786,12 +1802,16 @@ async fn test_change_rank() -> Result<()> {
     let _roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let role = owner_team.create_role(text!("mutable_role"), Rank::new(50)).await?;
+    let role = owner_team
+        .create_role(text!("mutable_role"), Rank::new(50))
+        .await?;
 
     let role_bytes: [u8; 32] = role.id.into();
     let role_obj: ObjectId = role_bytes.into();
 
-    owner_team.change_rank(role_obj, Rank::new(50), Rank::new(75)).await?;
+    owner_team
+        .change_rank(role_obj, Rank::new(50), Rank::new(75))
+        .await?;
 
     let new_rank = owner_team.query_rank(role_obj).await?;
     assert_eq!(new_rank, Rank::new(75));
@@ -1811,7 +1831,9 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let operator_team = devices.operator.client.team(team_id);
 
     // Create a role with rank 750 (higher than operator device rank 699)
-    let high_role = owner_team.create_role(text!("high_role"), Rank::new(750)).await?;
+    let high_role = owner_team
+        .create_role(text!("high_role"), Rank::new(750))
+        .await?;
 
     // Add operator device and sync
     owner_team
@@ -1949,8 +1971,7 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
 /// removing devices, deleting roles, or deleting labels.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
-    let mut devices =
-        DevicesCtx::new("test_insufficient_rank_cannot_operate_on_objects").await?;
+    let mut devices = DevicesCtx::new("test_insufficient_rank_cannot_operate_on_objects").await?;
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
 
@@ -2012,8 +2033,7 @@ async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
 /// Tests that change_rank fails when the new_rank exceeds the author's own rank.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
-    let mut devices =
-        DevicesCtx::new("test_change_rank_new_rank_above_author_rejected").await?;
+    let mut devices = DevicesCtx::new("test_change_rank_new_rank_above_author_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
 
@@ -2181,8 +2201,7 @@ async fn test_equal_rank_cannot_operate() -> Result<()> {
 /// and the target device.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_requires_outranking_both_role_and_device() -> Result<()> {
-    let mut devices =
-        DevicesCtx::new("test_assign_role_requires_outranking_both").await?;
+    let mut devices = DevicesCtx::new("test_assign_role_requires_outranking_both").await?;
     let team_id = devices.create_and_add_team().await?;
     let roles = devices.setup_default_roles(team_id).await?;
 
@@ -2432,4 +2451,3 @@ async fn test_deprecated_add_label_managing_role_noop() -> Result<()> {
 
     Ok(())
 }
-

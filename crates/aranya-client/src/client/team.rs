@@ -1,6 +1,6 @@
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
-use aranya_daemon_api::{self as api, CS, ObjectId, Rank};
+use aranya_daemon_api::{self as api, ObjectId, Rank, CS};
 use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
@@ -8,10 +8,10 @@ use buggy::BugExt as _;
 use tarpc::context;
 use tracing::instrument;
 
-use crate::client::Permission;
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
+        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Permission, Role,
+        RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -114,11 +114,7 @@ impl Team<'_> {
     /// specify an explicit rank.
     #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
-    pub async fn add_device(
-        &self,
-        keys: KeyBundle,
-        initial_role: Option<RoleId>,
-    ) -> Result<()> {
+    pub async fn add_device(&self, keys: KeyBundle, initial_role: Option<RoleId>) -> Result<()> {
         self.client
             .daemon
             .add_device_to_team(
@@ -379,7 +375,9 @@ impl Team<'_> {
     /// [`Self::query_rank`] instead.
     #[deprecated(note = "role ownership replaced by rank-based authorization; use `query_rank`")]
     pub async fn role_owners(&self, _role: RoleId) -> Result<Roles> {
-        tracing::warn!("role_owners is deprecated and always returns empty; use query_rank instead");
+        tracing::warn!(
+            "role_owners is deprecated and always returns empty; use query_rank instead"
+        );
         Ok(Roles {
             roles: Vec::new().into(),
         })
@@ -414,11 +412,7 @@ impl Team<'_> {
 
     /// Create a label with an explicit rank.
     #[instrument(skip(self))]
-    pub async fn create_label_with_rank(
-        &self,
-        label_name: Text,
-        rank: Rank,
-    ) -> Result<LabelId> {
+    pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
         self.client
             .daemon
             .create_label(context::current(), self.id, label_name, Some(rank))

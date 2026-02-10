@@ -8,8 +8,7 @@ use aranya_crypto::{
     Csprng, DeviceId, Rng,
 };
 use aranya_keygen::PublicKeys;
-use aranya_policy_ifgen::{Actionable, VmEffect};
-use aranya_policy_ifgen::BaseId;
+use aranya_policy_ifgen::{Actionable, BaseId, VmEffect};
 use aranya_policy_text::Text;
 #[cfg(feature = "afc")]
 use aranya_runtime::NullSink;
@@ -242,10 +241,7 @@ where
     /// Invokes `query_rank`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_rank(
-        &self,
-        object_id: BaseId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn query_rank(&self, object_id: BaseId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_session_action(policy::query_rank(object_id))
             .map_ok(|SessionData { effects, .. }| effects)
             .in_current_span()
@@ -435,9 +431,7 @@ where
 
     /// Invokes `setup_default_roles`.
     #[instrument(skip(self))]
-    fn setup_default_roles(
-        &self,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::setup_default_roles())
             .in_current_span()
     }

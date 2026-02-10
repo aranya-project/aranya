@@ -325,7 +325,9 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
-    owner.add_device_with_rank(ctx.admin.pk, Some(admin_role.id), Rank::new(100)).await?;
+    owner
+        .add_device_with_rank(ctx.admin.pk, Some(admin_role.id), Rank::new(100))
+        .await?;
 
     info!("adding operator to team");
     owner
@@ -356,7 +358,9 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
-    let label3 = owner.create_label_with_rank(text!("label3"), Rank::new(100)).await?;
+    let label3 = owner
+        .create_label_with_rank(text!("label3"), Rank::new(100))
+        .await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     owner

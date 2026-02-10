@@ -23,6 +23,7 @@ use aranya_daemon_api::{
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
+use aranya_policy_ifgen::BaseId;
 use aranya_runtime::GraphId;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage, StorageProvider};
@@ -46,8 +47,6 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use crate::actions::SessionData;
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
-use aranya_policy_ifgen::BaseId;
-
 use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
@@ -1361,8 +1360,7 @@ impl DaemonApi for Api {
             .await
             .context("unable to query rank")?;
 
-        if let Some(Effect::QueryRankResult(e)) =
-            find_effect!(&effects, Effect::QueryRankResult(_))
+        if let Some(Effect::QueryRankResult(e)) = find_effect!(&effects, Effect::QueryRankResult(_))
         {
             Ok(api::Rank::new(e.rank))
         } else {
@@ -1376,11 +1374,7 @@ impl Api {
     /// Otherwise, queries the command author's (this device's) rank and
     /// returns `author_rank - 1`. Returns an error if the author's rank
     /// cannot be determined.
-    async fn resolve_rank(
-        &self,
-        graph: GraphId,
-        rank: Option<api::Rank>,
-    ) -> anyhow::Result<i64> {
+    async fn resolve_rank(&self, graph: GraphId, rank: Option<api::Rank>) -> anyhow::Result<i64> {
         match rank {
             Some(r) => Ok(r.value()),
             None => {

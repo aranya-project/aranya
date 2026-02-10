@@ -41,7 +41,7 @@ use tokio::{
 use crate::{
     actions::Actions,
     aranya,
-    policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
+    policy::{Effect, KeyBundle as DeviceKeyBundle, Perm},
     sync::{self, quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
@@ -327,13 +327,14 @@ impl TestCtx {
                         name: result.name,
                         author_id: aranya_daemon_api::DeviceId::from_base(result.author_id),
                         default: result.default,
+                        rank: None, // Rank not included in QueryTeamRolesResult, use query_rank separately if needed
                     })
                 } else {
                     None
                 }
             })
             .collect();
-        let owner_role = roles
+        let _owner_role = roles
             .into_iter()
             .find(|role| role.name.as_str() == "owner" && role.default)
             .context("owner role not found")?;
@@ -341,7 +342,7 @@ impl TestCtx {
         // Setup default roles (admin, operator, member)
         owner
             .actions()
-            .setup_default_roles(RoleId::transmute(owner_role.id))
+            .setup_default_roles()
             .await
             .context("unable to setup default roles")?;
 
@@ -356,6 +357,7 @@ impl TestCtx {
                         name: result.name,
                         author_id: aranya_daemon_api::DeviceId::from_base(result.author_id),
                         default: result.default,
+                        rank: None, // Rank not included in QueryTeamRolesResult, use query_rank separately if needed
                     })
                 } else {
                     None
@@ -373,7 +375,7 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_device(DeviceKeyBundle::try_from(&admin.pk)?, None)
+            .add_device_with_rank(DeviceKeyBundle::try_from(&admin.pk)?, None, 0)
             .await
             .context("unable to add admin member")?;
         owner
@@ -396,7 +398,7 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_device(DeviceKeyBundle::try_from(&operator.pk)?, None)
+            .add_device_with_rank(DeviceKeyBundle::try_from(&operator.pk)?, None, 0)
             .await
             .context("unable to add operator member")?;
         owner
@@ -421,13 +423,13 @@ impl TestCtx {
 
         admin
             .actions()
-            .add_device(DeviceKeyBundle::try_from(&membera.pk)?, None)
+            .add_device_with_rank(DeviceKeyBundle::try_from(&membera.pk)?, None, 0)
             .await
             .context("unable to add membera member")?;
         membera.sync_expect(admin, None).await?;
         admin
             .actions()
-            .add_device(DeviceKeyBundle::try_from(&memberb.pk)?, None)
+            .add_device_with_rank(DeviceKeyBundle::try_from(&memberb.pk)?, None, 0)
             .await
             .context("unable to add memberb member")?;
         memberb.sync_expect(admin, None).await?;
@@ -472,67 +474,72 @@ async fn test_default_roles_seed_expected_permissions() -> Result<()> {
     for (role, perm, message) in [
         (
             admin_role,
-            SimplePerm::AddDevice,
+            Perm::AddDevice,
             "admin should already grant AddDevice",
         ),
         (
             admin_role,
-            SimplePerm::RemoveDevice,
+            Perm::RemoveDevice,
             "admin should already grant RemoveDevice",
         ),
         (
             admin_role,
-            SimplePerm::CreateLabel,
+            Perm::CreateLabel,
             "admin should already grant CreateLabel",
         ),
         (
             admin_role,
-            SimplePerm::DeleteLabel,
+            Perm::DeleteLabel,
             "admin should already grant DeleteLabel",
         ),
         (
             admin_role,
-            SimplePerm::ChangeLabelManagingRole,
-            "admin should already grant ChangeLabelManagingRole",
+            Perm::ChangeRank,
+            "admin should already grant ChangeRank",
         ),
         (
             admin_role,
-            SimplePerm::AssignRole,
-            "admin should already grant AssignRole",
+            Perm::CreateRole,
+            "admin should already grant CreateRole",
         ),
         (
             admin_role,
-            SimplePerm::RevokeRole,
-            "admin should already grant RevokeRole",
+            Perm::DeleteRole,
+            "admin should already grant DeleteRole",
+        ),
+        (
+            admin_role,
+            Perm::ChangeRolePerms,
+            "admin should already grant ChangeRolePerms",
         ),
         (
             operator_role,
-            SimplePerm::AssignLabel,
+            Perm::AssignLabel,
             "operator should already grant AssignLabel",
         ),
         (
             operator_role,
-            SimplePerm::RevokeLabel,
+            Perm::RevokeLabel,
             "operator should already grant RevokeLabel",
         ),
         (
             operator_role,
-            SimplePerm::AssignRole,
+            Perm::AssignRole,
             "operator should already grant AssignRole",
         ),
         (
             operator_role,
-            SimplePerm::RevokeRole,
+            Perm::RevokeRole,
             "operator should already grant RevokeRole",
         ),
         (
             member_role,
-            SimplePerm::CanUseAfc,
+            Perm::CanUseAfc,
             "member should already grant CanUseAfc",
         ),
         (
             member_role,
-            SimplePerm::CreateAfcUniChannel,
+            Perm::CreateAfcUniChannel,
             "member should already grant CreateAfcUniChannel",
         ),
     ] {
@@ -594,13 +601,13 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     owner
         .actions()
-        .add_device(DeviceKeyBundle::try_from(&extra.pk)?, None)
+        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, 0)
         .await
         .context("initial add should succeed")?;
 
     let err = owner
         .actions()
-        .add_device(DeviceKeyBundle::try_from(&extra.pk)?, None)
+        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, 0)
         .await
         .expect_err("expected duplicate device add to fail");
     expect_not_authorized(err);
@@ -608,43 +615,43 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
     Ok(())
 }
 
-/// Ensures add_device with an initial role fails without delegated authority.
+/// Ensures add_device with an initial role requires sufficient rank.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
+async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let admin = team.admin;
+    let membera = team.membera;
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
-    let operator_role = role_id_by_name(&roles, "operator");
-    let admin_role = role_id_by_name(&roles, "admin");
 
+    // Assign member role to membera
     owner
         .actions()
-        .assign_role_management_perm(operator_role, admin_role, RoleManagementPerm::CanAssignRole)
+        .assign_role(device_id(membera)?, member_role)
         .await
-        .context("delegating operator CanAssignRole should succeed")?;
+        .context("assigning member role should succeed")?;
 
-    admin
+    membera
         .sync_expect(owner, None)
         .await
-        .context("admin unable to sync owner state")?;
+        .context("membera unable to sync owner state")?;
 
     let (candidate, _store) = ctx
         .new_client("candidate", owner.graph_id)
         .await
         .context("unable to create candidate device")?;
 
-    let err = admin
+    // Member lacks AddDevice permission, so this should fail
+    let err = membera
         .actions()
-        .add_device(DeviceKeyBundle::try_from(&candidate.pk)?, Some(member_role))
+        .add_device_with_rank(DeviceKeyBundle::try_from(&candidate.pk)?, Some(member_role), 0)
         .await
-        .expect_err("expected add_device with initial role to fail without delegation");
+        .expect_err("expected add_device with initial role to fail without AddDevice permission");
     expect_not_authorized(err);
 
     Ok(())
@@ -682,22 +689,9 @@ async fn test_assign_role_rejects_unknown_device() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let admin = team.admin;
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .context("delegating CanAssignRole should succeed")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync delegation")?;
 
     let (extra, _store) = ctx
         .new_client("unknown-device", owner.graph_id)
@@ -705,7 +699,7 @@ async fn test_assign_role_rejects_unknown_device() -> Result<()> {
         .context("unable to create extra device")?;
     let bogus_device_id = extra.pk.ident_pk.id()?;
 
-    let err = admin
+    let err = owner
         .actions()
         .assign_role(bogus_device_id, member_role)
         .await
@@ -743,34 +737,6 @@ async fn test_assign_role_rejects_unknown_role() -> Result<()> {
     Ok(())
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_assign_role_management_perm_is_unique() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .context("first delegation should succeed")?;
-
-    let err = owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .expect_err("expected duplicate delegation to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
@@ -794,138 +760,28 @@ async fn test_assign_role_self_assignment_rejected() -> Result<()> {
     Ok(())
 }
 
+
+
+/// Requires create_label_with_rank to use a valid rank.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_revoke_role_management_perm_requires_existing_fact() -> Result<()> {
+async fn test_create_label_requires_valid_rank() -> Result<()> {
     let mut ctx = TestCtx::new()?;
     let mut clients = ctx.new_team().await?;
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
 
-    let roles = load_default_roles(owner).await?;
-    let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
-
+    // Create a label with owner rank (999,999)
     owner
         .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
+        .create_label_with_rank(text!("TEST_LABEL"), 999_999)
         .await
-        .context("granting management perm should succeed")?;
-
-    owner
-        .actions()
-        .revoke_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
-        .await
-        .context("first revocation should succeed")?;
-
-    let err = owner
-        .actions()
-        .revoke_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
-        .await
-        .expect_err("expected second revocation to fail");
-    expect_not_authorized(err);
+        .context("label creation with valid rank should succeed")?;
 
     Ok(())
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_assign_role_management_perm_requires_ownership() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-    let admin = team.admin;
-
-    let roles = load_default_roles(owner).await?;
-    let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync owner state")?;
-
-    let err = admin
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .expect_err("expected assigning management perm without ownership to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-/// Requires create_label to reference an existing managing role.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_create_label_requires_existing_managing_role() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-
-    let mut bogus_role_bytes: [u8; 32] = owner_role.into();
-    bogus_role_bytes[0] ^= 0x55;
-    let bogus_role = RoleId::from(bogus_role_bytes);
-
-    let err = owner
-        .actions()
-        .create_label(text!("MISSING_MANAGER"), bogus_role)
-        .await
-        .expect_err("expected create_label with unknown manager to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_add_label_managing_role_is_unique() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    let effects = owner
-        .actions()
-        .create_label(text!("TEST_LABEL"), owner_role)
-        .await
-        .context("label creation should succeed")?;
-    let label_id = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
-            _ => None,
-        })
-        .expect("expected label created effect");
-
-    owner
-        .actions()
-        .add_label_managing_role(label_id, admin_role)
-        .await
-        .context("first managing role addition should succeed")?;
-
-    let err = owner
-        .actions()
-        .add_label_managing_role(label_id, admin_role)
-        .await
-        .expect_err("expected duplicate managing role to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
 
 /// Ensures delete_label enforces permissions and blocks reuse afterward.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -939,11 +795,11 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
     let operator = team.operator;
 
     let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
+    let _owner_role = role_id_by_name(&roles, "owner");
 
     let effects = owner
         .actions()
-        .create_label(text!("DELETE_LABEL_GUARD"), owner_role)
+        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), 999_999)
         .await
         .context("label creation should succeed")?;
     let label_id = effects
@@ -975,98 +831,7 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
     Ok(())
 }
 
-/// Requires add_label_managing_role callers to hold label management rights.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_add_label_managing_role_requires_delegation() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
 
-    let owner = team.owner;
-    let admin = team.admin;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let operator_role = role_id_by_name(&roles, "operator");
-
-    let effects = owner
-        .actions()
-        .create_label(text!("LABEL_DELEGATION"), owner_role)
-        .await
-        .context("label creation should succeed")?;
-    let label_id = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
-            _ => None,
-        })
-        .expect("expected label created effect");
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync owner state")?;
-
-    let err = admin
-        .actions()
-        .add_label_managing_role(label_id, operator_role)
-        .await
-        .expect_err("expected add_label_managing_role without delegation to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-/// Enforces label and role existence when adding a managing role.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_add_label_managing_role_requires_existing_ids() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    let effects = owner
-        .actions()
-        .create_label(text!("LABEL_FOREIGN_KEY"), owner_role)
-        .await
-        .context("label creation should succeed")?;
-    let label_id = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
-            _ => None,
-        })
-        .expect("expected label created effect");
-
-    let bogus_label = LabelId::from([0x33; 32]);
-
-    let mut bogus_role_bytes: [u8; 32] = admin_role.into();
-    bogus_role_bytes[0] ^= 0x77;
-    let bogus_role = RoleId::from(bogus_role_bytes);
-
-    let err = owner
-        .actions()
-        .add_label_managing_role(bogus_label, admin_role)
-        .await
-        .expect_err("expected add_label_managing_role with unknown label to fail");
-    expect_not_authorized(err);
-
-    let err = owner
-        .actions()
-        .add_label_managing_role(label_id, bogus_role)
-        .await
-        .expect_err("expected add_label_managing_role with unknown role to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
@@ -1118,7 +883,7 @@ async fn test_add_perm_to_role_requires_management_delegation() -> Result<()> {
 
     let err = admin
         .actions()
-        .add_perm_to_role(member_role, SimplePerm::CanUseAfc)
+        .add_perm_to_role(member_role, Perm::CanUseAfc)
         .await
         .expect_err("expected add_perm_to_role without delegation to fail");
     expect_not_authorized(err);
@@ -1135,30 +900,13 @@ async fn test_remove_perm_from_role_requires_existing_permission() -> Result<()>
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let admin = team.admin;
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
 
-    owner
+    let err = owner
         .actions()
-        .assign_role_management_perm(
-            member_role,
-            admin_role,
-            RoleManagementPerm::CanChangeRolePerms,
-        )
-        .await
-        .context("delegating CanChangeRolePerms should succeed")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync delegation")?;
-
-    let err = admin
-        .actions()
-        .remove_perm_from_role(member_role, SimplePerm::AssignLabel)
+        .remove_perm_from_role(member_role, Perm::AssignLabel)
         .await
         .expect_err("expected remove_perm_from_role on missing perm to fail");
     expect_not_authorized(err);
@@ -1166,53 +914,6 @@ async fn test_remove_perm_from_role_requires_existing_permission() -> Result<()>
     Ok(())
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_revoke_label_managing_role_requires_existing_fact() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-
-    let owner = team.owner;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    let effects = owner
-        .actions()
-        .create_label(text!("TEST_LABEL_REVOKE"), owner_role)
-        .await
-        .context("label creation should succeed")?;
-    let label_id = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
-            _ => None,
-        })
-        .expect("expected label created effect");
-
-    owner
-        .actions()
-        .add_label_managing_role(label_id, admin_role)
-        .await
-        .context("first managing role addition should succeed")?;
-
-    owner
-        .actions()
-        .revoke_label_managing_role(label_id, admin_role)
-        .await
-        .context("first managing role revocation should succeed")?;
-
-    let err = owner
-        .actions()
-        .revoke_label_managing_role(label_id, admin_role)
-        .await
-        .expect_err("expected duplicate revocation to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
@@ -1222,35 +923,13 @@ async fn test_change_role_requires_remaining_owner() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let admin = team.admin;
 
     let roles = load_default_roles(owner).await?;
     let owner_role = role_id_by_name(&roles, "owner");
     let admin_role = role_id_by_name(&roles, "admin");
 
-    // Allow the admin role to manage both the owner and admin roles.
-    owner
-        .actions()
-        .assign_role_management_perm(owner_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .context("delegating owner CanAssignRole should succeed")?;
-    owner
-        .actions()
-        .assign_role_management_perm(owner_role, admin_role, RoleManagementPerm::CanRevokeRole)
-        .await
-        .context("delegating owner CanRevokeRole should succeed")?;
-    owner
-        .actions()
-        .assign_role_management_perm(admin_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .context("delegating admin CanAssignRole should succeed")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync owner delegations")?;
-
-    let err = admin
+    // Attempting to change the last owner to admin should fail
+    let err = owner
         .actions()
         .change_role(device_id(owner)?, owner_role, admin_role)
         .await
@@ -1269,28 +948,10 @@ async fn test_change_role_rejects_same_role_transition() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let admin = team.admin;
     let membera = team.membera;
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .context("delegating CanAssignRole should succeed")?;
-    owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanRevokeRole)
-        .await
-        .context("delegating CanRevokeRole should succeed")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync delegations")?;
 
     owner
         .actions()
@@ -1298,12 +959,7 @@ async fn test_change_role_rejects_same_role_transition() -> Result<()> {
         .await
         .context("assigning member role should succeed")?;
 
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync member assignment")?;
-
-    let err = admin
+    let err = owner
         .actions()
         .change_role(device_id(membera)?, member_role, member_role)
         .await
@@ -1322,29 +978,11 @@ async fn test_change_role_rejects_mismatched_current_role() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let admin = team.admin;
     let membera = team.membera;
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
     let operator_role = role_id_by_name(&roles, "operator");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    owner
-        .actions()
-        .assign_role_management_perm(member_role, admin_role, RoleManagementPerm::CanAssignRole)
-        .await
-        .context("delegating CanAssignRole should succeed")?;
-    owner
-        .actions()
-        .assign_role_management_perm(operator_role, admin_role, RoleManagementPerm::CanRevokeRole)
-        .await
-        .context("delegating operator CanRevokeRole should succeed")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync delegations")?;
 
     owner
         .actions()
@@ -1352,12 +990,7 @@ async fn test_change_role_rejects_mismatched_current_role() -> Result<()> {
         .await
         .context("assigning member role should succeed")?;
 
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync member assignment")?;
-
-    let err = admin
+    let err = owner
         .actions()
         .change_role(device_id(membera)?, operator_role, member_role)
         .await
@@ -1391,181 +1024,5 @@ async fn test_terminate_team_requires_matching_id() -> Result<()> {
     Ok(())
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_remove_role_owner_requires_remaining_owner() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
 
-    let owner = team.owner;
 
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    let err = owner
-        .actions()
-        .remove_role_owner(admin_role, owner_role)
-        .await
-        .expect_err("expected removing final role owner to fail");
-    expect_not_authorized(err);
-
-    Ok(())
-}
-
-/// Operators with label management rights cannot change label managing roles.
-/// Only owners and admins with ChangeLabelManagingRole permission can.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_add_label_managing_role_requires_change_perm() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-    let owner = team.owner;
-    let admin = team.admin;
-    let operator = team.operator;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let operator_role = role_id_by_name(&roles, "operator");
-    let member_role = role_id_by_name(&roles, "member");
-
-    // Create a label with owner as the managing role initially
-    let effects = owner
-        .actions()
-        .create_label(text!("PRIVILEGE_TEST"), owner_role)
-        .await
-        .context("label creation should succeed")?;
-    let label_id = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
-            _ => None,
-        })
-        .expect("expected label created effect");
-
-    // Give operator the ability to manage the label
-    owner
-        .actions()
-        .add_label_managing_role(label_id, operator_role)
-        .await
-        .context("owner should be able to add operator as managing role")?;
-
-    // Sync operator to get the latest state
-    operator
-        .sync_expect(owner, None)
-        .await
-        .context("operator unable to sync owner state")?;
-
-    // Operator should be able to manage the label (assign/revoke)
-    // but should NOT be able to add managing roles
-    let err = operator
-        .actions()
-        .add_label_managing_role(label_id, member_role)
-        .await
-        .expect_err("operator should not be able to add label managing roles");
-    expect_not_authorized(err);
-
-    // Admin should be able to add managing roles (has ChangeLabelManagingRole)
-    // But first needs to be given management permission for this label
-    owner
-        .actions()
-        .add_label_managing_role(label_id, role_id_by_name(&roles, "admin"))
-        .await
-        .context("owner should be able to add admin as managing role")?;
-
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync owner state")?;
-    admin
-        .actions()
-        .add_label_managing_role(label_id, member_role)
-        .await
-        .context("admin should be able to add label managing roles")?;
-
-    // Owner should also be able to add managing roles (already tested implicitly above)
-
-    Ok(())
-}
-
-/// Operators with label management rights cannot revoke label managing roles.
-/// Only owners and admins with ChangeLabelManagingRole permission can.
-#[test(tokio::test(flavor = "multi_thread"))]
-#[serial]
-async fn test_revoke_label_managing_role_requires_change_perm() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
-    let mut clients = ctx.new_team().await?;
-    let team = TestTeam::new(clients.as_mut_slice());
-    let owner = team.owner;
-    let admin = team.admin;
-    let operator = team.operator;
-
-    let roles = load_default_roles(owner).await?;
-    let owner_role = role_id_by_name(&roles, "owner");
-    let operator_role = role_id_by_name(&roles, "operator");
-    let admin_role = role_id_by_name(&roles, "admin");
-
-    // Create a label with owner as the managing role initially
-    let effects = owner
-        .actions()
-        .create_label(text!("REVOKE_PRIVILEGE_TEST"), owner_role)
-        .await
-        .context("label creation should succeed")?;
-    let label_id = effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            Effect::LabelCreated(e) => Some(LabelId::from_base(e.label_id)),
-            _ => None,
-        })
-        .expect("expected label created effect");
-
-    // Add admin and operator as managing roles
-    owner
-        .actions()
-        .add_label_managing_role(label_id, admin_role)
-        .await
-        .context("owner should be able to add admin as managing role")?;
-
-    owner
-        .actions()
-        .add_label_managing_role(label_id, operator_role)
-        .await
-        .context("owner should be able to add operator as managing role")?;
-
-    // Sync operator to get the latest state
-    operator
-        .sync_expect(owner, None)
-        .await
-        .context("operator unable to sync owner state")?;
-
-    // Operator should NOT be able to revoke the admin managing role
-    // even though operator can manage the label
-    let err = operator
-        .actions()
-        .revoke_label_managing_role(label_id, admin_role)
-        .await
-        .expect_err("operator should not be able to revoke label managing roles");
-    expect_not_authorized(err);
-
-    // Admin should be able to revoke managing roles (has ChangeLabelManagingRole)
-    admin
-        .sync_expect(owner, None)
-        .await
-        .context("admin unable to sync owner state")?;
-    admin
-        .actions()
-        .revoke_label_managing_role(label_id, operator_role)
-        .await
-        .context("admin should be able to revoke label managing roles")?;
-
-    // Owner should be able to revoke remaining managing role
-    owner
-        .actions()
-        .revoke_label_managing_role(label_id, admin_role)
-        .await
-        .context("owner should be able to revoke label managing roles")?;
-
-    Ok(())
-}

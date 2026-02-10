@@ -5,14 +5,14 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
+#[cfg(feature = "preview")]
+use aranya_client::HelloSubscriptionConfig;
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, KeyBundle},
     text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
     ObjectId, Permission, Rank, SyncPeerConfig,
 };
-#[cfg(feature = "preview")]
-use aranya_client::HelloSubscriptionConfig;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{
@@ -279,7 +279,9 @@ async fn main() -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
-    owner_team.add_device_with_rank(admin.pk, Some(admin_role.id), Rank::new(100)).await?;
+    owner_team
+        .add_device_with_rank(admin.pk, Some(admin_role.id), Rank::new(100))
+        .await?;
 
     info!("adding operator to team");
     owner_team
@@ -400,7 +402,9 @@ async fn main() -> Result<()> {
 
     // Add device to team to assign custom role to.
     info!("adding device to team to assign custom role to");
-    owner_team.add_device_with_rank(custom.pk.clone(), None, Rank::new(50)).await?;
+    owner_team
+        .add_device_with_rank(custom.pk.clone(), None, Rank::new(50))
+        .await?;
 
     // Add `CanUseAfc` permission to the custom role.
     owner_team

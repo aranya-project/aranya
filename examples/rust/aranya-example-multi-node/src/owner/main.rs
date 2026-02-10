@@ -106,7 +106,8 @@ async fn main() -> Result<()> {
         let info: DeviceInfo = onboard.recv().await?;
         info!("owner: received device ID from {}", device.name);
 
-        team.add_device_with_rank(info.pk, None, aranya_client::Rank::new(100)).await?;
+        team.add_device_with_rank(info.pk, None, aranya_client::Rank::new(100))
+            .await?;
         info!("owner: added device to team {}", device.name);
 
         // We did not assign a role by default, so let's add one.
