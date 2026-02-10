@@ -269,19 +269,16 @@ function valid_device_invariants(device_id id) bool {
         check !exists DeviceEncPubKey[device_id: device_id]
     } else {
         // The device DOES exist, so the device keys MUST also
-        // exist and match the key IDs in `Device`.
-        let dev = unwrap device
+        // exist and each key ID must be consistent with its public key.
 
         let ident_key_fact = unwrap query DeviceIdentPubKey[device_id: device_id]
         check device_id == idam::derive_device_id(ident_key_fact.key)
 
         let sign_key_fact = unwrap query DeviceSignPubKey[device_id: device_id]
-        check dev.sign_key_id == idam::derive_sign_key_id(sign_key_fact.key)
-        check sign_key_fact.key_id == dev.sign_key_id
+        check sign_key_fact.key_id == idam::derive_sign_key_id(sign_key_fact.key)
 
         let enc_key_fact = unwrap query DeviceEncPubKey[device_id: device_id]
-        check dev.enc_key_id == idam::derive_enc_key_id(enc_key_fact.key)
-        check enc_key_fact.key_id == dev.enc_key_id
+        check enc_key_fact.key_id == idam::derive_enc_key_id(enc_key_fact.key)
     }
 
     // NB: Since this function uses `check` internally, it
@@ -449,6 +446,12 @@ function get_enc_pk(device_id id) bytes {
     let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
     return device_enc_pk.key
 }
+
+// Returns the device's encryption key ID.
+function get_enc_key_id(device_id id) id {
+    let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
+    return device_enc_pk.key_id
+}
 ```
 
 ### Device Generations
@@ -521,8 +524,8 @@ ephemeral command QueryDevicesOnTeam {
         device_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -575,8 +578,8 @@ ephemeral command QueryAfcChannelIsValid {
         label_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -629,8 +632,8 @@ ephemeral command QueryDeviceRole {
         device_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -678,8 +681,8 @@ ephemeral command QueryDeviceKeyBundle {
         device_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -1086,8 +1089,8 @@ ephemeral command QueryRank {
         object_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -2345,8 +2348,8 @@ ephemeral command QueryTeamRoles {
         default bool,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -2591,7 +2594,7 @@ finish function delete_device_core(device_id id) {
     delete DeviceIdentPubKey[device_id: device_id]
     delete DeviceSignPubKey[device_id: device_id]
     delete DeviceEncPubKey[device_id: device_id]
-    delete Rank[object_id: this.device_id]
+    delete Rank[object_id: device_id]
 }
 ```
 
@@ -3447,8 +3450,8 @@ ephemeral command QueryRoleHasPerm {
         perm enum Perm,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -3502,8 +3505,8 @@ ephemeral command QueryRolePerms {
         perm enum Perm,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -3555,8 +3558,8 @@ ephemeral command QueryLabel {
         label_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -3613,8 +3616,8 @@ ephemeral command QueryLabels {
         label_author_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -3672,8 +3675,8 @@ ephemeral command QueryLabelsAssignedToDevice {
         label_author_id id,
     }
 
-    seal { }
-    open { }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
@@ -3734,12 +3737,12 @@ shared memory DB.
 ephemeral action create_afc_uni_channel(receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
-    let author = get_device(author_id)
+    let author_enc_key_id = get_enc_key_id(author_id)
     let peer_enc_pk = get_enc_pk(receiver_id)
 
     let ch = afc::create_uni_channel(
         parent_cmd_id,
-        author.enc_key_id,
+        author_enc_key_id,
         peer_enc_pk,
         author_id,
         receiver_id,
@@ -3824,12 +3827,13 @@ ephemeral command AfcCreateUniChannel {
         if current_device_id == sender_id {
             // We authored this command.
             let peer_enc_pk = get_enc_pk(receiver_id)
+            let sender_enc_key_id = get_enc_key_id(sender_id)
 
             finish {
                 emit AfcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
                     receiver_id: receiver_id,
-                    author_enc_key_id: sender.enc_key_id,
+                    author_enc_key_id: sender_enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
@@ -3839,13 +3843,14 @@ ephemeral command AfcCreateUniChannel {
         } else if current_device_id == receiver_id {
             // We're the intended recipient of this command.
             let author_enc_pk = get_enc_pk(sender_id)
+            let receiver_enc_key_id = get_enc_key_id(receiver_id)
 
             finish {
                 emit AfcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
                     sender_id: sender_id,
                     author_enc_pk: author_enc_pk,
-                    peer_enc_key_id: receiver.enc_key_id,
+                    peer_enc_key_id: receiver_enc_key_id,
                     label_id: this.label_id,
                     encap: this.peer_encap,
                 }
