@@ -24,7 +24,7 @@ use tracing::instrument;
 
 use crate::{
     keystore::AranyaStore,
-    policy::{ChanOp, RoleManagementPerm, SimplePerm},
+    policy::{ChanOp, Perm},
     util::TryClone,
 };
 
@@ -38,17 +38,10 @@ impl fmt::Display for ChanOp {
     }
 }
 
-/// Display implementation for [`RoleManagementPerm`]
-impl fmt::Display for RoleManagementPerm {
+/// Display implementation for [`Perm`]
+impl fmt::Display for Perm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RoleManagementPerm::{self:?}")
-    }
-}
-
-/// Display implementation for [`SimplePerm`]
-impl fmt::Display for SimplePerm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SimplePerm::{self:?}")
+        write!(f, "Perm::{self:?}")
     }
 }
 

@@ -1,6 +1,6 @@
 use std::{slice, vec};
 
-use aranya_daemon_api as api;
+use aranya_daemon_api::{self as api, Rank};
 use aranya_id::custom_id;
 use aranya_policy_text::Text;
 
@@ -21,10 +21,16 @@ impl ApiId<api::RoleId> for RoleId {}
 pub struct Role {
     /// Uniquely identifies the role.
     pub id: RoleId,
-    /// The humman-readable name of the role.
+    /// The human-readable name of the role.
     pub name: Text,
     /// The unique ID of the author of the role.
     pub author_id: DeviceId,
+    /// The role's rank in the authorization hierarchy.
+    ///
+    /// Populated when available (e.g., on creation). Use
+    /// [`Team::query_rank`](crate::client::team::Team::query_rank)
+    /// to retrieve the rank for roles returned by queries.
+    pub rank: Option<Rank>,
     /// Is this a default role?
     pub default: bool,
 }
@@ -35,6 +41,7 @@ impl Role {
             id: RoleId::from_api(v.id),
             name: v.name,
             author_id: DeviceId::from_api(v.author_id),
+            rank: v.rank,
             default: v.default,
         }
     }

@@ -46,11 +46,13 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use crate::actions::SessionData;
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
+use aranya_policy_ifgen::BaseId;
+
 use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
+    policy::{ChanOp, Effect, KeyBundle, Perm, RoleCreated},
     sync::{quic as qs, SyncHandle, SyncPeer},
     util::SeedDir,
     AranyaStore, Client, EF,
@@ -256,19 +258,16 @@ impl EffectHandler {
                 QueryDeviceRoleResult(_) => {}
                 QueryDeviceKeyBundleResult(_) => {}
                 QueryLabelsAssignedToDeviceResult(_) => {}
-                LabelManagingRoleAdded(_) => {}
-                LabelManagingRoleRevoked(_) => {}
                 PermAddedToRole(_) => {}
                 PermRemovedFromRole(_) => {}
-                RoleOwnerAdded(_) => {}
-                RoleOwnerRemoved(_) => {}
-                RoleManagementPermAssigned(_) => {}
-                RoleManagementPermRevoked(_) => {}
                 RoleChanged(_) => {}
                 QueryLabelsResult(_) => {}
                 QueryTeamRolesResult(_) => {}
-                QueryRoleOwnersResult(_) => {}
                 QueryAfcChannelIsValidResult(_) => {}
+                QueryRoleHasPermResult(_) => {}
+                QueryRolePermsResult(_) => {}
+                QueryRankResult(_) => {}
+                RankChanged(_) => {}
                 RoleCreated(_) => {}
                 RoleDeleted(_) => {}
                 CheckValidAfcChannels(_) => {
@@ -653,13 +652,38 @@ impl DaemonApi for Api {
         team: api::TeamId,
         keys: api::KeyBundle,
         initial_role: Option<api::RoleId>,
+        rank: Option<api::Rank>,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
+        // When rank is not specified and an initial_role is provided,
+        // default to role_rank - 1 so the policy check
+        // `role_rank >= device_rank` passes. Otherwise fall back to
+        // author_rank - 1.
+        let rank = match (rank, &initial_role) {
+            (Some(r), _) => r.value(),
+            (None, Some(role_id)) => {
+                let role_base: BaseId = RoleId::transmute(*role_id).as_base();
+                let effects = self
+                    .client
+                    .actions(graph)
+                    .query_rank(role_base)
+                    .await
+                    .context("unable to query role rank for default device rank")?;
+                if let Some(Effect::QueryRankResult(e)) =
+                    find_effect!(&effects, Effect::QueryRankResult(_))
+                {
+                    e.rank - 1
+                } else {
+                    self.resolve_rank(graph, None).await?
+                }
+            }
+            (None, None) => self.resolve_rank(graph, None).await?,
+        };
 
         let effects = self
             .client
             .actions(graph)
-            .add_device(keys.into(), initial_role.map(RoleId::transmute))
+            .add_device_with_rank(keys.into(), initial_role.map(RoleId::transmute), rank)
             .await
             .context("unable to add device to team")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -760,6 +784,7 @@ impl DaemonApi for Api {
                 labels.push(api::Label {
                     id: api::LabelId::from_base(e.label_id),
                     name: e.label_name,
+                    rank: None,
                     author_id: api::DeviceId::from_base(e.label_author_id),
                 });
             }
@@ -789,6 +814,7 @@ impl DaemonApi for Api {
                 id: api::RoleId::from_base(e.role_id),
                 name: e.name.clone(),
                 author_id: api::DeviceId::from_base(e.author_id),
+                rank: None,
                 default: e.default,
             }))
         } else {
@@ -796,21 +822,20 @@ impl DaemonApi for Api {
         }
     }
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn create_role(
         self,
         _: context::Context,
         team: api::TeamId,
         role_name: Text,
-        owning_role: api::RoleId,
+        rank: api::Rank,
     ) -> api::Result<api::Role> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .create_role(role_name, RoleId::transmute(owning_role))
+            .create_role(role_name, rank.value())
             .await
             .context("unable to create role")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -820,6 +845,7 @@ impl DaemonApi for Api {
                 id: api::RoleId::from_base(e.role_id),
                 name: e.name.clone(),
                 author_id: api::DeviceId::from_base(e.author_id),
+                rank: Some(api::Rank::new(e.rank)),
                 default: e.default,
             })
         } else {
@@ -827,7 +853,6 @@ impl DaemonApi for Api {
         }
     }
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn delete_role(
         self,
@@ -1021,14 +1046,15 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         label_name: Text,
-        managing_role_id: api::RoleId,
+        rank: Option<api::Rank>,
     ) -> api::Result<api::LabelId> {
         let graph = self.check_team_valid(team).await?;
+        let rank = self.resolve_rank(graph, rank).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .create_label(label_name, RoleId::transmute(managing_role_id))
+            .create_label_with_rank(label_name, rank)
             .await
             .context("unable to create label")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1061,35 +1087,6 @@ impl DaemonApi for Api {
             Ok(())
         } else {
             Err(anyhow!("unable to delete label").into())
-        }
-    }
-
-    async fn add_label_managing_role(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label_id: api::LabelId,
-        managing_role_id: api::RoleId,
-    ) -> api::Result<()> {
-        let graph = self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(graph)
-            .add_label_managing_role(
-                LabelId::transmute(label_id),
-                RoleId::transmute(managing_role_id),
-            )
-            .await
-            .context("unable to add label managing role")?;
-        self.effect_handler.handle_effects(graph, &effects).await?;
-
-        if let Some(Effect::LabelManagingRoleAdded(_e)) =
-            find_effect!(&effects, Effect::LabelManagingRoleAdded(_e))
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to add label managing role").into())
         }
     }
 
@@ -1173,6 +1170,7 @@ impl DaemonApi for Api {
             Ok(Some(api::Label {
                 id: api::LabelId::from_base(e.label_id),
                 name: e.label_name.clone(),
+                rank: None,
                 author_id: api::DeviceId::from_base(e.label_author_id),
             }))
         } else {
@@ -1197,6 +1195,7 @@ impl DaemonApi for Api {
                 labels.push(api::Label {
                     id: api::LabelId::from_base(e.label_id),
                     name: e.label_name.clone(),
+                    rank: None,
                     author_id: api::DeviceId::from_base(e.label_author_id),
                 });
             }
@@ -1209,14 +1208,13 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        owning_role: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .setup_default_roles(RoleId::transmute(owning_role))
+            .setup_default_roles()
             .await
             .context("unable to setup default roles")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1229,6 +1227,7 @@ impl DaemonApi for Api {
                         id: api::RoleId::from_base(e.role_id),
                         name: e.name,
                         author_id: api::DeviceId::from_base(e.author_id),
+                        rank: Some(api::Rank::new(e.rank)),
                         default: e.default,
                     })
                 } else {
@@ -1262,6 +1261,7 @@ impl DaemonApi for Api {
                         id: api::RoleId::from_base(e.role_id),
                         name: e.name,
                         author_id: api::DeviceId::from_base(e.author_id),
+                        rank: None,
                         default: e.default,
                     })
                 } else {
@@ -1277,7 +1277,6 @@ impl DaemonApi for Api {
     // Role management
     //
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn add_perm_to_role(
         self,
@@ -1299,7 +1298,6 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn remove_perm_from_role(
         self,
@@ -1321,138 +1319,90 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
-    async fn add_role_owner(
+    async fn change_rank(
         self,
         _: context::Context,
         team: api::TeamId,
-        role: api::RoleId,
-        owning_role: api::RoleId,
+        object_id: api::ObjectId,
+        old_rank: api::Rank,
+        new_rank: api::Rank,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .add_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
+            .change_rank(object_id.as_base(), old_rank.value(), new_rank.value())
             .await
-            .context("unable to add role owner")?;
+            .context("unable to change rank")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
 
-        Ok(())
+        if find_effect!(&effects, Effect::RankChanged(_)).is_some() {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to change rank").into())
+        }
     }
 
-    #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
-    async fn remove_role_owner(
+    async fn query_rank(
         self,
         _: context::Context,
         team: api::TeamId,
-        role: api::RoleId,
-        owning_role: api::RoleId,
-    ) -> api::Result<()> {
+        object_id: api::ObjectId,
+    ) -> api::Result<api::Rank> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .remove_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
+            .query_rank(object_id.as_base())
             .await
-            .context("unable to remove role owner")?;
-        self.effect_handler.handle_effects(graph, &effects).await?;
+            .context("unable to query rank")?;
 
-        Ok(())
-    }
-
-    #[instrument(skip(self), err)]
-    async fn role_owners(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-    ) -> api::Result<Box<[api::Role]>> {
-        let graph = self.check_team_valid(team).await?;
-
-        let roles = self
-            .client
-            .actions(graph)
-            .query_role_owners(RoleId::transmute(role))
-            .await
-            .context("unable to query role owners")?
-            .into_iter()
-            .filter_map(|e| {
-                if let Effect::QueryRoleOwnersResult(e) = e {
-                    Some(api::Role {
-                        id: api::RoleId::from_base(e.role_id),
-                        name: e.name,
-                        author_id: api::DeviceId::from_base(e.author_id),
-                        default: e.default,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
-        Ok(roles)
-    }
-
-    #[cfg(feature = "preview")]
-    #[instrument(skip(self), err)]
-    async fn assign_role_management_perm(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-        managing_role: api::RoleId,
-        perm: api::RoleManagementPerm,
-    ) -> api::Result<()> {
-        let graph = self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(graph)
-            .assign_role_management_perm(
-                RoleId::transmute(role),
-                RoleId::transmute(managing_role),
-                perm.into(),
-            )
-            .await
-            .context("unable to assign role management permission")?;
-        self.effect_handler.handle_effects(graph, &effects).await?;
-
-        Ok(())
-    }
-
-    #[cfg(feature = "preview")]
-    #[instrument(skip(self), err)]
-    async fn revoke_role_management_perm(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-        managing_role: api::RoleId,
-        perm: api::RoleManagementPerm,
-    ) -> api::Result<()> {
-        let graph = self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(graph)
-            .revoke_role_management_perm(
-                RoleId::transmute(role),
-                RoleId::transmute(managing_role),
-                perm.into(),
-            )
-            .await
-            .context("unable to revoke role management permission")?;
-        self.effect_handler.handle_effects(graph, &effects).await?;
-
-        Ok(())
+        if let Some(Effect::QueryRankResult(e)) =
+            find_effect!(&effects, Effect::QueryRankResult(_))
+        {
+            Ok(api::Rank::new(e.rank))
+        } else {
+            Err(anyhow!("rank not found for object").into())
+        }
     }
 }
 
 impl Api {
+    /// Resolves a rank value: if `rank` is `Some`, uses that value directly.
+    /// Otherwise, queries the command author's (this device's) rank and
+    /// returns `author_rank - 1`. Returns an error if the author's rank
+    /// cannot be determined.
+    async fn resolve_rank(
+        &self,
+        graph: GraphId,
+        rank: Option<api::Rank>,
+    ) -> anyhow::Result<i64> {
+        match rank {
+            Some(r) => Ok(r.value()),
+            None => {
+                let device_id = self.device_id()?;
+                let device_base: BaseId = DeviceId::transmute(device_id).as_base();
+                let effects = self
+                    .client
+                    .actions(graph)
+                    .query_rank(device_base)
+                    .await
+                    .context("unable to query author's rank for default")?;
+                if let Some(Effect::QueryRankResult(e)) =
+                    find_effect!(&effects, Effect::QueryRankResult(_))
+                {
+                    Ok(e.rank - 1)
+                } else {
+                    anyhow::bail!("could not determine author's rank; specify an explicit rank")
+                }
+            }
+        }
+    }
+
     async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
         let crypto = &mut *self.crypto.lock().await;
 
@@ -1521,70 +1471,48 @@ impl From<ChanOp> for api::ChanOp {
     }
 }
 
-impl From<api::RoleManagementPerm> for RoleManagementPerm {
-    fn from(value: api::RoleManagementPerm) -> Self {
-        match value {
-            api::RoleManagementPerm::CanAssignRole => RoleManagementPerm::CanAssignRole,
-            api::RoleManagementPerm::CanRevokeRole => RoleManagementPerm::CanRevokeRole,
-            api::RoleManagementPerm::CanChangeRolePerms => RoleManagementPerm::CanChangeRolePerms,
-        }
-    }
-}
-
-impl From<RoleManagementPerm> for api::RoleManagementPerm {
-    fn from(value: RoleManagementPerm) -> Self {
-        match value {
-            RoleManagementPerm::CanAssignRole => api::RoleManagementPerm::CanAssignRole,
-            RoleManagementPerm::CanRevokeRole => api::RoleManagementPerm::CanRevokeRole,
-            RoleManagementPerm::CanChangeRolePerms => api::RoleManagementPerm::CanChangeRolePerms,
-        }
-    }
-}
-
-impl From<api::SimplePerm> for SimplePerm {
+impl From<api::SimplePerm> for Perm {
     fn from(value: api::SimplePerm) -> Self {
         match value {
-            api::SimplePerm::AddDevice => SimplePerm::AddDevice,
-            api::SimplePerm::RemoveDevice => SimplePerm::RemoveDevice,
-            api::SimplePerm::TerminateTeam => SimplePerm::TerminateTeam,
-            api::SimplePerm::CreateRole => SimplePerm::CreateRole,
-            api::SimplePerm::DeleteRole => SimplePerm::DeleteRole,
-            api::SimplePerm::AssignRole => SimplePerm::AssignRole,
-            api::SimplePerm::RevokeRole => SimplePerm::RevokeRole,
-            api::SimplePerm::ChangeRoleManagementPerms => SimplePerm::ChangeRoleManagementPerms,
-            api::SimplePerm::SetupDefaultRole => SimplePerm::SetupDefaultRole,
-            api::SimplePerm::ChangeRoleManagingRole => SimplePerm::ChangeRoleManagingRole,
-            api::SimplePerm::CreateLabel => SimplePerm::CreateLabel,
-            api::SimplePerm::DeleteLabel => SimplePerm::DeleteLabel,
-            api::SimplePerm::ChangeLabelManagingRole => SimplePerm::ChangeLabelManagingRole,
-            api::SimplePerm::AssignLabel => SimplePerm::AssignLabel,
-            api::SimplePerm::RevokeLabel => SimplePerm::RevokeLabel,
-            api::SimplePerm::CanUseAfc => SimplePerm::CanUseAfc,
-            api::SimplePerm::CreateAfcUniChannel => SimplePerm::CreateAfcUniChannel,
+            api::SimplePerm::AddDevice => Perm::AddDevice,
+            api::SimplePerm::RemoveDevice => Perm::RemoveDevice,
+            api::SimplePerm::TerminateTeam => Perm::TerminateTeam,
+            api::SimplePerm::ChangeRank => Perm::ChangeRank,
+            api::SimplePerm::CreateRole => Perm::CreateRole,
+            api::SimplePerm::DeleteRole => Perm::DeleteRole,
+            api::SimplePerm::AssignRole => Perm::AssignRole,
+            api::SimplePerm::RevokeRole => Perm::RevokeRole,
+            api::SimplePerm::ChangeRolePerms => Perm::ChangeRolePerms,
+            api::SimplePerm::SetupDefaultRole => Perm::SetupDefaultRole,
+            api::SimplePerm::CreateLabel => Perm::CreateLabel,
+            api::SimplePerm::DeleteLabel => Perm::DeleteLabel,
+            api::SimplePerm::AssignLabel => Perm::AssignLabel,
+            api::SimplePerm::RevokeLabel => Perm::RevokeLabel,
+            api::SimplePerm::CanUseAfc => Perm::CanUseAfc,
+            api::SimplePerm::CreateAfcUniChannel => Perm::CreateAfcUniChannel,
         }
     }
 }
 
-impl From<SimplePerm> for api::SimplePerm {
-    fn from(value: SimplePerm) -> Self {
+impl From<Perm> for api::SimplePerm {
+    fn from(value: Perm) -> Self {
         match value {
-            SimplePerm::AddDevice => api::SimplePerm::AddDevice,
-            SimplePerm::RemoveDevice => api::SimplePerm::RemoveDevice,
-            SimplePerm::TerminateTeam => api::SimplePerm::TerminateTeam,
-            SimplePerm::CreateRole => api::SimplePerm::CreateRole,
-            SimplePerm::DeleteRole => api::SimplePerm::DeleteRole,
-            SimplePerm::AssignRole => api::SimplePerm::AssignRole,
-            SimplePerm::RevokeRole => api::SimplePerm::RevokeRole,
-            SimplePerm::ChangeRoleManagementPerms => api::SimplePerm::ChangeRoleManagementPerms,
-            SimplePerm::SetupDefaultRole => api::SimplePerm::SetupDefaultRole,
-            SimplePerm::ChangeRoleManagingRole => api::SimplePerm::ChangeRoleManagingRole,
-            SimplePerm::CreateLabel => api::SimplePerm::CreateLabel,
-            SimplePerm::DeleteLabel => api::SimplePerm::DeleteLabel,
-            SimplePerm::ChangeLabelManagingRole => api::SimplePerm::ChangeLabelManagingRole,
-            SimplePerm::AssignLabel => api::SimplePerm::AssignLabel,
-            SimplePerm::RevokeLabel => api::SimplePerm::RevokeLabel,
-            SimplePerm::CanUseAfc => api::SimplePerm::CanUseAfc,
-            SimplePerm::CreateAfcUniChannel => api::SimplePerm::CreateAfcUniChannel,
+            Perm::AddDevice => api::SimplePerm::AddDevice,
+            Perm::RemoveDevice => api::SimplePerm::RemoveDevice,
+            Perm::TerminateTeam => api::SimplePerm::TerminateTeam,
+            Perm::ChangeRank => api::SimplePerm::ChangeRank,
+            Perm::CreateRole => api::SimplePerm::CreateRole,
+            Perm::DeleteRole => api::SimplePerm::DeleteRole,
+            Perm::AssignRole => api::SimplePerm::AssignRole,
+            Perm::RevokeRole => api::SimplePerm::RevokeRole,
+            Perm::ChangeRolePerms => api::SimplePerm::ChangeRolePerms,
+            Perm::SetupDefaultRole => api::SimplePerm::SetupDefaultRole,
+            Perm::CreateLabel => api::SimplePerm::CreateLabel,
+            Perm::DeleteLabel => api::SimplePerm::DeleteLabel,
+            Perm::AssignLabel => api::SimplePerm::AssignLabel,
+            Perm::RevokeLabel => api::SimplePerm::RevokeLabel,
+            Perm::CanUseAfc => api::SimplePerm::CanUseAfc,
+            Perm::CreateAfcUniChannel => api::SimplePerm::CreateAfcUniChannel,
         }
     }
 }

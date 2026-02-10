@@ -2,9 +2,9 @@ use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::D
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
+    client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -78,43 +78,49 @@ impl DevicesCtx {
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         owner_team
-            .add_device(self.admin.pk.clone(), Some(roles.admin().id))
+            .add_device_with_rank(
+                self.admin.pk.clone(),
+                Some(roles.admin().id),
+                Rank::new(799),
+            )
             .await?;
 
         // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
-            .add_device(self.operator.pk.clone(), Some(roles.operator().id))
-            .await?;
-
-        // Make sure it sees the configuration change.
-        admin_team
-            .sync_now(self.owner.aranya_local_addr().await?, None)
-            .await?;
-
-        // Make sure it sees the configuration change.
-        operator_team
-            .sync_now(self.admin.aranya_local_addr().await?, None)
+            .add_device_with_rank(
+                self.operator.pk.clone(),
+                Some(roles.operator().id),
+                Rank::new(699),
+            )
             .await?;
 
         // Add member A as a new device.
         info!("adding membera to team");
-        admin_team
-            .add_device(self.membera.pk.clone(), Some(roles.member().id))
+        owner_team
+            .add_device_with_rank(
+                self.membera.pk.clone(),
+                Some(roles.member().id),
+                Rank::new(599),
+            )
             .await?;
 
         // Add member B as a new device.
         info!("adding memberb to team");
-        admin_team
-            .add_device(self.memberb.pk.clone(), Some(roles.member().id))
+        owner_team
+            .add_device_with_rank(
+                self.memberb.pk.clone(),
+                Some(roles.member().id),
+                Rank::new(599),
+            )
             .await?;
 
         // Make sure all see the configuration change.
-        let admin_addr = self.admin.aranya_local_addr().await?;
-        owner_team.sync_now(admin_addr, None).await?;
-        operator_team.sync_now(admin_addr, None).await?;
-        membera_team.sync_now(admin_addr, None).await?;
-        memberb_team.sync_now(admin_addr, None).await?;
+        let owner_addr = self.owner.aranya_local_addr().await?;
+        admin_team.sync_now(owner_addr, None).await?;
+        operator_team.sync_now(owner_addr, None).await?;
+        membera_team.sync_now(owner_addr, None).await?;
+        memberb_team.sync_now(owner_addr, None).await?;
 
         Ok(())
     }
@@ -191,19 +197,10 @@ impl DevicesCtx {
     }
 
     /// NB: This includes the owner role, which is not returned
-    /// by [`Client::setup_default_roles`].
+    /// by [`Client::setup_default_roles_no_owner`].
     #[instrument(skip(self))]
     pub async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
-        self.owner.setup_default_roles(team_id, true).await
-    }
-
-    /// Sets up default roles without creating any management delegations.
-    #[instrument(skip(self))]
-    pub async fn setup_default_roles_without_delegation(
-        &self,
-        team_id: TeamId,
-    ) -> Result<DefaultRoles> {
-        self.owner.setup_default_roles(team_id, false).await
+        self.owner.setup_default_roles(team_id).await
     }
 }
 
@@ -305,11 +302,10 @@ impl DeviceCtx {
         path
     }
 
-    #[instrument(skip(self, grant_delegations))]
-    async fn setup_default_roles(
+    #[instrument(skip(self))]
+    pub(crate) async fn setup_default_roles(
         &self,
         team_id: TeamId,
-        grant_delegations: bool,
     ) -> Result<DefaultRoles> {
         let owner_role = self
             .client
@@ -322,7 +318,7 @@ impl DeviceCtx {
         let setup_roles = self
             .client
             .team(team_id)
-            .setup_default_roles(owner_role.id)
+            .setup_default_roles_no_owner()
             .await?;
 
         let roles = setup_roles
@@ -331,28 +327,6 @@ impl DeviceCtx {
             .try_into_default_roles()
             .context("unable to parse `DefaultRoles`")?;
         tracing::debug!(?roles, "default roles set up");
-
-        if grant_delegations {
-            let mappings = [
-                // admin -> operator
-                ("admin -> operator", roles.admin().id, roles.operator().id),
-                // admin -> member
-                ("admin -> member", roles.admin().id, roles.member().id),
-                // operator -> member
-                ("operator -> member", roles.operator().id, roles.member().id),
-            ];
-            for (name, manager, role) in mappings {
-                self.client
-                    .team(team_id)
-                    .assign_role_management_permission(
-                        role,
-                        manager,
-                        RoleManagementPermission::CanAssignRole,
-                    )
-                    .await
-                    .with_context(|| format!("{name}: unable to change managing role"))?;
-            }
-        }
 
         Ok(roles)
     }

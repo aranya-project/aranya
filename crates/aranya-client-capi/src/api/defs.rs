@@ -354,7 +354,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 128, align = 8)]
 pub type Role = Safe<aranya_client::Role>;
 
 /// Uniquely identifies a [`Role`].
@@ -458,6 +458,49 @@ impl From<&LabelId> for aranya_client::LabelId {
     }
 }
 
+/// A generic object ID that can refer to a device, role, or label.
+///
+/// Used with [`change_rank`] and [`query_rank`].
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct ObjectId {
+    id: Id,
+}
+
+impl From<aranya_client::ObjectId> for ObjectId {
+    fn from(value: aranya_client::ObjectId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&ObjectId> for aranya_client::ObjectId {
+    fn from(value: &ObjectId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl From<&DeviceId> for ObjectId {
+    fn from(value: &DeviceId) -> Self {
+        Self { id: value.id }
+    }
+}
+
+impl From<&RoleId> for ObjectId {
+    fn from(value: &RoleId) -> Self {
+        Self { id: value.id }
+    }
+}
+
+impl From<&LabelId> for ObjectId {
+    fn from(value: &LabelId) -> Self {
+        Self { id: value.id }
+    }
+}
+
 /// A label name.
 ///
 /// E.g. "TELEMETRY_LABEL"
@@ -481,7 +524,6 @@ impl LabelName {
 pub struct RoleName(*const c_char);
 
 impl RoleName {
-    #[cfg(feature = "preview")]
     unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
@@ -504,35 +546,7 @@ impl Addr {
     }
 }
 
-/// Role management permission.
-#[cfg(feature = "preview")]
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum RoleManagementPermission {
-    /// Grants a managing role the ability to assign the target role
-    /// to any device except itself.
-    CanAssignRole,
-    /// Grants a managing role the ability to revoke the target role
-    /// from any device.
-    CanRevokeRole,
-    /// Grants a managing role the ability to change the permissions
-    /// assigned to the target role.
-    CanChangeRolePerms,
-}
-
-#[cfg(feature = "preview")]
-impl From<RoleManagementPermission> for aranya_client::client::RoleManagementPermission {
-    fn from(perm: RoleManagementPermission) -> Self {
-        match perm {
-            RoleManagementPermission::CanAssignRole => Self::CanAssignRole,
-            RoleManagementPermission::CanRevokeRole => Self::CanRevokeRole,
-            RoleManagementPermission::CanChangeRolePerms => Self::CanChangeRolePerms,
-        }
-    }
-}
-
 /// Simple permission.
-#[cfg(feature = "preview")]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum Permission {
@@ -546,6 +560,11 @@ pub enum Permission {
     /// commands to fail until a new team is created.
     TerminateTeam,
 
+    // # Rank
+    //
+    /// The role can change the rank of objects.
+    ChangeRank,
+
     // # Roles
     //
     /// The role can create a role.
@@ -556,15 +575,12 @@ pub enum Permission {
     AssignRole,
     /// The role can revoke a role from other devices.
     RevokeRole,
-    /// The role can change role management permissions for roles.
-    ChangeRoleManagementPerms,
+    /// The role can change permissions on roles.
+    ChangeRolePerms,
     /// The role can set up default roles. This can only be done
     /// once, so this permission can only effectively be used by
     /// the `owner` role.
     SetupDefaultRole,
-    /// The role can add a managing role to or remove a managing
-    /// role from a target role.
-    ChangeRoleManagingRole,
 
     // # Labels
     //
@@ -572,17 +588,9 @@ pub enum Permission {
     CreateLabel,
     /// The role can delete a label.
     DeleteLabel,
-    /// The role can grant a target role the ability to manage a
-    /// label. This management ability includes deleting a label
-    /// and adding/revoking a label to a device.
-    ChangeLabelManagingRole,
-    /// The role can assign a label to a device. The role must
-    /// also have label management permissions granted by a role
-    /// with the `ChangeLabelManagingRole` permission above.
+    /// The role can assign a label to a device.
     AssignLabel,
-    /// The role can revoke a label from a device. The role must
-    /// also have label management permissions granted by a role
-    /// with the `ChangeLabelManagingRole` permission above.
+    /// The role can revoke a label from a device.
     RevokeLabel,
 
     // # AFC
@@ -594,23 +602,21 @@ pub enum Permission {
     CreateAfcUniChannel,
 }
 
-#[cfg(feature = "preview")]
 impl From<Permission> for aranya_client::client::Permission {
     fn from(perm: Permission) -> Self {
         match perm {
             Permission::AddDevice => Self::AddDevice,
             Permission::RemoveDevice => Self::RemoveDevice,
             Permission::TerminateTeam => Self::TerminateTeam,
+            Permission::ChangeRank => Self::ChangeRank,
             Permission::CreateRole => Self::CreateRole,
             Permission::DeleteRole => Self::DeleteRole,
             Permission::AssignRole => Self::AssignRole,
             Permission::RevokeRole => Self::RevokeRole,
-            Permission::ChangeRoleManagementPerms => Self::ChangeRoleManagementPerms,
+            Permission::ChangeRolePerms => Self::ChangeRolePerms,
             Permission::SetupDefaultRole => Self::SetupDefaultRole,
-            Permission::ChangeRoleManagingRole => Self::ChangeRoleManagingRole,
             Permission::CreateLabel => Self::CreateLabel,
             Permission::DeleteLabel => Self::DeleteLabel,
-            Permission::ChangeLabelManagingRole => Self::ChangeLabelManagingRole,
             Permission::AssignLabel => Self::AssignLabel,
             Permission::RevokeLabel => Self::RevokeLabel,
             Permission::CanUseAfc => Self::CanUseAfc,
@@ -1204,13 +1210,17 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
 /// N.B. this function is meant to be called once to set up the default roles.
 /// Subsequent calls will result in an error if the default roles were already created.
 ///
+/// The `owning_role` parameter is accepted for backward compatibility but
+/// is ignored in the rank-based authorization model.
+///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[in] owning_role the ID of the owning role
-/// @param[in] roles_out returns a list of roles that own `role`
+/// @param[in] owning_role (ignored) formerly the owning role
+/// @param[in] roles_out returns a list of default roles
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
+#[allow(deprecated)]
 pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
@@ -1220,12 +1230,7 @@ pub unsafe fn setup_default_roles(
 ) -> Result<(), imp::Error> {
     let default_roles = client
         .rt
-        .block_on(
-            client
-                .inner
-                .team(team.into())
-                .setup_default_roles(owning_role.into()),
-        )?
+        .block_on(client.inner.team(team.into()).setup_default_roles(owning_role.into()))?
         .__into_data();
 
     debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
@@ -1244,69 +1249,19 @@ pub unsafe fn setup_default_roles(
     Ok(())
 }
 
-/// Adds `owning_role` as an owner of role.
+/// Returns the roles that own a given role.
 ///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] role ID of the subject role
-/// @param[in] owning_role ID of the owning role
-///
-/// @relates AranyaClient.
-#[cfg(feature = "preview")]
-pub fn add_role_owner(
-    client: &Client,
-    team: &TeamId,
-    role: &RoleId,
-    owning_role: &RoleId,
-) -> Result<(), imp::Error> {
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .add_role_owner(role.into(), owning_role.into()),
-    )?;
-
-    Ok(())
-}
-
-/// Removes an owning_role as an owner of role.
+/// Role ownership has been replaced by rank-based authorization.
+/// This function always returns an empty list.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] role the ID of the subject role
-/// @param[in] owning_role ID of the owning role
-///
-/// @relates AranyaClient.
-#[cfg(feature = "preview")]
-pub fn remove_role_owner(
-    client: &Client,
-    team: &TeamId,
-    role: &RoleId,
-    owning_role: &RoleId,
-) -> Result<(), imp::Error> {
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .remove_role_owner(role.into(), owning_role.into()),
-    )?;
-
-    Ok(())
-}
-
-/// Returns the roles that own `role`.
-///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
-/// Writes the number of roles that would have been returned to `roles_len`.
-/// The application can use `roles_len` to allocate a larger buffer.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] role the ID of the subject role
-/// @param[in] roles_out returns a list of roles that own `role`
+/// @param[out] roles_out returns a list of roles that own `role`
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
+#[allow(deprecated)]
 pub unsafe fn role_owners(
     client: &Client,
     team: &TeamId,
@@ -1329,60 +1284,6 @@ pub unsafe fn role_owners(
     for (dst, src) in out.iter_mut().zip(owning_roles) {
         Role::init(dst, src);
     }
-
-    Ok(())
-}
-
-/// Assigns a role management permission to a managing role.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] role the ID of the subject role
-/// @param[in] managing_role the ID of the managing role
-/// @param[in] perm the management permission to assign
-///
-/// @relates AranyaClient.
-#[cfg(feature = "preview")]
-pub fn assign_role_management_permission(
-    client: &Client,
-    team: &TeamId,
-    role: &RoleId,
-    managing_role: &RoleId,
-    perm: RoleManagementPermission,
-) -> Result<(), imp::Error> {
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .assign_role_management_permission(role.into(), managing_role.into(), perm.into()),
-    )?;
-
-    Ok(())
-}
-
-/// Revokes a role management permission from a managing role.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] role the ID of the subject role
-/// @param[in] managing_role the ID of the managing role
-/// @param[in] perm the management permission to assign
-///
-/// @relates AranyaClient.
-#[cfg(feature = "preview")]
-pub fn revoke_role_management_permission(
-    client: &Client,
-    team: &TeamId,
-    role: &RoleId,
-    managing_role: &RoleId,
-    perm: RoleManagementPermission,
-) -> Result<(), imp::Error> {
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .revoke_role_management_permission(role.into(), managing_role.into(), perm.into()),
-    )?;
 
     Ok(())
 }
@@ -1468,12 +1369,11 @@ pub unsafe fn team_roles(
 /// @param[out] role_out the newly created role
 ///
 /// @relates AranyaClient
-#[cfg(feature = "preview")]
 pub fn create_role(
     client: &Client,
     team: &TeamId,
     role_name: RoleName,
-    owning_role: &RoleId,
+    rank: i64,
     role_out: &mut MaybeUninit<Role>,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `name` is a valid C String.
@@ -1482,7 +1382,7 @@ pub fn create_role(
         client
             .inner
             .team(team.into())
-            .create_role(role_name, owning_role.into()),
+            .create_role(role_name, aranya_daemon_api::Rank::new(rank)),
     )?;
     Role::init(role_out, role);
     Ok(())
@@ -1500,7 +1400,6 @@ pub fn create_role(
 /// @param[in] role the ID of the role to delete
 ///
 /// @relates AranyaClient
-#[cfg(feature = "preview")]
 pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), imp::Error> {
     client
         .rt
@@ -1518,7 +1417,6 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 /// @param[in] team the team's ID
 /// @param[in] role the role ID of the role the permission is being added to
 /// @param[in] perm a permission to add to the role
-#[cfg(feature = "preview")]
 pub fn add_perm_to_role(
     client: &Client,
     team: &TeamId,
@@ -1544,7 +1442,6 @@ pub fn add_perm_to_role(
 /// @param[in] team the team's ID
 /// @param[in] role the role ID of the role the permission is being removed from
 /// @param[in] perm a permission to remove from the role
-#[cfg(feature = "preview")]
 pub fn remove_perm_from_role(
     client: &Client,
     team: &TeamId,
@@ -1620,14 +1517,19 @@ pub fn revoke_role(
 
 /// Create a channel label.
 ///
+/// The `managing_role_id` parameter is accepted for backward compatibility
+/// but is ignored in the rank-based authorization model. The label is
+/// created with a default rank of the command author's rank minus one.
+///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] name label name string
-/// @param[in] managing_role_id the ID of the role that manages this label
+/// @param[in] managing_role_id (ignored) formerly the managing role
 ///
 /// @relates AranyaClient.
+#[allow(deprecated)]
 pub fn create_label(
     client: &Client,
     team: &TeamId,
@@ -1641,6 +1543,33 @@ pub fn create_label(
             .inner
             .team(team.into())
             .create_label(name, managing_role_id.into()),
+    )?;
+    Ok(label_id.into())
+}
+
+/// Create a channel label with an explicit rank.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] name label name string
+/// @param[in] rank the rank to assign to the label
+///
+/// @relates AranyaClient.
+pub fn create_label_with_rank(
+    client: &Client,
+    team: &TeamId,
+    name: LabelName,
+    rank: i64,
+) -> Result<LabelId, imp::Error> {
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let name = unsafe { name.as_underlying() }?;
+    let label_id = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_label_with_rank(name, aranya_daemon_api::Rank::new(rank)),
     )?;
     Ok(label_id.into())
 }
@@ -1659,6 +1588,56 @@ pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Resul
         .rt
         .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
     Ok(())
+}
+
+/// Change the rank of an object (device, role, or label).
+///
+/// The caller must know the current rank of the object. The caller's
+/// rank must be strictly greater than both the old and new rank.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] object_id the ID of the object to change the rank of
+/// @param[in] old_rank the current rank of the object
+/// @param[in] new_rank the new rank to assign to the object
+///
+/// @relates AranyaClient.
+pub fn change_rank(
+    client: &Client,
+    team: &TeamId,
+    object_id: &ObjectId,
+    old_rank: i64,
+    new_rank: i64,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client.inner.team(team.into()).change_rank(
+            object_id.into(),
+            aranya_daemon_api::Rank::new(old_rank),
+            aranya_daemon_api::Rank::new(new_rank),
+        ),
+    )?;
+    Ok(())
+}
+
+/// Query the rank of an object (device, role, or label).
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] object_id the ID of the object to query
+/// @param[out] __output the rank of the object
+///
+/// @relates AranyaClient.
+pub fn query_rank(
+    client: &Client,
+    team: &TeamId,
+    object_id: &ObjectId,
+) -> Result<i64, imp::Error> {
+    let rank = client
+        .rt
+        .block_on(client.inner.team(team.into()).query_rank(object_id.into()))?;
+    Ok(rank.value())
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -1710,32 +1689,6 @@ pub fn revoke_label(
             .team(team.into())
             .device(device.into())
             .revoke_label(label_id.into()),
-    )?;
-    Ok(())
-}
-
-/// Add label managing role.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] label_id the label ID
-/// @param[in] managing_role_id the ID of the managing role
-///
-/// @relates AranyaClient.
-#[cfg(feature = "preview")]
-pub fn add_label_managing_role(
-    client: &Client,
-    team: &TeamId,
-    label_id: &LabelId,
-    managing_role_id: &RoleId,
-) -> Result<(), imp::Error> {
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .add_label_managing_role(label_id.into(), managing_role_id.into()),
     )?;
     Ok(())
 }
@@ -1859,6 +1812,9 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 
 /// Add a device to the team with the default role.
 ///
+/// The device is assigned a default rank of the command author's
+/// rank minus one.
+///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param[in] client the Aranya Client
@@ -1868,6 +1824,7 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 /// @param[in] role_id (optional) the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
+#[allow(deprecated)]
 pub unsafe fn add_device_to_team(
     client: &Client,
     team: &TeamId,
@@ -1881,6 +1838,40 @@ pub unsafe fn add_device_to_team(
             .inner
             .team(team.into())
             .add_device(keybundle, role_id.map(Into::into)),
+    )?;
+    Ok(())
+}
+
+/// Add a device to the team with an explicit rank.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param[in] keybundle_len is the length of the serialized keybundle.
+/// @param[in] role_id (optional) the ID of the role to assign to the device.
+/// @param[in] rank the rank to assign to the device.
+///
+/// @relates AranyaClient.
+pub unsafe fn add_device_to_team_with_rank(
+    client: &Client,
+    team: &TeamId,
+    keybundle: &[u8],
+    role_id: Option<&RoleId>,
+    rank: i64,
+) -> Result<(), imp::Error> {
+    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_device_with_rank(
+                keybundle,
+                role_id.map(Into::into),
+                aranya_daemon_api::Rank::new(rank),
+            ),
     )?;
     Ok(())
 }

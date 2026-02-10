@@ -10,7 +10,7 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
+    CreateTeamQuicSyncConfig, DeviceId, KeyBundle, Rank,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -279,13 +279,13 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Create default roles
     info!("creating default roles");
-    let owner_role = owner
+    let _owner_role = owner
         .roles()
         .await?
         .into_iter()
         .find(|role| role.name == "owner" && role.default)
         .context("unable to find owner role")?;
-    let roles = owner.setup_default_roles(owner_role.id).await?;
+    let roles = owner.setup_default_roles_no_owner().await?;
     let admin_role = roles
         .iter()
         .find(|r| r.name == "admin")
@@ -325,24 +325,24 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
-    owner.add_device(ctx.admin.pk, Some(admin_role.id)).await?;
+    owner.add_device_with_rank(ctx.admin.pk, Some(admin_role.id), Rank::new(100)).await?;
 
     info!("adding operator to team");
     owner
-        .add_device(ctx.operator.pk, Some(operator_role.id))
+        .add_device_with_rank(ctx.operator.pk, Some(operator_role.id), Rank::new(100))
         .await?;
 
     // add membera to team.
     info!("adding membera to team");
     owner
-        .add_device(ctx.membera.pk.clone(), Some(member_role.id))
+        .add_device_with_rank(ctx.membera.pk.clone(), Some(member_role.id), Rank::new(100))
         .await?;
     membera.sync_now(owner_addr, None).await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     owner
-        .add_device(ctx.memberb.pk.clone(), Some(member_role.id))
+        .add_device_with_rank(ctx.memberb.pk.clone(), Some(member_role.id), Rank::new(100))
         .await?;
     memberb.sync_now(owner_addr, None).await?;
 
@@ -356,7 +356,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
-    let label3 = owner.create_label(text!("label3"), owner_role.id).await?;
+    let label3 = owner.create_label_with_rank(text!("label3"), Rank::new(100)).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     owner

@@ -35,10 +35,10 @@ mod util;
 pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
-#[cfg(feature = "preview")]
-#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
-pub use crate::client::{Permission, RoleManagementPermission};
+pub use crate::client::Permission;
+pub use aranya_daemon_api::ObjectId;
+pub use aranya_daemon_api::Rank;
 #[cfg(feature = "preview")]
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]

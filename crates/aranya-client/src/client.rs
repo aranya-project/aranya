@@ -18,12 +18,8 @@ use aranya_daemon_api::{
     },
     DaemonApiClient, Version, CS,
 };
-#[cfg(feature = "preview")]
-#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
-pub use aranya_daemon_api::{
-    RoleManagementPerm as RoleManagementPermission, SimplePerm as Permission,
-};
+pub use aranya_daemon_api::SimplePerm as Permission;
 use aranya_util::{error::ReportExt, Addr};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};

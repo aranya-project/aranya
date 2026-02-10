@@ -156,7 +156,7 @@ typedef struct AranyaChannelIdent {
 AranyaError aranya_create_assign_label(AranyaClient *client, AranyaTeamId *id,
                                        const char *label_name,
                                        AranyaLabelId *label_id,
-                                       AranyaRoleId managing_role_id,
+                                       int64_t rank,
                                        AranyaChannelIdent *idents,
                                        int num_peers);
 
@@ -424,9 +424,10 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add admin to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
-                                    admin->pk_len, &admin_role_id);
+    // add admin to team with rank 100.
+    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id, admin->pk,
+                                               admin->pk_len, &admin_role_id,
+                                               100);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add admin to team\n");
         return err;
@@ -442,9 +443,10 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add operator to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, operator->pk,
-                                    operator->pk_len, &operator_role_id);
+    // add operator to team with rank 100.
+    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
+                                               operator->pk, operator->pk_len,
+                                               &operator_role_id, 100);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -460,17 +462,19 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add membera to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
-                                    membera->pk_len, &member_role_id);
+    // add membera to team with rank 100.
+    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
+                                               membera->pk, membera->pk_len,
+                                               &member_role_id, 100);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add membera to team\n");
         return err;
     }
 
-    // add memberb to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
-                                    memberb->pk_len, &member_role_id);
+    // add memberb to team with rank 100.
+    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
+                                               memberb->pk, memberb->pk_len,
+                                               &member_role_id, 100);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add memberb to team\n");
         return err;
@@ -580,34 +584,15 @@ AranyaError init_team(Team *t) {
         }
     }
 
-    // assign role management permissions.
-    err = aranya_assign_role_management_permission(
-        &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE);
-    EXPECT("unable to assign role management permission", err);
-    err = aranya_assign_role_management_permission(
-        &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
-    EXPECT("unable to assign role management permission", err);
-
-    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
-    EXPECT("error calling `sync_now` to sync with peer: admin->owner", err);
-
-    err = aranya_revoke_role(&admin->client, &t->id, &operator->id,
+    // Demonstrate role revoke/assign by the owner, who has AssignRole
+    // and RevokeRole permissions and outranks all other devices.
+    err = aranya_revoke_role(&owner->client, &t->id, &operator->id,
                              &operator_role_id);
     EXPECT("unable to revoke 'operator' role from 'operator'", err);
 
-    err = aranya_assign_role(&admin->client, &t->id, &operator->id,
+    err = aranya_assign_role(&owner->client, &t->id, &operator->id,
                              &operator_role_id);
     EXPECT("unable to assign 'operator' role to 'operator'\n", err);
-
-    err = aranya_sync_now(&owner->client, &t->id, sync_addrs[ADMIN], NULL);
-    EXPECT("error calling `sync_now` to sync with pee: owner->admin", err);
-
-    err = aranya_revoke_role_management_permission(
-        &owner->client, &t->id, &operator_role_id, &admin_role_id,
-        ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE);
-    EXPECT("unable to revoke role management permission", err);
 exit:
     return err;
 }
@@ -803,13 +788,12 @@ exit:
 AranyaError aranya_create_assign_label(AranyaClient *client, AranyaTeamId *id,
                                        const char *label_name,
                                        AranyaLabelId *label_id,
-                                       AranyaRoleId managing_role_id,
+                                       int64_t rank,
                                        AranyaChannelIdent *idents,
                                        int num_peers) {
     AranyaError err;
 
-    err = aranya_create_label(client, id, label_name, &managing_role_id,
-                              label_id);
+    err = aranya_create_label_with_rank(client, id, label_name, rank, label_id);
     EXPECT("error creating label", err);
 
     for (int i = 0; i < num_peers; i++) {
@@ -830,7 +814,6 @@ AranyaError run_afc_example(Team *t) {
 
     unsigned char *ciphertext = NULL;
     unsigned char *plaintext = NULL;
-    AranyaRole *roles = NULL;
 
     AranyaError err;
 
@@ -840,46 +823,11 @@ AranyaError run_afc_example(Team *t) {
     AranyaChannelIdent idents[] = {{&membera->id, ARANYA_CHAN_OP_SEND_ONLY},
                                    {&memberb->id, ARANYA_CHAN_OP_RECV_ONLY}};
 
-    size_t roles_len = 0;
-    roles = calloc(roles_len, sizeof(AranyaRole));
-
-    err = aranya_team_roles(&owner->client, &t->id, roles, &roles_len);
-    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-        printf("handling buffer too small error. roles_len: %zu\n", roles_len);
-        roles = realloc(roles, roles_len * sizeof(AranyaRole));
-        if (roles == NULL) {
-            abort();
-        }
-
-        printf("handled buffer reallocation. roles_len: %zu\n", roles_len);
-        err = aranya_team_roles(&owner->client, &t->id, roles, &roles_len);
-        printf("Re-tried fefching list of roles\n");
-    }
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to get list of roles\n");
-        return err;
-    }
-
-    AranyaRoleId owner_role_id;
-    err = get_role_id_by_name(roles, roles_len, "owner", &owner_role_id);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to get 'owner' role from list of roles\n");
-        return err;
-    }
-
     err = aranya_create_assign_label(&owner->client, &t->id, "uni_label",
-                                     &label_id, owner_role_id, idents, 2);
+                                     &label_id, 100, idents, 2);
     if (err != ARANYA_ERROR_SUCCESS) {
         goto exit;
     }
-
-    AranyaRoleId admin_role_id;
-    err = get_role_id_by_name(roles, roles_len, "admin", &admin_role_id);
-    EXPECT("error getting the 'admin' role.", err);
-
-    err = aranya_add_label_managing_role(&owner->client, &t->id, &label_id,
-                                         &admin_role_id);
-    EXPECT("error adding a new managing role to the label", err);
 
     // Tell them both to sync with the owner to see their new label.
     err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OWNER], NULL);
@@ -999,19 +947,13 @@ AranyaError run_afc_example(Team *t) {
 exit:
     free(ciphertext);
     free(plaintext);
-    free(roles);
     return err;
 }
 
 // Run the custom roles example
 AranyaError run_custom_roles_example(Team *t) {
     Client *owner = &t->clients.owner;
-    Client *admin = &t->clients.admin;
     Client *membera = &t->clients.membera;
-
-    size_t member_owning_roles_len = 1;
-    AranyaRole *member_owning_roles =
-        calloc(member_owning_roles_len, sizeof(AranyaRole));
 
     AranyaError err;
 
@@ -1042,19 +984,6 @@ AranyaError run_custom_roles_example(Team *t) {
         goto exit;
     }
 
-    // Get the role assigned to 'admin'
-    AranyaRole admin_role;
-    printf("getting the role assigned to 'admin'.\n");
-    err = aranya_team_device_role(&admin->client, &t->id, &admin->id,
-                                  &admin_role, &has_role);
-    EXPECT("unable to get role assigned to the 'admin' device", err);
-
-    if (!has_role) {
-        printf("no role assigned to 'admin'.\n");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
     // Get the ID of the 'member' role.
     AranyaRoleId member_role_id;
     err = aranya_role_get_id(&member_role, &member_role_id);
@@ -1063,11 +992,6 @@ AranyaError run_custom_roles_example(Team *t) {
     // Get the ID of the 'owner' role.
     AranyaRoleId owner_role_id;
     err = aranya_role_get_id(&owner_role, &owner_role_id);
-    EXPECT("unable to get the role ID.", err);
-
-    // Get the ID of the 'admin' role.
-    AranyaRoleId admin_role_id;
-    err = aranya_role_get_id(&admin_role, &admin_role_id);
     EXPECT("unable to get the role ID.", err);
 
     // Change the role assigned to 'membera'.
@@ -1098,72 +1022,9 @@ AranyaError run_custom_roles_example(Team *t) {
         goto exit;
     }
 
-    // check that there is a single owner for the 'member' role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                             member_owning_roles, &member_owning_roles_len);
-    EXPECT("unable to get the owning roles for the 'member' role.", err);
-    if (member_owning_roles_len != 1) {
-        fprintf(
-            stderr,
-            "there should only be 1 owner for the 'member' role. Actual: %zu\n",
-            member_owning_roles_len);
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
-    // Add a new owning role to the 'member' role.
-    printf("adding a new owning role to the 'member' role.\n");
-    err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id,
-                                &admin_role_id);
-    EXPECT("unable to add a new owning role.", err);
-
-    // check that there are 2 owners for the 'member' role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                             member_owning_roles, &member_owning_roles_len);
-    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-        printf("handling buffer too small error\n");
-        member_owning_roles = realloc(
-            member_owning_roles, member_owning_roles_len * sizeof(AranyaRole));
-        err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                                 member_owning_roles, &member_owning_roles_len);
-    }
-    EXPECT("unable to get the owning roles for the 'member' role", err);
-    if (member_owning_roles_len != 2) {
-        fprintf(
-            stderr,
-            "there should only be 2 owners for the 'member' role. Actual:%zu\n",
-            member_owning_roles_len);
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    printf("the 'member' role has %zu owning roles now.\n",
-           member_owning_roles_len);
-
-    // Remove an owning role from the 'member' role.
-    printf("removing an owning role to the 'member' role.\n");
-    err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id,
-                                   &admin_role_id);
-    EXPECT("unable to remove an owning role.", err);
-
-    // check that there is now just 1 owner for the 'member' role after removing
-    // an owning role.
-    err = aranya_role_owners(&owner->client, &t->id, &member_role_id,
-                             member_owning_roles, &member_owning_roles_len);
-    EXPECT("unable to get the owning roles for the 'member' role.", err);
-    if (member_owning_roles_len != 1) {
-        fprintf(
-            stderr,
-            "there should only be 1 owner for the 'member' role. Actual: %zu\n",
-            member_owning_roles_len);
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    printf("the 'member' role has %zu owning roles now.\n",
-           member_owning_roles_len);
-
-    // Create a custom role.
+    // Create a custom role with rank 50.
     AranyaRole buddy_role;
-    err = aranya_create_role(&owner->client, &t->id, "buddy", &owner_role_id,
+    err = aranya_create_role(&owner->client, &t->id, "buddy", 50,
                              &buddy_role);
     EXPECT("unable to create role", err);
     AranyaRoleId buddy_role_id;
@@ -1177,6 +1038,38 @@ AranyaError run_custom_roles_example(Team *t) {
     EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
+    // Demo change_rank/query_rank: change the buddy role's rank from 50 to 75.
+    AranyaObjectId buddy_object_id;
+    memcpy(buddy_object_id.id.bytes, buddy_role_id.id.bytes, ARANYA_ID_LEN);
+
+    int64_t current_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &buddy_object_id,
+                             &current_rank);
+    EXPECT("unable to query rank of 'buddy' role", err);
+    printf("buddy role rank before change: %lld\n", (long long)current_rank);
+    if (current_rank != 50) {
+        fprintf(stderr, "expected buddy role rank to be 50, got %lld\n",
+                (long long)current_rank);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
+    printf("changing buddy role rank from 50 to 75\n");
+    err = aranya_change_rank(&owner->client, &t->id, &buddy_object_id, 50, 75);
+    EXPECT("unable to change rank of 'buddy' role", err);
+
+    int64_t new_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &buddy_object_id,
+                             &new_rank);
+    EXPECT("unable to query new rank of 'buddy' role", err);
+    printf("buddy role rank after change: %lld\n", (long long)new_rank);
+    if (new_rank != 75) {
+        fprintf(stderr, "expected buddy role rank to be 75, got %lld\n",
+                (long long)new_rank);
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
     // Remove `CanUseAfc` permission from the custom role.
     err = aranya_remove_perm_from_role(&owner->client, &t->id, &buddy_role_id,
                                        ARANYA_PERMISSION_CAN_USE_AFC);
@@ -1189,7 +1082,6 @@ AranyaError run_custom_roles_example(Team *t) {
     printf("Removed 'buddy' role\n");
 
 exit:
-    free(member_owning_roles);
     if (err == ARANYA_ERROR_SUCCESS) {
         printf("completed the custom roles example.\n");
     }
