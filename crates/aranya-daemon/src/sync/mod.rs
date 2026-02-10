@@ -69,6 +69,10 @@ impl From<std::convert::Infallible> for Error {
 }
 
 impl Error {
+    fn transport(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::Transport(Box::new(err))
+    }
+
     /// Returns whether a `ParallelFinalize` error occurred, which needs to be resolved manually.
     fn is_parallel_finalize(&self) -> bool {
         use aranya_runtime::ClientError;

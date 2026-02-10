@@ -75,7 +75,7 @@ where
         stream
             .receive(&mut recv_buf)
             .await
-            .map_err(|e| Error::Transport(e.into()))?;
+            .map_err(Error::transport)?;
         trace!(n = recv_buf.len(), "received request bytes");
 
         let peer = stream.peer();
@@ -127,14 +127,8 @@ where
         };
 
         let data = postcard::to_allocvec(&response).context("postcard serialization failed")?;
-        stream
-            .send(&data)
-            .await
-            .map_err(|e| Error::Transport(e.into()))?;
-        stream
-            .finish()
-            .await
-            .map_err(|e| Error::Transport(e.into()))?;
+        stream.send(&data).await.map_err(Error::transport)?;
+        stream.finish().await.map_err(Error::transport)?;
 
         trace!(n = data.len(), "sent response");
         Ok(())
