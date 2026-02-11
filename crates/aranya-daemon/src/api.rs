@@ -1328,12 +1328,70 @@ impl DaemonApi for Api {
             .await
             .context("unable to query rank")?;
 
+<<<<<<< Updated upstream
         if let Some(Effect::QueryRankResult(e)) = find_effect!(&effects, Effect::QueryRankResult(_))
         {
             Ok(api::Rank::new(e.rank))
         } else {
             Err(anyhow!("rank not found for object").into())
         }
+=======
+        Ok(())
+    }
+
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn assign_role_management_perm(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        managing_role: api::RoleId,
+        perm: api::RoleManagementPerm,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .assign_role_management_perm(
+                RoleId::transmute(role),
+                RoleId::transmute(managing_role),
+                perm.into(),
+            )
+            .await
+            .context("unable to assign role management permission")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "preview")]
+    #[instrument(skip(self), err)]
+    async fn revoke_role_management_perm(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        managing_role: api::RoleId,
+        perm: api::RoleManagementPerm,
+    ) -> api::Result<()> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .revoke_role_management_perm(
+                RoleId::transmute(role),
+                RoleId::transmute(managing_role),
+                perm.into(),
+            )
+            .await
+            .context("unable to revoke role management permission")?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+
+        Ok(())
+>>>>>>> Stashed changes
     }
 }
 

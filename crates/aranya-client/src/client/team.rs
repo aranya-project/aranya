@@ -338,7 +338,47 @@ impl Team<'_> {
 
     /// Changes the rank of an object.
     #[instrument(skip(self))]
+<<<<<<< Updated upstream
     pub async fn change_rank(
+=======
+    pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .add_role_owner(
+                context::current(),
+                self.id,
+                role.into_api(),
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Removes an `owning_role` as an owner of `role`.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    #[instrument(skip(self))]
+    pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .remove_role_owner(
+                context::current(),
+                self.id,
+                role.into_api(),
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Assigns a role management permission to a managing role.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    #[instrument(skip(self))]
+    pub async fn assign_role_management_permission(
+>>>>>>> Stashed changes
         &self,
         object_id: ObjectId,
         old_rank: Rank,

@@ -1973,6 +1973,7 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
 
     Ok(())
 }
+<<<<<<< Updated upstream
 
 /// Tests that a role's rank can be demoted below a device that holds it.
 ///
@@ -2509,3 +2510,5 @@ async fn test_deprecated_add_label_managing_role_noop() -> Result<()> {
 
     Ok(())
 }
+=======
+>>>>>>> Stashed changes

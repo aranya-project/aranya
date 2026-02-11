@@ -474,9 +474,23 @@ pub trait DaemonApi {
     /// Adds a permission to a role.
     async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
     /// Removes a permission from a role.
+<<<<<<< Updated upstream
     async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
     /// Changes the rank of an object.
     async fn change_rank(
+=======
+    #[cfg(feature = "preview")]
+    async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: SimplePerm) -> Result<()>;
+    /// Adds an owning role to the target role.
+    #[cfg(feature = "preview")]
+    async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Removes an owning role from the target role.
+    #[cfg(feature = "preview")]
+    async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Assigns a role management permission to a role.
+    #[cfg(feature = "preview")]
+    async fn assign_role_management_perm(
+>>>>>>> Stashed changes
         team: TeamId,
         object_id: ObjectId,
         old_rank: Rank,

@@ -1014,6 +1014,21 @@ AranyaError run_custom_roles_example(Team *t) {
         goto exit;
     }
 
+<<<<<<< Updated upstream
+=======
+    // Add a new owning role to the 'member' role.
+    printf("adding a new owning role to the 'member' role.\n");
+    err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id,
+                                &admin_role_id);
+    EXPECT("unable to add a new owning role.", err);
+
+    // Remove an owning role from the 'member' role.
+    printf("removing an owning role to the 'member' role.\n");
+    err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id,
+                                   &admin_role_id);
+    EXPECT("unable to remove an owning role.", err);
+
+>>>>>>> Stashed changes
     // Create a custom role.
     const int64_t buddy_initial_rank = 50;
     const int64_t buddy_updated_rank = 75;

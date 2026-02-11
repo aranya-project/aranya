@@ -1237,6 +1237,7 @@ pub unsafe fn setup_default_roles(
 
 /// Setup default roles on team.
 ///
+<<<<<<< Updated upstream
 /// This sets up the following roles with default permissions as
 /// defined in Aranya's default policy:
 /// - admin
@@ -1283,11 +1284,61 @@ pub unsafe fn setup_default_roles_no_owning_role(
     for (dst, src) in out.iter_mut().zip(default_roles) {
         Role::init(dst, src);
     }
+=======
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role ID of the subject role
+/// @param[in] owning_role ID of the owning role
+///
+/// @relates AranyaClient.
+#[cfg(feature = "preview")]
+pub fn add_role_owner(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    owning_role: &RoleId,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_role_owner(role.into(), owning_role.into()),
+    )?;
+>>>>>>> Stashed changes
 
     Ok(())
 }
 
+<<<<<<< Updated upstream
 /// Deprecated: always returns an empty list.
+=======
+/// Removes an owning_role as an owner of role.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the ID of the subject role
+/// @param[in] owning_role ID of the owning role
+///
+/// @relates AranyaClient.
+#[cfg(feature = "preview")]
+pub fn remove_role_owner(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    owning_role: &RoleId,
+) -> Result<(), imp::Error> {
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_role_owner(role.into(), owning_role.into()),
+    )?;
+
+    Ok(())
+}
+
+/// Assigns a role management permission to a managing role.
+>>>>>>> Stashed changes
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
