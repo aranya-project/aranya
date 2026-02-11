@@ -24,8 +24,6 @@
 //! - **Unsubscribe**: Peers can unsubscribe from hello notifications using
 //!   SyncHandle::sync_hello_unsubscribe.
 //!
-//! See the [`hello`](super::hello) module for implementation details.
-//!
 //! [`SyncHandle`]: super::SyncHandle
 
 use std::collections::HashMap;
@@ -98,7 +96,7 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
 
 impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
     /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) -> Result<()> {
+    fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
         let new_key = match cfg.interval {
             _ if cfg.sync_now => Some(
@@ -111,15 +109,13 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
             self.queue.remove(&key);
         }
-        Ok(())
     }
 
     /// Remove a peer from the delay queue.
-    fn remove_peer(&mut self, peer: SyncPeer) -> Result<()> {
+    fn remove_peer(&mut self, peer: SyncPeer) {
         if let Some((_, Some(key))) = self.peers.remove(&peer) {
             self.queue.remove(&key);
         }
-        Ok(())
     }
 
     fn add_hello_subscription(
@@ -128,7 +124,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         graph_change_delay: Duration,
         duration: Duration,
         schedule_delay: Duration,
-    ) -> Result<()> {
+    ) {
         if let Some(sub) = self.hello_subscriptions.remove(&peer) {
             self.queue.remove(&sub.queue_key);
         }
@@ -143,19 +139,16 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
             expires_at: Instant::now() + duration,
             queue_key,
         };
-        let subscription_debug = format!("{subscription:?}");
 
+        debug!(?peer, ?subscription, "created hello subscription");
         self.hello_subscriptions.insert(peer, subscription);
-        debug!(?peer, ?subscription_debug, "created hello subscription");
-        Ok(())
     }
 
-    fn remove_hello_subscription(&mut self, peer: SyncPeer) -> Result<()> {
+    fn remove_hello_subscription(&mut self, peer: SyncPeer) {
         if let Some(old) = self.hello_subscriptions.remove(&peer) {
             self.queue.remove(&old.queue_key);
         }
         debug!(?peer, "removed hello subscription");
-        Ok(())
     }
 
     fn handle_sync_error(&mut self, peer: SyncPeer, err: &Error) {
@@ -252,7 +245,7 @@ where
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
-        trace!("subscribing to hello notifications from peer");
+        trace!(?peer, "subscribing to hello notifications from peer");
         let message = SyncType::Hello(SyncHelloType::Subscribe {
             graph_change_delay,
             duration,
@@ -266,7 +259,7 @@ where
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     async fn send_hello_unsubscribe(&mut self, peer: SyncPeer) -> Result<()> {
-        trace!("unsubscribing from hello notifications from peer");
+        trace!(?peer, "unsubscribing from hello notifications from peer");
         let message = SyncType::Hello(SyncHelloType::Unsubscribe {
             graph_id: peer.graph_id,
         });
@@ -274,7 +267,24 @@ where
         self.send_hello_request(peer, message).await
     }
 
-    async fn broadcast_hello(&mut self, graph_id: GraphId, head: Address) -> Result<()> {
+    #[cfg(feature = "preview")]
+    async fn send_hello_notification(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
+        trace!(?peer, "sending hello notifications to peer");
+
+        let message = SyncType::Hello(SyncHelloType::Hello {
+            head,
+            graph_id: peer.graph_id,
+        });
+        self.send_hello_request(peer, message).await?;
+
+        if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
+            sub.last_notified = Some(Instant::now());
+        }
+
+        Ok(())
+    }
+
+    async fn broadcast_hello(&mut self, graph_id: GraphId, head: Address) {
         let now = Instant::now();
 
         let mut subscribers = Vec::new();
@@ -284,6 +294,7 @@ where
             }
 
             if now >= sub.expires_at {
+                self.queue.remove(&sub.queue_key);
                 debug!(?peer, "removed expired subscription");
                 return false;
             }
@@ -300,15 +311,8 @@ where
                 }
             }
 
-            // Create the hello message
-            let message = SyncType::Hello(SyncHelloType::Hello { head, graph_id });
-            match self.send_hello_request(*peer, message).await {
-                Ok(()) => {
-                    if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
-                        sub.last_notified = Some(now);
-                    }
-                }
-                Err(error) => warn!(?peer, ?head, %error, "failed to send hello notification"),
+            if let Err(error) = self.send_hello_notification(*peer, head).await {
+                warn!(?peer, %error, "failed to send hello notification");
             }
         }
 
@@ -318,7 +322,6 @@ where
             subscriber_count = subscribers.len(),
             "Completed broadcast_hello_notifications"
         );
-        Ok(())
     }
 
     async fn handle_scheduled_hello(&mut self, peer: SyncPeer) {
@@ -343,10 +346,8 @@ where
         };
 
         if let Some(head) = head {
-            let message: SyncType = SyncType::Hello(SyncHelloType::Hello { head, graph_id });
-            match self.send_hello_request(peer, message).await {
-                Ok(()) => trace!(?peer, ?head, "sent scheduled hello notification"),
-                Err(error) => warn!(?peer, %error, "failed to broadcast scheduled hello"),
+            if let Err(error) = self.send_hello_notification(peer, head).await {
+                warn!(?peer, %error, "failed to send hello notification");
             }
         }
 
@@ -386,8 +387,14 @@ where
             Some((msg, tx)) = self.recv.recv() => {
                 let reply = match msg {
                     ManagerMessage::SyncNow { peer, cfg: _cfg } => self.sync(peer).await.map(|_| ()),
-                    ManagerMessage::AddPeer { peer, cfg } => self.add_peer(peer, cfg),
-                    ManagerMessage::RemovePeer { peer } => self.remove_peer(peer),
+                    ManagerMessage::AddPeer { peer, cfg } => {
+                        self.add_peer(peer, cfg);
+                        Ok(())
+                    }
+                    ManagerMessage::RemovePeer { peer } => {
+                        self.remove_peer(peer);
+                        Ok(())
+                    }
                     #[cfg(feature = "preview")]
                     ManagerMessage::HelloSubscribe { peer, graph_change_delay, duration, schedule_delay } => {
                         self.send_hello_subscribe(peer, graph_change_delay, duration, schedule_delay).await
@@ -395,13 +402,20 @@ where
                     #[cfg(feature = "preview")]
                     ManagerMessage::HelloUnsubscribe { peer } => self.send_hello_unsubscribe(peer).await,
                     #[cfg(feature = "preview")]
-                    ManagerMessage::BroadcastHello { graph_id, head } => self.broadcast_hello(graph_id, head).await,
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::HelloSubscribeRequest { peer, graph_change_delay, duration, schedule_delay } => {
-                        self.add_hello_subscription(peer, graph_change_delay, duration, schedule_delay)
+                    ManagerMessage::BroadcastHello { graph_id, head } => {
+                        self.broadcast_hello(graph_id, head).await;
+                        Ok(())
                     }
                     #[cfg(feature = "preview")]
-                    ManagerMessage::HelloUnsubscribeRequest { peer } => self.remove_hello_subscription(peer),
+                    ManagerMessage::HelloSubscribeRequest { peer, graph_change_delay, duration, schedule_delay } => {
+                        self.add_hello_subscription(peer, graph_change_delay, duration, schedule_delay);
+                        Ok(())
+                    }
+                    #[cfg(feature = "preview")]
+                    ManagerMessage::HelloUnsubscribeRequest { peer } => {
+                        self.remove_hello_subscription(peer);
+                        Ok(())
+                    }
                     #[cfg(feature = "preview")]
                     ManagerMessage::SyncOnHello { peer, head } => self.sync_on_hello(peer, head).await,
                 };
@@ -525,6 +539,13 @@ where
     async fn sync_on_hello(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
         debug!(?peer, ?head, "received hello notification message");
 
+        {
+            // Update the peer cache with the received head_id.
+            let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+            let cache = caches.entry(peer).or_default();
+            aranya.update_heads(peer.graph_id, [head], cache)?;
+        }
+
         let dominated = self
             .client
             .lock_aranya()
@@ -532,24 +553,16 @@ where
             .command_exists(peer.graph_id, head);
         if !dominated {
             match self.peers.get(&peer) {
-                Some((cfg, _)) => match cfg.sync_on_hello {
-                    true => self
-                        .sync(peer)
-                        .await
-                        .inspect_err(|error| {
-                            warn!(%error, ?peer, "failed to sync with peer");
-                        })
-                        .map(|_| ())?,
-                    false => trace!(?peer, "SyncOnHello is not enabled, ignoring"),
-                },
+                Some((cfg, _)) if cfg.sync_on_hello => {
+                    if let Err(error) = self.sync(peer).await {
+                        warn!(%error, ?peer, "failed to sync with peer");
+                    }
+                }
+                Some(_) => trace!(?peer, "SyncOnHello is not enabled, ignoring"),
                 None => warn!(?peer, "Peer not found, ignoring SyncOnHello"),
             }
         }
 
-        // Update the peer cache with the received head_id.
-        let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-        let cache = caches.entry(peer).or_default();
-        aranya.update_heads(peer.graph_id, [head], cache)?;
         Ok(())
     }
 }

@@ -198,11 +198,11 @@ where
                 check_request(peer.graph_id, graph_id)?;
                 self.handle
                     .hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
-                    .await;
+                    .await?;
             }
             SyncHelloType::Unsubscribe { graph_id } => {
                 check_request(peer.graph_id, graph_id)?;
-                self.handle.hello_unsubscribe_request(peer).await;
+                self.handle.hello_unsubscribe_request(peer).await?;
             }
             SyncHelloType::Hello { head, graph_id } => {
                 check_request(peer.graph_id, graph_id)?;
@@ -216,6 +216,8 @@ where
 
 fn check_request(graph_id: GraphId, message_id: GraphId) -> Result<GraphId, Error> {
     if graph_id.as_bytes() != message_id.as_bytes() {
+        // TODO(nikki): this isn't really a transport error, this is a protocol error. Change as
+        // part of a larger refactor?
         return Err(Error::Transport(
             anyhow::anyhow!("The sync message's GraphId doesn't match the current GraphId!").into(),
         ));

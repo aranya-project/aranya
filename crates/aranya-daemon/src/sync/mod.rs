@@ -77,6 +77,7 @@ impl Error {
     fn is_parallel_finalize(&self) -> bool {
         use aranya_runtime::ClientError;
         match self {
+            Self::AranyaClient(ClientError::ParallelFinalize) => true,
             Self::Other(err) => err
                 .downcast_ref::<ClientError>()
                 .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
