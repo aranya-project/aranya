@@ -16,7 +16,7 @@ pub(crate) struct QuicTransport {
     client: s2n_quic::Client,
     conns: SharedConnectionMap,
     psk_store: Arc<PskStore>,
-    return_address: Bytes,
+    return_port: Bytes,
 }
 
 impl QuicTransport {
@@ -24,7 +24,7 @@ impl QuicTransport {
         client_addr: Addr,
         conns: SharedConnectionMap,
         psk_store: Arc<PskStore>,
-        return_address: Bytes,
+        return_port: Bytes,
     ) -> Result<Self, Error> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -49,7 +49,7 @@ impl QuicTransport {
             client,
             conns,
             psk_store,
-            return_address,
+            return_port,
         })
     }
 }
@@ -83,7 +83,7 @@ impl SyncTransport for QuicTransport {
                 conn.keep_alive(true)?;
                 conn.open_send_stream()
                     .await?
-                    .send(self.return_address.clone())
+                    .send(self.return_port.clone())
                     .await?;
                 Ok(conn)
             })

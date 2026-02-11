@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use aranya_runtime::{PolicyStore, StorageProvider};
-use buggy::BugExt as _;
 use bytes::Bytes;
 use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
@@ -28,9 +27,8 @@ where
         recv: mpsc::Receiver<Callback>,
         conns: SharedConnectionMap,
     ) -> Result<Self, Error> {
-        let return_address =
-            Bytes::from(postcard::to_allocvec(&server_addr).assume("can serialize addr")?);
-        let transport = QuicTransport::new(client_addr, conns, psk_store, return_address)?;
+        let return_port = Bytes::copy_from_slice(&server_addr.port().to_be_bytes());
+        let transport = QuicTransport::new(client_addr, conns, psk_store, return_port)?;
 
         Ok(Self {
             client,

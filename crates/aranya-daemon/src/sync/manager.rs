@@ -250,8 +250,9 @@ where
         schedule_delay: Duration,
     ) -> Result<()> {
         trace!(?peer, "subscribing to hello notifications from peer");
+        // TODO(nikki): update aranya_core with the new name.
         let message = SyncType::Hello(SyncHelloType::Subscribe {
-            graph_change_debounce,
+            graph_change_delay: graph_change_debounce,
             duration,
             schedule_delay,
             graph_id: peer.graph_id,
