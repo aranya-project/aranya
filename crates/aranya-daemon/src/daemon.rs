@@ -288,23 +288,23 @@ impl Daemon {
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = mpsc::channel(256);
 
-        // Create the sync server
-        let (server, peers, conns, syncer_recv) =
-            SyncServer::new(client.clone(), &server_addr, Arc::clone(&psk_store))
-                .await
-                .context("unable to initialize QUIC sync server")?;
+        let (handle, recv) = SyncHandle::channel(128);
 
-        // Initialize the syncer
-        let syncer = SyncManager::new(
+        let (listener, conns) = QuicListener::new(server_addr, Arc::clone(&psk_store))
+            .await
+            .context("unable to initialize QUIC sync listener")?;
+        let server = SyncServer::new(listener, client.clone(), handle.clone());
+
+        let manager = SyncManager::new(
             client.clone(),
             send_effects,
             psk_store,
             (server.local_addr().into(), client_addr),
-            syncer_recv,
+            recv,
             conns,
         )?;
 
-        Ok((client, server, syncer, peers, recv_effects))
+        Ok((client, server, manager, handle, recv_effects))
     }
 
     /// Loads the crypto engine.

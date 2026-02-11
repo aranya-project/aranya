@@ -29,14 +29,6 @@ pub(crate) enum Error {
     #[error(transparent)]
     Runtime(#[from] aranya_runtime::SyncError),
 
-    /// Failed to send sync request.
-    #[error("Could not send sync request: {0}")]
-    SendSyncRequest(Box<Error>),
-
-    /// Failed to receive sync response.
-    #[error("Could not receive sync response: {0}")]
-    ReceiveSyncResponse(Box<Error>),
-
     /// Peer sent an empty response.
     #[cfg(feature = "preview")]
     #[error("peer sent empty response")]

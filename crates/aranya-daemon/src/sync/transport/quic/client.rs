@@ -39,7 +39,6 @@ where
             queue: DelayQueue::new(),
             send_effects,
             transport,
-            return_address,
             #[cfg(feature = "preview")]
             hello_subscriptions: HelloSubscriptions::new(),
         })

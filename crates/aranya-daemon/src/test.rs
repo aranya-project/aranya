@@ -238,18 +238,18 @@ impl TestCtx {
 
             let (send_effects, effects_recv) = mpsc::channel(1);
 
-            // Create server first to get the actual listening address
-            let (server, _sync_peers, conn_map, syncer_recv) =
-                TestServer::new(client.clone(), &any_local_addr, psk_store.clone()).await?;
+            let (handle, recv) = sync::SyncHandle::channel(128);
 
-            // Create syncer with the actual server address
+            let (listener, conns) = QuicListener::new(any_local_addr, psk_store.clone()).await?;
+            let server = TestServer::new(listener, client.clone(), handle);
+
             let syncer = TestSyncer::new(
                 client.clone(),
                 send_effects,
                 psk_store.clone(),
                 (server.local_addr().into(), any_local_addr),
-                syncer_recv,
-                conn_map,
+                recv,
+                conns,
             )?;
 
             (syncer, server, pk, psk_store, effects_recv)

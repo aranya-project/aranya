@@ -40,7 +40,6 @@ use aranya_runtime::{
 };
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
-use bytes::Bytes;
 use derive_where::derive_where;
 use futures_util::StreamExt as _;
 use tokio::{sync::mpsc, time::Instant};
@@ -65,7 +64,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-enum ScheduledTask {
+pub(super) enum ScheduledTask {
     Sync(SyncPeer),
     #[cfg(feature = "preview")]
     HelloNotify(SyncPeer),
@@ -91,8 +90,6 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Additional state used by the syncer.
     pub(super) transport: ST,
-    /// Sync server address. Peers will make incoming connections to us on this address.
-    pub(super) return_address: Bytes,
     /// Holds all active hello subscriptions.
     #[cfg(feature = "preview")]
     pub(super) hello_subscriptions: HelloSubscriptions,

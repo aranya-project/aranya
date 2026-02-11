@@ -37,9 +37,6 @@ pub(crate) enum Error {
     /// QUIC Stream error
     #[error(transparent)]
     QuicStream(#[from] s2n_quic::stream::Error),
-    /// Invalid PSK used for syncing
-    #[error("invalid PSK used when attempting to sync")]
-    InvalidPSK,
     /// QUIC server endpoint start error
     #[error("could not start QUIC server")]
     ServerStart(#[source] s2n_quic::provider::StartError),
