@@ -68,7 +68,7 @@ aranya-util = { version = "4.1.0", path = "crates/aranya-util", default-features
 anyhow = { version = "1.0.86" }
 async-trait = { version = "0.1" }
 backon = { version = "1.2.0" }
-bytes = { version = "1.10.0" }
+bytes = { version = "1.11.1" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 derive-where = { version = "1" }
