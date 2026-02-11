@@ -123,7 +123,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
     fn add_hello_subscription(
         &mut self,
         peer: SyncPeer,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) {
@@ -135,7 +135,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
             .queue
             .insert(ScheduledTask::HelloNotify(peer), schedule_delay);
         let subscription = HelloSubscription {
-            graph_change_delay,
+            graph_change_debounce,
             last_notified: None,
             schedule_delay,
             expires_at: Instant::now() + duration,
@@ -245,13 +245,13 @@ where
     async fn send_hello_subscribe(
         &self,
         peer: SyncPeer,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
         trace!(?peer, "subscribing to hello notifications from peer");
         let message = SyncType::Hello(SyncHelloType::Subscribe {
-            graph_change_delay,
+            graph_change_debounce,
             duration,
             schedule_delay,
             graph_id: peer.graph_id,
@@ -303,7 +303,7 @@ where
                 debug!(?peer, "removed expired subscription");
                 return false;
             }
-            subscribers.push((*peer, sub.graph_change_delay, sub.last_notified));
+            subscribers.push((*peer, sub.graph_change_debounce, sub.last_notified));
             true
         });
 
@@ -402,8 +402,8 @@ where
                         Ok(())
                     }
                     #[cfg(feature = "preview")]
-                    ManagerMessage::HelloSubscribe { peer, graph_change_delay, duration, schedule_delay } => {
-                        self.send_hello_subscribe(peer, graph_change_delay, duration, schedule_delay).await
+                    ManagerMessage::HelloSubscribe { peer, graph_change_debounce, duration, schedule_delay } => {
+                        self.send_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay).await
                     }
                     #[cfg(feature = "preview")]
                     ManagerMessage::HelloUnsubscribe { peer } => self.send_hello_unsubscribe(peer).await,
@@ -413,8 +413,8 @@ where
                         Ok(())
                     }
                     #[cfg(feature = "preview")]
-                    ManagerMessage::HelloSubscribeRequest { peer, graph_change_delay, duration, schedule_delay } => {
-                        self.add_hello_subscription(peer, graph_change_delay, duration, schedule_delay);
+                    ManagerMessage::HelloSubscribeRequest { peer, graph_change_debounce, duration, schedule_delay } => {
+                        self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay);
                         Ok(())
                     }
                     #[cfg(feature = "preview")]

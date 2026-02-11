@@ -82,7 +82,7 @@ pub(crate) enum ManagerMessage {
         /// The unique [`SyncPeer`] to send a message to.
         peer: SyncPeer,
         /// Rate limiting on how often to notify when a graph changes.
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         /// How long the subscription should last.
         duration: Duration,
         /// Interval to send hello notifications, regardless of graph changes.
@@ -176,13 +176,13 @@ impl SyncHandle {
     pub(super) async fn hello_subscribe_request(
         &self,
         peer: SyncPeer,
-        graph_change_delay: Duration,
+        graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
     ) -> Response {
         self.send(ManagerMessage::HelloSubscribeRequest {
             peer,
-            graph_change_delay,
+            graph_change_debounce,
             duration,
             schedule_delay,
         })

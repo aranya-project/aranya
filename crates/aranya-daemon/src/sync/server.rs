@@ -194,14 +194,14 @@ where
     ) -> Result<(), Error> {
         match hello_msg {
             SyncHelloType::Subscribe {
-                graph_change_delay,
+                graph_change_debounce,
                 duration,
                 schedule_delay,
                 graph_id,
             } => {
                 check_request(peer.graph_id, graph_id)?;
                 self.handle
-                    .hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
+                    .hello_subscribe_request(peer, graph_change_debounce, duration, schedule_delay)
                     .await?;
             }
             SyncHelloType::Unsubscribe { graph_id } => {

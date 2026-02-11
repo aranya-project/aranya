@@ -38,7 +38,7 @@ pub(crate) enum SyncResponse {
 #[cfg(feature = "preview")]
 pub(crate) struct HelloSubscription {
     /// Rate limiting on how often to notify when a graph changes.
-    pub(super) graph_change_delay: Duration,
+    pub(super) graph_change_debounce: Duration,
     /// The last time we notified a peer about our current graph.
     pub(super) last_notified: Option<Instant>,
     /// How far apart to space notifications on a schedule.
