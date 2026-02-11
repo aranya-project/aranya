@@ -8,8 +8,6 @@
 
 use std::{convert::Infallible, sync::Arc};
 
-use tracing::error;
-
 use crate::sync::Addr;
 
 mod client;

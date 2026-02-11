@@ -48,6 +48,7 @@ pub(crate) enum Error {
 
 // Implements this error type to allow it being sent over RPC.
 impl From<Error> for aranya_daemon_api::Error {
+    #[inline]
     fn from(err: Error) -> Self {
         Self::from_err(err)
     }

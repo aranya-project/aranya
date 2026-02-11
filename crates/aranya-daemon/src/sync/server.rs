@@ -26,6 +26,7 @@ pub(crate) struct SyncServer<SL, PS, SP> {
     /// Thread-safe Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     client: Client<PS, SP>,
     /// Interface to trigger sync operations
+    #[allow(dead_code, reason = "only used in preview right now")]
     handle: SyncHandle,
 }
 
@@ -35,7 +36,7 @@ where
     PS: PolicyStore + Send + 'static,
     SP: StorageProvider + Send + 'static,
 {
-    pub(crate) fn new(listener: SL, client: Client<PS, SP>, handle: SyncHandle) -> Self {
+    pub(crate) const fn new(listener: SL, client: Client<PS, SP>, handle: SyncHandle) -> Self {
         Self {
             listener,
             client,
@@ -175,9 +176,9 @@ where
                 buf.truncate(len);
                 Ok(buf.split_off(0).into_boxed_slice())
             }
-            SyncRequestMessage::RequestMissing { .. } => bug!("Should be a SyncRequest"),
-            SyncRequestMessage::SyncResume { .. } => bug!("Should be a SyncRequest"),
-            SyncRequestMessage::EndSession { .. } => bug!("Should be a SyncRequest"),
+            SyncRequestMessage::RequestMissing { .. }
+            | SyncRequestMessage::SyncResume { .. }
+            | SyncRequestMessage::EndSession { .. } => bug!("Should be a SyncRequest"),
         }
     }
 

@@ -92,7 +92,7 @@ impl SharedConnectionMap {
                     (entry.get().clone(), None)
                 } else {
                     let (handle, acceptor) = make_conn().await?.split();
-                    let _ = entry.insert(handle);
+                    entry.insert(handle);
                     (entry.get().clone(), Some(acceptor))
                 }
             }
@@ -135,11 +135,11 @@ impl SharedConnectionMap {
                     debug!(connection_key = ?peer, "Closing the connection because an open connection was already found");
                     conn.close(AppError::UNKNOWN);
                     return entry.get().clone();
-                } else {
-                    let (handle, acceptor) = conn.split();
-                    entry.insert(handle);
-                    (entry.get().clone(), acceptor)
                 }
+
+                let (handle, acceptor) = conn.split();
+                entry.insert(handle);
+                (entry.get().clone(), acceptor)
             }
             Entry::Vacant(entry) => {
                 debug!("existing QUIC connection not found");

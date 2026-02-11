@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use futures_util::AsyncReadExt;
+use futures_util::AsyncReadExt as _;
 use s2n_quic::stream::{BidirectionalStream, ReceiveStream, SendStream};
 
 use super::Error;

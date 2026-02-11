@@ -30,7 +30,7 @@ where
     ) -> Result<Self, Error> {
         let return_address =
             Bytes::from(postcard::to_allocvec(&server_addr).assume("can serialize addr")?);
-        let transport = QuicTransport::new(client_addr, conns, psk_store, return_address.clone())?;
+        let transport = QuicTransport::new(client_addr, conns, psk_store, return_address)?;
 
         Ok(Self {
             client,

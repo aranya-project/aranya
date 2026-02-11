@@ -3,7 +3,7 @@
 pub(crate) mod quic;
 
 #[async_trait::async_trait]
-pub(crate) trait SyncStream: Send + 'static {
+pub(crate) trait SyncStream: Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
 
     fn peer(&self) -> super::SyncPeer;
@@ -14,7 +14,7 @@ pub(crate) trait SyncStream: Send + 'static {
 }
 
 #[async_trait::async_trait]
-pub(crate) trait SyncTransport: Send + 'static {
+pub(crate) trait SyncTransport: Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Stream: SyncStream<Error = Self::Error>;
 
@@ -22,7 +22,7 @@ pub(crate) trait SyncTransport: Send + 'static {
 }
 
 #[async_trait::async_trait]
-pub(crate) trait SyncListener: Send + 'static {
+pub(crate) trait SyncListener: Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Stream: SyncStream<Error = Self::Error>;
 

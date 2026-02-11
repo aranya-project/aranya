@@ -1,6 +1,9 @@
+#[cfg(feature = "preview")]
 use std::collections::HashMap;
 
+#[cfg(feature = "preview")]
 use tokio::time::{Duration, Instant};
+#[cfg(feature = "preview")]
 use tokio_util::time::delay_queue;
 
 /// The unique identifier for a sync peer.
@@ -16,7 +19,7 @@ pub(crate) struct SyncPeer {
 
 impl SyncPeer {
     /// Create a new `SyncPeer`.
-    pub(crate) fn new(addr: super::Addr, graph_id: super::GraphId) -> Self {
+    pub(crate) const fn new(addr: super::Addr, graph_id: super::GraphId) -> Self {
         Self { addr, graph_id }
     }
 }
@@ -32,6 +35,7 @@ pub(crate) enum SyncResponse {
 
 /// Storage for a subscription to hello messages.
 #[derive(Debug, Clone)]
+#[cfg(feature = "preview")]
 pub(crate) struct HelloSubscription {
     /// Rate limiting on how often to notify when a graph changes.
     pub(super) graph_change_delay: Duration,
@@ -46,4 +50,5 @@ pub(crate) struct HelloSubscription {
 }
 
 /// Type alias to map a unique [`SyncPeer`] to their associated subscription.
+#[cfg(feature = "preview")]
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;

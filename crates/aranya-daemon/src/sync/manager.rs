@@ -15,14 +15,14 @@
 //! when their graph head changes, enabling more responsive synchronization:
 //!
 //! - **Subscriptions**: Peers can subscribe to hello notifications from other peers using
-//!   SyncHandle::sync_hello_subscribe, specifying a delay between notifications and a duration
+//!   `SyncHandle::sync_hello_subscribe`, specifying a delay between notifications and a duration
 //!   for the subscription.
 //! - **Broadcasting**: When a graph head changes, hello notifications are broadcast to all
-//!   subscribers via SyncHandle::broadcast_hello.
+//!   subscribers via `SyncHandle::broadcast_hello`.
 //! - **Sync on Hello**: Peers can be configured to automatically sync when they receive a hello
 //!   notification by setting `sync_on_hello` in their [`SyncPeerConfig`].
 //! - **Unsubscribe**: Peers can unsubscribe from hello notifications using
-//!   SyncHandle::sync_hello_unsubscribe.
+//!   `SyncHandle::sync_hello_unsubscribe`.
 //!
 //! [`SyncHandle`]: super::SyncHandle
 
@@ -179,13 +179,13 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
 
     /// Returns a reference to the Aranya client.
     #[cfg(test)]
-    pub(crate) fn client(&self) -> &Client<PS, SP> {
+    pub(crate) const fn client(&self) -> &Client<PS, SP> {
         &self.client
     }
 
     /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
-    pub(crate) fn client_mut(&mut self) -> &mut Client<PS, SP> {
+    pub(crate) const fn client_mut(&mut self) -> &mut Client<PS, SP> {
         &mut self.client
     }
 }
@@ -243,7 +243,7 @@ where
     /// Subscribe to hello notifications from a sync peer.
     #[cfg(feature = "preview")]
     async fn send_hello_subscribe(
-        &mut self,
+        &self,
         peer: SyncPeer,
         graph_change_delay: Duration,
         duration: Duration,
@@ -262,7 +262,7 @@ where
 
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
-    async fn send_hello_unsubscribe(&mut self, peer: SyncPeer) -> Result<()> {
+    async fn send_hello_unsubscribe(&self, peer: SyncPeer) -> Result<()> {
         trace!(?peer, "unsubscribing from hello notifications from peer");
         let message = SyncType::Hello(SyncHelloType::Unsubscribe {
             graph_id: peer.graph_id,
@@ -343,13 +343,13 @@ where
         let schedule_delay = sub.schedule_delay;
         let graph_id = peer.graph_id;
 
-        let head = {
-            let mut aranya = self.client.lock_aranya().await;
-            match aranya.provider().get_storage(graph_id) {
-                Ok(storage) => storage.get_head_address().ok(),
-                Err(_) => None,
-            }
-        };
+        let head = self
+            .client
+            .lock_aranya()
+            .await
+            .provider()
+            .get_storage(graph_id)
+            .map_or(None, |storage| storage.get_head_address().ok());
 
         if let Some(head) = head {
             if let Err(error) = self.send_hello_notification(peer, head).await {

@@ -32,7 +32,7 @@ impl QuicTransport {
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
         client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        client_config.preshared_keys = psk_store.clone(); // Pass the Arc<ClientPresharedKeys>
+        client_config.preshared_keys = Arc::<PskStore>::clone(&psk_store); // Pass the Arc<ClientPresharedKeys>
 
         // Client builder doesn't support adding preshared keys
         #[allow(deprecated)]
@@ -94,9 +94,11 @@ impl SyncTransport for QuicTransport {
         let stream = match handle.open_bidirectional_stream().await {
             Ok(stream) => stream,
             // Retry for these errors?
-            Err(e @ s2n_quic::connection::Error::StatelessReset { .. })
-            | Err(e @ s2n_quic::connection::Error::StreamIdExhausted { .. })
-            | Err(e @ s2n_quic::connection::Error::MaxHandshakeDurationExceeded { .. }) => {
+            Err(
+                e @ (s2n_quic::connection::Error::StatelessReset { .. }
+                | s2n_quic::connection::Error::StreamIdExhausted { .. }
+                | s2n_quic::connection::Error::MaxHandshakeDurationExceeded { .. }),
+            ) => {
                 return Err(Error::QuicConnection(e));
             }
             // Other errors means the stream has closed

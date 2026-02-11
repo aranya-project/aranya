@@ -115,7 +115,7 @@ pub(crate) struct SyncHandle {
 impl SyncHandle {
     /// Creates a new [`SyncHandle`] for sending messages.
     #[allow(unused)]
-    pub(crate) fn new(sender: mpsc::Sender<Callback>) -> Self {
+    pub(crate) const fn new(sender: mpsc::Sender<Callback>) -> Self {
         Self { sender }
     }
 
