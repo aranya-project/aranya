@@ -110,19 +110,34 @@ impl Team<'_> {
     /// Adds a device to the team with an optional initial role.
     ///
     /// The device is assigned a default rank of the command author's
-    /// rank minus one. Use [`Self::add_device_with_rank`] (preview) to
-    /// specify an explicit rank.
+    /// rank minus one. Use [`Self::add_device_with_rank`] to specify an
+    /// explicit rank.
     #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
     pub async fn add_device(&self, keys: KeyBundle, initial_role: Option<RoleId>) -> Result<()> {
+        // Default to role_rank - 1 when an initial_role is provided,
+        // otherwise fall back to author_rank - 1.
+        let rank = match &initial_role {
+            Some(role_id) => {
+                let role_obj: ObjectId = (*role_id).into();
+                let role_rank = self.query_rank(role_obj).await?;
+                Rank::new(role_rank.value() - 1)
+            }
+            None => {
+                let device_id = self.client.get_device_id().await?;
+                let device_obj: ObjectId = device_id.into();
+                let author_rank = self.query_rank(device_obj).await?;
+                Rank::new(author_rank.value() - 1)
+            }
+        };
         self.client
             .daemon
-            .add_device_to_team(
+            .add_device_to_team_with_rank(
                 context::current(),
                 self.id,
                 keys.into_api(),
                 initial_role.map(RoleId::into_api),
-                None,
+                rank,
             )
             .await
             .map_err(IpcError::new)?
@@ -140,12 +155,12 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(
+            .add_device_to_team_with_rank(
                 context::current(),
                 self.id,
                 keys.into_api(),
                 initial_role.map(RoleId::into_api),
-                Some(rank),
+                rank,
             )
             .await
             .map_err(IpcError::new)?
@@ -369,12 +384,10 @@ impl Team<'_> {
     }
 
     /// Deprecated: the `role` parameter is ignored and the returned
-    /// [`Roles`] is always empty. Use [`Self::query_rank`] instead.
-    #[deprecated(note = "use `query_rank` instead")]
+    /// [`Roles`] is always empty.
+    #[deprecated(note = "role_owners is deprecated")]
     pub async fn role_owners(&self, _role: RoleId) -> Result<Roles> {
-        tracing::warn!(
-            "role_owners is deprecated; use query_rank instead"
-        );
+        tracing::warn!("role_owners is deprecated");
         Ok(Roles {
             roles: Vec::new().into(),
         })
@@ -389,8 +402,7 @@ impl Team<'_> {
     /// model. The label is created with a default rank of the command
     /// author's rank minus one.
     ///
-    /// Use [`Self::create_label_with_rank`] (preview) to specify an
-    /// explicit rank.
+    /// Use [`Self::create_label_with_rank`] to specify an explicit rank.
     #[deprecated(note = "use `create_label_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
     pub async fn create_label(
@@ -398,9 +410,14 @@ impl Team<'_> {
         label_name: Text,
         _managing_role_id: RoleId,
     ) -> Result<LabelId> {
+        // Default to author_rank - 1.
+        let device_id = self.client.get_device_id().await?;
+        let device_obj: ObjectId = device_id.into();
+        let author_rank = self.query_rank(device_obj).await?;
+        let rank = Rank::new(author_rank.value() - 1);
         self.client
             .daemon
-            .create_label(context::current(), self.id, label_name, None)
+            .create_label_with_rank(context::current(), self.id, label_name, rank)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -412,7 +429,7 @@ impl Team<'_> {
     pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
         self.client
             .daemon
-            .create_label(context::current(), self.id, label_name, Some(rank))
+            .create_label_with_rank(context::current(), self.id, label_name, rank)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -421,20 +438,14 @@ impl Team<'_> {
 
     /// Adds a managing role to a label.
     ///
-    /// Label managing roles have been replaced by rank-based
-    /// authorization. This method is a no-op. Use
-    /// [`Self::create_label_with_rank`] instead.
-    #[deprecated(
-        note = "label managing roles replaced by rank-based authorization; use `create_label_with_rank`"
-    )]
+    /// Deprecated: this method is a no-op.
+    #[deprecated(note = "add_label_managing_role is deprecated")]
     pub async fn add_label_managing_role(
         &self,
         _label_id: LabelId,
         _managing_role: RoleId,
     ) -> Result<()> {
-        tracing::warn!(
-            "add_label_managing_role is deprecated and is a no-op; use create_label_with_rank instead"
-        );
+        tracing::warn!("add_label_managing_role is deprecated and is a no-op");
         Ok(())
     }
 

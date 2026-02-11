@@ -98,13 +98,14 @@ async fn test_sync_now() -> Result<()> {
         .await
         .context("owner unable to assign admin role")?;
 
-    // Now, we try to create a label using the admin, which is expected to fail
+    // Now, we try to assign a role using the admin, which is expected to fail
     // because the admin hasn't synced yet and doesn't know about its role.
     match admin
-        .create_label_with_rank(text!("test_label"), Rank::new(500))
+        .device(devices.operator.id)
+        .assign_role(roles.operator().id)
         .await
     {
-        Ok(_) => bail!("Expected label creation to fail"),
+        Ok(_) => bail!("Expected role assignment to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(_) => bail!("Unexpected error"),
     }
@@ -730,13 +731,14 @@ async fn test_add_team() -> Result<()> {
             Err(err) => return Err(err).context("unexpected error while syncing"),
         }
 
-        // Now, we try to create a label using the admin, which is expected to fail
+        // Now, we try to assign a role using the admin, which is expected to fail
         // because the admin hasn't called add_team() yet.
         match admin
-            .create_label_with_rank(text!("test_label"), Rank::new(500))
+            .device(devices.operator.id)
+            .assign_role(roles.operator().id)
             .await
         {
-            Ok(_) => bail!("Expected label creation to fail"),
+            Ok(()) => bail!("Expected role assignment to fail"),
             Err(aranya_client::Error::Aranya(_)) => {}
             Err(_) => bail!("Unexpected error"),
         }
@@ -929,13 +931,14 @@ async fn test_multi_team_sync() -> Result<()> {
             Err(err) => return Err(err).context("unexpected error while syncing"),
         }
 
-        // Now, we try to create a label using the admin, which is expected to fail
+        // Now, we try to assign a role using the admin, which is expected to fail
         // because add_team() hasn't been called yet.
         match admin
-            .create_label_with_rank(text!("team1_label"), Rank::new(500))
+            .device(devices.operator.id)
+            .assign_role(roles1.operator().id)
             .await
         {
-            Ok(_) => bail!("Expected label creation to fail"),
+            Ok(()) => bail!("Expected role assignment to fail"),
             Err(aranya_client::Error::Aranya(_)) => {}
             Err(_) => bail!("Unexpected error"),
         }
@@ -979,13 +982,14 @@ async fn test_multi_team_sync() -> Result<()> {
             Err(err) => return Err(err).context("unexpected error while syncing"),
         }
 
-        // Now, we try to create a label using the admin, which is expected to fail
+        // Now, we try to assign a role using the admin, which is expected to fail
         // because add_team() hasn't been called for team2 yet.
         match admin
-            .create_label_with_rank(text!("team2_label"), Rank::new(500))
+            .device(devices.operator.id)
+            .assign_role(roles2.operator().id)
             .await
         {
-            Ok(_) => bail!("Expected label creation to fail"),
+            Ok(()) => bail!("Expected role assignment to fail"),
             Err(aranya_client::Error::Aranya(_)) => {}
             Err(_) => bail!("Unexpected error"),
         }
@@ -1660,12 +1664,15 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
 
-    let r = owner_team
+    match owner_team
         .device(devices.membera.id)
         .assign_role(roles.operator().id)
-        .await;
-
-    assert!(matches!(r, Err(aranya_client::Error::Aranya(_))));
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
 
     Ok(())
 }
@@ -1963,6 +1970,55 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected change_rank error: {err:?}"),
     }
+
+    Ok(())
+}
+
+/// Tests that a role's rank can be demoted below a device that holds it.
+///
+/// This should normally not be done, but the policy cannot prevent it because
+/// enforcing `role_rank >= device_rank` on demotion would require iterating
+/// over all devices assigned to the role, which the policy language does not
+/// support. See the "Role Rank Changes and the Device-Role Invariant" section
+/// in policy.md for more details.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_role_rank_below_device_rank_allowed() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_role_rank_below_device_rank_allowed").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Add admin device with rank just below the member role rank (600)
+    let device_rank = Rank::new(599);
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await?;
+
+    let role_obj: ObjectId = roles.member().id.into();
+    let role_rank = Rank::new(600);
+
+    // Demote the member role rank below the device's rank
+    let demoted_role_rank = Rank::new(500);
+    owner_team
+        .change_rank(role_obj, role_rank, demoted_role_rank)
+        .await
+        .context("demoting role rank below device rank should succeed")?;
+
+    // Verify the role rank is now below the device rank
+    let current_role_rank = owner_team.query_rank(role_obj).await?;
+    assert_eq!(current_role_rank, demoted_role_rank);
+
+    let device_obj: ObjectId = devices.admin.id.into();
+    let current_device_rank = owner_team.query_rank(device_obj).await?;
+    assert!(
+        current_device_rank > current_role_rank,
+        "device rank ({current_device_rank}) should now exceed role rank ({current_role_rank})"
+    );
 
     Ok(())
 }

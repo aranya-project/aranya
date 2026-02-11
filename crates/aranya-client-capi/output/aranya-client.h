@@ -630,7 +630,7 @@ typedef struct AranyaLabelId {
 } AranyaLabelId;
 
 /**
- * An identifier for any object defined in the Aranya policy.
+ * An identifier for any object with a unique Aranya ID defined in the policy.
  */
 typedef struct AranyaObjectId {
     struct AranyaId id;
@@ -1869,7 +1869,7 @@ AranyaError aranya_setup_default_roles_no_owning_role_ext(struct AranyaClient *c
                                                     struct AranyaExtError *__ext_err);
 
 /**
- * Deprecated: always returns an empty list. Use `aranya_query_rank` instead.
+ * Deprecated: always returns an empty list.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -1886,7 +1886,7 @@ AranyaError aranya_role_owners(const struct AranyaClient *client,
                                size_t *roles_len);
 
 /**
- * Deprecated: always returns an empty list. Use `aranya_query_rank` instead.
+ * Deprecated: always returns an empty list.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID

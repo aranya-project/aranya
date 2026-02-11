@@ -106,7 +106,7 @@ custom_id! {
 }
 
 custom_id! {
-    /// An identifier for any object defined in the Aranya policy.
+    /// An identifier for any object with a unique Aranya ID defined in the policy.
     pub struct ObjectId;
 }
 
@@ -437,15 +437,13 @@ pub trait DaemonApi {
     // Device onboarding
     //
 
-    /// Adds a device to the team with optional initial role and rank.
-    ///
-    /// If `rank` is `None`, the daemon will use the command author's
-    /// rank minus one as the default.
-    async fn add_device_to_team(
+    /// Adds a device to the team with an optional initial role and
+    /// explicit rank.
+    async fn add_device_to_team_with_rank(
         team: TeamId,
         keys: KeyBundle,
         initial_role: Option<RoleId>,
-        rank: Option<Rank>,
+        rank: Rank,
     ) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
@@ -509,11 +507,8 @@ pub trait DaemonApi {
     // Label creation
     //
 
-    /// Create a label.
-    ///
-    /// If `rank` is `None`, the daemon will use the command author's
-    /// rank minus one as the default.
-    async fn create_label(team: TeamId, name: Text, rank: Option<Rank>) -> Result<LabelId>;
+    /// Creates a label with an explicit rank.
+    async fn create_label_with_rank(team: TeamId, name: Text, rank: Rank) -> Result<LabelId>;
     /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     /// Returns a specific label.

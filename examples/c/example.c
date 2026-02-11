@@ -1032,8 +1032,7 @@ AranyaError run_custom_roles_example(Team *t) {
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
     // Demo change_rank/query_rank: change the buddy role's rank.
-    AranyaObjectId buddy_object_id;
-    memcpy(buddy_object_id.id.bytes, buddy_role_id.id.bytes, ARANYA_ID_LEN);
+    AranyaObjectId buddy_object_id = { .id = buddy_role_id.id };
 
     int64_t current_rank = 0;
     err = aranya_query_rank(&owner->client, &t->id, &buddy_object_id,

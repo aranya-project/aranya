@@ -458,7 +458,7 @@ impl From<&LabelId> for aranya_client::LabelId {
     }
 }
 
-/// An identifier for any object defined in the Aranya policy.
+/// An identifier for any object with a unique Aranya ID defined in the policy.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ObjectId {
@@ -1287,7 +1287,7 @@ pub unsafe fn setup_default_roles_no_owning_role(
     Ok(())
 }
 
-/// Deprecated: always returns an empty list. Use [`query_rank`] instead.
+/// Deprecated: always returns an empty list.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1296,7 +1296,7 @@ pub unsafe fn setup_default_roles_no_owning_role(
 /// @param[in,out] roles_len set to 0 on return
 ///
 /// @relates AranyaClient.
-#[deprecated(note = "use `query_rank` instead")]
+#[deprecated(note = "role_owners is deprecated")]
 pub unsafe fn role_owners(
     _client: &Client,
     _team: &TeamId,

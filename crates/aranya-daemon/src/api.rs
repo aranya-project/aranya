@@ -645,44 +645,20 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn add_device_to_team(
+    async fn add_device_to_team_with_rank(
         self,
         _: context::Context,
         team: api::TeamId,
         keys: api::KeyBundle,
         initial_role: Option<api::RoleId>,
-        rank: Option<api::Rank>,
+        rank: api::Rank,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
-        // When rank is not specified and an initial_role is provided,
-        // default to role_rank - 1 so the policy check
-        // `role_rank >= device_rank` passes. Otherwise fall back to
-        // author_rank - 1.
-        let rank = match (rank, &initial_role) {
-            (Some(r), _) => r.value(),
-            (None, Some(role_id)) => {
-                let role_base: BaseId = RoleId::transmute(*role_id).as_base();
-                let effects = self
-                    .client
-                    .actions(graph)
-                    .query_rank(role_base)
-                    .await
-                    .context("unable to query role rank for default device rank")?;
-                if let Some(Effect::QueryRankResult(e)) =
-                    find_effect!(&effects, Effect::QueryRankResult(_))
-                {
-                    e.rank - 1
-                } else {
-                    self.resolve_rank(graph, None).await?
-                }
-            }
-            (None, None) => self.resolve_rank(graph, None).await?,
-        };
 
         let effects = self
             .client
             .actions(graph)
-            .add_device_with_rank(keys.into(), initial_role.map(RoleId::transmute), rank)
+            .add_device_with_rank(keys.into(), initial_role.map(RoleId::transmute), rank.value())
             .await
             .context("unable to add device to team")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1037,20 +1013,19 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn create_label(
+    async fn create_label_with_rank(
         self,
         _: context::Context,
         team: api::TeamId,
         label_name: Text,
-        rank: Option<api::Rank>,
+        rank: api::Rank,
     ) -> api::Result<api::LabelId> {
         let graph = self.check_team_valid(team).await?;
-        let rank = self.resolve_rank(graph, rank).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .create_label_with_rank(label_name, rank)
+            .create_label_with_rank(label_name, rank.value())
             .await
             .context("unable to create label")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1363,33 +1338,6 @@ impl DaemonApi for Api {
 }
 
 impl Api {
-    /// Resolves a rank value: if `rank` is `Some`, uses that value directly.
-    /// Otherwise, queries the command author's (this device's) rank and
-    /// returns `author_rank - 1`. Returns an error if the author's rank
-    /// cannot be determined.
-    async fn resolve_rank(&self, graph: GraphId, rank: Option<api::Rank>) -> anyhow::Result<i64> {
-        match rank {
-            Some(r) => Ok(r.value()),
-            None => {
-                let device_id = self.device_id()?;
-                let device_base: BaseId = DeviceId::transmute(device_id).as_base();
-                let effects = self
-                    .client
-                    .actions(graph)
-                    .query_rank(device_base)
-                    .await
-                    .context("unable to query author's rank for default")?;
-                if let Some(Effect::QueryRankResult(e)) =
-                    find_effect!(&effects, Effect::QueryRankResult(_))
-                {
-                    Ok(e.rank - 1)
-                } else {
-                    anyhow::bail!("could not determine author's rank; specify an explicit rank")
-                }
-            }
-        }
-    }
-
     async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
         let crypto = &mut *self.crypto.lock().await;
 
