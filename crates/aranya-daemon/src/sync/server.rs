@@ -1,7 +1,9 @@
 use anyhow::Context as _;
+#[cfg(feature = "preview")]
+use aranya_runtime::SyncHelloType;
 use aranya_runtime::{
-    PolicyStore, StorageError, StorageProvider, SyncHelloType, SyncRequestMessage, SyncResponder,
-    SyncType, MAX_SYNC_MESSAGE_SIZE,
+    PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::bug;
@@ -183,6 +185,7 @@ where
     ///
     /// Handles subscription management and hello notifications.
     #[instrument(skip_all)]
+    #[cfg(feature = "preview")]
     pub(super) async fn process_hello_message(
         &self,
         peer: SyncPeer,

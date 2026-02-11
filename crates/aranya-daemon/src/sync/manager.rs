@@ -33,9 +33,10 @@ use std::time::Duration;
 use anyhow::Context as _;
 use aranya_crypto::Rng;
 use aranya_daemon_api::SyncPeerConfig;
+#[cfg(feature = "preview")]
+use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
 use aranya_runtime::{
-    Address, Command as _, PolicyStore, Storage as _, StorageProvider, SyncHelloType,
-    SyncRequester, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Command as _, PolicyStore, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
@@ -45,18 +46,20 @@ use futures_util::StreamExt as _;
 use tokio::{sync::mpsc, time::Instant};
 use tokio_util::time::{delay_queue, DelayQueue};
 #[cfg(feature = "preview")]
-use tracing::trace;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, trace};
+use tracing::{error, info, instrument, warn};
 
 use super::{
     handle::{Callback, ManagerMessage},
     GraphId, Result, SyncPeer,
 };
+#[cfg(feature = "preview")]
+use crate::sync::{HelloSubscription, HelloSubscriptions};
 use crate::{
     aranya::Client,
     sync::{
         transport::{SyncStream as _, SyncTransport},
-        Error, HelloSubscription, HelloSubscriptions, SyncResponse,
+        Error, SyncResponse,
     },
     vm_policy::VecSink,
 };
@@ -64,6 +67,7 @@ use crate::{
 #[derive(Debug)]
 enum ScheduledTask {
     Sync(SyncPeer),
+    #[cfg(feature = "preview")]
     HelloNotify(SyncPeer),
 }
 
@@ -118,6 +122,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         }
     }
 
+    #[cfg(feature = "preview")]
     fn add_hello_subscription(
         &mut self,
         peer: SyncPeer,
@@ -144,6 +149,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         self.hello_subscriptions.insert(peer, subscription);
     }
 
+    #[cfg(feature = "preview")]
     fn remove_hello_subscription(&mut self, peer: SyncPeer) {
         if let Some(old) = self.hello_subscriptions.remove(&peer) {
             self.queue.remove(&old.queue_key);
@@ -205,6 +211,7 @@ where
     /// * `Ok(())` if the message was sent successfully
     /// * `Err(SyncError)` if there was an error
     #[instrument(skip_all)]
+    #[cfg(feature = "preview")]
     pub(super) async fn send_hello_request(
         &self,
         peer: SyncPeer,
@@ -284,6 +291,7 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     async fn broadcast_hello(&mut self, graph_id: GraphId, head: Address) {
         let now = Instant::now();
 
@@ -324,6 +332,7 @@ where
         );
     }
 
+    #[cfg(feature = "preview")]
     async fn handle_scheduled_hello(&mut self, peer: SyncPeer) {
         // Check whether the peer already got removed via hello unsubscribe.
         let Some(sub) = self.hello_subscriptions.get(&peer) else {
@@ -428,6 +437,7 @@ where
             Some(expired) = self.queue.next() => {
                 match expired.into_inner() {
                     ScheduledTask::Sync(peer) => self.handle_scheduled_sync(peer).await?,
+                    #[cfg(feature = "preview")]
                     ScheduledTask::HelloNotify(peer) => self.handle_scheduled_hello(peer).await,
                 }
             }
@@ -536,6 +546,7 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "preview")]
     async fn sync_on_hello(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
         debug!(?peer, ?head, "received hello notification message");
 

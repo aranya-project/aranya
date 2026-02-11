@@ -7,9 +7,11 @@ use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
 
 use super::{Error, PskStore, QuicTransport, SharedConnectionMap};
+#[cfg(feature = "preview")]
+use crate::sync::HelloSubscriptions;
 use crate::{
     aranya::Client,
-    sync::{Addr, Callback, GraphId, HelloSubscriptions, SyncManager},
+    sync::{Addr, Callback, GraphId, SyncManager},
 };
 
 impl<PS, SP, EF> SyncManager<QuicTransport, PS, SP, EF>
@@ -38,6 +40,7 @@ where
             send_effects,
             transport,
             return_address,
+            #[cfg(feature = "preview")]
             hello_subscriptions: HelloSubscriptions::new(),
         })
     }
