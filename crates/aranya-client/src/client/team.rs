@@ -329,6 +329,19 @@ impl Team<'_> {
         Ok(())
     }
 
+    /// Queries all permissions assigned to a role.
+    #[instrument(skip(self))]
+    pub async fn query_role_perms(&self, role_id: RoleId) -> Result<Vec<Permission>> {
+        let perms = self
+            .client
+            .daemon
+            .query_role_perms(context::current(), self.id, role_id.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(perms)
+    }
+
     /// Changes the rank of an object (device or label).
     ///
     /// Note: Role ranks cannot be changed after creation. This maintains the

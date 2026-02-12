@@ -1032,6 +1032,28 @@ AranyaError run_custom_roles_example(Team *t) {
     EXPECT("unable to add 'CanUseAfc' permission to 'buddy' role", err);
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
+    // Query permissions assigned to the custom role.
+    const size_t role_perms_max = 16;
+    AranyaPermission role_perms[role_perms_max];
+    size_t role_perms_len = role_perms_max;
+    err = aranya_query_role_perms(&owner->client, &t->id, &buddy_role_id,
+                                  role_perms, &role_perms_len);
+    EXPECT("unable to query permissions for 'buddy' role", err);
+    printf("buddy role has %zu permission(s):\n", role_perms_len);
+    bool found_can_use_afc = false;
+    for (size_t i = 0; i < role_perms_len; i++) {
+        printf("  - %s\n", aranya_permission_to_str(role_perms[i]));
+        if (role_perms[i] == ARANYA_PERMISSION_CAN_USE_AFC) {
+            found_can_use_afc = true;
+        }
+    }
+    if (!found_can_use_afc) {
+        fprintf(stderr,
+                "expected 'buddy' role to have 'CanUseAfc' permission\n");
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
     // Demo change_rank/query_rank: change the buddy role's rank.
     AranyaObjectId buddy_object_id = {.id = buddy_role_id.id};
 

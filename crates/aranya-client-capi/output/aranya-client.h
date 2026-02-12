@@ -892,6 +892,18 @@ AranyaError aranya_role_get_author_ext(const struct AranyaRole *role,
                                        struct AranyaExtError *__ext_err);
 
 /**
+ * Returns a human-readable string for an [`AranyaPermission`].
+ *
+ * The resulting pointer must NOT be freed.
+ *
+ * @param[in] perm the permission value.
+ *
+ * @relates AranyaPermission.
+ */
+AranyaError aranya_permission_to_str(AranyaPermission perm,
+                                     const char **__output);
+
+/**
  * Initializes logging.
  *
  * Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
@@ -2075,6 +2087,49 @@ AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
                                              const struct AranyaRoleId *role,
                                              AranyaPermission perm,
                                              struct AranyaExtError *__ext_err);
+
+/**
+ * Query all permissions assigned to a role.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
+ * Writes the number of permissions that would have been returned to `perms_len`.
+ * The application can use `perms_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID to query permissions for
+ * @param[out] perms_out returns a list of permissions assigned to the role
+ * @param[in,out] perms_len the number of permissions written to the buffer
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_role_perms(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaRoleId *role,
+                                    AranyaPermission *perms_out,
+                                    size_t *perms_len);
+
+/**
+ * Query all permissions assigned to a role.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
+ * Writes the number of permissions that would have been returned to `perms_len`.
+ * The application can use `perms_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID to query permissions for
+ * @param[out] perms_out returns a list of permissions assigned to the role
+ * @param[in,out] perms_len the number of permissions written to the buffer
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_role_perms_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaRoleId *role,
+                                        AranyaPermission *perms_out,
+                                        size_t *perms_len,
+                                        struct AranyaExtError *__ext_err);
 
 /**
  * Assign a role to a device.

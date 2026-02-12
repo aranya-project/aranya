@@ -227,6 +227,17 @@ where
             .in_current_span()
     }
 
+    /// Invokes `query_role_perms`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_perms(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_perms(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
     /// Invokes `change_rank`.
     #[instrument(skip(self))]
     fn change_rank(

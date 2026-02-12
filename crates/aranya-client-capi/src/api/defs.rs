@@ -608,6 +608,59 @@ impl From<Permission> for aranya_client::client::Permission {
     }
 }
 
+impl From<aranya_client::client::Permission> for Permission {
+    fn from(perm: aranya_client::client::Permission) -> Self {
+        use aranya_client::client::Permission as P;
+        match perm {
+            P::AddDevice => Self::AddDevice,
+            P::RemoveDevice => Self::RemoveDevice,
+            P::TerminateTeam => Self::TerminateTeam,
+            P::ChangeRank => Self::ChangeRank,
+            P::CreateRole => Self::CreateRole,
+            P::DeleteRole => Self::DeleteRole,
+            P::AssignRole => Self::AssignRole,
+            P::RevokeRole => Self::RevokeRole,
+            P::ChangeRolePerms => Self::ChangeRolePerms,
+            P::SetupDefaultRole => Self::SetupDefaultRole,
+            P::CreateLabel => Self::CreateLabel,
+            P::DeleteLabel => Self::DeleteLabel,
+            P::AssignLabel => Self::AssignLabel,
+            P::RevokeLabel => Self::RevokeLabel,
+            P::CanUseAfc => Self::CanUseAfc,
+            P::CreateAfcUniChannel => Self::CreateAfcUniChannel,
+        }
+    }
+}
+
+/// Returns a human-readable string for an [`AranyaPermission`].
+///
+/// The resulting pointer must NOT be freed.
+///
+/// @param[in] perm the permission value.
+///
+/// @relates AranyaPermission.
+#[aranya_capi_core::no_ext_error]
+pub fn permission_to_str(perm: Permission) -> *const c_char {
+    match perm {
+        Permission::AddDevice => c"AddDevice".as_ptr(),
+        Permission::RemoveDevice => c"RemoveDevice".as_ptr(),
+        Permission::TerminateTeam => c"TerminateTeam".as_ptr(),
+        Permission::ChangeRank => c"ChangeRank".as_ptr(),
+        Permission::CreateRole => c"CreateRole".as_ptr(),
+        Permission::DeleteRole => c"DeleteRole".as_ptr(),
+        Permission::AssignRole => c"AssignRole".as_ptr(),
+        Permission::RevokeRole => c"RevokeRole".as_ptr(),
+        Permission::ChangeRolePerms => c"ChangeRolePerms".as_ptr(),
+        Permission::SetupDefaultRole => c"SetupDefaultRole".as_ptr(),
+        Permission::CreateLabel => c"CreateLabel".as_ptr(),
+        Permission::DeleteLabel => c"DeleteLabel".as_ptr(),
+        Permission::AssignLabel => c"AssignLabel".as_ptr(),
+        Permission::RevokeLabel => c"RevokeLabel".as_ptr(),
+        Permission::CanUseAfc => c"CanUseAfc".as_ptr(),
+        Permission::CreateAfcUniChannel => c"CreateAfcUniChannel".as_ptr(),
+    }
+}
+
 /// Channel ID for AFC channel.
 #[cfg(feature = "afc")]
 #[repr(C)]
@@ -1417,6 +1470,48 @@ pub fn remove_perm_from_role(
             .team(team.into())
             .remove_perm_from_role(role.into(), perm.into()),
     )?;
+    Ok(())
+}
+
+/// Query all permissions assigned to a role.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
+/// Writes the number of permissions that would have been returned to `perms_len`.
+/// The application can use `perms_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] role the role ID to query permissions for
+/// @param[out] perms_out returns a list of permissions assigned to the role
+/// @param[in,out] perms_len the number of permissions written to the buffer
+///
+/// @relates AranyaClient.
+pub unsafe fn query_role_perms(
+    client: &Client,
+    team: &TeamId,
+    role: &RoleId,
+    // NB: Output buffer parameters for enums must use the generated `Aranya*` type
+    // rather than the local enum type. The FFI codegen creates a separate wrapper
+    // type (e.g., `AranyaPermission(u8)`) that is layout-compatible but distinct
+    // from `Permission` in Rust's type system.
+    perms_out: *mut MaybeUninit<super::generated::AranyaPermission>,
+    perms_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let perms = client
+        .rt
+        .block_on(client.inner.team(team.into()).query_role_perms(role.into()))?;
+
+    if *perms_len < perms.len() {
+        *perms_len = perms.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *perms_len = perms.len();
+    let out = aranya_capi_core::try_as_mut_slice!(perms_out, *perms_len);
+
+    for (dst, src) in out.iter_mut().zip(perms) {
+        let perm: Permission = src.into();
+        dst.write(perm.into());
+    }
     Ok(())
 }
 

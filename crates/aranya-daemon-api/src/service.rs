@@ -477,6 +477,8 @@ pub trait DaemonApi {
     async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
     /// Removes a permission from a role.
     async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
+    /// Queries all permissions assigned to a role.
+    async fn query_role_perms(team: TeamId, role: RoleId) -> Result<Vec<Perm>>;
     /// Changes the rank of an object (device or label).
     ///
     /// Note: Role ranks cannot be changed after creation. This maintains the

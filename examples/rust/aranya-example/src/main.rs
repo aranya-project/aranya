@@ -412,6 +412,21 @@ async fn main() -> Result<()> {
         .add_perm_to_role(custom_role.id, Permission::CanUseAfc)
         .await?;
 
+    // Query permissions assigned to the custom role.
+    info!("querying permissions for custom role");
+    let role_perms = owner_team.query_role_perms(custom_role.id).await?;
+    info!(
+        "custom role has {} permission(s): {:?}",
+        role_perms.len(),
+        role_perms
+    );
+    assert!(
+        role_perms
+            .iter()
+            .any(|p| matches!(p, Permission::CanUseAfc)),
+        "expected custom role to have CanUseAfc permission"
+    );
+
     // Assign custom role to a device.
     info!("assigning custom role to a device");
     owner_team

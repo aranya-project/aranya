@@ -1286,6 +1286,35 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn query_role_perms(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+    ) -> api::Result<Vec<api::Perm>> {
+        let graph = self.check_team_valid(team).await?;
+
+        let perms = self
+            .client
+            .actions(graph)
+            .query_role_perms(RoleId::transmute(role))
+            .await
+            .context("unable to query role permissions")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryRolePermsResult(e) = e {
+                    Some(e.perm.into())
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+
+        Ok(perms)
+    }
+
+    #[instrument(skip(self), err)]
     async fn change_rank(
         self,
         _: context::Context,
