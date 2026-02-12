@@ -285,7 +285,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .into_iter()
         .find(|role| role.name == "owner" && role.default)
         .context("unable to find owner role")?;
-    let roles = owner.setup_default_roles_no_owning_role().await?;
+    let roles = owner.setup_default_roles().await?;
     let admin_role = roles
         .iter()
         .find(|r| r.name == "admin")

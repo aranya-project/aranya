@@ -1773,11 +1773,11 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_setup_default_roles(struct AranyaClient *client,
-                                       const struct AranyaTeamId *team,
-                                       const struct AranyaRoleId *owning_role,
-                                       struct AranyaRole *roles_out,
-                                       size_t *roles_len);
+AranyaError aranya_setup_default_roles_deprecated(struct AranyaClient *client,
+                                                  const struct AranyaTeamId *team,
+                                                  const struct AranyaRoleId *owning_role,
+                                                  struct AranyaRole *roles_out,
+                                                  size_t *roles_len);
 
 /**
  * Assign a role to a device.
@@ -1806,67 +1806,67 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+AranyaError aranya_setup_default_roles_deprecated_ext(struct AranyaClient *client,
+                                                      const struct AranyaTeamId *team,
+                                                      const struct AranyaRoleId *owning_role,
+                                                      struct AranyaRole *roles_out,
+                                                      size_t *roles_len,
+                                                      struct AranyaExtError *__ext_err);
+
+/**
+ * Setup default roles on team.
+ *
+ * This sets up the following roles with default permissions as
+ * defined in Aranya's default policy:
+ * - admin
+ * - operator
+ * - member
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ *
+ * N.B. this function is meant to be called once to set up the default roles.
+ * Subsequent calls will result in an error if the default roles were already created.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] roles_out returns a list of default roles
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_setup_default_roles(struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       struct AranyaRole *roles_out,
+                                       size_t *roles_len);
+
+/**
+ * Setup default roles on team.
+ *
+ * This sets up the following roles with default permissions as
+ * defined in Aranya's default policy:
+ * - admin
+ * - operator
+ * - member
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ *
+ * N.B. this function is meant to be called once to set up the default roles.
+ * Subsequent calls will result in an error if the default roles were already created.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] roles_out returns a list of default roles
+ * @param[in,out] roles_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
-                                           const struct AranyaRoleId *owning_role,
                                            struct AranyaRole *roles_out,
                                            size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
-
-/**
- * Setup default roles on team.
- *
- * This sets up the following roles with default permissions as
- * defined in Aranya's default policy:
- * - admin
- * - operator
- * - member
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
- *
- * N.B. this function is meant to be called once to set up the default roles.
- * Subsequent calls will result in an error if the default roles were already created.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] roles_out returns a list of default roles
- * @param[in,out] roles_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_setup_default_roles_no_owning_role(struct AranyaClient *client,
-                                                      const struct AranyaTeamId *team,
-                                                      struct AranyaRole *roles_out,
-                                                      size_t *roles_len);
-
-/**
- * Setup default roles on team.
- *
- * This sets up the following roles with default permissions as
- * defined in Aranya's default policy:
- * - admin
- * - operator
- * - member
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
- *
- * N.B. this function is meant to be called once to set up the default roles.
- * Subsequent calls will result in an error if the default roles were already created.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] roles_out returns a list of default roles
- * @param[in,out] roles_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_setup_default_roles_no_owning_role_ext(struct AranyaClient *client,
-                                                          const struct AranyaTeamId *team,
-                                                          struct AranyaRole *roles_out,
-                                                          size_t *roles_len,
-                                                          struct AranyaExtError *__ext_err);
 
 /**
  * Deprecated: always returns an empty list.

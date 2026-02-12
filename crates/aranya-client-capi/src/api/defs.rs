@@ -1200,9 +1200,9 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-#[deprecated(note = "use `setup_default_roles_no_owning_role` instead")]
+#[deprecated(note = "use `setup_default_roles` instead")]
 #[allow(deprecated)]
-pub unsafe fn setup_default_roles(
+pub unsafe fn setup_default_roles_deprecated(
     client: &mut Client,
     team: &TeamId,
     owning_role: &RoleId,
@@ -1215,7 +1215,7 @@ pub unsafe fn setup_default_roles(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles(owning_role.into()),
+                .setup_default_roles_deprecated(owning_role.into()),
         )?
         .__into_data();
 
@@ -1255,7 +1255,7 @@ pub unsafe fn setup_default_roles(
 /// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub unsafe fn setup_default_roles_no_owning_role(
+pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
     roles_out: *mut MaybeUninit<Role>,
@@ -1267,7 +1267,7 @@ pub unsafe fn setup_default_roles_no_owning_role(
             client
                 .inner
                 .team(team.into())
-                .setup_default_roles_no_owning_role(),
+                .setup_default_roles(),
         )?
         .__into_data();
 

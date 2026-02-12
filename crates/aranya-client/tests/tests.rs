@@ -1396,7 +1396,7 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
         .context("unable to setup default roles")?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team.setup_default_roles_no_owning_role().await {
+    match owner_team.setup_default_roles().await {
         Ok(_) => bail!("expected replayed setup_default_roles to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected error re-running setup_default_roles: {err:?}"),
@@ -2422,8 +2422,8 @@ async fn test_deprecated_setup_default_roles() -> Result<()> {
         .find(|r| r.name == "owner" && r.default)
         .expect("owner role should exist");
 
-    // Use deprecated setup_default_roles API with owning_role parameter
-    let setup_roles = owner_team.setup_default_roles(owner_role.id).await?;
+    // Use deprecated setup_default_roles_deprecated API with owning_role parameter
+    let setup_roles = owner_team.setup_default_roles_deprecated(owner_role.id).await?;
     assert_eq!(
         setup_roles.iter().count(),
         3,

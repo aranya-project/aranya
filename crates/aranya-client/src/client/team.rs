@@ -251,20 +251,20 @@ impl Team<'_> {
     ///
     /// The `owning_role` parameter is accepted for backward
     /// compatibility but is ignored in the rank-based authorization
-    /// model. Use [`Self::setup_default_roles_no_owning_role`] instead.
+    /// model. Use [`Self::setup_default_roles`] instead.
     ///
     /// It returns the roles that were created.
-    #[deprecated(note = "use `setup_default_roles_no_owning_role` instead")]
+    #[deprecated(note = "use `setup_default_roles` instead")]
     #[instrument(skip(self))]
-    pub async fn setup_default_roles(&self, _owning_role: RoleId) -> Result<Roles> {
-        self.setup_default_roles_no_owning_role().await
+    pub async fn setup_default_roles_deprecated(&self, _owning_role: RoleId) -> Result<Roles> {
+        self.setup_default_roles().await
     }
 
     /// Sets up the default team roles.
     ///
     /// It returns the roles that were created.
     #[instrument(skip(self))]
-    pub async fn setup_default_roles_no_owning_role(&self) -> Result<Roles> {
+    pub async fn setup_default_roles(&self) -> Result<Roles> {
         let roles = self
             .client
             .daemon
