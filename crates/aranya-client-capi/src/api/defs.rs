@@ -1206,36 +1206,13 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
 pub unsafe fn setup_default_roles_deprecated(
     client: &mut Client,
     team: &TeamId,
-    owning_role: &RoleId,
+    _owning_role: &RoleId,
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let default_roles = client
-        .rt
-        .block_on(
-            client
-                .inner
-                .team(team.into())
-                .setup_default_roles_deprecated(owning_role.into()),
-        )?
-        .__into_data();
-
-    if DEFAULT_ROLES_LEN != default_roles.len() {
-        bug!("DEFAULT_ROLES_LEN does not match actual default roles count");
-    }
-
-    if *roles_len < default_roles.len() {
-        *roles_len = default_roles.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *roles_len = default_roles.len();
-    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
-
-    for (dst, src) in out.iter_mut().zip(default_roles) {
-        Role::init(dst, src);
-    }
-
-    Ok(())
+    // Delegate to the non-deprecated version; owning_role is ignored.
+    // SAFETY: Caller has already satisfied the safety requirements.
+    unsafe { setup_default_roles(client, team, roles_out, roles_len) }
 }
 
 /// Setup default roles on team.

@@ -1775,7 +1775,7 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  */
 AranyaError aranya_setup_default_roles_deprecated(struct AranyaClient *client,
                                                   const struct AranyaTeamId *team,
-                                                  const struct AranyaRoleId *owning_role,
+                                                  const struct AranyaRoleId *_owning_role,
                                                   struct AranyaRole *roles_out,
                                                   size_t *roles_len);
 
@@ -1808,7 +1808,7 @@ AranyaError aranya_setup_default_roles_deprecated(struct AranyaClient *client,
  */
 AranyaError aranya_setup_default_roles_deprecated_ext(struct AranyaClient *client,
                                                       const struct AranyaTeamId *team,
-                                                      const struct AranyaRoleId *owning_role,
+                                                      const struct AranyaRoleId *_owning_role,
                                                       struct AranyaRole *roles_out,
                                                       size_t *roles_len,
                                                       struct AranyaExtError *__ext_err);
