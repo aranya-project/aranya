@@ -86,6 +86,7 @@ where
         for (peer, subscription) in subscribers {
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
+                #[allow(clippy::arithmetic_side_effects)] // Instant subtraction cannot overflow
                 if now - last_notified < subscription.graph_change_debounce {
                     continue;
                 }
@@ -407,6 +408,7 @@ where
                 ensure!(graph_id == active_graph_id);
 
                 let peer = SyncPeer::new(address, graph_id);
+                #[allow(clippy::arithmetic_side_effects)] // Instant + Duration: panics only at year 2554+
                 let expires_at = Instant::now() + duration;
 
                 // Check if there's an existing subscription and cancel its scheduled task

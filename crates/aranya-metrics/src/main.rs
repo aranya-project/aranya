@@ -221,6 +221,7 @@ async fn setup_demo(team_name: &str) -> Result<(Vec<Pid>, DemoContext)> {
 
     const CLIENT_NAMES: [&str; 5] = ["owner", "admin", "operator", "member_a", "member_b"];
     let mut contexts: [Option<ClientCtx>; CLIENT_NAMES.len()] = Default::default();
+    #[allow(clippy::arithmetic_side_effects)] // 5 + 1 cannot overflow
     let mut daemon_pids: Vec<Pid> = Vec::with_capacity(CLIENT_NAMES.len() + 1);
 
     for (i, &user_name) in CLIENT_NAMES.iter().enumerate() {
@@ -396,7 +397,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
-    let mut ciphertext = vec![0u8; afc_msg.len() + afc::Channels::OVERHEAD];
+    let mut ciphertext = vec![0u8; afc_msg.len().checked_add(afc::Channels::OVERHEAD).expect("AFC overhead should not overflow")];
     send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
@@ -405,7 +406,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // memberb opens data from membera.
     info!("memberb receiving uni channel from membera");
-    let mut plaintext = vec![0u8; ciphertext.len() - afc::Channels::OVERHEAD];
+    let mut plaintext = vec![0u8; ciphertext.len().checked_sub(afc::Channels::OVERHEAD).expect("ciphertext must be larger than overhead")];
     info!("memberb opening data from membera");
     let seq1 = recv
         .open(&mut plaintext, &ciphertext)

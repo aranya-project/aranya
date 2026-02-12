@@ -329,6 +329,7 @@ where
 ///
 /// See
 /// <https://github.com/golang/go/blob/a66a3bf494f652bc4fb209d861cbdba1dea71303/src/net/dnsclient.go#L78>.
+#[allow(clippy::arithmetic_side_effects)] // `part_len` bounded by early return at > 63
 fn is_domain_name(s: &str) -> bool {
     if s == "." {
         return true;
@@ -399,6 +400,7 @@ impl FmtBuf {
     /// The number of bytes that can still be written to the
     /// buffer.
     #[inline(always)]
+    #[allow(clippy::arithmetic_side_effects)] // self.len <= 255, self.buf.len() == 256
     fn available(&self) -> usize {
         self.buf.len() - usize::from(self.len)
     }
@@ -414,7 +416,7 @@ impl FmtBuf {
 
     /// Writes `c` to the buffer.
     #[inline(always)]
-    #[allow(clippy::indexing_slicing)]
+    #[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)] // self.len is u8, max 255
     fn write(&mut self, c: u8) {
         debug_assert!(self.available() > 0);
 
@@ -436,6 +438,7 @@ impl FmtBuf {
 
     /// Writes `x` as a base-10 integer to the buffer.
     #[inline(always)]
+    #[allow(clippy::arithmetic_side_effects)] // division/modulo on u8, cannot overflow
     fn itoa10(&mut self, x: u8) {
         if x >= 100 {
             self.write(base10(x / 100))
@@ -448,6 +451,7 @@ impl FmtBuf {
 
     /// Writes `x` as a base-16 integer to the buffer.
     #[inline(always)]
+    #[allow(clippy::arithmetic_side_effects)] // shifts and masks on u16, cannot overflow
     fn itoa16(&mut self, x: u16) {
         if x >= 0x1000 {
             self.write(base16((x >> 12) as u8));
@@ -478,6 +482,7 @@ impl FmtBuf {
 
     /// Formats `ip` per [RFC
     /// 5952](https://tools.ietf.org/html/rfc5952).
+    #[allow(clippy::arithmetic_side_effects)] // Span fields bounded by 8 segments
     fn fmt_ipv6(ip: &Ipv6Addr) -> Self {
         let mut buf = Self::new();
 
@@ -553,6 +558,7 @@ impl FmtBuf {
 
 /// Converts `c`, which must be in `0..=9`, to its base-10
 /// representation.
+#[allow(clippy::arithmetic_side_effects)] // x is 0..=9, x + b'0' max is 57
 const fn base10(x: u8) -> u8 {
     debug_assert!(x <= 9);
 
@@ -561,6 +567,7 @@ const fn base10(x: u8) -> u8 {
 
 /// Converts `c`, which must be in `0..=15`, to its base-16
 /// representation.
+#[allow(clippy::arithmetic_side_effects)] // x is 0..=15, both branches fit in u8
 const fn base16(x: u8) -> u8 {
     debug_assert!(x <= 15);
 
@@ -606,7 +613,7 @@ impl From<Bug> for AddrError {
     }
 }
 
-#[allow(clippy::indexing_slicing, clippy::expect_used)]
+#[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing, clippy::expect_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

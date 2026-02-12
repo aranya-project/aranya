@@ -1,6 +1,6 @@
 //! Integration tests for certificate generation.
 
-#![allow(clippy::panic)]
+#![allow(clippy::arithmetic_side_effects, clippy::panic)]
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

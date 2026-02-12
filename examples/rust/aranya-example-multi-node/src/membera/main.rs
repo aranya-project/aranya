@@ -26,6 +26,7 @@ struct Args {
 }
 
 #[tokio::main]
+#[allow(clippy::arithmetic_side_effects)] // example code: Duration * 3 and AFC buffer sizing
 async fn main() -> Result<()> {
     init_tracing(module_path!());
     info!("starting aranya-example-multi-node-membera");
@@ -165,7 +166,7 @@ async fn main() -> Result<()> {
 
     info!("membera: sending AFC data");
     let msg_send = b"hello";
-    let mut req = vec![0u8; msg_send.len() + Channels::OVERHEAD];
+    let mut req = vec![0u8; msg_send.len().checked_add(Channels::OVERHEAD).expect("AFC overhead should not overflow")];
     sealer.seal(&mut req, msg_send)?;
     sender.send(env.memberb.afc_addr, &req).await?;
     info!("membera: sent AFC data");
@@ -179,7 +180,7 @@ async fn main() -> Result<()> {
 
     info!("membera: receiving AFC data");
     let resp = receiver.recv().await?;
-    let mut msg_recv = vec![0u8; resp.len() - Channels::OVERHEAD];
+    let mut msg_recv = vec![0u8; resp.len().checked_sub(Channels::OVERHEAD).expect("ciphertext must be larger than overhead")];
     opener.open(&mut msg_recv, &resp)?;
     assert_eq!(msg_send.as_slice(), msg_recv.as_slice());
     info!("membera: received AFC data");

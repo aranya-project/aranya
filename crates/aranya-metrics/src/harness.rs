@@ -121,6 +121,7 @@ fn scale_bytes(bytes: u64) -> String {
     let mut value = bytes as f64;
     let mut unit_index = 0;
 
+    #[allow(clippy::arithmetic_side_effects)] // unit_index bounded by UNITS.len()
     while value >= 1024.0 && unit_index < UNITS.len() {
         value /= 1024.0;
         unit_index += 1;
@@ -204,8 +205,8 @@ impl ProcessMetricsCollector {
             physical_memory_bytes: current.physical_memory_bytes,
             virtual_memory_bytes: current.virtual_memory_bytes,
             // These need to be cumulative since sysinfo only returns bytes since last refresh.
-            disk_read_bytes: self.total_metrics.disk_read_bytes + current.disk_read_bytes,
-            disk_write_bytes: self.total_metrics.disk_write_bytes + current.disk_write_bytes,
+            disk_read_bytes: self.total_metrics.disk_read_bytes.saturating_add(current.disk_read_bytes),
+            disk_write_bytes: self.total_metrics.disk_write_bytes.saturating_add(current.disk_write_bytes),
         };
 
         debug!("Total Metrics: {}", self.total_metrics);

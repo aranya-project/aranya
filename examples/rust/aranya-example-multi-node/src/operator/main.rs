@@ -24,6 +24,7 @@ struct Args {
 }
 
 #[tokio::main]
+#[allow(clippy::arithmetic_side_effects)] // example code: Duration * 3
 async fn main() -> Result<()> {
     init_tracing(module_path!());
     info!("starting aranya-example-multi-node-operator");
