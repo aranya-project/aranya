@@ -1541,8 +1541,9 @@ pub fn revoke_role(
 /// Create a channel label.
 ///
 /// The `managing_role_id` parameter is accepted for backward compatibility
-/// but is ignored in the rank-based authorization model. The label is
-/// created with a default rank of the command author's rank minus one.
+/// but is ignored in the rank-based authorization model. Since this API
+/// does not allow the user to specify a rank, the label is created with
+/// a default rank of the command author's rank minus one.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
