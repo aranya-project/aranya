@@ -2321,35 +2321,75 @@ async fn test_assign_role_requires_outranking_both_role_and_device() -> Result<(
 
     let owner_team = devices.owner.client.team(team_id);
     let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
 
-    // Add admin at DEFAULT_OPERATOR_DEVICE_RANK (below operator role rank)
+    // Give admin the AssignRole permission
+    owner_team
+        .add_perm_to_role(roles.admin().id, Permission::AssignRole)
+        .await?;
+
+    // Create custom roles and devices with simple index-based ranks.
+    // Ordering ((index + 1) * 100 = rank):
+    //   0: low_device  = 100
+    //   1: low_role    = 200
+    //   2: admin       = 300
+    //   3: high_device = 400
+    //   4: high_role   = 500
+    let [low_device_rank, low_role_rank, admin_rank, high_device_rank, high_role_rank] =
+        [100, 200, 300, 400, 500];
+
+    let low_role = owner_team
+        .create_role(text!("low_role"), low_role_rank.into())
+        .await?;
+    let high_role = owner_team
+        .create_role(text!("high_role"), high_role_rank.into())
+        .await?;
+
     owner_team
         .add_device_with_rank(
             devices.admin.pk.clone(),
             Some(roles.admin().id),
-            DEFAULT_OPERATOR_DEVICE_RANK.into(),
+            admin_rank.into(),
         )
         .await?;
-    // Add operator without role at DEFAULT_LABEL_RANK
     owner_team
-        .add_device_with_rank(devices.operator.pk.clone(), None, DEFAULT_LABEL_RANK.into())
+        .add_device_with_rank(devices.membera.pk.clone(), None, low_device_rank.into())
+        .await?;
+    owner_team
+        .add_device_with_rank(devices.memberb.pk.clone(), None, high_device_rank.into())
         .await?;
 
-    let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    // Admin tries to assign operator role (DEFAULT_OPERATOR_ROLE_RANK) to operator device (DEFAULT_LABEL_RANK)
-    // Admin outranks the device but NOT the role (DEFAULT_OPERATOR_DEVICE_RANK < DEFAULT_OPERATOR_ROLE_RANK)
-    // Should fail because author must outrank both targets
-    match admin_team
-        .device(devices.operator.id)
-        .assign_role(roles.operator().id)
+    // Case 1: Author outranks device but NOT role -- should fail
+    // Admin (300) tries to assign high_role (500) to membera (100)
+    let result = admin_team
+        .device(devices.membera.id)
+        .assign_role(high_role.id)
+        .await;
+    assert!(
+        matches!(result, Err(aranya_client::Error::Aranya(_))),
+        "Case 1: expected assign_role to fail when author doesn't outrank the role, got {result:?}"
+    );
+
+    // Case 2: Author outranks role but NOT device -- should fail
+    // Admin (300) tries to assign low_role (200) to memberb (400)
+    let result = admin_team
+        .device(devices.memberb.id)
+        .assign_role(low_role.id)
+        .await;
+    assert!(
+        matches!(result, Err(aranya_client::Error::Aranya(_))),
+        "Case 2: expected assign_role to fail when author doesn't outrank the device, got {result:?}"
+    );
+
+    // Case 3: Author outranks BOTH role and device -- should succeed
+    // Admin (300) tries to assign low_role (200) to membera (100)
+    admin_team
+        .device(devices.membera.id)
+        .assign_role(low_role.id)
         .await
-    {
-        Ok(_) => bail!("expected assign_role to fail when author doesn't outrank the role"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_role error: {err:?}"),
-    }
+        .context("Case 3: assign_role should succeed when author outranks both role and device")?;
 
     Ok(())
 }
