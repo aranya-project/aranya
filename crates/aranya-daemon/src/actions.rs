@@ -190,9 +190,8 @@ where
     async fn check_role_demotion_invariant(&self, object_id: BaseId, new_rank: Rank) -> Result<()> {
         // Check if object_id is a role
         let is_role = self
-            .call_session_action(policy::query_team_roles())
+            .query_team_roles()
             .await?
-            .effects
             .iter()
             .any(|e| matches!(e, Effect::QueryTeamRolesResult(r) if r.role_id == object_id));
 
@@ -201,37 +200,29 @@ where
         }
 
         // Check each device on the team
-        let devices = self
-            .call_session_action(policy::query_devices_on_team())
-            .await?
-            .effects;
+        let devices = self.query_devices_on_team().await?;
 
         for effect in devices {
             let Effect::QueryDevicesOnTeamResult(d) = effect else {
                 continue;
             };
 
+            let device_id = DeviceId::from_base(d.device_id);
+
             // Check if this device has the role we're demoting
-            let has_role = self
-                .call_session_action(policy::query_device_role(d.device_id))
-                .await?
-                .effects
-                .iter()
-                .any(|e| matches!(e, Effect::QueryDeviceRoleResult(r) if r.role_id == object_id));
+            let has_role =
+                self.query_device_role(device_id).await?.iter().any(
+                    |e| matches!(e, Effect::QueryDeviceRoleResult(r) if r.role_id == object_id),
+                );
 
             if !has_role {
                 continue;
             }
 
             // Check if device rank would violate invariant
-            for effect in self
-                .call_session_action(policy::query_rank(d.device_id))
-                .await?
-                .effects
-            {
+            for effect in self.query_rank(d.device_id).await? {
                 if let Effect::QueryRankResult(r) = effect {
                     if r.rank >= new_rank.value() {
-                        let device_id = DeviceId::from_base(d.device_id);
                         anyhow::bail!(
                             "cannot demote role rank to {} because device {} has rank {} \
                              (role_rank must be > device_rank)",
