@@ -361,11 +361,6 @@ pub struct DefaultRoles {
 }
 
 impl DefaultRoles {
-    /// Returns the 'owner' role.
-    pub fn owner(&self) -> &Role {
-        self.roles.get("owner").expect("owner role should exist")
-    }
-
     /// Returns the 'admin' role.
     pub fn admin(&self) -> &Role {
         self.roles.get("admin").expect("admin role should exist")

@@ -55,7 +55,7 @@ config_dir = "${out}/${device}/config"
 
 [afc]
 enable = true
-shm_path = "/test_shm_${device}"
+shm_path = "/test_shm1_${device}"
 max_chans = 100
 
 [sync.quic]

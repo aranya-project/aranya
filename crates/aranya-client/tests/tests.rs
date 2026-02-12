@@ -1772,7 +1772,7 @@ async fn test_create_role_with_rank() -> Result<()> {
         .create_role(text!("ranked_role"), expected_rank)
         .await?;
 
-    let role_obj: ObjectId = role.id.into();
+    let role_obj: ObjectId = ObjectId::transmute(role.id);
     let rank = owner_team.query_rank(role_obj).await?;
     assert_eq!(rank, expected_rank);
 
@@ -1793,7 +1793,7 @@ async fn test_create_label_with_rank() -> Result<()> {
         .create_label_with_rank(text!("ranked_label"), expected_rank)
         .await?;
 
-    let label_obj: ObjectId = label_id.into();
+    let label_obj: ObjectId = ObjectId::transmute(label_id);
     let rank = owner_team.query_rank(label_obj).await?;
     assert_eq!(rank, expected_rank);
 
@@ -1814,7 +1814,7 @@ async fn test_change_rank() -> Result<()> {
         .create_role(text!("mutable_role"), initial_rank)
         .await?;
 
-    let role_obj: ObjectId = role.id.into();
+    let role_obj: ObjectId = ObjectId::transmute(role.id);
 
     owner_team
         .change_rank(role_obj, initial_rank, updated_rank)
@@ -1861,7 +1861,7 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let role_obj: ObjectId = high_role.id.into();
+    let role_obj: ObjectId = ObjectId::transmute(high_role.id);
 
     // Operator tries to change rank of object ranked above it -- should fail
     match operator_team
@@ -1959,7 +1959,7 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
         )
         .await?;
 
-    let device_obj: ObjectId = devices.admin.id.into();
+    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
 
     // Try to change device rank above its role rank -- should fail
     match owner_team
@@ -1973,7 +1973,6 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
 
     Ok(())
 }
-<<<<<<< Updated upstream
 
 /// Tests that a role's rank can be demoted below a device that holds it.
 ///
@@ -2000,7 +1999,7 @@ async fn test_change_role_rank_below_device_rank_allowed() -> Result<()> {
         )
         .await?;
 
-    let role_obj: ObjectId = roles.member().id.into();
+    let role_obj: ObjectId = ObjectId::transmute(roles.member().id);
     let role_rank = Rank::new(600);
 
     // Demote the member role rank below the device's rank
@@ -2014,7 +2013,7 @@ async fn test_change_role_rank_below_device_rank_allowed() -> Result<()> {
     let current_role_rank = owner_team.query_rank(role_obj).await?;
     assert_eq!(current_role_rank, demoted_role_rank);
 
-    let device_obj: ObjectId = devices.admin.id.into();
+    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
     let current_device_rank = owner_team.query_rank(device_obj).await?;
     assert!(
         current_device_rank > current_role_rank,
@@ -2120,7 +2119,7 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let role_obj: ObjectId = role.id.into();
+    let role_obj: ObjectId = ObjectId::transmute(role.id);
 
     // Operator tries to change role rank to above operator's rank -- should fail
     match operator_team
@@ -2150,7 +2149,7 @@ async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
     let role = owner_team
         .create_role(text!("versioned_role"), initial_rank)
         .await?;
-    let role_obj: ObjectId = role.id.into();
+    let role_obj: ObjectId = ObjectId::transmute(role.id);
 
     // Change rank from initial to updated
     owner_team
@@ -2185,17 +2184,13 @@ async fn test_change_rank_self_demotion() -> Result<()> {
     let admin_rank = Rank::new(799);
     let demoted_rank = Rank::new(500);
     owner_team
-        .add_device_with_rank(
-            devices.admin.pk.clone(),
-            Some(roles.admin().id),
-            admin_rank,
-        )
+        .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), admin_rank)
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    let device_obj: ObjectId = devices.admin.id.into();
+    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
 
     // Admin demotes itself
     admin_team
@@ -2400,7 +2395,7 @@ async fn test_deprecated_add_device() -> Result<()> {
     assert!(team_devices.iter().any(|d| *d == devices.admin.id));
 
     // Verify default rank is role_rank - 1 (admin role rank 800 - 1 = 799)
-    let device_obj: ObjectId = devices.admin.id.into();
+    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
     let rank = owner_team.query_rank(device_obj).await?;
     assert_eq!(
         rank,
@@ -2459,7 +2454,7 @@ async fn test_deprecated_create_label() -> Result<()> {
     assert!(label.is_some(), "label should exist");
 
     // Verify default rank is author_rank - 1 (owner device rank 1000000 - 1 = 999999)
-    let label_obj: ObjectId = label_id.into();
+    let label_obj: ObjectId = ObjectId::transmute(label_id);
     let rank = owner_team.query_rank(label_obj).await?;
     assert_eq!(
         rank,
@@ -2510,5 +2505,3 @@ async fn test_deprecated_add_label_managing_role_noop() -> Result<()> {
 
     Ok(())
 }
-=======
->>>>>>> Stashed changes
