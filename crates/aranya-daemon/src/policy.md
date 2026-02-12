@@ -925,22 +925,47 @@ function object_exists(object_id id) bool {
 
 ### ChangeRank Command
 
-Command for changing the rank of a device or label.
+Command for changing the rank of an object.
 
 If the target object is a device with an assigned role, the new rank must not
-exceed the role's rank. This maintains the invariant that `role_rank > device_rank`
+exceed the role's rank. This maintains the invariant that `role_rank >= device_rank`
 which was established at role assignment time. To promote a device above its
 current role's rank, first change the device's role to one with a higher rank.
 
-#### Role Ranks Are Immutable
+#### Role Rank Changes and the Device-Role Invariant
 
-Role ranks cannot be changed after creation. This design decision maintains the
-invariant that `role_rank > device_rank` for all devices assigned to the role
-without requiring complex checks that would need to iterate over all assigned
-devices.
+The policy enforces `role_rank >= device_rank` at assignment time and when
+promoting devices. However, the policy does not prevent demoting a role's rank
+below devices that hold it. Enforcing this would require iterating over all
+devices assigned to the role, which the policy language does not support.
 
-If a different rank is needed for a role, create a new role with the desired
-rank and permissions, migrate devices to it, then delete the old role.
+**Why this limitation exists:** Changing role ranks is an infrequent
+administrative operation, and blocking it entirely when any device holds the
+role would be overly restrictive. The tradeoff accepts that role demotion is
+an advanced operation requiring care.
+
+**Risk:** If a role's rank is demoted below a device that holds it, the device
+could potentially modify permissions on its own role (if it has `ChangeRolePerms`),
+since it would then outrank the role.
+
+**Application mitigations:**
+
+1. **Unassign, change, reassign.** Before changing a role's rank, unassign the
+   role from all devices it is assigned to, change the rank, then reassign the
+   role to devices where the new rank >= the device rank. This ensures the
+   invariant is upheld.
+
+2. **Create a new role instead.** If a different rank is needed, create a new
+   role with the desired rank and permissions, migrate devices to it, then
+   delete the old role to clean up.
+
+3. **Audit before role rank changes.** Before demoting a role's rank, query
+   all devices assigned to that role and verify the new rank will still be
+   >= the rank of every assigned device.
+
+4. **Separate permission-modification roles.** Do not grant `ChangeRolePerms`
+   to roles that may be demoted. This limits the blast radius if the invariant
+   is violated.
 
 ```policy
 // Default maximum rank for the team creator device.
@@ -998,12 +1023,6 @@ command ChangeRank {
 
         // Check that the object exists before changing its rank.
         check object_exists(this.object_id)
-
-        // Changing the rank of a role is not supported. Role ranks are fixed
-        // at creation time to maintain the invariant that role_rank > device_rank
-        // for all devices assigned to the role.
-        let is_role = query Role[role_id: this.object_id]
-        check is_role is None
 
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
