@@ -229,7 +229,7 @@ impl TestCtx {
                 LinearStorageProvider::new(FileManager::new(&storage_dir)?),
             ));
 
-            let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, Rank::new(0)));
+            let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
 
