@@ -1837,10 +1837,12 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     Ok(())
 }
 
-/// Add a device to the team with the default role.
+/// Add a device to the team with an optional initial role.
 ///
-/// The device is assigned a default rank of the command author's
-/// rank minus one.
+/// Since this API does not allow specifying a rank, the device is
+/// assigned a default rank based on:
+/// - If a role is provided: the role's rank minus one
+/// - If no role is provided: the command author's rank minus one
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///

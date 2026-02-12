@@ -2681,10 +2681,12 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
- * Add a device to the team with the default role.
+ * Add a device to the team with an optional initial role.
  *
- * The device is assigned a default rank of the command author's
- * rank minus one.
+ * Since this API does not allow specifying a rank, the device is
+ * assigned a default rank based on:
+ * - If a role is provided: the role's rank minus one
+ * - If no role is provided: the command author's rank minus one
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -2703,10 +2705,12 @@ AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaRoleId *role_id);
 
 /**
- * Add a device to the team with the default role.
+ * Add a device to the team with an optional initial role.
  *
- * The device is assigned a default rank of the command author's
- * rank minus one.
+ * Since this API does not allow specifying a rank, the device is
+ * assigned a default rank based on:
+ * - If a role is provided: the role's rank minus one
+ * - If no role is provided: the command author's rank minus one
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *

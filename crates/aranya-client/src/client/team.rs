@@ -109,9 +109,12 @@ impl Team<'_> {
 impl Team<'_> {
     /// Adds a device to the team with an optional initial role.
     ///
-    /// The device is assigned a default rank of the command author's
-    /// rank minus one. Use [`Self::add_device_with_rank`] to specify an
-    /// explicit rank.
+    /// Since this API does not allow specifying a rank, the device is
+    /// assigned a default rank based on:
+    /// - If an initial role is provided: the role's rank minus one
+    /// - If no initial role is provided: the command author's rank minus one
+    ///
+    /// Use [`Self::add_device_with_rank`] to specify an explicit rank.
     #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
     pub async fn add_device(&self, keys: KeyBundle, initial_role: Option<RoleId>) -> Result<()> {
