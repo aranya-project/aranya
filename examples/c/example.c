@@ -401,8 +401,8 @@ AranyaError init_team(Team *t) {
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.
-    err = aranya_setup_default_roles_no_owning_role(&owner->client, &t->id,
-                                              default_roles, &default_roles_len);
+    err = aranya_setup_default_roles_no_owning_role(
+        &owner->client, &t->id, default_roles, &default_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
         return err;
@@ -1014,26 +1014,12 @@ AranyaError run_custom_roles_example(Team *t) {
         goto exit;
     }
 
-<<<<<<< Updated upstream
-=======
-    // Add a new owning role to the 'member' role.
-    printf("adding a new owning role to the 'member' role.\n");
-    err = aranya_add_role_owner(&owner->client, &t->id, &member_role_id,
-                                &admin_role_id);
-    EXPECT("unable to add a new owning role.", err);
-
-    // Remove an owning role from the 'member' role.
-    printf("removing an owning role to the 'member' role.\n");
-    err = aranya_remove_role_owner(&owner->client, &t->id, &member_role_id,
-                                   &admin_role_id);
-    EXPECT("unable to remove an owning role.", err);
-
->>>>>>> Stashed changes
     // Create a custom role.
     const int64_t buddy_initial_rank = 50;
     const int64_t buddy_updated_rank = 75;
     AranyaRole buddy_role;
-    err = aranya_create_role(&owner->client, &t->id, "buddy", buddy_initial_rank, &buddy_role);
+    err = aranya_create_role(&owner->client, &t->id, "buddy",
+                             buddy_initial_rank, &buddy_role);
     EXPECT("unable to create role", err);
     AranyaRoleId buddy_role_id;
     err = aranya_role_get_id(&buddy_role, &buddy_role_id);
@@ -1047,7 +1033,7 @@ AranyaError run_custom_roles_example(Team *t) {
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
     // Demo change_rank/query_rank: change the buddy role's rank.
-    AranyaObjectId buddy_object_id = { .id = buddy_role_id.id };
+    AranyaObjectId buddy_object_id = {.id = buddy_role_id.id};
 
     int64_t current_rank = 0;
     err = aranya_query_rank(&owner->client, &t->id, &buddy_object_id,
