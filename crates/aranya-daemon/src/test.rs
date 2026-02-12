@@ -22,7 +22,7 @@ use aranya_crypto::{
     policy::{LabelId, RoleId},
     Csprng, DeviceId, Rng,
 };
-use aranya_daemon_api::{text, Rank, TeamId};
+use aranya_daemon_api::{text, TeamId};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -371,7 +371,7 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&admin.pk)?, None, Rank::new(0))
+            .add_device_with_rank(DeviceKeyBundle::try_from(&admin.pk)?, None, 0.into())
             .await
             .context("unable to add admin member")?;
         owner
@@ -394,7 +394,7 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&operator.pk)?, None, Rank::new(0))
+            .add_device_with_rank(DeviceKeyBundle::try_from(&operator.pk)?, None, 0.into())
             .await
             .context("unable to add operator member")?;
         owner
@@ -419,13 +419,13 @@ impl TestCtx {
 
         admin
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&membera.pk)?, None, Rank::new(0))
+            .add_device_with_rank(DeviceKeyBundle::try_from(&membera.pk)?, None, 0.into())
             .await
             .context("unable to add membera member")?;
         membera.sync_expect(admin, None).await?;
         admin
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&memberb.pk)?, None, Rank::new(0))
+            .add_device_with_rank(DeviceKeyBundle::try_from(&memberb.pk)?, None, 0.into())
             .await
             .context("unable to add memberb member")?;
         memberb.sync_expect(admin, None).await?;
@@ -597,13 +597,13 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     owner
         .actions()
-        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, Rank::new(0))
+        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, 0.into())
         .await
         .context("initial add should succeed")?;
 
     let err = owner
         .actions()
-        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, Rank::new(0))
+        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, 0.into())
         .await
         .expect_err("expected duplicate device add to fail");
     expect_not_authorized(err);
@@ -648,7 +648,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&candidate.pk)?,
             Some(member_role),
-            Rank::new(0),
+            0.into(),
         )
         .await
         .expect_err("expected add_device with initial role to fail without AddDevice permission");
@@ -772,7 +772,7 @@ async fn test_create_label_requires_valid_rank() -> Result<()> {
     // Create a label with owner rank (999,999)
     owner
         .actions()
-        .create_label_with_rank(text!("TEST_LABEL"), Rank::new(999_999))
+        .create_label_with_rank(text!("TEST_LABEL"), 999_999.into())
         .await
         .context("label creation with valid rank should succeed")?;
 
@@ -795,7 +795,7 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
 
     let effects = owner
         .actions()
-        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), Rank::new(999_999))
+        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), 999_999.into())
         .await
         .context("label creation should succeed")?;
     let label_id = effects

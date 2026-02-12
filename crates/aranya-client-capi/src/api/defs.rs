@@ -8,12 +8,12 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
-use buggy::bug;
 #[cfg(feature = "afc")]
 use aranya_client::afc;
 use aranya_client::config::MAX_SYNC_INTERVAL;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
+use buggy::bug;
 use tracing::{debug, error};
 
 use crate::imp;
@@ -1405,7 +1405,7 @@ pub fn create_role(
         client
             .inner
             .team(team.into())
-            .create_role(role_name, aranya_daemon_api::Rank::new(rank)),
+            .create_role(role_name, rank.into()),
     )?;
     Role::init(role_out, role);
     Ok(())
@@ -1594,7 +1594,7 @@ pub fn create_label_with_rank(
         client
             .inner
             .team(team.into())
-            .create_label_with_rank(name, aranya_daemon_api::Rank::new(rank)),
+            .create_label_with_rank(name, rank.into()),
     )?;
     Ok(label_id.into())
 }
@@ -1646,8 +1646,8 @@ pub fn change_rank(
         .rt
         .block_on(client.inner.team(team.into()).change_rank(
             object_id.into(),
-            aranya_daemon_api::Rank::new(old_rank),
-            aranya_daemon_api::Rank::new(new_rank),
+            old_rank.into(),
+            new_rank.into(),
         ))?;
     Ok(())
 }
@@ -1896,7 +1896,7 @@ pub unsafe fn add_device_to_team_with_rank(
         .block_on(client.inner.team(team.into()).add_device_with_rank(
             keybundle,
             role_id.map(Into::into),
-            aranya_daemon_api::Rank::new(rank),
+            rank.into(),
         ))?;
     Ok(())
 }

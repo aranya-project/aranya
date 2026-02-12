@@ -10,7 +10,7 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, KeyBundle, Rank,
+    CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -324,26 +324,26 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // remaining operations to them.
     info!("adding admin to team");
     owner
-        .add_device_with_rank(ctx.admin.pk, Some(admin_role.id), Rank::new(100))
+        .add_device_with_rank(ctx.admin.pk, Some(admin_role.id), 100.into())
         .await?;
     admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
     owner
-        .add_device_with_rank(ctx.operator.pk, Some(operator_role.id), Rank::new(100))
+        .add_device_with_rank(ctx.operator.pk, Some(operator_role.id), 100.into())
         .await?;
     operator.sync_now(owner_addr, None).await?;
 
     // Admin adds membera and memberb to the team.
     info!("admin adding membera to team");
     admin
-        .add_device_with_rank(ctx.membera.pk.clone(), Some(member_role.id), Rank::new(50))
+        .add_device_with_rank(ctx.membera.pk.clone(), Some(member_role.id), 50.into())
         .await?;
     membera.sync_now(owner_addr, None).await?;
 
     info!("admin adding memberb to team");
     admin
-        .add_device_with_rank(ctx.memberb.pk.clone(), Some(member_role.id), Rank::new(50))
+        .add_device_with_rank(ctx.memberb.pk.clone(), Some(member_role.id), 50.into())
         .await?;
     memberb.sync_now(owner_addr, None).await?;
 
@@ -357,7 +357,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // Admin creates a label.
     info!("admin creating label");
     let label3 = admin
-        .create_label_with_rank(text!("label3"), Rank::new(50))
+        .create_label_with_rank(text!("label3"), 50.into())
         .await?;
 
     // Operator assigns the label to membera and memberb.

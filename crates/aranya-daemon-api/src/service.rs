@@ -134,6 +134,12 @@ impl fmt::Display for Rank {
     }
 }
 
+impl From<i64> for Rank {
+    fn from(value: i64) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Role {
     /// Uniquely identifies the role.

@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, KeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -78,11 +78,7 @@ impl DevicesCtx {
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         owner_team
-            .add_device_with_rank(
-                self.admin.pk.clone(),
-                Some(roles.admin().id),
-                Rank::new(799),
-            )
+            .add_device_with_rank(self.admin.pk.clone(), Some(roles.admin().id), 799.into())
             .await?;
 
         // Add the operator as a new device.
@@ -91,28 +87,20 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.operator.pk.clone(),
                 Some(roles.operator().id),
-                Rank::new(699),
+                699.into(),
             )
             .await?;
 
         // Add member A as a new device.
         info!("adding membera to team");
         owner_team
-            .add_device_with_rank(
-                self.membera.pk.clone(),
-                Some(roles.member().id),
-                Rank::new(599),
-            )
+            .add_device_with_rank(self.membera.pk.clone(), Some(roles.member().id), 599.into())
             .await?;
 
         // Add member B as a new device.
         info!("adding memberb to team");
         owner_team
-            .add_device_with_rank(
-                self.memberb.pk.clone(),
-                Some(roles.member().id),
-                Rank::new(599),
-            )
+            .add_device_with_rank(self.memberb.pk.clone(), Some(roles.member().id), 599.into())
             .await?;
 
         // Make sure all see the configuration change.
