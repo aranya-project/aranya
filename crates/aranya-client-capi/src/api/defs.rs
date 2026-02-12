@@ -1263,12 +1263,7 @@ pub unsafe fn setup_default_roles(
 ) -> Result<(), imp::Error> {
     let default_roles = client
         .rt
-        .block_on(
-            client
-                .inner
-                .team(team.into())
-                .setup_default_roles(),
-        )?
+        .block_on(client.inner.team(team.into()).setup_default_roles())?
         .__into_data();
 
     debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());

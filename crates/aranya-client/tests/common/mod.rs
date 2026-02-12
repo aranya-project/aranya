@@ -312,11 +312,7 @@ impl DeviceCtx {
             .try_into_owner_role()?;
         tracing::debug!(owner_role_id = %owner_role.id);
 
-        let setup_roles = self
-            .client
-            .team(team_id)
-            .setup_default_roles()
-            .await?;
+        let setup_roles = self.client.team(team_id).setup_default_roles().await?;
 
         let roles = setup_roles
             .into_iter()

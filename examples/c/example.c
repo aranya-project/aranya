@@ -401,8 +401,8 @@ AranyaError init_team(Team *t) {
     AranyaRole default_roles[default_roles_len];
 
     // setup default roles.
-    err = aranya_setup_default_roles(
-        &owner->client, &t->id, default_roles, &default_roles_len);
+    err = aranya_setup_default_roles(&owner->client, &t->id, default_roles,
+                                     &default_roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
         return err;

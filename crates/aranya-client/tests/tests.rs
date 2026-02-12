@@ -2423,7 +2423,9 @@ async fn test_deprecated_setup_default_roles() -> Result<()> {
         .expect("owner role should exist");
 
     // Use deprecated setup_default_roles_deprecated API with owning_role parameter
-    let setup_roles = owner_team.setup_default_roles_deprecated(owner_role.id).await?;
+    let setup_roles = owner_team
+        .setup_default_roles_deprecated(owner_role.id)
+        .await?;
     assert_eq!(
         setup_roles.iter().count(),
         3,
