@@ -645,7 +645,11 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
     // Member lacks AddDevice permission, so this should fail
     let err = membera
         .actions()
-        .add_device_with_rank(DeviceKeyBundle::try_from(&candidate.pk)?, Some(member_role), 0)
+        .add_device_with_rank(
+            DeviceKeyBundle::try_from(&candidate.pk)?,
+            Some(member_role),
+            0,
+        )
         .await
         .expect_err("expected add_device with initial role to fail without AddDevice permission");
     expect_not_authorized(err);
@@ -733,7 +737,6 @@ async fn test_assign_role_rejects_unknown_role() -> Result<()> {
     Ok(())
 }
 
-
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_assign_role_self_assignment_rejected() -> Result<()> {
@@ -756,8 +759,6 @@ async fn test_assign_role_self_assignment_rejected() -> Result<()> {
     Ok(())
 }
 
-
-
 /// Requires create_label_with_rank to use a valid rank.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
@@ -777,7 +778,6 @@ async fn test_create_label_requires_valid_rank() -> Result<()> {
 
     Ok(())
 }
-
 
 /// Ensures delete_label enforces permissions and blocks reuse afterward.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -826,8 +826,6 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
 
     Ok(())
 }
-
-
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
@@ -909,7 +907,6 @@ async fn test_remove_perm_from_role_requires_existing_permission() -> Result<()>
 
     Ok(())
 }
-
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
@@ -1019,6 +1016,3 @@ async fn test_terminate_team_requires_matching_id() -> Result<()> {
 
     Ok(())
 }
-
-
-

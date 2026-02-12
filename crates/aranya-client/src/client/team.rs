@@ -119,13 +119,13 @@ impl Team<'_> {
         // otherwise fall back to author_rank - 1.
         let rank = match &initial_role {
             Some(role_id) => {
-                let role_obj: ObjectId = (*role_id).into();
+                let role_obj: ObjectId = ObjectId::transmute(*role_id);
                 let role_rank = self.query_rank(role_obj).await?;
                 Rank::new(role_rank.value() - 1)
             }
             None => {
                 let device_id = self.client.get_device_id().await?;
-                let device_obj: ObjectId = device_id.into();
+                let device_obj: ObjectId = ObjectId::transmute(device_id);
                 let author_rank = self.query_rank(device_obj).await?;
                 Rank::new(author_rank.value() - 1)
             }
@@ -338,47 +338,7 @@ impl Team<'_> {
 
     /// Changes the rank of an object.
     #[instrument(skip(self))]
-<<<<<<< Updated upstream
     pub async fn change_rank(
-=======
-    pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .add_role_owner(
-                context::current(),
-                self.id,
-                role.into_api(),
-                owning_role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Removes an `owning_role` as an owner of `role`.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
-    #[instrument(skip(self))]
-    pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .remove_role_owner(
-                context::current(),
-                self.id,
-                role.into_api(),
-                owning_role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Assigns a role management permission to a managing role.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
-    #[instrument(skip(self))]
-    pub async fn assign_role_management_permission(
->>>>>>> Stashed changes
         &self,
         object_id: ObjectId,
         old_rank: Rank,
@@ -452,7 +412,7 @@ impl Team<'_> {
     ) -> Result<LabelId> {
         // Default to author_rank - 1.
         let device_id = self.client.get_device_id().await?;
-        let device_obj: ObjectId = device_id.into();
+        let device_obj: ObjectId = ObjectId::transmute(device_id);
         let author_rank = self.query_rank(device_obj).await?;
         let rank = Rank::new(author_rank.value() - 1);
         self.client

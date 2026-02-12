@@ -40,13 +40,6 @@ custom_id! {
 }
 impl ApiId<api::DeviceId> for DeviceId {}
 
-impl From<DeviceId> for aranya_daemon_api::ObjectId {
-    fn from(id: DeviceId) -> Self {
-        let bytes: [u8; 32] = id.into();
-        bytes.into()
-    }
-}
-
 /// A list of [`DeviceId`].
 #[derive(Debug)]
 pub struct Devices {

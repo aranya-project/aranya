@@ -15,13 +15,6 @@ custom_id! {
 }
 impl ApiId<api::RoleId> for RoleId {}
 
-impl From<RoleId> for aranya_daemon_api::ObjectId {
-    fn from(id: RoleId) -> Self {
-        let bytes: [u8; 32] = id.into();
-        bytes.into()
-    }
-}
-
 /// A role.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[non_exhaustive]

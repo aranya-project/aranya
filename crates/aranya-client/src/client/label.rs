@@ -15,13 +15,6 @@ custom_id! {
 }
 impl ApiId<api::LabelId> for LabelId {}
 
-impl From<LabelId> for aranya_daemon_api::ObjectId {
-    fn from(id: LabelId) -> Self {
-        let bytes: [u8; 32] = id.into();
-        bytes.into()
-    }
-}
-
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[non_exhaustive]

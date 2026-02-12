@@ -1816,7 +1816,6 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
 /**
  * Setup default roles on team.
  *
-<<<<<<< Updated upstream
  * This sets up the following roles with default permissions as
  * defined in Aranya's default policy:
  * - admin
@@ -1837,9 +1836,9 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles_no_owning_role(struct AranyaClient *client,
-                                                const struct AranyaTeamId *team,
-                                                struct AranyaRole *roles_out,
-                                                size_t *roles_len);
+                                                      const struct AranyaTeamId *team,
+                                                      struct AranyaRole *roles_out,
+                                                      size_t *roles_len);
 
 /**
  * Setup default roles on team.
@@ -1864,188 +1863,45 @@ AranyaError aranya_setup_default_roles_no_owning_role(struct AranyaClient *clien
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles_no_owning_role_ext(struct AranyaClient *client,
-                                                    const struct AranyaTeamId *team,
-                                                    struct AranyaRole *roles_out,
-                                                    size_t *roles_len,
-                                                    struct AranyaExtError *__ext_err);
+                                                          const struct AranyaTeamId *team,
+                                                          struct AranyaRole *roles_out,
+                                                          size_t *roles_len,
+                                                          struct AranyaExtError *__ext_err);
 
 /**
  * Deprecated: always returns an empty list.
-=======
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role ID of the subject role
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_role_owner(const struct AranyaClient *client,
-                                  const struct AranyaTeamId *team,
-                                  const struct AranyaRoleId *role,
-                                  const struct AranyaRoleId *owning_role);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Adds `owning_role` as an owner of role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role ID of the subject role
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      const struct AranyaRoleId *role,
-                                      const struct AranyaRoleId *owning_role,
-                                      struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Removes an owning_role as an owner of role.
->>>>>>> Stashed changes
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
-<<<<<<< Updated upstream
  * @param[out] roles_out unused, always returns an empty list
  * @param[in,out] roles_len set to 0 on return
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_role_owners(const struct AranyaClient *client,
-                               const struct AranyaTeamId *team,
-                               const struct AranyaRoleId *role,
-                               struct AranyaRole *roles_out,
+AranyaError aranya_role_owners(const struct AranyaClient *_client,
+                               const struct AranyaTeamId *_team,
+                               const struct AranyaRoleId *_role,
+                               struct AranyaRole *_roles_out,
                                size_t *roles_len);
 
 /**
  * Deprecated: always returns an empty list.
-=======
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team,
-                                     const struct AranyaRoleId *role,
-                                     const struct AranyaRoleId *owning_role);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Removes an owning_role as an owner of role.
->>>>>>> Stashed changes
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
-<<<<<<< Updated upstream
  * @param[out] roles_out unused, always returns an empty list
  * @param[in,out] roles_len set to 0 on return
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
-                                   const struct AranyaTeamId *team,
-                                   const struct AranyaRoleId *role,
-                                   struct AranyaRole *roles_out,
+AranyaError aranya_role_owners_ext(const struct AranyaClient *_client,
+                                   const struct AranyaTeamId *_team,
+                                   const struct AranyaRoleId *_role,
+                                   struct AranyaRole *_roles_out,
                                    size_t *roles_len,
                                    struct AranyaExtError *__ext_err);
-=======
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaRoleId *role,
-                                         const struct AranyaRoleId *owning_role,
-                                         struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Assigns a role management permission to a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_assign_role_management_permission(const struct AranyaClient *client,
-                                                     const struct AranyaTeamId *team,
-                                                     const struct AranyaRoleId *role,
-                                                     const struct AranyaRoleId *managing_role,
-                                                     AranyaRoleManagementPermission perm);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Assigns a role management permission to a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClient *client,
-                                                         const struct AranyaTeamId *team,
-                                                         const struct AranyaRoleId *role,
-                                                         const struct AranyaRoleId *managing_role,
-                                                         AranyaRoleManagementPermission perm,
-                                                         struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Revokes a role management permission from a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *client,
-                                                     const struct AranyaTeamId *team,
-                                                     const struct AranyaRoleId *role,
-                                                     const struct AranyaRoleId *managing_role,
-                                                     AranyaRoleManagementPermission perm);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Revokes a role management permission from a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClient *client,
-                                                         const struct AranyaTeamId *team,
-                                                         const struct AranyaRoleId *role,
-                                                         const struct AranyaRoleId *managing_role,
-                                                         AranyaRoleManagementPermission perm,
-                                                         struct AranyaExtError *__ext_err);
-#endif
->>>>>>> Stashed changes
 
 /**
  * Changes the `role` on a `device`

@@ -7,6 +7,7 @@ use aranya_crypto::{
     policy::{LabelId, RoleId},
     Csprng, DeviceId, Rng,
 };
+use aranya_daemon_api::Rank;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actionable, BaseId, VmEffect};
 use aranya_policy_text::Text;
@@ -176,12 +177,12 @@ where
         &self,
         keys: KeyBundle,
         initial_role_id: Option<RoleId>,
-        rank: i64,
+        rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::add_device_with_rank(
             keys,
             initial_role_id.map(|id| id.as_base()),
-            rank,
+            rank.value(),
         ))
         .in_current_span()
     }
@@ -191,9 +192,9 @@ where
     fn create_role(
         &self,
         role_name: Text,
-        rank: i64,
+        rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::create_role(role_name, rank))
+        self.call_persistent_action(policy::create_role(role_name, rank.value()))
             .in_current_span()
     }
 
@@ -231,11 +232,15 @@ where
     fn change_rank(
         &self,
         object_id: BaseId,
-        old_rank: i64,
-        new_rank: i64,
+        old_rank: Rank,
+        new_rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::change_rank(object_id, old_rank, new_rank))
-            .in_current_span()
+        self.call_persistent_action(policy::change_rank(
+            object_id,
+            old_rank.value(),
+            new_rank.value(),
+        ))
+        .in_current_span()
     }
 
     /// Invokes `query_rank`.
@@ -295,9 +300,9 @@ where
     fn create_label_with_rank(
         &self,
         name: Text,
-        rank: i64,
+        rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::create_label_with_rank(name, rank))
+        self.call_persistent_action(policy::create_label_with_rank(name, rank.value()))
             .in_current_span()
     }
 

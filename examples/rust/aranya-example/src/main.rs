@@ -421,13 +421,16 @@ async fn main() -> Result<()> {
 
     // Demo change_rank/query_rank: verify the role has the rank it was created with,
     // then change it.
-    let role_object_id: ObjectId = custom_role.id.into();
+    let role_object_id: ObjectId = ObjectId::transmute(custom_role.id);
     let current_rank = owner_team.query_rank(role_object_id).await?;
     info!("custom role rank before change: {}", current_rank);
     assert_eq!(current_rank, custom_role_rank);
 
     let updated_role_rank = Rank::new(75);
-    info!("changing custom role rank from {} to {}", custom_role_rank, updated_role_rank);
+    info!(
+        "changing custom role rank from {} to {}",
+        custom_role_rank, updated_role_rank
+    );
     owner_team
         .change_rank(role_object_id, custom_role_rank, updated_role_rank)
         .await?;

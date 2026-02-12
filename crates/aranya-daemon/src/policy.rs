@@ -71,12 +71,9 @@ pub enum Effect {
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsResult(QueryLabelsResult),
-<<<<<<< Updated upstream
     QueryRankResult(QueryRankResult),
     QueryRoleHasPermResult(QueryRoleHasPermResult),
     QueryRolePermsResult(QueryRolePermsResult),
-=======
->>>>>>> Stashed changes
     QueryTeamRolesResult(QueryTeamRolesResult),
     RankChanged(RankChanged),
     RoleAssigned(RoleAssigned),
@@ -218,7 +215,6 @@ pub struct QueryLabelsResult {
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
-<<<<<<< Updated upstream
 /// QueryRankResult policy effect.
 #[effect]
 pub struct QueryRankResult {
@@ -237,8 +233,6 @@ pub struct QueryRolePermsResult {
     pub role_id: BaseId,
     pub perm: Perm,
 }
-=======
->>>>>>> Stashed changes
 /// QueryTeamRolesResult policy effect.
 #[effect]
 pub struct QueryTeamRolesResult {
@@ -331,11 +325,8 @@ pub enum EphemeralAction {
     query_device_keybundle(query_device_keybundle),
     query_rank(query_rank),
     query_team_roles(query_team_roles),
-<<<<<<< Updated upstream
     query_role_has_perm(query_role_has_perm),
     query_role_perms(query_role_perms),
-=======
->>>>>>> Stashed changes
     query_label(query_label),
     query_labels(query_labels),
     query_labels_assigned_to_device(query_labels_assigned_to_device),
