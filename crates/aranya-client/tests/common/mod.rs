@@ -25,6 +25,44 @@ const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 #[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
+// =============================================================================
+// Rank constants for tests
+// =============================================================================
+//
+// These constants define rank values used in tests. They are derived from the
+// role ranks defined in policy.md to ensure the invariant `role_rank > device_rank`
+// is always satisfied.
+//
+// Role ranks (from policy.md):
+//   - Owner role:    999_999 (MAX_RANK - 1)
+//   - Admin role:    800
+//   - Operator role: 700
+//   - Member role:   600
+
+/// Default admin role rank as defined in policy.md.
+#[allow(dead_code)]
+pub const DEFAULT_ADMIN_ROLE_RANK: i64 = 800;
+/// Default operator role rank as defined in policy.md.
+#[allow(dead_code)]
+pub const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700;
+/// Default member role rank as defined in policy.md.
+#[allow(dead_code)]
+pub const DEFAULT_MEMBER_ROLE_RANK: i64 = 600;
+
+/// Default device rank for admin devices. Must be < DEFAULT_ADMIN_ROLE_RANK.
+#[allow(dead_code)]
+pub const DEFAULT_ADMIN_DEVICE_RANK: i64 = DEFAULT_ADMIN_ROLE_RANK - 1;
+/// Default device rank for operator devices. Must be < DEFAULT_OPERATOR_ROLE_RANK.
+#[allow(dead_code)]
+pub const DEFAULT_OPERATOR_DEVICE_RANK: i64 = DEFAULT_OPERATOR_ROLE_RANK - 1;
+/// Default device rank for member devices. Must be < DEFAULT_MEMBER_ROLE_RANK.
+#[allow(dead_code)]
+pub const DEFAULT_MEMBER_DEVICE_RANK: i64 = DEFAULT_MEMBER_ROLE_RANK - 1;
+
+/// Default rank for labels in tests.
+#[allow(dead_code)]
+pub const DEFAULT_LABEL_RANK: i64 = 500;
+
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
     trace!(?duration, "sleeping");
