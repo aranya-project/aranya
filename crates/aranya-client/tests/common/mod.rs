@@ -362,6 +362,7 @@ pub struct DefaultRoles {
 
 impl DefaultRoles {
     /// Returns the 'owner' role.
+    #[allow(dead_code)]
     pub fn owner(&self) -> &Role {
         self.roles.get("owner").expect("owner role should exist")
     }
