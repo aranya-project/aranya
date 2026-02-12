@@ -124,13 +124,13 @@ impl Team<'_> {
             Some(role_id) => {
                 let role_obj: ObjectId = ObjectId::transmute(*role_id);
                 let role_rank = self.query_rank(role_obj).await?;
-                Rank::new(role_rank.value() - 1)
+                Rank::new(role_rank.value().saturating_sub(1))
             }
             None => {
                 let device_id = self.client.get_device_id().await?;
                 let device_obj: ObjectId = ObjectId::transmute(device_id);
                 let author_rank = self.query_rank(device_obj).await?;
-                Rank::new(author_rank.value() - 1)
+                Rank::new(author_rank.value().saturating_sub(1))
             }
         };
         self.client
@@ -421,7 +421,7 @@ impl Team<'_> {
         let device_id = self.client.get_device_id().await?;
         let device_obj: ObjectId = ObjectId::transmute(device_id);
         let author_rank = self.query_rank(device_obj).await?;
-        let rank = Rank::new(author_rank.value() - 1);
+        let rank = Rank::new(author_rank.value().saturating_sub(1));
         self.client
             .daemon
             .create_label_with_rank(context::current(), self.id, label_name, rank)
