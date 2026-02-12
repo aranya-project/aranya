@@ -6,8 +6,8 @@
 //! separate process, it's impossible to fully remove the effect of measuring a process. See the
 //! [observer problem] for more details.
 //!
-//! Specifically, this uses `proc_pidinfo` on MacOS to collect CPU and memory usage, falling back to
-//! the `sysinfo` crate for disk usage stats.
+//! Specifically, this uses `proc_pidinfo` on MacOS and `/proc/{PID}/stat` on Linux to collect CPU
+//! and memory usage, falling back to the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
 use std::{collections::HashMap, fmt, time::Instant};
@@ -292,15 +292,128 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
+    /// Collects metrics for a specific process using the Linux `/proc` filesystem.
+    #[cfg(target_os = "linux")]
+    fn collect_process_metrics(&mut self, pid: Pid, metrics: &mut ProcessMetrics) -> Result<()> {
+        use std::collections::hash_map::Entry;
+
+        use crate::backend::DebugLogType;
+
+        // First, let's collect metrics for the individual process.
+        let mut process_metrics = ProcessMetrics::default();
+
+        // Collect what we can using /proc, and fall back to sysinfo for disk stats.
+        self.collect_native_linux_metrics(pid, &mut process_metrics)?;
+        self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
+
+        // Aggregate this process's metrics towards the total.
+        metrics.cpu_user_time_us += process_metrics.cpu_user_time_us;
+        metrics.cpu_system_time_us += process_metrics.cpu_system_time_us;
+        metrics.physical_memory_bytes += process_metrics.physical_memory_bytes;
+        metrics.virtual_memory_bytes = metrics
+            .virtual_memory_bytes
+            .max(process_metrics.virtual_memory_bytes);
+        metrics.disk_read_bytes += process_metrics.disk_read_bytes;
+        metrics.disk_write_bytes += process_metrics.disk_write_bytes;
+
+        // Store the latest per-process metrics
+        let result = match self.individual_metrics.entry(pid) {
+            Entry::Occupied(mut entry) => {
+                // Update the entries we need to accumulate
+                let stored = entry.get_mut();
+                process_metrics.timestamp = stored.timestamp;
+                process_metrics.disk_read_bytes += stored.disk_read_bytes;
+                process_metrics.disk_write_bytes += stored.disk_write_bytes;
+
+                &mut entry.insert(process_metrics)
+            }
+            Entry::Vacant(entry) => entry.insert(process_metrics),
+        };
+
+        if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
+            debug!(
+                "Process Metrics for \"{}\": PID {}, {result}",
+                pid.name, pid.pid
+            );
+        }
+
+        Ok(())
+    }
+
     /// Collects metrics for a specific process, using a number of syscalls.
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     #[allow(dead_code)]
     fn collect_process_metrics(&self, _pid: Pid, _metrics: &mut ProcessMetrics) -> Result<()> {
-        // TODO(nikki): Linux support using /proc/{PID}
         Err(anyhow!(
             "We don't currently support {} for metrics, sorry!",
             std::env::consts::OS
         ))
+    }
+
+    /// Collects metrics for a specific process using the Linux `/proc` filesystem.
+    ///
+    /// Reads `/proc/{PID}/stat` which contains CPU times (in clock ticks) and memory sizes.
+    /// Fields are documented in `proc(5)`.
+    #[cfg(target_os = "linux")]
+    fn collect_native_linux_metrics(
+        &self,
+        pid: Pid,
+        process_metrics: &mut ProcessMetrics,
+    ) -> Result<()> {
+        use std::fs;
+
+        let stat_path = format!("/proc/{}/stat", pid.pid);
+        let stat_contents =
+            fs::read_to_string(&stat_path).map_err(|e| anyhow!("Failed to read {stat_path}: {e}"))?;
+
+        // The comm field (field 2) is wrapped in parentheses and may contain spaces or
+        // other parentheses. Find the last ')' to reliably skip past it.
+        let rest = stat_contents
+            .rfind(')')
+            .map(|i| &stat_contents[i + 2..])
+            .ok_or_else(|| anyhow!("Malformed /proc/{}/stat", pid.pid))?;
+
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+
+        // After the closing ')', fields are indexed from 0:
+        //   0  = state    (field  3)
+        //   11 = utime    (field 14) - clock ticks spent in user mode
+        //   12 = stime    (field 15) - clock ticks spent in kernel mode
+        //   20 = vsize    (field 23) - virtual memory size in bytes
+        //   21 = rss      (field 24) - resident set size in pages
+        if fields.len() < 22 {
+            return Err(anyhow!(
+                "Not enough fields in /proc/{}/stat (got {})",
+                pid.pid,
+                fields.len()
+            ));
+        }
+
+        let utime_ticks: u64 = fields[11].parse()?;
+        let stime_ticks: u64 = fields[12].parse()?;
+        let vsize: u64 = fields[20].parse()?;
+        let rss_pages: u64 = fields[21].parse()?;
+
+        // SAFETY: sysconf with _SC_CLK_TCK is always a valid call.
+        let clock_ticks_per_sec = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+        // SAFETY: sysconf with _SC_PAGESIZE is always a valid call.
+        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+
+        if clock_ticks_per_sec <= 0 || page_size <= 0 {
+            return Err(anyhow!("Failed to query sysconf values"));
+        }
+
+        #[allow(clippy::cast_sign_loss)]
+        {
+            let ticks = clock_ticks_per_sec as u64;
+            // Convert clock ticks to microseconds: value * 1_000_000 / ticks_per_sec
+            process_metrics.cpu_user_time_us = utime_ticks * 1_000_000 / ticks;
+            process_metrics.cpu_system_time_us = stime_ticks * 1_000_000 / ticks;
+            process_metrics.virtual_memory_bytes = vsize;
+            process_metrics.physical_memory_bytes = rss_pages * page_size as u64;
+        }
+
+        Ok(())
     }
 
     /// Collects metrics for a specific process, using native MacOS syscalls.
@@ -424,5 +537,81 @@ impl ProcessMetricsCollector {
                 warn!("Failed to collect metrics: {e}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies that we can read metrics for the current process from /proc.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn collect_linux_metrics_for_self() {
+        // Burn some CPU so we have nonzero tick counts at 100Hz granularity.
+        let mut x: u64 = 0;
+        for i in 0..10_000_000u64 {
+            x = std::hint::black_box(x).wrapping_add(std::hint::black_box(i));
+        }
+        std::hint::black_box(x);
+
+        let pid = Pid::from_u32(std::process::id(), "self");
+        let mut collector = ProcessMetricsCollector::new(MetricsConfig::default(), vec![pid]);
+        let mut metrics = ProcessMetrics::default();
+
+        collector
+            .collect_process_metrics(pid, &mut metrics)
+            .expect("should collect metrics for our own process");
+
+        // CPU time (user + system) should be nonzero after the busywork above.
+        let total_cpu = metrics.cpu_user_time_us + metrics.cpu_system_time_us;
+        assert!(
+            total_cpu > 0,
+            "expected nonzero total CPU time, got user={} system={}",
+            metrics.cpu_user_time_us,
+            metrics.cpu_system_time_us
+        );
+
+        // RSS must be nonzero since we're a running process.
+        assert!(
+            metrics.physical_memory_bytes > 0,
+            "expected nonzero physical memory, got {}",
+            metrics.physical_memory_bytes
+        );
+
+        // Virtual memory must be nonzero.
+        assert!(
+            metrics.virtual_memory_bytes > 0,
+            "expected nonzero virtual memory, got {}",
+            metrics.virtual_memory_bytes
+        );
+    }
+
+    /// Verifies that collecting metrics for a nonexistent PID returns an error.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn collect_linux_metrics_bad_pid() {
+        let pid = Pid::from_u32(u32::MAX, "nonexistent");
+        let mut collector = ProcessMetricsCollector::new(MetricsConfig::default(), vec![pid]);
+        let mut metrics = ProcessMetrics::default();
+
+        let result = collector.collect_process_metrics(pid, &mut metrics);
+        assert!(result.is_err(), "expected error for nonexistent PID");
+    }
+
+    /// Verifies that the full collection loop aggregates across multiple calls.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn collect_aggregated_metrics_linux() {
+        let pid = Pid::from_u32(std::process::id(), "self");
+        let mut collector = ProcessMetricsCollector::new(MetricsConfig::default(), vec![pid]);
+
+        let aggregated = collector
+            .collect_aggregated_metrics()
+            .expect("should aggregate metrics");
+
+        assert_eq!(aggregated.process_count, 1);
+        assert!(aggregated.physical_memory_bytes > 0);
+        assert!(aggregated.virtual_memory_bytes > 0);
     }
 }
