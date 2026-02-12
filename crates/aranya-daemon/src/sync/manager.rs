@@ -36,7 +36,7 @@ use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
 use aranya_runtime::{
-    Command as _, PolicyStore, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
+    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
@@ -480,58 +480,57 @@ where
             SyncResponse::Ok(data) => data,
             SyncResponse::Err(msg) => return Err(anyhow::anyhow!("sync error: {msg}").into()),
         };
-        if data.is_empty() {
-            let cmd_count = 0;
-            info!(?peer, cmd_count, effects_count = 0, "sync completed");
-            return Ok(cmd_count);
-        }
-        let cmds = match requester.receive(&data)? {
-            Some(cmds) if !cmds.is_empty() => cmds,
-            _ => {
-                let cmd_count = 0;
-                info!(?peer, cmd_count, effects_count = 0, "sync completed");
-                return Ok(cmd_count);
-            }
-        };
 
-        let result: Result<()> = async {
-            // Lock both aranya and caches in the correct order.
-            let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-            let mut trx = aranya.transaction(peer.graph_id);
-            aranya
-                .add_commands(&mut trx, &mut sink, &cmds)
-                .context("unable to add received commands")?;
-            aranya
-                .commit(&mut trx, &mut sink)
-                .context("commit failed")?;
-            let cache = caches.entry(peer).or_default();
-            aranya
-                .update_heads(
-                    peer.graph_id,
-                    cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                    cache,
-                )
-                .context("failed to update cache heads")?;
-            Ok(())
-        }
-        .await;
-
-        if let Err(err) = result {
-            self.handle_sync_error(peer, &err);
-            return Err(err);
-        }
+        let cmd_result = self
+            .process_sync_data(&data, &mut requester, &mut sink, peer)
+            .await;
 
         let effects = sink.collect().context("could not collect effects")?;
-        let cmd_count = cmds.len();
         let effects_count = effects.len();
-
         self.send_effects
             .send((peer.graph_id, effects))
             .await
             .context("unable to send effects")?;
 
+        let cmd_count = cmd_result.inspect_err(|err| {
+            self.handle_sync_error(peer, err);
+        })?;
+
         info!(?peer, cmd_count, effects_count, "sync completed");
         Ok(cmd_count)
+    }
+
+    async fn process_sync_data<S: Sink<PS::Effect>>(
+        &self,
+        data: &[u8],
+        requester: &mut SyncRequester,
+        sink: &mut S,
+        peer: SyncPeer,
+    ) -> Result<usize> {
+        if data.is_empty() {
+            return Ok(0);
+        }
+
+        let cmds = match requester.receive(data)? {
+            Some(cmds) if !cmds.is_empty() => cmds,
+            _ => return Ok(0),
+        };
+
+        let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+        let mut trx = aranya.transaction(peer.graph_id);
+        aranya
+            .add_commands(&mut trx, sink, &cmds)
+            .context("unable to add received commands")?;
+        aranya.commit(&mut trx, sink).context("commit failed")?;
+        let cache = caches.entry(peer).or_default();
+        aranya
+            .update_heads(
+                peer.graph_id,
+                cmds.iter().filter_map(|cmd| cmd.address().ok()),
+                cache,
+            )
+            .context("failed to update cache heads")?;
+        Ok(cmds.len())
     }
 
     async fn handle_scheduled_sync(&mut self, peer: SyncPeer) -> Result<()> {
