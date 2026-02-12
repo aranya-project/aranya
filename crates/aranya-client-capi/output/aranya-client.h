@@ -1822,6 +1822,9 @@ AranyaError aranya_setup_default_roles_deprecated_ext(struct AranyaClient *clien
  * - operator
  * - member
  *
+ * The owner role is created automatically when the team is created,
+ * so it is not included here.
+ *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
  *
@@ -1848,6 +1851,9 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  * - admin
  * - operator
  * - member
+ *
+ * The owner role is created automatically when the team is created,
+ * so it is not included here.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.

@@ -260,7 +260,10 @@ impl Team<'_> {
         self.setup_default_roles().await
     }
 
-    /// Sets up the default team roles.
+    /// Sets up the default team roles (admin, operator, member).
+    ///
+    /// The owner role is created automatically when the team is created,
+    /// so it is not included here.
     ///
     /// It returns the roles that were created.
     #[instrument(skip(self))]

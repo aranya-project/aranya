@@ -8,6 +8,7 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use buggy::bug;
 #[cfg(feature = "afc")]
 use aranya_client::afc;
 use aranya_client::config::MAX_SYNC_INTERVAL;
@@ -1219,7 +1220,9 @@ pub unsafe fn setup_default_roles_deprecated(
         )?
         .__into_data();
 
-    debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
+    if DEFAULT_ROLES_LEN != default_roles.len() {
+        bug!("DEFAULT_ROLES_LEN does not match actual default roles count");
+    }
 
     if *roles_len < default_roles.len() {
         *roles_len = default_roles.len();
@@ -1242,6 +1245,9 @@ pub unsafe fn setup_default_roles_deprecated(
 /// - admin
 /// - operator
 /// - member
+///
+/// The owner role is created automatically when the team is created,
+/// so it is not included here.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
 /// Writes the number of roles that would have been returned to `roles_len`.
@@ -1266,7 +1272,9 @@ pub unsafe fn setup_default_roles(
         .block_on(client.inner.team(team.into()).setup_default_roles())?
         .__into_data();
 
-    debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
+    if DEFAULT_ROLES_LEN != default_roles.len() {
+        bug!("DEFAULT_ROLES_LEN does not match actual default roles count");
+    }
 
     if *roles_len < default_roles.len() {
         *roles_len = default_roles.len();
