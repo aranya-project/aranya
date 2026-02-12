@@ -1862,7 +1862,7 @@ async fn test_create_label_with_rank() -> Result<()> {
     Ok(())
 }
 
-/// Tests that the rank of an object can be changed with a valid old_rank.
+/// Tests that the rank of a label can be changed with a valid old_rank.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank").await?;
@@ -1872,17 +1872,17 @@ async fn test_change_rank() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let initial_rank = 50.into();
     let updated_rank = 75.into();
-    let role = owner_team
-        .create_role(text!("mutable_role"), initial_rank)
+    let label = owner_team
+        .create_label_with_rank(text!("mutable_label"), initial_rank)
         .await?;
 
-    let role_obj: ObjectId = ObjectId::transmute(role.id);
+    let label_obj: ObjectId = ObjectId::transmute(label);
 
     owner_team
-        .change_rank(role_obj, initial_rank, updated_rank)
+        .change_rank(label_obj, initial_rank, updated_rank)
         .await?;
 
-    let new_rank = owner_team.query_rank(role_obj).await?;
+    let new_rank = owner_team.query_rank(label_obj).await?;
     assert_eq!(new_rank, updated_rank);
 
     Ok(())
@@ -1899,10 +1899,10 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
-    // Create a role with rank higher than the operator device rank
-    let high_role_rank = (DEFAULT_OPERATOR_ROLE_RANK + 50).into(); // 750
-    let high_role = owner_team
-        .create_role(text!("high_role"), high_role_rank)
+    // Create a label with rank higher than the operator device rank
+    let high_label_rank = (DEFAULT_OPERATOR_ROLE_RANK + 50).into(); // 750
+    let high_label = owner_team
+        .create_label_with_rank(text!("high_label"), high_label_rank)
         .await?;
 
     // Add operator device and sync
@@ -1922,11 +1922,11 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let role_obj: ObjectId = ObjectId::transmute(high_role.id);
+    let label_obj: ObjectId = ObjectId::transmute(high_label);
 
     // Operator tries to change rank of object ranked above it -- should fail
     match operator_team
-        .change_rank(role_obj, high_role_rank, DEFAULT_MEMBER_ROLE_RANK.into())
+        .change_rank(label_obj, high_label_rank, DEFAULT_MEMBER_ROLE_RANK.into())
         .await
     {
         Ok(_) => bail!("expected change_rank to fail when author rank < object rank"),
@@ -2035,39 +2035,29 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
     Ok(())
 }
 
-/// Tests that demoting a role's rank below a device that holds it is rejected.
+/// Tests that role ranks cannot be changed after creation.
 ///
-/// The policy cannot prevent this (enforcing `role_rank >= device_rank` on
-/// demotion would require iterating over all devices assigned to the role),
-/// but the daemon checks the invariant before executing the action.
+/// Role ranks are fixed at creation time to maintain the invariant that
+/// `role_rank > device_rank` for all devices assigned to the role.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_change_role_rank_below_device_rank_rejected() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_change_role_rank_below_device_rank_rejected").await?;
+async fn test_change_role_rank_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_role_rank_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
 
-    // Add admin device with rank just below the member role rank
-    let device_rank = DEFAULT_MEMBER_DEVICE_RANK.into();
-    owner_team
-        .add_device_with_rank(
-            devices.admin.pk.clone(),
-            Some(roles.member().id),
-            device_rank,
-        )
+    // Create a role
+    let role_rank = 50.into();
+    let role = owner_team
+        .create_role(text!("immutable_role"), role_rank)
         .await?;
 
-    let role_obj: ObjectId = ObjectId::transmute(roles.member().id);
-    let role_rank = DEFAULT_MEMBER_ROLE_RANK.into();
+    let role_obj: ObjectId = ObjectId::transmute(role.id);
 
-    // Try to demote the member role rank below the device's rank -- should fail
-    let demoted_role_rank = DEFAULT_LABEL_RANK.into();
-    match owner_team
-        .change_rank(role_obj, role_rank, demoted_role_rank)
-        .await
-    {
-        Ok(_) => bail!("expected change_rank to fail when demoting role below device rank"),
+    // Try to change the role's rank -- should fail
+    match owner_team.change_rank(role_obj, role_rank, 75.into()).await {
+        Ok(_) => bail!("expected change_rank to fail for roles"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected change_rank error: {err:?}"),
     }
@@ -2155,11 +2145,11 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
-    let low_role_rank = 50.into();
+    let low_label_rank = 50.into();
 
-    // Owner creates a role at low rank
-    let role = owner_team
-        .create_role(text!("low_role"), low_role_rank)
+    // Owner creates a label at low rank
+    let label = owner_team
+        .create_label_with_rank(text!("low_label"), low_label_rank)
         .await?;
 
     // Add operator with ChangeRank perm
@@ -2177,11 +2167,11 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let role_obj: ObjectId = ObjectId::transmute(role.id);
+    let label_obj: ObjectId = ObjectId::transmute(label);
 
-    // Operator tries to change role rank to above operator's rank -- should fail
+    // Operator tries to change label rank to above operator's rank -- should fail
     match operator_team
-        .change_rank(role_obj, low_role_rank, DEFAULT_ADMIN_ROLE_RANK.into())
+        .change_rank(label_obj, low_label_rank, DEFAULT_ADMIN_ROLE_RANK.into())
         .await
     {
         Ok(_) => bail!("expected change_rank to fail when new_rank > author_rank"),
@@ -2204,19 +2194,19 @@ async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
 
     let initial_rank = 50.into();
     let updated_rank = 75.into();
-    let role = owner_team
-        .create_role(text!("versioned_role"), initial_rank)
+    let label = owner_team
+        .create_label_with_rank(text!("versioned_label"), initial_rank)
         .await?;
-    let role_obj: ObjectId = ObjectId::transmute(role.id);
+    let label_obj: ObjectId = ObjectId::transmute(label);
 
     // Change rank from initial to updated
     owner_team
-        .change_rank(role_obj, initial_rank, updated_rank)
+        .change_rank(label_obj, initial_rank, updated_rank)
         .await?;
 
     // Try to change rank using stale old_rank (initial instead of current updated)
     match owner_team
-        .change_rank(role_obj, initial_rank, 100.into())
+        .change_rank(label_obj, initial_rank, 100.into())
         .await
     {
         Ok(_) => bail!("expected change_rank to fail with stale old_rank"),
@@ -2502,35 +2492,6 @@ async fn test_deprecated_add_device() -> Result<()> {
         rank,
         DEFAULT_ADMIN_DEVICE_RANK.into(),
         "deprecated add_device should default to role_rank - 1"
-    );
-
-    Ok(())
-}
-
-/// Tests the deprecated setup_default_roles API that takes an owning_role
-/// parameter (which is ignored).
-#[allow(deprecated)]
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_deprecated_setup_default_roles() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_deprecated_setup_default_roles").await?;
-    let team_id = devices.create_and_add_team().await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-    let owner_role = owner_team
-        .roles()
-        .await?
-        .into_iter()
-        .find(|r| r.name == "owner" && r.default)
-        .expect("owner role should exist");
-
-    // Use deprecated setup_default_roles_deprecated API with owning_role parameter
-    let setup_roles = owner_team
-        .setup_default_roles_deprecated(owner_role.id)
-        .await?;
-    assert_eq!(
-        setup_roles.iter().count(),
-        3,
-        "should create admin, operator, member"
     );
 
     Ok(())

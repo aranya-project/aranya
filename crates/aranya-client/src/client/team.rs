@@ -250,19 +250,6 @@ impl Team<'_> {
 }
 
 impl Team<'_> {
-    /// Sets up the default team roles.
-    ///
-    /// The `owning_role` parameter is accepted for backward
-    /// compatibility but is ignored in the rank-based authorization
-    /// model. Use [`Self::setup_default_roles`] instead.
-    ///
-    /// It returns the roles that were created.
-    #[deprecated(note = "use `setup_default_roles` instead")]
-    #[instrument(skip(self))]
-    pub async fn setup_default_roles_deprecated(&self, _owning_role: RoleId) -> Result<Roles> {
-        self.setup_default_roles().await
-    }
-
     /// Sets up the default team roles (admin, operator, member).
     ///
     /// The owner role is created automatically when the team is created,
@@ -342,7 +329,11 @@ impl Team<'_> {
         Ok(())
     }
 
-    /// Changes the rank of an object.
+    /// Changes the rank of an object (device or label).
+    ///
+    /// Note: Role ranks cannot be changed after creation. This maintains the
+    /// invariant that `role_rank > device_rank` for all devices assigned to
+    /// the role.
     #[instrument(skip(self))]
     pub async fn change_rank(
         &self,

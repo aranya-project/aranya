@@ -227,101 +227,19 @@ where
             .in_current_span()
     }
 
-    /// Invokes `change_rank` with invariant checking.
-    ///
-    /// When demoting a role's rank, this checks that no device assigned to
-    /// that role has a rank >= the new role rank. This maintains the invariant
-    /// that role_rank > device_rank for all assigned devices.
+    /// Invokes `change_rank`.
     #[instrument(skip(self))]
     fn change_rank(
         &self,
         object_id: BaseId,
         old_rank: Rank,
         new_rank: Rank,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send
-    where
-        Self: Sync,
-    {
-        async move {
-            // Check invariant when demoting a role
-            if new_rank.value() < old_rank.value() {
-                // Check if object_id is a role
-                let is_role = self.query_team_roles().await?.iter().any(
-                    |e| matches!(e, Effect::QueryTeamRolesResult(r) if r.role_id == object_id),
-                );
-
-                if is_role {
-                    self.check_role_demotion_invariant(object_id, new_rank)
-                        .await?;
-                }
-            }
-
-            self.call_persistent_action(policy::change_rank(
-                object_id,
-                old_rank.value(),
-                new_rank.value(),
-            ))
-            .await
-        }
-        .in_current_span()
-    }
-
-    /// Checks that demoting a role's rank won't violate the role_rank > device_rank invariant.
-    ///
-    /// Verifies that no device assigned to the role has a rank >= `new_rank`.
-    /// Returns an error if the invariant would be violated.
-    ///
-    /// # Precondition
-    ///
-    /// `role_id` must be a valid role ID. The caller is responsible for verifying this.
-    #[instrument(skip(self))]
-    fn check_role_demotion_invariant(
-        &self,
-        role_id: BaseId,
-        new_rank: Rank,
-    ) -> impl Future<Output = Result<()>> + Send
-    where
-        Self: Sync,
-    {
-        async move {
-            // Check each device on the team
-            let devices = self.query_devices_on_team().await?;
-
-            for effect in devices {
-                let Effect::QueryDevicesOnTeamResult(d) = effect else {
-                    continue;
-                };
-
-                let device_id = DeviceId::from_base(d.device_id);
-
-                // Check if this device has the role we're demoting
-                let has_role =
-                    self.query_device_role(device_id).await?.iter().any(
-                        |e| matches!(e, Effect::QueryDeviceRoleResult(r) if r.role_id == role_id),
-                    );
-
-                if !has_role {
-                    continue;
-                }
-
-                // Check if device rank would violate invariant
-                for effect in self.query_rank(d.device_id).await? {
-                    if let Effect::QueryRankResult(r) = effect {
-                        if r.rank >= new_rank.value() {
-                            anyhow::bail!(
-                                "cannot demote role rank to {} because device {} has rank {} \
-                                 (role_rank must be > device_rank)",
-                                new_rank.value(),
-                                device_id,
-                                r.rank
-                            );
-                        }
-                    }
-                }
-            }
-
-            Ok(())
-        }
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::change_rank(
+            object_id,
+            old_rank.value(),
+            new_rank.value(),
+        ))
         .in_current_span()
     }
 

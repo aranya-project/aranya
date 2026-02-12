@@ -1749,73 +1749,6 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
 #endif
 
 /**
- * Assign a role to a device.
- * Setup default roles on team.
- *
- * This sets up the following roles with default permissions as
- * defined in Aranya's default policy:
- * - admin
- * - operator
- * - member
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
- *
- * N.B. this function is meant to be called once to set up the default roles.
- * Subsequent calls will result in an error if the default roles were already created.
- *
- * The `owning_role` parameter is accepted for backward compatibility but
- * is ignored in the rank-based authorization model.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] owning_role (ignored) formerly the owning role
- * @param[in] roles_out returns a list of default roles
- * @param[in,out] roles_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_setup_default_roles_deprecated(struct AranyaClient *client,
-                                                  const struct AranyaTeamId *team,
-                                                  const struct AranyaRoleId *_owning_role,
-                                                  struct AranyaRole *roles_out,
-                                                  size_t *roles_len);
-
-/**
- * Assign a role to a device.
- * Setup default roles on team.
- *
- * This sets up the following roles with default permissions as
- * defined in Aranya's default policy:
- * - admin
- * - operator
- * - member
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
- *
- * N.B. this function is meant to be called once to set up the default roles.
- * Subsequent calls will result in an error if the default roles were already created.
- *
- * The `owning_role` parameter is accepted for backward compatibility but
- * is ignored in the rank-based authorization model.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] owning_role (ignored) formerly the owning role
- * @param[in] roles_out returns a list of default roles
- * @param[in,out] roles_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_setup_default_roles_deprecated_ext(struct AranyaClient *client,
-                                                      const struct AranyaTeamId *team,
-                                                      const struct AranyaRoleId *_owning_role,
-                                                      struct AranyaRole *roles_out,
-                                                      size_t *roles_len,
-                                                      struct AranyaExtError *__ext_err);
-
-/**
  * Setup default roles on team.
  *
  * This sets up the following roles with default permissions as
@@ -2341,7 +2274,7 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
- * Change the rank of an object.
+ * Change the rank of an object (device or label).
  *
  * The caller must provide the current rank of the object (`old_rank`)
  * to guard against concurrent changes by other devices. If another
@@ -2353,6 +2286,10 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
  * The caller's rank must be strictly greater than both the old and
  * new rank. Permission to perform this operation is checked against
  * the Aranya policy.
+ *
+ * Note: Role ranks cannot be changed after creation. This maintains
+ * the invariant that `role_rank > device_rank` for all devices
+ * assigned to the role.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2369,7 +2306,7 @@ AranyaError aranya_change_rank(const struct AranyaClient *client,
                                int64_t new_rank);
 
 /**
- * Change the rank of an object.
+ * Change the rank of an object (device or label).
  *
  * The caller must provide the current rank of the object (`old_rank`)
  * to guard against concurrent changes by other devices. If another
@@ -2381,6 +2318,10 @@ AranyaError aranya_change_rank(const struct AranyaClient *client,
  * The caller's rank must be strictly greater than both the old and
  * new rank. Permission to perform this operation is checked against
  * the Aranya policy.
+ *
+ * Note: Role ranks cannot be changed after creation. This maintains
+ * the invariant that `role_rank > device_rank` for all devices
+ * assigned to the role.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
