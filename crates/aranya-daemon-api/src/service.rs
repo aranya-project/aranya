@@ -298,6 +298,23 @@ pub enum ChanOp {
 }
 
 /// Permissions that can be granted to a role.
+///
+/// # Stability
+///
+/// New permissions may be added to the end of this enum without breaking
+/// backward compatibility. Existing permissions will not be removed or
+/// renamed.
+///
+/// # Deprecation Strategy
+///
+/// When a permission needs to be deprecated:
+///
+/// 1. Mark the variant with `#[deprecated(since = "X.Y.Z", note = "reason")]`
+/// 2. Keep the variant in the enum so existing code continues to compile
+/// 3. Keep the corresponding permission in `policy.md` so enum conversions
+///    between APIs and the policy continue to work
+/// 4. Log a `warn!` message when the deprecated permission is used
+/// 5. Document the migration path in the deprecation note
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Perm {
     // # Team management

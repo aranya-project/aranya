@@ -528,6 +528,8 @@ impl Addr {
 }
 
 /// Simple permission.
+///
+/// See [`aranya_daemon_api::Perm`] for stability and deprecation policy.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum Permission {

@@ -208,6 +208,8 @@ typedef uint32_t AranyaError;
 
 /**
  * Simple permission.
+ *
+ * See [`aranya_daemon_api::Perm`] for stability and deprecation policy.
  */
 enum AranyaPermission
 #ifdef __cplusplus

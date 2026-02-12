@@ -863,7 +863,7 @@ async fn test_remove_team() -> Result<()> {
     {
         let admin = devices.admin.client.team(team_id);
 
-        // Label creation should fail after team removal.
+        // Label creation should fail since the team was removed from local storage above.
         match admin
             .create_label_with_rank(text!("test_label2"), DEFAULT_LABEL_RANK.into())
             .await
