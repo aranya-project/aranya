@@ -5,7 +5,7 @@ mod label;
 mod role;
 mod team;
 
-use std::{fmt::Debug, io, path::Path};
+use std::{fmt::Debug, io, path::Path, time::Instant};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
@@ -42,7 +42,7 @@ pub use crate::client::{
     team::{Team, TeamId},
 };
 use crate::{
-    config::{AddTeamConfig, CreateTeamConfig},
+    config::{AddTeamConfig, CreateTeamConfig, MAX_SYNC_INTERVAL},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
     util::ApiConv as _,
 };
@@ -119,7 +119,7 @@ impl ClientBuilder<'_> {
             debug!("connected to daemon");
 
             let got = daemon
-                .version(context::current())
+                .version(create_ctx())
                 .await
                 .map_err(IpcError::new)?
                 .context("unable to retrieve daemon version")
@@ -139,7 +139,7 @@ impl ClientBuilder<'_> {
             #[cfg(feature = "afc")]
             let afc_keys = {
                 let afc_shm_info = daemon
-                    .afc_shm_info(context::current())
+                    .afc_shm_info(create_ctx())
                     .await
                     .map_err(IpcError::new)?
                     .context("unable to retrieve afc shm info")
@@ -197,7 +197,7 @@ impl Client {
     /// Returns the address that the Aranya sync server is bound to.
     pub async fn local_addr(&self) -> Result<Addr> {
         self.daemon
-            .aranya_local_addr(context::current())
+            .aranya_local_addr(create_ctx())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -206,7 +206,7 @@ impl Client {
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&self) -> Result<KeyBundle> {
         self.daemon
-            .get_key_bundle(context::current())
+            .get_key_bundle(create_ctx())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -216,7 +216,7 @@ impl Client {
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&self) -> Result<DeviceId> {
         self.daemon
-            .get_device_id(context::current())
+            .get_device_id(create_ctx())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -227,7 +227,7 @@ impl Client {
     pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
-            .create_team(context::current(), cfg.into())
+            .create_team(create_ctx(), cfg.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -258,7 +258,7 @@ impl Client {
         let team_id = TeamId::from_api(cfg.team_id);
 
         self.daemon
-            .add_team(context::current(), cfg)
+            .add_team(create_ctx(), cfg)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -271,7 +271,7 @@ impl Client {
     /// Remove a team from local device storage.
     pub async fn remove_team(&self, team_id: TeamId) -> Result<()> {
         self.daemon
-            .remove_team(context::current(), team_id.into_api())
+            .remove_team(create_ctx(), team_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -283,4 +283,13 @@ impl Client {
     pub fn afc(&self) -> AfcChannels {
         AfcChannels::new(self.daemon.clone(), self.afc_keys.clone())
     }
+}
+
+/// Returns the current [`Context`](context::Context) with a deadline set to the current time
+/// plus [`MAX_SYNC_INTERVAL`].
+pub(crate) fn create_ctx() -> context::Context {
+    let mut ctx = context::current();
+    ctx.deadline = Instant::now() + MAX_SYNC_INTERVAL;
+
+    ctx
 }
