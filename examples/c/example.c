@@ -1016,7 +1016,6 @@ AranyaError run_custom_roles_example(Team *t) {
 
     // Create a custom role.
     const int64_t buddy_initial_rank = 50;
-    const int64_t buddy_updated_rank = 75;
     AranyaRole buddy_role;
     err = aranya_create_role(&owner->client, &t->id, "buddy",
                              buddy_initial_rank, &buddy_role);
@@ -1033,16 +1032,19 @@ AranyaError run_custom_roles_example(Team *t) {
     printf("Assigned 'buddy' the 'CanUseAfc' permission\n");
 
     // Query permissions assigned to the custom role.
-    const size_t role_perms_max = 16;
-    AranyaPermission role_perms[role_perms_max];
-    size_t role_perms_len = role_perms_max;
+    AranyaPermission role_perms[16];
+    size_t role_perms_len = 16;
     err = aranya_query_role_perms(&owner->client, &t->id, &buddy_role_id,
                                   role_perms, &role_perms_len);
     EXPECT("unable to query permissions for 'buddy' role", err);
     printf("buddy role has %zu permission(s):\n", role_perms_len);
     bool found_can_use_afc = false;
     for (size_t i = 0; i < role_perms_len; i++) {
-        printf("  - %s\n", aranya_permission_to_str(role_perms[i]));
+        const char *perm_str = NULL;
+        err = aranya_permission_to_str(role_perms[i], &perm_str);
+        if (err == ARANYA_ERROR_SUCCESS && perm_str != NULL) {
+            printf("  - %s\n", perm_str);
+        }
         if (role_perms[i] == ARANYA_PERMISSION_CAN_USE_AFC) {
             found_can_use_afc = true;
         }
@@ -1054,35 +1056,45 @@ AranyaError run_custom_roles_example(Team *t) {
         goto exit;
     }
 
-    // Demo change_rank/query_rank: change the buddy role's rank.
+    // Demo query_rank: verify the role has the rank it was created with.
+    // Note: Role ranks are immutable after creation.
     AranyaObjectId buddy_object_id = {.id = buddy_role_id.id};
 
-    int64_t current_rank = 0;
-    err = aranya_query_rank(&owner->client, &t->id, &buddy_object_id,
-                            &current_rank);
+    int64_t role_rank = 0;
+    err =
+        aranya_query_rank(&owner->client, &t->id, &buddy_object_id, &role_rank);
     EXPECT("unable to query rank of 'buddy' role", err);
-    printf("buddy role rank before change: %lld\n", (long long)current_rank);
-    if (current_rank != buddy_initial_rank) {
+    printf("buddy role rank: %lld\n", (long long)role_rank);
+    if (role_rank != buddy_initial_rank) {
         fprintf(stderr, "expected buddy role rank to be %lld, got %lld\n",
-                (long long)buddy_initial_rank, (long long)current_rank);
+                (long long)buddy_initial_rank, (long long)role_rank);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
 
-    printf("changing buddy role rank from %lld to %lld\n",
-           (long long)buddy_initial_rank, (long long)buddy_updated_rank);
-    err = aranya_change_rank(&owner->client, &t->id, &buddy_object_id,
-                             buddy_initial_rank, buddy_updated_rank);
-    EXPECT("unable to change rank of 'buddy' role", err);
+    // Demo change_rank on a device: change membera's rank.
+    AranyaObjectId membera_object_id = {.id = membera->id.id};
+    int64_t device_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &membera_object_id,
+                            &device_rank);
+    EXPECT("unable to query rank of 'membera' device", err);
+    printf("membera device rank before change: %lld\n", (long long)device_rank);
+
+    int64_t updated_device_rank = 90;
+    printf("changing membera device rank from %lld to %lld\n",
+           (long long)device_rank, (long long)updated_device_rank);
+    err = aranya_change_rank(&owner->client, &t->id, &membera_object_id,
+                             device_rank, updated_device_rank);
+    EXPECT("unable to change rank of 'membera' device", err);
 
     int64_t new_rank = 0;
-    err =
-        aranya_query_rank(&owner->client, &t->id, &buddy_object_id, &new_rank);
-    EXPECT("unable to query new rank of 'buddy' role", err);
-    printf("buddy role rank after change: %lld\n", (long long)new_rank);
-    if (new_rank != buddy_updated_rank) {
-        fprintf(stderr, "expected buddy role rank to be %lld, got %lld\n",
-                (long long)buddy_updated_rank, (long long)new_rank);
+    err = aranya_query_rank(&owner->client, &t->id, &membera_object_id,
+                            &new_rank);
+    EXPECT("unable to query new rank of 'membera' device", err);
+    printf("membera device rank after change: %lld\n", (long long)new_rank);
+    if (new_rank != updated_device_rank) {
+        fprintf(stderr, "expected membera device rank to be %lld, got %lld\n",
+                (long long)updated_device_rank, (long long)new_rank);
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }

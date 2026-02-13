@@ -434,25 +434,30 @@ async fn main() -> Result<()> {
         .assign_role(custom_role.id)
         .await?;
 
-    // Demo change_rank/query_rank: verify the role has the rank it was created with,
-    // then change it.
+    // Demo query_rank: verify the role has the rank it was created with.
+    // Note: Role ranks are immutable after creation.
     let role_object_id: ObjectId = ObjectId::transmute(custom_role.id);
     let current_rank = owner_team.query_rank(role_object_id).await?;
-    info!("custom role rank before change: {}", current_rank);
+    info!("custom role rank: {}", current_rank);
     assert_eq!(current_rank, custom_role_rank);
 
-    let updated_role_rank = Rank::new(75);
+    // Demo change_rank on a device: change the custom device's rank.
+    let device_object_id: ObjectId = ObjectId::transmute(custom.id);
+    let device_rank = owner_team.query_rank(device_object_id).await?;
+    info!("custom device rank before change: {}", device_rank);
+
+    let updated_device_rank = Rank::new(40);
     info!(
-        "changing custom role rank from {} to {}",
-        custom_role_rank, updated_role_rank
+        "changing custom device rank from {} to {}",
+        device_rank, updated_device_rank
     );
     owner_team
-        .change_rank(role_object_id, custom_role_rank, updated_role_rank)
+        .change_rank(device_object_id, device_rank, updated_device_rank)
         .await?;
 
-    let new_rank = owner_team.query_rank(role_object_id).await?;
-    info!("custom role rank after change: {}", new_rank);
-    assert_eq!(new_rank, updated_role_rank);
+    let new_rank = owner_team.query_rank(device_object_id).await?;
+    info!("custom device rank after change: {}", new_rank);
+    assert_eq!(new_rank, updated_device_rank);
 
     // Revoke custom role from a device.
     info!("revoking custom role from a device");
