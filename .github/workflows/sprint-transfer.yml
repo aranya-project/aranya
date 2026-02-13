@@ -1,0 +1,27 @@
+name: "Transfer issues to next sprint"
+
+on:
+  # Run at 05:00 UTC every Monday
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  move-issues:
+    name: Move issues to next sprint iteration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move incomplete issues to next iteration
+        # Pinned to v0.6.1 (https://github.com/blombard/move-to-next-iteration)
+        uses: blombard/move-to-next-iteration@e0d7571f7fa517a8da883e25b797b9d588e16538
+        with:
+          owner: aranya-project
+          number: ${{ vars.PROJECT_NUMBER }}
+          token: ${{ secrets.PROJECT_PAT }}
+          iteration-field: ${{ vars.ITERATION_FIELD }}
+          iteration: last
+          new-iteration: current
+          excluded-statuses: "Done,Won't Fix"
