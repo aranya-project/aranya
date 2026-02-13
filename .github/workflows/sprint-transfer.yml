@@ -1,9 +1,9 @@
 name: "Transfer issues to next sprint"
 
 on:
-  # Run at 05:00 UTC every Monday
+  # Run at midnight PST (08:00 UTC) every Wednesday
   schedule:
-    - cron: "0 5 * * 1"
+    - cron: "0 8 * * 3"
   workflow_dispatch:
 
 permissions:
