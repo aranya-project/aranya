@@ -21,14 +21,14 @@ impl NodeCtx {
     ///
     /// This follows the `DeviceCtx::new()` pattern but uses a unique index
     /// for identification and AFC shared memory path generation.
-    //= docs/multi-daemon-convergence-test.md#init-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-001
     //# Each node MUST be initialized with a unique daemon instance.
     #[instrument(skip(work_dir), fields(node_index = index))]
     pub(crate) async fn new(index: usize, work_dir: PathBuf, team_name: &str) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Generate unique AFC shm path per node
-        //= docs/multi-daemon-convergence-test.md#init-002
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-002
         //# Each node MUST have its own cryptographic keys.
         let afc_shm_path = {
             use aranya_daemon_api::shm;
@@ -90,7 +90,7 @@ impl NodeCtx {
             .await
             .context("unable to init client")?;
 
-        //= docs/multi-daemon-convergence-test.md#init-003
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-003
         //# All nodes MUST have unique device IDs.
         let pk = client
             .get_key_bundle()
@@ -118,10 +118,10 @@ impl TestCtx {
     ///
     /// Nodes are initialized in parallel batches to avoid resource exhaustion
     /// while still providing reasonable startup performance.
-    //= docs/multi-daemon-convergence-test.md#init-004
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-004
     //# Node initialization MUST occur in parallel batches to avoid resource exhaustion.
     #[instrument(skip(config), fields(node_count = config.node_count))]
-    pub async fn new(config: TestConfig, topology: Topology) -> Result<Self> {
+    pub async fn new(config: TestConfig, topology: Option<Vec<Topology>>) -> Result<Self> {
         config.validate()?;
 
         let work_dir = TempDir::new().context("unable to create temp dir")?;
@@ -154,7 +154,7 @@ impl TestCtx {
                 })
                 .collect();
 
-            //= docs/multi-daemon-convergence-test.md#init-005
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-005
             //# Node initialization MUST complete within a configurable timeout (default: 60 seconds per node batch).
             let batch_results = tokio::time::timeout(
                 config.init_timeout,
@@ -167,13 +167,13 @@ impl TestCtx {
             nodes.extend(batch_results);
         }
 
-        //= docs/multi-daemon-convergence-test.md#init-006
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-006
         //# The test MUST verify that all nodes started successfully.
 
-        //= docs/multi-daemon-convergence-test.md#err-001
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#err-001
         //# The test MUST fail if any node fails to initialize.
         if nodes.len() != config.node_count {
-            //= docs/multi-daemon-convergence-test.md#err-002
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#err-002
             //# If a node fails to initialize, the test MUST report which node failed and the cause of the failure.
             bail!(
                 "Expected {} nodes but only {} initialized",

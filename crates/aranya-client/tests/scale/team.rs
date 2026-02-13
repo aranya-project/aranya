@@ -23,13 +23,13 @@ impl TestCtx {
     }
 
     /// Creates a team with node 0 as the owner.
-    //= docs/multi-daemon-convergence-test.md#team-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-001
     //# A single team MUST be created by node 0 (the designated owner).
     #[instrument(skip(self))]
     pub async fn create_team(&mut self) -> Result<TeamId> {
         info!("Creating team with node 0 as owner");
 
-        //= docs/multi-daemon-convergence-test.md#team-003
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-003
         //# A shared QUIC sync seed MUST be distributed to all nodes during team setup.
         let owner_cfg = CreateTeamConfig::builder()
             .quic_sync(
@@ -84,7 +84,7 @@ impl TestCtx {
     }
 
     /// Adds all nodes to the team as members.
-    //= docs/multi-daemon-convergence-test.md#team-002
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-002
     //# All nodes MUST be added to the team before convergence testing begins.
     #[instrument(skip(self))]
     pub async fn add_all_nodes_to_team(&mut self) -> Result<()> {
@@ -96,7 +96,7 @@ impl TestCtx {
             "Adding all nodes to team as members"
         );
 
-        //= docs/multi-daemon-convergence-test.md#team-004
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-004
         //# Each non-owner node MUST be added as a team member by the owner.
         for node in &self.nodes[1..] {
             owner_team
@@ -110,10 +110,10 @@ impl TestCtx {
     }
 
     /// Verifies that all nodes have received the team configuration.
-    //= docs/multi-daemon-convergence-test.md#team-005
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-005
     //# Team configuration MUST be synchronized to all nodes before the convergence test phase.
 
-    //= docs/multi-daemon-convergence-test.md#team-006
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-006
     //# The test MUST verify that all nodes have received the team configuration.
     #[instrument(skip(self))]
     pub async fn verify_team_propagation(&self) -> Result<()> {
@@ -154,7 +154,7 @@ impl TestCtx {
     /// This is used during setup before the ring topology is configured.
     /// Sync failures are expected and retried - Aranya syncs can occasionally fail
     /// and that's normal behavior.
-    //= docs/multi-daemon-convergence-test.md#err-003
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#err-003
     //# The test MUST handle sync failures between nodes.
     #[instrument(skip(self))]
     pub async fn sync_team_from_owner(&self) -> Result<()> {

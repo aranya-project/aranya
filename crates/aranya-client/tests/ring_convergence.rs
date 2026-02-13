@@ -22,21 +22,21 @@ use serial_test::serial;
 use test_log::test;
 use tracing::info;
 
-use crate::scale::{SyncMode, TestConfig, TestCtx, Topology};
+use crate::scale::{NodeIndex, SyncMode, TestConfig, TestCtx, Topology};
 
 // ---------------------------------------------------------------------------
 // Helper: run a ring convergence test with the given config
 // ---------------------------------------------------------------------------
 
 async fn run_ring_convergence(config: TestConfig) -> Result<()> {
-    let mut ring = TestCtx::new(config, Topology::Ring).await?;
+    let mut ring = TestCtx::new(config, Some(vec![Topology::Ring])).await?;
 
     ring.setup_team().await?;
     ring.sync_team_from_owner().await?;
     ring.configure_topology().await?;
     ring.verify_team_propagation().await?;
 
-    ring.issue_test_command(0).await?;
+    ring.issue_test_command(NodeIndex(0)).await?;
     ring.wait_for_convergence().await?;
     ring.report_metrics();
 
@@ -50,7 +50,7 @@ async fn run_ring_convergence(config: TestConfig) -> Result<()> {
 /// Tests ring convergence with the minimum 3 nodes.
 ///
 /// This tests the edge case of the smallest valid ring.
-//= docs/multi-daemon-convergence-test.md#conf-003
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-003
 //= type=test
 //# The test MUST reject configurations with fewer than 3 nodes (the minimum for a valid ring).
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -71,7 +71,7 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
 /// Tests ring convergence with the minimum 3 nodes using hello sync mode.
 ///
 /// This tests the edge case of the smallest valid ring with reactive syncing.
-//= docs/multi-daemon-convergence-test.md#conf-008
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-008
 //= type=test
 //# The test MUST support configuring the sync mode (poll or hello).
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -100,7 +100,7 @@ async fn test_ring_minimum_3_nodes_hello() -> Result<()> {
 /// Tests ring convergence with 10 nodes using poll sync mode.
 ///
 /// This is a smaller test suitable for CI with reasonable execution time.
-//= docs/multi-daemon-convergence-test.md#conf-001
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-001
 //= type=test
 //# The test MUST support configuring the number of nodes.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -114,12 +114,12 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 
     info!(node_count = config.node_count, "Starting 10-node ring test (poll mode)");
 
-    //= docs/multi-daemon-convergence-test.md#init-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-001
     //= type=test
     //# Each node MUST be initialized with a unique daemon instance.
-    let mut ring = TestCtx::new(config, Topology::Ring).await?;
+    let mut ring = TestCtx::new(config, Some(vec![Topology::Ring])).await?;
 
-    //= docs/multi-daemon-convergence-test.md#team-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-001
     //= type=test
     //# A single team MUST be created by node 0 (the designated owner).
     ring.setup_team().await?;
@@ -127,27 +127,27 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
     // Sync team configuration before setting up ring topology
     ring.sync_team_from_owner().await?;
 
-    //= docs/multi-daemon-convergence-test.md#sync-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-001
     //= type=test
-    //# Each node MUST add its two ring neighbors as sync peers.
+    //# Each node MUST add sync peers according to the configured topology.
     ring.configure_topology().await?;
 
-    //= docs/multi-daemon-convergence-test.md#team-006
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-006
     //= type=test
     //# The test MUST verify that all nodes have received the team configuration.
     ring.verify_team_propagation().await?;
 
-    //= docs/multi-daemon-convergence-test.md#conv-002
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conv-002
     //= type=test
     //# The default source node for label assignment MUST be node 0.
-    ring.issue_test_command(0).await?;
+    ring.issue_test_command(NodeIndex(0)).await?;
 
-    //= docs/multi-daemon-convergence-test.md#conv-005
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conv-005
     //= type=test
     //# The test MUST measure the total convergence time from label assignment to full convergence.
     ring.wait_for_convergence().await?;
 
-    //= docs/multi-daemon-convergence-test.md#perf-003
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-003
     //= type=test
     //# The test MUST calculate and report the following metrics.
     ring.report_metrics();
@@ -159,17 +159,17 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 /// Tests ring convergence with 10 nodes using hello sync mode.
 ///
 /// Validates that hello-based reactive syncing works for convergence.
-//= docs/multi-daemon-convergence-test.md#conf-008
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-008
 //= type=test
 //# The test MUST support configuring the sync mode (poll or hello).
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
-    //= docs/multi-daemon-convergence-test.md#conf-010
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-010
     //= type=test
     //# In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
 
-    //= docs/multi-daemon-convergence-test.md#conf-011
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-011
     //= type=test
     //# In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
     let config = TestConfig::builder()
@@ -184,18 +184,18 @@ async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
 
     info!(node_count = config.node_count, "Starting 10-node ring test (hello mode)");
 
-    let mut ring = TestCtx::new(config, Topology::Ring).await?;
+    let mut ring = TestCtx::new(config, Some(vec![Topology::Ring])).await?;
 
     ring.setup_team().await?;
     ring.sync_team_from_owner().await?;
 
-    //= docs/multi-daemon-convergence-test.md#sync-006
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-006
     //= type=test
     //# In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
     ring.configure_topology().await?;
     ring.verify_team_propagation().await?;
 
-    ring.issue_test_command(0).await?;
+    ring.issue_test_command(NodeIndex(0)).await?;
     ring.wait_for_convergence().await?;
     ring.report_metrics();
 
@@ -418,7 +418,7 @@ async fn test_ring_convergence_60_nodes_hello() -> Result<()> {
 // ---------------------------------------------------------------------------
 
 /// Tests ring convergence with 70 nodes using poll sync mode.
-//= docs/multi-daemon-convergence-test.md#conf-002
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-002
 //= type=test
 //# The test MUST scale to at least 70 nodes without failure.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -549,7 +549,7 @@ async fn test_ring_convergence_90_nodes_hello() -> Result<()> {
 /// Tests ring convergence with 100 nodes using poll sync mode.
 ///
 /// This is the full-scale test as specified in the requirements.
-//= docs/multi-daemon-convergence-test.md#conf-002
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-002
 //= type=test
 //# The test MUST scale to at least 70 nodes without failure.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -607,7 +607,7 @@ async fn test_ring_config_validation() -> Result<()> {
     let result = TestConfig::builder().node_count(3).build();
     assert!(result.is_ok(), "Should accept node_count >= 3");
 
-    //= docs/multi-daemon-convergence-test.md#conf-009
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-009
     //= type=test
     //# The default sync mode MUST be hello.
     let config = TestConfig::default();

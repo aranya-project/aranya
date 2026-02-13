@@ -33,9 +33,9 @@ pub struct ConvergenceMetrics {
 
 impl TestCtx {
     /// Calculates and reports performance metrics.
-    //= docs/multi-daemon-convergence-test.md#perf-002
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-002
     //# The test MUST record the timestamp when each node achieves convergence.
-    //= docs/multi-daemon-convergence-test.md#perf-003
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-003
     //# The test MUST calculate and report the following metrics:
     //# - Minimum convergence time (fastest node)
     //# - Maximum convergence time (slowest node)
@@ -55,7 +55,7 @@ impl TestCtx {
             .node_status
             .iter()
             .enumerate()
-            .filter(|(i, s)| *i != self.tracker.source_node && s.convergence_time.is_some())
+            .filter(|(i, s)| *i != self.tracker.source_node.0 && s.convergence_time.is_some())
             .map(|(_, s)| s.convergence_time.unwrap().duration_since(command_issued))
             .collect();
 
@@ -173,7 +173,7 @@ impl TestCtx {
                     println!("Total convergence time:  {:?}", total);
                 }
 
-                //= docs/multi-daemon-convergence-test.md#perf-004
+                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-004
                 //# The test SHOULD report memory usage per node if available.
                 #[cfg(target_os = "linux")]
                 if let Some(mem) = get_process_memory_kb() {
@@ -214,7 +214,7 @@ impl TestCtx {
     /// Exports raw convergence data as a CSV file if the `ARANYA_CSV_EXPORT` env var is set.
     ///
     /// The env var value is used as the output file path.
-    //= docs/multi-daemon-convergence-test.md#perf-005
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-005
     //# When a CSV export feature flag is enabled, the test MUST output raw convergence data as a CSV file after each test run.
     fn export_csv_if_enabled(&self) {
         let csv_path = match std::env::var("ARANYA_CSV_EXPORT") {
@@ -224,7 +224,7 @@ impl TestCtx {
 
         let command_issued = self.tracker.timestamps.command_issued;
 
-        //= docs/multi-daemon-convergence-test.md#perf-006
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-006
         //# The CSV output MUST include one row per node with the following columns: node index, label assignment time (T0), node convergence time, and convergence duration (time from T0 to node convergence).
         let mut csv = String::from("node_index,t0_secs,convergence_time_secs,duration_secs\n");
 

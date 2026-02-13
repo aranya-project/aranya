@@ -1,4 +1,4 @@
-SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-convergence-test.md)
+SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md)
   SECTION: [CONF-001](#conf-001)
     TEXT[!MUST,implementation,test]: The test MUST support configuring the number of nodes.
 
@@ -33,16 +33,37 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
     TEXT[!MUST,implementation,test]: In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
 
   SECTION: [TOPO-001](#topo-001)
-    TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
+    TEXT[!MUST,implementation]: The test MUST support the Ring topology.
 
   SECTION: [TOPO-002](#topo-002)
-    TEXT[!MUST,implementation]: In the ring topology, sync peers MUST be configured bidirectionally, meaning if node A syncs with node B, node B MUST also sync with node A.
+    TEXT[!MUST]: The test MUST support the Custom topology.
 
   SECTION: [TOPO-003](#topo-003)
-    TEXT[!MUST,implementation]: The ring topology MUST form a single connected ring with no partitions.
+    TEXT[!MUST]: The initial implementation MUST include at least the Ring and Custom topologies.
 
   SECTION: [TOPO-004](#topo-004)
-    TEXT[!MUST,implementation]: In the ring topology, no node MUST have more than 2 sync peers.
+    TEXT[!MUST]: When multiple topologies are configured, the test MUST apply them sequentially, each topology adding its peers on top of any previously configured peers.
+
+  SECTION: [RING-001](#ring-001)
+    TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
+
+  SECTION: [RING-002](#ring-002)
+    TEXT[!MUST,implementation]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
+
+  SECTION: [CUST-001](#cust-001)
+    TEXT[!MUST]: The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
+
+  SECTION: [CUST-002](#cust-002)
+    TEXT[!MUST]: The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
+
+  SECTION: [CUST-003](#cust-003)
+    TEXT[!MUST]: The Custom topology MUST allow defining arbitrary peer relationships between nodes, including topologies such as star, mesh, and hierarchical.
+
+  SECTION: [CUST-004](#cust-004)
+    TEXT[!MUST]: `TestCtx` MUST provide an `add_sync_peer` method that adds a sync peer relationship between two nodes identified by `NodeIndex`.
+
+  SECTION: [CUST-005](#cust-005)
+    TEXT[!MUST]: `TestCtx` MUST provide a `remove_sync_peer` method that removes a sync peer relationship between two nodes identified by `NodeIndex`.
 
   SECTION: [INIT-001](#init-001)
     TEXT[!MUST,implementation,test]: Each node MUST be initialized with a unique daemon instance.
@@ -81,7 +102,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
     TEXT[!MUST,implementation,test]: The test MUST verify that all nodes have received the team configuration.
 
   SECTION: [SYNC-001](#sync-001)
-    TEXT[!MUST,implementation,test]: Each node MUST add its two ring neighbors as sync peers.
+    TEXT[!MUST,implementation,test]: Each node MUST add sync peers according to the configured topology.
 
   SECTION: [SYNC-002](#sync-002)
     TEXT[!MUST,implementation]: Sync peer configuration MUST specify the sync interval.
@@ -180,5 +201,5 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](docs/multi-daemon-c
 
   SECTION: [Duvet Integration](#duvet-integration)
     TEXT[!MUST]: ```rust
-    TEXT[!MUST]: //= docs/multi-daemon-convergence-test.md#conf-002
+    TEXT[!MUST]: //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#CONF-002
     TEXT[!MUST]: //# The test MUST scale to at least 70 nodes without failure.

@@ -6,14 +6,14 @@ use anyhow::{bail, Context, Result};
 use aranya_client::{HelloSubscriptionConfig, SyncPeerConfig};
 use tracing::{debug, info, instrument};
 
-use crate::scale::{SyncMode, TestCtx};
+use crate::scale::{NodeIndex, SyncMode, TestCtx};
 
 impl TestCtx {
     /// Configures the bidirectional ring topology.
     ///
     /// Each node is connected to its clockwise and counter-clockwise neighbors,
     /// forming a ring where data can propagate in both directions.
-    //= docs/multi-daemon-convergence-test.md#topo-001
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
     //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
     #[instrument(skip(self))]
     pub async fn configure_ring_topology(&mut self) -> Result<()> {
@@ -27,7 +27,7 @@ impl TestCtx {
         );
 
         // Build SyncPeerConfig based on the sync mode
-        //= docs/multi-daemon-convergence-test.md#sync-002
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-002
         //# Sync peer configuration MUST specify the sync interval.
         let peer_config = match &self.sync_mode {
             SyncMode::Poll { interval } => SyncPeerConfig::builder().interval(*interval).build()?,
@@ -50,18 +50,18 @@ impl TestCtx {
 
         // Configure each node's peers
         for i in 0..n {
-            //= docs/multi-daemon-convergence-test.md#topo-002
-            //# In the ring topology, sync peers MUST be configured bidirectionally, meaning if node A syncs with node B, node B MUST also sync with node A.
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
+            //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
             let clockwise = (i + 1) % n;
             let counter_clockwise = (i + n - 1) % n;
 
-            //= docs/multi-daemon-convergence-test.md#sync-003
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-003
             //# The sync peer address MUST be obtained from the neighbor node's local address.
             let cw_addr = self.nodes[clockwise].aranya_local_addr().await?;
             let ccw_addr = self.nodes[counter_clockwise].aranya_local_addr().await?;
 
-            //= docs/multi-daemon-convergence-test.md#sync-001
-            //# Each node MUST add its two ring neighbors as sync peers.
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-001
+            //# Each node MUST add sync peers according to the configured topology.
             let node_team = self.nodes[i].client.team(team_id);
             node_team
                 .add_sync_peer(cw_addr, peer_config.clone())
@@ -76,7 +76,7 @@ impl TestCtx {
                 })?;
 
             // In hello mode, subscribe to hello notifications from each peer
-            //= docs/multi-daemon-convergence-test.md#sync-006
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-006
             //# In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
             if let Some(ref hello_cfg) = hello_config {
                 node_team
@@ -96,9 +96,9 @@ impl TestCtx {
                     })?;
             }
 
-            //= docs/multi-daemon-convergence-test.md#topo-004
-            //# In the ring topology, no node MUST have more than 2 sync peers.
-            self.nodes[i].peers = vec![clockwise, counter_clockwise];
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
+            //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
+            self.nodes[i].peers = vec![NodeIndex(clockwise), NodeIndex(counter_clockwise)];
 
             debug!(
                 node = i,
@@ -106,7 +106,7 @@ impl TestCtx {
             );
         }
 
-        //= docs/multi-daemon-convergence-test.md#sync-004
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-004
         //# Sync peer configuration MUST complete before the convergence test phase.
         // Give a small delay for sync configuration to settle
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -121,11 +121,11 @@ impl TestCtx {
     /// 1. Each node has exactly 2 peers
     /// 2. Peers are bidirectional (if A peers with B, B peers with A)
     /// 3. The graph forms a single connected component
-    //= docs/multi-daemon-convergence-test.md#topo-002
-    //# In the ring topology, sync peers MUST be configured bidirectionally, meaning if node A syncs with node B, node B MUST also sync with node A.
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
+    //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
 
-    //= docs/multi-daemon-convergence-test.md#topo-003
-    //# The ring topology MUST form a single connected ring with no partitions.
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-002
+    //# The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
     #[instrument(skip(self))]
     pub fn verify_ring_topology(&self) -> Result<()> {
         let n = self.nodes.len();
@@ -134,8 +134,8 @@ impl TestCtx {
 
         // Check each node has correct peers
         for i in 0..n {
-            let expected_cw = (i + 1) % n;
-            let expected_ccw = (i + n - 1) % n;
+            let expected_cw = NodeIndex((i + 1) % n);
+            let expected_ccw = NodeIndex((i + n - 1) % n);
 
             if self.nodes[i].peers.len() != 2 {
                 bail!(
@@ -165,7 +165,7 @@ impl TestCtx {
 
             // Verify bidirectional connections
             for &peer in &self.nodes[i].peers {
-                if !self.nodes[peer].peers.contains(&i) {
+                if !self.nodes[peer.0].peers.contains(&NodeIndex(i)) {
                     bail!(
                         "Node {} peers with {}, but {} does not peer with {}",
                         i,
@@ -180,16 +180,16 @@ impl TestCtx {
         // Verify single connected component using BFS
         let mut visited = vec![false; n];
         let mut queue = VecDeque::new();
-        queue.push_back(0);
+        queue.push_back(0usize);
         visited[0] = true;
         let mut visited_count = 1;
 
         while let Some(node) = queue.pop_front() {
             for &peer in &self.nodes[node].peers {
-                if !visited[peer] {
-                    visited[peer] = true;
+                if !visited[peer.0] {
+                    visited[peer.0] = true;
                     visited_count += 1;
-                    queue.push_back(peer);
+                    queue.push_back(peer.0);
                 }
             }
         }

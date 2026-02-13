@@ -11,7 +11,7 @@ type = "test"
 
 # Specification document
 [[specification]]
-source = "docs/multi-daemon-convergence-test.md"
+source = "https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md"
 format = "markdown"
 
 # Report configuration
