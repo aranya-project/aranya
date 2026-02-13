@@ -8,20 +8,19 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{ensure, Context as _};
-use aranya_daemon_api::TeamId;
+use anyhow::Context as _;
 use aranya_runtime::{
     Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
 };
-use futures_util::AsyncReadExt as _;
+use quinn::{ConnectionError, WriteError};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
 
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic::{self, QuicState},
-        Addr, Error, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
+        transport::quic::{self, Error, QuicState},
+        Addr, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
     },
 };
 
@@ -40,6 +39,17 @@ pub(crate) struct HelloSubscription {
 
 /// Type alias to map a unique [`SyncPeer`] to their associated subscription.
 pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;
+
+/// Maximum size for hello response buffer.
+///
+/// Hello responses are either:
+/// - Success: `SyncResponse::Ok([])` (~3 bytes with postcard)
+/// - Error: `SyncResponse::Err(String)` (3 bytes + error message)
+///
+/// Actual responses are small, but we use 64KB as a defensive upper bound
+/// to accommodate potentially long error chains while preventing unbounded
+/// allocations from malicious peers.
+const MAX_HELLO_RESPONSE_SIZE: usize = 64 * 1024;
 
 impl<PS, SP, EF> SyncManager<QuicState, PS, SP, EF>
 where
@@ -140,14 +150,13 @@ where
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
         // Connect to the peer
-        let stream = self.connect(peer).await?;
-        let (mut recv, mut send) = stream.split();
+        let (mut send, mut recv) = self.connect(peer).await?;
 
         // Send the message
-        send.send(bytes::Bytes::from(data))
-            .await
-            .map_err(quic::Error::from)?;
-        send.close().await.map_err(quic::Error::from)?;
+        send.write_all(&data).await.map_err(Error::QuicWriteError)?;
+        send.finish().map_err(|_| {
+            Error::QuicWriteError(WriteError::ConnectionLost(ConnectionError::LocallyClosed))
+        })?;
 
         // Determine operation name from sync_type
         let operation_name = match &sync_type {
@@ -159,12 +168,12 @@ where
             _ => "unknown",
         };
         // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
+        let response_buf = recv
+            .read_to_end(MAX_HELLO_RESPONSE_SIZE)
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
         if response_buf.is_empty() {
-            return Err(Error::EmptyResponse);
+            return Err(crate::sync::Error::EmptyResponse);
         }
         Ok(())
     }
@@ -180,7 +189,6 @@ where
     /// * `graph_change_debounce` - Rate limiting on how often to notify when a graph changes
     /// * `duration` - How long the subscription should last
     /// * `schedule_delay` - Interval to send hello notifications, regardless of graph changes
-    /// * `subscriber_server_addr` - The address where this subscriber's sync server is listening
     ///
     /// # Returns
     /// * `Ok(())` if the subscribe request was sent successfully
@@ -195,10 +203,10 @@ where
     ) -> Result<()> {
         // Create the subscribe message
         let hello_msg = SyncHelloType::Subscribe {
+            graph_id: peer.graph_id,
             graph_change_delay: graph_change_debounce,
             duration,
             schedule_delay,
-            graph_id: peer.graph_id,
         };
         let sync_type = SyncType::Hello(hello_msg);
 
@@ -212,7 +220,6 @@ where
     ///
     /// # Arguments
     /// * `peer` - The unique identifier of the peer to send the message to
-    /// * `subscriber_server_addr` - The subscriber's server address to identify which subscription to remove
     ///
     /// # Returns
     /// * `Ok(())` if the unsubscribe request was sent successfully
@@ -222,7 +229,7 @@ where
         debug!("client sending unsubscribe request to QUIC sync server");
 
         // Create the unsubscribe message
-        let sync_type: SyncType = SyncType::Hello(SyncHelloType::Unsubscribe {
+        let sync_type = SyncType::Hello(SyncHelloType::Unsubscribe {
             graph_id: peer.graph_id,
         });
 
@@ -248,20 +255,16 @@ where
         peer: SyncPeer,
         head: Address,
     ) -> Result<()> {
-        // Set the team for this graph
-        let team_id = TeamId::transmute(peer.graph_id);
-        self.state.store().set_team(team_id);
-
         // Create the hello message
         let hello_msg = SyncHelloType::Hello {
-            head,
             graph_id: peer.graph_id,
+            head,
         };
-        let sync_type: SyncType = SyncType::Hello(hello_msg);
+        let sync_type = SyncType::Hello(hello_msg);
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
-        let stream = self.connect(peer).await.map_err(|error| {
+        let (mut send, mut recv) = self.connect(peer).await.map_err(|error| {
             warn!(
                 ?peer,
                 %error,
@@ -272,9 +275,7 @@ where
 
         // Spawn async task to send the notification
         self.hello_tasks.spawn(async move {
-            let (mut recv, mut send) = stream.split();
-
-            if let Err(error) = send.send(bytes::Bytes::from(data)).await {
+            if let Err(error) = send.write_all(&data).await {
                 warn!(
                     ?peer,
                     %error,
@@ -283,29 +284,31 @@ where
                 return;
             }
 
-            if let Err(error) = send.close().await {
+            if let Err(error) = send.finish() {
                 warn!(
                     ?peer,
                     %error,
-                    "Failed to close send stream"
+                    "Failed to finish send stream"
                 );
                 return;
             }
 
             // Read the response to avoid race condition with server
-            let mut response_buf = Vec::new();
-            if let Err(e) = recv.read_to_end(&mut response_buf).await {
-                warn!(
-                    error = %e,
-                    ?peer,
-                    "Failed to read hello notification response"
-                );
-                return;
+            match recv.read_to_end(MAX_HELLO_RESPONSE_SIZE).await {
+                Ok(response_buf) => {
+                    debug!(
+                        response_len = response_buf.len(),
+                        "received hello notification response"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        ?peer,
+                        "Failed to read hello notification response"
+                    );
+                }
             }
-            debug!(
-                response_len = response_buf.len(),
-                "received hello notification response"
-            );
         });
 
         Ok(())
@@ -387,26 +390,22 @@ where
     /// Processes a hello message.
     ///
     /// Handles subscription management and hello notifications.
+    /// The graph_id is included in the hello message protocol for proper multi-team support.
     #[instrument(skip_all)]
     pub(super) async fn process_hello_message(
         hello_msg: SyncHelloType,
         client: Client<PS, SP>,
-        active_team: &TeamId,
-        handle: SyncHandle,
-        address: Addr,
-    ) -> anyhow::Result<()> {
-        let active_graph_id = GraphId::transmute(*active_team);
-
+        peer_addr: Addr,
+        sync_peers: SyncHandle,
+    ) {
         match hello_msg {
             SyncHelloType::Subscribe {
+                graph_id,
                 graph_change_delay: graph_change_debounce,
                 duration,
                 schedule_delay,
-                graph_id,
             } => {
-                ensure!(graph_id == active_graph_id);
-
-                let peer = SyncPeer::new(address, graph_id);
+                let peer = SyncPeer::new(peer_addr, graph_id);
                 let expires_at = Instant::now() + duration;
 
                 // Check if there's an existing subscription and cancel its scheduled task
@@ -437,7 +436,7 @@ where
                     schedule_delay,
                     expires_at,
                     cancel_token,
-                    handle,
+                    sync_peers,
                     client.clone(),
                 );
 
@@ -450,9 +449,7 @@ where
                 );
             }
             SyncHelloType::Unsubscribe { graph_id } => {
-                ensure!(graph_id == active_graph_id);
-
-                let peer = SyncPeer::new(address, graph_id);
+                let peer = SyncPeer::new(peer_addr, graph_id);
                 debug!(?peer, "received message to unsubscribe from hello messages");
 
                 // Remove subscription for this peer and team
@@ -467,14 +464,12 @@ where
                     }
                 }
             }
-            SyncHelloType::Hello { head, graph_id } => {
-                ensure!(graph_id == active_graph_id);
-
-                let peer = SyncPeer::new(address, graph_id);
+            SyncHelloType::Hello { graph_id, head } => {
+                let peer = SyncPeer::new(peer_addr, graph_id);
                 debug!(?peer, ?head, "received hello notification message");
 
                 if !client.lock_aranya().await.command_exists(graph_id, head) {
-                    match handle.sync_on_hello(peer).await {
+                    match sync_peers.sync_on_hello(peer).await {
                         Ok(()) => debug!(?peer, ?head, "sent sync_on_hello request"),
                         Err(error) => warn!(
                             ?peer,
@@ -501,7 +496,5 @@ where
                 }
             }
         }
-
-        Ok(())
     }
 }

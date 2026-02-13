@@ -57,7 +57,9 @@ clap = { workspace = true }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
-s2n-quic = { workspace = true }
+quinn = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
@@ -77,6 +79,7 @@ tracing-subscriber = { workspace = true }
 
 
 [dev-dependencies]
+aranya-certgen = { workspace = true }
 aranya-crypto = { workspace = true, features = ["memstore"] }
 divan = { workspace = true }
 pretty_assertions = { workspace = true }
@@ -102,3 +105,8 @@ harness = false
 
 [package.metadata.cargo-all-features]
 always_include_features = ["experimental", "preview"]
+
+[package.metadata.cargo-machete]
+# rustls-pki-types is needed for its `alloc` feature which enables automatic
+# zeroization of private key bytes on drop, even though it's not directly imported.
+ignored = ["rustls-pki-types"]
