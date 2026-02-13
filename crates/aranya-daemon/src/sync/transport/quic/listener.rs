@@ -125,7 +125,6 @@ impl QuicListener {
     }
 }
 
-#[async_trait::async_trait]
 impl SyncListener for QuicListener {
     type Error = Error;
     type Stream = QuicStream;

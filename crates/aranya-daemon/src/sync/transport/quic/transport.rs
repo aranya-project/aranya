@@ -54,7 +54,6 @@ impl QuicTransport {
     }
 }
 
-#[async_trait::async_trait]
 impl SyncTransport for QuicTransport {
     type Error = Error;
     type Stream = QuicStream;
