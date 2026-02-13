@@ -16,9 +16,9 @@ use aranya_policy_ifgen::{
 pub enum Persistent {}
 #[derive(Debug)]
 pub enum Ephemeral {}
-/// KeyBundle policy struct.
+/// PublicKeyBundle policy struct.
 #[value]
-pub struct KeyBundle {
+pub struct PublicKeyBundle {
     pub ident_key: Vec<u8>,
     pub sign_key: Vec<u8>,
     pub enc_key: Vec<u8>,
@@ -130,7 +130,7 @@ pub struct CheckValidAfcChannels {}
 #[effect]
 pub struct DeviceAdded {
     pub device_id: BaseId,
-    pub device_keys: KeyBundle,
+    pub device_keys: PublicKeyBundle,
 }
 /// DeviceRemoved policy effect.
 #[effect]
@@ -202,7 +202,7 @@ pub struct QueryAfcChannelIsValidResult {
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
 pub struct QueryDeviceKeyBundleResult {
-    pub device_keys: KeyBundle,
+    pub device_keys: PublicKeyBundle,
 }
 /// QueryDeviceRoleResult policy effect.
 #[effect]
@@ -364,7 +364,7 @@ pub enum EphemeralAction {
     query_devices_on_team(query_devices_on_team),
     query_afc_channel_is_valid(query_afc_channel_is_valid),
     query_device_role(query_device_role),
-    query_device_keybundle(query_device_keybundle),
+    query_device_public_key_bundle(query_device_public_key_bundle),
     query_team_roles(query_team_roles),
     query_role_owners(query_role_owners),
     query_label(query_label),
@@ -387,9 +387,9 @@ pub struct query_afc_channel_is_valid {
 pub struct query_device_role {
     pub device_id: BaseId,
 }
-/// query_device_keybundle policy action.
+/// query_device_public_key_bundle policy action.
 #[action(interface = Ephemeral)]
-pub struct query_device_keybundle {
+pub struct query_device_public_key_bundle {
     pub device_id: BaseId,
 }
 /// add_perm_to_role policy action.
@@ -476,7 +476,7 @@ pub struct query_role_owners {
 /// create_team policy action.
 #[action(interface = Persistent)]
 pub struct create_team {
-    pub owner_keys: KeyBundle,
+    pub owner_keys: PublicKeyBundle,
     pub nonce: Vec<u8>,
 }
 /// terminate_team policy action.
@@ -487,7 +487,7 @@ pub struct terminate_team {
 /// add_device policy action.
 #[action(interface = Persistent)]
 pub struct add_device {
-    pub device_keys: KeyBundle,
+    pub device_keys: PublicKeyBundle,
     pub initial_role_id: Option<BaseId>,
 }
 /// remove_device policy action.
