@@ -427,15 +427,17 @@ impl ProcessMetricsCollector {
             return Err(anyhow!("Failed to query sysconf values"));
         }
 
-        #[allow(clippy::cast_sign_loss)]
-        {
-            let ticks = clock_ticks_per_sec as u64;
-            // Convert clock ticks to microseconds: value * 1_000_000 / ticks_per_sec
-            process_metrics.cpu_user_time_us = parsed.utime_ticks * 1_000_000 / ticks;
-            process_metrics.cpu_system_time_us = parsed.stime_ticks * 1_000_000 / ticks;
-            process_metrics.virtual_memory_bytes = parsed.vsize;
-            process_metrics.physical_memory_bytes = parsed.rss_pages * page_size as u64;
-        }
+        // Both values are known > 0 from the check above, so the conversion is safe.
+        let ticks: u64 = clock_ticks_per_sec
+            .try_into()
+            .expect("clock_ticks_per_sec is positive");
+        let page_size: u64 = page_size.try_into().expect("page_size is positive");
+
+        // Convert clock ticks to microseconds: value * 1_000_000 / ticks_per_sec
+        process_metrics.cpu_user_time_us = parsed.utime_ticks * 1_000_000 / ticks;
+        process_metrics.cpu_system_time_us = parsed.stime_ticks * 1_000_000 / ticks;
+        process_metrics.virtual_memory_bytes = parsed.vsize;
+        process_metrics.physical_memory_bytes = parsed.rss_pages * page_size;
 
         Ok(())
     }
