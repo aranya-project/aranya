@@ -1,4 +1,4 @@
-#![allow(clippy::panic)]
+#![allow(clippy::arithmetic_side_effects, clippy::panic)]
 #[cfg(feature = "afc")]
 mod common;
 

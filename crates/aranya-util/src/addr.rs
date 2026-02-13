@@ -339,21 +339,27 @@ fn is_domain_name(s: &str) -> bool {
 
     let mut last = b'.';
     let mut non_numeric = false;
-    let mut part_len = 0;
+    let mut part_len: usize = 0;
     for c in s.as_bytes() {
         match c {
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                 non_numeric = true;
-                part_len += 1;
+                part_len = part_len
+                    .checked_add(1)
+                    .expect("part_len should not overflow");
             }
             b'0'..=b'9' => {
-                part_len += 1;
+                part_len = part_len
+                    .checked_add(1)
+                    .expect("part_len should not overflow");
             }
             b'-' => {
                 if last == b'.' {
                     return false;
                 }
-                part_len += 1;
+                part_len = part_len
+                    .checked_add(1)
+                    .expect("part_len should not overflow");
                 non_numeric = true;
             }
             b'.' => {
@@ -400,7 +406,10 @@ impl FmtBuf {
     /// buffer.
     #[inline(always)]
     fn available(&self) -> usize {
-        self.buf.len() - usize::from(self.len)
+        self.buf
+            .len()
+            .checked_sub(usize::from(self.len))
+            .expect("buf.len() should be >= self.len")
     }
 
     /// Returns the used portion of the buffer.
@@ -421,7 +430,10 @@ impl FmtBuf {
         // NB: the compiler can prove that `self.idx` is in
         // bounds.
         self.buf[usize::from(self.len)] = c;
-        self.len += 1;
+        self.len = self
+            .len
+            .checked_add(1)
+            .expect("FmtBuf length should not overflow u8");
     }
 
     /// Writes `s` to the buffer.
@@ -504,7 +516,8 @@ impl FmtBuf {
             }
             impl Span {
                 const fn contains(&self, idx: usize) -> bool {
-                    self.start <= idx && idx < self.start + self.len
+                    // Both start and len are bounded by 8 (number of IPv6 segments).
+                    self.start <= idx && idx < self.start.wrapping_add(self.len)
                 }
             }
 
@@ -516,7 +529,10 @@ impl FmtBuf {
                     if cur.len == 0 {
                         cur.start = i;
                     }
-                    cur.len += 1;
+                    cur.len = cur
+                        .len
+                        .checked_add(1)
+                        .expect("span len should not overflow");
 
                     if cur.len >= 2 && cur.len > max.len {
                         max = cur;
@@ -537,7 +553,8 @@ impl FmtBuf {
             if zeros.contains(i) {
                 buf.write_str("::");
 
-                if let Some((_, &seg)) = iter.nth(zeros.len - 1) {
+                let skip = zeros.len.checked_sub(1).expect("zeros.len should be >= 1");
+                if let Some((_, &seg)) = iter.nth(skip) {
                     buf.itoa16(seg);
                 }
             } else {
@@ -556,7 +573,10 @@ impl FmtBuf {
 const fn base10(x: u8) -> u8 {
     debug_assert!(x <= 9);
 
-    x + b'0'
+    match x.checked_add(b'0') {
+        Some(v) => v,
+        None => panic!("base10 overflow"),
+    }
 }
 
 /// Converts `c`, which must be in `0..=15`, to its base-16
@@ -567,7 +587,13 @@ const fn base16(x: u8) -> u8 {
     if x < 10 {
         base10(x)
     } else {
-        x - 10 + b'a'
+        match x.checked_sub(10) {
+            Some(offset) => match offset.checked_add(b'a') {
+                Some(v) => v,
+                None => panic!("base16 overflow"),
+            },
+            None => panic!("base16 underflow"),
+        }
     }
 }
 
@@ -606,7 +632,11 @@ impl From<Bug> for AddrError {
     }
 }
 
-#[allow(clippy::indexing_slicing, clippy::expect_used)]
+#[allow(
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    clippy::expect_used
+)]
 #[cfg(test)]
 mod tests {
     use super::*;

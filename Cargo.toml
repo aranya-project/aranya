@@ -33,6 +33,7 @@ panic = "warn"
 unsafe_derive_deserialize = "warn"
 undocumented_unsafe_blocks = "warn"
 unwrap_used = "warn"
+arithmetic_side_effects = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
