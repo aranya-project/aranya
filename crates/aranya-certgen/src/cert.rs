@@ -374,10 +374,9 @@ fn generate_root_ca(cn: &str, days: u32) -> Result<(Certificate, KeyPair), CertG
 
     let now = OffsetDateTime::now_utc();
     params.not_before = now;
-    #[allow(clippy::arithmetic_side_effects)] // OffsetDateTime + Duration for reasonable cert lifetimes
-    {
-        params.not_after = now + Duration::days(i64::from(days));
-    }
+    params.not_after = now
+        .checked_add(Duration::days(i64::from(days)))
+        .ok_or(CertGenError::InvalidDays)?;
 
     let key_pair = KeyPair::generate()?;
     let cert = params.self_signed(&key_pair)?;
@@ -417,10 +416,9 @@ fn generate_signed_cert(
 
     let now = OffsetDateTime::now_utc();
     params.not_before = now;
-    #[allow(clippy::arithmetic_side_effects)] // OffsetDateTime + Duration for reasonable cert lifetimes
-    {
-        params.not_after = now + Duration::days(i64::from(days));
-    }
+    params.not_after = now
+        .checked_add(Duration::days(i64::from(days)))
+        .ok_or(CertGenError::InvalidDays)?;
 
     let key_pair = KeyPair::generate()?;
     let cert = params.signed_by(&key_pair, issuer)?;

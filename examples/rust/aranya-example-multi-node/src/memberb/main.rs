@@ -26,7 +26,6 @@ struct Args {
 }
 
 #[tokio::main]
-#[allow(clippy::arithmetic_side_effects)] // example code: Duration * 3 and AFC buffer sizing
 async fn main() -> Result<()> {
     init_tracing(module_path!());
     info!("starting aranya-example-multi-node-memberb");
@@ -117,7 +116,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(SLEEP_INTERVAL.checked_mul(3).expect("sleep interval should not overflow")).await;
     }
     info!("memberb: detected that all devices have been added to team");
 
@@ -146,7 +145,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(SLEEP_INTERVAL.checked_mul(3).expect("sleep interval should not overflow")).await;
     }
 
     // Remove operator sync peer.
