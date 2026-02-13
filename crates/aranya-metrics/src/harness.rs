@@ -133,6 +133,56 @@ fn scale_bytes(bytes: u64) -> String {
     }
 }
 
+/// Raw fields parsed from `/proc/{PID}/stat`.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+struct ProcStat {
+    /// Clock ticks spent in user mode (field 14).
+    utime_ticks: u64,
+    /// Clock ticks spent in kernel mode (field 15).
+    stime_ticks: u64,
+    /// Virtual memory size in bytes (field 23).
+    vsize: u64,
+    /// Resident set size in pages (field 24).
+    rss_pages: u64,
+}
+
+/// Parses the contents of `/proc/{PID}/stat` into a [`ProcStat`].
+///
+/// The `comm` field (field 2) is wrapped in parentheses and may contain spaces or
+/// other parentheses, so we find the last `)` to reliably skip past it.
+/// After that, fields are split by whitespace and indexed from 0
+/// (where index 0 = field 3 in proc(5)).
+#[cfg(target_os = "linux")]
+fn parse_proc_stat(contents: &str, pid: u32) -> Result<ProcStat> {
+    let rest = contents
+        .rfind(')')
+        .map(|i| &contents[i + 2..])
+        .ok_or_else(|| anyhow!("Malformed /proc/{pid}/stat"))?;
+
+    let fields: Vec<&str> = rest.split_whitespace().collect();
+
+    // After the closing ')', fields are indexed from 0:
+    //   0  = state    (field  3)
+    //   11 = utime    (field 14) - clock ticks spent in user mode
+    //   12 = stime    (field 15) - clock ticks spent in kernel mode
+    //   20 = vsize    (field 23) - virtual memory size in bytes
+    //   21 = rss      (field 24) - resident set size in pages
+    if fields.len() < 22 {
+        return Err(anyhow!(
+            "Not enough fields in /proc/{pid}/stat (got {})",
+            fields.len()
+        ));
+    }
+
+    Ok(ProcStat {
+        utime_ticks: fields[11].parse()?,
+        stime_ticks: fields[12].parse()?,
+        vsize: fields[20].parse()?,
+        rss_pages: fields[21].parse()?,
+    })
+}
+
 impl ProcessMetricsCollector {
     /// Create a new instance to collect process metrics.
     pub fn new(config: MetricsConfig, pids: Vec<Pid>) -> Self {
@@ -363,36 +413,10 @@ impl ProcessMetricsCollector {
         use std::fs;
 
         let stat_path = format!("/proc/{}/stat", pid.pid);
-        let stat_contents =
-            fs::read_to_string(&stat_path).map_err(|e| anyhow!("Failed to read {stat_path}: {e}"))?;
+        let stat_contents = fs::read_to_string(&stat_path)
+            .map_err(|e| anyhow!("Failed to read {stat_path}: {e}"))?;
 
-        // The comm field (field 2) is wrapped in parentheses and may contain spaces or
-        // other parentheses. Find the last ')' to reliably skip past it.
-        let rest = stat_contents
-            .rfind(')')
-            .map(|i| &stat_contents[i + 2..])
-            .ok_or_else(|| anyhow!("Malformed /proc/{}/stat", pid.pid))?;
-
-        let fields: Vec<&str> = rest.split_whitespace().collect();
-
-        // After the closing ')', fields are indexed from 0:
-        //   0  = state    (field  3)
-        //   11 = utime    (field 14) - clock ticks spent in user mode
-        //   12 = stime    (field 15) - clock ticks spent in kernel mode
-        //   20 = vsize    (field 23) - virtual memory size in bytes
-        //   21 = rss      (field 24) - resident set size in pages
-        if fields.len() < 22 {
-            return Err(anyhow!(
-                "Not enough fields in /proc/{}/stat (got {})",
-                pid.pid,
-                fields.len()
-            ));
-        }
-
-        let utime_ticks: u64 = fields[11].parse()?;
-        let stime_ticks: u64 = fields[12].parse()?;
-        let vsize: u64 = fields[20].parse()?;
-        let rss_pages: u64 = fields[21].parse()?;
+        let parsed = parse_proc_stat(&stat_contents, pid.pid)?;
 
         // SAFETY: sysconf with _SC_CLK_TCK is always a valid call.
         let clock_ticks_per_sec = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
@@ -407,10 +431,10 @@ impl ProcessMetricsCollector {
         {
             let ticks = clock_ticks_per_sec as u64;
             // Convert clock ticks to microseconds: value * 1_000_000 / ticks_per_sec
-            process_metrics.cpu_user_time_us = utime_ticks * 1_000_000 / ticks;
-            process_metrics.cpu_system_time_us = stime_ticks * 1_000_000 / ticks;
-            process_metrics.virtual_memory_bytes = vsize;
-            process_metrics.physical_memory_bytes = rss_pages * page_size as u64;
+            process_metrics.cpu_user_time_us = parsed.utime_ticks * 1_000_000 / ticks;
+            process_metrics.cpu_system_time_us = parsed.stime_ticks * 1_000_000 / ticks;
+            process_metrics.virtual_memory_bytes = parsed.vsize;
+            process_metrics.physical_memory_bytes = parsed.rss_pages * page_size as u64;
         }
 
         Ok(())
@@ -585,6 +609,45 @@ mod tests {
             "expected nonzero virtual memory, got {}",
             metrics.virtual_memory_bytes
         );
+    }
+
+    /// Verifies parse_proc_stat with a synthetic /proc/PID/stat line.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_proc_stat_synthetic() {
+        // Realistic /proc/PID/stat content (fields from proc(5)):
+        // pid (comm) state ppid pgrp session tty_nr tpgid flags minflt cminflt majflt cmajflt
+        //   utime stime cutime cstime priority nice num_threads itrealvalue starttime vsize rss ...
+        let stat = "42 (my program) S 1 42 42 0 -1 4194304 100 0 0 0 \
+                    500 200 0 0 20 0 1 0 12345 104857600 2560 18446744073709551615 0 0 0 0 0 0 0 0 0";
+
+        let parsed = parse_proc_stat(stat, 42).expect("should parse synthetic stat");
+        assert_eq!(parsed.utime_ticks, 500);
+        assert_eq!(parsed.stime_ticks, 200);
+        assert_eq!(parsed.vsize, 104857600);
+        assert_eq!(parsed.rss_pages, 2560);
+    }
+
+    /// Verifies parse_proc_stat handles comm fields with spaces and parentheses.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_proc_stat_tricky_comm() {
+        let stat = "99 (tricky (name)) S 1 99 99 0 -1 4194304 100 0 0 0 \
+                    42 17 0 0 20 0 1 0 12345 8192 128 18446744073709551615 0 0 0 0 0 0 0 0 0";
+
+        let parsed = parse_proc_stat(stat, 99).expect("should handle nested parens");
+        assert_eq!(parsed.utime_ticks, 42);
+        assert_eq!(parsed.stime_ticks, 17);
+        assert_eq!(parsed.vsize, 8192);
+        assert_eq!(parsed.rss_pages, 128);
+    }
+
+    /// Verifies parse_proc_stat returns an error for malformed input.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_proc_stat_malformed() {
+        assert!(parse_proc_stat("no closing paren", 1).is_err());
+        assert!(parse_proc_stat("1 (short) S", 1).is_err());
     }
 
     /// Verifies that collecting metrics for a nonexistent PID returns an error.
