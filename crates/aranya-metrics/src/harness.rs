@@ -149,6 +149,15 @@ struct ProcStat {
 
 /// Parses the contents of `/proc/{PID}/stat` into a [`ProcStat`].
 ///
+/// An example line from `/proc/1234/stat` (note: proc(5) uses 1-based field numbering):
+/// ```text
+/// 1234 (my-daemon) S 1 1234 1234 0 -1 4194304 500 0 0 0 150 30 0 0 20 0 4 0 5000 104857600 2560 ...
+///                  ^                                    ^^^ ^^                   ^^^^^^^^^ ^^^^
+///                  state                                |   stime                vsize     rss
+///                  (field 3)                            utime                    (field 23) (field 24)
+///                                                      (field 14)
+/// ```
+///
 /// The `comm` field (field 2) is wrapped in parentheses and may contain spaces or
 /// other parentheses, so we find the last `)` to reliably skip past it.
 /// After that, fields are split by whitespace and indexed from 0
@@ -162,7 +171,7 @@ fn parse_proc_stat(contents: &str, pid: u32) -> Result<ProcStat> {
 
     let fields: Vec<&str> = rest.split_whitespace().collect();
 
-    // After the closing ')', fields are indexed from 0:
+    // After the closing ')', fields are indexed from 0, original format is 1 indexed:
     //   0  = state    (field  3)
     //   11 = utime    (field 14) - clock ticks spent in user mode
     //   12 = stime    (field 15) - clock ticks spent in kernel mode
@@ -434,10 +443,21 @@ impl ProcessMetricsCollector {
         let page_size: u64 = page_size.try_into().expect("page_size is positive");
 
         // Convert clock ticks to microseconds: value * 1_000_000 / ticks_per_sec
-        process_metrics.cpu_user_time_us = parsed.utime_ticks * 1_000_000 / ticks;
-        process_metrics.cpu_system_time_us = parsed.stime_ticks * 1_000_000 / ticks;
+        process_metrics.cpu_user_time_us = parsed
+            .utime_ticks
+            .checked_mul(1_000_000)
+            .and_then(|v| v.checked_div(ticks))
+            .ok_or_else(|| anyhow!("overflow converting utime to microseconds"))?;
+        process_metrics.cpu_system_time_us = parsed
+            .stime_ticks
+            .checked_mul(1_000_000)
+            .and_then(|v| v.checked_div(ticks))
+            .ok_or_else(|| anyhow!("overflow converting stime to microseconds"))?;
         process_metrics.virtual_memory_bytes = parsed.vsize;
-        process_metrics.physical_memory_bytes = parsed.rss_pages * page_size;
+        process_metrics.physical_memory_bytes = parsed
+            .rss_pages
+            .checked_mul(page_size)
+            .ok_or_else(|| anyhow!("overflow converting rss pages to bytes"))?;
 
         Ok(())
     }
