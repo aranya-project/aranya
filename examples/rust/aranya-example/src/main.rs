@@ -187,8 +187,7 @@ async fn main() -> Result<()> {
     };
 
     let sync_interval = Duration::from_millis(100);
-    #[allow(clippy::arithmetic_side_effects)] // 100ms * 6 cannot overflow
-    let sleep_interval = sync_interval * 6;
+    let sleep_interval = sync_interval.checked_mul(6).expect("sleep interval should not overflow");
     let sync_cfg = {
         let mut builder = SyncPeerConfig::builder();
         builder = builder.interval(sync_interval);

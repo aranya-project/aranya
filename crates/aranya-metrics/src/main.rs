@@ -221,8 +221,7 @@ async fn setup_demo(team_name: &str) -> Result<(Vec<Pid>, DemoContext)> {
 
     const CLIENT_NAMES: [&str; 5] = ["owner", "admin", "operator", "member_a", "member_b"];
     let mut contexts: [Option<ClientCtx>; CLIENT_NAMES.len()] = Default::default();
-    #[allow(clippy::arithmetic_side_effects)] // 5 + 1 cannot overflow
-    let mut daemon_pids: Vec<Pid> = Vec::with_capacity(CLIENT_NAMES.len() + 1);
+    let mut daemon_pids: Vec<Pid> = Vec::with_capacity(CLIENT_NAMES.len().checked_add(1).expect("capacity should not overflow"));
 
     for (i, &user_name) in CLIENT_NAMES.iter().enumerate() {
         let ctx = ClientCtx::new(team_name, user_name, &daemon_path).await?;
