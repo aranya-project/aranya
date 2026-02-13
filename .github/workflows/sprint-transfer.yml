@@ -19,9 +19,9 @@ jobs:
         uses: blombard/move-to-next-iteration@e0d7571f7fa517a8da883e25b797b9d588e16538
         with:
           owner: aranya-project
-          number: ${{ vars.PROJECT_NUMBER }}
+          number: 1
           token: ${{ secrets.PROJECT_PAT }}
-          iteration-field: ${{ vars.ITERATION_FIELD }}
+          iteration-field: Sprint
           iteration: last
           new-iteration: current
           excluded-statuses: "Done,Won't Fix"
