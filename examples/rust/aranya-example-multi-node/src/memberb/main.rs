@@ -176,7 +176,12 @@ async fn main() -> Result<()> {
 
     info!("memberb: receiving AFC data");
     let resp = receiver.recv().await?;
-    let mut msg_recv = vec![0u8; resp.len().checked_sub(Channels::OVERHEAD).expect("ciphertext must be larger than overhead")];
+    let mut msg_recv = vec![
+        0u8;
+        resp.len()
+            .checked_sub(Channels::OVERHEAD)
+            .expect("ciphertext must be larger than overhead")
+    ];
     opener.open(&mut msg_recv, &resp)?;
     info!("memberb: received AFC data");
 
@@ -189,7 +194,13 @@ async fn main() -> Result<()> {
 
     info!("memberb: sending AFC data");
     let msg_send = b"hello";
-    let mut req = vec![0u8; msg_send.len().checked_add(Channels::OVERHEAD).expect("AFC overhead should not overflow")];
+    let mut req = vec![
+        0u8;
+        msg_send
+            .len()
+            .checked_add(Channels::OVERHEAD)
+            .expect("AFC overhead should not overflow")
+    ];
     sealer.seal(&mut req, msg_send)?;
     sender.send(env.membera.afc_addr, &req).await?;
     info!("memberb: sent AFC data");
