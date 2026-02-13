@@ -329,7 +329,6 @@ where
 ///
 /// See
 /// <https://github.com/golang/go/blob/a66a3bf494f652bc4fb209d861cbdba1dea71303/src/net/dnsclient.go#L78>.
-#[allow(clippy::arithmetic_side_effects)] // `part_len` bounded by early return at > 63
 fn is_domain_name(s: &str) -> bool {
     if s == "." {
         return true;
@@ -340,21 +339,27 @@ fn is_domain_name(s: &str) -> bool {
 
     let mut last = b'.';
     let mut non_numeric = false;
-    let mut part_len = 0;
+    let mut part_len: usize = 0;
     for c in s.as_bytes() {
         match c {
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                 non_numeric = true;
-                part_len += 1;
+                part_len = part_len
+                    .checked_add(1)
+                    .expect("part_len should not overflow");
             }
             b'0'..=b'9' => {
-                part_len += 1;
+                part_len = part_len
+                    .checked_add(1)
+                    .expect("part_len should not overflow");
             }
             b'-' => {
                 if last == b'.' {
                     return false;
                 }
-                part_len += 1;
+                part_len = part_len
+                    .checked_add(1)
+                    .expect("part_len should not overflow");
                 non_numeric = true;
             }
             b'.' => {
@@ -400,9 +405,11 @@ impl FmtBuf {
     /// The number of bytes that can still be written to the
     /// buffer.
     #[inline(always)]
-    #[allow(clippy::arithmetic_side_effects)] // self.len <= 255, self.buf.len() == 256
     fn available(&self) -> usize {
-        self.buf.len() - usize::from(self.len)
+        self.buf
+            .len()
+            .checked_sub(usize::from(self.len))
+            .expect("buf.len() should be >= self.len")
     }
 
     /// Returns the used portion of the buffer.
@@ -416,14 +423,17 @@ impl FmtBuf {
 
     /// Writes `c` to the buffer.
     #[inline(always)]
-    #[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)] // self.len is u8, max 255
+    #[allow(clippy::indexing_slicing)]
     fn write(&mut self, c: u8) {
         debug_assert!(self.available() > 0);
 
         // NB: the compiler can prove that `self.idx` is in
         // bounds.
         self.buf[usize::from(self.len)] = c;
-        self.len += 1;
+        self.len = self
+            .len
+            .checked_add(1)
+            .expect("FmtBuf length should not overflow u8");
     }
 
     /// Writes `s` to the buffer.
@@ -438,7 +448,6 @@ impl FmtBuf {
 
     /// Writes `x` as a base-10 integer to the buffer.
     #[inline(always)]
-    #[allow(clippy::arithmetic_side_effects)] // division/modulo on u8, cannot overflow
     fn itoa10(&mut self, x: u8) {
         if x >= 100 {
             self.write(base10(x / 100))
@@ -451,7 +460,6 @@ impl FmtBuf {
 
     /// Writes `x` as a base-16 integer to the buffer.
     #[inline(always)]
-    #[allow(clippy::arithmetic_side_effects)] // shifts and masks on u16, cannot overflow
     fn itoa16(&mut self, x: u16) {
         if x >= 0x1000 {
             self.write(base16((x >> 12) as u8));
@@ -482,7 +490,6 @@ impl FmtBuf {
 
     /// Formats `ip` per [RFC
     /// 5952](https://tools.ietf.org/html/rfc5952).
-    #[allow(clippy::arithmetic_side_effects)] // Span fields bounded by 8 segments
     fn fmt_ipv6(ip: &Ipv6Addr) -> Self {
         let mut buf = Self::new();
 
@@ -509,7 +516,8 @@ impl FmtBuf {
             }
             impl Span {
                 const fn contains(&self, idx: usize) -> bool {
-                    self.start <= idx && idx < self.start + self.len
+                    // Both start and len are bounded by 8 (number of IPv6 segments).
+                    self.start <= idx && idx < self.start.wrapping_add(self.len)
                 }
             }
 
@@ -521,7 +529,10 @@ impl FmtBuf {
                     if cur.len == 0 {
                         cur.start = i;
                     }
-                    cur.len += 1;
+                    cur.len = cur
+                        .len
+                        .checked_add(1)
+                        .expect("span len should not overflow");
 
                     if cur.len >= 2 && cur.len > max.len {
                         max = cur;
@@ -542,7 +553,8 @@ impl FmtBuf {
             if zeros.contains(i) {
                 buf.write_str("::");
 
-                if let Some((_, &seg)) = iter.nth(zeros.len - 1) {
+                let skip = zeros.len.checked_sub(1).expect("zeros.len should be >= 1");
+                if let Some((_, &seg)) = iter.nth(skip) {
                     buf.itoa16(seg);
                 }
             } else {
@@ -558,23 +570,30 @@ impl FmtBuf {
 
 /// Converts `c`, which must be in `0..=9`, to its base-10
 /// representation.
-#[allow(clippy::arithmetic_side_effects)] // x is 0..=9, x + b'0' max is 57
 const fn base10(x: u8) -> u8 {
     debug_assert!(x <= 9);
 
-    x + b'0'
+    match x.checked_add(b'0') {
+        Some(v) => v,
+        None => panic!("base10 overflow"),
+    }
 }
 
 /// Converts `c`, which must be in `0..=15`, to its base-16
 /// representation.
-#[allow(clippy::arithmetic_side_effects)] // x is 0..=15, both branches fit in u8
 const fn base16(x: u8) -> u8 {
     debug_assert!(x <= 15);
 
     if x < 10 {
         base10(x)
     } else {
-        x - 10 + b'a'
+        match x.checked_sub(10) {
+            Some(offset) => match offset.checked_add(b'a') {
+                Some(v) => v,
+                None => panic!("base16 overflow"),
+            },
+            None => panic!("base16 underflow"),
+        }
     }
 }
 
@@ -613,7 +632,11 @@ impl From<Bug> for AddrError {
     }
 }
 
-#[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing, clippy::expect_used)]
+#[allow(
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    clippy::expect_used
+)]
 #[cfg(test)]
 mod tests {
     use super::*;

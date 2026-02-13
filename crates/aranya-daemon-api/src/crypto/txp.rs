@@ -319,8 +319,7 @@ where
         // rekey when we're halfway there.
         let max = Seq::max::<<CS::Aead as Aead>::NonceSize>();
         let seq = ctx.seal.seq().to_u64();
-        #[allow(clippy::arithmetic_side_effects)] // division by 2 cannot overflow
-        { seq >= max / 2 }
+        seq >= max.checked_div(2).expect("division by 2 should not fail")
     }
 
     /// Generates a new HPKE encryption context and returns the

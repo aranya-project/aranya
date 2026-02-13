@@ -109,7 +109,12 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(SLEEP_INTERVAL.checked_mul(3).expect("sleep interval should not overflow")).await;
+        sleep(
+            SLEEP_INTERVAL
+                .checked_mul(3)
+                .expect("sleep interval should not overflow"),
+        )
+        .await;
     }
     let operator_role = team
         .roles()
@@ -124,7 +129,12 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(SLEEP_INTERVAL.checked_mul(3).expect("sleep interval should not overflow")).await;
+        sleep(
+            SLEEP_INTERVAL
+                .checked_mul(3)
+                .expect("sleep interval should not overflow"),
+        )
+        .await;
     }
     info!("operator: detected that all devices have been added to team and operator role has been assigned");
 
