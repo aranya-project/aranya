@@ -23,7 +23,7 @@ pub(crate) trait SyncListener: Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Stream: SyncStream<Error = Self::Error>;
 
-    fn local_addr(&self) -> std::net::SocketAddr;
+    fn local_addr(&self) -> super::Addr;
 
     async fn accept(&mut self) -> Option<Result<Self::Stream, Self::Error>>;
 }

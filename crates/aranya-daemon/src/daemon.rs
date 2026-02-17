@@ -299,7 +299,7 @@ impl Daemon {
             client.clone(),
             send_effects,
             psk_store,
-            (server.local_addr().into(), client_addr),
+            (server.local_addr(), client_addr),
             recv,
             conns,
         )?;

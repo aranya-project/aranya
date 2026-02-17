@@ -30,7 +30,7 @@ pub(crate) struct QuicListener {
     conns: SharedConnectionMap,
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     pending_accepts: JoinSet<AcceptResult>,
-    local_addr: std::net::SocketAddr,
+    local_addr: Addr,
 }
 
 impl QuicListener {
@@ -68,7 +68,8 @@ impl QuicListener {
 
         let local_addr = server
             .local_addr()
-            .context("unable to get server local address")?;
+            .context("unable to get server local address")?
+            .into();
 
         let server_instance = Self {
             server,
@@ -129,7 +130,7 @@ impl SyncListener for QuicListener {
     type Error = Error;
     type Stream = QuicStream;
 
-    fn local_addr(&self) -> std::net::SocketAddr {
+    fn local_addr(&self) -> Addr {
         self.local_addr
     }
 

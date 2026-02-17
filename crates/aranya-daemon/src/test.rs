@@ -85,7 +85,7 @@ impl TestDevice {
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
-        let sync_local_addr = server.local_addr().into();
+        let sync_local_addr = server.local_addr();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
@@ -247,7 +247,7 @@ impl TestCtx {
                 client.clone(),
                 send_effects,
                 psk_store.clone(),
-                (server.local_addr().into(), any_local_addr),
+                (server.local_addr(), any_local_addr),
                 recv,
                 conns,
             )?;

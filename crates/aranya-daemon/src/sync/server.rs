@@ -12,7 +12,7 @@ use tracing::{error, info, instrument, trace, warn};
 
 use super::{
     transport::{SyncListener, SyncStream},
-    Error, GraphId, SyncHandle, SyncPeer,
+    Addr, Error, GraphId, SyncHandle, SyncPeer,
 };
 use crate::{aranya::Client, sync::SyncResponse};
 
@@ -44,7 +44,7 @@ where
         }
     }
 
-    pub(crate) fn local_addr(&self) -> std::net::SocketAddr {
+    pub(crate) fn local_addr(&self) -> Addr {
         self.listener.local_addr()
     }
 
