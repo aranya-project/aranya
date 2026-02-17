@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:aranya-project.github.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(cargo check *)",
+      "Bash(cargo build *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  },
+  "env": {
+  },
+  "companyAnnouncements": [
+  ]
+}
