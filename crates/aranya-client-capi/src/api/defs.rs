@@ -682,7 +682,6 @@ pub unsafe fn get_key_bundle(
 }
 
 /// The size in bytes of an ID converted to a human-readable base58 string.
-#[allow(clippy::arithmetic_side_effects)] // constant expression
 pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 
 /// Writes the human-readable encoding of `id` to `str`.
