@@ -10,7 +10,7 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, KeyBundle,
+    CreateTeamQuicSyncConfig, DeviceId, PublicKeyBundle,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -127,7 +127,7 @@ impl Daemon {
 #[clippy::has_significant_drop]
 struct ClientCtx {
     client: Client,
-    pk: KeyBundle,
+    pk: PublicKeyBundle,
     id: DeviceId,
     /// This needs to be stored so it lasts for the same lifetime as `Daemon`.
     _work_dir: TempDir,
@@ -183,7 +183,7 @@ impl ClientCtx {
             .context("unable to initialize client")?;
 
         let pk = client
-            .get_key_bundle()
+            .get_public_key_bundle()
             .await
             .context("expected key bundle")?;
         let id = client.get_device_id().await.context("expected device id")?;
@@ -352,7 +352,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let owner_device = owner.device(ctx.owner.id);
     let owner_role = owner_device.role().await?.expect("expected owner role");
     info!("owner role: {:?}", owner_role);
-    let keybundle = owner_device.keybundle().await?;
+    let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");

@@ -24,7 +24,7 @@ use aranya_crypto::{
     Csprng, DeviceId, Rng,
 };
 use aranya_daemon_api::{text, TeamId};
-use aranya_keygen::{KeyBundle, PublicKeys};
+use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientError, ClientState, GraphId,
@@ -42,7 +42,7 @@ use tokio::{
 use crate::{
     actions::Actions,
     aranya,
-    policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
+    policy::{Effect, PublicKeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
     sync::{self, quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
@@ -212,8 +212,8 @@ impl TestCtx {
                 Store::open(path).map(AranyaStore::new)?
             };
             let (eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
-            let bundle =
-                KeyBundle::generate(&eng, &mut store).context("unable to generate `KeyBundle`")?;
+            let bundle = PublicKeyBundle::generate(&eng, &mut store)
+                .context("unable to generate `PublicKeyBundle`")?;
 
             let storage_dir = root.join("storage");
             fs::create_dir_all(&storage_dir)?;

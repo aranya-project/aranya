@@ -40,8 +40,11 @@ use {
 };
 
 #[doc(inline)]
-pub use crate::client::{
-    device::{Device, DeviceId, Devices, KeyBundle},
+#[expect(deprecated)]
+pub use self::device::KeyBundle;
+#[doc(inline)]
+pub use self::{
+    device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
@@ -213,14 +216,20 @@ impl Client {
             .map_err(aranya_error)
     }
 
+    /// See [`Self::get_public_key_bundle`].
+    #[deprecated(note = "Use `get_public_key_bundle`")]
+    pub async fn get_key_bundle(&self) -> Result<PublicKeyBundle> {
+        self.get_public_key_bundle().await
+    }
+
     /// Gets the public key bundle for this device.
-    pub async fn get_key_bundle(&self) -> Result<KeyBundle> {
+    pub async fn get_public_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.daemon
-            .get_key_bundle(create_ctx())
+            .get_public_key_bundle(create_ctx())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-            .map(KeyBundle::from_api)
+            .map(PublicKeyBundle::from_api)
     }
 
     /// Gets the public device ID for this device.
