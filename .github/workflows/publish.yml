@@ -29,11 +29,6 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    # TODO(#722): This environment must be created in GitHub repo settings with:
-    # - Deployment branches restricted to `main` and `patch/*`
-    # - Required reviewers enabled
-    # - ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY added as an environment secret
-    #   (and removed as a repo-level secret)
     environment: release
     steps:
       - name: Create Release
