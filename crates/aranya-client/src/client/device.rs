@@ -3,11 +3,10 @@ use std::slice;
 use aranya_daemon_api as api;
 use aranya_id::custom_id;
 use serde::{Deserialize, Serialize};
-use tarpc::context;
 use tracing::instrument;
 
 use crate::{
-    client::{ChanOp, Client, Label, LabelId, Labels, Role, RoleId},
+    client::{create_ctx, ChanOp, Client, Label, LabelId, Labels, Role, RoleId},
     error::{aranya_error, IpcError, Result},
     util::{impl_slice_iter_wrapper, ApiConv as _, ApiId},
 };
@@ -92,7 +91,7 @@ impl Device<'_> {
     pub async fn public_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.client
             .daemon
-            .device_public_key_bundle(context::current(), self.team_id, self.id)
+            .device_public_key_bundle(create_ctx(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -104,7 +103,7 @@ impl Device<'_> {
     pub async fn remove_from_team(&self) -> Result<()> {
         self.client
             .daemon
-            .remove_device_from_team(context::current(), self.team_id, self.id)
+            .remove_device_from_team(create_ctx(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -115,7 +114,7 @@ impl Device<'_> {
     pub async fn assign_role(&self, role: RoleId) -> Result<()> {
         self.client
             .daemon
-            .assign_role(context::current(), self.team_id, self.id, role.into_api())
+            .assign_role(create_ctx(), self.team_id, self.id, role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -126,7 +125,7 @@ impl Device<'_> {
     pub async fn revoke_role(&self, role: RoleId) -> Result<()> {
         self.client
             .daemon
-            .revoke_role(context::current(), self.team_id, self.id, role.into_api())
+            .revoke_role(create_ctx(), self.team_id, self.id, role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -138,7 +137,7 @@ impl Device<'_> {
         self.client
             .daemon
             .change_role(
-                context::current(),
+                create_ctx(),
                 self.team_id,
                 self.id,
                 old_role.into_api(),
@@ -154,7 +153,7 @@ impl Device<'_> {
         let role = self
             .client
             .daemon
-            .device_role(context::current(), self.team_id, self.id)
+            .device_role(create_ctx(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -167,7 +166,7 @@ impl Device<'_> {
         let data = self
             .client
             .daemon
-            .labels_assigned_to_device(context::current(), self.team_id, self.id)
+            .labels_assigned_to_device(create_ctx(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -186,13 +185,7 @@ impl Device<'_> {
     pub async fn assign_label(&self, label: LabelId, op: ChanOp) -> Result<()> {
         self.client
             .daemon
-            .assign_label_to_device(
-                context::current(),
-                self.team_id,
-                self.id,
-                label.into_api(),
-                op,
-            )
+            .assign_label_to_device(create_ctx(), self.team_id, self.id, label.into_api(), op)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -203,7 +196,7 @@ impl Device<'_> {
     pub async fn revoke_label(&self, label: LabelId) -> Result<()> {
         self.client
             .daemon
-            .revoke_label_from_device(context::current(), self.team_id, self.id, label.into_api())
+            .revoke_label_from_device(create_ctx(), self.team_id, self.id, label.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
