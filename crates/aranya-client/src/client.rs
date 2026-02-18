@@ -5,7 +5,12 @@ mod label;
 mod role;
 mod team;
 
-use std::{fmt::Debug, io, path::Path, time::Instant};
+use std::{
+    fmt::Debug,
+    io,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
@@ -42,10 +47,15 @@ pub use crate::client::{
     team::{Team, TeamId},
 };
 use crate::{
-    config::{AddTeamConfig, CreateTeamConfig, MAX_SYNC_INTERVAL},
+    config::{AddTeamConfig, CreateTeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
     util::ApiConv as _,
 };
+
+/// IPC timeout of 1 year (365 days).
+// A large value helps resolve IPC calls timing out when there are long-running
+// operations happening in the daemon.
+const IPC_TIMEOUT: Duration = Duration::from_secs(365 * 24 * 60 * 60);
 
 /// Builds a [`Client`].
 #[derive(Debug, Default)]
@@ -286,10 +296,10 @@ impl Client {
 }
 
 /// Returns the current [`Context`](context::Context) with a deadline set to the current time
-/// plus [`MAX_SYNC_INTERVAL`].
+/// plus [`IPC_TIMEOUT`].
 pub(crate) fn create_ctx() -> context::Context {
     let mut ctx = context::current();
-    ctx.deadline = Instant::now() + MAX_SYNC_INTERVAL;
+    ctx.deadline = Instant::now() + IPC_TIMEOUT;
 
     ctx
 }
