@@ -65,7 +65,7 @@ impl<CS: CipherSuite> Ctx<CS> {
 
     /// Creates the HPKE encryption context for the client.
     fn client<R: Csprng>(
-        rng: &mut R,
+        rng: R,
         pk: &PublicApiKey<CS>,
         info: &[u8],
     ) -> Result<(Self, Encap<CS>), HpkeError> {
@@ -748,8 +748,8 @@ mod tests {
         let path = Arc::new(dir.path().to_path_buf().join("sock"));
         let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
-        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
-        let sk = ApiKey::<CS>::new(&mut eng);
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&eng);
         let pk = sk.public().unwrap();
 
         const MAX_PING_PONGS: usize = 100;
@@ -832,8 +832,8 @@ mod tests {
         let path = Arc::new(dir.path().to_path_buf().join("sock"));
         let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
-        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
-        let sk = ApiKey::<CS>::new(&mut eng);
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&eng);
         let pk = sk.public().unwrap();
 
         const MAX_PING_PONGS: usize = 100;
@@ -928,8 +928,8 @@ mod tests {
         let path = Arc::new(dir.path().to_path_buf().join("sock"));
         let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
-        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
-        let sk = ApiKey::<CS>::new(&mut eng);
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&eng);
         let pk = sk.public().unwrap();
 
         const MAX_PING_PONGS: usize = 2;

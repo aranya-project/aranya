@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 /// # use aranya_crypto::{Engine, KeyStore};
 /// # use aranya_keygen::PublicKeyBundle;
 /// #
-/// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
+/// # fn example<CE, KS>(engine: &CE, store: &mut KS) -> Result<()>
 /// # where
 /// #     CE: Engine,
 /// #     KS: KeyStore,
@@ -122,7 +122,7 @@ impl PublicKeyBundle {
     /// # use aranya_crypto::{Engine, KeyStore};
     /// # use aranya_keygen::PublicKeyBundle;
     /// #
-    /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
+    /// # fn example<CE, KS>(engine: &CE, store: &mut KS) -> Result<()>
     /// # where
     /// #     CE: Engine,
     /// #     KS: KeyStore,
@@ -131,7 +131,7 @@ impl PublicKeyBundle {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn generate<CE, KS>(eng: &mut CE, store: &mut KS) -> Result<Self>
+    pub fn generate<CE, KS>(eng: &CE, store: &mut KS) -> Result<Self>
     where
         CE: Engine,
         KS: KeyStore,
@@ -180,7 +180,7 @@ impl PublicKeyBundle {
     /// # use aranya_crypto::{Engine, KeyStore};
     /// # use aranya_keygen::PublicKeyBundle;
     /// #
-    /// # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
+    /// # fn example<CE, KS>(engine: &CE, store: &mut KS) -> Result<()>
     /// # where
     /// #     CE: Engine,
     /// #     KS: KeyStore,
@@ -190,7 +190,7 @@ impl PublicKeyBundle {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn public_keys<CE, KS>(&self, eng: &mut CE, store: &KS) -> Result<PublicKeys<CE::CS>>
+    pub fn public_keys<CE, KS>(&self, eng: &CE, store: &KS) -> Result<PublicKeys<CE::CS>>
     where
         CE: Engine,
         KS: KeyStore,

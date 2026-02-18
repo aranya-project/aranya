@@ -25,7 +25,7 @@ impl Api {
             .clone();
 
         let seed = match &qs_cfg.seed_mode {
-            CreateSeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+            CreateSeedMode::Generate => qs::PskSeed::new(Rng, team_id),
             CreateSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
         };
 
@@ -59,7 +59,7 @@ impl Api {
                     let crypto = &mut *self.crypto.lock().await;
                     crypto
                         .aranya_store
-                        .get_key(&mut crypto.engine, enc_id)
+                        .get_key(&crypto.engine, enc_id)
                         .context("keystore error")?
                         .context("missing enc_sk in add_team")?
                 };
