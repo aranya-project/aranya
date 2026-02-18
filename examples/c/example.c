@@ -260,7 +260,7 @@ AranyaError init_team(Team *t) {
 
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
@@ -443,8 +443,9 @@ AranyaError init_team(Team *t) {
     }
 
     // add operator to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, operator->pk,
-                                    operator->pk_len, &operator_role_id);
+    err = aranya_add_device_to_team(&owner->client,
+                                    &t->id, operator->pk, operator->pk_len,
+                                    &operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -671,7 +672,7 @@ AranyaError run(Team *t) {
     AranyaDeviceId *devices = NULL;
 
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *memberb = &t->clients.memberb;
 
     // initialize logging.

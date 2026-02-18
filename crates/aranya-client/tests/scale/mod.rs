@@ -428,12 +428,10 @@ impl TestCtx {
         let to_addr = self.nodes[to.0].aranya_local_addr().await?;
 
         let peer_config = match &self.sync_mode {
-            SyncMode::Poll { interval } => {
-                aranya_client::SyncPeerConfig::builder()
-                    .interval(*interval)
-                    .build()
-                    .context("unable to build sync peer config")?
-            }
+            SyncMode::Poll { interval } => aranya_client::SyncPeerConfig::builder()
+                .interval(*interval)
+                .build()
+                .context("unable to build sync peer config")?,
             SyncMode::Hello { .. } => aranya_client::SyncPeerConfig::builder()
                 .sync_on_hello(true)
                 .build()
@@ -445,9 +443,7 @@ impl TestCtx {
             .team(team_id)
             .add_sync_peer(to_addr, peer_config)
             .await
-            .with_context(|| {
-                format!("node {} unable to add sync peer {}", from, to)
-            })?;
+            .with_context(|| format!("node {} unable to add sync peer {}", from, to))?;
 
         if let SyncMode::Hello {
             debounce,
@@ -487,9 +483,7 @@ impl TestCtx {
             .team(team_id)
             .remove_sync_peer(to_addr)
             .await
-            .with_context(|| {
-                format!("node {} unable to remove sync peer {}", from, to)
-            })?;
+            .with_context(|| format!("node {} unable to remove sync peer {}", from, to))?;
 
         if matches!(self.sync_mode, SyncMode::Hello { .. }) {
             self.nodes[from.0]
