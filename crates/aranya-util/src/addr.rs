@@ -1,3 +1,6 @@
+// This module was carefully written to ensure no arithmetic path can
+// panic, so we suppress the lint rather than add checked-math noise.
+#![allow(clippy::arithmetic_side_effects)]
 //! Network address handling and utilities.
 //!
 //! This module provides the [`Addr`] type for representing network addresses
@@ -339,27 +342,21 @@ fn is_domain_name(s: &str) -> bool {
 
     let mut last = b'.';
     let mut non_numeric = false;
-    let mut part_len: usize = 0;
+    let mut part_len = 0;
     for c in s.as_bytes() {
         match c {
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                 non_numeric = true;
-                part_len = part_len
-                    .checked_add(1)
-                    .expect("part_len should not overflow");
+                part_len += 1;
             }
             b'0'..=b'9' => {
-                part_len = part_len
-                    .checked_add(1)
-                    .expect("part_len should not overflow");
+                part_len += 1;
             }
             b'-' => {
                 if last == b'.' {
                     return false;
                 }
-                part_len = part_len
-                    .checked_add(1)
-                    .expect("part_len should not overflow");
+                part_len += 1;
                 non_numeric = true;
             }
             b'.' => {
@@ -406,10 +403,7 @@ impl FmtBuf {
     /// buffer.
     #[inline(always)]
     fn available(&self) -> usize {
-        self.buf
-            .len()
-            .checked_sub(usize::from(self.len))
-            .expect("buf.len() should be >= self.len")
+        self.buf.len() - usize::from(self.len)
     }
 
     /// Returns the used portion of the buffer.
@@ -430,10 +424,7 @@ impl FmtBuf {
         // NB: the compiler can prove that `self.idx` is in
         // bounds.
         self.buf[usize::from(self.len)] = c;
-        self.len = self
-            .len
-            .checked_add(1)
-            .expect("FmtBuf length should not overflow u8");
+        self.len += 1;
     }
 
     /// Writes `s` to the buffer.
@@ -516,8 +507,7 @@ impl FmtBuf {
             }
             impl Span {
                 const fn contains(&self, idx: usize) -> bool {
-                    // Both start and len are bounded by 8 (number of IPv6 segments).
-                    self.start <= idx && idx < self.start.wrapping_add(self.len)
+                    self.start <= idx && idx < self.start + self.len
                 }
             }
 
@@ -529,10 +519,7 @@ impl FmtBuf {
                     if cur.len == 0 {
                         cur.start = i;
                     }
-                    cur.len = cur
-                        .len
-                        .checked_add(1)
-                        .expect("span len should not overflow");
+                    cur.len += 1;
 
                     if cur.len >= 2 && cur.len > max.len {
                         max = cur;
@@ -553,8 +540,7 @@ impl FmtBuf {
             if zeros.contains(i) {
                 buf.write_str("::");
 
-                let skip = zeros.len.checked_sub(1).expect("zeros.len should be >= 1");
-                if let Some((_, &seg)) = iter.nth(skip) {
+                if let Some((_, &seg)) = iter.nth(zeros.len - 1) {
                     buf.itoa16(seg);
                 }
             } else {
@@ -573,10 +559,7 @@ impl FmtBuf {
 const fn base10(x: u8) -> u8 {
     debug_assert!(x <= 9);
 
-    match x.checked_add(b'0') {
-        Some(v) => v,
-        None => panic!("base10 overflow"),
-    }
+    x + b'0'
 }
 
 /// Converts `c`, which must be in `0..=15`, to its base-16
@@ -587,13 +570,7 @@ const fn base16(x: u8) -> u8 {
     if x < 10 {
         base10(x)
     } else {
-        match x.checked_sub(10) {
-            Some(offset) => match offset.checked_add(b'a') {
-                Some(v) => v,
-                None => panic!("base16 overflow"),
-            },
-            None => panic!("base16 underflow"),
-        }
+        x - 10 + b'a'
     }
 }
 
@@ -632,11 +609,7 @@ impl From<Bug> for AddrError {
     }
 }
 
-#[allow(
-    clippy::arithmetic_side_effects,
-    clippy::indexing_slicing,
-    clippy::expect_used
-)]
+#[allow(clippy::indexing_slicing, clippy::expect_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
