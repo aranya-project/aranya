@@ -5,14 +5,14 @@ use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
 use buggy::BugExt as _;
-use tarpc::context;
 use tracing::instrument;
 
 #[cfg(feature = "preview")]
 use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role, RoleId, Roles,
+        create_ctx, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role,
+        RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -43,7 +43,7 @@ impl Team<'_> {
     pub async fn close_team(&self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.id)
+            .close_team(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -62,7 +62,7 @@ impl Team<'_> {
         let wrapped = self
             .client
             .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
+            .encrypt_psk_seed_for_peer(create_ctx(), self.id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -75,7 +75,7 @@ impl Team<'_> {
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, config.into())
+            .add_sync_peer(create_ctx(), addr, self.id, config.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -89,7 +89,7 @@ impl Team<'_> {
     pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
+            .sync_now(create_ctx(), addr, self.id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -100,7 +100,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.id)
+            .remove_sync_peer(create_ctx(), addr, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -114,7 +114,7 @@ impl Team<'_> {
         self.client
             .daemon
             .add_device_to_team(
-                context::current(),
+                create_ctx(),
                 self.id,
                 keys.into_api(),
                 initial_role.map(RoleId::into_api),
@@ -139,7 +139,7 @@ impl Team<'_> {
         let data = self
             .client
             .daemon
-            .devices_on_team(context::current(), self.id)
+            .devices_on_team(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -176,7 +176,7 @@ impl Team<'_> {
         self.client
             .daemon
             .sync_hello_subscribe(
-                context::current(),
+                create_ctx(),
                 peer,
                 self.id,
                 config.graph_change_debounce(),
@@ -196,7 +196,7 @@ impl Team<'_> {
     pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_unsubscribe(context::current(), peer, self.id)
+            .sync_hello_unsubscribe(create_ctx(), peer, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -215,7 +215,7 @@ impl Team<'_> {
         let roles = self
             .client
             .daemon
-            .setup_default_roles(context::current(), self.id, owning_role.into_api())
+            .setup_default_roles(create_ctx(), self.id, owning_role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -241,12 +241,7 @@ impl Team<'_> {
         let role = self
             .client
             .daemon
-            .create_role(
-                context::current(),
-                self.id,
-                role_name,
-                owning_role.into_api(),
-            )
+            .create_role(create_ctx(), self.id, role_name, owning_role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -263,7 +258,7 @@ impl Team<'_> {
     pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
         self.client
             .daemon
-            .delete_role(context::current(), self.id, role_id.into_api())
+            .delete_role(create_ctx(), self.id, role_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -277,7 +272,7 @@ impl Team<'_> {
     pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
+            .add_perm_to_role(create_ctx(), self.id, role_id.into_api(), perm)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -291,7 +286,7 @@ impl Team<'_> {
     pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
+            .remove_perm_from_role(create_ctx(), self.id, role_id.into_api(), perm)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -306,7 +301,7 @@ impl Team<'_> {
         self.client
             .daemon
             .add_role_owner(
-                context::current(),
+                create_ctx(),
                 self.id,
                 role.into_api(),
                 owning_role.into_api(),
@@ -324,7 +319,7 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_role_owner(
-                context::current(),
+                create_ctx(),
                 self.id,
                 role.into_api(),
                 owning_role.into_api(),
@@ -340,7 +335,7 @@ impl Team<'_> {
         let roles = self
             .client
             .daemon
-            .role_owners(context::current(), self.id, role.into_api())
+            .role_owners(create_ctx(), self.id, role.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -367,7 +362,7 @@ impl Team<'_> {
         self.client
             .daemon
             .assign_role_management_perm(
-                context::current(),
+                create_ctx(),
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
@@ -392,7 +387,7 @@ impl Team<'_> {
         self.client
             .daemon
             .revoke_role_management_perm(
-                context::current(),
+                create_ctx(),
                 self.id,
                 role.into_api(),
                 managing_role.into_api(),
@@ -409,7 +404,7 @@ impl Team<'_> {
         let roles = self
             .client
             .daemon
-            .team_roles(context::current(), self.id)
+            .team_roles(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -435,7 +430,7 @@ impl Team<'_> {
         self.client
             .daemon
             .create_label(
-                context::current(),
+                create_ctx(),
                 self.id,
                 label_name,
                 managing_role_id.into_api(),
@@ -451,7 +446,7 @@ impl Team<'_> {
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.id, label_id.into_api())
+            .delete_label(create_ctx(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -467,7 +462,7 @@ impl Team<'_> {
         self.client
             .daemon
             .add_label_managing_role(
-                context::current(),
+                create_ctx(),
                 self.id,
                 label_id.into_api(),
                 managing_role_id.into_api(),
@@ -483,7 +478,7 @@ impl Team<'_> {
         let label = self
             .client
             .daemon
-            .label(context::current(), self.id, label_id.into_api())
+            .label(create_ctx(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -497,7 +492,7 @@ impl Team<'_> {
         let labels = self
             .client
             .daemon
-            .labels(context::current(), self.id)
+            .labels(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
