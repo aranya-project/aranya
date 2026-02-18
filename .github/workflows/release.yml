@@ -10,12 +10,20 @@ on:
   push:
     branches:
       - main
+      - 'patch/*'
 
 jobs:
   # Publish unpublished crates and create a git tag
   tag:
     name: Tag
     runs-on: ubuntu-latest
+    # TODO(#722): This environment must be created in GitHub repo settings with:
+    # - Deployment branches restricted to `main` and `patch/*`
+    # - Required reviewers enabled
+    # - ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY added as an environment secret
+    #   (and removed as a repo-level secret) so only allowed branches can
+    #   access the crates.io token.
+    environment: release
     concurrency:
       group: release-${{ github.ref }}
       cancel-in-progress: false
@@ -46,6 +54,11 @@ jobs:
         run: |
           cargo release publish -v --execute --no-confirm
         env:
+          # TODO(#722): Once DevOps moves ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY from
+          # a repo-level secret to the `release` environment secret, unprotected
+          # branches will no longer be able to access this token. Until then, the
+          # `environment: release` setting above provides branch-level protection
+          # via deployment branch rules.
           CARGO_REGISTRY_TOKEN: ${{ secrets.ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY }}
 
       - name: Push tags to github
