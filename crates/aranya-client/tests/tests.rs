@@ -100,15 +100,12 @@ async fn test_sync_now() -> Result<()> {
         .context("owner unable to assign admin role")?;
 
     // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin
+    let err = admin
         .device(devices.operator.id)
         .assign_role(roles.operator().id)
         .await
-    {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
-    }
+        .expect_err("admin has not synced yet, role assignment should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     // Let's sync immediately, which will propagate the role change.
     admin
@@ -467,14 +464,11 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
         .await
         .context("admin unable to sync with owner")?;
 
-    match admin_team
+    let err = admin_team
         .add_device(devices.membera.pk.clone(), Some(roles.member().id))
         .await
-    {
-        Ok(_) => bail!("expected delegated add_device to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected error: {err:?}"),
-    }
+        .expect_err("add_device with initial role should fail without delegation");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -674,24 +668,24 @@ async fn test_add_team() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id);
-        match admin.sync_now(owner_addr, None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
+        // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+        // but currently the handshake timeout races with the tarpc timeout.
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing should fail before add_team()");
+        assert!(matches!(
+            err,
+            aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)
+        ));
 
         // Now, we try to assign a role using the admin, which is expected to fail.
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles.operator().id)
             .await
-        {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)));
     }
 
     let admin_seed = owner
@@ -776,15 +770,12 @@ async fn test_remove_team() -> Result<()> {
         let admin = devices.admin.client.team(team_id);
 
         // Role assignment should fail
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles.member().id)
             .await
-        {
-            Ok(_) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment should fail after team removal");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)));
     }
 
     Ok(())
@@ -864,24 +855,24 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id1);
-        match admin.sync_now(owner_addr, None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
+        // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+        // but currently the handshake timeout races with the tarpc timeout.
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing team1 should fail before add_team()");
+        assert!(matches!(
+            err,
+            aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)
+        ));
 
         // Now, we try to assign a role using the admin, which is expected to fail.
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles1.operator().id)
             .await
-        {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment on team1 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)));
     }
 
     let admin_seed1 = team1
@@ -915,24 +906,24 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id2);
-        match admin.sync_now(owner_addr, None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
+        // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+        // but currently the handshake timeout races with the tarpc timeout.
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing team2 should fail before add_team()");
+        assert!(matches!(
+            err,
+            aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)
+        ));
 
         // Now, we try to assign a role using the admin, which is expected to fail.
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles2.operator().id)
             .await
-        {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment on team2 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)));
     }
 
     let admin_seed2 = team2
@@ -1337,11 +1328,11 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
         .context("unable to setup default roles without delegation")?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team.setup_default_roles(roles.owner().id).await {
-        Ok(_) => bail!("expected replayed setup_default_roles to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected error re-running setup_default_roles: {err:?}"),
-    }
+    let err = owner_team
+        .setup_default_roles(roles.owner().id)
+        .await
+        .expect_err("setup_default_roles should only succeed once");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1355,11 +1346,11 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let bogus_role = RoleId::from([0x55; 32]);
 
-    match owner_team.setup_default_roles(bogus_role).await {
-        Ok(_) => bail!("expected setup_default_roles to reject unknown owner role"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected error when using bogus owner role: {err:?}"),
-    }
+    let err = owner_team
+        .setup_default_roles(bogus_role)
+        .await
+        .expect_err("setup_default_roles should reject unknown owner role");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1596,15 +1587,12 @@ async fn test_assign_role_self_rejected() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team
+    let err = owner_team
         .device(devices.owner.id)
         .assign_role(roles.owner().id)
         .await
-    {
-        Ok(_) => bail!("expected assigning role to self to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_role error: {err:?}"),
-    }
+        .expect_err("assigning role to self should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1620,15 +1608,12 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team
+    let err = owner_team
         .device(devices.owner.id)
         .revoke_role(roles.owner().id)
         .await
-    {
-        Ok(_) => bail!("expected revoking owner role from self to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected revoke_role error: {err:?}"),
-    }
+        .expect_err("revoking owner role from self should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1656,15 +1641,12 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    match admin_team
+    let err = admin_team
         .device(devices.membera.id)
         .assign_role(roles.member().id)
         .await
-    {
-        Ok(_) => bail!("expected assigning role without delegation to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_role error: {err:?}"),
-    }
+        .expect_err("assigning role without delegation should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1688,18 +1670,15 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    match admin_team
+    let err = admin_team
         .assign_role_management_permission(
             roles.member().id,
             roles.operator().id,
             RoleManagementPermission::CanAssignRole,
         )
         .await
-    {
-        Ok(_) => bail!("expected assigning management perm without ownership to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_role_management_permission error: {err:?}"),
-    }
+        .expect_err("assigning management perm without ownership should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1764,15 +1743,12 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
     admin_team.sync_now(owner_addr, None).await?;
 
     // Try to assign operator role again as admin - should fail now
-    match admin_team
+    let err = admin_team
         .device(devices.membera.id)
         .assign_role(roles.operator().id)
         .await
-    {
-        Ok(_) => bail!("Admin should NOT be able to assign operator role after revocation"),
-        Err(aranya_client::Error::Aranya(_)) => {} // Expected failure
-        Err(err) => bail!("Unexpected error when trying to assign after revocation: {err:?}"),
-    }
+        .expect_err("admin should not be able to assign role after revocation");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1887,11 +1863,11 @@ async fn test_delete_label_requires_permission() -> Result<()> {
         .await
         .context("operator unable to sync owner state")?;
 
-    match operator_team.delete_label(label).await {
-        Ok(_) => bail!("expected delete_label without permission to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected delete_label error: {err:?}"),
-    }
+    let err = operator_team
+        .delete_label(label)
+        .await
+        .expect_err("delete_label without permission should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1911,15 +1887,12 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
         .create_label(text!("device-self-label"), roles.owner().id)
         .await?;
 
-    match owner_team
+    let err = owner_team
         .device(owner_id)
         .assign_label(label, ChanOp::SendRecv)
         .await
-    {
-        Ok(_) => bail!("expected assigning label to self to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_label error: {err:?}"),
-    }
+        .expect_err("assigning label to self should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1934,11 +1907,12 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let admin_team = devices.admin.client.team(team_id);
-    match admin_team.device(devices.owner.id).remove_from_team().await {
-        Ok(_) => bail!("expected removing the final owner to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected remove_device error: {err:?}"),
-    }
+    let err = admin_team
+        .device(devices.owner.id)
+        .remove_from_team()
+        .await
+        .expect_err("removing the final owner should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1961,14 +1935,11 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
-    match admin_team
+    let err = admin_team
         .add_role_owner(roles.member().id, roles.operator().id)
         .await
-    {
-        Ok(_) => bail!("expected add_role_owner to require additional permission"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected add_role_owner error: {err:?}"),
-    }
+        .expect_err("add_role_owner should require additional permission");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -1986,14 +1957,11 @@ async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
         .add_role_owner(roles.member().id, roles.admin().id)
         .await?;
 
-    match owner_team
+    let err = owner_team
         .add_role_owner(roles.member().id, roles.admin().id)
         .await
-    {
-        Ok(_) => bail!("expected duplicate role owner addition to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected add_role_owner duplicate error: {err:?}"),
-    }
+        .expect_err("duplicate role owner addition should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
@@ -2007,14 +1975,11 @@ async fn test_remove_role_owner_missing_entry() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team
+    let err = owner_team
         .remove_role_owner(roles.member().id, roles.operator().id)
         .await
-    {
-        Ok(_) => bail!("expected removing absent role owner to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected remove_role_owner error: {err:?}"),
-    }
+        .expect_err("removing absent role owner should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
 }
