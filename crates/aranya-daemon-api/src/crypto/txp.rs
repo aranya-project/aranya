@@ -329,7 +329,10 @@ where
         self.ctx = Some(ctx);
         // Rekeying takes so long (relatively speaking, anyway)
         // that this should never overflow.
-        self.rekeys = self.rekeys.checked_add(1).assume("rekey count should not overflow")?;
+        self.rekeys = self
+            .rekeys
+            .checked_add(1)
+            .assume("rekey count should not overflow")?;
         Ok(enc)
     }
 }
