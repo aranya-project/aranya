@@ -1612,7 +1612,7 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
         .device(devices.owner.id)
         .revoke_role(roles.owner().id)
         .await
-        .expect_err("revoking owner role from self should fail");
+        .expect_err("sole owner cannot revoke its own role");
     assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
@@ -1938,7 +1938,7 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
     let err = admin_team
         .add_role_owner(roles.member().id, roles.operator().id)
         .await
-        .expect_err("add_role_owner should require additional permission");
+        .expect_err("role owner change requires permission");
     assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
