@@ -2445,14 +2445,18 @@ pub unsafe fn afc_channel_seal(
         );
     }
 
-    if *dst_len < (plaintext.len() + ARANYA_AFC_CHANNEL_OVERHEAD) {
+    let sealed_len = plaintext
+        .len()
+        .checked_add(ARANYA_AFC_CHANNEL_OVERHEAD)
+        .ok_or(imp::Error::BufferTooSmall)?;
+    if *dst_len < sealed_len {
         return Err(imp::Error::BufferTooSmall);
     }
 
     // SAFETY: the user is responsible for giving us a valid pointer.
     let dst = aranya_capi_core::try_as_mut_slice!(dst, *dst_len);
     channel.seal(dst, plaintext)?;
-    *dst_len = plaintext.len() + ARANYA_AFC_CHANNEL_OVERHEAD;
+    *dst_len = sealed_len;
 
     Ok(())
 }
@@ -2480,7 +2484,11 @@ pub unsafe fn afc_channel_open(
         );
     }
 
-    if *dst_len < (ciphertext.len() - ARANYA_AFC_CHANNEL_OVERHEAD) {
+    let opened_len = ciphertext
+        .len()
+        .checked_sub(ARANYA_AFC_CHANNEL_OVERHEAD)
+        .ok_or(imp::Error::BufferTooSmall)?;
+    if *dst_len < opened_len {
         return Err(imp::Error::BufferTooSmall);
     }
 
@@ -2490,7 +2498,7 @@ pub unsafe fn afc_channel_open(
 
     AfcSeq::init(seq, seq_raw);
     // Do our best to set a max bound, even if we can't know if they pass in a larger ciphertext than needed.
-    *dst_len = ciphertext.len() - ARANYA_AFC_CHANNEL_OVERHEAD;
+    *dst_len = opened_len;
 
     Ok(())
 }
