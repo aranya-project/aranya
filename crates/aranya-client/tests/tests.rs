@@ -1,6 +1,7 @@
 //! Integration tests for the user library.
 
 #![allow(
+    clippy::arithmetic_side_effects,
     clippy::disallowed_macros,
     clippy::expect_used,
     clippy::indexing_slicing,

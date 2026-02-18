@@ -187,7 +187,9 @@ async fn main() -> Result<()> {
     };
 
     let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sleep_interval = sync_interval
+        .checked_mul(6)
+        .expect("sleep interval should not overflow");
     let sync_cfg = {
         let mut builder = SyncPeerConfig::builder();
         builder = builder.interval(sync_interval);
@@ -506,7 +508,13 @@ async fn main() -> Result<()> {
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
-    let mut ciphertext = vec![0u8; afc_msg.len() + afc::Channels::OVERHEAD];
+    let mut ciphertext = vec![
+        0u8;
+        afc_msg
+            .len()
+            .checked_add(afc::Channels::OVERHEAD)
+            .expect("AFC overhead should not overflow")
+    ];
     send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
@@ -515,7 +523,13 @@ async fn main() -> Result<()> {
 
     // memberb opens data from membera.
     info!("memberb receiving uni channel from membera");
-    let mut plaintext = vec![0u8; ciphertext.len() - afc::Channels::OVERHEAD];
+    let mut plaintext = vec![
+        0u8;
+        ciphertext
+            .len()
+            .checked_sub(afc::Channels::OVERHEAD)
+            .expect("ciphertext must be larger than overhead")
+    ];
     info!("memberb opening data from membera");
     let seq1 = recv
         .open(&mut plaintext, &ciphertext)

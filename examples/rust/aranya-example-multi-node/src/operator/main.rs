@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     let operator_role = team
         .roles()
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     info!("operator: detected that all devices have been added to team and operator role has been assigned");
 

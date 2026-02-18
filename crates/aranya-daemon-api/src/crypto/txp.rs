@@ -329,7 +329,10 @@ where
         self.ctx = Some(ctx);
         // Rekeying takes so long (relatively speaking, anyway)
         // that this should never overflow.
-        self.rekeys += 1;
+        self.rekeys = self
+            .rekeys
+            .checked_add(1)
+            .assume("rekey count should not overflow")?;
         Ok(enc)
     }
 }
@@ -702,7 +705,7 @@ pub mod unix {
 
 #[cfg(test)]
 #[cfg(unix)]
-#[allow(clippy::panic)]
+#[allow(clippy::arithmetic_side_effects, clippy::panic)]
 mod tests {
     use std::panic;
 
