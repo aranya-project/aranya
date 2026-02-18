@@ -5,7 +5,7 @@ use std::{future::Future, marker::PhantomData};
 use anyhow::{Context, Result};
 use aranya_crypto::{
     policy::{LabelId, RoleId},
-    Csprng, DeviceId, Rng,
+    DeviceId, Random as _, Rng,
 };
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actionable, VmEffect};
@@ -52,7 +52,7 @@ where
         let policy_data = &[0u8];
         let act = policy::create_team(
             owner_keys,
-            nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()).to_vec(),
+            nonce.unwrap_or(&<[u8; 16]>::random(Rng)).to_vec(),
         );
         let id = {
             let mut client = self.lock_aranya().await;

@@ -112,7 +112,7 @@ where
         // TODO: spawn a task for send/recv?
         let (mut recv, mut send) = stream.split();
 
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
+        let mut sync_requester = SyncRequester::new(peer.graph_id, Rng);
 
         // send sync request.
         syncer
