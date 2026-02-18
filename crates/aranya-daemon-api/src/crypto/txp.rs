@@ -319,7 +319,7 @@ where
         // rekey when we're halfway there.
         let max = Seq::max::<<CS::Aead as Aead>::NonceSize>();
         let seq = ctx.seal.seq().to_u64();
-        seq >= max.checked_div(2).expect("division by 2 should not fail")
+        seq >= max / 2
     }
 
     /// Generates a new HPKE encryption context and returns the
@@ -329,7 +329,7 @@ where
         self.ctx = Some(ctx);
         // Rekeying takes so long (relatively speaking, anyway)
         // that this should never overflow.
-        self.rekeys = self.rekeys.saturating_add(1);
+        self.rekeys = self.rekeys.checked_add(1).assume("rekey count should not overflow")?;
         Ok(enc)
     }
 }
