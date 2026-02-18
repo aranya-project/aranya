@@ -84,6 +84,16 @@ after_includes = """
         #define ARANYA_PACKED
     #endif
 #endif /* ARANYA_PACKED */
+
+#if !defined(ARANYA_DEPRECATED)
+    #if __has_attribute(deprecated)
+        #define ARANYA_DEPRECATED __attribute__((deprecated))
+        #define ARANYA_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+    #else
+        #define ARANYA_DEPRECATED
+        #define ARANYA_DEPRECATED_MSG(msg)
+    #endif
+#endif /* ARANYA_DEPRECATED */
 """
 braces = "SameLine"
 line_length = 80
@@ -111,10 +121,14 @@ renaming_overrides_prefixing = true
 rename_variants = "ScreamingSnakeCase"
 prefix_with_name = true
 must_use = "ARANYA_MUST_USE"
+deprecated = "ARANYA_DEPRECATED"
+deprecated_with_note = "ARANYA_DEPRECATED_MSG({})"
 
 [fn]
 must_use = "ARANYA_MUST_USE"
 no_return = "ARANYA_NO_RETURN"
+deprecated = "ARANYA_DEPRECATED"
+deprecated_with_note = "ARANYA_DEPRECATED_MSG({})"
 
 [layout]
 packed = "ARANYA_PACKED"
@@ -126,3 +140,5 @@ non_null_attribute = "ARANYA_NON_NULL"
 [struct]
 # We hack in support for `designated_init` via `must_use`.
 must_use = "ARANYA_DESIGNATED_INIT"
+deprecated = "ARANYA_DEPRECATED"
+deprecated_with_note = "ARANYA_DEPRECATED_MSG({})"

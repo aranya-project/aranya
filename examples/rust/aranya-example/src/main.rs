@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use aranya_client::{
     afc,
-    client::{ChanOp, Client, DeviceId, KeyBundle},
+    client::{ChanOp, Client, DeviceId, PublicKeyBundle},
     text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
     SyncPeerConfig,
 };
@@ -59,7 +59,7 @@ impl Daemon {
 /// An Aranya device.
 struct ClientCtx {
     client: Client,
-    pk: KeyBundle,
+    pk: PublicKeyBundle,
     id: DeviceId,
     // NB: These have important drop side effects.
     _work_dir: TempDir,
@@ -127,7 +127,7 @@ impl ClientCtx {
             .context("unable to initialize client")?;
 
         let pk = client
-            .get_key_bundle()
+            .get_public_key_bundle()
             .await
             .context("expected key bundle")?;
         let id = client.get_device_id().await.context("expected device id")?;
@@ -462,7 +462,7 @@ async fn main() -> Result<()> {
     let owner_device = owner_team.device(owner.id);
     let owner_role = owner_device.role().await?.expect("expected owner role");
     info!("owner role: {:?}", owner_role);
-    let keybundle = owner_device.keybundle().await?;
+    let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
