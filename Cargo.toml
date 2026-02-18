@@ -8,7 +8,7 @@ members = [
 
 
 [workspace.package]
-version = "4.1.0"
+version = "5.0.0"
 authors = ["SpiderOak, Inc."]
 edition = "2021"
 license = "AGPL-3.0-only"
@@ -58,11 +58,11 @@ aranya-runtime = { version = "0.20.0", features = ["std", "libc"] }
 buggy = { version = "0.1.0" }
 spideroak-base58 = { version = "0.2.0" }
 
-aranya-client = { version = "4.1.0", path = "crates/aranya-client", default-features = false }
-aranya-daemon = { version = "4.1.0", path = "crates/aranya-daemon", default-features = false }
-aranya-daemon-api = { version = "4.1.0", path = "crates/aranya-daemon-api", default-features = false }
-aranya-keygen = { version = "4.1.0", path = "crates/aranya-keygen", default-features = false }
-aranya-util = { version = "4.1.0", path = "crates/aranya-util", default-features = false }
+aranya-client = { version = "5.0.0", path = "crates/aranya-client", default-features = false }
+aranya-daemon = { version = "5.0.0", path = "crates/aranya-daemon", default-features = false }
+aranya-daemon-api = { version = "5.0.0", path = "crates/aranya-daemon-api", default-features = false }
+aranya-keygen = { version = "5.0.0", path = "crates/aranya-keygen", default-features = false }
+aranya-util = { version = "5.0.0", path = "crates/aranya-util", default-features = false }
 
 # External dependencies
 anyhow = { version = "1.0.86" }
