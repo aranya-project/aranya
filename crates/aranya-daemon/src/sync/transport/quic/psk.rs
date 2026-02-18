@@ -25,7 +25,7 @@ const QUIC_SYNC_PSK_CONTEXT: &[u8] = b"AranyaQuicSync-v1";
 pub(crate) struct PskSeed(pub(crate) aranya_crypto::tls::PskSeed<CS>);
 
 impl PskSeed {
-    pub(crate) fn new(rng: &mut impl Csprng, team: TeamId) -> Self {
+    pub(crate) fn new(rng: impl Csprng, team: TeamId) -> Self {
         let group = GroupId::transmute(team);
         Self(aranya_crypto::tls::PskSeed::new(rng, &group))
     }
@@ -38,11 +38,7 @@ impl PskSeed {
         ))
     }
 
-    pub(crate) fn load(
-        eng: &mut CE,
-        store: &LocalStore<KS>,
-        id: PskSeedId,
-    ) -> Result<Option<Self>> {
+    pub(crate) fn load(eng: &CE, store: &LocalStore<KS>, id: PskSeedId) -> Result<Option<Self>> {
         store
             .get_key(eng, id)
             .map(|r| r.map(Self))

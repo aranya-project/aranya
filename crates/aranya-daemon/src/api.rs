@@ -591,7 +591,7 @@ impl DaemonApi for Api {
             None => {
                 warn!("Missing QUIC sync config");
 
-                let seed = qs::PskSeed::new(&mut Rng, team_id);
+                let seed = qs::PskSeed::new(Rng, team_id);
                 self.add_seed(team_id, seed).await?;
             }
         }
@@ -623,12 +623,12 @@ impl DaemonApi for Api {
             let crypto = &mut *self.crypto.lock().await;
             let seed = {
                 let seed_id = self.seed_id_dir.get(team).await?;
-                qs::PskSeed::load(&mut crypto.engine, &crypto.local_store, seed_id)?
+                qs::PskSeed::load(&crypto.engine, &crypto.local_store, seed_id)?
                     .context("no seed in dir")?
             };
             let enc_sk: EncryptionKey<CS> = crypto
                 .aranya_store
-                .get_key(&mut crypto.engine, enc_pk.id()?)
+                .get_key(&crypto.engine, enc_pk.id()?)
                 .context("keystore error")?
                 .context("missing enc_sk for encrypt seed")?;
             (seed, enc_sk)
@@ -636,7 +636,7 @@ impl DaemonApi for Api {
 
         let group = GroupId::transmute(team);
         let (encap_key, encrypted_seed) = enc_sk
-            .seal_psk_seed(&mut Rng, &seed.0, &peer_enc_pk, &group)
+            .seal_psk_seed(Rng, &seed.0, &peer_enc_pk, &group)
             .context("could not seal psk seed")?;
 
         Ok(WrappedSeed {
@@ -1458,7 +1458,7 @@ impl Api {
 
         let id = crypto
             .local_store
-            .insert_key(&mut crypto.engine, seed.into_inner())
+            .insert_key(&crypto.engine, seed.into_inner())
             .context("inserting seed")?;
 
         if let Err(e) = self

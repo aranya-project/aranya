@@ -26,7 +26,7 @@ custom_id! {
 pub struct ApiKey<CS: CipherSuite>(<<CS as CipherSuite>::Kem as Kem>::DecapKey);
 
 impl<CS: CipherSuite> ApiKey<CS> {
-    pub(crate) fn new<CE>(eng: &mut CE) -> Self
+    pub(crate) fn new<CE>(eng: &CE) -> Self
     where
         CE: Engine<CS = CS>,
     {
@@ -49,7 +49,7 @@ impl<CS: CipherSuite> ApiKey<CS> {
     }
 
     /// Generates a random API key.
-    pub fn generate<CE>(eng: &mut CE) -> Self
+    pub fn generate<CE>(eng: &CE) -> Self
     where
         CE: Engine<CS = CS>,
     {
