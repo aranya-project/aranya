@@ -19,7 +19,7 @@
 //! # use aranya_crypto::{Engine, KeyStore};
 //! # use aranya_keygen::KeyBundle;
 //! #
-//! # fn example<CE, KS>(engine: &mut CE, store: &mut KS) -> Result<()>
+//! # fn example<CE, KS>(engine: &CE, store: &mut KS) -> Result<()>
 //! # where
 //! #     CE: Engine,
 //! #     KS: KeyStore,

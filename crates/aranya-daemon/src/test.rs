@@ -211,14 +211,14 @@ impl TestCtx {
                 fs::create_dir_all(&path)?;
                 Store::open(path).map(AranyaStore::new)?
             };
-            let (mut eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
-            let bundle = KeyBundle::generate(&mut eng, &mut store)
-                .context("unable to generate `KeyBundle`")?;
+            let (eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
+            let bundle =
+                KeyBundle::generate(&eng, &mut store).context("unable to generate `KeyBundle`")?;
 
             let storage_dir = root.join("storage");
             fs::create_dir_all(&storage_dir)?;
 
-            let pk = bundle.public_keys(&mut eng, &store)?;
+            let pk = bundle.public_keys(&eng, &store)?;
 
             let client = aranya::Client::new(ClientState::new(
                 PolicyEngine::new(
