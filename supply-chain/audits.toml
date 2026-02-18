@@ -39,6 +39,12 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.83 -> 0.1.87"
 
+[[audits.async-trait]]
+who = "nikki-aranya <npoelma@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.87 -> 0.1.88"
+notes = "Mundane and well documented changes, fixing a specific bug with a new unit test."
+
 [[audits.backon]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"

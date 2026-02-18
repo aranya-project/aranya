@@ -42,7 +42,11 @@ use crate::{
     actions::Actions,
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
-    sync::{self, quic::PskStore, SyncPeer},
+    sync::{
+        self,
+        quic::{PskStore, QuicListener, QuicTransport},
+        SyncPeer,
+    },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
 };
@@ -51,12 +55,11 @@ use crate::{
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::quic::QuicState;
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<TestState, crate::PS, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<QuicTransport, crate::PS, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
-type TestServer = sync::quic::Server<crate::PS, crate::SP>;
+type TestServer = sync::SyncServer<QuicListener, crate::PS, crate::SP>;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -82,7 +85,7 @@ impl TestDevice {
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
-        let sync_local_addr = server.local_addr().into();
+        let sync_local_addr = server.local_addr();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
@@ -235,18 +238,18 @@ impl TestCtx {
 
             let (send_effects, effects_recv) = mpsc::channel(1);
 
-            // Create server first to get the actual listening address
-            let (server, _sync_peers, conn_map, syncer_recv) =
-                TestServer::new(client.clone(), &any_local_addr, psk_store.clone()).await?;
+            let (handle, recv) = sync::SyncHandle::channel(128);
 
-            // Create syncer with the actual server address
+            let (listener, conns) = QuicListener::new(any_local_addr, psk_store.clone()).await?;
+            let server = TestServer::new(listener, client.clone(), handle);
+
             let syncer = TestSyncer::new(
                 client.clone(),
                 send_effects,
                 psk_store.clone(),
-                (server.local_addr().into(), any_local_addr),
-                syncer_recv,
-                conn_map,
+                (server.local_addr(), any_local_addr),
+                recv,
+                conns,
             )?;
 
             (syncer, server, pk, psk_store, effects_recv)

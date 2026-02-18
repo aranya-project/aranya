@@ -8,21 +8,20 @@
 
 use std::{convert::Infallible, sync::Arc};
 
-use s2n_quic::{connection, provider::StartError, stream};
-use tracing::error;
-
-use super::SyncState;
 use crate::sync::Addr;
 
 mod client;
 mod connections;
+mod listener;
 mod psk;
-mod server;
+mod stream;
+mod transport;
 
-pub(crate) use client::QuicState;
 pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
+pub(crate) use listener::QuicListener;
 pub(crate) use psk::{PskSeed, PskStore};
-pub(crate) use server::Server;
+pub(crate) use stream::QuicStream;
+pub(crate) use transport::QuicTransport;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -32,19 +31,32 @@ const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 pub(crate) enum Error {
     /// QUIC Connection error
     #[error(transparent)]
-    QuicConnection(#[from] connection::Error),
+    QuicConnection(#[from] s2n_quic::connection::Error),
     /// QUIC Stream error
     #[error(transparent)]
-    QuicStream(#[from] stream::Error),
-    /// Invalid PSK used for syncing
-    #[error("invalid PSK used when attempting to sync")]
-    InvalidPSK,
-    /// QUIC client endpoint start error
-    #[error("could not start QUIC client")]
-    ClientStart(#[source] StartError),
+    QuicStream(#[from] s2n_quic::stream::Error),
     /// QUIC server endpoint start error
     #[error("could not start QUIC server")]
-    ServerStart(#[source] StartError),
+    ServerStart(#[source] s2n_quic::provider::StartError),
+
+    #[error(transparent)]
+    Send(s2n_quic::stream::Error),
+    #[error(transparent)]
+    Receive(std::io::Error),
+    #[error(transparent)]
+    Finish(s2n_quic::stream::Error),
+
+    /// QUIC client endpoint start error
+    #[error("could not start QUIC client")]
+    ClientStart(#[source] s2n_quic::provider::StartError),
+
+    /// Encountered a bug in the program.
+    #[error(transparent)]
+    Bug(#[from] buggy::Bug),
+
+    /// Something has gone wrong.
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 impl From<Infallible> for Error {

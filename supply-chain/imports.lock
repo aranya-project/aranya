@@ -3068,6 +3068,16 @@ criteria = "safe-to-deploy"
 delta = "1.0.95 -> 1.0.97"
 aggregated-from = "https://raw.githubusercontent.com/zcash/wallet/main/supply-chain/audits.toml"
 
+[[audits.zcash.audits.async-trait]]
+who = "Jack Grigg <jack@electriccoin.co>"
+criteria = "safe-to-deploy"
+delta = "0.1.88 -> 0.1.89"
+notes = """
+Changes to generated code are to make use of `syn::Block` quoting in several places
+instead of directly quoting its statements.
+"""
+aggregated-from = "https://raw.githubusercontent.com/zcash/wallet/main/supply-chain/audits.toml"
+
 [[audits.zcash.audits.base64]]
 who = "Jack Grigg <jack@electriccoin.co>"
 criteria = "safe-to-deploy"

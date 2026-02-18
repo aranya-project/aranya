@@ -28,7 +28,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicState, SyncParams},
+        quic::{PskStore, QuicListener, QuicTransport, SyncParams},
         SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -50,7 +50,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<PS, SP>;
-pub(crate) type SyncServer = crate::sync::quic::Server<PS, SP>;
+pub(crate) type SyncServer = crate::sync::SyncServer<QuicListener, PS, SP>;
 
 /// Handle for the spawned daemon.
 ///
@@ -83,7 +83,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicState, PS, SP, EF>,
+    manager: SyncManager<QuicTransport, PS, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -272,7 +272,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicState, PS, SP, EF>,
+        SyncManager<QuicTransport, PS, SP, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {
@@ -288,23 +288,23 @@ impl Daemon {
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = mpsc::channel(256);
 
-        // Create the sync server
-        let (server, peers, conns, syncer_recv) =
-            SyncServer::new(client.clone(), &server_addr, Arc::clone(&psk_store))
-                .await
-                .context("unable to initialize QUIC sync server")?;
+        let (handle, recv) = SyncHandle::channel(128);
 
-        // Initialize the syncer
-        let syncer = SyncManager::new(
+        let (listener, conns) = QuicListener::new(server_addr, Arc::clone(&psk_store))
+            .await
+            .context("unable to initialize QUIC sync listener")?;
+        let server = SyncServer::new(listener, client.clone(), handle.clone());
+
+        let manager = SyncManager::new(
             client.clone(),
             send_effects,
             psk_store,
-            (server.local_addr().into(), client_addr),
-            syncer_recv,
+            (server.local_addr(), client_addr),
+            recv,
             conns,
         )?;
 
-        Ok((client, server, syncer, peers, recv_effects))
+        Ok((client, server, manager, handle, recv_effects))
     }
 
     /// Loads the crypto engine.

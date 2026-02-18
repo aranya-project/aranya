@@ -48,7 +48,7 @@ impl SharedConnectionMap {
     ///
     /// If the handle does not match the one in the map,
     /// it has been replaced and does not need to be removed.
-    pub(super) async fn remove(&mut self, peer: SyncPeer, handle: Handle) {
+    pub(super) async fn remove(&self, peer: SyncPeer, handle: Handle) {
         match self.handles.lock().await.entry(peer) {
             Entry::Vacant(_) => {}
             Entry::Occupied(entry) => {
@@ -79,7 +79,7 @@ impl SharedConnectionMap {
     ///
     /// Returns an error if the connection creation closure fails.
     pub(super) async fn get_or_try_insert_with(
-        &mut self,
+        &self,
         peer: SyncPeer,
         make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
     ) -> Result<Handle, super::Error> {
@@ -92,7 +92,7 @@ impl SharedConnectionMap {
                     (entry.get().clone(), None)
                 } else {
                     let (handle, acceptor) = make_conn().await?.split();
-                    let _ = entry.insert(handle);
+                    entry.insert(handle);
                     (entry.get().clone(), Some(acceptor))
                 }
             }
@@ -126,7 +126,7 @@ impl SharedConnectionMap {
     /// # Returns
     ///
     /// * `Handle` - The connection handle
-    pub(super) async fn insert(&mut self, peer: SyncPeer, conn: Connection) -> Handle {
+    pub(super) async fn insert(&self, peer: SyncPeer, conn: Connection) -> Handle {
         let (handle, acceptor) = match self.handles.lock().await.entry(peer) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");
@@ -135,11 +135,11 @@ impl SharedConnectionMap {
                     debug!(connection_key = ?peer, "Closing the connection because an open connection was already found");
                     conn.close(AppError::UNKNOWN);
                     return entry.get().clone();
-                } else {
-                    let (handle, acceptor) = conn.split();
-                    entry.insert(handle);
-                    (entry.get().clone(), acceptor)
                 }
+
+                let (handle, acceptor) = conn.split();
+                entry.insert(handle);
+                (entry.get().clone(), acceptor)
             }
             Entry::Vacant(entry) => {
                 debug!("existing QUIC connection not found");
