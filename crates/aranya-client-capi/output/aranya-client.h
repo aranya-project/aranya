@@ -79,6 +79,16 @@
     #endif
 #endif /* ARANYA_PACKED */
 
+#if !defined(ARANYA_DEPRECATED)
+    #if __has_attribute(deprecated)
+        #define ARANYA_DEPRECATED __attribute__((deprecated))
+        #define ARANYA_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+    #else
+        #define ARANYA_DEPRECATED
+        #define ARANYA_DEPRECATED_MSG(msg)
+    #endif
+#endif /* ARANYA_DEPRECATED */
+
 
 #define ARANYA_DURATION_SECONDS (1000 * ARANYA_DURATION_MILLISECONDS)
 
@@ -940,9 +950,9 @@ AranyaError aranya_init_logging_ext(struct AranyaExtError *__ext_err);
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
-                                  uint8_t *public_key_bundle,
-                                  size_t *public_key_bundle_len);
+AranyaError aranya_get_public_key_bundle(const struct AranyaClient *client,
+                                         uint8_t *public_key_bundle,
+                                         size_t *public_key_bundle_len);
 
 /**
  * Gets the public key bundle for this device.
@@ -953,6 +963,39 @@ AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+AranyaError aranya_get_public_key_bundle_ext(const struct AranyaClient *client,
+                                             uint8_t *public_key_bundle,
+                                             size_t *public_key_bundle_len,
+                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Gets the public key bundle for this device.
+ *
+ * Renamed to [`aranya_get_public_key_bundle`](@ref aranya_get_public_key_bundle).
+ *
+ * @param[in] client the Aranya Client
+ * @param[out] public_key_bundle key bundle byte buffer
+ * @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
+ *
+ * @relates AranyaClient.
+ */
+ARANYA_DEPRECATED_MSG("Use `aranya_get_public_key_bundle`.")
+AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
+                                  uint8_t *public_key_bundle,
+                                  size_t *public_key_bundle_len);
+
+/**
+ * Gets the public key bundle for this device.
+ *
+ * Renamed to [`aranya_get_public_key_bundle`](@ref aranya_get_public_key_bundle).
+ *
+ * @param[in] client the Aranya Client
+ * @param[out] public_key_bundle key bundle byte buffer
+ * @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
+ *
+ * @relates AranyaClient.
+ */
+ARANYA_DEPRECATED_MSG("Use `aranya_get_public_key_bundle`.")
 AranyaError aranya_get_key_bundle_ext(const struct AranyaClient *client,
                                       uint8_t *public_key_bundle,
                                       size_t *public_key_bundle_len,
@@ -3055,11 +3098,11 @@ AranyaError aranya_team_device_role_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaDeviceId *device,
-                                         uint8_t *public_key_bundle,
-                                         size_t *public_key_bundle_len);
+AranyaError aranya_team_device_public_key_bundle(const struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 uint8_t *public_key_bundle,
+                                                 size_t *public_key_bundle_len);
 
 /**
  * Query device's public key bundle.
@@ -3072,6 +3115,47 @@ AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+AranyaError aranya_team_device_public_key_bundle_ext(const struct AranyaClient *client,
+                                                     const struct AranyaTeamId *team,
+                                                     const struct AranyaDeviceId *device,
+                                                     uint8_t *public_key_bundle,
+                                                     size_t *public_key_bundle_len,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Query device's public key bundle.
+ *
+ * Renamed to [`aranya_team_device_public_key_bundle`](@ref aranya_team_device_public_key_bundle).
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[out] public_key_bundle key bundle byte buffer
+ * @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
+ *
+ * @relates AranyaClient.
+ */
+ARANYA_DEPRECATED_MSG("Use `aranya_team_device_public_key_bundle`.")
+AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaDeviceId *device,
+                                         uint8_t *public_key_bundle,
+                                         size_t *public_key_bundle_len);
+
+/**
+ * Query device's public key bundle.
+ *
+ * Renamed to [`aranya_team_device_public_key_bundle`](@ref aranya_team_device_public_key_bundle).
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] device the device's ID
+ * @param[out] public_key_bundle key bundle byte buffer
+ * @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
+ *
+ * @relates AranyaClient.
+ */
+ARANYA_DEPRECATED_MSG("Use `aranya_team_device_public_key_bundle`.")
 AranyaError aranya_team_device_keybundle_ext(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
