@@ -467,7 +467,7 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
     let err = admin_team
         .add_device(devices.membera.pk.clone(), Some(roles.member().id))
         .await
-        .expect_err("add_device with initial role should fail without delegation");
+        .expect_err("add_device with initial role requires delegation");
     assert!(matches!(err, aranya_client::Error::Aranya(_)));
 
     Ok(())
