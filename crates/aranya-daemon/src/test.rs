@@ -51,6 +51,10 @@ use crate::{
 // Rank constants for tests
 // =============================================================================
 //
+// TODO(aranya-core#577): These constants duplicate values from policy.md.
+// Replace with exported policy constants once the policy language supports
+// exporting const values.
+//
 // Role ranks (from policy.md):
 //   - Owner role:    999_999 (MAX_RANK - 1)
 //   - Admin role:    800
