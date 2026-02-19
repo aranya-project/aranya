@@ -47,6 +47,30 @@ use crate::{
     AranyaStore,
 };
 
+// =============================================================================
+// Rank constants for tests
+// =============================================================================
+//
+// Role ranks (from policy.md):
+//   - Owner role:    999_999 (MAX_RANK - 1)
+//   - Admin role:    800
+//   - Operator role: 700
+//   - Member role:   600
+
+/// Default admin role rank as defined in policy.md.
+const DEFAULT_ADMIN_ROLE_RANK: i64 = 800;
+/// Default operator role rank as defined in policy.md.
+const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700;
+/// Default member role rank as defined in policy.md.
+const DEFAULT_MEMBER_ROLE_RANK: i64 = 600;
+
+/// Default device rank for admin devices. Must be < DEFAULT_ADMIN_ROLE_RANK.
+const DEFAULT_ADMIN_DEVICE_RANK: i64 = DEFAULT_ADMIN_ROLE_RANK - 1;
+/// Default device rank for operator devices. Must be < DEFAULT_OPERATOR_ROLE_RANK.
+const DEFAULT_OPERATOR_DEVICE_RANK: i64 = DEFAULT_OPERATOR_ROLE_RANK - 1;
+/// Default device rank for member devices. Must be < DEFAULT_MEMBER_ROLE_RANK.
+const DEFAULT_MEMBER_DEVICE_RANK: i64 = DEFAULT_MEMBER_ROLE_RANK - 1;
+
 // Aranya graph client for testing.
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
@@ -371,7 +395,11 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&admin.pk)?, None, 0.into())
+            .add_device_with_rank(
+                DeviceKeyBundle::try_from(&admin.pk)?,
+                None,
+                DEFAULT_ADMIN_DEVICE_RANK.into(),
+            )
             .await
             .context("unable to add admin member")?;
         owner
@@ -394,7 +422,11 @@ impl TestCtx {
 
         owner
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&operator.pk)?, None, 0.into())
+            .add_device_with_rank(
+                DeviceKeyBundle::try_from(&operator.pk)?,
+                None,
+                DEFAULT_OPERATOR_DEVICE_RANK.into(),
+            )
             .await
             .context("unable to add operator member")?;
         owner
@@ -419,13 +451,21 @@ impl TestCtx {
 
         admin
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&membera.pk)?, None, 0.into())
+            .add_device_with_rank(
+                DeviceKeyBundle::try_from(&membera.pk)?,
+                None,
+                DEFAULT_MEMBER_DEVICE_RANK.into(),
+            )
             .await
             .context("unable to add membera member")?;
         membera.sync_expect(admin, None).await?;
         admin
             .actions()
-            .add_device_with_rank(DeviceKeyBundle::try_from(&memberb.pk)?, None, 0.into())
+            .add_device_with_rank(
+                DeviceKeyBundle::try_from(&memberb.pk)?,
+                None,
+                DEFAULT_MEMBER_DEVICE_RANK.into(),
+            )
             .await
             .context("unable to add memberb member")?;
         memberb.sync_expect(admin, None).await?;
@@ -597,13 +637,21 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     owner
         .actions()
-        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, 0.into())
+        .add_device_with_rank(
+            DeviceKeyBundle::try_from(&extra.pk)?,
+            None,
+            DEFAULT_MEMBER_DEVICE_RANK.into(),
+        )
         .await
         .context("initial add should succeed")?;
 
     let err = owner
         .actions()
-        .add_device_with_rank(DeviceKeyBundle::try_from(&extra.pk)?, None, 0.into())
+        .add_device_with_rank(
+            DeviceKeyBundle::try_from(&extra.pk)?,
+            None,
+            DEFAULT_MEMBER_DEVICE_RANK.into(),
+        )
         .await
         .expect_err("expected duplicate device add to fail");
     expect_not_authorized(err);
@@ -648,7 +696,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&candidate.pk)?,
             Some(member_role),
-            0.into(),
+            DEFAULT_MEMBER_DEVICE_RANK.into(),
         )
         .await
         .expect_err("expected add_device with initial role to fail without AddDevice permission");
