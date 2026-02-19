@@ -16,6 +16,11 @@ unused_lifetimes = "warn"
 unused_qualifications = "warn"
 
 [lints.clippy]
+arithmetic_side_effects = "warn"
+cast_lossless = "warn"
+cast_possible_wrap = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
 dbg_macro = "deny"
 expect_used = "deny"
 implicit_clone = "warn"
@@ -24,8 +29,11 @@ needless_pass_by_value = "warn"
 panic = "deny"
 redundant_closure_for_method_calls = "warn"
 todo = "deny"
+undocumented_unsafe_blocks = "warn"
 unimplemented = "deny"
+unsafe_derive_deserialize = "warn"
 unwrap_used = "deny"
+wildcard_imports = "warn"
 
 [features]
 default = [

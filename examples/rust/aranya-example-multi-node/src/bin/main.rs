@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
             .join("uds.sock");
 
         let mut child =
-            client(device.name.clone(), &uds_sock, &release).context("expected to spawn client")?;
+            client(&device.name, &uds_sock, &release).context("expected to spawn client")?;
         // Spawn device process and collect exit status.
         processes.spawn(async move {
             let status = child.wait().await.context("expected exit status")?;
@@ -104,8 +104,8 @@ fn daemon(release: &Path, cfg: &Path) -> Result<Child> {
 }
 
 // Spawn a client child process.
-fn client(device: String, uds_sock: &Path, release: &Path) -> Result<Child> {
-    let child = Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
+fn client(device: &str, uds_sock: &Path, release: &Path) -> Result<Child> {
+    let child = Command::new(release.join(format!("aranya-example-multi-node-{device}")))
         .kill_on_drop(true)
         .arg("--uds-sock")
         .arg(uds_sock)
