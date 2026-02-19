@@ -8,7 +8,7 @@ pub(crate) trait SyncStream: Send + Sync + 'static {
     fn peer(&self) -> super::SyncPeer;
 
     async fn send(&mut self, data: &[u8]) -> Result<(), Self::Error>;
-    async fn receive(&mut self, buffer: &mut Vec<u8>) -> Result<(), Self::Error>;
+    async fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, Self::Error>;
     async fn finish(&mut self) -> Result<(), Self::Error>;
 }
 

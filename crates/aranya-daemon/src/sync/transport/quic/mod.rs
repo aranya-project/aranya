@@ -45,6 +45,8 @@ pub(crate) enum Error {
     Receive(std::io::Error),
     #[error(transparent)]
     Finish(s2n_quic::stream::Error),
+    #[error("message exceeds buffer capacity")]
+    MessageTooLarge,
 
     /// QUIC client endpoint start error
     #[error("could not start QUIC client")]

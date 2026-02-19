@@ -74,7 +74,7 @@ where
     async fn handle_stream<S: SyncStream>(&self, mut stream: S) -> Result<(), Error> {
         trace!("received sync request");
 
-        let mut buf = Vec::with_capacity(MAX_SYNC_MESSAGE_SIZE);
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         stream.receive(&mut buf).await.map_err(Error::transport)?;
         trace!(n = buf.len(), "received request bytes");
 
@@ -127,9 +127,9 @@ where
             }
         };
 
-        buf.clear();
-        postcard::to_io(&response, &mut buf).context("postcard serialization failed")?;
-        stream.send(&buf).await.map_err(Error::transport)?;
+        let data =
+            postcard::to_slice(&response, &mut buf).context("postcard serialization failed")?;
+        stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         trace!(n = buf.len(), "sent response");

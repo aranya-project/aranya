@@ -214,9 +214,6 @@ where
         peer: SyncPeer,
         sync_type: SyncType,
     ) -> Result<()> {
-        // Serialize the message
-        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
-
         // Connect to the peer
         let mut stream = self
             .transport
@@ -224,19 +221,19 @@ where
             .await
             .map_err(Error::transport)?;
 
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+
         // Send the message
-        stream.send(&data).await.map_err(Error::transport)?;
+        let data =
+            postcard::to_slice(&sync_type, &mut buf).context("postcard serialization failed")?;
+        stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         // Read the response to avoid race condition with server
-        let mut response_buf = Vec::new();
-        stream
-            .receive(&mut response_buf)
-            .await
-            .map_err(Error::transport)?;
-        match response_buf.is_empty() {
-            true => Err(Error::EmptyResponse),
-            false => Ok(()),
+        match stream.receive(&mut buf).await {
+            Ok(0) => Err(Error::EmptyResponse),
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error::transport(e)),
         }
     }
 
@@ -466,16 +463,16 @@ where
                 .context("sync poll failed")?;
             len
         };
-        buf.truncate(len);
 
-        stream.send(&buf).await.map_err(Error::transport)?;
+        let buffer = buf.get(..len).assume("valid offset")?;
+        stream.send(buffer).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
-        buf.clear();
-        stream.receive(&mut buf).await.map_err(Error::transport)?;
+        let len = stream.receive(&mut buf).await.map_err(Error::transport)?;
 
         // process the sync response.
-        let resp = postcard::from_bytes(&buf).context("failed to deserialize sync response")?;
+        let buffer = buf.get(..len).assume("valid offset")?;
+        let resp = postcard::from_bytes(buffer).context("failed to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
             SyncResponse::Err(msg) => return Err(anyhow::anyhow!("sync error: {msg}").into()),

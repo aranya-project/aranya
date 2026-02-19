@@ -1,3 +1,4 @@
+use buggy::BugExt as _;
 use bytes::Bytes;
 use futures_util::AsyncReadExt as _;
 use s2n_quic::stream::{BidirectionalStream, ReceiveStream, SendStream};
@@ -26,20 +27,32 @@ impl SyncStream for QuicStream {
     }
 
     async fn send(&mut self, data: &[u8]) -> Result<(), Self::Error> {
+        let len: u32 = data.len().try_into().map_err(|_| Error::MessageTooLarge)?;
+        self.send
+            .send(Bytes::copy_from_slice(&len.to_be_bytes()))
+            .await
+            .map_err(Error::Send)?;
         self.send
             .send(Bytes::copy_from_slice(data))
             .await
-            .map_err(Error::Send)?;
-        Ok(())
+            .map_err(Error::Send)
     }
 
-    async fn receive(&mut self, buffer: &mut Vec<u8>) -> Result<(), Self::Error> {
-        buffer.clear();
+    async fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, Self::Error> {
+        let mut len_buf = [0u8; 4];
         self.recv
-            .read_to_end(buffer)
+            .read_exact(&mut len_buf)
             .await
             .map_err(Error::Receive)?;
-        Ok(())
+        let len = u32::from_be_bytes(len_buf) as usize;
+
+        if len > buffer.len() {
+            return Err(Error::MessageTooLarge);
+        }
+
+        let buf = buffer.get_mut(..len).assume("valid offset")?;
+        self.recv.read_exact(buf).await.map_err(Error::Receive)?;
+        Ok(len)
     }
 
     async fn finish(&mut self) -> Result<(), Self::Error> {
