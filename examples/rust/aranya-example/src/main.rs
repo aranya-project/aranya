@@ -420,7 +420,12 @@ async fn main() -> Result<()> {
         role_perms.len(),
         role_perms
     );
-    info!("confirmed CanUseAfc is in the permission list");
+    anyhow::ensure!(
+        role_perms
+            .iter()
+            .any(|p| matches!(p, Permission::CanUseAfc)),
+        "expected custom role to have CanUseAfc permission"
+    );
 
     // Assign custom role to a device.
     info!("assigning custom role to a device");
