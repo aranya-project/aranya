@@ -123,7 +123,9 @@ fn scale_bytes(bytes: u64) -> String {
 
     while value >= 1024.0 && unit_index < UNITS.len() {
         value /= 1024.0;
-        unit_index += 1;
+        unit_index = unit_index
+            .checked_add(1)
+            .expect("unit index should not overflow");
     }
 
     if unit_index == 0 {
@@ -263,8 +265,14 @@ impl ProcessMetricsCollector {
             physical_memory_bytes: current.physical_memory_bytes,
             virtual_memory_bytes: current.virtual_memory_bytes,
             // These need to be cumulative since sysinfo only returns bytes since last refresh.
-            disk_read_bytes: self.total_metrics.disk_read_bytes + current.disk_read_bytes,
-            disk_write_bytes: self.total_metrics.disk_write_bytes + current.disk_write_bytes,
+            disk_read_bytes: self
+                .total_metrics
+                .disk_read_bytes
+                .saturating_add(current.disk_read_bytes),
+            disk_write_bytes: self
+                .total_metrics
+                .disk_write_bytes
+                .saturating_add(current.disk_write_bytes),
         };
 
         debug!("Total Metrics: {}", self.total_metrics);

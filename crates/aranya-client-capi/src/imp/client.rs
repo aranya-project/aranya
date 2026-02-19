@@ -1,6 +1,6 @@
 use core::mem::MaybeUninit;
 
-use aranya_client::KeyBundle;
+use aranya_client::PublicKeyBundle;
 
 use crate::imp;
 
@@ -11,13 +11,13 @@ pub struct Client {
     pub(crate) rt: tokio::runtime::Runtime,
 }
 
-/// Serializes a [`KeyBundle`] into the output buffer.
-pub unsafe fn key_bundle_serialize(
-    keybundle: &KeyBundle,
+/// Serializes a [`PublicKeyBundle`] into the output buffer.
+pub unsafe fn public_key_bundle_serialize(
+    public_key_bundle: &PublicKeyBundle,
     buf: *mut MaybeUninit<u8>,
     buf_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let data = postcard::to_allocvec(&keybundle)?;
+    let data = postcard::to_allocvec(&public_key_bundle)?;
 
     if *buf_len < data.len() {
         *buf_len = data.len();
@@ -33,7 +33,7 @@ pub unsafe fn key_bundle_serialize(
     Ok(())
 }
 
-/// Deserializes key bundle buffer into a [`KeyBundle`].
-pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
+/// Deserializes key bundle buffer into a [`PublicKeyBundle`].
+pub fn public_key_bundle_deserialize(buf: &[u8]) -> Result<PublicKeyBundle, imp::Error> {
     Ok(postcard::from_bytes(buf)?)
 }
