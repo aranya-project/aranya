@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use aranya_client::{client::ChanOp, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
     })
     .retry(ExponentialBuilder::default())
     .await
-    .expect("expected to initialize client");
+    .context("expected to initialize client")?;
     info!("operator: initialized client");
 
     // Get team info from owner.
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
+        sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
     let operator_role = team
         .roles()
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
+        sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
     info!("operator: detected that all devices have been added to team and operator role has been assigned");
 

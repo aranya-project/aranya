@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use aranya_example_multi_node::{config::create_config, env::EnvVars, tracing::init_tracing};
 use tempfile::tempdir;
 use tokio::{
@@ -51,11 +51,11 @@ async fn main() -> Result<()> {
         info!("generating daemon config file for {}", device.name);
         let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path())
             .await
-            .expect("expected to generate daemon config file");
+            .context("expected to generate daemon config file")?;
 
         // Start daemon.
         info!("starting {} daemon", device.name);
-        let child = daemon(&release, &cfg).expect("expected to spawn daemon");
+        let child = daemon(&release, &cfg).context("expected to spawn daemon")?;
         daemons.push(child);
     }
     // Wait for daemons to start.
@@ -73,11 +73,12 @@ async fn main() -> Result<()> {
             .join("uds.sock");
 
         let mut child =
-            client(device.name.clone(), &uds_sock, &release).expect("expected to spawn client");
+            client(device.name.clone(), &uds_sock, &release).context("expected to spawn client")?;
         // Spawn device process and collect exit status.
         processes.spawn(async move {
-            let status = child.wait().await.expect("expected exit status");
-            assert!(status.success(), "{status:?}");
+            let status = child.wait().await.context("expected exit status")?;
+            ensure!(status.success(), "child process failed: {status:?}");
+            Ok::<(), anyhow::Error>(())
         });
     }
     // Wait for all device processes to complete.
