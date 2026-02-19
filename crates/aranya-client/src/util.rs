@@ -1,4 +1,15 @@
 use aranya_id::{Id, IdTag};
+use std::time::{Duration, Instant};
+use tarpc::context;
+use tarpc::trace::TraceId as TarpcTraceId;
+use tarpc::trace::{Context as TraceContext, SamplingDecision, SpanId};
+
+use crate::trace::TraceId;
+
+/// IPC timeout of 1 year (365 days).
+/// A large value helps resolve IPC calls timing out when there are long-running
+/// operations happening in the daemon.
+const IPC_TIMEOUT: Duration = Duration::from_secs(365 * 24 * 60 * 60);
 
 pub(crate) trait ApiId<A> {}
 pub(crate) trait ApiConv<A> {
@@ -188,3 +199,42 @@ macro_rules! impl_vec_into_iter_wrapper {
     };
 }
 pub(crate) use impl_vec_into_iter_wrapper;
+
+/// Creates a new tarpc context with trace metadata.
+///
+/// This function generates a fresh context for each RPC call, including
+/// a unique trace ID that will be propagated through the daemon and
+/// correlated in all logs.
+///
+/// The trace ID is generated client-side and logged, enabling end-to-end
+/// request tracking across client and daemon components.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use aranya_client::util::rpc_context;
+/// let ctx = rpc_context();
+/// client.create_team(ctx, cfg).await?;
+/// ```
+///
+/// # How It Works
+///
+/// - Gets current tarpc context
+/// - Generates unique trace_id
+/// - Logs the trace ID for client-side tracing
+/// - Returns context for use in RPC calls
+pub(crate) fn rpc_context() -> context::Context {
+    let mut ctx = context::current();
+    ctx.deadline = Instant::now()
+        .checked_add(IPC_TIMEOUT)
+        .expect("IPC_TIMEOUT should not overflow");
+    let mut rng = rand::thread_rng();
+    ctx.trace_context = TraceContext {
+        trace_id: TarpcTraceId::random(&mut rng),
+        span_id: SpanId::random(&mut rng),
+        sampling_decision: SamplingDecision::Sampled,
+    };
+    let trace_id = TraceId::new();
+    tracing::debug!(%trace_id, "generated RPC context with tarpc trace");
+    ctx
+}

@@ -44,6 +44,7 @@ buggy = { workspace = true, features = ["std"] }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
