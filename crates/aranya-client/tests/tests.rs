@@ -529,13 +529,12 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
         .context("admin should be able to add device with member role (admin outranks member)")?;
 
     // Admin should fail when trying to add a device with the owner role
-    // because admin (rank DEFAULT_ADMIN_DEVICE_RANK) does not outrank the owner role.
-    // Device rank is arbitrary here — the check fails on the role rank.
+    // because admin does not outrank the owner role.
     match admin_team
         .add_device_with_rank(
             devices.memberb.pk.clone(),
             Some(roles.owner().id),
-            900.into(),
+            DEFAULT_MEMBER_DEVICE_RANK.into(),
         )
         .await
     {
