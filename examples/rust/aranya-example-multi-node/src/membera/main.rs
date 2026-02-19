@@ -192,7 +192,10 @@ async fn main() -> Result<()> {
             .context("ciphertext must be larger than overhead")?
     ];
     opener.open(&mut msg_recv, &resp)?;
-    ensure!(msg_send.as_slice() == msg_recv.as_slice(), "decrypted message does not match");
+    ensure!(
+        msg_send.as_slice() == msg_recv.as_slice(),
+        "decrypted message does not match"
+    );
     info!("membera: received AFC data");
 
     info!("membera: complete");

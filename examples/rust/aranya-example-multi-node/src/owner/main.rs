@@ -76,7 +76,11 @@ async fn main() -> Result<()> {
         let mut roles = roles.iter();
         let owner_role = roles.next().context("missing role")?;
         ensure!(roles.next().is_none(), "unexpected extra roles");
-        ensure!(owner_role.name == "owner", "expected owner role, got {}", owner_role.name);
+        ensure!(
+            owner_role.name == "owner",
+            "expected owner role, got {}",
+            owner_role.name
+        );
         team.setup_default_roles(owner_role.id)
             .await
             .context("could not set up default roles")?;

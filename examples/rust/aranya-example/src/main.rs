@@ -535,7 +535,10 @@ async fn main() -> Result<()> {
         .open(&mut plaintext, &ciphertext)
         .context("expected to open afc data")?;
     info!(?plaintext, "memberb opened data from membera");
-    ensure!(afc_msg == plaintext, "decrypted plaintext does not match original message");
+    ensure!(
+        afc_msg == plaintext,
+        "decrypted plaintext does not match original message"
+    );
 
     // seal/open again to get a new sequence number.
     send.seal(&mut ciphertext, afc_msg)
@@ -545,7 +548,10 @@ async fn main() -> Result<()> {
         .open(&mut plaintext, &ciphertext)
         .context("expected to open afc data")?;
     info!(?plaintext, "memberb opened data from membera");
-    ensure!(afc_msg == plaintext, "decrypted plaintext does not match original message");
+    ensure!(
+        afc_msg == plaintext,
+        "decrypted plaintext does not match original message"
+    );
 
     // AFC sequence numbers should be ascending.
     ensure!(seq2 > seq1, "AFC sequence numbers should be ascending");
