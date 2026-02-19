@@ -420,7 +420,7 @@ async fn main() -> Result<()> {
         role_perms.len(),
         role_perms
     );
-    anyhow::ensure!(
+    assert!(
         role_perms
             .iter()
             .any(|p| matches!(p, Permission::CanUseAfc)),
