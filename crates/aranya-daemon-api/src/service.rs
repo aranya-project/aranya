@@ -305,16 +305,12 @@ pub enum ChanOp {
 /// backward compatibility. Existing permissions will not be removed or
 /// renamed.
 ///
-/// # Deprecation Strategy
+/// # Deprecation
 ///
-/// When a permission needs to be deprecated:
-///
-/// 1. Mark the variant with `#[deprecated(since = "X.Y.Z", note = "reason")]`
-/// 2. Keep the variant in the enum so existing code continues to compile
-/// 3. Keep the corresponding permission in `policy.md` so enum conversions
-///    between APIs and the policy continue to work
-/// 4. Log a `warn!` message when the deprecated permission is used
-/// 5. Document the migration path in the deprecation note
+/// Deprecated variants are marked with `#[deprecated]` and will emit
+/// compiler warnings when used. They remain in the enum for backward
+/// compatibility — see the deprecation note on each variant for the
+/// migration path.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Perm {
     // # Team management

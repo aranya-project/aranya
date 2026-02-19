@@ -495,7 +495,8 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let admin_team = devices.admin.client.team(team_id);
 
-    // Give admin the AssignRole permission so it can add devices with initial roles.
+    // Admin already has AddDevice from setup_default_roles, but needs AssignRole
+    // to add a device with an initial role assignment.
     owner_team
         .add_perm_to_role(roles.admin().id, Permission::AssignRole)
         .await
@@ -527,8 +528,9 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
         .await
         .context("admin should be able to add device with member role (admin outranks member)")?;
 
-    // Admin (rank 799) should fail when trying to add a device with the owner role
-    // because admin does not outrank the owner role.
+    // Admin should fail when trying to add a device with the owner role
+    // because admin (rank DEFAULT_ADMIN_DEVICE_RANK) does not outrank the owner role.
+    // Device rank is arbitrary here — the check fails on the role rank.
     match admin_team
         .add_device_with_rank(
             devices.memberb.pk.clone(),
@@ -1647,7 +1649,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
 
     // Admin cannot add operator
     admin_team
-        .add_device_with_rank(devices.operator.pk, None, DEFAULT_LABEL_RANK.into())
+        .add_device_with_rank(devices.operator.pk, None, DEFAULT_OPERATOR_DEVICE_RANK.into())
         .await
         .expect_err("admin should not be able to add operator");
 

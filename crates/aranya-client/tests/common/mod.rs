@@ -116,7 +116,7 @@ impl DevicesCtx {
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         owner_team
-            .add_device_with_rank(self.admin.pk.clone(), Some(roles.admin().id), 799.into())
+            .add_device_with_rank(self.admin.pk.clone(), Some(roles.admin().id), DEFAULT_ADMIN_DEVICE_RANK.into())
             .await?;
 
         // Add the operator as a new device.
@@ -125,20 +125,20 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.operator.pk.clone(),
                 Some(roles.operator().id),
-                699.into(),
+                DEFAULT_OPERATOR_DEVICE_RANK.into(),
             )
             .await?;
 
         // Add member A as a new device.
         info!("adding membera to team");
         owner_team
-            .add_device_with_rank(self.membera.pk.clone(), Some(roles.member().id), 599.into())
+            .add_device_with_rank(self.membera.pk.clone(), Some(roles.member().id), DEFAULT_MEMBER_DEVICE_RANK.into())
             .await?;
 
         // Add member B as a new device.
         info!("adding memberb to team");
         owner_team
-            .add_device_with_rank(self.memberb.pk.clone(), Some(roles.member().id), 599.into())
+            .add_device_with_rank(self.memberb.pk.clone(), Some(roles.member().id), DEFAULT_MEMBER_DEVICE_RANK.into())
             .await?;
 
         // Make sure all see the configuration change.
