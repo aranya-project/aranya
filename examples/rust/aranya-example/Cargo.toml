@@ -16,8 +16,11 @@ unused_lifetimes = "warn"
 unused_qualifications = "warn"
 
 [lints.clippy]
+dbg_macro = "deny"
 expect_used = "deny"
 panic = "deny"
+todo = "deny"
+unimplemented = "deny"
 unwrap_used = "deny"
 
 [features]
