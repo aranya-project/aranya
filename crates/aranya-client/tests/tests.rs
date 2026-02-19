@@ -1648,7 +1648,11 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
 
     // Admin cannot add operator
     admin_team
-        .add_device_with_rank(devices.operator.pk, None, DEFAULT_OPERATOR_DEVICE_RANK.into())
+        .add_device_with_rank(
+            devices.operator.pk,
+            None,
+            DEFAULT_OPERATOR_DEVICE_RANK.into(),
+        )
         .await
         .expect_err("admin should not be able to add operator");
 
