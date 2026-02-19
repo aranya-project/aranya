@@ -1672,7 +1672,9 @@ async fn test_delete_role() -> Result<()> {
     Ok(())
 }
 
-/// Prevents devices from assigning roles to themselves.
+/// A device cannot assign a role to itself. The rank system enforces this:
+/// `author_can_operate_on_target` uses strict `>`, so a device never
+/// outranks itself and the operation is rejected.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
@@ -1681,6 +1683,8 @@ async fn test_assign_role_self_rejected() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    // Owner tries to assign a role to itself. Fails because the policy
+    // requires the author to strictly outrank the target device.
     match owner_team
         .device(devices.owner.id)
         .assign_role(roles.owner().id)
@@ -1694,7 +1698,9 @@ async fn test_assign_role_self_rejected() -> Result<()> {
     Ok(())
 }
 
-/// Prevents the sole owner from revoking its own owner role.
+/// The sole owner cannot revoke its own owner role. The rank system
+/// prevents self-operations (strict `>` means a device never outranks
+/// itself), and the policy also prevents removing the last owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
@@ -1716,7 +1722,9 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     Ok(())
 }
 
-/// Test that a role cannot be assigned if a role is already assigned.
+/// A device that already has a role cannot be assigned another role.
+/// The policy rejects the operation because an existing role assignment
+/// already exists for the target device.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_cannot_assign_role_twice() -> Result<()> {
     let mut devices = DevicesCtx::new("test_cannot_assign_role_twice").await?;
@@ -1740,7 +1748,9 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
     Ok(())
 }
 
-/// Deleting a label requires `DeleteLabel` and label management rights.
+/// Deleting a label requires `DeleteLabel` permission and sufficient rank.
+/// An operator without `DeleteLabel` cannot delete a label even if it
+/// outranks the label.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_delete_label_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_label_requires_permission").await?;
@@ -1770,7 +1780,9 @@ async fn test_delete_label_requires_permission() -> Result<()> {
     Ok(())
 }
 
-/// Devices cannot assign labels to themselves.
+/// A device cannot assign a label to itself. The rank system enforces this:
+/// `author_can_operate_on_target` uses strict `>`, so a device never
+/// outranks itself and the operation is rejected.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
@@ -1785,6 +1797,9 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
         .create_label_with_rank(text!("device-self-label"), DEFAULT_LABEL_RANK.into())
         .await?;
 
+    // Owner tries to assign a label to itself. This fails because the policy
+    // requires the author to strictly outrank the target device, and a device
+    // can never outrank itself (rank comparison uses `>`).
     match owner_team
         .device(owner_id)
         .assign_label(label, ChanOp::SendRecv)
