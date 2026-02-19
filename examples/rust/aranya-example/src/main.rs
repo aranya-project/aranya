@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context as _, Result};
+use anyhow::{ensure, Context as _, Result};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, PublicKeyBundle},
@@ -189,7 +189,7 @@ async fn main() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval
         .checked_mul(6)
-        .expect("sleep interval should not overflow");
+        .context("sleep interval should not overflow")?;
     let sync_cfg = {
         let mut builder = SyncPeerConfig::builder();
         builder = builder.interval(sync_interval);
@@ -460,7 +460,7 @@ async fn main() -> Result<()> {
     let devices = membera_team.devices().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let owner_device = owner_team.device(owner.id);
-    let owner_role = owner_device.role().await?.expect("expected owner role");
+    let owner_role = owner_device.role().await?.context("expected owner role")?;
     info!("owner role: {:?}", owner_role);
     let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
@@ -493,7 +493,7 @@ async fn main() -> Result<()> {
     let (mut send, ctrl) = membera_afc
         .create_channel(team_id, memberb.id, label3)
         .await
-        .expect("expected to create afc send channel");
+        .context("expected to create afc send channel")?;
     info!("created afc channel: {}", send.id());
 
     // memberb receives AFC channel.
@@ -502,7 +502,7 @@ async fn main() -> Result<()> {
     let recv = memberb_afc
         .accept_channel(team_id, ctrl)
         .await
-        .expect("expected to receive afc channel");
+        .context("expected to receive afc channel")?;
     info!("received afc channel: {}", recv.id());
 
     // membera seals data for memberb.
@@ -513,10 +513,10 @@ async fn main() -> Result<()> {
         afc_msg
             .len()
             .checked_add(afc::Channels::OVERHEAD)
-            .expect("AFC overhead should not overflow")
+            .context("AFC overhead should not overflow")?
     ];
     send.seal(&mut ciphertext, afc_msg)
-        .expect("expected to seal afc data");
+        .context("expected to seal afc data")?;
     info!(?afc_msg, "membera sealed data for memberb");
 
     // This is where membera would send the ciphertext to memberb via the network.
@@ -528,27 +528,33 @@ async fn main() -> Result<()> {
         ciphertext
             .len()
             .checked_sub(afc::Channels::OVERHEAD)
-            .expect("ciphertext must be larger than overhead")
+            .context("ciphertext must be larger than overhead")?
     ];
     info!("memberb opening data from membera");
     let seq1 = recv
         .open(&mut plaintext, &ciphertext)
-        .expect("expected to open afc data");
+        .context("expected to open afc data")?;
     info!(?plaintext, "memberb opened data from membera");
-    assert_eq!(afc_msg, plaintext);
+    ensure!(
+        afc_msg == plaintext,
+        "decrypted plaintext does not match original message"
+    );
 
     // seal/open again to get a new sequence number.
     send.seal(&mut ciphertext, afc_msg)
-        .expect("expected to seal afc data");
+        .context("expected to seal afc data")?;
     info!(?afc_msg, "membera sealed data for memberb");
     let seq2 = recv
         .open(&mut plaintext, &ciphertext)
-        .expect("expected to open afc data");
+        .context("expected to open afc data")?;
     info!(?plaintext, "memberb opened data from membera");
-    assert_eq!(afc_msg, plaintext);
+    ensure!(
+        afc_msg == plaintext,
+        "decrypted plaintext does not match original message"
+    );
 
     // AFC sequence numbers should be ascending.
-    assert!(seq2 > seq1);
+    ensure!(seq2 > seq1, "AFC sequence numbers should be ascending");
 
     // delete the channels
     info!("deleting afc channels");

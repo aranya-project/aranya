@@ -1,10 +1,8 @@
 //! Owner device.
 
-#![allow(clippy::panic)]
-
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{ensure, Context as _, Result};
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -50,7 +48,7 @@ async fn main() -> Result<()> {
     })
     .retry(ExponentialBuilder::default())
     .await
-    .expect("expected to initialize client");
+    .context("expected to initialize client")?;
     info!("owner: initialized client");
 
     // Create team.
@@ -69,21 +67,23 @@ async fn main() -> Result<()> {
     let team = client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .context("expected to create team")?;
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 
     {
-        let roles = team.roles().await.expect("could not query roles");
+        let roles = team.roles().await.context("could not query roles")?;
         let mut roles = roles.iter();
-        let owner_role = roles.next().expect("missing role");
-        if roles.next().is_some() {
-            panic!("unexpected roles");
-        }
-        assert_eq!(owner_role.name, "owner");
+        let owner_role = roles.next().context("missing role")?;
+        ensure!(roles.next().is_none(), "unexpected extra roles");
+        ensure!(
+            owner_role.name == "owner",
+            "expected owner role, got {}",
+            owner_role.name
+        );
         team.setup_default_roles(owner_role.id)
             .await
-            .expect("could not set up default roles");
+            .context("could not set up default roles")?;
     }
 
     // Send team ID and IKM to each device except for itself.
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
         team.device(info.device_id)
             .assign_role(role.id)
             .await
-            .expect("expected to assign role");
+            .context("expected to assign role")?;
         info!(
             "owner: assigned role {:?} to device {}",
             device.role, device.name
