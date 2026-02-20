@@ -37,56 +37,56 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.aranya-afc-util]]
-version = "0.20.0"
-when = "2026-01-23"
+version = "0.21.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.6.1"
-when = "2026-01-23"
+version = "0.7.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.7.1"
-when = "2026-01-23"
+version = "0.8.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-macro]]
-version = "0.6.1"
-when = "2026-01-23"
+version = "0.7.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.12.1"
-when = "2026-01-06"
+version = "0.13.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.19.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.19.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.19.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.17.2"
-when = "2026-01-23"
+version = "0.18.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -97,8 +97,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.19.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -127,56 +127,56 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.19.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ast]]
-version = "0.12.0"
-when = "2026-01-23"
+version = "0.12.1"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.19.0"
-when = "2026-01-23"
+version = "0.20.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.13.0"
-when = "2026-01-23"
+version = "0.14.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.19.0"
-when = "2026-01-23"
+version = "0.20.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.12.1"
-when = "2026-01-23"
+version = "0.13.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-macro]]
-version = "0.5.0"
-when = "2025-11-05"
+version = "0.6.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.12.0"
-when = "2026-01-23"
+version = "0.13.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.18.1"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -193,14 +193,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.18.0"
-when = "2026-01-23"
+version = "0.19.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.19.0"
-when = "2026-01-23"
+version = "0.20.0"
+when = "2026-02-17"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -288,8 +288,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.spideroak-crypto]]
-version = "0.6.0"
-when = "2025-06-17"
+version = "0.7.0"
+when = "2026-02-13"
 user-id = 293722
 user-login = "aranya-project-bot"
 
