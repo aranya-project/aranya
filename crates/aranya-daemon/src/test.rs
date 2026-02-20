@@ -61,6 +61,10 @@ use crate::{
 //   - Operator role: 700
 //   - Member role:   600
 
+/// Maximum rank value as defined in policy.md.
+const MAX_RANK: i64 = 1_000_000;
+/// Default owner role rank as defined in policy.md.
+const DEFAULT_OWNER_ROLE_RANK: i64 = MAX_RANK - 1;
 /// Default admin role rank as defined in policy.md.
 const DEFAULT_ADMIN_ROLE_RANK: i64 = 800;
 /// Default operator role rank as defined in policy.md.
@@ -821,10 +825,10 @@ async fn test_create_label_requires_valid_rank() -> Result<()> {
 
     let owner = team.owner;
 
-    // Create a label with owner rank (999,999)
+    // Create a label with owner role rank
     owner
         .actions()
-        .create_label_with_rank(text!("TEST_LABEL"), 999_999.into())
+        .create_label_with_rank(text!("TEST_LABEL"), DEFAULT_OWNER_ROLE_RANK.into())
         .await
         .context("label creation with valid rank should succeed")?;
 
@@ -847,7 +851,7 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
 
     let effects = owner
         .actions()
-        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), 999_999.into())
+        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), DEFAULT_OWNER_ROLE_RANK.into())
         .await
         .context("label creation should succeed")?;
     let label_id = effects

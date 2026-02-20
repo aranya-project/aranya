@@ -126,13 +126,13 @@ impl Team<'_> {
         // otherwise fall back to author_rank - 1.
         let rank = match &initial_role {
             Some(role_id) => {
-                let role_obj: ObjectId = ObjectId::transmute(*role_id);
+                let role_obj = ObjectId::transmute(*role_id);
                 let role_rank = self.query_rank(role_obj).await?;
                 Rank::new(role_rank.value().saturating_sub(1))
             }
             None => {
                 let device_id = self.client.get_device_id().await?;
-                let device_obj: ObjectId = ObjectId::transmute(device_id);
+                let device_obj = ObjectId::transmute(device_id);
                 let author_rank = self.query_rank(device_obj).await?;
                 Rank::new(author_rank.value().saturating_sub(1))
             }
@@ -455,7 +455,7 @@ impl Team<'_> {
     ) -> Result<LabelId> {
         // Default to author_rank - 1.
         let device_id = self.client.get_device_id().await?;
-        let device_obj: ObjectId = ObjectId::transmute(device_id);
+        let device_obj = ObjectId::transmute(device_id);
         let author_rank = self.query_rank(device_obj).await?;
         let rank = Rank::new(author_rank.value().saturating_sub(1));
         self.client

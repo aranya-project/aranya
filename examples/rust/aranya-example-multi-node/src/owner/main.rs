@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
 
         // Query the role's rank and set device rank to role_rank - 1.
         // This ensures the device rank is below its role rank as required.
-        let role_obj: ObjectId = ObjectId::transmute(role.id);
+        let role_obj = ObjectId::transmute(role.id);
         let role_rank = team.query_rank(role_obj).await?;
         let device_rank = aranya_client::Rank::new(role_rank.value().saturating_sub(1));
 

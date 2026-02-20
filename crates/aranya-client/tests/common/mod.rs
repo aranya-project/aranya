@@ -43,6 +43,12 @@ pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 //   - Operator role: 700
 //   - Member role:   600
 
+/// Maximum rank value as defined in policy.md.
+#[allow(dead_code)]
+pub const MAX_RANK: i64 = 1_000_000;
+/// Default owner role rank as defined in policy.md.
+#[allow(dead_code)]
+pub const DEFAULT_OWNER_ROLE_RANK: i64 = MAX_RANK - 1;
 /// Default admin role rank as defined in policy.md.
 #[allow(dead_code)]
 pub const DEFAULT_ADMIN_ROLE_RANK: i64 = 800;
@@ -53,6 +59,9 @@ pub const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700;
 #[allow(dead_code)]
 pub const DEFAULT_MEMBER_ROLE_RANK: i64 = 600;
 
+/// Default device rank for the team creator (owner). Equal to MAX_RANK.
+#[allow(dead_code)]
+pub const DEFAULT_OWNER_DEVICE_RANK: i64 = MAX_RANK;
 /// Default device rank for admin devices. Must be < DEFAULT_ADMIN_ROLE_RANK.
 #[allow(dead_code)]
 pub const DEFAULT_ADMIN_DEVICE_RANK: i64 = DEFAULT_ADMIN_ROLE_RANK - 1;

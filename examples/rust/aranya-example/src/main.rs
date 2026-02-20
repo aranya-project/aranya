@@ -436,13 +436,13 @@ async fn main() -> Result<()> {
 
     // Demo query_rank: verify the role has the rank it was created with.
     // Note: Role ranks are immutable after creation.
-    let role_object_id: ObjectId = ObjectId::transmute(custom_role.id);
+    let role_object_id = ObjectId::transmute(custom_role.id);
     let current_rank = owner_team.query_rank(role_object_id).await?;
     info!("custom role rank: {}", current_rank);
     assert_eq!(current_rank, custom_role_rank);
 
     // Demo change_rank on a device: change the custom device's rank.
-    let device_object_id: ObjectId = ObjectId::transmute(custom.id);
+    let device_object_id = ObjectId::transmute(custom.id);
     let device_rank = owner_team.query_rank(device_object_id).await?;
     info!("custom device rank before change: {}", device_rank);
 

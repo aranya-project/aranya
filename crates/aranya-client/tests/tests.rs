@@ -26,7 +26,8 @@ use tracing::{debug, info};
 use crate::common::{
     sleep, DeviceCtx, DevicesCtx, DEFAULT_ADMIN_DEVICE_RANK, DEFAULT_ADMIN_ROLE_RANK,
     DEFAULT_LABEL_RANK, DEFAULT_MEMBER_DEVICE_RANK, DEFAULT_MEMBER_ROLE_RANK,
-    DEFAULT_OPERATOR_DEVICE_RANK, DEFAULT_OPERATOR_ROLE_RANK, SLEEP_INTERVAL,
+    DEFAULT_OPERATOR_DEVICE_RANK, DEFAULT_OPERATOR_ROLE_RANK, DEFAULT_OWNER_DEVICE_RANK,
+    DEFAULT_OWNER_ROLE_RANK, SLEEP_INTERVAL,
 };
 
 /// Tests getting keybundle and device ID.
@@ -1854,7 +1855,7 @@ async fn test_create_role_with_rank() -> Result<()> {
         .create_role(text!("ranked_role"), expected_rank)
         .await?;
 
-    let role_obj: ObjectId = ObjectId::transmute(role.id);
+    let role_obj = ObjectId::transmute(role.id);
     let rank = owner_team.query_rank(role_obj).await?;
     assert_eq!(rank, expected_rank);
 
@@ -1875,7 +1876,7 @@ async fn test_create_label_with_rank() -> Result<()> {
         .create_label_with_rank(text!("ranked_label"), expected_rank)
         .await?;
 
-    let label_obj: ObjectId = ObjectId::transmute(label_id);
+    let label_obj = ObjectId::transmute(label_id);
     let rank = owner_team.query_rank(label_obj).await?;
     assert_eq!(rank, expected_rank);
 
@@ -1896,7 +1897,7 @@ async fn test_change_rank() -> Result<()> {
         .create_label_with_rank(text!("mutable_label"), initial_rank)
         .await?;
 
-    let label_obj: ObjectId = ObjectId::transmute(label);
+    let label_obj = ObjectId::transmute(label);
 
     owner_team
         .change_rank(label_obj, initial_rank, updated_rank)
@@ -1942,7 +1943,7 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let label_obj: ObjectId = ObjectId::transmute(high_label);
+    let label_obj = ObjectId::transmute(high_label);
 
     // Operator tries to change rank of object ranked above it -- should fail
     match operator_team
@@ -2040,7 +2041,7 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
         )
         .await?;
 
-    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
+    let device_obj = ObjectId::transmute(devices.admin.id);
 
     // Try to change device rank above its role rank -- should fail
     match owner_team
@@ -2076,7 +2077,7 @@ async fn test_change_role_rank_rejected() -> Result<()> {
         .create_role(text!("immutable_role"), role_rank)
         .await?;
 
-    let role_obj: ObjectId = ObjectId::transmute(role.id);
+    let role_obj = ObjectId::transmute(role.id);
 
     // Try to change the role's rank -- should fail
     match owner_team.change_rank(role_obj, role_rank, 75.into()).await {
@@ -2209,9 +2210,10 @@ async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
         )
         .await?;
 
-    // Create a high-rank label (same as admin role rank)
+    // Create a label with rank above the operator's rank so the operator can't delete it.
+    let high_label_rank = DEFAULT_OPERATOR_ROLE_RANK + 100;
     let high_label = owner_team
-        .create_label_with_rank(text!("high_label"), DEFAULT_ADMIN_ROLE_RANK.into())
+        .create_label_with_rank(text!("high_label"), high_label_rank.into())
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -2277,7 +2279,7 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let label_obj: ObjectId = ObjectId::transmute(label);
+    let label_obj = ObjectId::transmute(label);
 
     // Operator tries to change label rank to above operator's rank -- should fail
     match operator_team
@@ -2307,7 +2309,7 @@ async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
     let label = owner_team
         .create_label_with_rank(text!("versioned_label"), initial_rank)
         .await?;
-    let label_obj: ObjectId = ObjectId::transmute(label);
+    let label_obj = ObjectId::transmute(label);
 
     // Change rank from initial to updated
     owner_team
@@ -2348,7 +2350,7 @@ async fn test_change_rank_self_demotion() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
+    let device_obj = ObjectId::transmute(devices.admin.id);
 
     // Admin demotes itself
     admin_team
@@ -2390,7 +2392,7 @@ async fn test_change_rank_self_promotion_rejected() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
+    let device_obj = ObjectId::transmute(devices.admin.id);
 
     // Admin tries to promote itself -- should fail
     match admin_team
@@ -2679,7 +2681,7 @@ async fn test_change_rank_device_to_exact_role_rank_allowed() -> Result<()> {
         )
         .await?;
 
-    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
+    let device_obj = ObjectId::transmute(devices.admin.id);
 
     // Change device rank to exactly equal the role rank -- should succeed
     owner_team
@@ -2729,7 +2731,7 @@ async fn test_has_permission_but_insufficient_rank() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     operator_team.sync_now(owner_addr, None).await?;
 
-    let label_obj: ObjectId = ObjectId::transmute(high_label);
+    let label_obj = ObjectId::transmute(high_label);
 
     // Operator has ChangeRank permission but cannot change higher-ranked label
     match operator_team
@@ -2781,7 +2783,7 @@ async fn test_outranks_but_missing_permission() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
     admin_team.sync_now(owner_addr, None).await?;
 
-    let label_obj: ObjectId = ObjectId::transmute(low_label);
+    let label_obj = ObjectId::transmute(low_label);
 
     // Admin outranks the label but lacks ChangeRank permission
     match admin_team
@@ -2822,7 +2824,7 @@ async fn test_deprecated_add_device() -> Result<()> {
     assert!(team_devices.iter().any(|d| *d == devices.admin.id));
 
     // Verify default rank is role_rank - 1 (DEFAULT_ADMIN_ROLE_RANK - 1 = DEFAULT_ADMIN_DEVICE_RANK)
-    let device_obj: ObjectId = ObjectId::transmute(devices.admin.id);
+    let device_obj = ObjectId::transmute(devices.admin.id);
     let rank = owner_team.query_rank(device_obj).await?;
     assert_eq!(
         rank,
@@ -2853,12 +2855,12 @@ async fn test_deprecated_create_label() -> Result<()> {
     let label = owner_team.label(label_id).await?;
     assert!(label.is_some(), "label should exist");
 
-    // Verify default rank is author_rank - 1 (owner device rank 1000000 - 1 = 999999)
-    let label_obj: ObjectId = ObjectId::transmute(label_id);
+    // Verify default rank is author_rank - 1 (DEFAULT_OWNER_DEVICE_RANK - 1 = DEFAULT_OWNER_ROLE_RANK)
+    let label_obj = ObjectId::transmute(label_id);
     let rank = owner_team.query_rank(label_obj).await?;
     assert_eq!(
         rank,
-        999999.into(),
+        DEFAULT_OWNER_ROLE_RANK.into(),
         "deprecated create_label should default to author_rank - 1"
     );
 
