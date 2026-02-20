@@ -45,6 +45,131 @@ async fn run_ring_convergence(config: TestConfig) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: run a custom topology convergence test with the given config
+// ---------------------------------------------------------------------------
+
+async fn run_custom_convergence(config: TestConfig, topology: Topology) -> Result<()> {
+    let mut ctx = TestCtx::new(config, Some(vec![topology])).await?;
+
+    ctx.setup_team().await?;
+    ctx.sync_team_from_owner().await?;
+    ctx.configure_topology().await?;
+    ctx.verify_team_propagation().await?;
+
+    ctx.issue_test_command(NodeIndex(0)).await?;
+    ctx.wait_for_convergence().await?;
+    ctx.report_metrics();
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Custom topology: dual ring with bridge
+// ---------------------------------------------------------------------------
+
+/// Builds a topology of two rings connected by a single bidirectional bridge.
+///
+/// Nodes are split evenly into two rings (ring A = first half, ring B = second
+/// half). Within each ring, every node connects to its clockwise and
+/// counter-clockwise neighbor. A single bridge connects the last node of
+/// ring A to the first node of ring B (bidirectional).
+///
+/// ```text
+///   Ring A: 0 - 1 - 2 - 3 - 4
+///           |               |
+///           +-------+-------+
+///                   |
+///               bridge (4 <-> 5)
+///                   |
+///           +-------+-------+
+///           |               |
+///   Ring B: 5 - 6 - 7 - 8 - 9
+/// ```
+///
+/// Requires `n` to be even and `n >= 6` (each ring needs at least 3 nodes).
+fn dual_ring_bridge_topology(n: usize) -> Vec<Vec<NodeIndex>> {
+    assert!(n >= 6, "dual ring bridge requires at least 6 nodes");
+    assert!(
+        n.is_multiple_of(2),
+        "dual ring bridge requires an even node count"
+    );
+
+    let half = n / 2;
+    let mut peers = vec![vec![]; n];
+
+    // Ring A: nodes [0, half)
+    for (i, node_peers) in peers[..half].iter_mut().enumerate() {
+        let cw = (i + 1) % half;
+        let ccw = (i + half - 1) % half;
+        node_peers.push(NodeIndex(cw));
+        node_peers.push(NodeIndex(ccw));
+    }
+
+    // Ring B: nodes [half, n)
+    for (i, node_peers) in peers[half..].iter_mut().enumerate() {
+        let cw = half + (i + 1) % half;
+        let ccw = half + (i + half - 1) % half;
+        node_peers.push(NodeIndex(cw));
+        node_peers.push(NodeIndex(ccw));
+    }
+
+    // Bridge: last node of ring A <-> first node of ring B
+    let bridge_a = half - 1;
+    let bridge_b = half;
+    peers[bridge_a].push(NodeIndex(bridge_b));
+    peers[bridge_b].push(NodeIndex(bridge_a));
+
+    peers
+}
+
+/// Tests convergence with 10 nodes arranged in two 5-node rings connected
+/// by a single bidirectional bridge, using poll sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_dual_ring_bridge_10_nodes() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("10-node dual ring bridge (poll)")
+        .node_count(10)
+        .sync_mode(SyncMode::Poll {
+            interval: Duration::from_secs(1),
+        })
+        .max_duration(Duration::from_secs(120))
+        .build()?;
+
+    info!(
+        node_count = config.node_count,
+        "Starting 10-node dual ring bridge test (poll mode)"
+    );
+    run_custom_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
+    info!("10-node dual ring bridge convergence test (poll mode) completed successfully");
+    Ok(())
+}
+
+/// Tests convergence with 10 nodes arranged in two 5-node rings connected
+/// by a single bidirectional bridge, using hello sync mode.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_dual_ring_bridge_10_nodes_hello() -> Result<()> {
+    let config = TestConfig::builder()
+        .test_name("10-node dual ring bridge (hello)")
+        .node_count(10)
+        .sync_mode(SyncMode::Hello {
+            debounce: Duration::from_millis(100),
+            subscription_duration: Duration::from_secs(600),
+        })
+        .max_duration(Duration::from_secs(120))
+        .build()?;
+
+    info!(
+        node_count = config.node_count,
+        "Starting 10-node dual ring bridge test (hello mode)"
+    );
+    run_custom_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
+    info!("10-node dual ring bridge convergence test (hello mode) completed successfully");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // 3-node edge-case tests (minimum valid ring)
 // ---------------------------------------------------------------------------
 
