@@ -121,7 +121,13 @@ async fn test_dual_ring_bridge_10_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node dual ring bridge test (poll mode)"
     );
-    run_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
+    run_convergence(
+        config,
+        Topology::Custom {
+            connect: dual_ring_bridge_topology,
+        },
+    )
+    .await?;
     info!("10-node dual ring bridge convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -145,7 +151,13 @@ async fn test_dual_ring_bridge_10_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node dual ring bridge test (hello mode)"
     );
-    run_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
+    run_convergence(
+        config,
+        Topology::Custom {
+            connect: dual_ring_bridge_topology,
+        },
+    )
+    .await?;
     info!("10-node dual ring bridge convergence test (hello mode) completed successfully");
     Ok(())
 }
