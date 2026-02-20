@@ -122,45 +122,7 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node ring test (poll mode)"
     );
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-001
-    //= type=test
-    //# Each node MUST be initialized with a unique daemon instance.
-    let mut ring = TestCtx::new(config, Some(vec![Topology::Ring])).await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-001
-    //= type=test
-    //# A single team MUST be created by node 0 (the designated owner).
-    ring.setup_team().await?;
-
-    // Sync team configuration before setting up ring topology
-    ring.sync_team_from_owner().await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-001
-    //= type=test
-    //# Each node MUST add sync peers according to the configured topology.
-    ring.configure_topology().await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-006
-    //= type=test
-    //# The test MUST verify that all nodes have received the team configuration.
-    ring.verify_team_propagation().await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conv-002
-    //= type=test
-    //# The default source node for label assignment MUST be node 0.
-    ring.issue_test_command(NodeIndex(0)).await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conv-005
-    //= type=test
-    //# The test MUST measure the total convergence time from label assignment to full convergence.
-    ring.wait_for_convergence().await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-003
-    //= type=test
-    //# The test MUST calculate and report the following metrics.
-    ring.report_metrics();
-
+    run_ring_convergence(config).await?;
     info!("10-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -174,13 +136,6 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-010
-    //= type=test
-    //# In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-011
-    //= type=test
-    //# In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
     let config = TestConfig::builder()
         .test_name("10-node ring (hello)")
         .node_count(10)
@@ -195,22 +150,7 @@ async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node ring test (hello mode)"
     );
-
-    let mut ring = TestCtx::new(config, Some(vec![Topology::Ring])).await?;
-
-    ring.setup_team().await?;
-    ring.sync_team_from_owner().await?;
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-006
-    //= type=test
-    //# In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
-    ring.configure_topology().await?;
-    ring.verify_team_propagation().await?;
-
-    ring.issue_test_command(NodeIndex(0)).await?;
-    ring.wait_for_convergence().await?;
-    ring.report_metrics();
-
+    run_ring_convergence(config).await?;
     info!("10-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
