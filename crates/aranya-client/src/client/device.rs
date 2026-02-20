@@ -91,9 +91,9 @@ impl Device<'_> {
 
     /// Removes `device` from the team.
     ///
-    /// A device can always remove itself. Removing another device
-    /// requires the `RemoveDevice` permission and the caller must
-    /// outrank the target device.
+    /// A device can always remove itself. Removing another device requires:
+    /// - `RemoveDevice` permission
+    /// - Caller must outrank the target device
     #[instrument(skip(self))]
     pub async fn remove_from_team(&self) -> Result<()> {
         self.client
@@ -106,8 +106,9 @@ impl Device<'_> {
 
     /// Assigns `role` to `device`.
     ///
-    /// Requires the `AssignRole` permission and the caller must
-    /// outrank both the device and the role.
+    /// Requires:
+    /// - `AssignRole` permission
+    /// - Caller must outrank both the device and the role
     #[instrument(skip(self))]
     pub async fn assign_role(&self, role: RoleId) -> Result<()> {
         self.client
@@ -120,8 +121,9 @@ impl Device<'_> {
 
     /// Revokes `role` from `device`.
     ///
-    /// Requires the `RevokeRole` permission and the caller must
-    /// outrank both the device and the role.
+    /// Requires:
+    /// - `RevokeRole` permission
+    /// - Caller must outrank both the device and the role
     #[instrument(skip(self))]
     pub async fn revoke_role(&self, role: RoleId) -> Result<()> {
         self.client
@@ -134,9 +136,10 @@ impl Device<'_> {
 
     /// Changes the `role` on a `device`.
     ///
-    /// Requires both `RevokeRole` (for the old role) and `AssignRole`
-    /// (for the new role) permissions, and the caller must outrank the
-    /// device and both roles.
+    /// Requires:
+    /// - `RevokeRole` permission (for the old role)
+    /// - `AssignRole` permission (for the new role)
+    /// - Caller must outrank the device and both roles
     #[instrument(skip(self))]
     pub async fn change_role(&self, old_role: RoleId, new_role: RoleId) -> Result<()> {
         self.client
@@ -187,8 +190,9 @@ impl Device<'_> {
 
     /// Assigns `label` to the device.
     ///
-    /// Requires the `AssignLabel` permission and the caller must
-    /// outrank both the device and the label.
+    /// Requires:
+    /// - `AssignLabel` permission
+    /// - Caller must outrank both the device and the label
     #[instrument(skip(self))]
     pub async fn assign_label(&self, label: LabelId, op: ChanOp) -> Result<()> {
         self.client
@@ -207,8 +211,9 @@ impl Device<'_> {
 
     /// Revokes `label` from the device.
     ///
-    /// Requires the `RevokeLabel` permission and the caller must
-    /// outrank both the device and the label.
+    /// Requires:
+    /// - `RevokeLabel` permission
+    /// - Caller must outrank both the device and the label
     #[instrument(skip(self))]
     pub async fn revoke_label(&self, label: LabelId) -> Result<()> {
         self.client

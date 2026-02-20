@@ -114,7 +114,8 @@ impl Team<'_> {
     /// - If an initial role is provided: the role's rank minus one
     /// - If no initial role is provided: the command author's rank minus one
     ///
-    /// Requires the `AddDevice` permission.
+    /// Requires:
+    /// - `AddDevice` permission
     ///
     /// Use [`Self::add_device_with_rank`] to specify an explicit rank.
     #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
@@ -152,8 +153,9 @@ impl Team<'_> {
     /// Adds a device to the team with an optional initial role and
     /// explicit rank.
     ///
-    /// The rank must be less than or equal to the caller's rank.
-    /// Requires the `AddDevice` permission.
+    /// Requires:
+    /// - `AddDevice` permission
+    /// - Rank must be less than or equal to the caller's rank
     #[instrument(skip(self))]
     pub async fn add_device_with_rank(
         &self,
@@ -282,8 +284,9 @@ impl Team<'_> {
 
     /// Creates a new role with the given rank.
     ///
-    /// The rank must be less than or equal to the caller's rank.
-    /// Requires the `CreateRole` permission.
+    /// Requires:
+    /// - `CreateRole` permission
+    /// - Rank must be less than or equal to the caller's rank
     ///
     /// It returns the Role that was created.
     #[instrument(skip(self))]
@@ -301,8 +304,10 @@ impl Team<'_> {
     /// Deletes a role.
     ///
     /// The role must not be assigned to any devices.
-    /// Requires the `DeleteRole` permission and the caller must
-    /// outrank the role.
+    ///
+    /// Requires:
+    /// - `DeleteRole` permission
+    /// - Caller must outrank the role
     #[instrument(skip(self))]
     pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
         self.client
@@ -316,8 +321,9 @@ impl Team<'_> {
 
     /// Adds a permission to a role.
     ///
-    /// Requires the `ChangeRolePerms` permission and the caller must
-    /// outrank the role.
+    /// Requires:
+    /// - `ChangeRolePerms` permission
+    /// - Caller must outrank the role
     #[instrument(skip(self))]
     pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
@@ -331,8 +337,9 @@ impl Team<'_> {
 
     /// Removes a permission from a role.
     ///
-    /// Requires the `ChangeRolePerms` permission and the caller must
-    /// outrank the role.
+    /// Requires:
+    /// - `ChangeRolePerms` permission
+    /// - Caller must outrank the role
     #[instrument(skip(self))]
     pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
@@ -359,9 +366,10 @@ impl Team<'_> {
 
     /// Changes the rank of an object (device or label).
     ///
-    /// Requires the `ChangeRank` permission. The caller must outrank
-    /// the target (unless changing their own rank) and the new rank
-    /// must be less than or equal to the caller's rank.
+    /// Requires:
+    /// - `ChangeRank` permission
+    /// - Caller must outrank the target (unless changing their own rank)
+    /// - New rank must be less than or equal to the caller's rank
     ///
     /// Note: Role ranks cannot be changed after creation. This maintains the
     /// invariant that `role_rank >= device_rank` for all devices assigned to
@@ -432,7 +440,8 @@ impl Team<'_> {
     /// the label is created with a default rank of the command author's
     /// rank minus one.
     ///
-    /// Requires the `CreateLabel` permission.
+    /// Requires:
+    /// - `CreateLabel` permission
     ///
     /// Use [`Self::create_label_with_rank`] to specify an explicit rank.
     #[deprecated(note = "use `create_label_with_rank` to specify an explicit rank")]
@@ -458,8 +467,9 @@ impl Team<'_> {
 
     /// Create a label with an explicit rank.
     ///
-    /// The rank must be less than or equal to the caller's rank.
-    /// Requires the `CreateLabel` permission.
+    /// Requires:
+    /// - `CreateLabel` permission
+    /// - Rank must be less than or equal to the caller's rank
     #[instrument(skip(self))]
     pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
         self.client
@@ -486,8 +496,9 @@ impl Team<'_> {
 
     /// Delete a label.
     ///
-    /// Requires the `DeleteLabel` permission and the caller must
-    /// outrank the label.
+    /// Requires:
+    /// - `DeleteLabel` permission
+    /// - Caller must outrank the label
     #[instrument(skip(self))]
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client

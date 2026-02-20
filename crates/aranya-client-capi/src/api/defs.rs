@@ -1308,9 +1308,10 @@ pub unsafe fn role_owners(
 ///
 /// This will change the device's current role to the new role assigned.
 ///
-/// Requires both `RevokeRole` (for the old role) and `AssignRole`
-/// (for the new role) permissions, and the caller must outrank the
-/// device and both roles.
+/// Requires:
+/// - `RevokeRole` permission (for the old role)
+/// - `AssignRole` permission (for the new role)
+/// - Caller must outrank the device and both roles
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1376,8 +1377,9 @@ pub unsafe fn team_roles(
 
 /// Create a role.
 ///
-/// The rank must be less than or equal to the caller's rank.
-/// Requires the `CreateRole` permission.
+/// Requires:
+/// - `CreateRole` permission
+/// - Rank must be less than or equal to the caller's rank
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1408,8 +1410,10 @@ pub fn create_role(
 /// Delete a role.
 ///
 /// The role must not be assigned to any devices.
-/// Requires the `DeleteRole` permission and the caller must outrank
-/// the role.
+///
+/// Requires:
+/// - `DeleteRole` permission
+/// - Caller must outrank the role
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1426,8 +1430,10 @@ pub fn delete_role(client: &Client, team: &TeamId, role: &RoleId) -> Result<(), 
 /// Add a permission to a role.
 ///
 /// It is an error to add a permission already added to the role.
-/// Requires the `ChangeRolePerms` permission and the caller must
-/// outrank the role.
+///
+/// Requires:
+/// - `ChangeRolePerms` permission
+/// - Caller must outrank the role
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1451,8 +1457,10 @@ pub fn add_perm_to_role(
 /// Remove a permission from a role.
 ///
 /// It is an error to remove a permission not added to the role.
-/// Requires the `ChangeRolePerms` permission and the caller must
-/// outrank the role.
+///
+/// Requires:
+/// - `ChangeRolePerms` permission
+/// - Caller must outrank the role
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1517,8 +1525,9 @@ pub unsafe fn query_role_perms(
 
 /// Assign a role to a device.
 ///
-/// Requires the `AssignRole` permission and the caller must outrank
-/// both the device and the role.
+/// Requires:
+/// - `AssignRole` permission
+/// - Caller must outrank both the device and the role
 ///
 /// It is an error if the device has already been assigned a role.
 /// If you want to assign a different role to a device that already
@@ -1548,8 +1557,9 @@ pub fn assign_role(
 
 /// Revoke a role from a device.
 ///
-/// Requires the `RevokeRole` permission and the caller must outrank
-/// both the device and the role.
+/// Requires:
+/// - `RevokeRole` permission
+/// - Caller must outrank both the device and the role
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1580,7 +1590,8 @@ pub fn revoke_role(
 /// does not allow the user to specify a rank, the label is created with
 /// a default rank of the command author's rank minus one.
 ///
-/// Requires the `CreateLabel` permission.
+/// Requires:
+/// - `CreateLabel` permission
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1609,8 +1620,9 @@ pub fn create_label(
 
 /// Create a channel label with an explicit rank.
 ///
-/// The rank must be less than or equal to the caller's rank.
-/// Requires the `CreateLabel` permission.
+/// Requires:
+/// - `CreateLabel` permission
+/// - Rank must be less than or equal to the caller's rank
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1637,8 +1649,9 @@ pub fn create_label_with_rank(
 
 /// Delete a channel label.
 ///
-/// Requires the `DeleteLabel` permission and the caller must outrank
-/// the label.
+/// Requires:
+/// - `DeleteLabel` permission
+/// - Caller must outrank the label
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1661,9 +1674,10 @@ pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Resul
 /// This preserves the caller's intent to only change the rank under
 /// expected conditions.
 ///
-/// Requires the `ChangeRank` permission. The caller must outrank the
-/// target (unless changing their own rank) and the new rank must be
-/// less than or equal to the caller's rank.
+/// Requires:
+/// - `ChangeRank` permission
+/// - Caller must outrank the target (unless changing their own rank)
+/// - New rank must be less than or equal to the caller's rank
 ///
 /// Note: Role ranks cannot be changed after creation. This maintains
 /// the invariant that `role_rank >= device_rank` for all devices
@@ -1710,8 +1724,9 @@ pub fn query_rank(client: &Client, team: &TeamId, object_id: &ObjectId) -> Resul
 
 /// Assign a label to a device so that it can be used for a channel.
 ///
-/// Requires the `AssignLabel` permission and the caller must outrank
-/// both the device and the label.
+/// Requires:
+/// - `AssignLabel` permission
+/// - Caller must outrank both the device and the label
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1738,8 +1753,9 @@ pub fn assign_label(
 
 /// Revoke a label from a device.
 ///
-/// Requires the `RevokeLabel` permission and the caller must outrank
-/// both the device and the label.
+/// Requires:
+/// - `RevokeLabel` permission
+/// - Caller must outrank both the device and the label
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1887,7 +1903,8 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 /// - If a role is provided: the role's rank minus one
 /// - If no role is provided: the command author's rank minus one
 ///
-/// Requires the `AddDevice` permission.
+/// Requires:
+/// - `AddDevice` permission
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1917,8 +1934,9 @@ pub unsafe fn add_device_to_team(
 
 /// Add a device to the team with an explicit rank.
 ///
-/// The rank must be less than or equal to the caller's rank.
-/// Requires the `AddDevice` permission.
+/// Requires:
+/// - `AddDevice` permission
+/// - Rank must be less than or equal to the caller's rank
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -1949,9 +1967,9 @@ pub unsafe fn add_device_to_team_with_rank(
 
 /// Remove a device from the team.
 ///
-/// A device can always remove itself. Removing another device
-/// requires the `RemoveDevice` permission and the caller must
-/// outrank the target device.
+/// A device can always remove itself. Removing another device requires:
+/// - `RemoveDevice` permission
+/// - Caller must outrank the target device
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -2347,9 +2365,10 @@ const _: () = {
 /// Note that the control message needs to be sent to the other peer using the
 /// transport of your choice to create the other side of the channel.
 ///
-/// Both devices must have the `CanUseAfc` permission and appropriate
-/// channel operations (`SendOnly`, `RecvOnly`, or `SendRecv`) assigned
-/// for the label.
+/// Requires:
+/// - Both devices must have the `CanUseAfc` permission
+/// - Both devices must have appropriate channel operations
+///   (`SendOnly`, `RecvOnly`, or `SendRecv`) assigned for the label
 ///
 /// @param[in]  client the Aranya Client
 /// @param[in]  team_id the team's identifier
