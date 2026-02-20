@@ -3,3 +3,6 @@ reports/
 
 # Requirements extraction output
 requirements/
+
+# Downloaded specification cache
+specifications/

@@ -12,7 +12,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: In poll sync mode, the test MUST support configuring the sync interval between peers.
 
   SECTION: [CONF-005](#conf-005)
-    TEXT[!MUST]: In poll sync mode, the default sync interval MUST be 1 second.
+    TEXT[!MUST,implementation]: In poll sync mode, the default sync interval MUST be 1 second.
 
   SECTION: [CONF-006](#conf-006)
     TEXT[!MUST,implementation]: The test MUST support configuring a maximum test duration timeout.
@@ -36,13 +36,13 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: The test MUST support the Ring topology.
 
   SECTION: [TOPO-002](#topo-002)
-    TEXT[!MUST]: The test MUST support the Custom topology.
+    TEXT[!MUST,implementation]: The test MUST support the Custom topology.
 
   SECTION: [TOPO-003](#topo-003)
-    TEXT[!MUST]: The initial implementation MUST include at least the Ring and Custom topologies.
+    TEXT[!MUST,implementation]: The initial implementation MUST include at least the Ring and Custom topologies.
 
   SECTION: [TOPO-004](#topo-004)
-    TEXT[!MUST]: When multiple topologies are configured, the test MUST apply them sequentially, each topology adding its peers on top of any previously configured peers.
+    TEXT[!MUST,implementation]: When multiple topologies are configured, the test MUST apply them sequentially, each topology adding its peers on top of any previously configured peers.
 
   SECTION: [RING-001](#ring-001)
     TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
@@ -51,19 +51,19 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
 
   SECTION: [CUST-001](#cust-001)
-    TEXT[!MUST]: The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
+    TEXT[!MUST,implementation]: The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
 
   SECTION: [CUST-002](#cust-002)
-    TEXT[!MUST]: The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
+    TEXT[!MUST,implementation]: The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
 
   SECTION: [CUST-003](#cust-003)
-    TEXT[!MUST]: The Custom topology MUST allow defining arbitrary peer relationships between nodes, including topologies such as star, mesh, and hierarchical.
+    TEXT[!MUST,implementation]: The Custom topology MUST allow defining arbitrary peer relationships between nodes, including topologies such as star, mesh, and hierarchical.
 
   SECTION: [CUST-004](#cust-004)
-    TEXT[!MUST]: `TestCtx` MUST provide an `add_sync_peer` method that adds a sync peer relationship between two nodes identified by `NodeIndex`.
+    TEXT[!MUST,implementation]: `TestCtx` MUST provide an `add_sync_peer` method that adds a sync peer relationship between two nodes identified by `NodeIndex`.
 
   SECTION: [CUST-005](#cust-005)
-    TEXT[!MUST]: `TestCtx` MUST provide a `remove_sync_peer` method that removes a sync peer relationship between two nodes identified by `NodeIndex`.
+    TEXT[!MUST,implementation]: `TestCtx` MUST provide a `remove_sync_peer` method that removes a sync peer relationship between two nodes identified by `NodeIndex`.
 
   SECTION: [INIT-001](#init-001)
     TEXT[!MUST,implementation,test]: Each node MUST be initialized with a unique daemon instance.

@@ -49,6 +49,9 @@ pub enum SyncMode {
         /// How frequently each node polls its sync peers.
         //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-004
         //# In poll sync mode, the test MUST support configuring the sync interval between peers.
+
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conf-005
+        //# In poll sync mode, the default sync interval MUST be 1 second.
         interval: Duration,
     },
     /// All nodes use hello notifications to trigger sync on graph changes.
@@ -73,6 +76,16 @@ impl Default for SyncMode {
         Self::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
+        }
+    }
+}
+
+impl SyncMode {
+    /// Returns the default poll sync mode with a 1-second interval.
+    #[allow(dead_code)]
+    pub fn poll_default() -> Self {
+        Self::Poll {
+            interval: Duration::from_secs(1),
         }
     }
 }
@@ -365,16 +378,25 @@ impl ConvergenceTracker {
 
 /// A function that takes the total node count and returns the peer list
 /// for each node. `peers[i]` contains the `NodeIndex`s of node `i`'s sync peers.
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-001
+//# The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
+
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-002
+//# The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
 pub type TopologyConnectFn = fn(usize) -> Vec<Vec<NodeIndex>>;
 
 /// The topology used to connect nodes.
 ///
 /// The enum is expected to grow as additional topologies (star, mesh, etc.)
 /// are added in future extensions.
+//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#topo-003
+//# The initial implementation MUST include at least the Ring and Custom topologies.
 #[derive(Clone)]
 #[allow(dead_code)]
 pub enum Topology {
     Ring,
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-003
+    //# The Custom topology MUST allow defining arbitrary peer relationships between nodes, including topologies such as star, mesh, and hierarchical.
     Custom { connect: TopologyConnectFn },
 }
 
@@ -423,6 +445,8 @@ impl TestCtx {
     }
 
     /// Manually add a sync peer relationship between two nodes.
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-004
+    //# `TestCtx` MUST provide an `add_sync_peer` method that adds a sync peer relationship between two nodes identified by `NodeIndex`.
     pub async fn add_sync_peer(&mut self, from: NodeIndex, to: NodeIndex) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;
         let to_addr = self.nodes[to.0].aranya_local_addr().await?;
@@ -473,6 +497,8 @@ impl TestCtx {
     }
 
     /// Remove a sync peer relationship between two nodes.
+    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-005
+    //# `TestCtx` MUST provide a `remove_sync_peer` method that removes a sync peer relationship between two nodes identified by `NodeIndex`.
     #[allow(dead_code)]
     pub async fn remove_sync_peer(&mut self, from: NodeIndex, to: NodeIndex) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;

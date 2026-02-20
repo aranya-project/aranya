@@ -18,12 +18,18 @@ impl TestCtx {
             None => return Ok(()),
         };
 
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#topo-004
+        //# When multiple topologies are configured, the test MUST apply them sequentially, each topology adding its peers on top of any previously configured peers.
         for topo in &topos {
             match topo {
+                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#topo-001
+                //# The test MUST support the Ring topology.
                 Topology::Ring => {
                     self.configure_ring_topology().await?;
                     self.verify_ring_topology()?;
                 }
+                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#topo-002
+                //# The test MUST support the Custom topology.
                 Topology::Custom { connect } => {
                     let n = self.nodes.len();
                     let peer_map = connect(n);
