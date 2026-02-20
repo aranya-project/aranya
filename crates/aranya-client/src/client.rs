@@ -5,12 +5,7 @@ mod label;
 mod role;
 mod team;
 
-use std::{
-    fmt::Debug,
-    io,
-    path::Path,
-    time::{Duration, Instant},
-};
+use std::{fmt::Debug, io, path::Path};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
@@ -30,7 +25,6 @@ pub use aranya_daemon_api::{
     RoleManagementPerm as RoleManagementPermission, SimplePerm as Permission,
 };
 use aranya_util::{error::ReportExt, Addr};
-use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info};
 #[cfg(feature = "afc")]
@@ -52,13 +46,8 @@ pub use self::{
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
-    util::ApiConv as _,
+    util::{rpc_context, ApiConv as _},
 };
-
-/// IPC timeout of 1 year (365 days).
-// A large value helps resolve IPC calls timing out when there are long-running
-// operations happening in the daemon.
-const IPC_TIMEOUT: Duration = Duration::from_secs(365 * 24 * 60 * 60);
 
 /// Builds a [`Client`].
 #[derive(Debug, Default)]
@@ -132,7 +121,7 @@ impl ClientBuilder<'_> {
             debug!("connected to daemon");
 
             let got = daemon
-                .version(create_ctx())
+                .version(rpc_context())
                 .await
                 .map_err(IpcError::new)?
                 .context("unable to retrieve daemon version")
@@ -152,7 +141,7 @@ impl ClientBuilder<'_> {
             #[cfg(feature = "afc")]
             let afc_keys = {
                 let afc_shm_info = daemon
-                    .afc_shm_info(create_ctx())
+                    .afc_shm_info(rpc_context())
                     .await
                     .map_err(IpcError::new)?
                     .context("unable to retrieve afc shm info")
@@ -210,7 +199,7 @@ impl Client {
     /// Returns the address that the Aranya sync server is bound to.
     pub async fn local_addr(&self) -> Result<Addr> {
         self.daemon
-            .aranya_local_addr(create_ctx())
+            .aranya_local_addr(rpc_context())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -225,7 +214,7 @@ impl Client {
     /// Gets the public key bundle for this device.
     pub async fn get_public_key_bundle(&self) -> Result<PublicKeyBundle> {
         self.daemon
-            .get_public_key_bundle(create_ctx())
+            .get_public_key_bundle(rpc_context())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -235,7 +224,7 @@ impl Client {
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&self) -> Result<DeviceId> {
         self.daemon
-            .get_device_id(create_ctx())
+            .get_device_id(rpc_context())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -246,7 +235,7 @@ impl Client {
     pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
-            .create_team(create_ctx(), cfg.into())
+            .create_team(rpc_context(), cfg.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -277,7 +266,7 @@ impl Client {
         let team_id = TeamId::from_api(cfg.team_id);
 
         self.daemon
-            .add_team(create_ctx(), cfg)
+            .add_team(rpc_context(), cfg)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -290,7 +279,7 @@ impl Client {
     /// Remove a team from local device storage.
     pub async fn remove_team(&self, team_id: TeamId) -> Result<()> {
         self.daemon
-            .remove_team(create_ctx(), team_id.into_api())
+            .remove_team(rpc_context(), team_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -302,15 +291,4 @@ impl Client {
     pub fn afc(&self) -> AfcChannels {
         AfcChannels::new(self.daemon.clone(), self.afc_keys.clone())
     }
-}
-
-/// Returns the current [`Context`](context::Context) with a deadline set to the current time
-/// plus [`IPC_TIMEOUT`].
-pub(crate) fn create_ctx() -> context::Context {
-    let mut ctx = context::current();
-    ctx.deadline = Instant::now()
-        .checked_add(IPC_TIMEOUT)
-        .expect("IPC_TIMEOUT should not overflow");
-
-    ctx
 }

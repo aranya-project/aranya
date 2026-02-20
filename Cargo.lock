@@ -274,6 +274,7 @@ dependencies = [
  "derive-where",
  "futures-util",
  "postcard",
+ "rand 0.8.5",
  "serde",
  "serial_test",
  "spideroak-base58",

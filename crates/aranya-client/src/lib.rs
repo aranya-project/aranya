@@ -30,6 +30,7 @@ pub mod afc;
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod trace;
 mod util;
 
 pub use aranya_policy_text::{text, Text};
