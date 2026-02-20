@@ -151,7 +151,7 @@ impl TestCtx {
 
     /// Performs a manual sync from all nodes to ensure team configuration propagates.
     ///
-    /// This is used during setup before the ring topology is configured.
+    /// This is used during setup before the topology is configured.
     /// Sync failures are expected and retried - Aranya syncs can occasionally fail
     /// and that's normal behavior.
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#err-003
