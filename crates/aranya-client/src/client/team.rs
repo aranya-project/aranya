@@ -149,6 +149,8 @@ impl Team<'_> {
 
     /// Adds a device to the team with an optional initial role and
     /// explicit rank.
+    ///
+    /// The rank must be less than or equal to the caller's rank.
     #[instrument(skip(self))]
     pub async fn add_device_with_rank(
         &self,
@@ -277,6 +279,7 @@ impl Team<'_> {
 
     /// Creates a new role with the given rank.
     ///
+    /// The rank must be less than or equal to the caller's rank.
     /// It returns the Role that was created.
     #[instrument(skip(self))]
     pub async fn create_role(&self, role_name: Text, rank: Rank) -> Result<Role> {
@@ -436,6 +439,8 @@ impl Team<'_> {
     }
 
     /// Create a label with an explicit rank.
+    ///
+    /// The rank must be less than or equal to the caller's rank.
     #[instrument(skip(self))]
     pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
         self.client

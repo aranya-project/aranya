@@ -1376,6 +1376,7 @@ pub unsafe fn team_roles(
 ///
 /// The `owning_role` is the initial owner of the new role.
 ///
+/// The rank must be less than or equal to the caller's rank.
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param[in] client the Aranya Client
@@ -1609,6 +1610,7 @@ pub fn create_label(
 
 /// Create a channel label with an explicit rank.
 ///
+/// The rank must be less than or equal to the caller's rank.
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param[in] client the Aranya Client
@@ -1913,6 +1915,7 @@ pub unsafe fn add_device_to_team(
 
 /// Add a device to the team with an explicit rank.
 ///
+/// The rank must be less than or equal to the caller's rank.
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param[in] client the Aranya Client
