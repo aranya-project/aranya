@@ -311,7 +311,7 @@ pub enum ChanOp {
 /// compiler warnings when used. They remain in the enum for backward
 /// compatibility — see the deprecation note on each variant for the
 /// migration path.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Perm {
     // # Team management
     //

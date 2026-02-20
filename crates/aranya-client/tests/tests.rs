@@ -26,8 +26,8 @@ use tracing::{debug, info};
 use crate::common::{
     sleep, DeviceCtx, DevicesCtx, DEFAULT_ADMIN_DEVICE_RANK, DEFAULT_ADMIN_ROLE_RANK,
     DEFAULT_LABEL_RANK, DEFAULT_MEMBER_DEVICE_RANK, DEFAULT_MEMBER_ROLE_RANK,
-    DEFAULT_OPERATOR_DEVICE_RANK, DEFAULT_OPERATOR_ROLE_RANK, DEFAULT_OWNER_DEVICE_RANK,
-    DEFAULT_OWNER_ROLE_RANK, SLEEP_INTERVAL,
+    DEFAULT_OPERATOR_DEVICE_RANK, DEFAULT_OPERATOR_ROLE_RANK, DEFAULT_OWNER_ROLE_RANK,
+    SLEEP_INTERVAL,
 };
 
 /// Tests getting keybundle and device ID.
@@ -2148,13 +2148,17 @@ async fn test_role_rank_migration_pattern() -> Result<()> {
     // Step 3: Query permissions from old role and copy to new role
     let old_perms = owner_team.query_role_perms(old_role.id).await?;
     assert_eq!(old_perms.len(), 2, "old role should have 2 permissions");
-    for perm in old_perms {
+    for &perm in &old_perms {
         owner_team.add_perm_to_role(new_role.id, perm).await?;
     }
 
-    // Verify new role has the same permissions
-    let new_perms = owner_team.query_role_perms(new_role.id).await?;
-    assert_eq!(new_perms.len(), 2, "new role should have 2 permissions");
+    // Verify new role has the same permissions (sort since fact iteration order
+    // is not guaranteed across different roles)
+    let mut new_perms = owner_team.query_role_perms(new_role.id).await?;
+    let mut old_sorted = old_perms.clone();
+    old_sorted.sort_by_key(|p| format!("{p:?}"));
+    new_perms.sort_by_key(|p| format!("{p:?}"));
+    assert_eq!(old_sorted, new_perms, "new role should have the same permissions as old role");
 
     // Step 4: Migrate device from old role to new role
     owner_team
