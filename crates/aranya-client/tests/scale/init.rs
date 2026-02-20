@@ -91,22 +91,14 @@ impl NodeCtx {
         //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-002
         //# Each node MUST have its own cryptographic keys.
         let pk = client
-            .get_key_bundle()
+            .get_public_key_bundle()
             .await
-            .context("unable to get key bundle")?;
-
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-003
-        //# All nodes MUST have unique device IDs.
-        let id = client
-            .get_device_id()
-            .await
-            .context("unable to get device id")?;
+            .context("unable to get public key bundle")?;
 
         Ok(Self {
             index,
             client,
             pk,
-            id,
             daemon,
             peers: Vec::new(),
             work_dir,

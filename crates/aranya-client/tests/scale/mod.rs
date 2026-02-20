@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, TeamId},
+    client::{Client, PublicKeyBundle, TeamId},
     Addr,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
@@ -248,9 +248,7 @@ pub struct NodeCtx {
     /// Aranya client connection.
     pub client: Client,
     /// Device's public key bundle.
-    pub pk: KeyBundle,
-    /// Device ID.
-    pub id: DeviceId,
+    pub pk: PublicKeyBundle,
     /// Daemon handle (RAII cleanup).
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#clean-001
     //# All daemon processes MUST be terminated when the test completes.
@@ -380,7 +378,6 @@ impl ConvergenceTracker {
 /// for each node. `peers[i]` contains the `NodeIndex`s of node `i`'s sync peers.
 //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-001
 //# The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
-
 //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-002
 //# The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
 pub type TopologyConnectFn = fn(usize) -> Vec<Vec<NodeIndex>>;
