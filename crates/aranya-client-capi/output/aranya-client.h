@@ -1862,9 +1862,10 @@ AranyaError aranya_role_owners_ext(const struct AranyaClient *_client,
  * This will change the device's current role to the new role assigned.
  *
  * Requires:
- * - `RevokeRole` permission (for the old role)
- * - `AssignRole` permission (for the new role)
- * - Caller must outrank the device and both roles
+ * - `RevokeRole` permission (for `old_role`)
+ * - `AssignRole` permission (for `new_role`)
+ * - `caller_rank > device_rank`, `caller_rank > old_role_rank`,
+ *   and `caller_rank > new_role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -1886,9 +1887,10 @@ AranyaError aranya_change_role(const struct AranyaClient *client,
  * This will change the device's current role to the new role assigned.
  *
  * Requires:
- * - `RevokeRole` permission (for the old role)
- * - `AssignRole` permission (for the new role)
- * - Caller must outrank the device and both roles
+ * - `RevokeRole` permission (for `old_role`)
+ * - `AssignRole` permission (for `new_role`)
+ * - `caller_rank > device_rank`, `caller_rank > old_role_rank`,
+ *   and `caller_rank > new_role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -1949,12 +1951,12 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `CreateRole` permission
- * - Rank must be less than or equal to the caller's rank
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role_name the name of the new role
- * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[in] rank the rank to assign to the new role
  * @param[out] role_out the newly created role
  *
  * @relates AranyaClient
@@ -1970,12 +1972,12 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
  *
  * Requires:
  * - `CreateRole` permission
- * - Rank must be less than or equal to the caller's rank
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role_name the name of the new role
- * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[in] rank the rank to assign to the new role
  * @param[out] role_out the newly created role
  *
  * @relates AranyaClient
@@ -1994,7 +1996,7 @@ AranyaError aranya_create_role_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `DeleteRole` permission
- * - Caller must outrank the role
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2013,7 +2015,7 @@ AranyaError aranya_delete_role(const struct AranyaClient *client,
  *
  * Requires:
  * - `DeleteRole` permission
- * - Caller must outrank the role
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2033,7 +2035,7 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `ChangeRolePerms` permission
- * - Caller must outrank the role
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2052,7 +2054,7 @@ AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
  *
  * Requires:
  * - `ChangeRolePerms` permission
- * - Caller must outrank the role
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2072,7 +2074,7 @@ AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `ChangeRolePerms` permission
- * - Caller must outrank the role
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2091,7 +2093,7 @@ AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
  *
  * Requires:
  * - `ChangeRolePerms` permission
- * - Caller must outrank the role
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2152,7 +2154,7 @@ AranyaError aranya_query_role_perms_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `AssignRole` permission
- * - Caller must outrank both the device and the role
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * It is an error if the device has already been assigned a role.
  * If you want to assign a different role to a device that already
@@ -2175,7 +2177,7 @@ AranyaError aranya_assign_role(const struct AranyaClient *client,
  *
  * Requires:
  * - `AssignRole` permission
- * - Caller must outrank both the device and the role
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * It is an error if the device has already been assigned a role.
  * If you want to assign a different role to a device that already
@@ -2199,7 +2201,7 @@ AranyaError aranya_assign_role_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `RevokeRole` permission
- * - Caller must outrank both the device and the role
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2218,7 +2220,7 @@ AranyaError aranya_revoke_role(const struct AranyaClient *client,
  *
  * Requires:
  * - `RevokeRole` permission
- * - Caller must outrank both the device and the role
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2287,7 +2289,7 @@ AranyaError aranya_create_label_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `CreateLabel` permission
- * - Rank must be less than or equal to the caller's rank
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2307,7 +2309,7 @@ AranyaError aranya_create_label_with_rank(const struct AranyaClient *client,
  *
  * Requires:
  * - `CreateLabel` permission
- * - Rank must be less than or equal to the caller's rank
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2328,7 +2330,7 @@ AranyaError aranya_create_label_with_rank_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `DeleteLabel` permission
- * - Caller must outrank the label
+ * - `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2345,7 +2347,7 @@ AranyaError aranya_delete_label(const struct AranyaClient *client,
  *
  * Requires:
  * - `DeleteLabel` permission
- * - Caller must outrank the label
+ * - `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2370,8 +2372,8 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `ChangeRank` permission
- * - Caller must outrank the target (unless changing their own rank)
- * - New rank must be less than or equal to the caller's rank
+ * - `caller_rank > object_rank` (unless changing own rank)
+ * - `caller_rank >= new_rank`
  *
  * Note: Role ranks cannot be changed after creation. This maintains
  * the invariant that `role_rank >= device_rank` for all devices
@@ -2403,8 +2405,8 @@ AranyaError aranya_change_rank(const struct AranyaClient *client,
  *
  * Requires:
  * - `ChangeRank` permission
- * - Caller must outrank the target (unless changing their own rank)
- * - New rank must be less than or equal to the caller's rank
+ * - `caller_rank > object_rank` (unless changing own rank)
+ * - `caller_rank >= new_rank`
  *
  * Note: Role ranks cannot be changed after creation. This maintains
  * the invariant that `role_rank >= device_rank` for all devices
@@ -2461,7 +2463,7 @@ AranyaError aranya_query_rank_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `AssignLabel` permission
- * - Caller must outrank both the device and the label
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2481,7 +2483,7 @@ AranyaError aranya_assign_label(const struct AranyaClient *client,
  *
  * Requires:
  * - `AssignLabel` permission
- * - Caller must outrank both the device and the label
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2502,7 +2504,7 @@ AranyaError aranya_assign_label_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `RevokeLabel` permission
- * - Caller must outrank both the device and the label
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2521,7 +2523,7 @@ AranyaError aranya_revoke_label(const struct AranyaClient *client,
  *
  * Requires:
  * - `RevokeLabel` permission
- * - Caller must outrank both the device and the label
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2774,7 +2776,7 @@ AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
  *
  * Requires:
  * - `AddDevice` permission
- * - Rank must be less than or equal to the caller's rank
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2797,7 +2799,7 @@ AranyaError aranya_add_device_to_team_with_rank(const struct AranyaClient *clien
  *
  * Requires:
  * - `AddDevice` permission
- * - Rank must be less than or equal to the caller's rank
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2821,7 +2823,7 @@ AranyaError aranya_add_device_to_team_with_rank_ext(const struct AranyaClient *c
  *
  * A device can always remove itself. Removing another device requires:
  * - `RemoveDevice` permission
- * - Caller must outrank the target device
+ * - `caller_rank > device_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2838,7 +2840,7 @@ AranyaError aranya_remove_device_from_team(const struct AranyaClient *client,
  *
  * A device can always remove itself. Removing another device requires:
  * - `RemoveDevice` permission
- * - Caller must outrank the target device
+ * - `caller_rank > device_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID

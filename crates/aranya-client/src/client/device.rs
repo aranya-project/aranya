@@ -93,7 +93,7 @@ impl Device<'_> {
     ///
     /// A device can always remove itself. Removing another device requires:
     /// - `RemoveDevice` permission
-    /// - Caller must outrank the target device
+    /// - `caller_rank > device_rank`
     #[instrument(skip(self))]
     pub async fn remove_from_team(&self) -> Result<()> {
         self.client
@@ -108,7 +108,7 @@ impl Device<'_> {
     ///
     /// Requires:
     /// - `AssignRole` permission
-    /// - Caller must outrank both the device and the role
+    /// - `caller_rank > device_rank` and `caller_rank > role_rank`
     #[instrument(skip(self))]
     pub async fn assign_role(&self, role: RoleId) -> Result<()> {
         self.client
@@ -123,7 +123,7 @@ impl Device<'_> {
     ///
     /// Requires:
     /// - `RevokeRole` permission
-    /// - Caller must outrank both the device and the role
+    /// - `caller_rank > device_rank` and `caller_rank > role_rank`
     #[instrument(skip(self))]
     pub async fn revoke_role(&self, role: RoleId) -> Result<()> {
         self.client
@@ -137,9 +137,10 @@ impl Device<'_> {
     /// Changes the `role` on a `device`.
     ///
     /// Requires:
-    /// - `RevokeRole` permission (for the old role)
-    /// - `AssignRole` permission (for the new role)
-    /// - Caller must outrank the device and both roles
+    /// - `RevokeRole` permission (for `old_role`)
+    /// - `AssignRole` permission (for `new_role`)
+    /// - `caller_rank > device_rank`, `caller_rank > old_role_rank`,
+    ///   and `caller_rank > new_role_rank`
     #[instrument(skip(self))]
     pub async fn change_role(&self, old_role: RoleId, new_role: RoleId) -> Result<()> {
         self.client
@@ -192,7 +193,7 @@ impl Device<'_> {
     ///
     /// Requires:
     /// - `AssignLabel` permission
-    /// - Caller must outrank both the device and the label
+    /// - `caller_rank > device_rank` and `caller_rank > label_rank`
     #[instrument(skip(self))]
     pub async fn assign_label(&self, label: LabelId, op: ChanOp) -> Result<()> {
         self.client
@@ -213,7 +214,7 @@ impl Device<'_> {
     ///
     /// Requires:
     /// - `RevokeLabel` permission
-    /// - Caller must outrank both the device and the label
+    /// - `caller_rank > device_rank` and `caller_rank > label_rank`
     #[instrument(skip(self))]
     pub async fn revoke_label(&self, label: LabelId) -> Result<()> {
         self.client
