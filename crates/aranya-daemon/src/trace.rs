@@ -63,10 +63,8 @@ tokio::task_local! {
 /// let trace_id = extract_trace_id(&ctx).to_string();
 /// ```
 pub fn extract_trace_id(ctx: &tarpc::context::Context) -> TraceId {
-    // Try to extract trace ID from context metadata if available
-    // For now, generate one from deadline/unique identifier
-    let trace_id = format!("{:?}-{:?}", ctx.deadline, std::process::id());
-    TraceId::new(trace_id)
+    // Extract trace ID from tarpc trace context
+    TraceId::new(ctx.trace_context.trace_id.to_string())
 }
 
 /// Returns the current trace ID if one is set in async-local storage.
