@@ -27,10 +27,10 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation,test]: The default sync mode MUST be hello.
 
   SECTION: [CONF-010](#conf-010)
-    TEXT[!MUST,implementation,test]: In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
+    TEXT[!MUST,implementation]: In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
 
   SECTION: [CONF-011](#conf-011)
-    TEXT[!MUST,implementation,test]: In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
+    TEXT[!MUST,implementation]: In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
 
   SECTION: [TOPO-001](#topo-001)
     TEXT[!MUST,implementation]: The test MUST support the Ring topology.
@@ -48,7 +48,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
 
   SECTION: [RING-002](#ring-002)
-    TEXT[!MUST,implementation]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
+    TEXT[!MUST]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
 
   SECTION: [CUST-001](#cust-001)
     TEXT[!MUST,implementation]: The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
@@ -66,13 +66,13 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: `TestCtx` MUST provide a `remove_sync_peer` method that removes a sync peer relationship between two nodes identified by `NodeIndex`.
 
   SECTION: [INIT-001](#init-001)
-    TEXT[!MUST,implementation,test]: Each node MUST be initialized with a unique daemon instance.
+    TEXT[!MUST,implementation]: Each node MUST be initialized with a unique daemon instance.
 
   SECTION: [INIT-002](#init-002)
     TEXT[!MUST,implementation]: Each node MUST have its own cryptographic keys.
 
   SECTION: [INIT-003](#init-003)
-    TEXT[!MUST,implementation]: All nodes MUST have unique device IDs.
+    TEXT[!MUST]: All nodes MUST have unique device IDs.
 
   SECTION: [INIT-004](#init-004)
     TEXT[!MUST,implementation]: Node initialization MUST occur in parallel batches to avoid resource exhaustion.
@@ -84,7 +84,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: The test MUST verify that all nodes started successfully.
 
   SECTION: [TEAM-001](#team-001)
-    TEXT[!MUST,implementation,test]: A single team MUST be created by node 0 (the designated owner).
+    TEXT[!MUST,implementation]: A single team MUST be created by node 0 (the designated owner).
 
   SECTION: [TEAM-002](#team-002)
     TEXT[!MUST,implementation]: All nodes MUST be added to the team before convergence testing begins.
@@ -99,10 +99,10 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: Team configuration MUST be synchronized to all nodes before the convergence test phase.
 
   SECTION: [TEAM-006](#team-006)
-    TEXT[!MUST,implementation,test]: The test MUST verify that all nodes have received the team configuration.
+    TEXT[!MUST,implementation]: The test MUST verify that all nodes have received the team configuration.
 
   SECTION: [SYNC-001](#sync-001)
-    TEXT[!MUST,implementation,test]: Each node MUST add sync peers according to the configured topology.
+    TEXT[!MUST,implementation]: Each node MUST add sync peers according to the configured topology.
 
   SECTION: [SYNC-002](#sync-002)
     TEXT[!MUST,implementation]: Sync peer configuration MUST specify the sync interval.
@@ -117,13 +117,13 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: In poll sync mode, each node MUST poll its sync peers at the configured sync interval.
 
   SECTION: [SYNC-006](#sync-006)
-    TEXT[!MUST,implementation,test]: In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+    TEXT[!MUST,implementation]: In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
 
   SECTION: [CONV-001](#conv-001)
     TEXT[!MUST,implementation]: The test MUST assign a label to the source node's graph to mark the start of convergence testing.
 
   SECTION: [CONV-002](#conv-002)
-    TEXT[!MUST,implementation,test]: The default source node for label assignment MUST be node 0.
+    TEXT[!MUST,implementation]: The default source node for label assignment MUST be node 0.
 
   SECTION: [CONV-003](#conv-003)
     TEXT[!MUST,implementation]: The test MUST track when each node receives the convergence label.
@@ -132,7 +132,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: Convergence MUST be defined as all nodes having received the convergence label.
 
   SECTION: [CONV-005](#conv-005)
-    TEXT[!MUST,implementation,test]: The test MUST measure the total convergence time from label assignment to full convergence.
+    TEXT[!MUST,implementation]: The test MUST measure the total convergence time from label assignment to full convergence.
 
   SECTION: [CONV-006](#conv-006)
     TEXT[!MUST,implementation]: The test MUST fail if convergence is not achieved within the maximum test duration.
@@ -159,7 +159,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: The test MUST record the timestamp when each node achieves convergence.
 
   SECTION: [PERF-003](#perf-003)
-    TEXT[!MUST,implementation,test]: The test MUST calculate and report the following metrics:
+    TEXT[!MUST,implementation]: The test MUST calculate and report the following metrics:
     TEXT[implementation]: - Minimum convergence time (fastest node)
     TEXT[implementation]: - Maximum convergence time (slowest node)
     TEXT[implementation]: - Mean convergence time
@@ -201,5 +201,5 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
 
   SECTION: [Duvet Integration](#duvet-integration)
     TEXT[!MUST]: ```rust
-    TEXT[!MUST]: //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#CONF-002
+    TEXT[!MUST]: //= https://github.com/aranya-project/aranya-docs/docs/multi-daemon-convergence-test.md#CONF-002
     TEXT[!MUST]: //# The test MUST scale to at least 70 nodes without failure.
