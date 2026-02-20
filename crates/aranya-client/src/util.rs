@@ -231,8 +231,7 @@ pub(crate) fn rpc_context() -> context::Context {
     let mut rng = rand::thread_rng();
     ctx.trace_context = TraceContext {
         trace_id: TarpcTraceId::random(&mut rng),
-        span_id: SpanId::random(&mut rng),
-        sampling_decision: SamplingDecision::Sampled,
+        ..TraceContext::default()
     };
     let trace_id = TraceId::new();
     tracing::debug!(%trace_id, "generated RPC context with tarpc trace");
