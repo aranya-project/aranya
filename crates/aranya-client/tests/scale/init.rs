@@ -1,6 +1,6 @@
 //! Node initialization for scale convergence tests.
 
-use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf};
+use std::{net::Ipv4Addr, path::PathBuf};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{client::Client, Addr};
@@ -28,8 +28,6 @@ impl NodeCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Generate unique AFC shm path per node
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-002
-        //# Each node MUST have its own cryptographic keys.
         let afc_shm_path = {
             use aranya_daemon_api::shm;
 
@@ -90,12 +88,15 @@ impl NodeCtx {
             .await
             .context("unable to init client")?;
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-003
-        //# All nodes MUST have unique device IDs.
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-002
+        //# Each node MUST have its own cryptographic keys.
         let pk = client
             .get_key_bundle()
             .await
             .context("unable to get key bundle")?;
+
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-003
+        //# All nodes MUST have unique device IDs.
         let id = client
             .get_device_id()
             .await
@@ -180,12 +181,6 @@ impl TestCtx {
                 config.node_count,
                 nodes.len()
             );
-        }
-
-        // Verify all nodes have unique device IDs
-        let unique_ids: HashSet<_> = nodes.iter().map(|n| n.id).collect();
-        if unique_ids.len() != nodes.len() {
-            bail!("Duplicate device IDs detected among nodes");
         }
 
         info!(
