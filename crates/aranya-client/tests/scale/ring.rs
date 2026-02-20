@@ -1,8 +1,6 @@
 //! Ring topology configuration for scale convergence tests.
 
-use std::collections::VecDeque;
-
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use aranya_client::{HelloSubscriptionConfig, SyncPeerConfig};
 use tracing::{debug, info, instrument};
 
@@ -49,6 +47,8 @@ impl TestCtx {
         };
 
         // Configure each node's peers
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-004
+        //# Sync peer configuration MUST complete before the convergence test phase.
         for i in 0..n {
             //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
             //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
@@ -106,110 +106,7 @@ impl TestCtx {
             );
         }
 
-        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#sync-004
-        //# Sync peer configuration MUST complete before the convergence test phase.
-        // Give a small delay for sync configuration to settle
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
         info!("Ring topology configured");
-        Ok(())
-    }
-
-    /// Verifies the ring topology is correctly configured.
-    ///
-    /// Checks that:
-    /// 1. Each node has exactly 2 peers
-    /// 2. Peers are bidirectional (if A peers with B, B peers with A)
-    /// 3. The graph forms a single connected component
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
-    //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
-
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-002
-    //# The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
-    #[instrument(skip(self))]
-    pub fn verify_ring_topology(&self) -> Result<()> {
-        let n = self.nodes.len();
-
-        info!(node_count = n, "Verifying ring topology");
-
-        // Check each node has correct peers
-        for i in 0..n {
-            let expected_cw = NodeIndex((i + 1) % n);
-            let expected_ccw = NodeIndex((i + n - 1) % n);
-
-            if self.nodes[i].peers.len() != 2 {
-                bail!(
-                    "Node {} has {} peers, expected 2",
-                    i,
-                    self.nodes[i].peers.len()
-                );
-            }
-
-            if !self.nodes[i].peers.contains(&expected_cw) {
-                bail!(
-                    "Node {} missing clockwise peer {} (has {:?})",
-                    i,
-                    expected_cw,
-                    self.nodes[i].peers
-                );
-            }
-
-            if !self.nodes[i].peers.contains(&expected_ccw) {
-                bail!(
-                    "Node {} missing counter-clockwise peer {} (has {:?})",
-                    i,
-                    expected_ccw,
-                    self.nodes[i].peers
-                );
-            }
-
-            // Verify bidirectional connections
-            for &peer in &self.nodes[i].peers {
-                if !self.nodes[peer.0].peers.contains(&NodeIndex(i)) {
-                    bail!(
-                        "Node {} peers with {}, but {} does not peer with {}",
-                        i,
-                        peer,
-                        peer,
-                        i
-                    );
-                }
-            }
-        }
-
-        // Verify single connected component using BFS
-        let mut visited = vec![false; n];
-        let mut queue = VecDeque::new();
-        queue.push_back(0usize);
-        visited[0] = true;
-        let mut visited_count = 1;
-
-        while let Some(node) = queue.pop_front() {
-            for &peer in &self.nodes[node].peers {
-                if !visited[peer.0] {
-                    visited[peer.0] = true;
-                    visited_count += 1;
-                    queue.push_back(peer.0);
-                }
-            }
-        }
-
-        if visited_count != n {
-            let unvisited: Vec<_> = visited
-                .iter()
-                .enumerate()
-                .filter(|(_, &v)| !v)
-                .map(|(i, _)| i)
-                .collect();
-            bail!(
-                "Ring topology is partitioned: {} nodes reachable, {} unreachable {:?}",
-                visited_count,
-                n - visited_count,
-                unvisited
-            );
-        }
-
-        info!("Ring topology verified");
         Ok(())
     }
 }

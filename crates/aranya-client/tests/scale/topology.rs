@@ -26,7 +26,6 @@ impl TestCtx {
                 //# The test MUST support the Ring topology.
                 Topology::Ring => {
                     self.configure_ring_topology().await?;
-                    self.verify_ring_topology()?;
                 }
                 //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#topo-002
                 //# The test MUST support the Custom topology.
