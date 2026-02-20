@@ -22,9 +22,9 @@ pub(crate) struct QuicTransport {
 impl QuicTransport {
     pub(crate) fn new(
         client_addr: Addr,
+        server_addr: Addr,
         conns: SharedConnectionMap,
         psk_store: Arc<PskStore>,
-        return_port: Bytes,
     ) -> Result<Self, Error> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -44,6 +44,8 @@ impl QuicTransport {
             .assume("can set quic client address")?
             .start()
             .map_err(Error::ClientStart)?;
+
+        let return_port = Bytes::copy_from_slice(&server_addr.port().to_be_bytes());
 
         Ok(Self {
             client,

@@ -1,7 +1,4 @@
 #[cfg(feature = "preview")]
-use std::collections::HashMap;
-
-#[cfg(feature = "preview")]
 use tokio::time::{Duration, Instant};
 #[cfg(feature = "preview")]
 use tokio_util::time::delay_queue;
@@ -48,7 +45,3 @@ pub(crate) struct HelloSubscription {
     /// The key to access the entry in the `DelayQueue`.
     pub(super) queue_key: delay_queue::Key,
 }
-
-/// Type alias to map a unique [`SyncPeer`] to their associated subscription.
-#[cfg(feature = "preview")]
-pub(crate) type HelloSubscriptions = HashMap<SyncPeer, HelloSubscription>;

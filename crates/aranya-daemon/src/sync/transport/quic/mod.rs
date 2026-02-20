@@ -10,7 +10,6 @@ use std::{convert::Infallible, sync::Arc};
 
 use crate::sync::Addr;
 
-mod client;
 mod connections;
 mod listener;
 mod psk;

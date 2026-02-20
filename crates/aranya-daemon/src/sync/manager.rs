@@ -53,7 +53,7 @@ use super::{
     GraphId, Result, SyncPeer,
 };
 #[cfg(feature = "preview")]
-use crate::sync::{HelloSubscription, HelloSubscriptions};
+use crate::sync::HelloSubscription;
 use crate::{
     aranya::Client,
     sync::{
@@ -70,33 +70,53 @@ pub(super) enum ScheduledTask {
     HelloNotify(SyncPeer),
 }
 
-/// Syncs with each peer after the specified interval.
+/// Manages sync scheduling and sending/receiving data on a transport.
 ///
-/// Uses a [`DelayQueue`] to obtain the next peer to sync with.
-/// Receives added/removed peers from [`SyncHandle`] via mpsc channels.
-///
-/// [`SyncHandle`]: super::SyncHandle
+/// Uses a [`DelayQueue`] to handle scheduling sync tasks, and uses [`SyncHandle`] to receive
+/// requests from the server and any clients.
 #[derive_where(Debug; ST)]
 pub(crate) struct SyncManager<ST, PS, SP, EF> {
-    /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
+    /// The Aranya client and peer cache, alongside invalid graph tracking.
     pub(super) client: Client<PS, SP>,
-    /// Keeps track of peer info. The Key is None if the peer has no interval configured.
-    pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
-    /// Receives added/removed peers.
+    /// The transport used to send and receive sync data.
+    pub(super) transport: ST,
+
+    /// Receives requests from the [`SyncHandle`].
     pub(super) recv: mpsc::Receiver<Callback>,
-    /// Delay queue for getting the next peer to sync with.
-    pub(super) queue: DelayQueue<ScheduledTask>,
     /// Used to send effects to the API to be processed.
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
-    /// Additional state used by the syncer.
-    pub(super) transport: ST,
+
+    /// Sync peer lookup info, used for storing configuration and delay queue info.
+    pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
+    /// Handles waiting on future sync tasks.
+    pub(super) queue: DelayQueue<ScheduledTask>,
+
     /// Holds all active hello subscriptions.
     #[cfg(feature = "preview")]
-    pub(super) hello_subscriptions: HelloSubscriptions,
+    pub(super) hello_subscriptions: HashMap<SyncPeer, HelloSubscription>,
 }
 
 impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
-    /// Add a peer to the delay queue, overwriting an existing one.
+    /// Creates a new [`SyncManager`].
+    pub(crate) fn new(
+        client: Client<PS, SP>,
+        transport: ST,
+        recv: mpsc::Receiver<Callback>,
+        send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
+    ) -> Result<Self> {
+        Ok(Self {
+            client,
+            transport,
+            recv,
+            send_effects,
+            peers: HashMap::new(),
+            queue: DelayQueue::new(),
+            #[cfg(feature = "preview")]
+            hello_subscriptions: HashMap::new(),
+        })
+    }
+
+    /// Registers a new peer with the manager, optionally adding it to the sync schedule.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
         let new_key = match cfg.interval {
@@ -112,13 +132,14 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         }
     }
 
-    /// Remove a peer from the delay queue.
+    /// Unregisters a peer with the manager.
     fn remove_peer(&mut self, peer: SyncPeer) {
         if let Some((_, Some(key))) = self.peers.remove(&peer) {
             self.queue.remove(&key);
         }
     }
 
+    /// Registers a new hello subscription and adds it to the sync schedule.
     #[cfg(feature = "preview")]
     fn add_hello_subscription(
         &mut self,
@@ -146,6 +167,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         self.hello_subscriptions.insert(peer, subscription);
     }
 
+    /// Unregisters a hello subscription with the manager.
     #[cfg(feature = "preview")]
     fn remove_hello_subscription(&mut self, peer: SyncPeer) {
         if let Some(old) = self.hello_subscriptions.remove(&peer) {
@@ -154,10 +176,11 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         debug!(?peer, "removed hello subscription");
     }
 
+    /// Handles checking for parallel finalization errors, as they're considered a fatal error.
     fn handle_sync_error(&mut self, peer: SyncPeer, err: &Error) {
         if err.is_parallel_finalize() {
             warn!(?peer, "parallel finalize error, removing all peers");
-            // Remove sync peers for graph that had finalization error.
+            // Remove all sync peers for the graph that had a finalization error.
             self.peers.retain(|p, (_, key)| {
                 let keep = p.graph_id != peer.graph_id;
                 if !keep {
@@ -171,19 +194,19 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         }
     }
 
-    /// Get peer caches for test inspection.
+    /// Returns the peer cache map for tests that need it.
     #[cfg(test)]
     pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
         self.client.caches_for_test()
     }
 
-    /// Returns a reference to the Aranya client.
+    /// Returns a reference to the Aranya client for tests that need it.
     #[cfg(test)]
     pub(crate) const fn client(&self) -> &Client<PS, SP> {
         &self.client
     }
 
-    /// Returns a mutable reference to the Aranya client.
+    /// Returns a mutable reference to the Aranya client for tests that need it.
     #[cfg(test)]
     pub(crate) const fn client_mut(&mut self) -> &mut Client<PS, SP> {
         &mut self.client
@@ -196,18 +219,6 @@ where
     SP: StorageProvider,
 {
     /// Send a hello message to a peer and wait for a response.
-    ///
-    /// This is a helper method that handles the common logic for sending hello messages,
-    /// including serialization, connection management, and response handling.
-    ///
-    /// # Arguments
-    /// * `peer` - The unique identifier of the peer to send the message to
-    /// * `sync_type` - The hello message to send
-    ///
-    /// # Returns
-    /// * `Ok(())` if the message was sent successfully
-    /// * `Err(SyncError)` if there was an error
-    #[instrument(skip_all)]
     #[cfg(feature = "preview")]
     pub(super) async fn send_hello_request(
         &self,
@@ -229,7 +240,7 @@ where
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
-        // Read the response to avoid race condition with server
+        // Read the response to avoid a race condition with the server
         match stream.receive(&mut buf).await {
             Ok(0) => Err(Error::EmptyResponse),
             Ok(_) => Ok(()),
@@ -269,6 +280,7 @@ where
         self.send_hello_request(peer, message).await
     }
 
+    /// Send a hello notification to a sync peer.
     #[cfg(feature = "preview")]
     async fn send_hello_notification(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
         trace!(?peer, "sending hello notifications to peer");
@@ -279,6 +291,7 @@ where
         });
         self.send_hello_request(peer, message).await?;
 
+        // Update the last time we notified the peer.
         if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
             sub.last_notified = Some(Instant::now());
         }
@@ -286,26 +299,31 @@ where
         Ok(())
     }
 
+    /// Send a hello notification to all peers that are subscribed to updates on this graph.
     #[cfg(feature = "preview")]
     async fn broadcast_hello(&mut self, graph_id: GraphId, head: Address) {
         let now = Instant::now();
 
         let mut subscribers = Vec::new();
         self.hello_subscriptions.retain(|peer, sub| {
+            // Retain all peers that are subscribed to different GraphIds
             if peer.graph_id != graph_id {
                 return true;
             }
 
+            // If this subscription has expired, remove it
             if now >= sub.expires_at {
                 self.queue.remove(&sub.queue_key);
                 debug!(?peer, "removed expired subscription");
                 return false;
             }
+
+            // This is for the correct GraphId, and hasn't yet expired.
             subscribers.push((*peer, sub.graph_change_debounce, sub.last_notified));
             true
         });
 
-        // Send hello notification to each valid subscriber
+        // Loop through all subscribers and send them a hello notification.
         for (peer, debounce, last_notified) in &subscribers {
             // Check if enough time has passed since last notification
             if let Some(last) = last_notified {

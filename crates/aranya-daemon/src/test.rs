@@ -243,14 +243,13 @@ impl TestCtx {
             let (listener, conns) = QuicListener::new(any_local_addr, psk_store.clone()).await?;
             let server = TestServer::new(listener, client.clone(), handle);
 
-            let syncer = TestSyncer::new(
-                client.clone(),
-                send_effects,
-                psk_store.clone(),
-                (server.local_addr(), any_local_addr),
-                recv,
+            let transport = QuicTransport::new(
+                any_local_addr,
+                server.local_addr(),
                 conns,
+                psk_store.clone(),
             )?;
+            let syncer = TestSyncer::new(client.clone(), transport, recv, send_effects)?;
 
             (syncer, server, pk, psk_store, effects_recv)
         };
