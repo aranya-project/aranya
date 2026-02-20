@@ -26,29 +26,10 @@ use tracing::info;
 use crate::scale::{NodeIndex, SyncMode, TestConfig, TestCtx, Topology};
 
 // ---------------------------------------------------------------------------
-// Helper: run a ring convergence test with the given config
+// Helper: run a convergence test with the given config and topology
 // ---------------------------------------------------------------------------
 
-async fn run_ring_convergence(config: TestConfig) -> Result<()> {
-    let mut ring = TestCtx::new(config, Some(vec![Topology::Ring])).await?;
-
-    ring.setup_team().await?;
-    ring.sync_team_from_owner().await?;
-    ring.configure_topology().await?;
-    ring.verify_team_propagation().await?;
-
-    ring.issue_test_command(NodeIndex(0)).await?;
-    ring.wait_for_convergence().await?;
-    ring.report_metrics();
-
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Helper: run a custom topology convergence test with the given config
-// ---------------------------------------------------------------------------
-
-async fn run_custom_convergence(config: TestConfig, topology: Topology) -> Result<()> {
+async fn run_convergence(config: TestConfig, topology: Topology) -> Result<()> {
     let mut ctx = TestCtx::new(config, Some(vec![topology])).await?;
 
     ctx.setup_team().await?;
@@ -140,7 +121,7 @@ async fn test_dual_ring_bridge_10_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node dual ring bridge test (poll mode)"
     );
-    run_custom_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
+    run_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
     info!("10-node dual ring bridge convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -164,7 +145,7 @@ async fn test_dual_ring_bridge_10_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node dual ring bridge test (hello mode)"
     );
-    run_custom_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
+    run_convergence(config, Topology::Custom { connect: dual_ring_bridge_topology }).await?;
     info!("10-node dual ring bridge convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -192,7 +173,7 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 3-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("3-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -220,7 +201,7 @@ async fn test_ring_minimum_3_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 3-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("3-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -248,7 +229,7 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("10-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -276,7 +257,7 @@ async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 10-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("10-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -300,7 +281,7 @@ async fn test_ring_convergence_20_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 20-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("20-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -324,7 +305,7 @@ async fn test_ring_convergence_20_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 20-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("20-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -348,7 +329,7 @@ async fn test_ring_convergence_30_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 30-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("30-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -372,7 +353,7 @@ async fn test_ring_convergence_30_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 30-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("30-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -396,7 +377,7 @@ async fn test_ring_convergence_40_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 40-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("40-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -420,7 +401,7 @@ async fn test_ring_convergence_40_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 40-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("40-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -444,7 +425,7 @@ async fn test_ring_convergence_50_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 50-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("50-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -468,7 +449,7 @@ async fn test_ring_convergence_50_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 50-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("50-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -492,7 +473,7 @@ async fn test_ring_convergence_60_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 60-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("60-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -516,7 +497,7 @@ async fn test_ring_convergence_60_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 60-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("60-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -543,7 +524,7 @@ async fn test_ring_convergence_70_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 70-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("70-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -567,7 +548,7 @@ async fn test_ring_convergence_70_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 70-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("70-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -591,7 +572,7 @@ async fn test_ring_convergence_80_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 80-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("80-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -615,7 +596,7 @@ async fn test_ring_convergence_80_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 80-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("80-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -639,7 +620,7 @@ async fn test_ring_convergence_90_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 90-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("90-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -663,7 +644,7 @@ async fn test_ring_convergence_90_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 90-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("90-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -692,7 +673,7 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
         node_count = config.node_count,
         "Starting 100-node ring test (poll mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("100-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -716,7 +697,7 @@ async fn test_ring_convergence_100_nodes_hello() -> Result<()> {
         node_count = config.node_count,
         "Starting 100-node ring test (hello mode)"
     );
-    run_ring_convergence(config).await?;
+    run_convergence(config, Topology::Ring).await?;
     info!("100-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
