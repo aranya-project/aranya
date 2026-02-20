@@ -265,7 +265,6 @@ skip = [
     "toml@0.5.11",
     "untrusted@0.7.1",
     "getrandom@0.1.16",
-    "getrandom@0.2.15",
     "hash32@0.2.1",
     "heapless@0.7.17",
     "zerocopy@0.7.35",
