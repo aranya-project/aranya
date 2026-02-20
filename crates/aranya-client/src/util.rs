@@ -1,10 +1,8 @@
 use aranya_id::{Id, IdTag};
 use std::time::{Duration, Instant};
 use tarpc::context;
+use tarpc::trace::Context as TraceContext;
 use tarpc::trace::TraceId as TarpcTraceId;
-use tarpc::trace::{Context as TraceContext, SamplingDecision, SpanId};
-
-use crate::trace::TraceId;
 
 /// IPC timeout of 1 year (365 days).
 /// A large value helps resolve IPC calls timing out when there are long-running
@@ -233,7 +231,5 @@ pub(crate) fn rpc_context() -> context::Context {
         trace_id: TarpcTraceId::random(&mut rng),
         ..TraceContext::default()
     };
-    let trace_id = TraceId::new();
-    tracing::debug!(%trace_id, "generated RPC context with tarpc trace");
     ctx
 }
