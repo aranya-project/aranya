@@ -284,6 +284,8 @@ impl Team<'_> {
     ///
     /// The rank must be less than or equal to the caller's rank.
     /// Requires the `CreateRole` permission.
+    ///
+    /// It returns the Role that was created.
     #[instrument(skip(self))]
     pub async fn create_role(&self, role_name: Text, rank: Rank) -> Result<Role> {
         let role = self
