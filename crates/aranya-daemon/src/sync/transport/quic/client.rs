@@ -2,7 +2,7 @@
 use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
@@ -44,6 +44,12 @@ pub(crate) struct QuicState {
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
 }
+
+/// Upper bound for wire-encoded sync request/response envelopes.
+///
+/// `MAX_SYNC_MESSAGE_SIZE` bounds runtime sync payloads; the wire envelope adds a small
+/// serialization overhead.
+const MAX_SYNC_WIRE_MESSAGE_SIZE: usize = MAX_SYNC_MESSAGE_SIZE.saturating_add(1024);
 
 impl QuicState {
     /// Get a reference to the PSK store
@@ -338,9 +344,18 @@ where
         trace!("client receiving sync response from QUIC sync server");
 
         let mut recv_buf = Vec::new();
-        recv.read_to_end(&mut recv_buf)
+        recv.take((MAX_SYNC_WIRE_MESSAGE_SIZE as u64) + 1)
+            .read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
+        if recv_buf.len() > MAX_SYNC_WIRE_MESSAGE_SIZE {
+            return Err(anyhow!(
+                "sync response too large: {} > {} bytes",
+                recv_buf.len(),
+                MAX_SYNC_WIRE_MESSAGE_SIZE
+            )
+            .into());
+        }
         trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.

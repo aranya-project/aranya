@@ -1,6 +1,6 @@
 use std::{future::Future, net::SocketAddr, sync::Arc};
 
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
@@ -35,6 +35,12 @@ use crate::{
         transport::quic, Addr, Callback, Error, GraphId, Result, SyncHandle, SyncPeer, SyncResponse,
     },
 };
+
+/// Upper bound for wire-encoded sync request/response envelopes.
+///
+/// `MAX_SYNC_MESSAGE_SIZE` bounds runtime sync payloads; the wire envelope adds a small
+/// serialization overhead.
+const MAX_SYNC_WIRE_MESSAGE_SIZE: usize = MAX_SYNC_MESSAGE_SIZE.saturating_add(1024);
 
 /// The Aranya QUIC sync server.
 ///
@@ -236,10 +242,19 @@ where
         trace!("server received a sync request");
 
         let mut recv_buf = Vec::new();
-        let (mut recv, mut send) = stream.split();
-        recv.read_to_end(&mut recv_buf)
+        let (recv, mut send) = stream.split();
+        recv.take((MAX_SYNC_WIRE_MESSAGE_SIZE as u64) + 1)
+            .read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
+        if recv_buf.len() > MAX_SYNC_WIRE_MESSAGE_SIZE {
+            return Err(anyhow!(
+                "sync request too large: {} > {} bytes",
+                recv_buf.len(),
+                MAX_SYNC_WIRE_MESSAGE_SIZE
+            )
+            .into());
+        }
         trace!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
