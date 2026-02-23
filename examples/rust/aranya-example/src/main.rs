@@ -21,6 +21,15 @@ use tokio::{
     time::sleep,
 };
 use tracing::{debug, info, Metadata};
+
+/// Default rank for devices added to the team.
+const DEFAULT_DEVICE_RANK: i64 = 100;
+/// Updated rank for the custom device demo.
+const UPDATED_DEVICE_RANK: i64 = 40;
+/// Default rank for labels.
+const DEFAULT_LABEL_RANK: i64 = 100;
+/// Rank for the custom role demo.
+const CUSTOM_ROLE_RANK: i64 = 50;
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
@@ -279,12 +288,12 @@ async fn main() -> Result<()> {
     // setup sync peers.
     info!("adding admin to team");
     owner_team
-        .add_device_with_rank(admin.pk, Some(admin_role.id), Rank::new(100))
+        .add_device_with_rank(admin.pk, Some(admin_role.id), Rank::new(DEFAULT_DEVICE_RANK))
         .await?;
 
     info!("adding operator to team");
     owner_team
-        .add_device_with_rank(operator.pk, Some(operator_role.id), Rank::new(100))
+        .add_device_with_rank(operator.pk, Some(operator_role.id), Rank::new(DEFAULT_DEVICE_RANK))
         .await?;
 
     // Demo hello subscription functionality
@@ -380,13 +389,13 @@ async fn main() -> Result<()> {
     // add membera to team.
     info!("adding membera to team");
     owner_team
-        .add_device_with_rank(membera.pk.clone(), Some(member_role.id), Rank::new(100))
+        .add_device_with_rank(membera.pk.clone(), Some(member_role.id), Rank::new(DEFAULT_DEVICE_RANK))
         .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     owner_team
-        .add_device_with_rank(memberb.pk.clone(), Some(member_role.id), Rank::new(100))
+        .add_device_with_rank(memberb.pk.clone(), Some(member_role.id), Rank::new(DEFAULT_DEVICE_RANK))
         .await?;
 
     // Sync membera and memberb so they see their team membership and roles.
@@ -399,7 +408,7 @@ async fn main() -> Result<()> {
     // Create a custom role.
     info!("creating a custom role");
     let custom = ClientCtx::new(team_name, "custom", &daemon_path).await?;
-    let custom_role_rank = Rank::new(50);
+    let custom_role_rank = Rank::new(CUSTOM_ROLE_RANK);
     let custom_role = owner_team
         .create_role(text!("custom_role"), custom_role_rank)
         .await?;
@@ -449,7 +458,7 @@ async fn main() -> Result<()> {
     let device_rank = owner_team.query_rank(device_object_id).await?;
     info!("custom device rank before change: {}", device_rank);
 
-    let updated_device_rank = Rank::new(40);
+    let updated_device_rank = Rank::new(UPDATED_DEVICE_RANK);
     info!(
         "changing custom device rank from {} to {}",
         device_rank, updated_device_rank
@@ -490,7 +499,7 @@ async fn main() -> Result<()> {
 
     info!("creating label");
     let label3 = owner_team
-        .create_label_with_rank(text!("label3"), Rank::new(100))
+        .create_label_with_rank(text!("label3"), Rank::new(DEFAULT_LABEL_RANK))
         .await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");

@@ -19,6 +19,8 @@ use crate::{
 pub const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 /// How long to wait to sync new effects.
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(600);
+/// Default rank for labels.
+pub const DEFAULT_LABEL_RANK: i64 = 100;
 
 /// Team info sent from team owner to other devices during onboarding.
 #[derive(Debug, Serialize, Deserialize)]

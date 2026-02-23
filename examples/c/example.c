@@ -23,6 +23,15 @@
 #define ENABLE_ARANYA_EXPERIMENTAL 1
 #include "aranya-client.h"
 
+// Default rank for devices added to the team.
+#define DEFAULT_DEVICE_RANK 100
+// Updated rank for the device rank change demo.
+#define UPDATED_DEVICE_RANK 90
+// Default rank for labels.
+#define DEFAULT_LABEL_RANK 100
+// Rank for the custom role demo.
+#define CUSTOM_ROLE_RANK 50
+
 // Macro for printing AranyaError to stderr and returning the error.
 // Does nothing if error value is ARANYA_SUCCESS.
 #define EXPECT(M, E)                                                           \
@@ -418,9 +427,9 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add admin to team with rank 100.
+    // add admin to team.
     err = aranya_add_device_to_team_with_rank(
-        &owner->client, &t->id, admin->pk, admin->pk_len, &admin_role_id, 100);
+        &owner->client, &t->id, admin->pk, admin->pk_len, &admin_role_id, DEFAULT_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add admin to team\n");
         return err;
@@ -436,10 +445,10 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add operator to team with rank 100.
+    // add operator to team.
     err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
                                               operator->pk, operator->pk_len,
-                                              &operator_role_id, 100);
+                                              &operator_role_id, DEFAULT_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -455,19 +464,19 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add membera to team with rank 100.
+    // add membera to team.
     err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
                                               membera->pk, membera->pk_len,
-                                              &member_role_id, 100);
+                                              &member_role_id, DEFAULT_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add membera to team\n");
         return err;
     }
 
-    // add memberb to team with rank 100.
+    // add memberb to team.
     err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
                                               memberb->pk, memberb->pk_len,
-                                              &member_role_id, 100);
+                                              &member_role_id, DEFAULT_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add memberb to team\n");
         return err;
@@ -816,7 +825,7 @@ AranyaError run_afc_example(Team *t) {
                                    {&memberb->id, ARANYA_CHAN_OP_RECV_ONLY}};
 
     err = aranya_create_assign_label(&owner->client, &t->id, "uni_label",
-                                     &label_id, 100, idents, 2);
+                                     &label_id, DEFAULT_LABEL_RANK, idents, 2);
     if (err != ARANYA_ERROR_SUCCESS) {
         goto exit;
     }
@@ -1015,7 +1024,7 @@ AranyaError run_custom_roles_example(Team *t) {
     }
 
     // Create a custom role.
-    const int64_t buddy_initial_rank = 50;
+    const int64_t buddy_initial_rank = CUSTOM_ROLE_RANK;
     AranyaRole buddy_role;
     err = aranya_create_role(&owner->client, &t->id, "buddy",
                              buddy_initial_rank, &buddy_role);
@@ -1080,7 +1089,7 @@ AranyaError run_custom_roles_example(Team *t) {
     EXPECT("unable to query rank of 'membera' device", err);
     printf("membera device rank before change: %lld\n", (long long)device_rank);
 
-    int64_t updated_device_rank = 90;
+    int64_t updated_device_rank = UPDATED_DEVICE_RANK;
     printf("changing membera device rank from %lld to %lld\n",
            (long long)device_rank, (long long)updated_device_rank);
     err = aranya_change_rank(&owner->client, &t->id, &membera_object_id,
