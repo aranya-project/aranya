@@ -6,7 +6,9 @@ use anyhow::Result;
 use aranya_client::{text, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo, EXAMPLE_LABEL_RANK, SLEEP_INTERVAL, SYNC_INTERVAL},
+    onboarding::{
+        DeviceInfo, Onboard, TeamInfo, EXAMPLE_LABEL_RANK, SLEEP_INTERVAL, SYNC_INTERVAL,
+    },
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -111,8 +113,11 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    team.create_label_with_rank(text!("label1"), aranya_client::Rank::new(EXAMPLE_LABEL_RANK))
-        .await?;
+    team.create_label_with_rank(
+        text!("label1"),
+        aranya_client::Rank::new(EXAMPLE_LABEL_RANK),
+    )
+    .await?;
     info!("admin: created label");
 
     info!("admin: complete");

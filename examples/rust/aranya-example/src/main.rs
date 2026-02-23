@@ -288,12 +288,20 @@ async fn main() -> Result<()> {
     // setup sync peers.
     info!("adding admin to team");
     owner_team
-        .add_device_with_rank(admin.pk, Some(admin_role.id), Rank::new(EXAMPLE_DEVICE_RANK))
+        .add_device_with_rank(
+            admin.pk,
+            Some(admin_role.id),
+            Rank::new(EXAMPLE_DEVICE_RANK),
+        )
         .await?;
 
     info!("adding operator to team");
     owner_team
-        .add_device_with_rank(operator.pk, Some(operator_role.id), Rank::new(EXAMPLE_DEVICE_RANK))
+        .add_device_with_rank(
+            operator.pk,
+            Some(operator_role.id),
+            Rank::new(EXAMPLE_DEVICE_RANK),
+        )
         .await?;
 
     // Demo hello subscription functionality
@@ -389,13 +397,21 @@ async fn main() -> Result<()> {
     // add membera to team.
     info!("adding membera to team");
     owner_team
-        .add_device_with_rank(membera.pk.clone(), Some(member_role.id), Rank::new(EXAMPLE_DEVICE_RANK))
+        .add_device_with_rank(
+            membera.pk.clone(),
+            Some(member_role.id),
+            Rank::new(EXAMPLE_DEVICE_RANK),
+        )
         .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     owner_team
-        .add_device_with_rank(memberb.pk.clone(), Some(member_role.id), Rank::new(EXAMPLE_DEVICE_RANK))
+        .add_device_with_rank(
+            memberb.pk.clone(),
+            Some(member_role.id),
+            Rank::new(EXAMPLE_DEVICE_RANK),
+        )
         .await?;
 
     // Sync membera and memberb so they see their team membership and roles.
@@ -433,9 +449,7 @@ async fn main() -> Result<()> {
         role_perms
     );
     assert!(
-        role_perms
-            .iter()
-            .any(|p| matches!(p, Permission::CanUseAfc)),
+        role_perms.contains(&Permission::CanUseAfc),
         "expected custom role to have CanUseAfc permission"
     );
 

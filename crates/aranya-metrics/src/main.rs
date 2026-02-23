@@ -331,26 +331,42 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // remaining operations to them.
     info!("adding admin to team");
     owner
-        .add_device_with_rank(ctx.admin.pk, Some(admin_role.id), EXAMPLE_DEVICE_RANK.into())
+        .add_device_with_rank(
+            ctx.admin.pk,
+            Some(admin_role.id),
+            EXAMPLE_DEVICE_RANK.into(),
+        )
         .await?;
     admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
     owner
-        .add_device_with_rank(ctx.operator.pk, Some(operator_role.id), EXAMPLE_DEVICE_RANK.into())
+        .add_device_with_rank(
+            ctx.operator.pk,
+            Some(operator_role.id),
+            EXAMPLE_DEVICE_RANK.into(),
+        )
         .await?;
     operator.sync_now(owner_addr, None).await?;
 
     // Admin adds membera and memberb to the team.
     info!("admin adding membera to team");
     admin
-        .add_device_with_rank(ctx.membera.pk.clone(), Some(member_role.id), EXAMPLE_MEMBER_RANK.into())
+        .add_device_with_rank(
+            ctx.membera.pk.clone(),
+            Some(member_role.id),
+            EXAMPLE_MEMBER_RANK.into(),
+        )
         .await?;
     membera.sync_now(owner_addr, None).await?;
 
     info!("admin adding memberb to team");
     admin
-        .add_device_with_rank(ctx.memberb.pk.clone(), Some(member_role.id), EXAMPLE_MEMBER_RANK.into())
+        .add_device_with_rank(
+            ctx.memberb.pk.clone(),
+            Some(member_role.id),
+            EXAMPLE_MEMBER_RANK.into(),
+        )
         .await?;
     memberb.sync_now(owner_addr, None).await?;
 
