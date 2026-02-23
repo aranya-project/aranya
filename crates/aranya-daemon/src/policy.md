@@ -268,17 +268,11 @@ function valid_device_invariants(device_id id) bool {
         check !exists DeviceSignPubKey[device_id: device_id]
         check !exists DeviceEncPubKey[device_id: device_id]
     } else {
-        // The device DOES exist, so the device keys MUST also
-        // exist and each key ID must be consistent with its public key.
+        // The device DOES exist, so the device keys MUST also exist.
 
-        let ident_key_fact = unwrap query DeviceIdentPubKey[device_id: device_id]
-        check device_id == idam::derive_device_id(ident_key_fact.key)
-
-        let sign_key_fact = unwrap query DeviceSignPubKey[device_id: device_id]
-        check sign_key_fact.key_id == idam::derive_sign_key_id(sign_key_fact.key)
-
-        let enc_key_fact = unwrap query DeviceEncPubKey[device_id: device_id]
-        check enc_key_fact.key_id == idam::derive_enc_key_id(enc_key_fact.key)
+        check exists DeviceIdentPubKey[device_id: device_id]
+        check exists DeviceSignPubKey[device_id: device_id]
+        check exists DeviceEncPubKey[device_id: device_id]
     }
 
     // NB: Since this function uses `check` internally, it
