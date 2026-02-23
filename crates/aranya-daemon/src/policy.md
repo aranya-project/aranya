@@ -269,7 +269,12 @@ function valid_device_invariants(device_id id) bool {
         check !exists DeviceEncPubKey[device_id: device_id]
     } else {
         // The device DOES exist, so the device keys MUST also
-        // exist and each key ID must be consistent with its public key.
+        // exist and each key ID must be consistent with its public
+        // key. These checks are future proofing the policy against
+        // bugs: key IDs are deterministically derived from keys at
+        // fact creation time, so they should always match. The
+        // checks catch future policy changes that might store
+        // inconsistent key/key_id pairs.
 
         let ident_key_fact = unwrap query DeviceIdentPubKey[device_id: device_id]
         check device_id == idam::derive_device_id(ident_key_fact.key)
