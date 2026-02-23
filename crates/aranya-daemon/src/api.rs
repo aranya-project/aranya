@@ -50,7 +50,7 @@ use crate::{
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{ChanOp, Effect, PublicKeyBundle, Perm, RoleCreated},
+    policy::{ChanOp, Effect, Perm, PublicKeyBundle, RoleCreated},
     sync::{quic as qs, SyncHandle, SyncPeer},
     util::SeedDir,
     AranyaStore, Client, EF,

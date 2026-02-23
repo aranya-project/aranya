@@ -19,7 +19,7 @@ use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, PublicKeyBundle, Perm},
+    policy::{self, ChanOp, Effect, Perm, PublicKeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 

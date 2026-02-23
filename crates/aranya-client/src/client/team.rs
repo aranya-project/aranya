@@ -120,7 +120,11 @@ impl Team<'_> {
     /// Use [`Self::add_device_with_rank`] to specify an explicit rank.
     #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
-    pub async fn add_device(&self, keys: PublicKeyBundle, initial_role: Option<RoleId>) -> Result<()> {
+    pub async fn add_device(
+        &self,
+        keys: PublicKeyBundle,
+        initial_role: Option<RoleId>,
+    ) -> Result<()> {
         // Default to role_rank - 1 when an initial_role is provided,
         // otherwise fall back to author_rank - 1.
         let rank = match &initial_role {

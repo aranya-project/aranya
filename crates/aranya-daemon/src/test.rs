@@ -42,7 +42,7 @@ use tokio::{
 use crate::{
     actions::Actions,
     aranya,
-    policy::{Effect, PublicKeyBundle as DeviceKeyBundle, Perm},
+    policy::{Effect, Perm, PublicKeyBundle as DeviceKeyBundle},
     sync::{self, quic::PskStore, SyncPeer},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
