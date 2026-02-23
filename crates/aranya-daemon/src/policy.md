@@ -283,7 +283,7 @@ function valid_device_invariants(device_id id) bool {
     // a meaningful result, but that would obscure which
     // invariant was violated. We would only know that
     // `valid_device_invariants` failed, not that (for example)
-    // `check ident_key_id == device_id` failed.
+    // `check exists DeviceIdentPubKey[...]` failed.
     return true
 }
 ```
@@ -395,11 +395,6 @@ function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
         sign_key: sign_key.key,
         enc_key: enc_key.key,
     }
-}
-
-// Derives the device ID from the device's public key bundle.
-function derive_device_id(device_keys struct PublicKeyBundle) id {
-    return idam::derive_device_id(device_keys.ident_key)
 }
 
 // Returns the device's encoded public Encryption Key.
@@ -2437,7 +2432,7 @@ command CreateTeam {
 
         let author_id = envelope::author_id(envelope)
 
-        let owner_device_id = derive_device_id(this.owner_keys)
+        let owner_device_id = idam::derive_device_id(this.owner_keys.ident_key)
 
         // The ID of a team is the ID of the command that created
         // it.
@@ -2638,7 +2633,7 @@ action add_device_with_rank(device_keys struct PublicKeyBundle, initial_role_id 
     if initial_role_id is Some {
         let role_id = unwrap initial_role_id
         publish AssignRole {
-            device_id: derive_device_id(device_keys),
+            device_id: idam::derive_device_id(device_keys.ident_key),
             role_id: role_id,
         }
     }
@@ -2680,7 +2675,7 @@ command AddDevice {
         // The author's rank must be greater than the rank of the device it is adding to the team.
         check get_object_rank(author.device_id) >= this.rank
 
-        let device_id = derive_device_id(this.device_keys)
+        let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
         check !exists Device[device_id: device_id]
         check !exists DeviceIdentPubKey[device_id: device_id]
