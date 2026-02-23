@@ -1973,7 +1973,7 @@ pub unsafe fn add_device_to_team_with_rank(
     role_id: Option<&RoleId>,
     rank: i64,
 ) -> Result<(), imp::Error> {
-    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+    let keybundle = imp::public_key_bundle_deserialize(keybundle)?;
 
     client
         .rt

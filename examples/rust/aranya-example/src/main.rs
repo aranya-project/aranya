@@ -374,8 +374,11 @@ async fn main() -> Result<()> {
         .await?;
     memberb_team.add_sync_peer(membera_addr, sync_cfg).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
+    // Sync all devices with owner so they see each other's sync peer state.
+    admin_team.sync_now(owner_addr, None).await?;
+    operator_team.sync_now(owner_addr, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
 
     // add membera to team.
     info!("adding membera to team");
@@ -389,8 +392,9 @@ async fn main() -> Result<()> {
         .add_device_with_rank(memberb.pk.clone(), Some(member_role.id), Rank::new(100))
         .await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
+    // Sync membera and memberb so they see their team membership and roles.
+    membera_team.sync_now(owner_addr, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
 
     // Demo custom roles.
     info!("demo custom roles functionality");
@@ -503,8 +507,9 @@ async fn main() -> Result<()> {
         .assign_label(label3, op)
         .await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
+    // Sync membera and memberb so they see the label assignments.
+    membera_team.sync_now(owner_addr, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");

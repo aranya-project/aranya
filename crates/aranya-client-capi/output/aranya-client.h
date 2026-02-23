@@ -1865,6 +1865,7 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("role_owners is deprecated")
 AranyaError aranya_role_owners(const struct AranyaClient *_client,
                                const struct AranyaTeamId *_team,
                                const struct AranyaRoleId *_role,
@@ -1882,6 +1883,7 @@ AranyaError aranya_role_owners(const struct AranyaClient *_client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("role_owners is deprecated")
 AranyaError aranya_role_owners_ext(const struct AranyaClient *_client,
                                    const struct AranyaTeamId *_team,
                                    const struct AranyaRoleId *_role,
@@ -2286,6 +2288,7 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `create_label_with_rank` to specify an explicit rank")
 AranyaError aranya_create_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
@@ -2310,6 +2313,7 @@ AranyaError aranya_create_label(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `create_label_with_rank` to specify an explicit rank")
 AranyaError aranya_create_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
@@ -2772,6 +2776,7 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `add_device_to_team_with_rank` to specify an explicit rank")
 AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
                                       const uint8_t *public_key_bundle,
@@ -2797,6 +2802,7 @@ AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `add_device_to_team_with_rank` to specify an explicit rank")
 AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const uint8_t *public_key_bundle,
