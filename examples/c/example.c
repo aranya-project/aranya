@@ -428,8 +428,9 @@ AranyaError init_team(Team *t) {
     }
 
     // add admin to team.
-    err = aranya_add_device_to_team_with_rank(
-        &owner->client, &t->id, admin->pk, admin->pk_len, &admin_role_id, EXAMPLE_DEVICE_RANK);
+    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id, admin->pk,
+                                              admin->pk_len, &admin_role_id,
+                                              EXAMPLE_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add admin to team\n");
         return err;
@@ -446,9 +447,9 @@ AranyaError init_team(Team *t) {
     }
 
     // add operator to team.
-    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
-                                              operator->pk, operator->pk_len,
-                                              &operator_role_id, EXAMPLE_DEVICE_RANK);
+    err = aranya_add_device_to_team_with_rank(
+        &owner->client, &t->id, operator->pk, operator->pk_len,
+        &operator_role_id, EXAMPLE_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -465,18 +466,18 @@ AranyaError init_team(Team *t) {
     }
 
     // add membera to team.
-    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
-                                              membera->pk, membera->pk_len,
-                                              &member_role_id, EXAMPLE_DEVICE_RANK);
+    err = aranya_add_device_to_team_with_rank(
+        &owner->client, &t->id, membera->pk, membera->pk_len, &member_role_id,
+        EXAMPLE_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add membera to team\n");
         return err;
     }
 
     // add memberb to team.
-    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id,
-                                              memberb->pk, memberb->pk_len,
-                                              &member_role_id, EXAMPLE_DEVICE_RANK);
+    err = aranya_add_device_to_team_with_rank(
+        &owner->client, &t->id, memberb->pk, memberb->pk_len, &member_role_id,
+        EXAMPLE_DEVICE_RANK);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add memberb to team\n");
         return err;
