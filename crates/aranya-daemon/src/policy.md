@@ -2680,14 +2680,14 @@ command AddDevice {
         // The author's rank must be greater than the rank of the device it is adding to the team.
         check get_object_rank(author.device_id) >= this.rank
 
-        let dev_device_id = derive_device_id(this.device_keys)
+        let device_id = derive_device_id(this.device_keys)
 
-        check !exists Device[device_id: dev_device_id]
-        check !exists DeviceIdentPubKey[device_id: dev_device_id]
-        check !exists DeviceSignPubKey[device_id: dev_device_id]
-        check !exists DeviceEncPubKey[device_id: dev_device_id]
+        check !exists Device[device_id: device_id]
+        check !exists DeviceIdentPubKey[device_id: device_id]
+        check !exists DeviceSignPubKey[device_id: device_id]
+        check !exists DeviceEncPubKey[device_id: device_id]
 
-        let existing_gen = query DeviceGeneration[device_id: dev_device_id]
+        let existing_gen = query DeviceGeneration[device_id: device_id]
 
         // At this point we believe the following to be true:
         //
@@ -2700,15 +2700,15 @@ command AddDevice {
         // existing one.
         if existing_gen is None {
             finish {
-                create DeviceGeneration[device_id: dev_device_id]=>{generation: 0}
+                create DeviceGeneration[device_id: device_id]=>{generation: 0}
 
                 add_new_device(
-                    dev_device_id,
+                    device_id,
                     this.device_keys,
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: dev_device_id,
+                    device_id: device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
@@ -2716,12 +2716,12 @@ command AddDevice {
         } else {
             finish {
                 add_new_device(
-                    dev_device_id,
+                    device_id,
                     this.device_keys,
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: dev_device_id,
+                    device_id: device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
