@@ -11,8 +11,8 @@ use tracing::instrument;
 use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle,
-        Role, RoleId, Roles,
+        Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle, Role, RoleId,
+        Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},

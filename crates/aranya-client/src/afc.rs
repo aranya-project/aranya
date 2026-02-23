@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-
     error::{aranya_error, IpcError},
     util::{rpc_context, ApiConv as _},
     DeviceId, LabelId, Result, TeamId,
