@@ -20,12 +20,12 @@ use tokio::{
 };
 use tracing::{debug, info, warn, Metadata};
 
-/// Default rank for devices added by the owner.
-const DEFAULT_DEVICE_RANK: i64 = 100;
-/// Default rank for devices added by the admin.
-const ADMIN_DEVICE_RANK: i64 = 50;
-/// Default rank for labels.
-const DEFAULT_LABEL_RANK: i64 = 50;
+/// Example rank for devices added by the owner.
+const EXAMPLE_DEVICE_RANK: i64 = 100;
+/// Example rank for devices added by the admin.
+const EXAMPLE_MEMBER_RANK: i64 = 50;
+/// Example rank for labels.
+const EXAMPLE_LABEL_RANK: i64 = 50;
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
@@ -331,26 +331,26 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // remaining operations to them.
     info!("adding admin to team");
     owner
-        .add_device_with_rank(ctx.admin.pk, Some(admin_role.id), DEFAULT_DEVICE_RANK.into())
+        .add_device_with_rank(ctx.admin.pk, Some(admin_role.id), EXAMPLE_DEVICE_RANK.into())
         .await?;
     admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
     owner
-        .add_device_with_rank(ctx.operator.pk, Some(operator_role.id), DEFAULT_DEVICE_RANK.into())
+        .add_device_with_rank(ctx.operator.pk, Some(operator_role.id), EXAMPLE_DEVICE_RANK.into())
         .await?;
     operator.sync_now(owner_addr, None).await?;
 
     // Admin adds membera and memberb to the team.
     info!("admin adding membera to team");
     admin
-        .add_device_with_rank(ctx.membera.pk.clone(), Some(member_role.id), ADMIN_DEVICE_RANK.into())
+        .add_device_with_rank(ctx.membera.pk.clone(), Some(member_role.id), EXAMPLE_MEMBER_RANK.into())
         .await?;
     membera.sync_now(owner_addr, None).await?;
 
     info!("admin adding memberb to team");
     admin
-        .add_device_with_rank(ctx.memberb.pk.clone(), Some(member_role.id), ADMIN_DEVICE_RANK.into())
+        .add_device_with_rank(ctx.memberb.pk.clone(), Some(member_role.id), EXAMPLE_MEMBER_RANK.into())
         .await?;
     memberb.sync_now(owner_addr, None).await?;
 
@@ -364,7 +364,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // Admin creates a label.
     info!("admin creating label");
     let label3 = admin
-        .create_label_with_rank(text!("label3"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label3"), EXAMPLE_LABEL_RANK.into())
         .await?;
 
     // Operator assigns the label to membera and memberb.
