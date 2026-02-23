@@ -187,9 +187,6 @@ async fn main() -> Result<()> {
     };
 
     let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval
-        .checked_mul(6)
-        .expect("sleep interval should not overflow");
     let sync_cfg = {
         let mut builder = SyncPeerConfig::builder();
         builder = builder.interval(sync_interval);
@@ -307,7 +304,7 @@ async fn main() -> Result<()> {
             .sync_hello_subscribe(admin_addr, HelloSubscriptionConfig::default())
             .await?;
 
-        sleep(sleep_interval).await;
+        sleep(sync_interval).await;
 
         // Later, unsubscribe from hello notifications
         info!("admin unsubscribing from hello notifications from owner");
@@ -316,7 +313,7 @@ async fn main() -> Result<()> {
         info!("operator unsubscribing from hello notifications from admin");
         operator_team.sync_hello_unsubscribe(admin_addr).await?;
 
-        sleep(sleep_interval).await;
+        sleep(sync_interval).await;
     }
 
     info!("adding sync peers");
