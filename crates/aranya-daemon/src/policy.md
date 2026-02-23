@@ -214,8 +214,9 @@ function seal_command(payload bytes) struct Envelope {
     let parent_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
+    let author_sign_key_id = idam::derive_sign_key_id(author_sign_pk.key)
 
-    let signed = crypto::sign(idam::derive_sign_key_id(author_sign_pk.key), payload)
+    let signed = crypto::sign(author_sign_key_id, payload)
     return envelope::new(
         parent_id,
         author_id,
@@ -2632,8 +2633,9 @@ action add_device_with_rank(device_keys struct PublicKeyBundle, initial_role_id 
     }
     if initial_role_id is Some {
         let role_id = unwrap initial_role_id
+        let device_id = idam::derive_device_id(device_keys.ident_key)
         publish AssignRole {
-            device_id: idam::derive_device_id(device_keys.ident_key),
+            device_id: device_id,
             role_id: role_id,
         }
     }
