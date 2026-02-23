@@ -49,6 +49,14 @@ impl std::fmt::Display for TraceId {
     }
 }
 
+impl std::str::FromStr for TraceId {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(Arc::from(s)))
+    }
+}
+
 impl From<&str> for TraceId {
     fn from(s: &str) -> Self {
         Self::from_str(s.to_string())
