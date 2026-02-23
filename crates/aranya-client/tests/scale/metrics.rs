@@ -56,7 +56,11 @@ impl TestCtx {
             .iter()
             .enumerate()
             .filter(|(i, s)| *i != self.tracker.source_node.0 && s.convergence_time.is_some())
-            .map(|(_, s)| s.convergence_time.unwrap().duration_since(command_issued))
+            .map(|(_, s)| {
+                s.convergence_time
+                    .expect("convergence_time must be set when filter passes")
+                    .duration_since(command_issued)
+            })
             .collect();
 
         if times.is_empty() {
@@ -65,8 +69,8 @@ impl TestCtx {
 
         times.sort();
 
-        let min_time = *times.first().unwrap();
-        let max_time = *times.last().unwrap();
+        let min_time = *times.first().expect("times must not be empty");
+        let max_time = *times.last().expect("times must not be empty");
 
         let sum: Duration = times.iter().sum();
         let mean_time = sum / times.len() as u32;
