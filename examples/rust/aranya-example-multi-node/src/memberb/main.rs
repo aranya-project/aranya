@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     // Send device info to owner.
     info!("memberb: sending device info to owner");
     let device_id = client.get_device_id().await?;
-    let pk = client.get_key_bundle().await?;
+    let pk = client.get_public_key_bundle().await?;
     onboard
         .send(
             &DeviceInfo {
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     info!("memberb: detected that all devices have been added to team");
 
@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
 
     // Remove operator sync peer.
@@ -166,7 +166,12 @@ async fn main() -> Result<()> {
 
     info!("memberb: receiving AFC data");
     let resp = receiver.recv().await?;
-    let mut msg_recv = vec![0u8; resp.len() - Channels::OVERHEAD];
+    let mut msg_recv = vec![
+        0u8;
+        resp.len()
+            .checked_sub(Channels::OVERHEAD)
+            .expect("ciphertext must be larger than overhead")
+    ];
     opener.open(&mut msg_recv, &resp)?;
     info!("memberb: received AFC data");
 
@@ -179,7 +184,13 @@ async fn main() -> Result<()> {
 
     info!("memberb: sending AFC data");
     let msg_send = b"hello";
-    let mut req = vec![0u8; msg_send.len() + Channels::OVERHEAD];
+    let mut req = vec![
+        0u8;
+        msg_send
+            .len()
+            .checked_add(Channels::OVERHEAD)
+            .expect("AFC overhead should not overflow")
+    ];
     sealer.seal(&mut req, msg_send)?;
     sender.send(env.membera.afc_addr, &req).await?;
     info!("memberb: sent AFC data");
