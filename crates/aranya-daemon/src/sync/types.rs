@@ -19,6 +19,17 @@ impl SyncPeer {
     pub(crate) const fn new(addr: super::Addr, graph_id: super::GraphId) -> Self {
         Self { addr, graph_id }
     }
+
+    pub(crate) fn check_request(&self, message_id: super::GraphId) -> Result<(), super::Error> {
+        match self.graph_id.as_bytes() == message_id.as_bytes() {
+            true => Ok(()),
+            // TODO(nikki): this isn't really a transport error, this is a protocol error. Change as
+            // part of a larger refactor?
+            false => Err(super::Error::Transport(
+                anyhow::anyhow!("The message's GraphId doesn't match the current GraphId!").into(),
+            )),
+        }
+    }
 }
 
 /// A response to a sync request.

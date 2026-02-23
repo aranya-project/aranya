@@ -229,7 +229,7 @@ where
             .await
             .map_err(Error::transport)?;
 
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
 
         // Send the message
         let data =
@@ -384,7 +384,7 @@ where
     EF: Send + Sync + 'static + TryFrom<PS::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,
 {
-    /// Runs the sync manager, processing [`SyncHandle`] requests and scheduled tasks.
+    /// Runs the [`SyncManager`], processing [`SyncHandle`] requests and scheduled tasks.
     pub(crate) async fn run(mut self, ready: ready::Notifier) {
         ready.notify();
         loop {
@@ -466,7 +466,7 @@ where
             .map_err(Error::transport)?;
 
         let mut requester = SyncRequester::new(peer.graph_id, &mut Rng);
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
 
         // Process a poll request, and get back the length/number of commands.
         let (len, _cmds) = {
