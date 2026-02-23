@@ -51,9 +51,8 @@ use crate::{
 // Rank constants for tests
 // =============================================================================
 //
-// TODO(aranya-core#577): These constants duplicate values from policy.md.
-// Replace with exported policy constants once the policy language supports
-// exporting const values.
+// TODO(aranya-core#582): These constants duplicate values from policy.md.
+// Replace with exported policy constants once policy-ifgen exposes globals.
 //
 // Role ranks (from policy.md):
 //   - Owner role:    999_999 (MAX_RANK - 1)
@@ -891,22 +890,23 @@ async fn test_assign_role_requires_delegated_permission() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let operator = team.operator;
     let membera = team.membera;
+    let memberb = team.memberb;
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
 
-    operator
+    membera
         .sync_expect(owner, None)
         .await
-        .context("operator unable to sync owner state")?;
+        .context("membera unable to sync owner state")?;
 
-    let err = operator
+    // Member role does not have AssignRole permission, so this should fail.
+    let err = membera
         .actions()
-        .assign_role(device_id(membera)?, member_role)
+        .assign_role(device_id(memberb)?, member_role)
         .await
-        .expect_err("expected assigning role without delegation to fail");
+        .expect_err("expected assigning role without AssignRole permission to fail");
     expect_not_authorized(err);
 
     Ok(())

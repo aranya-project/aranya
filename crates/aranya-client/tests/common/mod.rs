@@ -29,9 +29,8 @@ pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 // Rank constants for tests
 // =============================================================================
 //
-// TODO(aranya-core#577): These constants duplicate values from policy.md.
-// Replace with exported policy constants once the policy language supports
-// exporting const values.
+// TODO(aranya-core#582): These constants duplicate values from policy.md.
+// Replace with exported policy constants once policy-ifgen exposes globals.
 //
 // These constants define rank values used in tests. They are derived from the
 // role ranks defined in policy.md to ensure the invariant `role_rank > device_rank`

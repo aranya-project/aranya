@@ -2158,7 +2158,10 @@ async fn test_role_rank_migration_pattern() -> Result<()> {
     let mut old_sorted = old_perms.clone();
     old_sorted.sort_by_key(|p| format!("{p:?}"));
     new_perms.sort_by_key(|p| format!("{p:?}"));
-    assert_eq!(old_sorted, new_perms, "new role should have the same permissions as old role");
+    assert_eq!(
+        old_sorted, new_perms,
+        "new role should have the same permissions as old role"
+    );
 
     // Step 4: Migrate device from old role to new role
     owner_team
