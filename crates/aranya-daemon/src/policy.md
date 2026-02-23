@@ -215,7 +215,7 @@ function seal_command(payload bytes) struct Envelope {
     let author_id = device::current_device_id()
     let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
 
-    let signed = crypto::sign(author_sign_pk.key_id, payload)
+    let signed = crypto::sign(idam::derive_sign_key_id(author_sign_pk.key), payload)
     return envelope::new(
         parent_id,
         author_id,
@@ -268,22 +268,11 @@ function valid_device_invariants(device_id id) bool {
         check !exists DeviceSignPubKey[device_id: device_id]
         check !exists DeviceEncPubKey[device_id: device_id]
     } else {
-        // The device DOES exist, so the device keys MUST also
-        // exist and each key ID must be consistent with its public
-        // key. These checks are future proofing the policy against
-        // bugs: key IDs are deterministically derived from keys at
-        // fact creation time, so they should always match. The
-        // checks catch future policy changes that might store
-        // inconsistent key/key_id pairs.
+        // The device DOES exist, so the device keys MUST also exist.
 
-        let ident_key_fact = unwrap query DeviceIdentPubKey[device_id: device_id]
-        check device_id == idam::derive_device_id(ident_key_fact.key)
-
-        let sign_key_fact = unwrap query DeviceSignPubKey[device_id: device_id]
-        check sign_key_fact.key_id == idam::derive_sign_key_id(sign_key_fact.key)
-
-        let enc_key_fact = unwrap query DeviceEncPubKey[device_id: device_id]
-        check enc_key_fact.key_id == idam::derive_enc_key_id(enc_key_fact.key)
+        check exists DeviceIdentPubKey[device_id: device_id]
+        check exists DeviceSignPubKey[device_id: device_id]
+        check exists DeviceEncPubKey[device_id: device_id]
     }
 
     // NB: Since this function uses `check` internally, it
@@ -326,7 +315,7 @@ that the device publishes to the graph.
 
 ```policy
 // Records the public half of the device's Signing Key.
-fact DeviceSignPubKey[device_id id]=>{key_id id, key bytes}
+fact DeviceSignPubKey[device_id id]=>{key bytes}
 ```
 
 #### Device Encryption Key
@@ -336,7 +325,7 @@ encapsulated secret keys to other devices. It is primarily used to securely tran
 
 ```policy
 // Records the public half of the device's Encryption Key.
-fact DeviceEncPubKey[device_id id]=>{key_id id, key bytes}
+fact DeviceEncPubKey[device_id id]=>{key bytes}
 ```
 
 ### Device Functions
@@ -455,7 +444,7 @@ function get_enc_pk(device_id id) bytes {
 // Returns the device's encryption key ID.
 function get_enc_key_id(device_id id) id {
     let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
-    return device_enc_pk.key_id
+    return idam::derive_enc_key_id(device_enc_pk.key)
 }
 ```
 
@@ -2563,11 +2552,9 @@ finish function add_new_device(
         key: kb.ident_key,
     }
     create DeviceSignPubKey[device_id: keys.device_id]=>{
-        key_id: keys.sign_key_id,
         key: kb.sign_key,
     }
     create DeviceEncPubKey[device_id: keys.device_id]=>{
-        key_id: keys.enc_key_id,
         key: kb.enc_key,
     }
 
