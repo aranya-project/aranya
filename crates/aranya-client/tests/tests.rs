@@ -1,6 +1,7 @@
 //! Integration tests for the user library.
 
 #![allow(
+    clippy::arithmetic_side_effects,
     clippy::disallowed_macros,
     clippy::expect_used,
     clippy::indexing_slicing,
@@ -42,7 +43,7 @@ async fn test_get_keybundle_device_id() -> Result<()> {
         devices.owner.id
     );
     assert_eq!(
-        devices.owner.client.get_key_bundle().await?,
+        devices.owner.client.get_public_key_bundle().await?,
         devices.owner.pk
     );
 
@@ -113,15 +114,12 @@ async fn test_sync_now() -> Result<()> {
 
     // Now, we try to assign a role using the admin, which is expected to fail
     // because the admin hasn't synced yet and doesn't know about its role.
-    match admin
+    let err = admin
         .device(devices.operator.id)
         .assign_role(roles.operator().id)
         .await
-    {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
-    }
+        .expect_err("admin has not synced yet, role assignment should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     // Let's sync immediately, which will propagate the role change.
     admin
@@ -663,7 +661,10 @@ async fn test_query_functions() -> Result<()> {
     debug!("membera role: {:?}", dev_role);
 
     // Make sure that we have the correct keybundle.
-    let keybundle = memberb.device(devices.membera.id).keybundle().await?;
+    let keybundle = memberb
+        .device(devices.membera.id)
+        .public_key_bundle()
+        .await?;
     debug!("membera keybundle: {:?}", keybundle);
 
     // Make sure membera can query labels assigned to it.
@@ -753,25 +754,20 @@ async fn test_add_team() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id);
-        match admin.sync_now(owner_addr, None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
         // Now, we try to assign a role using the admin, which is expected to fail
         // because the admin hasn't called add_team() yet.
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles.operator().id)
             .await
-        {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
     }
 
     let admin_seed = owner
@@ -977,25 +973,20 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id1);
-        match admin.sync_now(owner_addr, None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing team1 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
         // Now, we try to assign a role using the admin, which is expected to fail
         // because add_team() hasn't been called yet.
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles1.operator().id)
             .await
-        {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment on team1 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
     }
 
     let admin_seed1 = team1
@@ -1028,25 +1019,20 @@ async fn test_multi_team_sync() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id2);
-        match admin.sync_now(owner_addr, None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing team2 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
         // Now, we try to assign a role using the admin, which is expected to fail
         // because add_team() hasn't been called for team2 yet.
-        match admin
+        let err = admin
             .device(devices.operator.id)
             .assign_role(roles2.operator().id)
             .await
-        {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
+            .expect_err("role assignment on team2 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
     }
 
     let admin_seed2 = team2
@@ -1690,15 +1676,12 @@ async fn test_assign_role_self_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     // Owner tries to assign a role to itself. Fails because the policy
     // requires the author to strictly outrank the target device.
-    match owner_team
+    let err = owner_team
         .device(devices.owner.id)
         .assign_role(roles.owner().id)
         .await
-    {
-        Ok(_) => bail!("expected assigning role to self to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_role error: {err:?}"),
-    }
+        .expect_err("assigning role to self should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
@@ -1714,15 +1697,12 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    match owner_team
+    let err = owner_team
         .device(devices.owner.id)
         .revoke_role(roles.owner().id)
         .await
-    {
-        Ok(_) => bail!("expected revoking owner role from self to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected revoke_role error: {err:?}"),
-    }
+        .expect_err("sole owner cannot revoke its own role");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
@@ -1776,11 +1756,11 @@ async fn test_delete_label_requires_permission() -> Result<()> {
         .await
         .context("operator unable to sync owner state")?;
 
-    match operator_team.delete_label(label).await {
-        Ok(_) => bail!("expected delete_label without permission to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected delete_label error: {err:?}"),
-    }
+    let err = operator_team
+        .delete_label(label)
+        .await
+        .expect_err("delete_label without permission should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
@@ -1805,15 +1785,12 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     // Owner tries to assign a label to itself. This fails because the policy
     // requires the author to strictly outrank the target device, and a device
     // can never outrank itself (rank comparison uses `>`).
-    match owner_team
+    let err = owner_team
         .device(owner_id)
         .assign_label(label, ChanOp::SendRecv)
         .await
-    {
-        Ok(_) => bail!("expected assigning label to self to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected assign_label error: {err:?}"),
-    }
+        .expect_err("assigning label to self should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
@@ -1828,11 +1805,12 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let admin_team = devices.admin.client.team(team_id);
-    match admin_team.device(devices.owner.id).remove_from_team().await {
-        Ok(_) => bail!("expected removing the final owner to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected remove_device error: {err:?}"),
-    }
+    let err = admin_team
+        .device(devices.owner.id)
+        .remove_from_team()
+        .await
+        .expect_err("removing the final owner should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }

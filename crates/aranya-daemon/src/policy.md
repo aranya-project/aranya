@@ -368,13 +368,13 @@ function get_author(evp struct Envelope) struct Device {
 }
 
 // Collection of public Device Keys for a device.
-struct KeyBundle {
+struct PublicKeyBundle {
     ident_key bytes,
     sign_key bytes,
     enc_key bytes,
 }
 
-// Returns the device's key bundle.
+// Returns the device's public key bundle.
 //
 // # Caveats
 //
@@ -383,7 +383,7 @@ struct KeyBundle {
 // between devices and keys so it would be a very significant
 // violation if a device's key existed without the device also
 // existing. See `valid_device_invariants`.
-function get_device_keybundle(device_id id) struct KeyBundle {
+function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
     // This function is a little too expensive to call every
     // time we need to get a device, so only uncomment this when
     // debugging/developing.
@@ -396,7 +396,7 @@ function get_device_keybundle(device_id id) struct KeyBundle {
     let sign_key = check_unwrap query DeviceSignPubKey[device_id: device_id]
     let enc_key = check_unwrap query DeviceEncPubKey[device_id: device_id]
 
-    return KeyBundle {
+    return PublicKeyBundle {
         ident_key: ident_key.key,
         sign_key: sign_key.key,
         enc_key: enc_key.key,
@@ -414,7 +414,7 @@ struct DevKeyIds {
 }
 
 // Derives the unique ID for each Device Key in the bundle.
-function derive_device_key_ids(device_keys struct KeyBundle) struct DevKeyIds {
+function derive_device_key_ids(device_keys struct PublicKeyBundle) struct DevKeyIds {
     let device_id = idam::derive_device_id(device_keys.ident_key)
     let sign_key_id = idam::derive_sign_key_id(device_keys.sign_key)
     let enc_key_id = idam::derive_enc_key_id(device_keys.enc_key)
@@ -654,25 +654,25 @@ ephemeral command QueryDeviceRole {
 }
 ```
 
-### `query_device_keybundle`
+### `query_device_public_key_bundle`
 
-Returns a device's `KeyBundle`.
+Returns a device's `PublicKeyBundle`.
 
 ```policy
 // Emits `QueryDeviceKeyBundleResult` with the device's key
 // bundle.
-ephemeral action query_device_keybundle(device_id id) {
+ephemeral action query_device_public_key_bundle(device_id id) {
     publish QueryDeviceKeyBundle {
         device_id: device_id,
     }
 }
 
-// Emitted when a device's key bundle is queried by
-// `query_device_keybundle`.
+// Emitted when a device's public key bundle is queried by
+// `query_device_public_key_bundle`.
 effect QueryDeviceKeyBundleResult {
     // NB: We don't include the device ID here since the caller
     // must already know it as it was provided to the action.
-    device_keys struct KeyBundle,
+    device_keys struct PublicKeyBundle,
 }
 
 ephemeral command QueryDeviceKeyBundle {
@@ -690,7 +690,7 @@ ephemeral command QueryDeviceKeyBundle {
         // NB: A device's keys exist iff `fact Device` exists, so
         // we don't need to use `get_device` or anything
         // like that.
-        let device_keys = get_device_keybundle(this.device_id)
+        let device_keys = get_device_public_key_bundle(this.device_id)
 
         finish {
             emit QueryDeviceKeyBundleResult {
@@ -2388,9 +2388,9 @@ which creates the `TeamStart` fact.
 
 ```policy
 // Creates a Team.
-action create_team(creator_keys struct KeyBundle, nonce bytes) {
+action create_team(owner_keys struct PublicKeyBundle, nonce bytes) {
     publish CreateTeam {
-        creator_keys: creator_keys,
+        owner_keys: owner_keys,
         nonce: nonce,
     }
 }
@@ -2399,8 +2399,8 @@ action create_team(creator_keys struct KeyBundle, nonce bytes) {
 effect TeamCreated {
     // The ID of the team.
     team_id id,
-    // The ID of the device that created the team.
-    creator_id id,
+    // The ID of the device that owns the team.
+    owner_id id,
 }
 
 command CreateTeam {
@@ -2409,8 +2409,8 @@ command CreateTeam {
     }
 
     fields {
-        // The creator's public Device Keys.
-        creator_keys struct KeyBundle,
+        // The initial owner's public Device Keys.
+        owner_keys struct PublicKeyBundle,
         // Random nonce to enforce this team's uniqueness.
         nonce bytes,
     }
@@ -2422,7 +2422,7 @@ command CreateTeam {
         let parent_id = perspective::head_id()
         let author_id = device::current_device_id()
         let payload = serialize(this)
-        let author_sign_key_id = idam::derive_sign_key_id(this.creator_keys.sign_key)
+        let author_sign_key_id = idam::derive_sign_key_id(this.owner_keys.sign_key)
 
         let signed = crypto::sign(author_sign_key_id, payload)
         return envelope::new(
@@ -2436,7 +2436,7 @@ command CreateTeam {
 
     open {
         let payload = envelope::payload(envelope)
-        let author_sign_key = deserialize(payload).creator_keys.sign_key
+        let author_sign_key = deserialize(payload).owner_keys.sign_key
 
         let verified_command = crypto::verify(
             author_sign_key,
@@ -2461,7 +2461,7 @@ command CreateTeam {
 
         let author_id = envelope::author_id(envelope)
 
-        let creator_key_ids = derive_device_key_ids(this.creator_keys)
+        let owner_key_ids = derive_device_key_ids(this.owner_keys)
 
         // The ID of a team is the ID of the command that created
         // it.
@@ -2469,19 +2469,19 @@ command CreateTeam {
 
         // The author must have signed the command with the same
         // device keys.
-        check author_id == creator_key_ids.device_id
+        check author_id == owner_key_ids.device_id
 
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
-        let creator_rank = MAX_RANK
+        let owner_rank = MAX_RANK
         let owner_role_rank = saturating_sub(MAX_RANK, 1)
         finish {
             create TeamStart[]=>{team_id: team_id}
 
-            create DeviceGeneration[device_id: creator_key_ids.device_id]=>{generation: 0}
+            create DeviceGeneration[device_id: owner_key_ids.device_id]=>{generation: 0}
 
-            add_new_device(this.creator_keys, creator_key_ids, creator_rank)
+            add_new_device(this.owner_keys, owner_key_ids, owner_rank)
 
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
@@ -2522,12 +2522,12 @@ command CreateTeam {
             // order, but try to make it intuitive.
             emit TeamCreated {
                 team_id: team_id,
-                creator_id: author_id,
+                owner_id: author_id,
             }
             emit DeviceAdded {
-                device_id: creator_key_ids.device_id,
-                device_keys: this.creator_keys,
-                rank: creator_rank,
+                device_id: owner_key_ids.device_id,
+                device_keys: this.owner_keys,
+                rank: owner_rank,
             }
             emit RoleCreated {
                 role_id: owner_role_id,
@@ -2547,7 +2547,7 @@ command CreateTeam {
 
 // Adds the device to the team.
 finish function add_new_device(
-    kb struct KeyBundle,
+    kb struct PublicKeyBundle,
     keys struct DevKeyIds,
     rank int,
 ) {
@@ -2599,7 +2599,7 @@ effect TeamTerminated {
     // The ID of the team that was terminated.
     team_id id,
     // The ID of the device that terminated the team.
-    creator_id id,
+    owner_id id,
 }
 
 // This effect is emitted when a command could cause certain AFC channels to be invalidated.
@@ -2640,7 +2640,7 @@ command TerminateTeam {
 
             emit TeamTerminated {
                 team_id: current_team_id,
-                creator_id: author.device_id,
+                owner_id: author.device_id,
             }
 
             emit CheckValidAfcChannels {}
@@ -2658,7 +2658,7 @@ command TerminateTeam {
 //
 // - `AddDevice`
 // - `AssignRole` (if assigned an initial role)
-action add_device_with_rank(device_keys struct KeyBundle, initial_role_id optional id, rank int) {
+action add_device_with_rank(device_keys struct PublicKeyBundle, initial_role_id optional id, rank int) {
     publish AddDevice {
         device_keys: device_keys,
         rank: rank,
@@ -2677,7 +2677,7 @@ effect DeviceAdded {
     // Uniquely identifies the device.
     device_id id,
     // The device's set of public Device Keys.
-    device_keys struct KeyBundle,
+    device_keys struct PublicKeyBundle,
     // The rank of the device object.
     rank int,
 }
@@ -2689,7 +2689,7 @@ command AddDevice {
 
     fields {
         // The new device's public Device Keys.
-        device_keys struct KeyBundle,
+        device_keys struct PublicKeyBundle,
         // Device rank.
         rank int,
     }

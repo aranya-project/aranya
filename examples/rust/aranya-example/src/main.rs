@@ -9,7 +9,7 @@ use anyhow::{Context as _, Result};
 use aranya_client::HelloSubscriptionConfig;
 use aranya_client::{
     afc,
-    client::{ChanOp, Client, DeviceId, KeyBundle},
+    client::{ChanOp, Client, DeviceId, PublicKeyBundle},
     text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
     ObjectId, Permission, Rank, SyncPeerConfig,
 };
@@ -59,7 +59,7 @@ impl Daemon {
 /// An Aranya device.
 struct ClientCtx {
     client: Client,
-    pk: KeyBundle,
+    pk: PublicKeyBundle,
     id: DeviceId,
     // NB: These have important drop side effects.
     _work_dir: TempDir,
@@ -127,7 +127,7 @@ impl ClientCtx {
             .context("unable to initialize client")?;
 
         let pk = client
-            .get_key_bundle()
+            .get_public_key_bundle()
             .await
             .context("expected key bundle")?;
         let id = client.get_device_id().await.context("expected device id")?;
@@ -187,7 +187,9 @@ async fn main() -> Result<()> {
     };
 
     let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sleep_interval = sync_interval
+        .checked_mul(6)
+        .expect("sleep interval should not overflow");
     let sync_cfg = {
         let mut builder = SyncPeerConfig::builder();
         builder = builder.interval(sync_interval);
@@ -482,7 +484,7 @@ async fn main() -> Result<()> {
     let owner_device = owner_team.device(owner.id);
     let owner_role = owner_device.role().await?.expect("expected owner role");
     info!("owner role: {:?}", owner_role);
-    let keybundle = owner_device.keybundle().await?;
+    let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
@@ -528,7 +530,13 @@ async fn main() -> Result<()> {
     // membera seals data for memberb.
     let afc_msg = "afc msg".as_bytes();
     info!(?afc_msg, "membera sealing data for memberb");
-    let mut ciphertext = vec![0u8; afc_msg.len() + afc::Channels::OVERHEAD];
+    let mut ciphertext = vec![
+        0u8;
+        afc_msg
+            .len()
+            .checked_add(afc::Channels::OVERHEAD)
+            .expect("AFC overhead should not overflow")
+    ];
     send.seal(&mut ciphertext, afc_msg)
         .expect("expected to seal afc data");
     info!(?afc_msg, "membera sealed data for memberb");
@@ -537,7 +545,13 @@ async fn main() -> Result<()> {
 
     // memberb opens data from membera.
     info!("memberb receiving uni channel from membera");
-    let mut plaintext = vec![0u8; ciphertext.len() - afc::Channels::OVERHEAD];
+    let mut plaintext = vec![
+        0u8;
+        ciphertext
+            .len()
+            .checked_sub(afc::Channels::OVERHEAD)
+            .expect("ciphertext must be larger than overhead")
+    ];
     info!("memberb opening data from membera");
     let seq1 = recv
         .open(&mut plaintext, &ciphertext)

@@ -5,7 +5,7 @@ use std::{future::Future, marker::PhantomData};
 use anyhow::{Context, Result};
 use aranya_crypto::{
     policy::{LabelId, RoleId},
-    Csprng, DeviceId, Rng,
+    DeviceId, Random as _, Rng,
 };
 use aranya_daemon_api::Rank;
 use aranya_keygen::PublicKeys;
@@ -19,7 +19,7 @@ use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, KeyBundle, Perm},
+    policy::{self, ChanOp, Effect, PublicKeyBundle, Perm},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -46,14 +46,14 @@ where
     #[instrument(skip_all)]
     pub async fn create_team(
         &self,
-        owner_keys: KeyBundle,
+        owner_keys: PublicKeyBundle,
         nonce: Option<&[u8]>,
     ) -> Result<(GraphId, Vec<Effect>)> {
         let mut sink = VecSink::new();
         let policy_data = &[0u8];
         let act = policy::create_team(
             owner_keys,
-            nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()).to_vec(),
+            nonce.unwrap_or(&<[u8; 16]>::random(Rng)).to_vec(),
         );
         let id = {
             let mut client = self.lock_aranya().await;
@@ -175,7 +175,7 @@ where
     #[instrument(skip_all)]
     fn add_device_with_rank(
         &self,
-        keys: KeyBundle,
+        keys: PublicKeyBundle,
         initial_role_id: Option<RoleId>,
         rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
@@ -340,14 +340,14 @@ where
             .in_current_span()
     }
 
-    /// Invokes `query_device_keybundle`.
+    /// Invokes `query_device_public_key_bundle`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(%device_id))]
-    fn query_device_keybundle(
+    fn query_device_public_key_bundle(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_session_action(policy::query_device_keybundle(device_id.as_base()))
+        self.call_session_action(policy::query_device_public_key_bundle(device_id.as_base()))
             .map_ok(|SessionData { effects, .. }| effects)
             .in_current_span()
     }
@@ -460,7 +460,7 @@ where
     }
 }
 
-impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
+impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for PublicKeyBundle {
     type Error = postcard::Error;
     fn try_from(pk: &PublicKeys<CS>) -> Result<Self, Self::Error> {
         Ok(Self {

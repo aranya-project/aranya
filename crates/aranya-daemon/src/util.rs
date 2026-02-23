@@ -78,7 +78,7 @@ impl SeedDir {
 }
 
 pub(crate) async fn load_team_psk_pairs(
-    eng: &mut CE,
+    eng: &CE,
     store: &mut LocalStore<KS>,
     dir: &SeedDir,
 ) -> Result<Vec<(TeamId, Arc<PresharedKey>)>> {
@@ -138,8 +138,8 @@ mod tests {
         let mut seen = HashSet::new();
 
         for _ in 0..100 {
-            let team_id = TeamId::random(&mut Rng);
-            let seed_id = PskSeedId::random(&mut Rng);
+            let team_id = TeamId::random(Rng);
+            let seed_id = PskSeedId::random(Rng);
 
             // may see duplicates by random chance
             if !seen.insert(team_id) {
@@ -174,8 +174,8 @@ mod tests {
             .context("could not create seed dir")?;
 
         for _ in 0..100 {
-            let team_id = TeamId::random(&mut Rng);
-            let seed_id = PskSeedId::random(&mut Rng);
+            let team_id = TeamId::random(Rng);
+            let seed_id = PskSeedId::random(Rng);
 
             seed_dir
                 .append(team_id, seed_id)

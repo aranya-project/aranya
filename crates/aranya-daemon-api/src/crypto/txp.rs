@@ -65,7 +65,7 @@ impl<CS: CipherSuite> Ctx<CS> {
 
     /// Creates the HPKE encryption context for the client.
     fn client<R: Csprng>(
-        rng: &mut R,
+        rng: R,
         pk: &PublicApiKey<CS>,
         info: &[u8],
     ) -> Result<(Self, Encap<CS>), HpkeError> {
@@ -329,7 +329,10 @@ where
         self.ctx = Some(ctx);
         // Rekeying takes so long (relatively speaking, anyway)
         // that this should never overflow.
-        self.rekeys += 1;
+        self.rekeys = self
+            .rekeys
+            .checked_add(1)
+            .assume("rekey count should not overflow")?;
         Ok(enc)
     }
 }
@@ -702,7 +705,7 @@ pub mod unix {
 
 #[cfg(test)]
 #[cfg(unix)]
-#[allow(clippy::panic)]
+#[allow(clippy::arithmetic_side_effects, clippy::panic)]
 mod tests {
     use std::panic;
 
@@ -748,8 +751,8 @@ mod tests {
         let path = Arc::new(dir.path().to_path_buf().join("sock"));
         let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
-        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
-        let sk = ApiKey::<CS>::new(&mut eng);
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&eng);
         let pk = sk.public().unwrap();
 
         const MAX_PING_PONGS: usize = 100;
@@ -832,8 +835,8 @@ mod tests {
         let path = Arc::new(dir.path().to_path_buf().join("sock"));
         let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
-        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
-        let sk = ApiKey::<CS>::new(&mut eng);
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&eng);
         let pk = sk.public().unwrap();
 
         const MAX_PING_PONGS: usize = 100;
@@ -928,8 +931,8 @@ mod tests {
         let path = Arc::new(dir.path().to_path_buf().join("sock"));
         let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
-        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
-        let sk = ApiKey::<CS>::new(&mut eng);
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&eng);
         let pk = sk.public().unwrap();
 
         const MAX_PING_PONGS: usize = 2;

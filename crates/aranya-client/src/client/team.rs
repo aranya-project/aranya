@@ -5,13 +5,12 @@ use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
 use buggy::BugExt as _;
-use tarpc::context;
 use tracing::instrument;
 
 use crate::{
     client::{
-        Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Permission, Role,
-        RoleId, Roles,
+        create_ctx, Client, Device, DeviceId, Devices, Label, LabelId, Labels, Permission,
+        PublicKeyBundle, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -42,7 +41,7 @@ impl Team<'_> {
     pub async fn close_team(&self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.id)
+            .close_team(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -52,7 +51,7 @@ impl Team<'_> {
 impl Team<'_> {
     /// Encrypts the team's QUIC syncer PSK seed for a peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
-    /// See [`KeyBundle::encryption`].
+    /// See [`PublicKeyBundle::encryption`].
     #[instrument(skip(self))]
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
@@ -61,7 +60,7 @@ impl Team<'_> {
         let wrapped = self
             .client
             .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
+            .encrypt_psk_seed_for_peer(create_ctx(), self.id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -74,7 +73,7 @@ impl Team<'_> {
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, config.into())
+            .add_sync_peer(create_ctx(), addr, self.id, config.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -88,7 +87,7 @@ impl Team<'_> {
     pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
+            .sync_now(create_ctx(), addr, self.id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -99,7 +98,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.id)
+            .remove_sync_peer(create_ctx(), addr, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -121,7 +120,7 @@ impl Team<'_> {
     /// Use [`Self::add_device_with_rank`] to specify an explicit rank.
     #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
-    pub async fn add_device(&self, keys: KeyBundle, initial_role: Option<RoleId>) -> Result<()> {
+    pub async fn add_device(&self, keys: PublicKeyBundle, initial_role: Option<RoleId>) -> Result<()> {
         // Default to role_rank - 1 when an initial_role is provided,
         // otherwise fall back to author_rank - 1.
         let rank = match &initial_role {
@@ -140,7 +139,7 @@ impl Team<'_> {
         self.client
             .daemon
             .add_device_to_team_with_rank(
-                context::current(),
+                create_ctx(),
                 self.id,
                 keys.into_api(),
                 initial_role.map(RoleId::into_api),
@@ -160,14 +159,14 @@ impl Team<'_> {
     #[instrument(skip(self))]
     pub async fn add_device_with_rank(
         &self,
-        keys: KeyBundle,
+        keys: PublicKeyBundle,
         initial_role: Option<RoleId>,
         rank: Rank,
     ) -> Result<()> {
         self.client
             .daemon
             .add_device_to_team_with_rank(
-                context::current(),
+                create_ctx(),
                 self.id,
                 keys.into_api(),
                 initial_role.map(RoleId::into_api),
@@ -193,7 +192,7 @@ impl Team<'_> {
         let data = self
             .client
             .daemon
-            .devices_on_team(context::current(), self.id)
+            .devices_on_team(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -230,7 +229,7 @@ impl Team<'_> {
         self.client
             .daemon
             .sync_hello_subscribe(
-                context::current(),
+                create_ctx(),
                 peer,
                 self.id,
                 config.graph_change_debounce(),
@@ -250,7 +249,7 @@ impl Team<'_> {
     pub async fn sync_hello_unsubscribe(&self, peer: Addr) -> Result<()> {
         self.client
             .daemon
-            .sync_hello_unsubscribe(context::current(), peer, self.id)
+            .sync_hello_unsubscribe(create_ctx(), peer, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -269,7 +268,7 @@ impl Team<'_> {
         let roles = self
             .client
             .daemon
-            .setup_default_roles(context::current(), self.id)
+            .setup_default_roles(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -295,7 +294,7 @@ impl Team<'_> {
         let role = self
             .client
             .daemon
-            .create_role(context::current(), self.id, role_name, rank)
+            .create_role(create_ctx(), self.id, role_name, rank)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -313,7 +312,7 @@ impl Team<'_> {
     pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
         self.client
             .daemon
-            .delete_role(context::current(), self.id, role_id.into_api())
+            .delete_role(create_ctx(), self.id, role_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -329,7 +328,7 @@ impl Team<'_> {
     pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .add_perm_to_role(context::current(), self.id, role_id.into_api(), perm)
+            .add_perm_to_role(create_ctx(), self.id, role_id.into_api(), perm)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -345,7 +344,7 @@ impl Team<'_> {
     pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
             .daemon
-            .remove_perm_from_role(context::current(), self.id, role_id.into_api(), perm)
+            .remove_perm_from_role(create_ctx(), self.id, role_id.into_api(), perm)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -358,7 +357,7 @@ impl Team<'_> {
         let perms = self
             .client
             .daemon
-            .query_role_perms(context::current(), self.id, role_id.into_api())
+            .query_role_perms(create_ctx(), self.id, role_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -384,7 +383,7 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .change_rank(context::current(), self.id, object_id, old_rank, new_rank)
+            .change_rank(create_ctx(), self.id, object_id, old_rank, new_rank)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -395,7 +394,7 @@ impl Team<'_> {
     pub async fn query_rank(&self, object_id: ObjectId) -> Result<Rank> {
         self.client
             .daemon
-            .query_rank(context::current(), self.id, object_id)
+            .query_rank(create_ctx(), self.id, object_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -407,7 +406,7 @@ impl Team<'_> {
         let roles = self
             .client
             .daemon
-            .team_roles(context::current(), self.id)
+            .team_roles(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -460,7 +459,7 @@ impl Team<'_> {
         let rank = Rank::new(author_rank.value().saturating_sub(1));
         self.client
             .daemon
-            .create_label_with_rank(context::current(), self.id, label_name, rank)
+            .create_label_with_rank(create_ctx(), self.id, label_name, rank)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -476,7 +475,7 @@ impl Team<'_> {
     pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
         self.client
             .daemon
-            .create_label_with_rank(context::current(), self.id, label_name, rank)
+            .create_label_with_rank(create_ctx(), self.id, label_name, rank)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -505,7 +504,7 @@ impl Team<'_> {
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.id, label_id.into_api())
+            .delete_label(create_ctx(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -517,7 +516,7 @@ impl Team<'_> {
         let label = self
             .client
             .daemon
-            .label(context::current(), self.id, label_id.into_api())
+            .label(create_ctx(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -531,7 +530,7 @@ impl Team<'_> {
         let labels = self
             .client
             .daemon
-            .labels(context::current(), self.id)
+            .labels(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
