@@ -214,8 +214,9 @@ function seal_command(payload bytes) struct Envelope {
     let parent_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
+    let author_sign_key_id = idam::derive_sign_key_id(author_sign_pk.key)
 
-    let signed = crypto::sign(author_sign_pk.key_id, payload)
+    let signed = crypto::sign(author_sign_key_id, payload)
     return envelope::new(
         parent_id,
         author_id,
@@ -268,17 +269,11 @@ function valid_device_invariants(device_id id) bool {
         check !exists DeviceSignPubKey[device_id: device_id]
         check !exists DeviceEncPubKey[device_id: device_id]
     } else {
-        // The device DOES exist, so the device keys MUST also
-        // exist and each key ID must be consistent with its public key.
+        // The device DOES exist, so the device keys MUST also exist.
 
-        let ident_key_fact = unwrap query DeviceIdentPubKey[device_id: device_id]
-        check device_id == idam::derive_device_id(ident_key_fact.key)
-
-        let sign_key_fact = unwrap query DeviceSignPubKey[device_id: device_id]
-        check sign_key_fact.key_id == idam::derive_sign_key_id(sign_key_fact.key)
-
-        let enc_key_fact = unwrap query DeviceEncPubKey[device_id: device_id]
-        check enc_key_fact.key_id == idam::derive_enc_key_id(enc_key_fact.key)
+        check exists DeviceIdentPubKey[device_id: device_id]
+        check exists DeviceSignPubKey[device_id: device_id]
+        check exists DeviceEncPubKey[device_id: device_id]
     }
 
     // NB: Since this function uses `check` internally, it
@@ -289,7 +284,7 @@ function valid_device_invariants(device_id id) bool {
     // a meaningful result, but that would obscure which
     // invariant was violated. We would only know that
     // `valid_device_invariants` failed, not that (for example)
-    // `check ident_key_id == device_id` failed.
+    // `check exists DeviceIdentPubKey[...]` failed.
     return true
 }
 ```
@@ -321,7 +316,7 @@ that the device publishes to the graph.
 
 ```policy
 // Records the public half of the device's Signing Key.
-fact DeviceSignPubKey[device_id id]=>{key_id id, key bytes}
+fact DeviceSignPubKey[device_id id]=>{key bytes}
 ```
 
 #### Device Encryption Key
@@ -331,7 +326,7 @@ encapsulated secret keys to other devices. It is primarily used to securely tran
 
 ```policy
 // Records the public half of the device's Encryption Key.
-fact DeviceEncPubKey[device_id id]=>{key_id id, key bytes}
+fact DeviceEncPubKey[device_id id]=>{key bytes}
 ```
 
 ### Device Functions
@@ -403,29 +398,6 @@ function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
     }
 }
 
-// The unique IDs for each Device Key.
-struct DevKeyIds {
-    // Uniquely identifies the Device Identity Key.
-    device_id id,
-    // Uniquely identifies the Device Signing Key.
-    sign_key_id id,
-    // Uniquely identifies the Device Encryption Key.
-    enc_key_id id,
-}
-
-// Derives the unique ID for each Device Key in the bundle.
-function derive_device_key_ids(device_keys struct PublicKeyBundle) struct DevKeyIds {
-    let device_id = idam::derive_device_id(device_keys.ident_key)
-    let sign_key_id = idam::derive_sign_key_id(device_keys.sign_key)
-    let enc_key_id = idam::derive_enc_key_id(device_keys.enc_key)
-
-    return DevKeyIds {
-        device_id: device_id,
-        sign_key_id: sign_key_id,
-        enc_key_id: enc_key_id,
-    }
-}
-
 // Returns the device's encoded public Encryption Key.
 //
 // # Caveats
@@ -450,7 +422,7 @@ function get_enc_pk(device_id id) bytes {
 // Returns the device's encryption key ID.
 function get_enc_key_id(device_id id) id {
     let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
-    return device_enc_pk.key_id
+    return idam::derive_enc_key_id(device_enc_pk.key)
 }
 ```
 
@@ -2461,7 +2433,7 @@ command CreateTeam {
 
         let author_id = envelope::author_id(envelope)
 
-        let owner_key_ids = derive_device_key_ids(this.owner_keys)
+        let owner_device_id = idam::derive_device_id(this.owner_keys.ident_key)
 
         // The ID of a team is the ID of the command that created
         // it.
@@ -2469,7 +2441,7 @@ command CreateTeam {
 
         // The author must have signed the command with the same
         // device keys.
-        check author_id == owner_key_ids.device_id
+        check author_id == owner_device_id
 
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
@@ -2479,9 +2451,9 @@ command CreateTeam {
         finish {
             create TeamStart[]=>{team_id: team_id}
 
-            create DeviceGeneration[device_id: owner_key_ids.device_id]=>{generation: 0}
+            create DeviceGeneration[device_id: owner_device_id]=>{generation: 0}
 
-            add_new_device(this.owner_keys, owner_key_ids, owner_rank)
+            add_new_device(owner_device_id, this.owner_keys, owner_rank)
 
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
@@ -2525,7 +2497,7 @@ command CreateTeam {
                 owner_id: author_id,
             }
             emit DeviceAdded {
-                device_id: owner_key_ids.device_id,
+                device_id: owner_device_id,
                 device_keys: this.owner_keys,
                 rank: owner_rank,
             }
@@ -2547,26 +2519,22 @@ command CreateTeam {
 
 // Adds the device to the team.
 finish function add_new_device(
+    device_id id,
     kb struct PublicKeyBundle,
-    keys struct DevKeyIds,
     rank int,
 ) {
-    // TODO: check that `kb` matches `keys`.
-
-    create Device[device_id: keys.device_id]=>{}
-    create DeviceIdentPubKey[device_id: keys.device_id]=>{
+    create Device[device_id: device_id]=>{}
+    create DeviceIdentPubKey[device_id: device_id]=>{
         key: kb.ident_key,
     }
-    create DeviceSignPubKey[device_id: keys.device_id]=>{
-        key_id: keys.sign_key_id,
+    create DeviceSignPubKey[device_id: device_id]=>{
         key: kb.sign_key,
     }
-    create DeviceEncPubKey[device_id: keys.device_id]=>{
-        key_id: keys.enc_key_id,
+    create DeviceEncPubKey[device_id: device_id]=>{
         key: kb.enc_key,
     }
 
-    set_object_rank(keys.device_id, rank)
+    set_object_rank(device_id, rank)
 }
 
 // Deletes the core device facts for `device_id`.
@@ -2665,8 +2633,9 @@ action add_device_with_rank(device_keys struct PublicKeyBundle, initial_role_id 
     }
     if initial_role_id is Some {
         let role_id = unwrap initial_role_id
+        let device_id = idam::derive_device_id(device_keys.ident_key)
         publish AssignRole {
-            device_id: derive_device_key_ids(device_keys).device_id,
+            device_id: device_id,
             role_id: role_id,
         }
     }
@@ -2708,36 +2677,35 @@ command AddDevice {
         // The author's rank must be greater than the rank of the device it is adding to the team.
         check get_object_rank(author.device_id) >= this.rank
 
-        let dev_key_ids = derive_device_key_ids(this.device_keys)
+        let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
-        check !exists Device[device_id: dev_key_ids.device_id]
-        check !exists DeviceIdentPubKey[device_id: dev_key_ids.device_id]
-        check !exists DeviceSignPubKey[device_id: dev_key_ids.device_id]
-        check !exists DeviceEncPubKey[device_id: dev_key_ids.device_id]
+        check !exists Device[device_id: device_id]
+        check !exists DeviceIdentPubKey[device_id: device_id]
+        check !exists DeviceSignPubKey[device_id: device_id]
+        check !exists DeviceEncPubKey[device_id: device_id]
 
-        let existing_gen = query DeviceGeneration[device_id: dev_key_ids.device_id]
+        let existing_gen = query DeviceGeneration[device_id: device_id]
 
         // At this point we believe the following to be true:
         //
         // - the team is active
         // - `author` has the `AddDevice` permission
-        // - the key material for `dev_key_ids` is not already
-        //   present on the team
+        // - the key material is not already present on the team
         //
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
         if existing_gen is None {
             finish {
-                create DeviceGeneration[device_id: dev_key_ids.device_id]=>{generation: 0}
+                create DeviceGeneration[device_id: device_id]=>{generation: 0}
 
                 add_new_device(
+                    device_id,
                     this.device_keys,
-                    dev_key_ids,
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: dev_key_ids.device_id,
+                    device_id: device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
@@ -2745,12 +2713,12 @@ command AddDevice {
         } else {
             finish {
                 add_new_device(
+                    device_id,
                     this.device_keys,
-                    dev_key_ids,
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: dev_key_ids.device_id,
+                    device_id: device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
