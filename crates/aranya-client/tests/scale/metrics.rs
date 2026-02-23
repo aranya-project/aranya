@@ -177,17 +177,6 @@ impl TestCtx {
                     println!("Total convergence time:  {:?}", total);
                 }
 
-                //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-004
-                //# The test SHOULD report memory usage per node if available.
-                #[cfg(target_os = "linux")]
-                if let Some(mem) = get_process_memory_kb() {
-                    println!("Process memory:          {} KB", mem);
-                    println!(
-                        "Est. memory per node:    {} KB",
-                        mem / metrics.node_count as u64
-                    );
-                }
-
                 println!("================================\n");
 
                 info!(
@@ -250,21 +239,4 @@ impl TestCtx {
             Err(e) => warn!(path = %csv_path, error = %e, "Failed to export CSV"),
         }
     }
-}
-
-/// Gets the current process memory usage in KB (Linux only).
-#[cfg(target_os = "linux")]
-fn get_process_memory_kb() -> Option<u64> {
-    use std::fs;
-
-    let status = fs::read_to_string("/proc/self/status").ok()?;
-    for line in status.lines() {
-        if line.starts_with("VmRSS:") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                return parts[1].parse().ok();
-            }
-        }
-    }
-    None
 }

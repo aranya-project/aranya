@@ -178,6 +178,7 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("3-node ring (poll)")
         .node_count(3)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(60))
         .build()?;
 
@@ -234,6 +235,7 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("10-node ring (poll)")
         .node_count(10)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(120))
         .build()?;
 
@@ -286,6 +288,7 @@ async fn test_ring_convergence_20_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("20-node ring (poll)")
         .node_count(20)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(200))
         .build()?;
 
@@ -334,6 +337,7 @@ async fn test_ring_convergence_30_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("30-node ring (poll)")
         .node_count(30)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(300))
         .build()?;
 
@@ -382,6 +386,7 @@ async fn test_ring_convergence_40_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("40-node ring (poll)")
         .node_count(40)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(400))
         .build()?;
 
@@ -430,6 +435,7 @@ async fn test_ring_convergence_50_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("50-node ring (poll)")
         .node_count(50)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(400))
         .build()?;
 
@@ -478,6 +484,7 @@ async fn test_ring_convergence_60_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("60-node ring (poll)")
         .node_count(60)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
         .build()?;
 
@@ -529,6 +536,7 @@ async fn test_ring_convergence_70_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("70-node ring (poll)")
         .node_count(70)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
         .build()?;
 
@@ -577,6 +585,7 @@ async fn test_ring_convergence_80_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("80-node ring (poll)")
         .node_count(80)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
         .build()?;
 
@@ -625,6 +634,7 @@ async fn test_ring_convergence_90_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("90-node ring (poll)")
         .node_count(90)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
         .build()?;
 
@@ -678,6 +688,7 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
     let config = TestConfig::builder()
         .test_name("100-node ring (poll)")
         .node_count(100)
+        .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
         .build()?;
 
