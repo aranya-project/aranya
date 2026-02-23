@@ -36,10 +36,10 @@ pub(crate) enum SyncResponse {
 pub(crate) struct HelloSubscription {
     /// Rate limiting on how often to notify when a graph changes.
     pub(super) graph_change_debounce: Duration,
-    /// The last time we notified a peer about our current graph.
-    pub(super) last_notified: Option<Instant>,
     /// How far apart to space notifications on a schedule.
     pub(super) schedule_delay: Duration,
+    /// The last time we notified a peer about our current graph.
+    pub(super) last_notified: Instant,
     /// How long until the subscription is no longer valid.
     pub(super) expires_at: Instant,
     /// The key to access the entry in the `DelayQueue`.
