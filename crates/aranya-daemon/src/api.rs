@@ -166,8 +166,7 @@ impl DaemonApiServer {
                 let effect_handler = self.api.effect_handler.clone();
                 async move {
                     while let Some((graph, effects)) = self.recv_effects.recv().await {
-                        if let Err(err) = effect_handler.handle_effects(graph, &effects, None).await
-                        {
+                        if let Err(err) = effect_handler.handle_effects(graph, &effects).await {
                             error!(error = ?err, "error handling effects");
                         }
                     }
@@ -232,31 +231,14 @@ struct EffectHandler {
 
 impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
-    #[instrument(
-        skip_all,
-        fields(%graph, effects = effects.len(), trace_id = tracing::field::Empty)
-    )]
-    async fn handle_effects(
-        &self,
-        graph: GraphId,
-        effects: &[Effect],
-        trace_id: Option<TraceId>,
-    ) -> anyhow::Result<()> {
-        if let Some(trace_id) = trace_id {
-            trace::record_current_span_trace_id(trace_id);
-            trace!(trace_id = %trace_id, "handling effects");
-        } else {
-            trace!("handling effects");
-        }
+    #[instrument(skip_all, fields(%graph, effects = effects.len()))]
+    async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> anyhow::Result<()> {
+        trace!("handling effects");
 
         use Effect::*;
         // TODO: support feature flag in interface generator to compile out certain effects.
         for effect in effects {
-            if let Some(trace_id) = trace_id {
-                trace!(?effect, trace_id = %trace_id, "handling effect");
-            } else {
-                trace!(?effect, "handling effect");
-            }
+            trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_) => {}
                 TeamTerminated(_) => {}
@@ -455,13 +437,13 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err, fields(trace_id = tracing::field::Empty))]
     async fn version(self, ctx: context::Context) -> api::Result<api::Version> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.version");
+        self.setup_trace_context(&ctx, "DaemonApi.version");
         api::Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
     }
 
     #[instrument(skip(self), err, fields(trace_id = tracing::field::Empty))]
     async fn aranya_local_addr(self, ctx: context::Context) -> api::Result<Addr> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.aranya_local_addr");
+        self.setup_trace_context(&ctx, "DaemonApi.aranya_local_addr");
         Ok(self.local_addr.into())
     }
 
@@ -470,7 +452,7 @@ impl DaemonApi for Api {
         self,
         ctx: context::Context,
     ) -> api::Result<api::PublicKeyBundle> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.get_public_key_bundle");
+        self.setup_trace_context(&ctx, "DaemonApi.get_public_key_bundle");
         Ok(self
             .get_pk()
             .context("unable to get device public keys")?
@@ -479,14 +461,14 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err, fields(trace_id = tracing::field::Empty))]
     async fn get_device_id(self, ctx: context::Context) -> api::Result<api::DeviceId> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.get_device_id");
+        self.setup_trace_context(&ctx, "DaemonApi.get_device_id");
         self.device_id().map(api::DeviceId::transmute)
     }
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err, fields(trace_id = tracing::field::Empty))]
     async fn afc_shm_info(self, ctx: context::Context) -> api::Result<api::AfcShmInfo> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.afc_shm_info");
+        self.setup_trace_context(&ctx, "DaemonApi.afc_shm_info");
         Ok(self.afc.get_shm_info().await)
     }
 
@@ -502,7 +484,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.add_sync_peer");
+        self.setup_trace_context(&ctx, "DaemonApi.add_sync_peer");
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer.add_peer(peer, cfg).await?;
@@ -517,7 +499,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.sync_now");
+        self.setup_trace_context(&ctx, "DaemonApi.sync_now");
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer.sync_now(peer, cfg).await?;
@@ -535,7 +517,7 @@ impl DaemonApi for Api {
         duration: Duration,
         schedule_delay: Duration,
     ) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.sync_hello_subscribe");
+        self.setup_trace_context(&ctx, "DaemonApi.sync_hello_subscribe");
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer
@@ -552,7 +534,7 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.sync_hello_unsubscribe");
+        self.setup_trace_context(&ctx, "DaemonApi.sync_hello_unsubscribe");
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer.sync_hello_unsubscribe(peer).await?;
@@ -566,7 +548,7 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.remove_sync_peer");
+        self.setup_trace_context(&ctx, "DaemonApi.remove_sync_peer");
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer
@@ -582,7 +564,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), fields(trace_id = tracing::field::Empty))]
     async fn add_team(mut self, ctx: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.add_team");
+        self.setup_trace_context(&ctx, "DaemonApi.add_team");
         let team = cfg.team_id;
         self.check_team_valid(team).await?;
 
@@ -594,7 +576,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err, fields(trace_id = tracing::field::Empty))]
     async fn remove_team(self, ctx: context::Context, team: api::TeamId) -> api::Result<()> {
-        let _trace_id = self.setup_trace_context(&ctx, "DaemonApi.remove_team");
+        self.setup_trace_context(&ctx, "DaemonApi.remove_team");
         if let Some(data) = &self.quic {
             self.remove_team_quic_sync(team, data)?;
         }
@@ -616,8 +598,8 @@ impl DaemonApi for Api {
         ctx: context::Context,
         cfg: api::CreateTeamConfig,
     ) -> api::Result<api::TeamId> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.create_team");
-        info!(?trace_id, "create_team");
+        self.setup_trace_context(&ctx, "DaemonApi.create_team");
+        info!("create_team");
 
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -627,7 +609,7 @@ impl DaemonApi for Api {
             .create_team(pk, Some(nonce))
             .await
             .context("unable to create team")?;
-        debug!(?graph_id, ?trace_id);
+        debug!(?graph_id);
         let team_id = api::TeamId::transmute(graph_id);
 
         match cfg.quic_sync {
@@ -700,7 +682,7 @@ impl DaemonApi for Api {
         keys: api::PublicKeyBundle,
         initial_role: Option<api::RoleId>,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.add_device_to_team");
+        self.setup_trace_context(&ctx, "DaemonApi.add_device_to_team");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -709,10 +691,8 @@ impl DaemonApi for Api {
             .add_device(keys.into(), initial_role.map(RoleId::transmute))
             .await
             .context("unable to add device to team")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
-        trace!(?trace_id, ?graph, "added device to team");
+        self.effect_handler.handle_effects(graph, &effects).await?;
+        trace!(?graph, "added device to team");
         Ok(())
     }
 
@@ -723,7 +703,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.remove_device_from_team");
+        self.setup_trace_context(&ctx, "DaemonApi.remove_device_from_team");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -732,9 +712,7 @@ impl DaemonApi for Api {
             .remove_device(DeviceId::transmute(device))
             .await
             .context("unable to remove device from team")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
@@ -858,7 +836,7 @@ impl DaemonApi for Api {
         role_name: Text,
         owning_role: api::RoleId,
     ) -> api::Result<api::Role> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.create_role");
+        self.setup_trace_context(&ctx, "DaemonApi.create_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -867,9 +845,7 @@ impl DaemonApi for Api {
             .create_role(role_name, RoleId::transmute(owning_role))
             .await
             .context("unable to create role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleCreated(e)) = find_effect!(&effects, Effect::RoleCreated(_)) {
             Ok(api::Role {
@@ -891,7 +867,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         role_id: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.delete_role");
+        self.setup_trace_context(&ctx, "DaemonApi.delete_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -900,9 +876,7 @@ impl DaemonApi for Api {
             .delete_role(RoleId::transmute(role_id))
             .await
             .context("unable to delete role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleDeleted(e)) = find_effect!(&effects, Effect::RoleDeleted(_)) {
             info!("Deleted role {role_id} ({})", e.name());
@@ -920,7 +894,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.assign_role");
+        self.setup_trace_context(&ctx, "DaemonApi.assign_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -929,12 +903,10 @@ impl DaemonApi for Api {
             .assign_role(DeviceId::transmute(device), RoleId::transmute(role))
             .await
             .context("unable to assign role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleAssigned(_e)) = find_effect!(&effects, Effect::RoleAssigned(_e)) {
-            trace!(?trace_id, ?device, ?role, "assigned role to device");
+            trace!(?device, ?role, "assigned role to device");
             Ok(())
         } else {
             Err(anyhow!("unable to assign role").into())
@@ -949,7 +921,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.revoke_role");
+        self.setup_trace_context(&ctx, "DaemonApi.revoke_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -958,12 +930,10 @@ impl DaemonApi for Api {
             .revoke_role(DeviceId::transmute(device), RoleId::transmute(role))
             .await
             .context("unable to revoke device role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleRevoked(_e)) = find_effect!(&effects, Effect::RoleRevoked(_e)) {
-            trace!(?trace_id, ?device, ?role, "revoked role from device");
+            trace!(?device, ?role, "revoked role from device");
             Ok(())
         } else {
             Err(anyhow!("unable to revoke device role").into())
@@ -979,7 +949,7 @@ impl DaemonApi for Api {
         old_role_id: api::RoleId,
         new_role_id: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.change_role");
+        self.setup_trace_context(&ctx, "DaemonApi.change_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -992,9 +962,7 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to change device role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::RoleChanged(_e)) = find_effect!(&effects, Effect::RoleChanged(_e)) {
             Ok(())
@@ -1012,7 +980,7 @@ impl DaemonApi for Api {
         peer_id: api::DeviceId,
         label: api::LabelId,
     ) -> api::Result<api::AfcSendChannelInfo> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.create_afc_channel");
+        self.setup_trace_context(&ctx, "DaemonApi.create_afc_channel");
         let graph = self.check_team_valid(team).await?;
 
         info!("creating afc uni channel");
@@ -1030,9 +998,7 @@ impl DaemonApi for Api {
             bug!("expected afc uni channel created effect")
         };
 
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         let (local_channel_id, channel_id) = self.afc.uni_channel_created(e).await?;
         info!("afc uni channel created");
@@ -1066,7 +1032,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         ctrl: api::AfcCtrl,
     ) -> api::Result<api::AfcReceiveChannelInfo> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.accept_afc_channel");
+        self.setup_trace_context(&ctx, "DaemonApi.accept_afc_channel");
         let graph = self.check_team_valid(team).await?;
 
         let mut session = self.client.session_new(graph).await?;
@@ -1077,9 +1043,7 @@ impl DaemonApi for Api {
             bug!("expected afc uni channel received effect")
         };
 
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         let (local_channel_id, channel_id) = self.afc.uni_channel_received(e).await?;
 
@@ -1099,7 +1063,7 @@ impl DaemonApi for Api {
         label_name: Text,
         managing_role_id: api::RoleId,
     ) -> api::Result<api::LabelId> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.create_label");
+        self.setup_trace_context(&ctx, "DaemonApi.create_label");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1108,12 +1072,10 @@ impl DaemonApi for Api {
             .create_label(label_name.clone(), RoleId::transmute(managing_role_id))
             .await
             .context("unable to create label")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            trace!(?trace_id, label = %label_name, "created label");
+            trace!(label = %label_name, "created label");
             Ok(api::LabelId::from_base(e.label_id))
         } else {
             Err(anyhow!("unable to create label").into())
@@ -1127,7 +1089,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.delete_label");
+        self.setup_trace_context(&ctx, "DaemonApi.delete_label");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1136,12 +1098,10 @@ impl DaemonApi for Api {
             .delete_label(LabelId::transmute(label_id))
             .await
             .context("unable to delete label")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
-            trace!(?trace_id, ?label_id, "deleted label");
+            trace!(?label_id, "deleted label");
             Ok(())
         } else {
             Err(anyhow!("unable to delete label").into())
@@ -1156,7 +1116,7 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         managing_role_id: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.add_label_managing_role");
+        self.setup_trace_context(&ctx, "DaemonApi.add_label_managing_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1168,9 +1128,7 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to add label managing role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::LabelManagingRoleAdded(_e)) =
             find_effect!(&effects, Effect::LabelManagingRoleAdded(_e))
@@ -1190,7 +1148,7 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         op: api::ChanOp,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.assign_label_to_device");
+        self.setup_trace_context(&ctx, "DaemonApi.assign_label_to_device");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1203,14 +1161,12 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to assign label")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::AssignedLabelToDevice(_e)) =
             find_effect!(&effects, Effect::AssignedLabelToDevice(_e))
         {
-            trace!(?trace_id, ?device, ?label_id, "assigned label to device");
+            trace!(?device, ?label_id, "assigned label to device");
             Ok(())
         } else {
             Err(anyhow!("unable to assign label").into())
@@ -1225,7 +1181,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.revoke_label_from_device");
+        self.setup_trace_context(&ctx, "DaemonApi.revoke_label_from_device");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1234,14 +1190,12 @@ impl DaemonApi for Api {
             .revoke_label_from_device(DeviceId::transmute(device), LabelId::transmute(label_id))
             .await
             .context("unable to revoke label")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         if let Some(Effect::LabelRevokedFromDevice(_e)) =
             find_effect!(&effects, Effect::LabelRevokedFromDevice(_e))
         {
-            trace!(?trace_id, ?device, ?label_id, "revoked label from device");
+            trace!(?device, ?label_id, "revoked label from device");
             Ok(())
         } else {
             Err(anyhow!("unable to revoke label").into())
@@ -1307,7 +1261,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         owning_role: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.setup_default_roles");
+        self.setup_trace_context(&ctx, "DaemonApi.setup_default_roles");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1316,9 +1270,7 @@ impl DaemonApi for Api {
             .setup_default_roles(RoleId::transmute(owning_role))
             .await
             .context("unable to setup default roles")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         let roles = effects
             .into_iter()
@@ -1385,7 +1337,7 @@ impl DaemonApi for Api {
         role: api::RoleId,
         perm: api::SimplePerm,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.add_perm_to_role");
+        self.setup_trace_context(&ctx, "DaemonApi.add_perm_to_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1394,9 +1346,7 @@ impl DaemonApi for Api {
             .add_perm_to_role(RoleId::transmute(role), perm.into())
             .await
             .context("unable to add permission to role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
@@ -1410,7 +1360,7 @@ impl DaemonApi for Api {
         role: api::RoleId,
         perm: api::SimplePerm,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.remove_perm_from_role");
+        self.setup_trace_context(&ctx, "DaemonApi.remove_perm_from_role");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1419,9 +1369,7 @@ impl DaemonApi for Api {
             .remove_perm_from_role(RoleId::transmute(role), perm.into())
             .await
             .context("unable to add permission to role")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
@@ -1435,7 +1383,7 @@ impl DaemonApi for Api {
         role: api::RoleId,
         owning_role: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.add_role_owner");
+        self.setup_trace_context(&ctx, "DaemonApi.add_role_owner");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1444,9 +1392,7 @@ impl DaemonApi for Api {
             .add_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
             .await
             .context("unable to add role owner")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
@@ -1460,7 +1406,7 @@ impl DaemonApi for Api {
         role: api::RoleId,
         owning_role: api::RoleId,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.remove_role_owner");
+        self.setup_trace_context(&ctx, "DaemonApi.remove_role_owner");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1469,9 +1415,7 @@ impl DaemonApi for Api {
             .remove_role_owner(RoleId::transmute(role), RoleId::transmute(owning_role))
             .await
             .context("unable to remove role owner")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
@@ -1518,7 +1462,7 @@ impl DaemonApi for Api {
         managing_role: api::RoleId,
         perm: api::RoleManagementPerm,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.assign_role_management_perm");
+        self.setup_trace_context(&ctx, "DaemonApi.assign_role_management_perm");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1531,9 +1475,7 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to assign role management permission")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
@@ -1548,7 +1490,7 @@ impl DaemonApi for Api {
         managing_role: api::RoleId,
         perm: api::RoleManagementPerm,
     ) -> api::Result<()> {
-        let trace_id = self.setup_trace_context(&ctx, "DaemonApi.revoke_role_management_perm");
+        self.setup_trace_context(&ctx, "DaemonApi.revoke_role_management_perm");
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1561,9 +1503,7 @@ impl DaemonApi for Api {
             )
             .await
             .context("unable to revoke role management permission")?;
-        self.effect_handler
-            .handle_effects(graph, &effects, Some(trace_id))
-            .await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         Ok(())
     }
