@@ -5,7 +5,7 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::{
-    client::{Client, DeviceId, KeyBundle, Role, RoleManagementPermission, TeamId},
+    client::{Client, DeviceId, PublicKeyBundle, Role, RoleManagementPermission, TeamId},
     Addr, SyncPeerConfig,
 };
 // These deprecated types are only used in create_and_add_team for backward compatibility testing.
