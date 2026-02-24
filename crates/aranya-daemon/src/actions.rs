@@ -18,7 +18,7 @@ use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, KeyBundle, RoleManagementPerm, SimplePerm},
+    policy::{self, ChanOp, Effect, PublicKeyBundle, RoleManagementPerm, SimplePerm},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -45,7 +45,7 @@ where
     #[instrument(skip_all)]
     pub async fn create_team(
         &self,
-        owner_keys: KeyBundle,
+        owner_keys: PublicKeyBundle,
         nonce: Option<&[u8]>,
     ) -> Result<(GraphId, Vec<Effect>)> {
         let mut sink = VecSink::new();
@@ -176,7 +176,7 @@ where
     #[instrument(skip_all)]
     fn add_device(
         &self,
-        keys: KeyBundle,
+        keys: PublicKeyBundle,
         initial_role_id: Option<RoleId>,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::add_device(
@@ -338,14 +338,14 @@ where
             .in_current_span()
     }
 
-    /// Invokes `query_device_keybundle`.
+    /// Invokes `query_device_public_key_bundle`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(%device_id))]
-    fn query_device_keybundle(
+    fn query_device_public_key_bundle(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_session_action(policy::query_device_keybundle(device_id.as_base()))
+        self.call_session_action(policy::query_device_public_key_bundle(device_id.as_base()))
             .map_ok(|SessionData { effects, .. }| effects)
             .in_current_span()
     }
@@ -527,7 +527,7 @@ where
     }
 }
 
-impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
+impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for PublicKeyBundle {
     type Error = postcard::Error;
     fn try_from(pk: &PublicKeys<CS>) -> Result<Self, Self::Error> {
         Ok(Self {

@@ -275,7 +275,7 @@ impl DevicesCtx {
 
 pub struct DeviceCtx {
     pub client: Client,
-    pub pk: KeyBundle,
+    pub pk: PublicKeyBundle,
     pub id: DeviceId,
     #[expect(unused, reason = "manages tasks")]
     pub daemon: DaemonHandle,
@@ -356,7 +356,10 @@ impl DeviceCtx {
             .context("unable to init client")?;
 
         // Get device id and key bundle.
-        let pk = client.get_key_bundle().await.expect("expected key bundle");
+        let pk = client
+            .get_public_key_bundle()
+            .await
+            .expect("expected key bundle");
         let id = client.get_device_id().await.expect("expected device id");
 
         Ok(Self {

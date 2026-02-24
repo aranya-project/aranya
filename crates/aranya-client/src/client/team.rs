@@ -8,8 +8,8 @@ use tracing::instrument;
 use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
-        create_ctx, Client, Device, DeviceId, Devices, KeyBundle, Label, LabelId, Labels, Role,
-        RoleId, Roles,
+        create_ctx, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle,
+        Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{aranya_error, IpcError, Result},
@@ -101,7 +101,11 @@ impl Team<'_> {
 impl Team<'_> {
     /// Adds a device to the team with an optional initial role.
     #[instrument(skip(self))]
-    pub async fn add_device(&self, keys: KeyBundle, initial_role: Option<RoleId>) -> Result<()> {
+    pub async fn add_device(
+        &self,
+        keys: PublicKeyBundle,
+        initial_role: Option<RoleId>,
+    ) -> Result<()> {
         self.client
             .daemon
             .add_device_to_team(

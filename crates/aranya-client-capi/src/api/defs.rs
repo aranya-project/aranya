@@ -674,20 +674,39 @@ pub fn init_logging() -> Result<(), imp::Error> {
 /// Gets the public key bundle for this device.
 ///
 /// @param[in] client the Aranya Client
-/// @param[out] keybundle keybundle byte buffer `KeyBundle`.
-/// @param[in,out] keybundle_len returns the length of the serialized keybundle.
+/// @param[out] public_key_bundle key bundle byte buffer
+/// @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
 ///
 /// @relates AranyaClient.
-pub unsafe fn get_key_bundle(
+pub unsafe fn get_public_key_bundle(
     client: &Client,
-    keybundle: *mut MaybeUninit<u8>,
-    keybundle_len: &mut usize,
+    public_key_bundle: *mut MaybeUninit<u8>,
+    public_key_bundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let keys = client.rt.block_on(client.inner.get_key_bundle())?;
-    // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
-    unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
+    let keys = client.rt.block_on(client.inner.get_public_key_bundle())?;
+    // SAFETY: Must trust caller provides valid ptr/len for public_key_bundle buffer.
+    unsafe { imp::public_key_bundle_serialize(&keys, public_key_bundle, public_key_bundle_len)? };
 
     Ok(())
+}
+
+/// Gets the public key bundle for this device.
+///
+/// Renamed to [`get_public_key_bundle`].
+///
+/// @param[in] client the Aranya Client
+/// @param[out] public_key_bundle key bundle byte buffer
+/// @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
+///
+/// @relates AranyaClient.
+#[deprecated(note = "Use `aranya_get_public_key_bundle`.")]
+pub unsafe fn get_key_bundle(
+    client: &Client,
+    public_key_bundle: *mut MaybeUninit<u8>,
+    public_key_bundle_len: &mut usize,
+) -> Result<(), imp::Error> {
+    // SAFETY: Just forwarding.
+    unsafe { get_public_key_bundle(client, public_key_bundle, public_key_bundle_len) }
 }
 
 /// The size in bytes of an ID converted to a human-readable base58 string.
@@ -1890,8 +1909,8 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team_id the team's ID
-/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param[in] keybundle_len the length of the keybundle
+/// @param[in] public_key_bundle serialized key bundle bytes
+/// @param[in] public_key_bundle_len the length of the key bundle
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
 ///
@@ -1901,17 +1920,17 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 pub unsafe fn encrypt_psk_seed_for_peer(
     client: &Client,
     team_id: &TeamId,
-    keybundle: &[u8],
+    public_key_bundle: &[u8],
     seed: *mut MaybeUninit<u8>,
     seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+    let public_key_bundle = imp::public_key_bundle_deserialize(public_key_bundle)?;
 
     let wrapped_seed = client.rt.block_on(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(keybundle.encryption()),
+            .encrypt_psk_seed_for_peer(public_key_bundle.encryption()),
     )?;
 
     if *seed_len < wrapped_seed.len() {
@@ -1976,24 +1995,24 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param[in] keybundle_len is the length of the serialized keybundle.
+/// @param[in] public_key_bundle serialized key bundle bytes
+/// @param[in] public_key_bundle_len is the length of the serialized public key bundle.
 /// @param[in] role_id (optional) the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
     client: &Client,
     team: &TeamId,
-    keybundle: &[u8],
+    public_key_bundle: &[u8],
     role_id: Option<&RoleId>,
 ) -> Result<(), imp::Error> {
-    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+    let public_key_bundle = imp::public_key_bundle_deserialize(public_key_bundle)?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .add_device(keybundle, role_id.map(Into::into)),
+            .add_device(public_key_bundle, role_id.map(Into::into)),
     )?;
     Ok(())
 }
@@ -2226,32 +2245,63 @@ pub fn team_device_role(
     Ok(())
 }
 
-/// Query device's keybundle.
+/// Query device's public key bundle.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 /// @param[in] device the device's ID
-/// @param[out] keybundle keybundle byte buffer `KeyBundle`.
-/// @param[in,out] keybundle_len returns the length of the serialized keybundle.
+/// @param[out] public_key_bundle key bundle byte buffer
+/// @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
 ///
 /// @relates AranyaClient.
-pub unsafe fn team_device_keybundle(
+pub unsafe fn team_device_public_key_bundle(
     client: &Client,
     team: &TeamId,
     device: &DeviceId,
-    keybundle: *mut MaybeUninit<u8>,
-    keybundle_len: &mut usize,
+    public_key_bundle: *mut MaybeUninit<u8>,
+    public_key_bundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let keys = client.rt.block_on(
         client
             .inner
             .team(team.into())
             .device(device.into())
-            .keybundle(),
+            .public_key_bundle(),
     )?;
-    // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
-    unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
+    // SAFETY: Must trust caller provides valid ptr/len for public_key_bundle buffer.
+    unsafe { imp::public_key_bundle_serialize(&keys, public_key_bundle, public_key_bundle_len)? };
     Ok(())
+}
+
+/// Query device's public key bundle.
+///
+/// Renamed to [`team_device_public_key_bundle`].
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] device the device's ID
+/// @param[out] public_key_bundle key bundle byte buffer
+/// @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
+///
+/// @relates AranyaClient.
+#[deprecated(note = "Use `aranya_team_device_public_key_bundle`.")]
+pub unsafe fn team_device_keybundle(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+    public_key_bundle: *mut MaybeUninit<u8>,
+    public_key_bundle_len: &mut usize,
+) -> Result<(), imp::Error> {
+    // SAFETY: Just forwarding.
+    unsafe {
+        team_device_public_key_bundle(
+            client,
+            team,
+            device,
+            public_key_bundle,
+            public_key_bundle_len,
+        )
+    }
 }
 
 /// Query device label assignments.

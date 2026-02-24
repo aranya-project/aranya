@@ -9,7 +9,7 @@
 //!
 //! ## Key Components
 //!
-//! - [`KeyBundle`]: The main structure that contains references to identity, encryption, and signing keys
+//! - [`PublicKeyBundle`]: The main structure that contains references to identity, encryption, and signing keys
 //! - [`PublicKeys`]: A structure that holds the public portions of the keys in a key bundle
 //!
 //! ## Example
@@ -17,7 +17,7 @@
 //! ```rust
 //! # use anyhow::Result;
 //! # use aranya_crypto::{Engine, KeyStore};
-//! # use aranya_keygen::KeyBundle;
+//! # use aranya_keygen::PublicKeyBundle;
 //! #
 //! # fn example<CE, KS>(engine: &CE, store: &mut KS) -> Result<()>
 //! # where
@@ -25,7 +25,7 @@
 //! #     KS: KeyStore,
 //! # {
 //! // Generate a new key bundle
-//! let key_bundle = KeyBundle::generate(engine, store)?;
+//! let key_bundle = PublicKeyBundle::generate(engine, store)?;
 //!
 //! // Load the public keys from the bundle
 //! let public_keys = key_bundle.public_keys(engine, store)?;

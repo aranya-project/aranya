@@ -225,7 +225,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
     if (c->pk == NULL) {
         abort();
     }
-    err = aranya_get_key_bundle(&c->client, c->pk, &c->pk_len);
+    err = aranya_get_public_key_bundle(&c->client, c->pk, &c->pk_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         // Too small, so the actual size was written to
         // `c->pk_len`.
@@ -235,7 +235,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr) {
         }
         c->pk = new_pk;
 
-        err = aranya_get_key_bundle(&c->client, c->pk, &c->pk_len);
+        err = aranya_get_public_key_bundle(&c->client, c->pk, &c->pk_len);
     }
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to get device IDs\n");
@@ -607,9 +607,9 @@ AranyaError run(Team *t) {
 
     uint8_t memberb_keybundle[1024] = {0};
     size_t memberb_keybundle_len = sizeof(memberb_keybundle);
-    err =
-        aranya_team_device_keybundle(&operator->client, &t->id, &memberb->id,
-                                     memberb_keybundle, &memberb_keybundle_len);
+    err = aranya_team_device_public_key_bundle(&operator->client, &t->id,
+                                               &memberb->id, memberb_keybundle,
+                                               &memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
     printf("%s key bundle len: %zu\n", t->clients_arr[MEMBERB].name,
            memberb_keybundle_len);

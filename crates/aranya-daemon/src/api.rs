@@ -48,7 +48,7 @@ use crate::daemon::{CE, KS};
 use crate::{
     actions::Actions,
     daemon::CS,
-    policy::{ChanOp, Effect, KeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
+    policy::{ChanOp, Effect, PublicKeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
     sync::{SyncHandle, SyncPeer},
     Client, EF,
 };
@@ -354,9 +354,9 @@ struct ApiInner {
 }
 
 impl ApiInner {
-    fn get_pk(&self) -> api::Result<KeyBundle> {
+    fn get_pk(&self) -> api::Result<PublicKeyBundle> {
         let pk = self.pk.lock().expect("poisoned");
-        Ok(KeyBundle::try_from(&*pk).context("bad key bundle")?)
+        Ok(PublicKeyBundle::try_from(&*pk).context("bad key bundle")?)
     }
 
     fn device_id(&self) -> api::Result<DeviceId> {
@@ -410,7 +410,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn get_key_bundle(self, _: context::Context) -> api::Result<api::KeyBundle> {
+    async fn get_public_key_bundle(self, _: context::Context) -> api::Result<api::PublicKeyBundle> {
         Ok(self
             .get_pk()
             .context("unable to get device public keys")?
@@ -558,7 +558,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        keys: api::KeyBundle,
+        keys: api::PublicKeyBundle,
         initial_role: Option<api::RoleId>,
     ) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
@@ -622,26 +622,26 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn device_keybundle(
+    async fn device_public_key_bundle(
         self,
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-    ) -> api::Result<api::KeyBundle> {
+    ) -> api::Result<api::PublicKeyBundle> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(graph)
-            .query_device_keybundle(DeviceId::transmute(device))
+            .query_device_public_key_bundle(DeviceId::transmute(device))
             .await
-            .context("unable to query device keybundle")?;
+            .context("unable to query device public key bundle")?;
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
-            Ok(api::KeyBundle::from(e.device_keys))
+            Ok(api::PublicKeyBundle::from(e.device_keys))
         } else {
-            Err(anyhow!("unable to query device keybundle").into())
+            Err(anyhow!("unable to query device public key bundle").into())
         }
     }
 
@@ -1359,9 +1359,9 @@ impl DaemonApi for Api {
     }
 }
 
-impl From<api::KeyBundle> for KeyBundle {
-    fn from(value: api::KeyBundle) -> Self {
-        KeyBundle {
+impl From<api::PublicKeyBundle> for PublicKeyBundle {
+    fn from(value: api::PublicKeyBundle) -> Self {
+        PublicKeyBundle {
             ident_key: value.identity,
             sign_key: value.signing,
             enc_key: value.encryption,
@@ -1369,9 +1369,9 @@ impl From<api::KeyBundle> for KeyBundle {
     }
 }
 
-impl From<KeyBundle> for api::KeyBundle {
-    fn from(value: KeyBundle) -> Self {
-        api::KeyBundle {
+impl From<PublicKeyBundle> for api::PublicKeyBundle {
+    fn from(value: PublicKeyBundle) -> Self {
+        api::PublicKeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
             encryption: value.enc_key,
