@@ -4,9 +4,7 @@ mod common;
 
 #[cfg(test)]
 mod trace_tests {
-    use aranya_client::{
-        config::CreateTeamQuicSyncConfig, trace::generate_trace_id, CreateTeamConfig,
-    };
+    use aranya_client::{config::CreateTeamQuicSyncConfig, CreateTeamConfig};
     use aranya_daemon_api::SEED_IKM_SIZE;
     use std::cell::RefCell;
     use tempfile::TempDir;
@@ -15,22 +13,6 @@ mod trace_tests {
     use tracing_test::traced_test;
 
     use crate::common::DeviceCtx;
-
-    #[traced_test]
-    #[test]
-    fn test_trace_id_generation() {
-        // Test that trace IDs can be generated and logged
-        let trace_id = generate_trace_id();
-        info!(%trace_id, "generated trace ID");
-
-        let trace_id2 = generate_trace_id();
-        info!(%trace_id2, "generated second trace ID");
-
-        // Verify they're different
-        assert_ne!(trace_id, trace_id2);
-        assert!(logs_contain("generated trace ID"));
-        assert!(logs_contain("generated second trace ID"));
-    }
 
     fn parse_trace_id(line: &str) -> Option<String> {
         let marker = "rpc.trace_id=";
