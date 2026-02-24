@@ -48,47 +48,41 @@ mod trace_tests {
         let team = owner.client.create_team(owner_cfg).await?;
         info!(team_id = %team.team_id(), "created team");
 
-        let daemon_trace_id = RefCell::new(None);
+        let parsed = RefCell::new((None, Vec::new()));
         logs_assert(|lines: &[&str]| {
-            let mut match_trace_id = None;
-            for line in lines
-                .iter()
-                .filter(|line| line.contains("RPC: ReceiveRequest"))
-            {
-                if line.contains("create_team") || line.contains("DaemonApi.create_team") {
+            let mut daemon_trace_id = None;
+            let mut client_trace_ids = Vec::new();
+
+            for line in lines.iter() {
+                if line.contains("RPC: ReceiveRequest")
+                    && (line.contains("create_team") || line.contains("DaemonApi.create_team"))
+                {
                     if let Some(trace_id) = parse_trace_id(line) {
-                        match_trace_id = Some(trace_id);
+                        daemon_trace_id = Some(trace_id);
+                    }
+                }
+
+                if line.contains("RPC: SendRequest")
+                    && (line.contains("create_team") || line.contains("DaemonApi.create_team"))
+                {
+                    if let Some(trace_id) = parse_trace_id(line) {
+                        client_trace_ids.push(trace_id);
                     }
                 }
             }
-            match match_trace_id {
-                Some(trace_id) => {
-                    *daemon_trace_id.borrow_mut() = Some(trace_id);
-                    Ok(())
-                }
-                None => Err("missing daemon trace id for create_team".to_string()),
-            }
-        });
-        let daemon_trace_id = daemon_trace_id
-            .into_inner()
-            .expect("daemon trace id should be captured");
 
-        let client_trace_ids = RefCell::new(Vec::new());
-        logs_assert(|lines: &[&str]| {
-            for line in lines
-                .iter()
-                .filter(|line| line.contains("RPC: SendRequest"))
-            {
-                if let Some(trace_id) = parse_trace_id(line) {
-                    client_trace_ids.borrow_mut().push(trace_id);
-                }
+            let Some(daemon_trace_id) = daemon_trace_id else {
+                return Err("missing daemon trace id for create_team".to_string());
+            };
+            if client_trace_ids.is_empty() {
+                return Err("missing client trace ids for create_team".to_string());
             }
-            if client_trace_ids.borrow().is_empty() {
-                return Err("missing client trace ids".to_string());
-            }
+
+            *parsed.borrow_mut() = (Some(daemon_trace_id), client_trace_ids);
             Ok(())
         });
-        let client_trace_ids = client_trace_ids.into_inner();
+        let (daemon_trace_id, client_trace_ids) = parsed.into_inner();
+        let daemon_trace_id = daemon_trace_id.expect("daemon trace id should be captured");
         assert!(
             client_trace_ids.iter().any(|id| id == &daemon_trace_id),
             "daemon trace id not found in client logs"
