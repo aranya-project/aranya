@@ -84,7 +84,7 @@ pub(crate) struct Afc<CE, CS, KS> {
     #[derive_where(skip(Debug))]
     handler: Mutex<Handler<AranyaStore<KS>>>,
     #[derive_where(skip(Debug))]
-    eng: Mutex<CE>,
+    eng: CE,
     /// AFC shared memory.
     shm: Mutex<AfcShm<CS>>,
 }
@@ -105,18 +105,17 @@ impl<CE, CS, KS> Afc<CE, CS, KS> {
         Ok(Self {
             client,
             handler: Mutex::new(Handler::new(device_id, store)),
-            eng: Mutex::new(eng),
+            eng,
             shm: Mutex::new(shm),
         })
     }
 
     async fn while_locked<'a, F, R>(&'a self, f: F) -> R
     where
-        F: for<'b> FnOnce(&'b mut Handler<AranyaStore<KS>>, &'b mut CE) -> R,
+        F: for<'b> FnOnce(&'b mut Handler<AranyaStore<KS>>, &'b CE) -> R,
     {
         let mut handler = self.handler.lock().await;
-        let mut eng = self.eng.lock().await;
-        f(&mut *handler, &mut *eng)
+        f(&mut *handler, &self.eng)
     }
 }
 

@@ -102,11 +102,11 @@ impl Daemon {
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
-            let mut eng = Self::load_crypto_engine(&cfg).await?;
-            let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
+            let eng = Self::load_crypto_engine(&cfg).await?;
+            let pks = Self::load_or_gen_public_keys(&cfg, &eng, &mut aranya_store).await?;
 
             // Generate a fresh API key at startup.
-            let api_sk = ApiKey::generate(&mut eng);
+            let api_sk = ApiKey::generate(&eng);
             aranya_util::write_file(cfg.api_pk_path(), &api_sk.public()?.encode()?)
                 .await
                 .context("unable to write API public key")?;
@@ -310,7 +310,7 @@ impl Daemon {
     /// Loads the daemon's [`PublicKeys`].
     async fn load_or_gen_public_keys<CE, KS>(
         cfg: &Config,
-        eng: &mut CE,
+        eng: &CE,
         store: &mut AranyaStore<KS>,
     ) -> Result<PublicKeys<CE::CS>>
     where
@@ -362,7 +362,7 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 tracing::info!("generating key");
-                let key = K::random(&mut Rng);
+                let key = K::random(Rng);
                 let bytes = key
                     .try_export_secret()
                     .context("unable to export new key")?;

@@ -98,7 +98,7 @@ where
             .await
             .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
 
-        let mut sync_requester = SyncRequester::new(peer.graph_id, &mut Rng);
+        let mut sync_requester = SyncRequester::new(peer.graph_id, Rng);
 
         // send sync request.
         syncer
