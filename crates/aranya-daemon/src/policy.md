@@ -697,11 +697,11 @@ When a team is created, the default ranks are:
 
 | Object | Rank |
 |--------|------|
-| Creator Device | 1000000 |
-| Owner Role | 999999 |
-| Admin Role | 800 |
-| Operator Role | 700 |
-| Member Role | 600 |
+| Creator Device | `DEFAULT_OWNER_DEVICE_RANK` (1,000,000) |
+| Owner Role | `DEFAULT_OWNER_ROLE_RANK` (999,999) |
+| Admin Role | `DEFAULT_ADMIN_ROLE_RANK` (800) |
+| Operator Role | `DEFAULT_OPERATOR_ROLE_RANK` (700) |
+| Member Role | `DEFAULT_MEMBER_ROLE_RANK` (600) |
 
 ### Rank Examples
 
@@ -917,6 +917,18 @@ rank and permissions, migrate devices to it, then delete the old role.
 ```policy
 // Default maximum rank for the team creator device.
 let MAX_RANK = 1000000
+
+// TODO(https://github.com/aranya-project/aranya-core/issues/582): use const
+// expression once supported by the policy language. E.g.:
+//   let DEFAULT_OWNER_DEVICE_RANK = MAX_RANK
+let DEFAULT_OWNER_DEVICE_RANK = 1000000
+// TODO(https://github.com/aranya-project/aranya-core/issues/582): use const
+// expression once supported by the policy language. E.g.:
+//   let DEFAULT_OWNER_ROLE_RANK = saturating_sub(MAX_RANK, 1)
+let DEFAULT_OWNER_ROLE_RANK = 999999
+let DEFAULT_ADMIN_ROLE_RANK = 800
+let DEFAULT_OPERATOR_ROLE_RANK = 700
+let DEFAULT_MEMBER_ROLE_RANK = 600
 
 // Change the rank of an object.
 //
@@ -1643,9 +1655,9 @@ command SetupDefaultRole {
         let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope)
 
-        let admin_role_rank = 800
-        let operator_role_rank = 700
-        let member_role_rank = 600
+        let admin_role_rank = DEFAULT_ADMIN_ROLE_RANK
+        let operator_role_rank = DEFAULT_OPERATOR_ROLE_RANK
+        let member_role_rank = DEFAULT_MEMBER_ROLE_RANK
         match this.name {
             DefaultRoleName::Admin => {
                 finish {
@@ -2446,8 +2458,8 @@ command CreateTeam {
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
 
-        let owner_rank = MAX_RANK
-        let owner_role_rank = saturating_sub(MAX_RANK, 1)
+        let owner_rank = DEFAULT_OWNER_DEVICE_RANK
+        let owner_role_rank = DEFAULT_OWNER_ROLE_RANK
         finish {
             create TeamStart[]=>{team_id: team_id}
 
