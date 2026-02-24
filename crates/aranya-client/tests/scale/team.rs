@@ -1,11 +1,14 @@
 //! Team setup for scale convergence tests.
 
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::TeamId, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
     CreateTeamQuicSyncConfig,
 };
-use tracing::{info, instrument};
+use tokio::time::sleep;
+use tracing::{info, instrument, warn};
 
 use crate::scale::TestCtx;
 
@@ -158,11 +161,6 @@ impl TestCtx {
     //# The test MUST handle sync failures between nodes.
     #[instrument(skip(self))]
     pub async fn sync_team_from_owner(&self) -> Result<()> {
-        use std::time::Duration;
-
-        use tokio::time::sleep;
-        use tracing::warn;
-
         const MAX_RETRIES: usize = 25;
         const RETRY_DELAY: Duration = Duration::from_millis(500);
 

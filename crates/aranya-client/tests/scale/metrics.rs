@@ -1,6 +1,6 @@
 //! Performance metrics calculation for scale convergence tests.
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use tracing::{info, warn};
 
@@ -124,8 +124,6 @@ impl TestCtx {
 
     /// Calculates the mode by bucketing durations into 100ms intervals.
     fn calculate_mode(times: &[Duration]) -> Duration {
-        use std::collections::HashMap;
-
         let bucket_ms = 100u128;
         let mut buckets: HashMap<u128, usize> = HashMap::new();
 

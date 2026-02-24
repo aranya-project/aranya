@@ -8,7 +8,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon,
 };
-use aranya_daemon_api::SEED_IKM_SIZE;
+use aranya_daemon_api::{shm, SEED_IKM_SIZE};
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::fs;
@@ -29,8 +29,6 @@ impl NodeCtx {
 
         // Generate unique AFC shm path per node
         let afc_shm_path = {
-            use aranya_daemon_api::shm;
-
             let path = Self::get_shm_path(format!("/{team_name}_{index:03}\0"));
             let path: Box<shm::Path> = path
                 .as_str()
