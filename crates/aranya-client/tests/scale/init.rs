@@ -90,6 +90,10 @@ impl NodeCtx {
 
         //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-002
         //# Each node MUST have its own cryptographic keys.
+
+        // Unique keys imply unique device IDs (derived from identity key).
+        //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-003
+        //# All nodes MUST have unique device IDs.
         let pk = client
             .get_public_key_bundle()
             .await

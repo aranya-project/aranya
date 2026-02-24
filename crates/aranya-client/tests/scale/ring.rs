@@ -52,6 +52,10 @@ impl TestCtx {
         for i in 0..n {
             //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-001
             //# In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
+
+            // Modular arithmetic guarantees a single cycle: 0->1->...->n-1->0.
+            //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#ring-002
+            //# The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
             let clockwise = (i + 1) % n;
             let counter_clockwise = (i + n - 1) % n;
 

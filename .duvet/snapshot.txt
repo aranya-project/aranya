@@ -48,7 +48,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
 
   SECTION: [RING-002](#ring-002)
-    TEXT[!MUST]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
+    TEXT[!MUST,implementation]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
 
   SECTION: [CUST-001](#cust-001)
     TEXT[!MUST,implementation]: The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
@@ -72,7 +72,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[!MUST,implementation]: Each node MUST have its own cryptographic keys.
 
   SECTION: [INIT-003](#init-003)
-    TEXT[!MUST]: All nodes MUST have unique device IDs.
+    TEXT[!MUST,implementation]: All nodes MUST have unique device IDs.
 
   SECTION: [INIT-004](#init-004)
     TEXT[!MUST,implementation]: Node initialization MUST occur in parallel batches to avoid resource exhaustion.
@@ -170,7 +170,7 @@ SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubu
     TEXT[implementation]: - Standard deviation of convergence times
 
   SECTION: [PERF-004](#perf-004)
-    TEXT[!SHOULD,implementation]: The test SHOULD report memory usage per node if available.
+    TEXT[!SHOULD]: The test SHOULD report memory usage per node if available.
 
   SECTION: [PERF-005](#perf-005)
     TEXT[!MUST,implementation]: When a CSV export feature flag is enabled, the test MUST output raw convergence data as a CSV file after each test run.
