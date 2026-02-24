@@ -24,7 +24,7 @@ use aranya_daemon_api::{text, Rank};
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DeviceCtx, DevicesCtx, EXAMPLE_LABEL_RANK, SLEEP_INTERVAL};
+use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -125,8 +125,11 @@ async fn test_sync_now() -> Result<()> {
         .context("admin unable to sync with owner")?;
 
     // Now we should be able to successfully create a label (admin has CreateLabel perm).
+    let member_role_rank = admin.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     admin
-        .create_label_with_rank(text!("test_label"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("test_label"), label_rank)
         .await
         .context("admin unable to create label after sync")?;
 
@@ -156,8 +159,11 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 
     // Add a command to graph by having the owner create a label.
     let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     owner_team
-        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), label_rank)
         .await?;
 
     // Wait for syncing.
@@ -198,7 +204,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 
     // Create another label.
     owner_team
-        .create_label_with_rank(text!("label2"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label2"), label_rank)
         .await?;
 
     // Wait for syncing.
@@ -248,9 +254,13 @@ async fn test_role_create_assign_revoke() -> Result<()> {
         .find(|r| r.name == "admin")
         .ok_or_else(|| anyhow::anyhow!("no admin role"))?;
 
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
+
     // Show that admin cannot create a label.
     admin_team
-        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect_err("expected label creation to fail");
 
@@ -292,7 +302,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Show that admin cannot create a label.
     admin_team
-        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect_err("expected label creation to fail");
 
@@ -318,7 +328,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Create label.
     let label1 = admin_team
-        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect("expected admin to create label");
 
@@ -347,7 +357,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Show that admin cannot create a label.
     admin_team
-        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect_err("expected label creation to fail");
 
@@ -617,8 +627,11 @@ async fn test_query_functions() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), label_rank)
         .await?;
 
     // Assigning labels to devices with the "member" role should succeed since it does not have `CanUseAfc` permission.
@@ -727,6 +740,9 @@ async fn test_add_team() -> Result<()> {
     info!(?team_id);
 
     let roles = devices.setup_default_roles(team_id).await?;
+    let member_role_rank = owner.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
 
     // Add the admin as a new device.
     info!("adding admin to team");
@@ -798,7 +814,7 @@ async fn test_add_team() -> Result<()> {
 
         // Now we should be able to successfully create a label (admin has CreateLabel perm).
         admin
-            .create_label_with_rank(text!("test_label"), EXAMPLE_LABEL_RANK.into())
+            .create_label_with_rank(text!("test_label"), label_rank)
             .await
             .context("Creating a label should not fail here!")?;
     }
@@ -821,6 +837,9 @@ async fn test_remove_team() -> Result<()> {
 
     let owner = devices.owner.client.team(team_id);
     let roles = devices.setup_default_roles(team_id).await?;
+    let member_role_rank = owner.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
 
     {
         let admin = devices.admin.client.team(team_id);
@@ -858,7 +877,7 @@ async fn test_remove_team() -> Result<()> {
 
         // We should be able to successfully create a label (admin has CreateLabel perm).
         admin
-            .create_label_with_rank(text!("test_label"), EXAMPLE_LABEL_RANK.into())
+            .create_label_with_rank(text!("test_label"), label_rank)
             .await?;
     }
 
@@ -870,7 +889,7 @@ async fn test_remove_team() -> Result<()> {
 
         // Label creation should fail since the team was removed from local storage above.
         match admin
-            .create_label_with_rank(text!("test_label2"), EXAMPLE_LABEL_RANK.into())
+            .create_label_with_rank(text!("test_label2"), label_rank)
             .await
         {
             Ok(_) => bail!("Expected label creation to fail"),
@@ -1022,8 +1041,11 @@ async fn test_multi_team_sync() -> Result<()> {
     admin1.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully create a label (admin has CreateLabel perm).
+    let member_role_rank_t1 = admin1.query_rank(ObjectId::transmute(roles1.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank_t1 = Rank::new(member_role_rank_t1.value() - 1);
     admin1
-        .create_label_with_rank(text!("team1_label"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("team1_label"), label_rank_t1)
         .await
         .context("Creating a label should not fail here!")?;
 
@@ -1068,8 +1090,11 @@ async fn test_multi_team_sync() -> Result<()> {
     admin2.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully create a label (admin has CreateLabel perm).
+    let member_role_rank_t2 = admin2.query_rank(ObjectId::transmute(roles2.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank_t2 = Rank::new(member_role_rank_t2.value() - 1);
     admin2
-        .create_label_with_rank(text!("team2_label"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("team2_label"), label_rank_t2)
         .await
         .context("Creating a label should not fail here!")?;
 
@@ -1130,10 +1155,13 @@ async fn test_hello_subscription() -> Result<()> {
     // Admin performs an action that will update their graph - create a label
     // (admin has permission to create labels)
     info!("admin creating a test label");
+    let member_role_rank = admin_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     let test_label = admin_team
         .create_label_with_rank(
             aranya_daemon_api::text!("sync_hello_test_label"),
-            EXAMPLE_LABEL_RANK.into(),
+            label_rank,
         )
         .await?;
     info!("admin created test label: {:?}", test_label);
@@ -1282,10 +1310,13 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
 
     // Admin creates first label
     info!("admin creating first test label");
+    let member_role_rank = admin_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     let test_label_1 = admin_team
         .create_label_with_rank(
             aranya_daemon_api::text!("schedule_test_label_1"),
-            EXAMPLE_LABEL_RANK.into(),
+            label_rank,
         )
         .await?;
     info!("admin created first test label: {:?}", test_label_1);
@@ -1334,7 +1365,7 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
     let test_label_2 = admin_team
         .create_label_with_rank(
             aranya_daemon_api::text!("schedule_test_label_2"),
-            EXAMPLE_LABEL_RANK.into(),
+            label_rank,
         )
         .await?;
     info!("admin created second test label: {:?}", test_label_2);
@@ -1513,8 +1544,9 @@ async fn test_add_perm_to_created_role() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
 
-    // Create a custom admin type role at EXAMPLE_LABEL_RANK
-    let custom_role_rank = EXAMPLE_LABEL_RANK;
+    // Create a custom admin type role with rank derived from the owner's device rank.
+    let owner_device_rank = owner_team.query_rank(ObjectId::transmute(devices.owner.id)).await?;
+    let custom_role_rank = owner_device_rank.value() / 2;
     let admin_role = owner_team
         .create_role(text!("admin"), custom_role_rank.into())
         .await?;
@@ -1761,8 +1793,11 @@ async fn test_delete_label_requires_permission() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     let label = owner_team
-        .create_label_with_rank(text!("delete-label-guard"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("delete-label-guard"), label_rank)
         .await?;
 
     operator_team
@@ -1787,13 +1822,16 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    devices.setup_default_roles(team_id).await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_id = devices.owner.id;
     let owner_team = devices.owner.client.team(team_id);
 
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     let label = owner_team
-        .create_label_with_rank(text!("device-self-label"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("device-self-label"), label_rank)
         .await?;
 
     // Owner tries to assign a label to itself. This fails because the policy
@@ -2352,7 +2390,9 @@ async fn test_change_rank_self_demotion() -> Result<()> {
     // Add admin -- admin default role already has ChangeRank
     let admin_role_rank = devices.owner.client.team(team_id).query_rank(ObjectId::transmute(roles.admin().id)).await?;
     let admin_rank = Rank::new(admin_role_rank.value() - 1);
-    let demoted_rank = EXAMPLE_LABEL_RANK.into();
+    let member_role_rank = devices.owner.client.team(team_id).query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Demoted rank must be lower than admin's current rank.
+    let demoted_rank = Rank::new(member_role_rank.value() - 1);
     owner_team
         .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), admin_rank)
         .await?;
@@ -2395,7 +2435,7 @@ async fn test_change_rank_self_promotion_rejected() -> Result<()> {
     // Add admin with ChangeRank permission (admin role has it by default)
     let admin_role_rank = devices.owner.client.team(team_id).query_rank(ObjectId::transmute(roles.admin().id)).await?;
     let admin_rank = Rank::new(admin_role_rank.value() - 1);
-    let promoted_rank = Rank::new(admin_role_rank.value() - 1 + 50);
+    let promoted_rank = Rank::new(admin_rank.value() + 50);
     owner_team
         .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), admin_rank)
         .await?;
@@ -2915,8 +2955,11 @@ async fn test_deprecated_add_label_managing_role_noop() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value() - 1);
     let label_id = owner_team
-        .create_label_with_rank(text!("test_label"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("test_label"), label_rank)
         .await?;
 
     // Use deprecated add_label_managing_role API -- should succeed as no-op

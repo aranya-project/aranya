@@ -26,10 +26,6 @@ const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 #[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
-/// Example rank for labels in tests.
-#[allow(dead_code)]
-pub const EXAMPLE_LABEL_RANK: i64 = 500;
-
 
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
