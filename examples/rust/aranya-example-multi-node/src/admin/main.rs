@@ -3,11 +3,11 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{text, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{text, AddTeamConfig, AddTeamQuicSyncConfig, Client, ObjectId, Rank, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{
-        DeviceInfo, Onboard, TeamInfo, EXAMPLE_LABEL_RANK, SLEEP_INTERVAL, SYNC_INTERVAL,
+        DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL,
     },
     tracing::init_tracing,
 };
@@ -113,11 +113,11 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    team.create_label_with_rank(
-        text!("label1"),
-        aranya_client::Rank::new(EXAMPLE_LABEL_RANK),
-    )
-    .await?;
+    let admin_device_rank = team.query_rank(ObjectId::transmute(device_id)).await?;
+    // Label rank must be lower than the admin's device rank so the admin can operate on it.
+    let label_rank = Rank::new(admin_device_rank.value() - 1);
+    team.create_label_with_rank(text!("label1"), label_rank)
+        .await?;
     info!("admin: created label");
 
     info!("admin: complete");

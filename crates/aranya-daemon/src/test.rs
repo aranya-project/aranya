@@ -48,36 +48,20 @@ use crate::{
     AranyaStore,
 };
 
-// =============================================================================
-// Rank constants for tests
-// =============================================================================
-//
-// TODO(aranya-core#582): These constants duplicate values from policy.md.
-// Replace with exported policy constants once policy-ifgen exposes globals.
-//
-// Role ranks (from policy.md):
-//   - Owner role:    999_999 (MAX_RANK - 1)
-//   - Admin role:    800
-//   - Operator role: 700
-//   - Member role:   600
+// TODO(aranya-core#582): Replace rank queries with exported policy constants
+// once policy-ifgen exposes globals.
 
-/// Maximum rank value as defined in policy.md.
-const MAX_RANK: i64 = 1_000_000;
-/// Default owner role rank as defined in policy.md.
-const DEFAULT_OWNER_ROLE_RANK: i64 = MAX_RANK - 1;
-/// Default admin role rank as defined in policy.md.
-const DEFAULT_ADMIN_ROLE_RANK: i64 = 800;
-/// Default operator role rank as defined in policy.md.
-const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700;
-/// Default member role rank as defined in policy.md.
-const DEFAULT_MEMBER_ROLE_RANK: i64 = 600;
-
-/// Default device rank for admin devices. Must be < DEFAULT_ADMIN_ROLE_RANK.
-const DEFAULT_ADMIN_DEVICE_RANK: i64 = DEFAULT_ADMIN_ROLE_RANK - 1;
-/// Default device rank for operator devices. Must be < DEFAULT_OPERATOR_ROLE_RANK.
-const DEFAULT_OPERATOR_DEVICE_RANK: i64 = DEFAULT_OPERATOR_ROLE_RANK - 1;
-/// Default device rank for member devices. Must be < DEFAULT_MEMBER_ROLE_RANK.
-const DEFAULT_MEMBER_DEVICE_RANK: i64 = DEFAULT_MEMBER_ROLE_RANK - 1;
+/// Queries the rank of an object via the policy engine, returning the raw i64 value.
+async fn query_rank(device: &TestDevice, object_id: aranya_policy_ifgen::BaseId) -> Result<i64> {
+    let effects = device.actions().query_rank(object_id).await?;
+    effects
+        .into_iter()
+        .find_map(|e| match e {
+            Effect::QueryRankResult(r) => Some(r.rank),
+            _ => None,
+        })
+        .context("expected QueryRankResult effect")
+}
 
 // Aranya graph client for testing.
 type TestClient =
@@ -400,13 +384,18 @@ impl TestCtx {
             .iter()
             .find(|role| role.name.as_str() == "operator" && role.default)
             .context("operator role not found after setup")?;
+        let member_role = all_roles
+            .iter()
+            .find(|role| role.name.as_str() == "member" && role.default)
+            .context("member role not found after setup")?;
 
+        let admin_role_rank = query_rank(owner, admin_role.id.as_base()).await?;
         owner
             .actions()
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&admin.pk)?,
                 None,
-                DEFAULT_ADMIN_DEVICE_RANK.into(),
+                (admin_role_rank - 1).into(),
             )
             .await
             .context("unable to add admin member")?;
@@ -428,12 +417,13 @@ impl TestCtx {
             .len();
         assert!(admin_cache_size > 0);
 
+        let operator_role_rank = query_rank(owner, operator_role.id.as_base()).await?;
         owner
             .actions()
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&operator.pk)?,
                 None,
-                DEFAULT_OPERATOR_DEVICE_RANK.into(),
+                (operator_role_rank - 1).into(),
             )
             .await
             .context("unable to add operator member")?;
@@ -457,12 +447,13 @@ impl TestCtx {
             .len();
         assert!(operator_cache_size > 0);
 
+        let member_role_rank = query_rank(owner, member_role.id.as_base()).await?;
         admin
             .actions()
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&membera.pk)?,
                 None,
-                DEFAULT_MEMBER_DEVICE_RANK.into(),
+                (member_role_rank - 1).into(),
             )
             .await
             .context("unable to add membera member")?;
@@ -472,7 +463,7 @@ impl TestCtx {
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&memberb.pk)?,
                 None,
-                DEFAULT_MEMBER_DEVICE_RANK.into(),
+                (member_role_rank - 1).into(),
             )
             .await
             .context("unable to add memberb member")?;
@@ -643,12 +634,16 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
         .await
         .context("unable to create extra device")?;
 
+    let roles = load_default_roles(owner).await?;
+    let member_role = role_id_by_name(&roles, "member");
+    let member_role_rank = query_rank(owner, member_role.as_base()).await?;
+
     owner
         .actions()
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&extra.pk)?,
             None,
-            DEFAULT_MEMBER_DEVICE_RANK.into(),
+            (member_role_rank - 1).into(),
         )
         .await
         .context("initial add should succeed")?;
@@ -658,7 +653,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&extra.pk)?,
             None,
-            DEFAULT_MEMBER_DEVICE_RANK.into(),
+            (member_role_rank - 1).into(),
         )
         .await
         .expect_err("expected duplicate device add to fail");
@@ -680,6 +675,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
+    let member_role_rank = query_rank(owner, member_role.as_base()).await?;
 
     // Assign member role to membera
     owner
@@ -704,7 +700,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&candidate.pk)?,
             Some(member_role),
-            DEFAULT_MEMBER_DEVICE_RANK.into(),
+            (member_role_rank - 1).into(),
         )
         .await
         .expect_err("expected add_device with initial role to fail without AddDevice permission");
@@ -826,9 +822,12 @@ async fn test_create_label_requires_valid_rank() -> Result<()> {
     let owner = team.owner;
 
     // Create a label with owner role rank
+    let roles = load_default_roles(owner).await?;
+    let owner_role = role_id_by_name(&roles, "owner");
+    let owner_role_rank = query_rank(owner, owner_role.as_base()).await?;
     owner
         .actions()
-        .create_label_with_rank(text!("TEST_LABEL"), DEFAULT_OWNER_ROLE_RANK.into())
+        .create_label_with_rank(text!("TEST_LABEL"), owner_role_rank.into())
         .await
         .context("label creation with valid rank should succeed")?;
 
@@ -847,11 +846,12 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
     let operator = team.operator;
 
     let roles = load_default_roles(owner).await?;
-    role_id_by_name(&roles, "owner");
+    let owner_role = role_id_by_name(&roles, "owner");
+    let owner_role_rank = query_rank(owner, owner_role.as_base()).await?;
 
     let effects = owner
         .actions()
-        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), DEFAULT_OWNER_ROLE_RANK.into())
+        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), owner_role_rank.into())
         .await
         .context("label creation should succeed")?;
     let label_id = effects

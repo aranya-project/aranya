@@ -10,7 +10,7 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, PublicKeyBundle,
+    CreateTeamQuicSyncConfig, DeviceId, ObjectId, PublicKeyBundle, Rank,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -20,12 +20,6 @@ use tokio::{
 };
 use tracing::{debug, info, warn, Metadata};
 
-/// Example rank for devices added by the owner.
-const EXAMPLE_DEVICE_RANK: i64 = 100;
-/// Example rank for devices added by the admin.
-const EXAMPLE_MEMBER_RANK: i64 = 50;
-/// Example rank for labels.
-const EXAMPLE_LABEL_RANK: i64 = 50;
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
@@ -330,32 +324,35 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // Owner adds admin and operator to the team, then delegates
     // remaining operations to them.
     info!("adding admin to team");
+    let admin_role_rank = owner.query_rank(ObjectId::transmute(admin_role.id)).await?;
     owner
         .add_device_with_rank(
             ctx.admin.pk,
             Some(admin_role.id),
-            EXAMPLE_DEVICE_RANK.into(),
+            Rank::new(admin_role_rank.value() - 1),
         )
         .await?;
     admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
+    let operator_role_rank = owner.query_rank(ObjectId::transmute(operator_role.id)).await?;
     owner
         .add_device_with_rank(
             ctx.operator.pk,
             Some(operator_role.id),
-            EXAMPLE_DEVICE_RANK.into(),
+            Rank::new(operator_role_rank.value() - 1),
         )
         .await?;
     operator.sync_now(owner_addr, None).await?;
 
     // Admin adds membera and memberb to the team.
     info!("admin adding membera to team");
+    let member_role_rank = admin.query_rank(ObjectId::transmute(member_role.id)).await?;
     admin
         .add_device_with_rank(
             ctx.membera.pk.clone(),
             Some(member_role.id),
-            EXAMPLE_MEMBER_RANK.into(),
+            Rank::new(member_role_rank.value() - 1),
         )
         .await?;
     membera.sync_now(owner_addr, None).await?;
@@ -365,7 +362,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .add_device_with_rank(
             ctx.memberb.pk.clone(),
             Some(member_role.id),
-            EXAMPLE_MEMBER_RANK.into(),
+            Rank::new(member_role_rank.value() - 1),
         )
         .await?;
     memberb.sync_now(owner_addr, None).await?;
@@ -379,8 +376,11 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Admin creates a label.
     info!("admin creating label");
+    let admin_device_rank = admin.query_rank(ObjectId::transmute(ctx.admin.id)).await?;
+    // Label rank must be lower than the admin's device rank so the admin can operate on it.
+    let label_rank = Rank::new(admin_device_rank.value() - 1);
     let label3 = admin
-        .create_label_with_rank(text!("label3"), EXAMPLE_LABEL_RANK.into())
+        .create_label_with_rank(text!("label3"), label_rank)
         .await?;
 
     // Operator assigns the label to membera and memberb.

@@ -22,12 +22,8 @@ use tokio::{
 };
 use tracing::{debug, info, Metadata};
 
-/// Example rank for devices added to the team.
-const EXAMPLE_DEVICE_RANK: i64 = 100;
 /// Example updated rank for the device rank change demo.
 const EXAMPLE_UPDATED_DEVICE_RANK: i64 = 40;
-/// Example rank for labels.
-const EXAMPLE_LABEL_RANK: i64 = 100;
 /// Example rank for the custom role demo.
 const EXAMPLE_ROLE_RANK: i64 = 50;
 use tracing_subscriber::{
@@ -287,20 +283,22 @@ async fn main() -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
+    let admin_role_rank = owner_team.query_rank(ObjectId::transmute(admin_role.id)).await?;
     owner_team
         .add_device_with_rank(
             admin.pk,
             Some(admin_role.id),
-            Rank::new(EXAMPLE_DEVICE_RANK),
+            Rank::new(admin_role_rank.value() - 1),
         )
         .await?;
 
     info!("adding operator to team");
+    let operator_role_rank = owner_team.query_rank(ObjectId::transmute(operator_role.id)).await?;
     owner_team
         .add_device_with_rank(
             operator.pk,
             Some(operator_role.id),
-            Rank::new(EXAMPLE_DEVICE_RANK),
+            Rank::new(operator_role_rank.value() - 1),
         )
         .await?;
 
@@ -396,11 +394,12 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
+    let member_role_rank = owner_team.query_rank(ObjectId::transmute(member_role.id)).await?;
     owner_team
         .add_device_with_rank(
             membera.pk.clone(),
             Some(member_role.id),
-            Rank::new(EXAMPLE_DEVICE_RANK),
+            Rank::new(member_role_rank.value() - 1),
         )
         .await?;
 
@@ -410,7 +409,7 @@ async fn main() -> Result<()> {
         .add_device_with_rank(
             memberb.pk.clone(),
             Some(member_role.id),
-            Rank::new(EXAMPLE_DEVICE_RANK),
+            Rank::new(member_role_rank.value() - 1),
         )
         .await?;
 
@@ -512,8 +511,11 @@ async fn main() -> Result<()> {
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
+    let owner_device_rank = owner_team.query_rank(ObjectId::transmute(owner.id)).await?;
+    // Label rank must be lower than the owner's device rank so the owner can operate on it.
+    let label_rank = Rank::new(owner_device_rank.value() - 1);
     let label3 = owner_team
-        .create_label_with_rank(text!("label3"), Rank::new(EXAMPLE_LABEL_RANK))
+        .create_label_with_rank(text!("label3"), label_rank)
         .await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");

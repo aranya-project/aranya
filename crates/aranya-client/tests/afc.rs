@@ -4,7 +4,7 @@ mod common;
 
 #[cfg(feature = "afc")]
 use {
-    crate::common::{sleep, DevicesCtx, DEFAULT_LABEL_RANK, SLEEP_INTERVAL},
+    crate::common::{sleep, DevicesCtx, EXAMPLE_LABEL_RANK, SLEEP_INTERVAL},
     anyhow::{Context, Result},
     aranya_client::afc::Channels,
     aranya_client::client::ChanOp,
@@ -40,7 +40,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     assert_eq!(memberb_team.labels().await?.iter().count(), 0);
 
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
 
@@ -160,7 +160,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -227,7 +227,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -304,7 +304,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -389,7 +389,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -493,7 +493,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -603,7 +603,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -722,7 +722,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -839,7 +839,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
     let label_id = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     let op = ChanOp::SendRecv;
     owner_team
@@ -961,7 +961,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
     // First label.
     let op = ChanOp::SendRecv;
     let label_id1 = owner_team
-        .create_label_with_rank(text!("label1"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label1"), EXAMPLE_LABEL_RANK.into())
         .await?;
     owner_team
         .device(devices.membera.id)
@@ -974,7 +974,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
 
     // Second label.
     let label_id2 = owner_team
-        .create_label_with_rank(text!("label2"), DEFAULT_LABEL_RANK.into())
+        .create_label_with_rank(text!("label2"), EXAMPLE_LABEL_RANK.into())
         .await?;
     owner_team
         .device(devices.membera.id)

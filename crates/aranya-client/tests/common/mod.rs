@@ -4,8 +4,9 @@ use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, ObjectId, SyncPeerConfig,
 };
+use aranya_daemon_api::Rank;
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
@@ -25,55 +26,13 @@ const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 #[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
-// =============================================================================
-// Rank constants for tests
-// =============================================================================
-//
-// TODO(aranya-core#582): These constants duplicate values from policy.md.
-// Replace with exported policy constants once policy-ifgen exposes globals.
-//
-// These constants define rank values used in tests. They are derived from the
-// role ranks defined in policy.md to ensure the invariant `role_rank > device_rank`
-// is always satisfied.
-//
-// Role ranks (from policy.md):
-//   - Owner role:    999_999 (MAX_RANK - 1)
-//   - Admin role:    800
-//   - Operator role: 700
-//   - Member role:   600
+// TODO(aranya-core#582): Replace rank queries with exported policy constants
+// once policy-ifgen exposes globals.
 
-/// Maximum rank value as defined in policy.md.
+/// Example rank for labels in tests.
 #[allow(dead_code)]
-pub const MAX_RANK: i64 = 1_000_000;
-/// Default owner role rank as defined in policy.md.
-#[allow(dead_code)]
-pub const DEFAULT_OWNER_ROLE_RANK: i64 = MAX_RANK - 1;
-/// Default admin role rank as defined in policy.md.
-#[allow(dead_code)]
-pub const DEFAULT_ADMIN_ROLE_RANK: i64 = 800;
-/// Default operator role rank as defined in policy.md.
-#[allow(dead_code)]
-pub const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700;
-/// Default member role rank as defined in policy.md.
-#[allow(dead_code)]
-pub const DEFAULT_MEMBER_ROLE_RANK: i64 = 600;
+pub const EXAMPLE_LABEL_RANK: i64 = 500;
 
-/// Default device rank for the team creator (owner). Equal to MAX_RANK.
-#[allow(dead_code)]
-pub const DEFAULT_OWNER_DEVICE_RANK: i64 = MAX_RANK;
-/// Default device rank for admin devices. Must be < DEFAULT_ADMIN_ROLE_RANK.
-#[allow(dead_code)]
-pub const DEFAULT_ADMIN_DEVICE_RANK: i64 = DEFAULT_ADMIN_ROLE_RANK - 1;
-/// Default device rank for operator devices. Must be < DEFAULT_OPERATOR_ROLE_RANK.
-#[allow(dead_code)]
-pub const DEFAULT_OPERATOR_DEVICE_RANK: i64 = DEFAULT_OPERATOR_ROLE_RANK - 1;
-/// Default device rank for member devices. Must be < DEFAULT_MEMBER_ROLE_RANK.
-#[allow(dead_code)]
-pub const DEFAULT_MEMBER_DEVICE_RANK: i64 = DEFAULT_MEMBER_ROLE_RANK - 1;
-
-/// Default rank for labels in tests.
-#[allow(dead_code)]
-pub const DEFAULT_LABEL_RANK: i64 = 500;
 
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
@@ -127,31 +86,34 @@ impl DevicesCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
+        let admin_role_rank = owner_team.query_rank(ObjectId::transmute(roles.admin().id)).await?;
         owner_team
             .add_device_with_rank(
                 self.admin.pk.clone(),
                 Some(roles.admin().id),
-                DEFAULT_ADMIN_DEVICE_RANK.into(),
+                Rank::new(admin_role_rank.value() - 1),
             )
             .await?;
 
         // Add the operator as a new device.
         info!("adding operator to team");
+        let operator_role_rank = owner_team.query_rank(ObjectId::transmute(roles.operator().id)).await?;
         owner_team
             .add_device_with_rank(
                 self.operator.pk.clone(),
                 Some(roles.operator().id),
-                DEFAULT_OPERATOR_DEVICE_RANK.into(),
+                Rank::new(operator_role_rank.value() - 1),
             )
             .await?;
 
         // Add member A as a new device.
         info!("adding membera to team");
+        let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
         owner_team
             .add_device_with_rank(
                 self.membera.pk.clone(),
                 Some(roles.member().id),
-                DEFAULT_MEMBER_DEVICE_RANK.into(),
+                Rank::new(member_role_rank.value() - 1),
             )
             .await?;
 
@@ -161,7 +123,7 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.memberb.pk.clone(),
                 Some(roles.member().id),
-                DEFAULT_MEMBER_DEVICE_RANK.into(),
+                Rank::new(member_role_rank.value() - 1),
             )
             .await?;
 

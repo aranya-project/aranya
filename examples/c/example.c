@@ -23,12 +23,8 @@
 #define ENABLE_ARANYA_EXPERIMENTAL 1
 #include "aranya-client.h"
 
-// Example rank for devices added to the team.
-#define EXAMPLE_DEVICE_RANK 100
 // Example updated rank for the device rank change demo.
 #define EXAMPLE_UPDATED_DEVICE_RANK 90
-// Example rank for labels.
-#define EXAMPLE_LABEL_RANK 100
 // Example rank for the custom role demo.
 #define EXAMPLE_ROLE_RANK 50
 
@@ -427,10 +423,18 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add admin to team.
+    // Query the admin role rank and add admin to team.
+    AranyaObjectId admin_role_object_id = {.id = admin_role_id.id};
+    int64_t admin_role_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &admin_role_object_id,
+                            &admin_role_rank);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to query rank of 'admin' role\n");
+        return err;
+    }
     err = aranya_add_device_to_team_with_rank(&owner->client, &t->id, admin->pk,
                                               admin->pk_len, &admin_role_id,
-                                              EXAMPLE_DEVICE_RANK);
+                                              admin_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add admin to team\n");
         return err;
@@ -446,10 +450,18 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add operator to team.
+    // Query the operator role rank and add operator to team.
+    AranyaObjectId operator_role_object_id = {.id = operator_role_id.id};
+    int64_t operator_role_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &operator_role_object_id,
+                            &operator_role_rank);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to query rank of 'operator' role\n");
+        return err;
+    }
     err = aranya_add_device_to_team_with_rank(
         &owner->client, &t->id, operator->pk, operator->pk_len,
-        &operator_role_id, EXAMPLE_DEVICE_RANK);
+        &operator_role_id, operator_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -465,10 +477,18 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // add membera to team.
+    // Query the member role rank and add membera to team.
+    AranyaObjectId member_role_object_id = {.id = member_role_id.id};
+    int64_t member_role_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &member_role_object_id,
+                            &member_role_rank);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to query rank of 'member' role\n");
+        return err;
+    }
     err = aranya_add_device_to_team_with_rank(
         &owner->client, &t->id, membera->pk, membera->pk_len, &member_role_id,
-        EXAMPLE_DEVICE_RANK);
+        member_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add membera to team\n");
         return err;
@@ -477,7 +497,7 @@ AranyaError init_team(Team *t) {
     // add memberb to team.
     err = aranya_add_device_to_team_with_rank(
         &owner->client, &t->id, memberb->pk, memberb->pk_len, &member_role_id,
-        EXAMPLE_DEVICE_RANK);
+        member_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add memberb to team\n");
         return err;
@@ -825,8 +845,20 @@ AranyaError run_afc_example(Team *t) {
     AranyaChannelIdent idents[] = {{&membera->id, ARANYA_CHAN_OP_SEND_ONLY},
                                    {&memberb->id, ARANYA_CHAN_OP_RECV_ONLY}};
 
+    // Query the owner's device rank to derive the label rank.
+    AranyaObjectId owner_object_id = {.id = owner->id.id};
+    int64_t owner_device_rank = 0;
+    err = aranya_query_rank(&owner->client, &t->id, &owner_object_id,
+                            &owner_device_rank);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        goto exit;
+    }
+
+    // Label rank must be lower than the owner's device rank so the owner can
+    // operate on it.
+    int64_t label_rank = owner_device_rank - 1;
     err = aranya_create_assign_label(&owner->client, &t->id, "uni_label",
-                                     &label_id, EXAMPLE_LABEL_RANK, idents, 2);
+                                     &label_id, label_rank, idents, 2);
     if (err != ARANYA_ERROR_SUCCESS) {
         goto exit;
     }
