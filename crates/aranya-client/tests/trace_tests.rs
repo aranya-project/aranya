@@ -17,7 +17,7 @@ mod trace_tests {
 
     fn parse_trace_id(line: &str) -> Option<String> {
         let marker = "rpc.trace_id=";
-        let start = line.find(marker)? + marker.len();
+        let start = line.find(marker)?.checked_add(marker.len())?;
         let rest = &line[start..];
         let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
         let raw = rest[..end].trim_matches(|c| c == '"' || c == ',' || c == '}' || c == ':');
