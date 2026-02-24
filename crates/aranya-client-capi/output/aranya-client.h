@@ -206,39 +206,10 @@ enum AranyaError
 typedef uint32_t AranyaError;
 #endif // __cplusplus
 
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Role management permission.
- */
-enum AranyaRoleManagementPermission
-#ifdef __cplusplus
-  : uint8_t
-#endif // __cplusplus
- {
-    /**
-     * Grants a managing role the ability to assign the target role
-     * to any device except itself.
-     */
-    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_ASSIGN_ROLE,
-    /**
-     * Grants a managing role the ability to revoke the target role
-     * from any device.
-     */
-    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_REVOKE_ROLE,
-    /**
-     * Grants a managing role the ability to change the permissions
-     * assigned to the target role.
-     */
-    ARANYA_ROLE_MANAGEMENT_PERMISSION_CAN_CHANGE_ROLE_PERMS,
-};
-#ifndef __cplusplus
-typedef uint8_t AranyaRoleManagementPermission;
-#endif // __cplusplus
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Simple permission.
+ *
+ * See [`aranya_daemon_api::Perm`] for stability and deprecation policy.
  */
 enum AranyaPermission
 #ifdef __cplusplus
@@ -259,6 +230,10 @@ enum AranyaPermission
      */
     ARANYA_PERMISSION_TERMINATE_TEAM,
     /**
+     * The role can change the rank of objects.
+     */
+    ARANYA_PERMISSION_CHANGE_RANK,
+    /**
      * The role can create a role.
      */
     ARANYA_PERMISSION_CREATE_ROLE,
@@ -275,20 +250,15 @@ enum AranyaPermission
      */
     ARANYA_PERMISSION_REVOKE_ROLE,
     /**
-     * The role can change role management permissions for roles.
+     * The role can change permissions on roles.
      */
-    ARANYA_PERMISSION_CHANGE_ROLE_MANAGEMENT_PERMS,
+    ARANYA_PERMISSION_CHANGE_ROLE_PERMS,
     /**
      * The role can set up default roles. This can only be done
      * once, so this permission can only effectively be used by
      * the `owner` role.
      */
     ARANYA_PERMISSION_SETUP_DEFAULT_ROLE,
-    /**
-     * The role can add a managing role to or remove a managing
-     * role from a target role.
-     */
-    ARANYA_PERMISSION_CHANGE_ROLE_MANAGING_ROLE,
     /**
      * The role can create a label.
      */
@@ -298,21 +268,11 @@ enum AranyaPermission
      */
     ARANYA_PERMISSION_DELETE_LABEL,
     /**
-     * The role can grant a target role the ability to manage a
-     * label. This management ability includes deleting a label
-     * and adding/revoking a label to a device.
-     */
-    ARANYA_PERMISSION_CHANGE_LABEL_MANAGING_ROLE,
-    /**
-     * The role can assign a label to a device. The role must
-     * also have label management permissions granted by a role
-     * with the `ChangeLabelManagingRole` permission above.
+     * The role can assign a label to a device.
      */
     ARANYA_PERMISSION_ASSIGN_LABEL,
     /**
-     * The role can revoke a label from a device. The role must
-     * also have label management permissions granted by a role
-     * with the `ChangeLabelManagingRole` permission above.
+     * The role can revoke a label from a device.
      */
     ARANYA_PERMISSION_REVOKE_LABEL,
     /**
@@ -328,7 +288,6 @@ enum AranyaPermission
 #ifndef __cplusplus
 typedef uint8_t AranyaPermission;
 #endif // __cplusplus
-#endif
 
 /**
  * Valid channel operations for a label assignment.
@@ -432,7 +391,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaRole {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[128];
 } AranyaRole;
 
 /**
@@ -671,6 +630,13 @@ typedef const char *AranyaLabelName;
 typedef struct AranyaLabelId {
     struct AranyaId id;
 } AranyaLabelId;
+
+/**
+ * An identifier for any object with a unique Aranya ID defined in the policy.
+ */
+typedef struct AranyaObjectId {
+    struct AranyaId id;
+} AranyaObjectId;
 
 /**
  * A network socket address for an Aranya client.
@@ -924,6 +890,18 @@ AranyaError aranya_role_get_author(const struct AranyaRole *role,
 AranyaError aranya_role_get_author_ext(const struct AranyaRole *role,
                                        struct AranyaDeviceId *__output,
                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Returns a human-readable string for an [`AranyaPermission`].
+ *
+ * The resulting pointer must NOT be freed.
+ *
+ * @param[in] perm the permission value.
+ *
+ * @relates AranyaPermission.
+ */
+AranyaError aranya_permission_to_str(AranyaPermission perm,
+                                     const char **__output);
 
 /**
  * Initializes logging.
@@ -1816,7 +1794,6 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
 #endif
 
 /**
- * Assign a role to a device.
  * Setup default roles on team.
  *
  * This sets up the following roles with default permissions as
@@ -1824,6 +1801,9 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  * - admin
  * - operator
  * - member
+ *
+ * The owner role is created automatically when the team is created,
+ * so it is not included here.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
@@ -1833,20 +1813,17 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] owning_role the ID of the owning role
- * @param[in] roles_out returns a list of roles that own `role`
+ * @param[in] roles_out returns a list of default roles
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team,
-                                       const struct AranyaRoleId *owning_role,
                                        struct AranyaRole *roles_out,
                                        size_t *roles_len);
 
 /**
- * Assign a role to a device.
  * Setup default roles on team.
  *
  * This sets up the following roles with default permissions as
@@ -1854,6 +1831,9 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  * - admin
  * - operator
  * - member
+ *
+ * The owner role is created automatically when the team is created,
+ * so it is not included here.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
  * Writes the number of roles that would have been returned to `roles_len`.
@@ -1863,216 +1843,64 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] owning_role the ID of the owning role
- * @param[in] roles_out returns a list of roles that own `role`
+ * @param[in] roles_out returns a list of default roles
  * @param[in,out] roles_len the number of roles written to the buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
-                                           const struct AranyaRoleId *owning_role,
                                            struct AranyaRole *roles_out,
                                            size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Adds `owning_role` as an owner of role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role ID of the subject role
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_role_owner(const struct AranyaClient *client,
-                                  const struct AranyaTeamId *team,
-                                  const struct AranyaRoleId *role,
-                                  const struct AranyaRoleId *owning_role);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Adds `owning_role` as an owner of role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role ID of the subject role
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_role_owner_ext(const struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      const struct AranyaRoleId *role,
-                                      const struct AranyaRoleId *owning_role,
-                                      struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Removes an owning_role as an owner of role.
+ * Deprecated: always returns an empty list.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
- * @param[in] owning_role ID of the owning role
+ * @param[out] roles_out unused, always returns an empty list
+ * @param[in,out] roles_len set to 0 on return
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_role_owner(const struct AranyaClient *client,
-                                     const struct AranyaTeamId *team,
-                                     const struct AranyaRoleId *role,
-                                     const struct AranyaRoleId *owning_role);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Removes an owning_role as an owner of role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] owning_role ID of the owning role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_remove_role_owner_ext(const struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaRoleId *role,
-                                         const struct AranyaRoleId *owning_role,
-                                         struct AranyaExtError *__ext_err);
-#endif
-
-/**
- * Returns the roles that own `role`.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
- * The application can use `roles_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] roles_out returns a list of roles that own `role`
- * @param[in,out] roles_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_role_owners(const struct AranyaClient *client,
-                               const struct AranyaTeamId *team,
-                               const struct AranyaRoleId *role,
-                               struct AranyaRole *roles_out,
+ARANYA_DEPRECATED_MSG("role_owners is deprecated")
+AranyaError aranya_role_owners(const struct AranyaClient *_client,
+                               const struct AranyaTeamId *_team,
+                               const struct AranyaRoleId *_role,
+                               struct AranyaRole *_roles_out,
                                size_t *roles_len);
 
 /**
- * Returns the roles that own `role`.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
- * The application can use `roles_len` to allocate a larger buffer.
+ * Deprecated: always returns an empty list.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role the ID of the subject role
- * @param[in] roles_out returns a list of roles that own `role`
- * @param[in,out] roles_len the number of roles written to the buffer.
+ * @param[out] roles_out unused, always returns an empty list
+ * @param[in,out] roles_len set to 0 on return
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_role_owners_ext(const struct AranyaClient *client,
-                                   const struct AranyaTeamId *team,
-                                   const struct AranyaRoleId *role,
-                                   struct AranyaRole *roles_out,
+ARANYA_DEPRECATED_MSG("role_owners is deprecated")
+AranyaError aranya_role_owners_ext(const struct AranyaClient *_client,
+                                   const struct AranyaTeamId *_team,
+                                   const struct AranyaRoleId *_role,
+                                   struct AranyaRole *_roles_out,
                                    size_t *roles_len,
                                    struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
- * Assigns a role management permission to a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_assign_role_management_permission(const struct AranyaClient *client,
-                                                     const struct AranyaTeamId *team,
-                                                     const struct AranyaRoleId *role,
-                                                     const struct AranyaRoleId *managing_role,
-                                                     AranyaRoleManagementPermission perm);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Assigns a role management permission to a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_assign_role_management_permission_ext(const struct AranyaClient *client,
-                                                         const struct AranyaTeamId *team,
-                                                         const struct AranyaRoleId *role,
-                                                         const struct AranyaRoleId *managing_role,
-                                                         AranyaRoleManagementPermission perm,
-                                                         struct AranyaExtError *__ext_err);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Revokes a role management permission from a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_revoke_role_management_permission(const struct AranyaClient *client,
-                                                     const struct AranyaTeamId *team,
-                                                     const struct AranyaRoleId *role,
-                                                     const struct AranyaRoleId *managing_role,
-                                                     AranyaRoleManagementPermission perm);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Revokes a role management permission from a managing role.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[in] managing_role the ID of the managing role
- * @param[in] perm the management permission to assign
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_revoke_role_management_permission_ext(const struct AranyaClient *client,
-                                                         const struct AranyaTeamId *team,
-                                                         const struct AranyaRoleId *role,
-                                                         const struct AranyaRoleId *managing_role,
-                                                         AranyaRoleManagementPermission perm,
-                                                         struct AranyaExtError *__ext_err);
-#endif
-
-/**
- * Changes the `role` on a `device`
+ * Changes the `role` on a `device`.
  *
  * This will change the device's current role to the new role assigned.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `RevokeRole` permission (for `old_role`)
+ * - `AssignRole` permission (for `new_role`)
+ * - `caller_rank > device_rank`, `caller_rank > old_role_rank`,
+ *   and `caller_rank > new_role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2089,11 +1917,15 @@ AranyaError aranya_change_role(const struct AranyaClient *client,
                                const struct AranyaRoleId *new_role);
 
 /**
- * Changes the `role` on a `device`
+ * Changes the `role` on a `device`.
  *
  * This will change the device's current role to the new role assigned.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `RevokeRole` permission (for `old_role`)
+ * - `AssignRole` permission (for `new_role`)
+ * - `caller_rank > device_rank`, `caller_rank > old_role_rank`,
+ *   and `caller_rank > new_role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2149,18 +1981,17 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   size_t *roles_out_len,
                                   struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Create a role.
  *
- * The `owning_role` is the initial owner of the new role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `CreateRole` permission
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role_name the name of the new role
- * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[in] rank the rank to assign to the new role
  * @param[out] role_out the newly created role
  *
  * @relates AranyaClient
@@ -2168,22 +1999,20 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
 AranyaError aranya_create_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                AranyaRoleName role_name,
-                               const struct AranyaRoleId *owning_role,
+                               int64_t rank,
                                struct AranyaRole *role_out);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Create a role.
  *
- * The `owning_role` is the initial owner of the new role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `CreateRole` permission
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] role_name the name of the new role
- * @param[in] owning_role the role ID of the role that will own the new role
+ * @param[in] rank the rank to assign to the new role
  * @param[out] role_out the newly created role
  *
  * @relates AranyaClient
@@ -2191,19 +2020,18 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
 AranyaError aranya_create_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    AranyaRoleName role_name,
-                                   const struct AranyaRoleId *owning_role,
+                                   int64_t rank,
                                    struct AranyaRole *role_out,
                                    struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Delete a role.
  *
- * The role must not be assigned to any devices, nor should it own any
- * other roles.
+ * The role must not be assigned to any devices.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `DeleteRole` permission
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2214,16 +2042,15 @@ AranyaError aranya_create_role_ext(const struct AranyaClient *client,
 AranyaError aranya_delete_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaRoleId *role);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Delete a role.
  *
- * The role must not be assigned to any devices, nor should it own any
- * other roles.
+ * The role must not be assigned to any devices.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `DeleteRole` permission
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2235,15 +2062,15 @@ AranyaError aranya_delete_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaRoleId *role,
                                    struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add a permission to a role.
  *
  * It is an error to add a permission already added to the role.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `ChangeRolePerms` permission
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2254,15 +2081,15 @@ AranyaError aranya_add_perm_to_role(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaRoleId *role,
                                     AranyaPermission perm);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Add a permission to a role.
  *
  * It is an error to add a permission already added to the role.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `ChangeRolePerms` permission
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2274,15 +2101,15 @@ AranyaError aranya_add_perm_to_role_ext(const struct AranyaClient *client,
                                         const struct AranyaRoleId *role,
                                         AranyaPermission perm,
                                         struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Remove a permission from a role.
  *
  * It is an error to remove a permission not added to the role.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `ChangeRolePerms` permission
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2293,15 +2120,15 @@ AranyaError aranya_remove_perm_from_role(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role,
                                          AranyaPermission perm);
-#endif
 
-#if defined(ENABLE_ARANYA_PREVIEW)
 /**
  * Remove a permission from a role.
  *
  * It is an error to remove a permission not added to the role.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `ChangeRolePerms` permission
+ * - `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2313,14 +2140,56 @@ AranyaError aranya_remove_perm_from_role_ext(const struct AranyaClient *client,
                                              const struct AranyaRoleId *role,
                                              AranyaPermission perm,
                                              struct AranyaExtError *__ext_err);
-#endif
+
+/**
+ * Query all permissions assigned to a role.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
+ * Writes the number of permissions that would have been returned to `perms_len`.
+ * The application can use `perms_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID to query permissions for
+ * @param[out] perms_out returns a list of permissions assigned to the role
+ * @param[in,out] perms_len the number of permissions written to the buffer
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_role_perms(const struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    const struct AranyaRoleId *role,
+                                    AranyaPermission *perms_out,
+                                    size_t *perms_len);
+
+/**
+ * Query all permissions assigned to a role.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
+ * Writes the number of permissions that would have been returned to `perms_len`.
+ * The application can use `perms_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] role the role ID to query permissions for
+ * @param[out] perms_out returns a list of permissions assigned to the role
+ * @param[in,out] perms_len the number of permissions written to the buffer
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_role_perms_ext(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaRoleId *role,
+                                        AranyaPermission *perms_out,
+                                        size_t *perms_len,
+                                        struct AranyaExtError *__ext_err);
 
 /**
  * Assign a role to a device.
  *
- * This will change the device's currently assigned role to the new role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `AssignRole` permission
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * It is an error if the device has already been assigned a role.
  * If you want to assign a different role to a device that already
@@ -2341,9 +2210,9 @@ AranyaError aranya_assign_role(const struct AranyaClient *client,
 /**
  * Assign a role to a device.
  *
- * This will change the device's currently assigned role to the new role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `AssignRole` permission
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * It is an error if the device has already been assigned a role.
  * If you want to assign a different role to a device that already
@@ -2365,7 +2234,9 @@ AranyaError aranya_assign_role_ext(const struct AranyaClient *client,
 /**
  * Revoke a role from a device.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `RevokeRole` permission
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2382,7 +2253,9 @@ AranyaError aranya_revoke_role(const struct AranyaClient *client,
 /**
  * Revoke a role from a device.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `RevokeRole` permission
+ * - `caller_rank > device_rank` and `caller_rank > role_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2400,15 +2273,22 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
 /**
  * Create a channel label.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * The `managing_role_id` parameter is accepted for backward compatibility
+ * but is ignored in the rank-based authorization model. Since this API
+ * does not allow the user to specify a rank, the label is created with
+ * a default rank of the command author's rank minus one.
+ *
+ * Requires:
+ * - `CreateLabel` permission
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id the ID of the role that manages this label
+ * @param[in] managing_role_id (ignored) formerly the managing role
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `create_label_with_rank` to specify an explicit rank")
 AranyaError aranya_create_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
@@ -2418,15 +2298,22 @@ AranyaError aranya_create_label(const struct AranyaClient *client,
 /**
  * Create a channel label.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * The `managing_role_id` parameter is accepted for backward compatibility
+ * but is ignored in the rank-based authorization model. Since this API
+ * does not allow the user to specify a rank, the label is created with
+ * a default rank of the command author's rank minus one.
+ *
+ * Requires:
+ * - `CreateLabel` permission
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id the ID of the role that manages this label
+ * @param[in] managing_role_id (ignored) formerly the managing role
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `create_label_with_rank` to specify an explicit rank")
 AranyaError aranya_create_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
@@ -2435,9 +2322,52 @@ AranyaError aranya_create_label_ext(const struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
+ * Create a channel label with an explicit rank.
+ *
+ * Requires:
+ * - `CreateLabel` permission
+ * - `caller_rank >= rank`
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] name label name string
+ * @param[in] rank the rank to assign to the label
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_create_label_with_rank(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team,
+                                          AranyaLabelName name,
+                                          int64_t rank,
+                                          struct AranyaLabelId *__output);
+
+/**
+ * Create a channel label with an explicit rank.
+ *
+ * Requires:
+ * - `CreateLabel` permission
+ * - `caller_rank >= rank`
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] name label name string
+ * @param[in] rank the rank to assign to the label
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_create_label_with_rank_ext(const struct AranyaClient *client,
+                                              const struct AranyaTeamId *team,
+                                              AranyaLabelName name,
+                                              int64_t rank,
+                                              struct AranyaLabelId *__output,
+                                              struct AranyaExtError *__ext_err);
+
+/**
  * Delete a channel label.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `DeleteLabel` permission
+ * - `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2452,7 +2382,9 @@ AranyaError aranya_delete_label(const struct AranyaClient *client,
 /**
  * Delete a channel label.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `DeleteLabel` permission
+ * - `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2466,9 +2398,109 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
+ * Change the rank of an object (device or label).
+ *
+ * The caller must provide the current rank of the object (`old_rank`)
+ * to guard against concurrent changes by other devices. If another
+ * device changes the rank before this command is applied, the
+ * operation will fail rather than silently overwriting the new value.
+ * This preserves the caller's intent to only change the rank under
+ * expected conditions.
+ *
+ * Requires:
+ * - `ChangeRank` permission
+ * - `caller_rank > object_rank` (unless changing own rank)
+ * - `caller_rank >= new_rank`
+ *
+ * Note: Role ranks cannot be changed after creation. This maintains
+ * the invariant that `role_rank >= device_rank` for all devices
+ * assigned to the role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] object_id the ID of the object to change the rank of
+ * @param[in] old_rank the current rank of the object
+ * @param[in] new_rank the new rank to assign to the object
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_change_rank(const struct AranyaClient *client,
+                               const struct AranyaTeamId *team,
+                               const struct AranyaObjectId *object_id,
+                               int64_t old_rank,
+                               int64_t new_rank);
+
+/**
+ * Change the rank of an object (device or label).
+ *
+ * The caller must provide the current rank of the object (`old_rank`)
+ * to guard against concurrent changes by other devices. If another
+ * device changes the rank before this command is applied, the
+ * operation will fail rather than silently overwriting the new value.
+ * This preserves the caller's intent to only change the rank under
+ * expected conditions.
+ *
+ * Requires:
+ * - `ChangeRank` permission
+ * - `caller_rank > object_rank` (unless changing own rank)
+ * - `caller_rank >= new_rank`
+ *
+ * Note: Role ranks cannot be changed after creation. This maintains
+ * the invariant that `role_rank >= device_rank` for all devices
+ * assigned to the role.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] object_id the ID of the object to change the rank of
+ * @param[in] old_rank the current rank of the object
+ * @param[in] new_rank the new rank to assign to the object
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_change_rank_ext(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaObjectId *object_id,
+                                   int64_t old_rank,
+                                   int64_t new_rank,
+                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Query the rank of an object.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] object_id the ID of the object to query
+ * @param[out] __output the rank of the object
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_rank(const struct AranyaClient *client,
+                              const struct AranyaTeamId *team,
+                              const struct AranyaObjectId *object_id,
+                              int64_t *__output);
+
+/**
+ * Query the rank of an object.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] object_id the ID of the object to query
+ * @param[out] __output the rank of the object
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_rank_ext(const struct AranyaClient *client,
+                                  const struct AranyaTeamId *team,
+                                  const struct AranyaObjectId *object_id,
+                                  int64_t *__output,
+                                  struct AranyaExtError *__ext_err);
+
+/**
  * Assign a label to a device so that it can be used for a channel.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `AssignLabel` permission
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2486,7 +2518,9 @@ AranyaError aranya_assign_label(const struct AranyaClient *client,
 /**
  * Assign a label to a device so that it can be used for a channel.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `AssignLabel` permission
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2505,7 +2539,9 @@ AranyaError aranya_assign_label_ext(const struct AranyaClient *client,
 /**
  * Revoke a label from a device.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `RevokeLabel` permission
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2522,7 +2558,9 @@ AranyaError aranya_revoke_label(const struct AranyaClient *client,
 /**
  * Revoke a label from a device.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Requires:
+ * - `RevokeLabel` permission
+ * - `caller_rank > device_rank` and `caller_rank > label_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2536,45 +2574,6 @@ AranyaError aranya_revoke_label_ext(const struct AranyaClient *client,
                                     const struct AranyaDeviceId *device,
                                     const struct AranyaLabelId *label_id,
                                     struct AranyaExtError *__ext_err);
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Add label managing role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] label_id the label ID
- * @param[in] managing_role_id the ID of the managing role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_label_managing_role(const struct AranyaClient *client,
-                                           const struct AranyaTeamId *team,
-                                           const struct AranyaLabelId *label_id,
-                                           const struct AranyaRoleId *managing_role_id);
-#endif
-
-#if defined(ENABLE_ARANYA_PREVIEW)
-/**
- * Add label managing role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] label_id the label ID
- * @param[in] managing_role_id the ID of the managing role
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_label_managing_role_ext(const struct AranyaClient *client,
-                                               const struct AranyaTeamId *team,
-                                               const struct AranyaLabelId *label_id,
-                                               const struct AranyaRoleId *managing_role_id,
-                                               struct AranyaExtError *__ext_err);
-#endif
 
 /**
  * Create a new graph/team with the current device as the owner.
@@ -2759,9 +2758,15 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
- * Add a device to the team with the default role.
+ * Add a device to the team with an optional initial role.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Since this API does not allow specifying a rank, the device is
+ * assigned a default rank based on:
+ * - If a role is provided: the role's rank minus one
+ * - If no role is provided: the command author's rank minus one
+ *
+ * Requires:
+ * - `AddDevice` permission
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2771,6 +2776,7 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `add_device_to_team_with_rank` to specify an explicit rank")
 AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
                                       const uint8_t *public_key_bundle,
@@ -2778,9 +2784,15 @@ AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaRoleId *role_id);
 
 /**
- * Add a device to the team with the default role.
+ * Add a device to the team with an optional initial role.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * Since this API does not allow specifying a rank, the device is
+ * assigned a default rank based on:
+ * - If a role is provided: the role's rank minus one
+ * - If no role is provided: the command author's rank minus one
+ *
+ * Requires:
+ * - `AddDevice` permission
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2790,6 +2802,7 @@ AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
+ARANYA_DEPRECATED_MSG("use `add_device_to_team_with_rank` to specify an explicit rank")
 AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const uint8_t *public_key_bundle,
@@ -2798,9 +2811,58 @@ AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
                                           struct AranyaExtError *__ext_err);
 
 /**
+ * Add a device to the team with an explicit rank.
+ *
+ * Requires:
+ * - `AddDevice` permission
+ * - `caller_rank >= rank`
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
+ * @param[in] role_id (optional) the ID of the role to assign to the device.
+ * @param[in] rank the rank to assign to the device.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_device_to_team_with_rank(const struct AranyaClient *client,
+                                                const struct AranyaTeamId *team,
+                                                const uint8_t *keybundle,
+                                                size_t keybundle_len,
+                                                const struct AranyaRoleId *role_id,
+                                                int64_t rank);
+
+/**
+ * Add a device to the team with an explicit rank.
+ *
+ * Requires:
+ * - `AddDevice` permission
+ * - `caller_rank >= rank`
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
+ * @param[in] role_id (optional) the ID of the role to assign to the device.
+ * @param[in] rank the rank to assign to the device.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_add_device_to_team_with_rank_ext(const struct AranyaClient *client,
+                                                    const struct AranyaTeamId *team,
+                                                    const uint8_t *keybundle,
+                                                    size_t keybundle_len,
+                                                    const struct AranyaRoleId *role_id,
+                                                    int64_t rank,
+                                                    struct AranyaExtError *__ext_err);
+
+/**
  * Remove a device from the team.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * A device can always remove itself. Removing another device requires:
+ * - `RemoveDevice` permission
+ * - `caller_rank > device_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2815,7 +2877,9 @@ AranyaError aranya_remove_device_from_team(const struct AranyaClient *client,
 /**
  * Remove a device from the team.
  *
- * Permission to perform this operation is checked against the Aranya policy.
+ * A device can always remove itself. Removing another device requires:
+ * - `RemoveDevice` permission
+ * - `caller_rank > device_rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -3329,9 +3393,10 @@ AranyaError aranya_afc_seq_cleanup(struct AranyaAfcSeq *ptr);
  * Note that the control message needs to be sent to the other peer using the
  * transport of your choice to create the other side of the channel.
  *
- * Permission to perform this operation is checked against the Aranya policy.
- * Both the current node and its peer should have permission to use the label
- * and have appropriate channel permissions.
+ * Requires:
+ * - Both devices must have the `CanUseAfc` permission
+ * - Both devices must have appropriate channel operations
+ *   (`SendOnly`, `RecvOnly`, or `SendRecv`) assigned for the label
  *
  * @param[in]  client the Aranya Client
  * @param[in]  team_id the team's identifier
@@ -3357,9 +3422,10 @@ AranyaError aranya_afc_create_channel(const struct AranyaClient *client,
  * Note that the control message needs to be sent to the other peer using the
  * transport of your choice to create the other side of the channel.
  *
- * Permission to perform this operation is checked against the Aranya policy.
- * Both the current node and its peer should have permission to use the label
- * and have appropriate channel permissions.
+ * Requires:
+ * - Both devices must have the `CanUseAfc` permission
+ * - Both devices must have appropriate channel operations
+ *   (`SendOnly`, `RecvOnly`, or `SendRecv`) assigned for the label
  *
  * @param[in]  client the Aranya Client
  * @param[in]  team_id the team's identifier

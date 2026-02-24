@@ -105,6 +105,41 @@ custom_id! {
     pub struct RoleId;
 }
 
+custom_id! {
+    /// An identifier for any object with a unique Aranya ID defined in the policy.
+    pub struct ObjectId;
+}
+
+/// A numerical rank used for authorization in the rank-based hierarchy.
+///
+/// Higher-ranked objects can operate on lower-ranked objects.
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Rank(i64);
+
+impl Rank {
+    /// Creates a new rank from a raw value.
+    pub const fn new(value: i64) -> Self {
+        Self(value)
+    }
+
+    /// Returns the raw rank value.
+    pub const fn value(self) -> i64 {
+        self.0
+    }
+}
+
+impl fmt::Display for Rank {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<i64> for Rank {
+    fn from(value: i64) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Role {
     /// Uniquely identifies the role.
@@ -262,32 +297,35 @@ pub enum ChanOp {
     SendRecv,
 }
 
-/// Role management permissions.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum RoleManagementPerm {
-    // Grants a managing role the ability to assign the target role
-    // to any device except itself.
-    CanAssignRole,
-    // Grants a managing role the ability to revoke the target role
-    // from any device.
-    CanRevokeRole,
-    // Grants a managing role the ability to change the permissions
-    // assigned to the target role.
-    CanChangeRolePerms,
-}
-
-/// Simple permissions.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum SimplePerm {
+/// Permissions that can be granted to a role.
+///
+/// # Stability
+///
+/// New permissions may be added to the end of this enum without breaking
+/// backward compatibility. Existing permissions will not be removed or
+/// renamed.
+///
+/// # Deprecation
+///
+/// Deprecated variants are marked with `#[deprecated]` and will emit
+/// compiler warnings when used. They remain in the enum for backward
+/// compatibility — see the deprecation note on each variant for the
+/// migration path.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Perm {
     // # Team management
     //
     // The role can add a device to the team.
     AddDevice,
     // The role can remove a device from the team.
     RemoveDevice,
-    // The role can terminate the team. This causes all team
-    // commands to fail until a new team is created.
+    // The role can terminate the team.
     TerminateTeam,
+
+    // # Rank
+    //
+    // The role can change the rank of objects.
+    ChangeRank,
 
     // # Roles
     //
@@ -299,15 +337,10 @@ pub enum SimplePerm {
     AssignRole,
     // The role can revoke a role from other devices.
     RevokeRole,
-    // The role can change role management permissions for roles.
-    ChangeRoleManagementPerms,
-    // The role can set up default roles. This can only be done
-    // once, so this permission can only effectively be used by
-    // the `owner` role.
+    // The role can change permissions on roles.
+    ChangeRolePerms,
+    // The role can set up default roles.
     SetupDefaultRole,
-    // The role can add a managing role to or remove a managing
-    // role from a target role.
-    ChangeRoleManagingRole,
 
     // # Labels
     //
@@ -315,23 +348,14 @@ pub enum SimplePerm {
     CreateLabel,
     // The role can delete a label.
     DeleteLabel,
-    // The role can grant a target role the ability to manage a
-    // label. This management ability includes deleting a label
-    // and adding/revoking a label to a device.
-    ChangeLabelManagingRole,
-    // The role can assign a label to a device. The role must
-    // also have label management permissions granted by a role
-    // with the `ChangeLabelManagingRole` permission above.
+    // The role can assign a label to a device.
     AssignLabel,
-    // The role can revoke a label from a device. The role must
-    // also have label management permissions granted by a role
-    // with the `ChangeLabelManagingRole` permission above.
+    // The role can revoke a label from a device.
     RevokeLabel,
 
     // # AFC
     //
-    // The role can use AFC. This controls the ability to
-    // create or receive a unidirectional AFC channels.
+    // The role can use AFC.
     CanUseAfc,
     // The role can create a unidirectional AFC channel.
     CreateAfcUniChannel,
@@ -411,11 +435,13 @@ pub trait DaemonApi {
     // Device onboarding
     //
 
-    /// Adds a device to the team with optional initial roles.
-    async fn add_device_to_team(
+    /// Adds a device to the team with an optional initial role and
+    /// explicit rank.
+    async fn add_device_to_team_with_rank(
         team: TeamId,
         keys: PublicKeyBundle,
         initial_role: Option<RoleId>,
+        rank: Rank,
     ) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
@@ -431,12 +457,10 @@ pub trait DaemonApi {
     /// Configures the team with default roles from policy.
     ///
     /// It returns the default roles that were created.
-    async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
-    /// Creates a new role.
-    #[cfg(feature = "preview")]
-    async fn create_role(team: TeamId, role_name: Text, owning_role: RoleId) -> Result<Role>;
+    async fn setup_default_roles(team: TeamId) -> Result<Box<[Role]>>;
+    /// Creates a new role with the given rank.
+    async fn create_role(team: TeamId, role_name: Text, rank: Rank) -> Result<Role>;
     /// Deletes a role.
-    #[cfg(feature = "preview")]
     async fn delete_role(team: TeamId, role_id: RoleId) -> Result<()>;
     /// Returns the current team roles.
     async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
@@ -446,35 +470,24 @@ pub trait DaemonApi {
     //
 
     /// Adds a permission to a role.
-    #[cfg(feature = "preview")]
-    async fn add_perm_to_role(team: TeamId, role: RoleId, perm: SimplePerm) -> Result<()>;
+    async fn add_perm_to_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
     /// Removes a permission from a role.
-    #[cfg(feature = "preview")]
-    async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: SimplePerm) -> Result<()>;
-    /// Adds an owning role to the target role.
-    #[cfg(feature = "preview")]
-    async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
-    /// Removes an owning role from the target role.
-    #[cfg(feature = "preview")]
-    async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
-    /// Returns the roles that own the target role.
-    async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
-    /// Assigns a role management permission to a role.
-    #[cfg(feature = "preview")]
-    async fn assign_role_management_perm(
+    async fn remove_perm_from_role(team: TeamId, role: RoleId, perm: Perm) -> Result<()>;
+    /// Queries all permissions assigned to a role.
+    async fn query_role_perms(team: TeamId, role: RoleId) -> Result<Vec<Perm>>;
+    /// Changes the rank of an object (device or label).
+    ///
+    /// Note: Role ranks cannot be changed after creation. This maintains the
+    /// invariant that `role_rank > device_rank` for all devices assigned to
+    /// the role.
+    async fn change_rank(
         team: TeamId,
-        role: RoleId,
-        managing_role: RoleId,
-        perm: RoleManagementPerm,
+        object_id: ObjectId,
+        old_rank: Rank,
+        new_rank: Rank,
     ) -> Result<()>;
-    /// Revokes a role management permission from a role.
-    #[cfg(feature = "preview")]
-    async fn revoke_role_management_perm(
-        team: TeamId,
-        role: RoleId,
-        managing_role: RoleId,
-        perm: RoleManagementPerm,
-    ) -> Result<()>;
+    /// Queries the rank of an object.
+    async fn query_rank(team: TeamId, object_id: ObjectId) -> Result<Rank>;
 
     //
     // Role assignment
@@ -498,24 +511,14 @@ pub trait DaemonApi {
     // Label creation
     //
 
-    /// Create a label.
-    async fn create_label(team: TeamId, name: Text, managing_role_id: RoleId) -> Result<LabelId>;
+    /// Creates a label with an explicit rank.
+    async fn create_label_with_rank(team: TeamId, name: Text, rank: Rank) -> Result<LabelId>;
     /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     /// Returns a specific label.
     async fn label(team: TeamId, label: LabelId) -> Result<Option<Label>>;
     /// Returns all labels on the team.
     async fn labels(team: TeamId) -> Result<Vec<Label>>;
-
-    //
-    // Label management
-    //
-
-    async fn add_label_managing_role(
-        team: TeamId,
-        label_id: LabelId,
-        managing_role_id: RoleId,
-    ) -> Result<()>;
 
     //
     // Label assignments

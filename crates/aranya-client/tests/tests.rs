@@ -16,11 +16,11 @@ use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{ChanOp, Permission, RoleId, RoleManagementPermission},
+    client::{ChanOp, Permission},
     config::{CreateTeamConfig, HelloSubscriptionConfig, SyncPeerConfig},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, ObjectId,
 };
-use aranya_daemon_api::text;
+use aranya_daemon_api::{text, Rank};
 use test_log::test;
 use tracing::{debug, info};
 
@@ -61,7 +61,7 @@ async fn test_client_rand() -> Result<()> {
     Ok(())
 }
 
-/// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
+/// Tests sync_now() by showing that an admin cannot perform operations until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -81,14 +81,34 @@ async fn test_sync_now() -> Result<()> {
     let admin = devices.admin.client.team(team_id);
 
     // Add the admin as a new device, but don't give it a role.
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
     owner
-        .add_device(devices.admin.pk.clone(), None)
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            None,
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
         .await
         .context("owner unable to add admin to team")?;
 
     // Add the operator as a new device, but don't give it a role.
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
     owner
-        .add_device(devices.operator.pk.clone(), None)
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            None,
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
         .await
         .context("owner unable to add operator to team")?;
 
@@ -99,7 +119,8 @@ async fn test_sync_now() -> Result<()> {
         .await
         .context("owner unable to assign admin role")?;
 
-    // Now, we try to assign a role using the admin, which is expected to fail.
+    // Now, we try to assign a role using the admin, which is expected to fail
+    // because the admin hasn't synced yet and doesn't know about its role.
     let err = admin
         .device(devices.operator.id)
         .assign_role(roles.operator().id)
@@ -113,12 +134,16 @@ async fn test_sync_now() -> Result<()> {
         .await
         .context("admin unable to sync with owner")?;
 
-    // Now we should be able to successfully assign a role.
+    // Now we should be able to successfully create a label (admin has CreateLabel perm).
+    let member_role_rank = admin
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     admin
-        .device(devices.operator.id)
-        .assign_role(roles.operator().id)
+        .create_label_with_rank(text!("test_label"), label_rank)
         .await
-        .context("admin unable to assign role to operator")?;
+        .context("admin unable to create label after sync")?;
 
     Ok(())
 }
@@ -146,8 +171,13 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 
     // Add a command to graph by having the owner create a label.
     let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     owner_team
-        .create_label(text!("label1"), roles.owner().id)
+        .create_label_with_rank(text!("label1"), label_rank)
         .await?;
 
     // Wait for syncing.
@@ -188,7 +218,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 
     // Create another label.
     owner_team
-        .create_label(text!("label2"), roles.owner().id)
+        .create_label_with_rank(text!("label2"), label_rank)
         .await?;
 
     // Wait for syncing.
@@ -233,21 +263,38 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     // Query to show admin role exists.
     let roles_on_team = owner_team.roles().await?;
     assert_eq!(roles_on_team.iter().count(), 4);
-    let _admin_role = roles_on_team
+    roles_on_team
         .iter()
         .find(|r| r.name == "admin")
-        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
-        .clone();
+        .ok_or_else(|| anyhow::anyhow!("no admin role"))?;
+
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
     // Show that admin cannot create a label.
     admin_team
-        .create_label(text!("label1"), roles.admin().id)
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect_err("expected label creation to fail");
 
     // Add the admin as a new device.
     info!("adding admin to team");
-    owner.add_device(devices.admin.pk.clone(), None).await?;
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    owner
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            None,
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Add team to admin device.
     let admin_seed = owner
@@ -276,7 +323,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Show that admin cannot create a label.
     admin_team
-        .create_label(text!("label1"), roles.admin().id)
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect_err("expected label creation to fail");
 
@@ -302,7 +349,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Create label.
     let label1 = admin_team
-        .create_label(text!("label1"), roles.admin().id)
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect("expected admin to create label");
 
@@ -331,7 +378,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 
     // Show that admin cannot create a label.
     admin_team
-        .create_label(text!("label1"), roles.admin().id)
+        .create_label_with_rank(text!("label1"), label_rank)
         .await
         .expect_err("expected label creation to fail");
 
@@ -395,8 +442,18 @@ async fn test_add_devices() -> Result<()> {
 
     // Add the initial admin who should be allowed to add
     // devices.
+    let admin_role_rank = team
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
     owner
-        .add_device(team.admin.pk.clone(), Some(roles.admin().id))
+        .add_device_with_rank(
+            team.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
         .await
         .context("owner should be able to add admin to team")?;
 
@@ -405,24 +462,58 @@ async fn test_add_devices() -> Result<()> {
         .await
         .context("admin unable to sync with owner")?;
 
+    // Admin adds operator without initial role (admin has AddDevice but not AssignRole).
+    let operator_role_rank = team
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
     admin
-        .add_device(team.operator.pk.clone(), Some(roles.operator().id))
+        .add_device_with_rank(
+            team.operator.pk.clone(),
+            None,
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
         .await
         .context("admin should be able to add operator to team")?;
 
-    operator
+    // Owner assigns operator role (owner has AssignRole).
+    owner
         .sync_now(team.admin.aranya_local_addr().await?, None)
         .await
-        .context("operator unable to sync with admin")?;
+        .context("owner unable to sync with admin")?;
+    owner
+        .device(team.operator.id)
+        .assign_role(roles.operator().id)
+        .await
+        .context("owner should be able to assign operator role")?;
 
+    operator
+        .sync_now(team.owner.aranya_local_addr().await?, None)
+        .await
+        .context("operator unable to sync with owner")?;
+
+    let member_role_rank = team
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
     for (name, kb, device_id) in [
         ("membera", team.membera.pk.clone(), team.membera.id),
         ("memberb", team.memberb.pk.clone(), team.memberb.id),
     ] {
+        // Admin adds members without role (admin has AddDevice but not AssignRole).
         admin
-            .add_device(kb, None)
+            .add_device_with_rank(
+                kb,
+                None,
+                Rank::new(member_role_rank.value().saturating_sub(1)),
+            )
             .await
             .with_context(|| format!("admin should be able to add `{name}` to team"))?;
+        // Operator syncs to see newly added device, then assigns member role (operator has AssignRole).
         operator
             .sync_now(team.admin.aranya_local_addr().await?, None)
             .await
@@ -440,22 +531,46 @@ async fn test_add_devices() -> Result<()> {
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
+async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
     let mut devices =
-        DevicesCtx::new("test_add_device_with_initial_role_requires_delegation").await?;
+        DevicesCtx::new("test_add_device_with_initial_role_requires_outranking").await?;
 
     let team_id = devices.create_and_add_team().await?;
 
     let roles = devices
-        .setup_default_roles_without_delegation(team_id)
+        .setup_default_roles(team_id)
         .await
         .context("unable to setup default roles")?;
 
     let owner_team = devices.owner.client.team(team_id);
     let admin_team = devices.admin.client.team(team_id);
 
+    // Admin already has AddDevice from setup_default_roles, but needs AssignRole
+    // to add a device with an initial role assignment.
     owner_team
-        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .add_perm_to_role(roles.admin().id, Permission::AssignRole)
+        .await
+        .context("owner should be able to add AssignRole to admin")?;
+
+    // Add admin with rank below admin role (outranks member role at rank 600).
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    let member_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
         .await
         .context("owner should be able to add admin to team")?;
 
@@ -464,11 +579,33 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
         .await
         .context("admin unable to sync with owner")?;
 
-    let err = admin_team
-        .add_device(devices.membera.pk.clone(), Some(roles.member().id))
+    // Admin should succeed at adding membera with member role
+    // because admin outranks the member role and has both AddDevice and AssignRole perms.
+    admin_team
+        .add_device_with_rank(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
+        )
         .await
-        .expect_err("add_device with initial role requires delegation");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+        .context("admin should be able to add device with member role (admin outranks member)")?;
+
+    // Admin should fail when trying to add a device with the owner role
+    // because admin does not outrank the owner role.
+    match admin_team
+        .add_device_with_rank(
+            devices.memberb.pk.clone(),
+            Some(roles.owner().id),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
+        )
+        .await
+    {
+        Ok(_) => {
+            bail!("expected add_device with owner role to fail (admin does not outrank owner)")
+        }
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected error: {err:?}"),
+    }
 
     Ok(())
 }
@@ -540,8 +677,13 @@ async fn test_query_functions() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
-        .create_label(text!("label1"), roles.owner().id)
+        .create_label_with_rank(text!("label1"), label_rank)
         .await?;
 
     // Assigning labels to devices with the "member" role should succeed since it does not have `CanUseAfc` permission.
@@ -650,14 +792,43 @@ async fn test_add_team() -> Result<()> {
     info!(?team_id);
 
     let roles = devices.setup_default_roles(team_id).await?;
+    let member_role_rank = owner
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
     // Add the admin as a new device.
     info!("adding admin to team");
-    owner.add_device(devices.admin.pk.clone(), None).await?;
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    owner
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            None,
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Add the operator as a new device.
     info!("adding operator to team");
-    owner.add_device(devices.operator.pk.clone(), None).await?;
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    owner
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            None,
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Give the admin its role.
     owner
@@ -674,7 +845,8 @@ async fn test_add_team() -> Result<()> {
             .expect_err("syncing should fail before add_team()");
         assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
-        // Now, we try to assign a role using the admin, which is expected to fail.
+        // Now, we try to assign a role using the admin, which is expected to fail
+        // because the admin hasn't called add_team() yet.
         let err = admin
             .device(devices.operator.id)
             .assign_role(roles.operator().id)
@@ -704,12 +876,11 @@ async fn test_add_team() -> Result<()> {
         let admin = devices.admin.client.team(team_id);
         admin.sync_now(owner_addr, None).await?;
 
-        // Now we should be able to successfully assign a role.
+        // Now we should be able to successfully create a label (admin has CreateLabel perm).
         admin
-            .device(devices.operator.id)
-            .assign_role(roles.operator().id)
+            .create_label_with_rank(text!("test_label"), label_rank)
             .await
-            .context("Assigning a role should not fail here!")?;
+            .context("Creating a label should not fail here!")?;
     }
 
     return Ok(());
@@ -730,16 +901,45 @@ async fn test_remove_team() -> Result<()> {
 
     let owner = devices.owner.client.team(team_id);
     let roles = devices.setup_default_roles(team_id).await?;
+    let member_role_rank = owner
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
     {
         let admin = devices.admin.client.team(team_id);
 
         // Add the operator as a new device.
         info!("adding operator to team");
-        owner.add_device(devices.operator.pk.clone(), None).await?;
+        let operator_role_rank = devices
+            .owner
+            .client
+            .team(team_id)
+            .query_rank(ObjectId::transmute(roles.operator().id))
+            .await?;
+        owner
+            .add_device_with_rank(
+                devices.operator.pk.clone(),
+                None,
+                Rank::new(operator_role_rank.value().saturating_sub(1)),
+            )
+            .await?;
 
         // Add the admin as a new device.
-        owner.add_device(devices.admin.pk.clone(), None).await?;
+        let admin_role_rank = devices
+            .owner
+            .client
+            .team(team_id)
+            .query_rank(ObjectId::transmute(roles.admin().id))
+            .await?;
+        owner
+            .add_device_with_rank(
+                devices.admin.pk.clone(),
+                None,
+                Rank::new(admin_role_rank.value().saturating_sub(1)),
+            )
+            .await?;
 
         // Give the admin its role.
         owner
@@ -751,10 +951,9 @@ async fn test_remove_team() -> Result<()> {
             .sync_now(devices.owner.aranya_local_addr().await?, None)
             .await?;
 
-        // We should be able to successfully assign a role.
+        // We should be able to successfully create a label (admin has CreateLabel perm).
         admin
-            .device(devices.operator.id)
-            .assign_role(roles.operator().id)
+            .create_label_with_rank(text!("test_label"), label_rank)
             .await?;
     }
 
@@ -764,13 +963,15 @@ async fn test_remove_team() -> Result<()> {
     {
         let admin = devices.admin.client.team(team_id);
 
-        // Role assignment should fail
-        let err = admin
-            .device(devices.operator.id)
-            .assign_role(roles.member().id)
+        // Label creation should fail since the team was removed from local storage above.
+        match admin
+            .create_label_with_rank(text!("test_label2"), label_rank)
             .await
-            .expect_err("role assignment should fail after team removal");
-        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+        {
+            Ok(_) => bail!("Expected label creation to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
     }
 
     Ok(())
@@ -821,11 +1022,35 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Add the admin as a new device.
     info!("adding admin to team1");
-    team1.add_device(devices.admin.pk.clone(), None).await?;
+    let admin_role_rank_t1 = devices
+        .owner
+        .client
+        .team(team_id1)
+        .query_rank(ObjectId::transmute(roles1.admin().id))
+        .await?;
+    let operator_role_rank_t1 = devices
+        .owner
+        .client
+        .team(team_id1)
+        .query_rank(ObjectId::transmute(roles1.operator().id))
+        .await?;
+    team1
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            None,
+            Rank::new(admin_role_rank_t1.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Add the operator as a new device.
     info!("adding operator to team1");
-    team1.add_device(devices.operator.pk.clone(), None).await?;
+    team1
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            None,
+            Rank::new(operator_role_rank_t1.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Give the admin its role.
     team1
@@ -835,11 +1060,35 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Add the admin as a new device.
     info!("adding admin to team2");
-    team2.add_device(devices.admin.pk.clone(), None).await?;
+    let admin_role_rank_t2 = devices
+        .owner
+        .client
+        .team(team_id2)
+        .query_rank(ObjectId::transmute(roles2.admin().id))
+        .await?;
+    let operator_role_rank_t2 = devices
+        .owner
+        .client
+        .team(team_id2)
+        .query_rank(ObjectId::transmute(roles2.operator().id))
+        .await?;
+    team2
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            None,
+            Rank::new(admin_role_rank_t2.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Add the operator as a new device.
     info!("adding operator to team2");
-    team2.add_device(devices.operator.pk.clone(), None).await?;
+    team2
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            None,
+            Rank::new(operator_role_rank_t2.value().saturating_sub(1)),
+        )
+        .await?;
 
     // Give the admin its role.
     team2
@@ -856,7 +1105,8 @@ async fn test_multi_team_sync() -> Result<()> {
             .expect_err("syncing team1 should fail before add_team()");
         assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
-        // Now, we try to assign a role using the admin, which is expected to fail.
+        // Now, we try to assign a role using the admin, which is expected to fail
+        // because add_team() hasn't been called yet.
         let err = admin
             .device(devices.operator.id)
             .assign_role(roles1.operator().id)
@@ -886,12 +1136,16 @@ async fn test_multi_team_sync() -> Result<()> {
     let admin1 = devices.admin.client.team(team_id1);
     admin1.sync_now(owner_addr, None).await?;
 
-    // Now we should be able to successfully assign a role.
+    // Now we should be able to successfully create a label (admin has CreateLabel perm).
+    let member_role_rank_t1 = admin1
+        .query_rank(ObjectId::transmute(roles1.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank_t1 = Rank::new(member_role_rank_t1.value().saturating_sub(1));
     admin1
-        .device(devices.operator.id)
-        .assign_role(roles1.operator().id)
+        .create_label_with_rank(text!("team1_label"), label_rank_t1)
         .await
-        .context("Assigning a role should not fail here!")?;
+        .context("Creating a label should not fail here!")?;
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
@@ -902,7 +1156,8 @@ async fn test_multi_team_sync() -> Result<()> {
             .expect_err("syncing team2 should fail before add_team()");
         assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
-        // Now, we try to assign a role using the admin, which is expected to fail.
+        // Now, we try to assign a role using the admin, which is expected to fail
+        // because add_team() hasn't been called for team2 yet.
         let err = admin
             .device(devices.operator.id)
             .assign_role(roles2.operator().id)
@@ -932,12 +1187,16 @@ async fn test_multi_team_sync() -> Result<()> {
     let admin2 = devices.admin.client.team(team_id2);
     admin2.sync_now(owner_addr, None).await?;
 
-    // Now we should be able to successfully assign a role.
+    // Now we should be able to successfully create a label (admin has CreateLabel perm).
+    let member_role_rank_t2 = admin2
+        .query_rank(ObjectId::transmute(roles2.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank_t2 = Rank::new(member_role_rank_t2.value().saturating_sub(1));
     admin2
-        .device(devices.operator.id)
-        .assign_role(roles2.operator().id)
+        .create_label_with_rank(text!("team2_label"), label_rank_t2)
         .await
-        .context("Assigning a role should not fail here!")?;
+        .context("Creating a label should not fail here!")?;
 
     Ok(())
 }
@@ -996,10 +1255,15 @@ async fn test_hello_subscription() -> Result<()> {
     // Admin performs an action that will update their graph - create a label
     // (admin has permission to create labels)
     info!("admin creating a test label");
+    let member_role_rank = admin_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let test_label = admin_team
-        .create_label(
+        .create_label_with_rank(
             aranya_daemon_api::text!("sync_hello_test_label"),
-            roles.admin().id,
+            label_rank,
         )
         .await?;
     info!("admin created test label: {:?}", test_label);
@@ -1148,10 +1412,15 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
 
     // Admin creates first label
     info!("admin creating first test label");
+    let member_role_rank = admin_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let test_label_1 = admin_team
-        .create_label(
+        .create_label_with_rank(
             aranya_daemon_api::text!("schedule_test_label_1"),
-            roles.admin().id,
+            label_rank,
         )
         .await?;
     info!("admin created first test label: {:?}", test_label_1);
@@ -1198,9 +1467,9 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
     // Admin creates second label
     info!("admin creating second test label");
     let test_label_2 = admin_team
-        .create_label(
+        .create_label_with_rank(
             aranya_daemon_api::text!("schedule_test_label_2"),
-            roles.admin().id,
+            label_rank,
         )
         .await?;
     info!("admin created second test label: {:?}", test_label_2);
@@ -1307,35 +1576,17 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
     let mut devices = DevicesCtx::new("test_setup_default_roles_single_use").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
+    devices
+        .setup_default_roles(team_id)
         .await
-        .context("unable to setup default roles without delegation")?;
+        .context("unable to setup default roles")?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let err = owner_team
-        .setup_default_roles(roles.owner().id)
-        .await
-        .expect_err("setup_default_roles should only succeed once");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Verifies that the managing role supplied to setup_default_roles must exist.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_setup_default_roles_rejects_unknown_owner").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let owner_team = devices.owner.client.team(team_id);
-    let bogus_role = RoleId::from([0x55; 32]);
-
-    let err = owner_team
-        .setup_default_roles(bogus_role)
-        .await
-        .expect_err("setup_default_roles should reject unknown owner role");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+    match owner_team.setup_default_roles().await {
+        Ok(_) => bail!("expected replayed setup_default_roles to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected error re-running setup_default_roles: {err:?}"),
+    }
 
     Ok(())
 }
@@ -1346,20 +1597,12 @@ async fn test_create_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let owner_role = owner_team
-        .roles()
-        .await?
-        .into_iter()
-        .find(|r| r.name == "owner")
-        .expect("no owner role!?");
 
     let test_role = owner_team
-        .create_role(text!("test_role"), owner_role.id)
+        .create_role(text!("test_role"), 50.into())
         .await
         .expect("expected to create role");
 
@@ -1372,8 +1615,18 @@ async fn test_create_role() -> Result<()> {
 
     // Set up another device, sync it, and make sure they can see the
     // role.
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
     owner_team
-        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
         .await?;
     let admin_team = devices.admin.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -1385,7 +1638,8 @@ async fn test_create_role() -> Result<()> {
         .into_iter()
         .find(|r| r.name == "test_role")
         .expect("no test role found");
-    assert_eq!(test_role, test_role2);
+    assert_eq!(test_role.id, test_role2.id);
+    assert_eq!(test_role.name, test_role2.name);
 
     Ok(())
 }
@@ -1398,25 +1652,27 @@ async fn test_add_perm_to_created_role() -> Result<()> {
     let team_id = devices.create_and_add_team().await?;
     let owner_team = devices.owner.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    let owner_role = owner_team
-        .roles()
-        .await?
-        .into_iter()
-        .find(|r| r.name == "owner")
-        .expect("no owner role!?");
 
-    // Create a custom admin type role
+    // Create a custom admin type role with rank derived from the owner's device rank.
+    let owner_device_rank = owner_team
+        .query_rank(ObjectId::transmute(devices.owner.id))
+        .await?;
+    let custom_role_rank = owner_device_rank.value() / 2;
     let admin_role = owner_team
-        .create_role(text!("admin"), owner_role.id)
+        .create_role(text!("admin"), custom_role_rank.into())
         .await?;
     owner_team
         .add_perm_to_role(admin_role.id, Permission::AddDevice)
         .await
         .expect("expected to assign AddDevice to admin");
 
-    // Add our admin with this role
+    // Add our admin with this role (rank must be < role rank)
     owner_team
-        .add_device(devices.admin.pk, Some(admin_role.id))
+        .add_device_with_rank(
+            devices.admin.pk,
+            Some(admin_role.id),
+            custom_role_rank.saturating_sub(1).into(),
+        )
         .await
         .expect("expected to add admin with role");
 
@@ -1424,8 +1680,13 @@ async fn test_add_perm_to_created_role() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
+    // Admin adds operator at an even lower rank
     admin_team
-        .add_device(devices.operator.pk, None)
+        .add_device_with_rank(
+            devices.operator.pk,
+            None,
+            custom_role_rank.saturating_sub(100).into(),
+        )
         .await
         .expect("admin should be able to add operator");
 
@@ -1441,18 +1702,14 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Owner creates the team.
     let team_id = devices.create_and_add_team().await?;
     let owner_team = devices.owner.client.team(team_id);
-    let owner_role = owner_team
-        .roles()
-        .await?
-        .into_iter()
-        .find(|r| r.name == "owner")
-        .ok_or_else(|| anyhow::anyhow!("no owner role!?"))?;
 
     // Initialize malicious device on team.
     let work_dir = tempfile::tempdir()?;
     let work_dir_path = work_dir.path();
     let device = DeviceCtx::new(team_name, "malicious", work_dir_path.join("malicious")).await?;
-    owner_team.add_device(device.pk.clone(), None).await?;
+    owner_team
+        .add_device_with_rank(device.pk.clone(), None, 399.into())
+        .await?;
     let device_seed = owner_team
         .encrypt_psk_seed_for_peer(device.pk.encryption())
         .await?;
@@ -1472,7 +1729,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 
     // Owner creates malicious role on team:
     let role = owner_team
-        .create_role(text!("malicious_role"), owner_role.id)
+        .create_role(text!("malicious_role"), 400.into())
         .await
         .expect("expected to create malicious role");
 
@@ -1491,7 +1748,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 
     // Malicious device creates a new target role (which it maintains control of).
     let target_role = device_team
-        .create_role(text!("target_role"), role.id)
+        .create_role(text!("target_role"), 300.into())
         .await
         .expect("unable to create target role");
 
@@ -1511,16 +1768,24 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let owner_addr = devices.owner.aranya_local_addr().await?;
 
     // Add admin with admin role
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
     owner_team
-        .add_device(devices.admin.pk, Some(roles.admin().id))
+        .add_device_with_rank(
+            devices.admin.pk,
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
         .await
         .expect("expected to add admin with role");
 
@@ -1534,8 +1799,18 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
     admin_team.sync_now(owner_addr, None).await?;
 
     // Admin cannot add operator
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
     admin_team
-        .add_device(devices.operator.pk, None)
+        .add_device_with_rank(
+            devices.operator.pk,
+            None,
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
         .await
         .expect_err("admin should not be able to add operator");
 
@@ -1548,9 +1823,7 @@ async fn test_delete_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     owner_team
@@ -1561,17 +1834,19 @@ async fn test_delete_role() -> Result<()> {
     Ok(())
 }
 
-/// Prevents devices from assigning roles to themselves.
+/// A device cannot assign a role to itself. The rank system enforces this:
+/// `author_can_operate_on_target` uses strict `>`, so a device never
+/// outranks itself and the operation is rejected.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    // Owner tries to assign a role to itself. Fails because the policy
+    // requires the author to strictly outrank the target device.
     let err = owner_team
         .device(devices.owner.id)
         .assign_role(roles.owner().id)
@@ -1582,15 +1857,15 @@ async fn test_assign_role_self_rejected() -> Result<()> {
     Ok(())
 }
 
-/// Prevents the sole owner from revoking its own owner role.
+/// The sole owner cannot revoke its own owner role. The rank system
+/// prevents self-operations (strict `>` means a device never outranks
+/// itself), and the policy also prevents removing the last owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
 
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
+    let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
     let err = owner_team
@@ -1603,210 +1878,9 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     Ok(())
 }
 
-/// Requires role management delegation before assigning a role.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_assign_role_requires_delegation() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_assign_role_requires_delegation").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-    let admin_team = devices.admin.client.team(team_id);
-
-    owner_team
-        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
-        .await?;
-    owner_team
-        .add_device(devices.membera.pk.clone(), None)
-        .await?;
-
-    let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
-
-    let err = admin_team
-        .device(devices.membera.id)
-        .assign_role(roles.member().id)
-        .await
-        .expect_err("assigning role without delegation should fail");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Role management changes require the caller to own the role.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_assign_role_management_permission_requires_ownership() -> Result<()> {
-    let mut devices =
-        DevicesCtx::new("test_assign_role_management_permission_requires_ownership").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-    let admin_team = devices.admin.client.team(team_id);
-
-    owner_team
-        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
-        .await?;
-
-    let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
-
-    let err = admin_team
-        .assign_role_management_permission(
-            roles.member().id,
-            roles.operator().id,
-            RoleManagementPermission::CanAssignRole,
-        )
-        .await
-        .expect_err("assigning management perm without ownership should fail");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Test that role management permissions can be assigned and revoked correctly.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_assign_and_revoke_role_management_permission").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    // Use setup without delegations so owner owns all roles without conflicts
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-
-    // First, assign the permission
-    owner_team
-        .assign_role_management_permission(
-            roles.operator().id,
-            roles.admin().id,
-            RoleManagementPermission::CanAssignRole,
-        )
-        .await
-        .context("Failed to assign role management permission")?;
-
-    // Add admin and operator devices
-    owner_team
-        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
-        .await?;
-    owner_team
-        .add_device(devices.operator.pk.clone(), None)
-        .await?;
-    owner_team
-        .add_device(devices.membera.pk.clone(), None)
-        .await?;
-
-    // Sync admin with owner
-    let admin_team = devices.admin.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
-
-    // Try to assign operator role as admin - should succeed with the permission
-    admin_team
-        .device(devices.operator.id)
-        .assign_role(roles.operator().id)
-        .await
-        .context("Admin should be able to assign operator role with CanAssignRole permission")?;
-
-    // Now revoke the permission
-    owner_team
-        .revoke_role_management_permission(
-            roles.operator().id,
-            roles.admin().id,
-            RoleManagementPermission::CanAssignRole,
-        )
-        .await
-        .context("Failed to revoke role management permission")?;
-
-    // Sync admin with owner again to get the revocation
-    admin_team.sync_now(owner_addr, None).await?;
-
-    // Try to assign operator role again as admin - should fail now
-    let err = admin_team
-        .device(devices.membera.id)
-        .assign_role(roles.operator().id)
-        .await
-        .expect_err("admin should not be able to assign role after revocation");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Confirms that role can no longer manage another role after it is removed as a role owner.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_role_owner_removed_permissions_revoked").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    // Use setup without delegations so owner owns all roles without conflicts
-    let roles = devices
-        .setup_default_roles_without_delegation(team_id)
-        .await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-
-    // First, assign the permission
-    owner_team
-        .assign_role_management_permission(
-            roles.operator().id,
-            roles.admin().id,
-            RoleManagementPermission::CanAssignRole,
-        )
-        .await
-        .context("Failed to assign role management permission")?;
-
-    // Add admin and operator devices
-    owner_team
-        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
-        .await?;
-    owner_team
-        .add_device(devices.operator.pk.clone(), None)
-        .await?;
-
-    // Sync admin with owner
-    let admin_team = devices.admin.client.team(team_id);
-    let owner_addr = devices.owner.aranya_local_addr().await?;
-    admin_team.sync_now(owner_addr, None).await?;
-
-    // Try to assign operator role as admin - should succeed with the permission
-    admin_team
-        .device(devices.operator.id)
-        .assign_role(roles.operator().id)
-        .await
-        .context("Admin should be able to assign operator role with CanAssignRole permission")?;
-
-    // Add a new owner role to operator so we can remove the owner role.
-    // Note: this is because there must be at least one owning role.
-    owner_team
-        .add_role_owner(roles.operator().id, roles.member().id)
-        .await?;
-
-    // Now remove the owner as a role owner of operator.
-    owner_team
-        .remove_role_owner(roles.operator().id, roles.owner().id)
-        .await
-        .context("Failed to remove owner as role owner from operator")?;
-
-    // Verify owner can no longer change role management permissions of operator role.
-    owner_team
-        .assign_role_management_permission(
-            roles.operator().id,
-            roles.admin().id,
-            RoleManagementPermission::CanRevokeRole,
-        )
-        .await
-        .expect_err("expected owner role management to fail after owner role was removed");
-
-    Ok(())
-}
-
-/// Test that a role cannot be assigned if a role is already assigned.
+/// A device that already has a role cannot be assigned another role.
+/// The policy rejects the operation because an existing role assignment
+/// already exists for the target device.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_cannot_assign_role_twice() -> Result<()> {
     let mut devices = DevicesCtx::new("test_cannot_assign_role_twice").await?;
@@ -1817,17 +1891,22 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
 
     let owner_team = devices.owner.client.team(team_id);
 
-    let r = owner_team
+    match owner_team
         .device(devices.membera.id)
         .assign_role(roles.operator().id)
-        .await;
-
-    assert!(matches!(r, Err(aranya_client::Error::Aranya(_))));
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
 
     Ok(())
 }
 
-/// Deleting a label requires `DeleteLabel` and label management rights.
+/// Deleting a label requires `DeleteLabel` permission and sufficient rank.
+/// An operator without `DeleteLabel` cannot delete a label even if it
+/// outranks the label.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_delete_label_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_label_requires_permission").await?;
@@ -1839,8 +1918,13 @@ async fn test_delete_label_requires_permission() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team
-        .create_label(text!("delete-label-guard"), roles.owner().id)
+        .create_label_with_rank(text!("delete-label-guard"), label_rank)
         .await?;
 
     operator_team
@@ -1857,7 +1941,9 @@ async fn test_delete_label_requires_permission() -> Result<()> {
     Ok(())
 }
 
-/// Devices cannot assign labels to themselves.
+/// A device cannot assign a label to itself. The rank system enforces this:
+/// `author_can_operate_on_target` uses strict `>`, so a device never
+/// outranks itself and the operation is rejected.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
@@ -1868,10 +1954,18 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let owner_id = devices.owner.id;
     let owner_team = devices.owner.client.team(team_id);
 
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team
-        .create_label(text!("device-self-label"), roles.owner().id)
+        .create_label_with_rank(text!("device-self-label"), label_rank)
         .await?;
 
+    // Owner tries to assign a label to itself. This fails because the policy
+    // requires the author to strictly outrank the target device, and a device
+    // can never outrank itself (rank comparison uses `>`).
     let err = owner_team
         .device(owner_id)
         .assign_label(label, ChanOp::SendRecv)
@@ -1902,202 +1996,1212 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     Ok(())
 }
 
-/// Confirms that managing-role changes require an explicit permission grant.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_role_owner_change_requires_permission() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_role_owner_change_requires_permission").await?;
+// ========================================================================
+// Rank-based tests
+// ========================================================================
 
+/// Tests that a role can be created with a specific rank and that the rank
+/// can be queried back.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_role_with_rank() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_role_with_rank").await?;
     let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-    devices.add_all_device_roles(team_id, &roles).await?;
+    devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
+    let expected_rank = 50.into();
+    let role = owner_team
+        .create_role(text!("ranked_role"), expected_rank)
+        .await?;
+
+    let role_obj = ObjectId::transmute(role.id);
+    let rank = owner_team.query_rank(role_obj).await?;
+    assert_eq!(rank, expected_rank);
+
+    Ok(())
+}
+
+/// Tests that a label can be created with a specific rank and that the rank
+/// can be queried back.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_label_with_rank() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_label_with_rank").await?;
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let expected_rank = 50.into();
+    let label_id = owner_team
+        .create_label_with_rank(text!("ranked_label"), expected_rank)
+        .await?;
+
+    let label_obj = ObjectId::transmute(label_id);
+    let rank = owner_team.query_rank(label_obj).await?;
+    assert_eq!(rank, expected_rank);
+
+    Ok(())
+}
+
+/// Tests that the rank of a label can be changed with a valid old_rank.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank").await?;
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let initial_rank = 50.into();
+    let updated_rank = 75.into();
+    let label = owner_team
+        .create_label_with_rank(text!("mutable_label"), initial_rank)
+        .await?;
+
+    let label_obj = ObjectId::transmute(label);
+
     owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
+        .change_rank(label_obj, initial_rank, updated_rank)
+        .await?;
+
+    let new_rank = owner_team.query_rank(label_obj).await?;
+    assert_eq!(new_rank, updated_rank);
+
+    Ok(())
+}
+
+/// Tests that a lower-ranked device cannot change the rank of a higher-ranked
+/// object (author_rank must be > target_rank).
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_requires_sufficient_author_rank").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+
+    // Create a label with rank higher than the operator device rank
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    let member_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    let high_label_rank = Rank::new(operator_role_rank.value().saturating_add(50));
+    let high_label = owner_team
+        .create_label_with_rank(text!("high_label"), high_label_rank)
+        .await?;
+
+    // Add operator device and sync
+    owner_team
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            Some(roles.operator().id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+
+    // Give operator ChangeRank permission
+    owner_team
+        .add_perm_to_role(roles.operator().id, Permission::ChangeRank)
         .await?;
 
     let owner_addr = devices.owner.aranya_local_addr().await?;
+    operator_team.sync_now(owner_addr, None).await?;
+
+    let label_obj = ObjectId::transmute(high_label);
+
+    // Operator tries to change rank of object ranked above it -- should fail
+    match operator_team
+        .change_rank(label_obj, high_label_rank, member_role_rank)
+        .await
+    {
+        Ok(_) => bail!("expected change_rank to fail when author rank < object rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that an admin cannot create a role with a rank higher than the
+/// admin's own rank.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_role_rank_too_high_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_role_rank_too_high_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
     let admin_team = devices.admin.client.team(team_id);
-    admin_team.sync_now(owner_addr, None).await?;
 
-    let err = admin_team
-        .add_role_owner(roles.member().id, roles.operator().id)
-        .await
-        .expect_err("role owner change requires permission");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Duplicate role-owner entries must be rejected before attempting storage writes.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_add_role_owner_duplicate_rejected").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-
-    let owner_team = devices.owner.client.team(team_id);
+    // Add admin with rank below admin role (admin default role already has CreateRole)
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
     owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
         .await?;
 
-    let err = owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
-        .await
-        .expect_err("duplicate role owner addition should fail");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Removing a non-existent owning role should produce a policy failure, not a runtime error.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_remove_role_owner_missing_entry() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_remove_role_owner_missing_entry").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-    let err = owner_team
-        .remove_role_owner(roles.member().id, roles.operator().id)
-        .await
-        .expect_err("removing absent role owner should fail");
-    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
-
-    Ok(())
-}
-
-/// Tests that role_owners returns the correct owning roles.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_role_owners_query() -> Result<()> {
-    let mut devices = DevicesCtx::new("test_role_owners_query").await?;
-
-    let team_id = devices.create_and_add_team().await?;
-    let roles = devices.setup_default_roles(team_id).await?;
-    devices.add_all_device_roles(team_id, &roles).await?;
-
-    let owner_team = devices.owner.client.team(team_id);
-
-    // Initially, member role should have owner role as its owner (from setup_default_roles)
-    let initial_owners = owner_team.role_owners(roles.member().id).await?;
-    let initial_owners_vec: Vec<_> = initial_owners.iter().collect();
-    assert_eq!(
-        initial_owners_vec.len(),
-        1,
-        "member role should initially have one owner from setup"
-    );
-    assert_eq!(
-        initial_owners_vec[0].id,
-        roles.owner().id,
-        "owner role should initially own member role"
-    );
-
-    // Add admin as owner of member role
-    owner_team
-        .add_role_owner(roles.member().id, roles.admin().id)
-        .await?;
-
-    // Query owners again - should now show both owner and admin roles
-    let owners_after_add = owner_team.role_owners(roles.member().id).await?;
-    let owners_after_add_vec: Vec<_> = owners_after_add.iter().collect();
-    assert_eq!(
-        owners_after_add_vec.len(),
-        2,
-        "member role should have two owners after adding admin"
-    );
-
-    // Check both owners are present (order not guaranteed)
-    let owner_ids_after_add: Vec<_> = owners_after_add_vec.iter().map(|r| r.id).collect();
-    assert!(
-        owner_ids_after_add.contains(&roles.owner().id),
-        "owner should still be owner"
-    );
-    assert!(
-        owner_ids_after_add.contains(&roles.admin().id),
-        "admin should now be owner"
-    );
-
-    // Add operator as another owner of member role
-    owner_team
-        .add_role_owner(roles.member().id, roles.operator().id)
-        .await?;
-
-    // Query owners again - should now show all three: owner, admin, and operator
-    let owners_after_second_add = owner_team.role_owners(roles.member().id).await?;
-    let owners_after_second_add_vec: Vec<_> = owners_after_second_add.iter().collect();
-    assert_eq!(
-        owners_after_second_add_vec.len(),
-        3,
-        "member role should have three owners"
-    );
-
-    // Check all owners are present (order not guaranteed)
-    let owner_ids: Vec<_> = owners_after_second_add_vec.iter().map(|r| r.id).collect();
-    assert!(
-        owner_ids.contains(&roles.owner().id),
-        "owner should still be owner"
-    );
-    assert!(
-        owner_ids.contains(&roles.admin().id),
-        "admin should still be owner"
-    );
-    assert!(
-        owner_ids.contains(&roles.operator().id),
-        "operator should now be owner"
-    );
-
-    // Remove admin as owner
-    owner_team
-        .remove_role_owner(roles.member().id, roles.admin().id)
-        .await?;
-
-    // Query owners again - should now show owner and operator
-    let owners_after_remove = owner_team.role_owners(roles.member().id).await?;
-    let owners_after_remove_vec: Vec<_> = owners_after_remove.iter().collect();
-    assert_eq!(
-        owners_after_remove_vec.len(),
-        2,
-        "member role should have two owners after removing admin"
-    );
-
-    let owner_ids_after_remove: Vec<_> = owners_after_remove_vec.iter().map(|r| r.id).collect();
-    assert!(
-        owner_ids_after_remove.contains(&roles.owner().id),
-        "owner should still be owner"
-    );
-    assert!(
-        owner_ids_after_remove.contains(&roles.operator().id),
-        "operator should still be owner"
-    );
-    assert!(
-        !owner_ids_after_remove.contains(&roles.admin().id),
-        "admin should no longer be owner"
-    );
-
-    // Verify other clients can also query role owners after sync
     let owner_addr = devices.owner.aranya_local_addr().await?;
-    let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
-    let admin_view_owners = admin_team.role_owners(roles.member().id).await?;
-    let admin_view_owners_vec: Vec<_> = admin_view_owners.iter().collect();
+    // Admin tries to create role with rank above admin role rank -- should fail
+    match admin_team
+        .create_role(
+            text!("too_high"),
+            Rank::new(admin_role_rank.value().saturating_add(100)),
+        )
+        .await
+    {
+        Ok(_) => bail!("expected create_role to fail when rank > author rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected create_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that adding a device with a rank higher than its assigned role's rank
+/// is rejected (role_rank >= device_rank must hold).
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_device_rank_higher_than_role_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_device_rank_higher_than_role_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Try to add device with rank above member role rank
+    // Should fail: role_rank (member) >= device_rank (operator role rank) is false
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    match owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.member().id),
+            operator_role_rank,
+        )
+        .await
+    {
+        Ok(_) => bail!("expected add_device to fail when device rank > role rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected add_device error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that changing a device rank above its role's rank is rejected.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_above_role_rank_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Add admin with member role and device rank below the role rank
+    let member_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await?;
+
+    let device_obj = ObjectId::transmute(devices.admin.id);
+
+    // Try to change device rank above its role rank -- should fail
+    match owner_team
+        .change_rank(device_obj, device_rank, operator_role_rank)
+        .await
+    {
+        Ok(_) => bail!("expected change_rank to fail when new rank > role rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that role ranks cannot be changed after creation.
+///
+/// Role ranks are fixed at creation time to maintain the invariant that
+/// `role_rank > device_rank` for all devices assigned to the role.
+///
+/// This applies unconditionally to all roles - a device cannot promote or
+/// demote any role's rank, including the rank of its own assigned role.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_role_rank_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_role_rank_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Create a role
+    let role_rank = 50.into();
+    let role = owner_team
+        .create_role(text!("immutable_role"), role_rank)
+        .await?;
+
+    let role_obj = ObjectId::transmute(role.id);
+
+    // Try to change the role's rank -- should fail
+    match owner_team.change_rank(role_obj, role_rank, 75.into()).await {
+        Ok(_) => bail!("expected change_rank to fail for roles"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    // Verify the role rank was not changed
+    let current_role_rank = owner_team.query_rank(role_obj).await?;
     assert_eq!(
-        admin_view_owners_vec.len(),
-        2,
-        "admin client should see two owners"
+        current_role_rank, role_rank,
+        "role rank should not have changed"
     );
 
-    let admin_view_owner_ids: Vec<_> = admin_view_owners_vec.iter().map(|r| r.id).collect();
-    assert!(
-        admin_view_owner_ids.contains(&roles.owner().id),
-        "admin client should see owner as owner"
+    Ok(())
+}
+
+/// Tests the migration pattern for changing a role's effective rank.
+///
+/// Since role ranks are immutable after creation, the recommended workflow is:
+/// 1. Create a new role with the desired rank
+/// 2. Query and copy permissions from the old role to the new role
+/// 3. Change devices from the old role to the new role
+/// 4. Delete the old role (optional cleanup)
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_role_rank_migration_pattern() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_role_rank_migration_pattern").await?;
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Step 1: Create original role at rank 400 with some permissions
+    let old_role_rank = 400;
+    let old_role = owner_team
+        .create_role(text!("old_role"), old_role_rank.into())
+        .await?;
+
+    // Add permissions to the old role
+    owner_team
+        .add_perm_to_role(old_role.id, Permission::CreateLabel)
+        .await?;
+    owner_team
+        .add_perm_to_role(old_role.id, Permission::DeleteLabel)
+        .await?;
+
+    // Add device with old role (device rank must be <= role rank)
+    let device_rank = 300;
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(old_role.id),
+            device_rank.into(),
+        )
+        .await?;
+
+    // Verify device has old role
+    let assigned = owner_team.device(devices.admin.id).role().await?;
+    assert_eq!(assigned.map(|r| r.id), Some(old_role.id));
+
+    // Step 2: Create new role with higher rank (500)
+    let new_role_rank = 500;
+    let new_role = owner_team
+        .create_role(text!("new_role"), new_role_rank.into())
+        .await?;
+
+    // Step 3: Query permissions from old role and copy to new role
+    let old_perms = owner_team.query_role_perms(old_role.id).await?;
+    assert_eq!(old_perms.len(), 2, "old role should have 2 permissions");
+    for &perm in &old_perms {
+        owner_team.add_perm_to_role(new_role.id, perm).await?;
+    }
+
+    // Verify new role has the same permissions (sort since fact iteration order
+    // is not guaranteed across different roles)
+    let mut new_perms = owner_team.query_role_perms(new_role.id).await?;
+    let mut old_sorted = old_perms.clone();
+    old_sorted.sort_by_key(|p| format!("{p:?}"));
+    new_perms.sort_by_key(|p| format!("{p:?}"));
+    assert_eq!(
+        old_sorted, new_perms,
+        "new role should have the same permissions as old role"
     );
+
+    // Step 4: Migrate device from old role to new role
+    owner_team
+        .device(devices.admin.id)
+        .change_role(old_role.id, new_role.id)
+        .await
+        .context("should be able to change to higher-ranked role")?;
+
+    // Verify device now has new role
+    let assigned = owner_team.device(devices.admin.id).role().await?;
+    assert_eq!(assigned.map(|r| r.id), Some(new_role.id));
+
+    // Step 5: Delete the old role (cleanup)
+    owner_team
+        .delete_role(old_role.id)
+        .await
+        .context("should be able to delete unused role")?;
+
+    // Verify old role no longer exists
+    let all_roles = owner_team.roles().await?;
     assert!(
-        admin_view_owner_ids.contains(&roles.operator().id),
-        "admin client should see operator as owner"
+        !all_roles.iter().any(|r| r.id == old_role.id),
+        "old role should be deleted"
     );
+
+    Ok(())
+}
+
+/// Tests that a lower-ranked device cannot operate on higher-ranked objects:
+/// removing devices, deleting roles, or deleting labels.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_insufficient_rank_cannot_operate_on_objects").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+
+    // Add admin and operator devices
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            Some(roles.operator().id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+
+    // Create a label with rank above the operator's rank so the operator can't delete it.
+    let high_label_rank = Rank::new(operator_role_rank.value().saturating_add(100));
+    let high_label = owner_team
+        .create_label_with_rank(text!("high_label"), high_label_rank)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    operator_team.sync_now(owner_addr, None).await?;
+
+    // Operator tries to remove admin (higher ranked device) -- should fail
+    match operator_team
+        .device(devices.admin.id)
+        .remove_from_team()
+        .await
+    {
+        Ok(_) => bail!("expected removing higher-ranked device to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected remove_device error: {err:?}"),
+    }
+
+    // Operator tries to delete admin role (higher ranked) -- should fail
+    match operator_team.delete_role(roles.admin().id).await {
+        Ok(_) => bail!("expected deleting higher-ranked role to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected delete_role error: {err:?}"),
+    }
+
+    // Operator tries to delete high-rank label -- should fail
+    match operator_team.delete_label(high_label).await {
+        Ok(_) => bail!("expected deleting higher-ranked label to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected delete_label error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that change_rank fails when the new_rank exceeds the author's own rank.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_new_rank_above_author_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+
+    let low_label_rank = 50.into();
+
+    // Owner creates a label at low rank
+    let label = owner_team
+        .create_label_with_rank(text!("low_label"), low_label_rank)
+        .await?;
+
+    // Add operator with ChangeRank perm
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            Some(roles.operator().id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+    owner_team
+        .add_perm_to_role(roles.operator().id, Permission::ChangeRank)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    operator_team.sync_now(owner_addr, None).await?;
+
+    let label_obj = ObjectId::transmute(label);
+
+    // Operator tries to change label rank to above operator's rank -- should fail
+    match operator_team
+        .change_rank(label_obj, low_label_rank, admin_role_rank)
+        .await
+    {
+        Ok(_) => bail!("expected change_rank to fail when new_rank > author_rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that change_rank fails when the provided old_rank does not match the
+/// object's current rank (stale old_rank).
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_stale_old_rank_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    let initial_rank = 50.into();
+    let updated_rank = 75.into();
+    let label = owner_team
+        .create_label_with_rank(text!("versioned_label"), initial_rank)
+        .await?;
+    let label_obj = ObjectId::transmute(label);
+
+    // Change rank from initial to updated
+    owner_team
+        .change_rank(label_obj, initial_rank, updated_rank)
+        .await?;
+
+    // Try to change rank using stale old_rank (initial instead of current updated)
+    match owner_team
+        .change_rank(label_obj, initial_rank, 100.into())
+        .await
+    {
+        Ok(_) => bail!("expected change_rank to fail with stale old_rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that a device can demote its own rank (self-demotion is allowed with
+/// just the ChangeRank permission).
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_self_demotion() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_self_demotion").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    // Add admin -- admin default role already has ChangeRank
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    let admin_rank = Rank::new(admin_role_rank.value().saturating_sub(1));
+    let member_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Demoted rank must be lower than admin's current rank.
+    let demoted_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), admin_rank)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+
+    let device_obj = ObjectId::transmute(devices.admin.id);
+
+    // Admin demotes itself
+    admin_team
+        .change_rank(device_obj, admin_rank, demoted_rank)
+        .await
+        .context("device should be able to demote its own rank")?;
+
+    // Verify the rank actually changed
+    // Need to sync owner to see the change
+    owner_team
+        .sync_now(devices.admin.aranya_local_addr().await?, None)
+        .await?;
+    let new_rank = owner_team.query_rank(device_obj).await?;
+    assert_eq!(new_rank, demoted_rank);
+
+    Ok(())
+}
+
+/// Tests that a device cannot promote its own rank (self-promotion is rejected).
+///
+/// This is a critical security control: a device should never be able to
+/// escalate its own privileges by increasing its rank.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_self_promotion_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_self_promotion_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    // Add admin with ChangeRank permission (admin role has it by default)
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    let admin_rank = Rank::new(admin_role_rank.value().saturating_sub(1));
+    let promoted_rank = Rank::new(admin_rank.value().saturating_add(50));
+    owner_team
+        .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), admin_rank)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+
+    let device_obj = ObjectId::transmute(devices.admin.id);
+
+    // Admin tries to promote itself -- should fail
+    match admin_team
+        .change_rank(device_obj, admin_rank, promoted_rank)
+        .await
+    {
+        Ok(_) => bail!("expected self-promotion to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    // Verify the rank was not changed
+    let current_rank = admin_team.query_rank(device_obj).await?;
+    assert_eq!(current_rank, admin_rank, "rank should not have changed");
+
+    Ok(())
+}
+
+/// Tests that a device at the same rank as another cannot operate on it
+/// (strict > is required, not >=).
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_equal_rank_cannot_operate() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_equal_rank_cannot_operate").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    // Add admin and operator both at operator device rank (testing equal ranks)
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    let equal_rank = Rank::new(operator_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device_with_rank(devices.admin.pk.clone(), Some(roles.admin().id), equal_rank)
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            Some(roles.operator().id),
+            equal_rank,
+        )
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Admin tries to remove operator (same rank) -- should fail (strict >)
+    match admin_team
+        .device(devices.operator.id)
+        .remove_from_team()
+        .await
+    {
+        Ok(_) => bail!("expected removing equal-ranked device to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected remove_device error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that assigning a role requires the author to outrank both the role
+/// and the target device.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_role_requires_outranking_both_role_and_device() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_assign_role_requires_outranking_both").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+
+    // Give admin the AssignRole permission
+    owner_team
+        .add_perm_to_role(roles.admin().id, Permission::AssignRole)
+        .await?;
+
+    // Create custom roles and devices with simple index-based ranks.
+    // Ordering ((index + 1) * 100 = rank):
+    //   0: low_device  = 100
+    //   1: low_role    = 200
+    //   2: admin       = 300
+    //   3: high_device = 400
+    //   4: high_role   = 500
+    let [low_device_rank, low_role_rank, admin_rank, high_device_rank, high_role_rank] =
+        [100, 200, 300, 400, 500];
+
+    let low_role = owner_team
+        .create_role(text!("low_role"), low_role_rank.into())
+        .await?;
+    let high_role = owner_team
+        .create_role(text!("high_role"), high_role_rank.into())
+        .await?;
+
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            admin_rank.into(),
+        )
+        .await?;
+    owner_team
+        .add_device_with_rank(devices.membera.pk.clone(), None, low_device_rank.into())
+        .await?;
+    owner_team
+        .add_device_with_rank(devices.memberb.pk.clone(), None, high_device_rank.into())
+        .await?;
+
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Case 1: Author outranks device but NOT role -- should fail
+    // Admin (300) tries to assign high_role (500) to membera (100)
+    let result = admin_team
+        .device(devices.membera.id)
+        .assign_role(high_role.id)
+        .await;
+    assert!(
+        matches!(result, Err(aranya_client::Error::Aranya(_))),
+        "Case 1: expected assign_role to fail when author doesn't outrank the role, got {result:?}"
+    );
+
+    // Case 2: Author outranks role but NOT device -- should fail
+    // Admin (300) tries to assign low_role (200) to memberb (400)
+    let result = admin_team
+        .device(devices.memberb.id)
+        .assign_role(low_role.id)
+        .await;
+    assert!(
+        matches!(result, Err(aranya_client::Error::Aranya(_))),
+        "Case 2: expected assign_role to fail when author doesn't outrank the device, got {result:?}"
+    );
+
+    // Case 3: Author outranks BOTH role and device -- should succeed
+    // Admin (300) tries to assign low_role (200) to membera (100)
+    admin_team
+        .device(devices.membera.id)
+        .assign_role(low_role.id)
+        .await
+        .context("Case 3: assign_role should succeed when author outranks both role and device")?;
+
+    Ok(())
+}
+
+/// Tests that creating a label with a rank higher than the author's rank is
+/// rejected.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_create_label_rank_too_high_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_create_label_rank_too_high_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    // Add admin with rank below admin role
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Admin tries to create label with rank above admin role -- should fail
+    match admin_team
+        .create_label_with_rank(
+            text!("too_high_label"),
+            Rank::new(admin_role_rank.value().saturating_add(100)),
+        )
+        .await
+    {
+        Ok(_) => bail!("expected create_label to fail when rank > author rank"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected create_label error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that adding a permission to a role requires the author to outrank
+/// that role.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_perm_change_requires_outranking_role() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_perm_change_requires_outranking_role").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+
+    // Add operator with ChangeRolePerms permission
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            Some(roles.operator().id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+    owner_team
+        .add_perm_to_role(roles.operator().id, Permission::ChangeRolePerms)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    operator_team.sync_now(owner_addr, None).await?;
+
+    // Operator tries to add permission to admin role (higher ranked) -- should fail
+    match operator_team
+        .add_perm_to_role(roles.admin().id, Permission::CreateRole)
+        .await
+    {
+        Ok(_) => bail!("expected add_perm_to_role to fail when author doesn't outrank role"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected add_perm_to_role error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that assigning a role where role_rank equals device_rank is allowed.
+///
+/// The policy uses `role_rank >= device_rank` (not strict `>`). Equal ranks
+/// are safe because a device still cannot modify its own role - modification
+/// requires strictly outranking the target via `author_can_operate_on_target`.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_assign_role_where_role_rank_equals_device_rank_allowed() -> Result<()> {
+    let mut devices =
+        DevicesCtx::new("test_assign_role_where_role_rank_equals_device_rank_allowed").await?;
+    let team_id = devices.create_and_add_team().await?;
+    devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Create a custom role at rank 500
+    let role_rank = 500;
+    let custom_role = owner_team
+        .create_role(text!("equal_rank_role"), role_rank.into())
+        .await?;
+
+    // Add device at exactly the same rank as the role
+    owner_team
+        .add_device_with_rank(devices.admin.pk.clone(), None, role_rank.into())
+        .await?;
+
+    // Assign role where role_rank == device_rank -- should succeed
+    owner_team
+        .device(devices.admin.id)
+        .assign_role(custom_role.id)
+        .await
+        .context("assigning role with equal rank should succeed")?;
+
+    // Verify the role was assigned
+    let assigned_role = owner_team.device(devices.admin.id).role().await?;
+    assert_eq!(
+        assigned_role.map(|r| r.id),
+        Some(custom_role.id),
+        "role should be assigned"
+    );
+
+    Ok(())
+}
+
+/// Tests that changing a device's rank to exactly equal its role's rank is allowed.
+///
+/// The policy uses `role_rank >= device_rank` (not strict `>`). Equal ranks
+/// are safe because the device still cannot modify its own role.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_change_rank_device_to_exact_role_rank_allowed() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_change_rank_device_to_exact_role_rank_allowed").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Add device with member role at rank below the role
+    let member_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(100));
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await?;
+
+    let device_obj = ObjectId::transmute(devices.admin.id);
+
+    // Change device rank to exactly equal the role rank -- should succeed
+    owner_team
+        .change_rank(device_obj, device_rank, member_role_rank)
+        .await
+        .context("changing device rank to equal role rank should succeed")?;
+
+    // Verify the rank was changed
+    let new_rank = owner_team.query_rank(device_obj).await?;
+    assert_eq!(new_rank, member_role_rank);
+
+    Ok(())
+}
+
+/// Tests that having a permission is not sufficient without also having
+/// sufficient rank to operate on the target.
+///
+/// A device with ChangeRank permission but lower rank than the target
+/// cannot change the target's rank.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_has_permission_but_insufficient_rank() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_has_permission_but_insufficient_rank").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+
+    // Create a label ranked higher than operator
+    let operator_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.operator().id))
+        .await?;
+    let high_label_rank = Rank::new(operator_role_rank.value().saturating_add(100));
+    let high_label = owner_team
+        .create_label_with_rank(text!("high_label"), high_label_rank)
+        .await?;
+
+    // Add operator with ChangeRank permission
+    owner_team
+        .add_device_with_rank(
+            devices.operator.pk.clone(),
+            Some(roles.operator().id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+    owner_team
+        .add_perm_to_role(roles.operator().id, Permission::ChangeRank)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    operator_team.sync_now(owner_addr, None).await?;
+
+    let label_obj = ObjectId::transmute(high_label);
+
+    // Operator has ChangeRank permission but cannot change higher-ranked label
+    match operator_team
+        .change_rank(label_obj, high_label_rank, 50.into())
+        .await
+    {
+        Ok(_) => {
+            bail!("expected change_rank to fail despite having permission (insufficient rank)")
+        }
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+/// Tests that outranking a target is not sufficient without also having
+/// the required permission.
+///
+/// A device that outranks a target but lacks ChangeRank permission
+/// cannot change the target's rank.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_outranks_but_missing_permission() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_outranks_but_missing_permission").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+
+    // Create a label ranked lower than admin
+    let low_label_rank = 50.into();
+    let low_label = owner_team
+        .create_label_with_rank(text!("low_label"), low_label_rank)
+        .await?;
+
+    // Add admin but explicitly remove ChangeRank permission
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    owner_team
+        .add_device_with_rank(
+            devices.admin.pk.clone(),
+            Some(roles.admin().id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+    owner_team
+        .remove_perm_from_role(roles.admin().id, Permission::ChangeRank)
+        .await?;
+
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    admin_team.sync_now(owner_addr, None).await?;
+
+    let label_obj = ObjectId::transmute(low_label);
+
+    // Admin outranks the label but lacks ChangeRank permission
+    match admin_team
+        .change_rank(label_obj, low_label_rank, 100.into())
+        .await
+    {
+        Ok(_) => {
+            bail!("expected change_rank to fail despite outranking target (missing permission)")
+        }
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(err) => bail!("unexpected change_rank error: {err:?}"),
+    }
+
+    Ok(())
+}
+
+// ========================================================================
+// Deprecated API coverage tests
+// ========================================================================
+
+/// Tests the deprecated add_device API still works and assigns a default rank.
+#[allow(deprecated)]
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_deprecated_add_device() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_deprecated_add_device").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Use deprecated add_device API
+    owner_team
+        .add_device(devices.admin.pk.clone(), Some(roles.admin().id))
+        .await?;
+
+    // Verify device was added
+    let team_devices = owner_team.devices().await?;
+    assert!(team_devices.iter().any(|d| *d == devices.admin.id));
+
+    // Verify default rank is role_rank - 1
+    let admin_role_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(roles.admin().id))
+        .await?;
+    let device_obj = ObjectId::transmute(devices.admin.id);
+    let rank = owner_team.query_rank(device_obj).await?;
+    assert_eq!(
+        rank,
+        Rank::new(admin_role_rank.value().saturating_sub(1)),
+        "deprecated add_device should default to role_rank - 1"
+    );
+
+    Ok(())
+}
+
+/// Tests the deprecated create_label API that takes a managing_role_id
+/// parameter (which is ignored).
+#[allow(deprecated)]
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_deprecated_create_label() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_deprecated_create_label").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Use deprecated create_label API
+    let label_id = owner_team
+        .create_label(text!("deprecated_label"), roles.owner().id)
+        .await?;
+
+    // Verify label was created
+    let label = owner_team.label(label_id).await?;
+    assert!(label.is_some(), "label should exist");
+
+    // Verify default rank is author_rank - 1
+    let owner_device_rank = devices
+        .owner
+        .client
+        .team(team_id)
+        .query_rank(ObjectId::transmute(devices.owner.id))
+        .await?;
+    let label_obj = ObjectId::transmute(label_id);
+    let rank = owner_team.query_rank(label_obj).await?;
+    assert_eq!(
+        rank,
+        Rank::new(owner_device_rank.value().saturating_sub(1)),
+        "deprecated create_label should default to author_rank - 1"
+    );
+
+    Ok(())
+}
+
+/// Tests the deprecated role_owners API always returns an empty list.
+#[allow(deprecated)]
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_deprecated_role_owners_returns_empty() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_deprecated_role_owners_returns_empty").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let owners = owner_team.role_owners(roles.admin().id).await?;
+    assert_eq!(
+        owners.iter().count(),
+        0,
+        "deprecated role_owners should always return empty"
+    );
+
+    Ok(())
+}
+
+/// Tests the deprecated add_label_managing_role API succeeds as a no-op.
+#[allow(deprecated)]
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_deprecated_add_label_managing_role_noop() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_deprecated_add_label_managing_role_noop").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices.setup_default_roles(team_id).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(roles.member().id))
+        .await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    let label_id = owner_team
+        .create_label_with_rank(text!("test_label"), label_rank)
+        .await?;
+
+    // Use deprecated add_label_managing_role API -- should succeed as no-op
+    owner_team
+        .add_label_managing_role(label_id, roles.admin().id)
+        .await
+        .context("deprecated add_label_managing_role should succeed as no-op")?;
 
     Ok(())
 }

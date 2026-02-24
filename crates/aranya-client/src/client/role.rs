@@ -1,6 +1,6 @@
 use std::{slice, vec};
 
-use aranya_daemon_api as api;
+use aranya_daemon_api::{self as api};
 use aranya_id::custom_id;
 use aranya_policy_text::Text;
 
@@ -21,7 +21,7 @@ impl ApiId<api::RoleId> for RoleId {}
 pub struct Role {
     /// Uniquely identifies the role.
     pub id: RoleId,
-    /// The humman-readable name of the role.
+    /// The human-readable name of the role.
     pub name: Text,
     /// The unique ID of the author of the role.
     pub author_id: DeviceId,

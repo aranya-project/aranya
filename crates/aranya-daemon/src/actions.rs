@@ -7,8 +7,9 @@ use aranya_crypto::{
     policy::{LabelId, RoleId},
     DeviceId, Random as _, Rng,
 };
+use aranya_daemon_api::Rank;
 use aranya_keygen::PublicKeys;
-use aranya_policy_ifgen::{Actionable, VmEffect};
+use aranya_policy_ifgen::{Actionable, BaseId, VmEffect};
 use aranya_policy_text::Text;
 #[cfg(feature = "afc")]
 use aranya_runtime::NullSink;
@@ -18,7 +19,7 @@ use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{self, ChanOp, Effect, PublicKeyBundle, RoleManagementPerm, SimplePerm},
+    policy::{self, ChanOp, Effect, Perm, PublicKeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -170,77 +171,96 @@ where
         act: impl Actionable<Interface = policy::Ephemeral> + Send,
     ) -> impl Future<Output = Result<SessionData>> + Send;
 
-    /// Invokes `add_device`.
+    /// Invokes `add_device_with_rank`.
     #[instrument(skip_all)]
-    fn add_device(
+    fn add_device_with_rank(
         &self,
         keys: PublicKeyBundle,
         initial_role_id: Option<RoleId>,
+        rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::add_device(
+        self.call_persistent_action(policy::add_device_with_rank(
             keys,
             initial_role_id.map(|id| id.as_base()),
+            rank.value(),
         ))
         .in_current_span()
     }
 
     /// Invokes `create_role`.
-    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     fn create_role(
         &self,
         role_name: Text,
-        owning_role_id: RoleId,
+        rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::create_role(role_name, owning_role_id.as_base()))
+        self.call_persistent_action(policy::create_role(role_name, rank.value()))
             .in_current_span()
     }
 
     /// Invokes `delete_role`.
-    #[cfg(feature = "preview")]
     #[instrument(skip(self))]
     fn delete_role(&self, role_id: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::delete_role(role_id.as_base()))
             .in_current_span()
     }
 
-    /// Invokes `add_label_managing_role`.
-    #[instrument(skip(self), fields(%label_id, %managing_role_id))]
-    fn add_label_managing_role(
-        &self,
-        label_id: LabelId,
-        managing_role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::add_label_managing_role(
-            label_id.as_base(),
-            managing_role_id.as_base(),
-        ))
-        .in_current_span()
-    }
-
     /// Invokes `add_perm_to_role`.
-    #[instrument(skip(self), fields(%role_id, %perm))]
+    #[instrument(skip(self), fields(%role_id))]
     fn add_perm_to_role(
         &self,
         role_id: RoleId,
-        perm: SimplePerm,
+        perm: Perm,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::add_perm_to_role(role_id.as_base(), perm))
             .in_current_span()
     }
 
-    /// Invokes `add_role_owner`.
-    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
-    fn add_role_owner(
+    /// Invokes `remove_perm_from_role`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn remove_perm_from_role(
         &self,
         role_id: RoleId,
-        new_owning_role_id: RoleId,
+        perm: Perm,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::add_role_owner(
-            role_id.as_base(),
-            new_owning_role_id.as_base(),
+        self.call_persistent_action(policy::remove_perm_from_role(role_id.as_base(), perm))
+            .in_current_span()
+    }
+
+    /// Invokes `query_role_perms`.
+    #[instrument(skip(self), fields(%role_id))]
+    fn query_role_perms(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_role_perms(role_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
+    /// Invokes `change_rank`.
+    #[instrument(skip(self))]
+    fn change_rank(
+        &self,
+        object_id: BaseId,
+        old_rank: Rank,
+        new_rank: Rank,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::change_rank(
+            object_id,
+            old_rank.value(),
+            new_rank.value(),
         ))
         .in_current_span()
+    }
+
+    /// Invokes `query_rank`.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_rank(&self, object_id: BaseId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_rank(object_id))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
     }
 
     /// Invokes `assign_label_to_device`.
@@ -270,22 +290,6 @@ where
             .in_current_span()
     }
 
-    /// Invokes `assign_role_management_perm`.
-    #[instrument(skip(self), fields(%target_role_id, %managing_role_id, %perm))]
-    fn assign_role_management_perm(
-        &self,
-        target_role_id: RoleId,
-        managing_role_id: RoleId,
-        perm: RoleManagementPerm,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::assign_role_management_perm(
-            target_role_id.as_base(),
-            managing_role_id.as_base(),
-            perm,
-        ))
-        .in_current_span()
-    }
-
     /// Invokes `change_role`.
     #[instrument(skip(self), fields(%device_id, %old_role_id, %new_role_id))]
     fn change_role(
@@ -302,14 +306,14 @@ where
         .in_current_span()
     }
 
-    /// Invokes `create_label`.
-    #[instrument(skip(self), fields(%name, %managing_role_id))]
-    fn create_label(
+    /// Invokes `create_label_with_rank`.
+    #[instrument(skip(self), fields(%name))]
+    fn create_label_with_rank(
         &self,
         name: Text,
-        managing_role_id: RoleId,
+        rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::create_label(name, managing_role_id.as_base()))
+        self.call_persistent_action(policy::create_label_with_rank(name, rank.value()))
             .in_current_span()
     }
 
@@ -406,17 +410,6 @@ where
             .in_current_span()
     }
 
-    /// Invokes `query_role_owners`.
-    #[instrument(skip(self), fields(%role_id))]
-    fn query_role_owners(
-        &self,
-        role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_session_action(policy::query_role_owners(role_id.as_base()))
-            .map_ok(|SessionData { effects, .. }| effects)
-            .in_current_span()
-    }
-
     /// Invokes `remove_device`.
     #[instrument(skip(self), fields(%device_id))]
     fn remove_device(
@@ -425,31 +418,6 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.call_persistent_action(policy::remove_device(device_id.as_base()))
             .in_current_span()
-    }
-
-    /// Invokes `remove_perm_from_role`.
-    #[instrument(skip(self), fields(%role_id, %perm))]
-    fn remove_perm_from_role(
-        &self,
-        role_id: RoleId,
-        perm: SimplePerm,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::remove_perm_from_role(role_id.as_base(), perm))
-            .in_current_span()
-    }
-
-    /// Invokes `remove_role_owner`.
-    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
-    fn remove_role_owner(
-        &self,
-        role_id: RoleId,
-        new_owning_role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::remove_role_owner(
-            role_id.as_base(),
-            new_owning_role_id.as_base(),
-        ))
-        .in_current_span()
     }
 
     /// Invokes `revoke_label_from_device`.
@@ -466,20 +434,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `revoke_label_managing_role`.
-    #[instrument(skip(self), fields(%label_id, %managing_role_id))]
-    fn revoke_label_managing_role(
-        &self,
-        label_id: LabelId,
-        managing_role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::revoke_label_managing_role(
-            label_id.as_base(),
-            managing_role_id.as_base(),
-        ))
-        .in_current_span()
-    }
-
     /// Invokes `revoke_role`.
     #[instrument(skip(self), fields(%device_id, %role_id))]
     fn revoke_role(
@@ -491,29 +445,10 @@ where
             .in_current_span()
     }
 
-    /// Invokes `revoke_role_management_perm`.
-    #[instrument(skip(self), fields(%target_role_id, %managing_role_id, %perm))]
-    fn revoke_role_management_perm(
-        &self,
-        target_role_id: RoleId,
-        managing_role_id: RoleId,
-        perm: RoleManagementPerm,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::revoke_role_management_perm(
-            target_role_id.as_base(),
-            managing_role_id.as_base(),
-            perm,
-        ))
-        .in_current_span()
-    }
-
     /// Invokes `setup_default_roles`.
-    #[instrument(skip(self), fields(%managing_role_id))]
-    fn setup_default_roles(
-        &self,
-        managing_role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::setup_default_roles(managing_role_id.as_base()))
+    #[instrument(skip(self))]
+    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_persistent_action(policy::setup_default_roles())
             .in_current_span()
     }
 
