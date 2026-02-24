@@ -8,13 +8,17 @@ mod trace_tests {
         config::CreateTeamQuicSyncConfig, trace::generate_trace_id, CreateTeamConfig,
     };
     use aranya_daemon_api::SEED_IKM_SIZE;
+    use std::cell::RefCell;
     use tempfile::TempDir;
     use tracing::info;
+    // Test-only macro for capturing logs in tests.
+    use tracing_test::traced_test;
 
     use crate::common::DeviceCtx;
 
-    #[test_log::test(tokio::test)]
-    async fn test_trace_id_generation() {
+    #[traced_test]
+    #[test]
+    fn test_trace_id_generation() {
         // Test that trace IDs can be generated and logged
         let trace_id = generate_trace_id();
         info!(%trace_id, "generated trace ID");
@@ -24,9 +28,25 @@ mod trace_tests {
 
         // Verify they're different
         assert_ne!(trace_id.as_str(), trace_id2.as_str());
+        assert!(logs_contain("generated trace ID"));
+        assert!(logs_contain("generated second trace ID"));
+    }
+
+    fn parse_trace_id(line: &str) -> Option<String> {
+        let marker = "rpc.trace_id=";
+        let start = line.find(marker)? + marker.len();
+        let rest = &line[start..];
+        let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
+        let raw = rest[..end].trim_matches(|c| c == '"' || c == ',' || c == '}' || c == ':');
+        if raw.is_empty() {
+            None
+        } else {
+            Some(raw.to_string())
+        }
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_basic_rpc_operations() -> anyhow::Result<()> {
         // Test that basic RPC operations work (RPC trace correlation is automatic via rpc_context)
         let work_dir = TempDir::new()?;
@@ -44,6 +64,61 @@ mod trace_tests {
 
         let team = owner.client.create_team(owner_cfg).await?;
         info!(team_id = %team.team_id(), "created team");
+
+        let daemon_trace_id = RefCell::new(None);
+        logs_assert(|lines: &[&str]| {
+            let mut match_trace_id = None;
+            for line in lines
+                .iter()
+                .filter(|line| line.contains("RPC: ReceiveRequest"))
+            {
+                if line.contains("create_team") || line.contains("DaemonApi.create_team") {
+                    if let Some(trace_id) = parse_trace_id(line) {
+                        match_trace_id = Some(trace_id);
+                    }
+                }
+            }
+            match match_trace_id {
+                Some(trace_id) => {
+                    *daemon_trace_id.borrow_mut() = Some(trace_id);
+                    Ok(())
+                }
+                None => Err("missing daemon trace id for create_team".to_string()),
+            }
+        });
+        let daemon_trace_id = daemon_trace_id
+            .into_inner()
+            .expect("daemon trace id should be captured");
+
+        let client_trace_ids = RefCell::new(Vec::new());
+        logs_assert(|lines: &[&str]| {
+            for line in lines
+                .iter()
+                .filter(|line| line.contains("RPC: SendRequest"))
+            {
+                if let Some(trace_id) = parse_trace_id(line) {
+                    client_trace_ids.borrow_mut().push(trace_id);
+                }
+            }
+            if client_trace_ids.borrow().is_empty() {
+                return Err("missing client trace ids".to_string());
+            }
+            Ok(())
+        });
+        let client_trace_ids = client_trace_ids.into_inner();
+        assert!(
+            client_trace_ids.iter().any(|id| id == &daemon_trace_id),
+            "daemon trace id not found in client logs"
+        );
+        let client_trace_id = client_trace_ids
+            .iter()
+            .find(|id| *id == &daemon_trace_id)
+            .expect("matched client trace id should exist");
+        info!(
+            client_trace_id = %client_trace_id,
+            daemon_trace_id = %daemon_trace_id,
+            "trace id matched between client and daemon"
+        );
 
         Ok(())
     }

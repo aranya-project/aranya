@@ -231,5 +231,6 @@ pub(crate) fn rpc_context() -> context::Context {
         trace_id: TarpcTraceId::random(&mut rng),
         ..TraceContext::default()
     };
+    tracing::trace!(rpc.trace_id = %ctx.trace_context.trace_id, "RPC: SendRequest");
     ctx
 }
