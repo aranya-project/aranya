@@ -39,7 +39,7 @@ impl QuicListener {
         server_keys: Arc<PskStore>,
     ) -> Result<(Self, SharedConnectionMap), Error> {
         // Create shared connection map and channel for connection updates
-        let (conns, conn_rx) = SharedConnectionMap::new();
+        let (conns, conn_rx) = SharedConnectionMap::new(32);
 
         // Create Server Config
         let mut server_config = ServerConfig::builder()

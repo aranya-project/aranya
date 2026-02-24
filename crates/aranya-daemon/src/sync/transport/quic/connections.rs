@@ -1,7 +1,8 @@
-//! This modules contains a map for storing persistent QUIC connections between pairs of sync peers.
-//! The [connection map][SharedConnectionMap] allows the sync client and server to share existing connections by providing
-//! the client access to a mutable connection [handle][Handle]. The corresponding [stream acceptor][StreamAcceptor],
-//! that's used by the sync server, is sent over a channel when new connections are inserted in the map.
+//! This module contains a [`SharedConnectionMap`] that allows for reusing connections for an
+//! existing [`SyncPeer`].
+//!
+//! This works by keeping track of a connection's [`Handle`], sending the acceptor to the
+//! `SyncListener` to allow it to respond when a new connection is inserted.
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -23,9 +24,8 @@ use crate::sync::SyncPeer;
 pub(crate) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 type ConnectionMap = BTreeMap<SyncPeer, Handle>;
 
-/// Thread-safe map for sharing QUIC connections between sync peers.
-///
-/// This map stores persistent QUIC connections indexed by [`SyncPeer`].
+/// Thread-safe map that stores a [`Handle`] to the connection to allow for reuse across multiple
+/// connection requests to a peer.
 #[derive(Clone, Debug)]
 pub(crate) struct SharedConnectionMap {
     tx: mpsc::Sender<ConnectionUpdate>,
@@ -33,8 +33,9 @@ pub(crate) struct SharedConnectionMap {
 }
 
 impl SharedConnectionMap {
-    pub(super) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
-        let (tx, rx) = mpsc::channel(32);
+    /// Creates a new [`SharedConnectionMap`].
+    pub(super) fn new(buffer: usize) -> (Self, mpsc::Receiver<ConnectionUpdate>) {
+        let (tx, rx) = mpsc::channel(buffer);
         (
             Self {
                 tx,
@@ -44,14 +45,15 @@ impl SharedConnectionMap {
         )
     }
 
-    /// Removes a connection from the map and closes it.
+    /// Tries to remove a connection from the map and close it.
     ///
-    /// If the handle does not match the one in the map,
-    /// it has been replaced and does not need to be removed.
+    /// Note that this will skip removing it if the passed handle does not match the stored handle
+    /// for the peer.
     pub(super) async fn remove(&self, peer: SyncPeer, handle: Handle) {
         match self.handles.lock().await.entry(peer) {
             Entry::Vacant(_) => {}
             Entry::Occupied(entry) => {
+                // Was the handle replaced in the time the current task decided to remove it?
                 if entry.get().id() == handle.id() {
                     entry.remove();
                     handle.close(AppError::UNKNOWN);
@@ -60,98 +62,69 @@ impl SharedConnectionMap {
         }
     }
 
-    /// Gets an existing connection handle or creates a new one using the provided closure.
+    /// Returns a handle by either getting an existing one from the map or creating a new one.
     ///
-    /// First checks if a connection already exists for the key. If found, verifies the connection
-    /// is still alive via ping - reuses open connections and replaces closed ones. Sends a [`ConnectionUpdate`] when
-    /// a new connection is created.
+    /// If a handle already exists, we verify it's still live by pinging the peer (note that this
+    /// makes no guarantees about the state of the connection after pinging it), and otherwise we
+    /// create a new one and return it. If a handle doesn't already exist, we create a new one and
+    /// return it.
     ///
-    /// # Parameters
-    ///
-    /// * `peer` - The [`SyncPeer`] that uniquely identifies the connection pair based on team ID and the peer's network address.
-    /// * `make_conn` - Async closure that creates a new [`Connection`] when needed
-    ///
-    /// # Returns
-    ///
-    /// * `Handle` - The connection handle
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the connection creation closure fails.
+    /// Note that the `make_conn` function can fail and return an error, but otherwise this function
+    /// is infallible.
     pub(super) async fn get_or_try_insert_with(
         &self,
         peer: SyncPeer,
         make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
     ) -> Result<Handle, super::Error> {
-        let (handle, maybe_acceptor) = match self.handles.lock().await.entry(peer) {
-            Entry::Occupied(mut entry) => {
-                debug!("existing QUIC connection found");
+        let mut map = self.handles.lock().await;
 
-                if entry.get_mut().ping().is_ok() {
-                    debug!("re-using QUIC connection");
-                    (entry.get().clone(), None)
-                } else {
-                    let (handle, acceptor) = make_conn().await?.split();
-                    entry.insert(handle);
-                    (entry.get().clone(), Some(acceptor))
+        match map.get_mut(&peer) {
+            Some(existing) => {
+                debug!("existing connection found");
+
+                if existing.ping().is_ok() {
+                    debug!("reusing the existing connection");
+                    return Ok(existing.clone());
                 }
             }
-            Entry::Vacant(entry) => {
-                debug!("existing QUIC connection not found");
-                let (handle, acceptor) = make_conn().await?.split();
-
-                (entry.insert(handle).clone(), Some(acceptor))
-            }
-        };
-
-        if let Some(acceptor) = maybe_acceptor {
-            debug!("created new quic connection");
-            self.tx.send((peer, acceptor)).await.ok();
+            None => debug!("existing connection not found"),
         }
+
+        let (handle, acceptor) = make_conn().await?.split();
+        map.insert(peer, handle.clone());
+        debug!("created new quic connection");
+        drop(map);
+
+        self.tx.send((peer, acceptor)).await.ok();
         Ok(handle)
     }
 
-    /// Inserts a QUIC connection into the map, unless an open connection exists.
+    /// Tries to insert a connection into the map, returning the handle to it.
     ///
-    /// Checks if a connection already exists for the key. If found and still alive via ping,
-    /// returns the original connection. If found but closed, replaces it with the new connection.
-    /// If no connection exists, inserts the new one. Sends a [`ConnectionUpdate`] when a
-    /// connection is successfully inserted.
-    ///
-    /// # Parameters
-    ///
-    /// * `peer` - The [`SyncPeer`] that uniquely identifies the connection pair
-    /// * `conn` - The [`Connection`] to insert
-    ///
-    /// # Returns
-    ///
-    /// * `Handle` - The connection handle
+    /// If a handle already exists and is able to be pinged, this will close the passed connection
+    /// and keep the existing one. Otherwise, it will insert the connection into the map.
     pub(super) async fn insert(&self, peer: SyncPeer, conn: Connection) -> Handle {
-        let (handle, acceptor) = match self.handles.lock().await.entry(peer) {
-            Entry::Occupied(mut entry) => {
-                debug!("existing QUIC connection found");
+        let mut map = self.handles.lock().await;
 
-                if entry.get_mut().ping().is_ok() {
-                    debug!(connection_key = ?peer, "Closing the connection because an open connection was already found");
+        match map.get_mut(&peer) {
+            Some(existing) => {
+                debug!("existing connection found");
+
+                if existing.ping().is_ok() {
+                    debug!(connection_key = ?peer, "closing the passed connection and reusing the existing one");
                     conn.close(AppError::UNKNOWN);
-                    return entry.get().clone();
+                    return existing.clone();
                 }
-
-                let (handle, acceptor) = conn.split();
-                entry.insert(handle);
-                (entry.get().clone(), acceptor)
             }
-            Entry::Vacant(entry) => {
-                debug!("existing QUIC connection not found");
-                let (handle, acceptor) = conn.split();
+            None => debug!("existing connection not found"),
+        }
 
-                (entry.insert(handle).clone(), acceptor)
-            }
-        };
+        let (handle, acceptor) = conn.split();
+        map.insert(peer, handle.clone());
+        debug!("created new connection");
+        drop(map);
 
-        debug!("created new quic connection");
         self.tx.send((peer, acceptor)).await.ok();
-
         handle
     }
 }
