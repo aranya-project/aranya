@@ -208,21 +208,6 @@ pub(crate) use impl_vec_into_iter_wrapper;
 ///
 /// The trace ID is generated client-side and logged, enabling end-to-end
 /// request tracking across client and daemon components.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use aranya_client::util::rpc_context;
-/// let ctx = rpc_context();
-/// client.create_team(ctx, cfg).await?;
-/// ```
-///
-/// # How It Works
-///
-/// - Gets current tarpc context
-/// - Generates unique trace_id
-/// - Logs the trace ID for client-side tracing
-/// - Returns context for use in RPC calls
 pub(crate) fn rpc_context() -> context::Context {
     let mut ctx = context::current();
     ctx.deadline = Instant::now()
