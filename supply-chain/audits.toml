@@ -204,6 +204,15 @@ criteria = "safe-to-deploy"
 delta = "0.4.5 -> 0.4.6"
 notes = "Fixes compilation on x86_64-unknown-linux-gnux32 target. No file I/O or networking code. Limited use of unsafe is well-documented."
 
+[[audits.num-conv]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.2.0"
+notes = """
+This update is mainly for the removal of items (traits and macros).
+Cargo.toml changes.
+"""
+
 [[audits.object]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -483,17 +492,49 @@ criteria = "safe-to-deploy"
 version = "0.3.44"
 notes = "Date & time library compatible with the standard libarary. No networking code. Documented use of unsafe. No file I/O except for reading timezone from libc."
 
+[[audits.time]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.44 -> 0.3.46"
+notes = """
+New 'unsafe' blocks were not added.
+Updates to existing 'unsafe' blocks seem to align with the corresponding comments.
+"""
+
+[[audits.time]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.46 -> 0.3.47"
+notes = """
+Resolves RUSTSEC-2026-0009.
+
+New 'unsafe' blocks are reasonable with 'SAFETY' comments describing invariants that must be upheld or why the code is
+safe to execute.
+"""
+
 [[audits.time-core]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.4 -> 0.1.6"
 notes = "Improvements to API ergonomics. Adds a DefaultOutput trait. No networking, unsafe, or file I/O code."
 
+[[audits.time-core]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.6 -> 0.1.8"
+notes = "Minor changes for performance improvements. No 'unsafe' blocks"
+
 [[audits.time-macros]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.22 -> 0.2.24"
 notes = "Updates time macros. Renames TokenTree to TokenStream. Appears to rename some things and clean up some tech debt. No unsafe, networking, or file I/O code."
+
+[[audits.time-macros]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.24 -> 0.2.27"
+notes = "No 'unsafe' blocks added."
 
 [[audits.tinyvec]]
 who = "Jonathan Dygert <jdygert@spideroak.com>"
