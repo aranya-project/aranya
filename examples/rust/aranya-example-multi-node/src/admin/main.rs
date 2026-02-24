@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{
-    text, AddTeamConfig, AddTeamQuicSyncConfig, Client, ObjectId, Rank, SyncPeerConfig,
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Client, ObjectId, Rank, Role, SyncPeerConfig,
 };
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -113,9 +113,15 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let admin_device_rank = team.query_rank(ObjectId::transmute(device_id)).await?;
-    // Label rank must be lower than the admin's device rank so the admin can operate on it.
-    let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
+    let member_role = team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r: &Role| r.name == "member")
+        .ok_or_else(|| anyhow::anyhow!("member role not found"))?;
+    let member_role_rank = team.query_rank(ObjectId::transmute(member_role.id)).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     team.create_label_with_rank(text!("label1"), label_rank)
         .await?;
     info!("admin: created label");

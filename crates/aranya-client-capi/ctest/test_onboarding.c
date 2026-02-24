@@ -86,10 +86,22 @@ static int test_create_team_and_onboard_member(const char *tmpdir) {
 
     printf("Got member key bundle (%zu bytes)\n", member_pk_len);
 
-    /* Add member to team */
+    /* Query owner's device rank to derive the new device's rank */
+    AranyaDeviceId owner_device_id;
+    CLIENT_EXPECT("Failed to get owner device id", "",
+                  aranya_get_device_id(&owner_client, &owner_device_id));
+
+    AranyaObjectId owner_object_id = {.id = owner_device_id.id};
+    int64_t owner_device_rank = 0;
+    CLIENT_EXPECT("Failed to query owner device rank", "",
+                  aranya_query_rank(&owner_client, &team_id, &owner_object_id,
+                                    &owner_device_rank));
+
+    /* Add member to team with rank below owner's device rank */
     CLIENT_EXPECT("Failed to add member to team", "",
-                  aranya_add_device_to_team(&owner_client, &team_id, member_pk,
-                                            member_pk_len, NULL));
+                  aranya_add_device_to_team_with_rank(
+                      &owner_client, &team_id, member_pk, member_pk_len, NULL,
+                      owner_device_rank - 1));
 
     printf("Member added to team successfully\n");
 
