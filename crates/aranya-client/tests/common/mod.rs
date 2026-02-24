@@ -84,7 +84,7 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.admin.pk.clone(),
                 Some(roles.admin().id),
-                Rank::new(admin_role_rank.value() - 1),
+                Rank::new(admin_role_rank.value().saturating_sub(1)),
             )
             .await?;
 
@@ -95,7 +95,7 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.operator.pk.clone(),
                 Some(roles.operator().id),
-                Rank::new(operator_role_rank.value() - 1),
+                Rank::new(operator_role_rank.value().saturating_sub(1)),
             )
             .await?;
 
@@ -106,7 +106,7 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.membera.pk.clone(),
                 Some(roles.member().id),
-                Rank::new(member_role_rank.value() - 1),
+                Rank::new(member_role_rank.value().saturating_sub(1)),
             )
             .await?;
 
@@ -116,7 +116,7 @@ impl DevicesCtx {
             .add_device_with_rank(
                 self.memberb.pk.clone(),
                 Some(roles.member().id),
-                Rank::new(member_role_rank.value() - 1),
+                Rank::new(member_role_rank.value().saturating_sub(1)),
             )
             .await?;
 

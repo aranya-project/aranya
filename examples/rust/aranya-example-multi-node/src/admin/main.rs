@@ -115,7 +115,7 @@ async fn main() -> Result<()> {
     info!("admin: creating label");
     let admin_device_rank = team.query_rank(ObjectId::transmute(device_id)).await?;
     // Label rank must be lower than the admin's device rank so the admin can operate on it.
-    let label_rank = Rank::new(admin_device_rank.value() - 1);
+    let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
     team.create_label_with_rank(text!("label1"), label_rank)
         .await?;
     info!("admin: created label");

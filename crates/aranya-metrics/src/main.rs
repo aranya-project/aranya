@@ -329,7 +329,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .add_device_with_rank(
             ctx.admin.pk,
             Some(admin_role.id),
-            Rank::new(admin_role_rank.value() - 1),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
         )
         .await?;
     admin.sync_now(owner_addr, None).await?;
@@ -340,7 +340,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .add_device_with_rank(
             ctx.operator.pk,
             Some(operator_role.id),
-            Rank::new(operator_role_rank.value() - 1),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
         )
         .await?;
     operator.sync_now(owner_addr, None).await?;
@@ -352,7 +352,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .add_device_with_rank(
             ctx.membera.pk.clone(),
             Some(member_role.id),
-            Rank::new(member_role_rank.value() - 1),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
     membera.sync_now(owner_addr, None).await?;
@@ -362,7 +362,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .add_device_with_rank(
             ctx.memberb.pk.clone(),
             Some(member_role.id),
-            Rank::new(member_role_rank.value() - 1),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
     memberb.sync_now(owner_addr, None).await?;
@@ -378,7 +378,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("admin creating label");
     let admin_device_rank = admin.query_rank(ObjectId::transmute(ctx.admin.id)).await?;
     // Label rank must be lower than the admin's device rank so the admin can operate on it.
-    let label_rank = Rank::new(admin_device_rank.value() - 1);
+    let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
     let label3 = admin
         .create_label_with_rank(text!("label3"), label_rank)
         .await?;

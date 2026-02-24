@@ -288,7 +288,7 @@ async fn main() -> Result<()> {
         .add_device_with_rank(
             admin.pk,
             Some(admin_role.id),
-            Rank::new(admin_role_rank.value() - 1),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
         )
         .await?;
 
@@ -298,7 +298,7 @@ async fn main() -> Result<()> {
         .add_device_with_rank(
             operator.pk,
             Some(operator_role.id),
-            Rank::new(operator_role_rank.value() - 1),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
         )
         .await?;
 
@@ -399,7 +399,7 @@ async fn main() -> Result<()> {
         .add_device_with_rank(
             membera.pk.clone(),
             Some(member_role.id),
-            Rank::new(member_role_rank.value() - 1),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
 
@@ -409,7 +409,7 @@ async fn main() -> Result<()> {
         .add_device_with_rank(
             memberb.pk.clone(),
             Some(member_role.id),
-            Rank::new(member_role_rank.value() - 1),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
 
@@ -513,7 +513,7 @@ async fn main() -> Result<()> {
     info!("creating label");
     let owner_device_rank = owner_team.query_rank(ObjectId::transmute(owner.id)).await?;
     // Label rank must be lower than the owner's device rank so the owner can operate on it.
-    let label_rank = Rank::new(owner_device_rank.value() - 1);
+    let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
     let label3 = owner_team
         .create_label_with_rank(text!("label3"), label_rank)
         .await?;

@@ -392,7 +392,7 @@ impl TestCtx {
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&admin.pk)?,
                 None,
-                (admin_role_rank - 1).into(),
+                (admin_role_rank.saturating_sub(1)).into(),
             )
             .await
             .context("unable to add admin member")?;
@@ -420,7 +420,7 @@ impl TestCtx {
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&operator.pk)?,
                 None,
-                (operator_role_rank - 1).into(),
+                (operator_role_rank.saturating_sub(1)).into(),
             )
             .await
             .context("unable to add operator member")?;
@@ -450,7 +450,7 @@ impl TestCtx {
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&membera.pk)?,
                 None,
-                (member_role_rank - 1).into(),
+                (member_role_rank.saturating_sub(1)).into(),
             )
             .await
             .context("unable to add membera member")?;
@@ -460,7 +460,7 @@ impl TestCtx {
             .add_device_with_rank(
                 DeviceKeyBundle::try_from(&memberb.pk)?,
                 None,
-                (member_role_rank - 1).into(),
+                (member_role_rank.saturating_sub(1)).into(),
             )
             .await
             .context("unable to add memberb member")?;
@@ -640,7 +640,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&extra.pk)?,
             None,
-            (member_role_rank - 1).into(),
+            (member_role_rank.saturating_sub(1)).into(),
         )
         .await
         .context("initial add should succeed")?;
@@ -650,7 +650,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&extra.pk)?,
             None,
-            (member_role_rank - 1).into(),
+            (member_role_rank.saturating_sub(1)).into(),
         )
         .await
         .expect_err("expected duplicate device add to fail");
@@ -697,7 +697,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
         .add_device_with_rank(
             DeviceKeyBundle::try_from(&candidate.pk)?,
             Some(member_role),
-            (member_role_rank - 1).into(),
+            (member_role_rank.saturating_sub(1)).into(),
         )
         .await
         .expect_err("expected add_device with initial role to fail without AddDevice permission");
