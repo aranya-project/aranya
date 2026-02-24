@@ -4,9 +4,10 @@ mod common;
 
 #[cfg(test)]
 mod trace_tests {
+    use std::cell::RefCell;
+
     use aranya_client::{config::CreateTeamQuicSyncConfig, CreateTeamConfig};
     use aranya_daemon_api::SEED_IKM_SIZE;
-    use std::cell::RefCell;
     use tempfile::TempDir;
     use tracing::info;
     // Test-only macro for capturing logs in tests.

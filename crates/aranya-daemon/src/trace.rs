@@ -26,7 +26,7 @@ pub fn extract_trace_id(ctx: &tarpc::context::Context) -> TraceId {
 
 /// Records the trace ID on the provided span.
 pub fn record_trace_id(span: &Span, trace_id: TraceId) {
-    span.record("trace_id", &tracing::field::display(trace_id));
+    span.record("trace_id", tracing::field::display(trace_id));
 }
 
 /// Records the trace ID on the current span.

@@ -1,8 +1,10 @@
-use aranya_id::{Id, IdTag};
 use std::time::{Duration, Instant};
-use tarpc::context;
-use tarpc::trace::Context as TraceContext;
-use tarpc::trace::TraceId as TarpcTraceId;
+
+use aranya_id::{Id, IdTag};
+use tarpc::{
+    context,
+    trace::{Context as TraceContext, TraceId as TarpcTraceId},
+};
 
 /// IPC timeout of 1 year (365 days).
 /// A large value helps resolve IPC calls timing out when there are long-running
