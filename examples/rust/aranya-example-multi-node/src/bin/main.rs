@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
         processes.spawn(async move {
             let status = child.wait().await.context("expected exit status")?;
             ensure!(status.success(), "child process failed: {status:?}");
-            Ok::<(), anyhow::Error>(())
+            anyhow::Ok(())
         });
     }
     // Wait for all device processes to complete.

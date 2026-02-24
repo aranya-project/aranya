@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     info!("membera: detected that all devices have been added to team");
 
@@ -144,7 +144,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
 
     // Remove operator sync peer.
