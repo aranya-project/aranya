@@ -48,9 +48,6 @@ use crate::{
     AranyaStore,
 };
 
-// TODO(aranya-core#582): Replace rank queries with exported policy constants
-// once policy-ifgen exposes globals.
-
 /// Queries the rank of an object via the policy engine, returning the raw i64 value.
 async fn query_rank(device: &TestDevice, object_id: aranya_policy_ifgen::BaseId) -> Result<i64> {
     let effects = device.actions().query_rank(object_id).await?;

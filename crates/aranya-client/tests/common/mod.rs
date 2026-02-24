@@ -26,9 +26,6 @@ const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 #[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
-// TODO(aranya-core#582): Replace rank queries with exported policy constants
-// once policy-ifgen exposes globals.
-
 /// Example rank for labels in tests.
 #[allow(dead_code)]
 pub const EXAMPLE_LABEL_RANK: i64 = 500;
