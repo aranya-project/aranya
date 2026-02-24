@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
     // Send device info to owner.
     info!("operator: sending device info to owner");
     let device_id = client.get_device_id().await?;
-    let pk = client.get_key_bundle().await?;
+    let pk = client.get_public_key_bundle().await?;
     onboard
         .send(
             &DeviceInfo {
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     let operator_role = team
         .roles()
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     info!("operator: detected that all devices have been added to team and operator role has been assigned");
 

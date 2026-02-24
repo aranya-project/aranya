@@ -69,7 +69,8 @@ static int test_create_team_and_onboard_member(const char *tmpdir) {
         goto exit;
     }
 
-    err = aranya_get_key_bundle(&member_client, member_pk, &member_pk_len);
+    err =
+        aranya_get_public_key_bundle(&member_client, member_pk, &member_pk_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         member_pk = realloc(member_pk, member_pk_len);
         if (!member_pk) {
@@ -77,9 +78,9 @@ static int test_create_team_and_onboard_member(const char *tmpdir) {
                     "Failed to reallocate memory for member key bundle\n");
             goto exit;
         }
-        CLIENT_EXPECT(
-            "Failed to get member key bundle", "",
-            aranya_get_key_bundle(&member_client, member_pk, &member_pk_len));
+        CLIENT_EXPECT("Failed to get member public key bundle", "",
+                      aranya_get_public_key_bundle(&member_client, member_pk,
+                                                   &member_pk_len));
     }
     CLIENT_EXPECT("Failed to get member key bundle", "", err);
 
