@@ -106,7 +106,6 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
         source: e,
     })?;
 
-    let mut cert_count = 0;
     for entry in entries {
         let entry = entry.map_err(CertError::ReadDirEntry)?;
         let path = entry.path();
@@ -141,16 +140,15 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
                         path: path.clone(),
                         source: e,
                     })?;
-                cert_count += 1;
             }
         }
     }
 
-    if cert_count == 0 {
+    if root_store.is_empty() {
         return Err(CertError::NoRootCertsFound(dir.to_path_buf()));
     }
 
-    debug!("loaded {} root CA certificate(s)", cert_count);
+    debug!("loaded {} root CA certificate(s)", root_store.len());
     Ok(root_store)
 }
 
