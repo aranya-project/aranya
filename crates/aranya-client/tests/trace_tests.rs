@@ -27,7 +27,7 @@ mod trace_tests {
         info!(%trace_id2, "generated second trace ID");
 
         // Verify they're different
-        assert_ne!(trace_id.as_str(), trace_id2.as_str());
+        assert_ne!(trace_id, trace_id2);
         assert!(logs_contain("generated trace ID"));
         assert!(logs_contain("generated second trace ID"));
     }

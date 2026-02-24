@@ -3,45 +3,8 @@
 //! This module provides helpers for extracting and propagating RPC trace IDs
 //! from tarpc context throughout the daemon's execution.
 
-use std::sync::Arc;
+pub use tarpc::trace::TraceId;
 use tracing::Span;
-
-/// A unique identifier for correlating RPC requests across the system.
-///
-/// This trace ID is extracted from tarpc's context and propagated through
-/// all log spans and effects to enable end-to-end request tracing.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TraceId(Arc<str>);
-
-impl TraceId {
-    /// Creates a new `TraceId` from a string.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(Arc::from(id.into()))
-    }
-
-    /// Returns the trace ID as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for TraceId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl From<&str> for TraceId {
-    fn from(s: &str) -> Self {
-        Self::new(s.to_string())
-    }
-}
-
-impl From<String> for TraceId {
-    fn from(s: String) -> Self {
-        Self::new(s)
-    }
-}
 
 tokio::task_local! {
     #[doc(hidden)]
@@ -63,8 +26,7 @@ tokio::task_local! {
 /// let trace_id = extract_trace_id(&ctx).to_string();
 /// ```
 pub fn extract_trace_id(ctx: &tarpc::context::Context) -> TraceId {
-    // Extract trace ID from tarpc trace context
-    TraceId::new(ctx.trace_context.trace_id.to_string())
+    ctx.trace_context.trace_id
 }
 
 /// Returns the current trace ID if one is set in async-local storage.
@@ -90,7 +52,7 @@ where
 ///
 pub fn add_trace_to_span(span: &Span) {
     if let Some(trace_id) = current_trace_id() {
-        span.record("trace_id", trace_id.as_str());
+        span.record("trace_id", &tracing::field::display(trace_id));
     }
 }
 
@@ -100,13 +62,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_trace_id_creation() {
-        let trace_id = TraceId::new("test-123");
-        assert_eq!(trace_id.as_str(), "test-123");
+        let trace_id = TraceId::default();
+        assert!(!trace_id.to_string().is_empty());
     }
 
     #[tokio::test]
     async fn test_trace_context_propagation() {
-        let trace_id = TraceId::new("test-456");
+        let trace_id = TraceId::default();
 
         with_trace_context(trace_id.clone(), async {
             assert_eq!(current_trace_id(), Some(trace_id));
@@ -120,6 +82,6 @@ mod tests {
     async fn test_extract_trace_id() {
         let ctx = tarpc::context::current();
         let trace_id = extract_trace_id(&ctx);
-        assert!(!trace_id.as_str().is_empty());
+        assert!(!trace_id.to_string().is_empty());
     }
 }
