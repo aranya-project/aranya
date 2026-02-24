@@ -301,7 +301,9 @@ impl Client {
 /// plus [`IPC_TIMEOUT`].
 pub(crate) fn create_ctx() -> context::Context {
     let mut ctx = context::current();
-    ctx.deadline = Instant::now() + IPC_TIMEOUT;
+    ctx.deadline = Instant::now()
+        .checked_add(IPC_TIMEOUT)
+        .expect("IPC_TIMEOUT should not overflow");
 
     ctx
 }

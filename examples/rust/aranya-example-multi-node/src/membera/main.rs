@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
     info!("membera: detected that all devices have been added to team");
 
@@ -133,7 +133,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(3 * SLEEP_INTERVAL).await;
+        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
     }
 
     // Remove operator sync peer.
@@ -154,7 +154,13 @@ async fn main() -> Result<()> {
 
     info!("membera: sending AFC data");
     let msg_send = b"hello";
-    let mut req = vec![0u8; msg_send.len() + Channels::OVERHEAD];
+    let mut req = vec![
+        0u8;
+        msg_send
+            .len()
+            .checked_add(Channels::OVERHEAD)
+            .expect("AFC overhead should not overflow")
+    ];
     sealer.seal(&mut req, msg_send)?;
     sender.send(env.memberb.afc_addr, &req).await?;
     info!("membera: sent AFC data");
@@ -168,7 +174,12 @@ async fn main() -> Result<()> {
 
     info!("membera: receiving AFC data");
     let resp = receiver.recv().await?;
-    let mut msg_recv = vec![0u8; resp.len() - Channels::OVERHEAD];
+    let mut msg_recv = vec![
+        0u8;
+        resp.len()
+            .checked_sub(Channels::OVERHEAD)
+            .expect("ciphertext must be larger than overhead")
+    ];
     opener.open(&mut msg_recv, &resp)?;
     assert_eq!(msg_send.as_slice(), msg_recv.as_slice());
     info!("membera: received AFC data");

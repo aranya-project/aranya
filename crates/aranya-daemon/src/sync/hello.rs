@@ -96,7 +96,11 @@ where
         for (peer, subscription) in subscribers {
             // Check if enough time has passed since last notification
             if let Some(last_notified) = subscription.last_notified {
-                if now - last_notified < subscription.graph_change_debounce {
+                if now
+                    .checked_duration_since(last_notified)
+                    .unwrap_or_default()
+                    < subscription.graph_change_debounce
+                {
                     continue;
                 }
             }
@@ -406,7 +410,11 @@ where
                 schedule_delay,
             } => {
                 let peer = SyncPeer::new(peer_addr, graph_id);
-                let expires_at = Instant::now() + duration;
+
+                let Some(expires_at) = Instant::now().checked_add(duration) else {
+                    warn!(?peer, ?duration, "subscription expiry overflow");
+                    return;
+                };
 
                 // Check if there's an existing subscription and cancel its scheduled task
                 if let Some(subscription) = client.lock_hello_subscriptions().await.get(&peer) {
