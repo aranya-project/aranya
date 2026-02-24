@@ -3,12 +3,12 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{text, AddTeamConfig, AddTeamQuicSyncConfig, Client, ObjectId, Rank, SyncPeerConfig};
+use aranya_client::{
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Client, ObjectId, Rank, SyncPeerConfig,
+};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{
-        DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL,
-    },
+    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};

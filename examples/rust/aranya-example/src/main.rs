@@ -283,7 +283,9 @@ async fn main() -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
-    let admin_role_rank = owner_team.query_rank(ObjectId::transmute(admin_role.id)).await?;
+    let admin_role_rank = owner_team
+        .query_rank(ObjectId::transmute(admin_role.id))
+        .await?;
     owner_team
         .add_device_with_rank(
             admin.pk,
@@ -293,7 +295,9 @@ async fn main() -> Result<()> {
         .await?;
 
     info!("adding operator to team");
-    let operator_role_rank = owner_team.query_rank(ObjectId::transmute(operator_role.id)).await?;
+    let operator_role_rank = owner_team
+        .query_rank(ObjectId::transmute(operator_role.id))
+        .await?;
     owner_team
         .add_device_with_rank(
             operator.pk,
@@ -394,7 +398,9 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(member_role.id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(member_role.id))
+        .await?;
     owner_team
         .add_device_with_rank(
             membera.pk.clone(),

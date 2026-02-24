@@ -19,7 +19,6 @@ use tokio::{
     process::{Child, Command},
 };
 use tracing::{debug, info, warn, Metadata};
-
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
@@ -335,7 +334,9 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
-    let operator_role_rank = owner.query_rank(ObjectId::transmute(operator_role.id)).await?;
+    let operator_role_rank = owner
+        .query_rank(ObjectId::transmute(operator_role.id))
+        .await?;
     owner
         .add_device_with_rank(
             ctx.operator.pk,
@@ -347,7 +348,9 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Admin adds membera and memberb to the team.
     info!("admin adding membera to team");
-    let member_role_rank = admin.query_rank(ObjectId::transmute(member_role.id)).await?;
+    let member_role_rank = admin
+        .query_rank(ObjectId::transmute(member_role.id))
+        .await?;
     admin
         .add_device_with_rank(
             ctx.membera.pk.clone(),

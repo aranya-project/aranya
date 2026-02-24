@@ -6,13 +6,12 @@ use aranya_client::{
     config::CreateTeamConfig,
     AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, ObjectId, SyncPeerConfig,
 };
-use aranya_daemon_api::Rank;
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::SEED_IKM_SIZE;
+use aranya_daemon_api::{Rank, SEED_IKM_SIZE};
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -25,7 +24,6 @@ const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 #[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
-
 
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
@@ -79,7 +77,9 @@ impl DevicesCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        let admin_role_rank = owner_team.query_rank(ObjectId::transmute(roles.admin().id)).await?;
+        let admin_role_rank = owner_team
+            .query_rank(ObjectId::transmute(roles.admin().id))
+            .await?;
         owner_team
             .add_device_with_rank(
                 self.admin.pk.clone(),
@@ -90,7 +90,9 @@ impl DevicesCtx {
 
         // Add the operator as a new device.
         info!("adding operator to team");
-        let operator_role_rank = owner_team.query_rank(ObjectId::transmute(roles.operator().id)).await?;
+        let operator_role_rank = owner_team
+            .query_rank(ObjectId::transmute(roles.operator().id))
+            .await?;
         owner_team
             .add_device_with_rank(
                 self.operator.pk.clone(),
@@ -101,7 +103,9 @@ impl DevicesCtx {
 
         // Add member A as a new device.
         info!("adding membera to team");
-        let member_role_rank = owner_team.query_rank(ObjectId::transmute(roles.member().id)).await?;
+        let member_role_rank = owner_team
+            .query_rank(ObjectId::transmute(roles.member().id))
+            .await?;
         owner_team
             .add_device_with_rank(
                 self.membera.pk.clone(),

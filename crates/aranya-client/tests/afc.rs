@@ -40,7 +40,9 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     memberb_team.sync_now(owner_addr, None).await?;
     assert_eq!(memberb_team.labels().await?.iter().count(), 0);
 
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -163,7 +165,9 @@ async fn test_afc_uni_chan_create() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -233,7 +237,9 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -313,7 +319,9 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -401,7 +409,9 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -508,7 +518,9 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -621,7 +633,9 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -743,7 +757,9 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -863,7 +879,9 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
@@ -985,7 +1003,9 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(ObjectId::transmute(default_roles.member().id)).await?;
+    let member_role_rank = owner_team
+        .query_rank(ObjectId::transmute(default_roles.member().id))
+        .await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
