@@ -50,6 +50,7 @@ use crate::{
     daemon::CS,
     policy::{ChanOp, Effect, PublicKeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
     sync::{SyncHandle, SyncPeer},
+    util::TeamConfigStore,
     Client, EF,
 };
 
@@ -134,6 +135,7 @@ impl DaemonApiServer {
             effect_handler,
             #[cfg(feature = "afc")]
             afc,
+            teams: TeamConfigStore::new(),
         }));
         Ok(Self {
             uds_path,
@@ -351,6 +353,7 @@ struct ApiInner {
     effect_handler: EffectHandler,
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
+    teams: TeamConfigStore,
 }
 
 impl ApiInner {
@@ -382,6 +385,9 @@ impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<GraphId> {
+        if !self.teams.contains(team) {
+            anyhow::bail!("team {team} not created or added")
+        }
         if self
             .client
             .invalid_graphs()
@@ -516,14 +522,21 @@ impl DaemonApi for Api {
     #[instrument(skip(self))]
     async fn add_team(self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
         let team = cfg.team_id;
+
+        if !self.teams.add(team) {
+            return Err(anyhow!("team {team} is already present").into());
+        }
         self.check_team_valid(team).await?;
 
-        // TODO(jdygert): Mark team usable
         Ok(())
     }
 
     #[instrument(skip(self), err)]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        if !self.teams.remove(team) {
+            return Err(anyhow!("team {team} was not present").into());
+        }
+
         self.client
             .lock_aranya()
             .await
@@ -552,7 +565,11 @@ impl DaemonApi for Api {
         debug!(?graph_id);
         let team_id = api::TeamId::transmute(graph_id);
 
-        // TODO(jdygert): Mark team usable
+        if !self.teams.add(team_id) {
+            return Err(
+                anyhow!("new team {team_id} with random nonce should not be present").into(),
+            );
+        }
 
         Ok(team_id)
     }
