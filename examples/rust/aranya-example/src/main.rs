@@ -11,7 +11,7 @@ use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, PublicKeyBundle},
     text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
-    ObjectId, Permission, Rank, SyncPeerConfig,
+    Permission, Rank, SyncPeerConfig,
 };
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
@@ -283,9 +283,7 @@ async fn main() -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
-    let admin_role_rank = owner_team
-        .query_rank(admin_role.id.into())
-        .await?;
+    let admin_role_rank = owner_team.query_rank(admin_role.id).await?;
     owner_team
         .add_device_with_rank(
             admin.pk,
@@ -295,9 +293,7 @@ async fn main() -> Result<()> {
         .await?;
 
     info!("adding operator to team");
-    let operator_role_rank = owner_team
-        .query_rank(operator_role.id.into())
-        .await?;
+    let operator_role_rank = owner_team.query_rank(operator_role.id).await?;
     owner_team
         .add_device_with_rank(
             operator.pk,
@@ -398,9 +394,7 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    let member_role_rank = owner_team
-        .query_rank(member_role.id.into())
-        .await?;
+    let member_role_rank = owner_team.query_rank(member_role.id).await?;
     owner_team
         .add_device_with_rank(
             membera.pk.clone(),
@@ -467,13 +461,12 @@ async fn main() -> Result<()> {
 
     // Demo query_rank: verify the role has the rank it was created with.
     // Note: Role ranks are immutable after creation.
-    let current_rank = owner_team.query_rank(custom_role.id.into()).await?;
+    let current_rank = owner_team.query_rank(custom_role.id).await?;
     info!("custom role rank: {}", current_rank);
     assert_eq!(current_rank, custom_role_rank);
 
     // Demo change_rank on a device: change the custom device's rank.
-    let device_object_id: ObjectId = custom.id.into();
-    let device_rank = owner_team.query_rank(device_object_id).await?;
+    let device_rank = owner_team.query_rank(custom.id).await?;
     info!("custom device rank before change: {}", device_rank);
 
     let updated_device_rank = Rank::new(EXAMPLE_UPDATED_DEVICE_RANK);
@@ -482,10 +475,10 @@ async fn main() -> Result<()> {
         device_rank, updated_device_rank
     );
     owner_team
-        .change_rank(device_object_id, device_rank, updated_device_rank)
+        .change_rank(custom.id, device_rank, updated_device_rank)
         .await?;
 
-    let new_rank = owner_team.query_rank(device_object_id).await?;
+    let new_rank = owner_team.query_rank(custom.id).await?;
     info!("custom device rank after change: {}", new_rank);
     assert_eq!(new_rank, updated_device_rank);
 
@@ -516,7 +509,7 @@ async fn main() -> Result<()> {
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
-    let owner_device_rank = owner_team.query_rank(owner.id.into()).await?;
+    let owner_device_rank = owner_team.query_rank(owner.id).await?;
     // Label rank must be lower than the owner's device rank so the owner can operate on it.
     let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
     let label3 = owner_team

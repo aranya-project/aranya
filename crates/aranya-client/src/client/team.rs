@@ -3,7 +3,7 @@ use core::fmt;
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
-use aranya_id::custom_id;
+use aranya_id::{custom_id, Id, IdTag};
 use aranya_policy_text::Text;
 use aranya_util::Addr;
 use buggy::BugExt as _;
@@ -25,64 +25,39 @@ custom_id! {
 }
 impl ApiId<api::TeamId> for TeamId {}
 
-/// An identifier for any object with a unique Aranya ID defined in the policy.
+custom_id! {
+    /// An identifier for any object with a unique Aranya ID defined in the policy.
+    pub struct ObjectId;
+}
+impl ApiId<api::ObjectId> for ObjectId {}
+
+/// Marker trait for ID types that can be converted to [`ObjectId`].
 ///
-/// Roles, devices, labels, and teams all have unique Aranya IDs.
-/// This type can be constructed from any of those specific ID types
-/// via [`From`]/[`Into`].
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ObjectId(api::ObjectId);
+/// Implemented for [`RoleId`], [`DeviceId`], [`LabelId`], and [`TeamId`].
+pub trait IsObjectId {}
+impl IsObjectId for RoleId {}
+impl IsObjectId for DeviceId {}
+impl IsObjectId for LabelId {}
+impl IsObjectId for TeamId {}
+impl IsObjectId for ObjectId {}
 
-impl ObjectId {
-    /// Creates an `ObjectId` from raw bytes.
-    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
-        Self(api::ObjectId::from_bytes(bytes))
-    }
-
-    pub(crate) fn into_api(self) -> api::ObjectId {
-        self.0
-    }
+/// Extension trait for converting typed IDs into [`ObjectId`].
+///
+/// Roles, devices, labels, and teams all have unique Aranya IDs
+/// that can be treated as generic object IDs for rank queries and
+/// other operations that accept any object type.
+pub trait AsObjectId: fmt::Debug {
+    /// Converts this ID into an [`ObjectId`].
+    fn to_object_id(self) -> ObjectId;
 }
 
-impl From<[u8; 32]> for ObjectId {
-    fn from(bytes: [u8; 32]) -> Self {
-        Self::from_bytes(bytes)
-    }
-}
-
-impl From<ObjectId> for [u8; 32] {
-    fn from(id: ObjectId) -> Self {
-        *id.0.as_array()
-    }
-}
-
-impl From<RoleId> for ObjectId {
-    fn from(id: RoleId) -> Self {
-        Self(api::ObjectId::transmute(id.into_api()))
-    }
-}
-
-impl From<DeviceId> for ObjectId {
-    fn from(id: DeviceId) -> Self {
-        Self(api::ObjectId::transmute(id.into_api()))
-    }
-}
-
-impl From<LabelId> for ObjectId {
-    fn from(id: LabelId) -> Self {
-        Self(api::ObjectId::transmute(id.into_api()))
-    }
-}
-
-impl From<TeamId> for ObjectId {
-    fn from(id: TeamId) -> Self {
-        Self(api::ObjectId::transmute(id.into_api()))
-    }
-}
-
-impl fmt::Display for ObjectId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+impl<Tag> AsObjectId for Id<Tag>
+where
+    Tag: IdTag,
+    Id<Tag>: IsObjectId,
+{
+    fn to_object_id(self) -> ObjectId {
+        ObjectId::transmute(self)
     }
 }
 
@@ -230,12 +205,12 @@ impl Team<'_> {
         // otherwise fall back to author_rank - 1.
         let rank = match &initial_role {
             Some(role_id) => {
-                let role_rank = self.query_rank((*role_id).into()).await?;
+                let role_rank = self.query_rank(*role_id).await?;
                 Rank::new(role_rank.value().saturating_sub(1))
             }
             None => {
                 let device_id = self.client.get_device_id().await?;
-                let author_rank = self.query_rank(device_id.into()).await?;
+                let author_rank = self.query_rank(device_id).await?;
                 Rank::new(author_rank.value().saturating_sub(1))
             }
         };
@@ -480,7 +455,7 @@ impl Team<'_> {
     #[instrument(skip(self))]
     pub async fn change_rank(
         &self,
-        object_id: ObjectId,
+        object_id: impl AsObjectId,
         old_rank: Rank,
         new_rank: Rank,
     ) -> Result<()> {
@@ -489,7 +464,7 @@ impl Team<'_> {
             .change_rank(
                 create_ctx(),
                 self.id,
-                object_id.into_api(),
+                object_id.to_object_id().into_api(),
                 old_rank.into_api(),
                 new_rank.into_api(),
             )
@@ -500,10 +475,10 @@ impl Team<'_> {
 
     /// Queries the rank of an object.
     #[instrument(skip(self))]
-    pub async fn query_rank(&self, object_id: ObjectId) -> Result<Rank> {
+    pub async fn query_rank(&self, object_id: impl AsObjectId) -> Result<Rank> {
         self.client
             .daemon
-            .query_rank(create_ctx(), self.id, object_id.into_api())
+            .query_rank(create_ctx(), self.id, object_id.to_object_id().into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -564,7 +539,7 @@ impl Team<'_> {
     ) -> Result<LabelId> {
         // Default to author_rank - 1.
         let device_id = self.client.get_device_id().await?;
-        let author_rank = self.query_rank(device_id.into()).await?;
+        let author_rank = self.query_rank(device_id).await?;
         let rank = Rank::new(author_rank.value().saturating_sub(1));
         self.client
             .daemon

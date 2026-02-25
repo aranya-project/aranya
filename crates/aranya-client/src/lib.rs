@@ -44,8 +44,8 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, ObjectId,
-        PublicKeyBundle, Rank, Role, RoleId, Roles, Team, TeamId,
+        AsObjectId, ChanOp, Client, Device, DeviceId, Devices, IsObjectId, Label, LabelId, Labels,
+        ObjectId, PublicKeyBundle, Rank, Role, RoleId, Roles, Team, TeamId,
     },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,

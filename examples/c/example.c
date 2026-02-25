@@ -387,8 +387,8 @@ AranyaError init_team(Team *t) {
 
     // Setup default roles.
     size_t num_default_roles = 0;
-    err = aranya_setup_default_roles(&owner->client, &t->id,
-                                     &num_default_roles);
+    err =
+        aranya_setup_default_roles(&owner->client, &t->id, &num_default_roles);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
         return err;
@@ -407,8 +407,7 @@ AranyaError init_team(Team *t) {
         // No need to realloc and retry since we used the hint from
         // setup_default_roles for the initial allocation. A mismatch
         // means something unexpected changed.
-        fprintf(stderr,
-                "expected %zu default roles but found %zu\n",
+        fprintf(stderr, "expected %zu default roles but found %zu\n",
                 num_default_roles, roles_len);
         free(roles);
         return ARANYA_ERROR_OTHER;
@@ -423,26 +422,21 @@ AranyaError init_team(Team *t) {
     AranyaRoleId admin_role_id;
     err = get_role_id_by_name(roles, roles_len, "admin", &admin_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to get 'admin' role from list of roles\n");
+        fprintf(stderr, "unable to get 'admin' role from list of roles\n");
         free(roles);
         return err;
     }
     AranyaRoleId operator_role_id;
-    err = get_role_id_by_name(roles, roles_len, "operator",
-                              &operator_role_id);
+    err = get_role_id_by_name(roles, roles_len, "operator", &operator_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to get 'operator' role from list of roles\n");
+        fprintf(stderr, "unable to get 'operator' role from list of roles\n");
         free(roles);
         return err;
     }
     AranyaRoleId member_role_id;
-    err = get_role_id_by_name(roles, roles_len, "member",
-                              &member_role_id);
+    err = get_role_id_by_name(roles, roles_len, "member", &member_role_id);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to get 'member' role from list of roles\n");
+        fprintf(stderr, "unable to get 'member' role from list of roles\n");
         free(roles);
         return err;
     }
