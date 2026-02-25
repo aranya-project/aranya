@@ -104,11 +104,6 @@
 #define ARANYA_ID_LEN 32
 
 /**
- * The number of roles returned from `setup_default_roles`.
- */
-#define DEFAULT_ROLES_LEN 3
-
-/**
  * The size in bytes of a PSK seed IKM.
  */
 #define ARANYA_SEED_IKM_LEN 32
@@ -1805,23 +1800,24 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  * The owner role is created automatically when the team is created,
  * so it is not included here.
  *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
+ * Returns the total number of default roles on the team in
+ * `num_default_roles_out`, including the owner role which is
+ * created automatically when the team is created. Use
+ * [`aranya_team_roles`](@ref aranya_team_roles) to obtain the full list of roles after calling
+ * this function.
  *
  * N.B. this function is meant to be called once to set up the default roles.
  * Subsequent calls will result in an error if the default roles were already created.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] roles_out returns a list of default roles
- * @param[in,out] roles_len the number of roles written to the buffer.
+ * @param[out] num_default_roles_out the total number of default roles on the team
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team,
-                                       struct AranyaRole *roles_out,
-                                       size_t *roles_len);
+                                       size_t *num_default_roles_out);
 
 /**
  * Setup default roles on team.
@@ -1835,23 +1831,24 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  * The owner role is created automatically when the team is created,
  * so it is not included here.
  *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of roles that would have been returned to `roles_len`.
+ * Returns the total number of default roles on the team in
+ * `num_default_roles_out`, including the owner role which is
+ * created automatically when the team is created. Use
+ * [`aranya_team_roles`](@ref aranya_team_roles) to obtain the full list of roles after calling
+ * this function.
  *
  * N.B. this function is meant to be called once to set up the default roles.
  * Subsequent calls will result in an error if the default roles were already created.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] roles_out returns a list of default roles
- * @param[in,out] roles_len the number of roles written to the buffer.
+ * @param[out] num_default_roles_out the total number of default roles on the team
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
-                                           struct AranyaRole *roles_out,
-                                           size_t *roles_len,
+                                           size_t *num_default_roles_out,
                                            struct AranyaExtError *__ext_err);
 
 /**
@@ -1980,6 +1977,45 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   struct AranyaRole *roles_out,
                                   size_t *roles_out_len,
                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Returns only the default roles for this team.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of default roles that would have been returned to `roles_out_len`.
+ * The application can use `roles_out_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] roles_out returns a list of default roles on the team
+ * @param[in,out] roles_out_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_default_roles(const struct AranyaClient *client,
+                                      const struct AranyaTeamId *team,
+                                      struct AranyaRole *roles_out,
+                                      size_t *roles_out_len);
+
+/**
+ * Returns only the default roles for this team.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of default roles that would have been returned to `roles_out_len`.
+ * The application can use `roles_out_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] roles_out returns a list of default roles on the team
+ * @param[in,out] roles_out_len the number of roles written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_default_roles_ext(const struct AranyaClient *client,
+                                          const struct AranyaTeamId *team,
+                                          struct AranyaRole *roles_out,
+                                          size_t *roles_out_len,
+                                          struct AranyaExtError *__ext_err);
 
 /**
  * Create a role.

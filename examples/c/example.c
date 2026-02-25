@@ -385,43 +385,68 @@ AranyaError init_team(Team *t) {
     // real world scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
-    // Get list of existing roles
-    size_t team_roles_len = 1;
-    AranyaRole team_roles[team_roles_len];
-
-    err =
-        aranya_team_roles(&owner->client, &t->id, team_roles, &team_roles_len);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        return err;
-    }
-    if (team_roles_len != 1) {
-        fprintf(stderr,
-                "There should only be 1 role after creating a team but there "
-                "are %zu roles.\n",
-                team_roles_len);
-        return err;
-    }
-
-    size_t default_roles_len = DEFAULT_ROLES_LEN;
-    AranyaRole default_roles[default_roles_len];
-
-    // setup default roles.
-    err = aranya_setup_default_roles(&owner->client, &t->id, default_roles,
-                                     &default_roles_len);
+    // Setup default roles.
+    size_t num_default_roles = 0;
+    err = aranya_setup_default_roles(&owner->client, &t->id,
+                                     &num_default_roles);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set up default roles\n");
         return err;
     }
 
-    // Get the ID of the admin role.
-    AranyaRoleId admin_role_id;
-    err = get_role_id_by_name(default_roles, default_roles_len, "admin",
-                              &admin_role_id);
-    if (err != ARANYA_ERROR_SUCCESS) {
+    // Query default roles on the team. Use the BufferTooSmall retry
+    // pattern since the count is dynamic.
+    size_t roles_len = num_default_roles;
+    AranyaRole *roles = calloc(roles_len, sizeof(AranyaRole));
+    if (roles == NULL) {
+        abort();
+    }
+    err = aranya_team_default_roles(&owner->client, &t->id, (void *)roles,
+                                    &roles_len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        // No need to realloc and retry since we used the hint from
+        // setup_default_roles for the initial allocation. A mismatch
+        // means something unexpected changed.
         fprintf(stderr,
-                "unable to get 'admin' role from list of default roles\n");
+                "expected %zu default roles but found %zu\n",
+                num_default_roles, roles_len);
+        free(roles);
+        return ARANYA_ERROR_OTHER;
+    }
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to query default roles\n");
+        free(roles);
         return err;
     }
+
+    // Look up role IDs by name.
+    AranyaRoleId admin_role_id;
+    err = get_role_id_by_name(roles, roles_len, "admin", &admin_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "unable to get 'admin' role from list of roles\n");
+        free(roles);
+        return err;
+    }
+    AranyaRoleId operator_role_id;
+    err = get_role_id_by_name(roles, roles_len, "operator",
+                              &operator_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "unable to get 'operator' role from list of roles\n");
+        free(roles);
+        return err;
+    }
+    AranyaRoleId member_role_id;
+    err = get_role_id_by_name(roles, roles_len, "member",
+                              &member_role_id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "unable to get 'member' role from list of roles\n");
+        free(roles);
+        return err;
+    }
+    free(roles);
 
     // Query the admin role rank and add admin to team.
     AranyaObjectId admin_role_object_id = {.id = admin_role_id.id};
@@ -440,16 +465,6 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    // Get the ID of the operator role.
-    AranyaRoleId operator_role_id;
-    err = get_role_id_by_name(default_roles, default_roles_len, "operator",
-                              &operator_role_id);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to get 'operator' role from list of default roles\n");
-        return err;
-    }
-
     // Query the operator role rank and add operator to team.
     AranyaObjectId operator_role_object_id = {.id = operator_role_id.id};
     int64_t operator_role_rank = 0;
@@ -464,16 +479,6 @@ AranyaError init_team(Team *t) {
         &operator_role_id, operator_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
-        return err;
-    }
-
-    // Get the ID of the member role.
-    AranyaRoleId member_role_id;
-    err = get_role_id_by_name(default_roles, default_roles_len, "member",
-                              &member_role_id);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "unable to get 'member' role from list of default roles\n");
         return err;
     }
 

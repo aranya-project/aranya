@@ -13,7 +13,6 @@ use aranya_client::afc;
 use aranya_client::config::MAX_SYNC_INTERVAL;
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
-use buggy::bug;
 use tracing::{debug, error};
 
 use crate::imp;
@@ -276,11 +275,6 @@ pub const ARANYA_ID_LEN: usize = 32;
 const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_id::BaseId>());
 };
-
-// N.B. Keep in sync with the `setup_default_roles` action in
-// crates/aranya-daemon/src/policy.md.
-/// The number of roles returned from `setup_default_roles`.
-pub const DEFAULT_ROLES_LEN: usize = 3;
 
 /// Cryptographically secure Aranya ID.
 #[repr(C)]
@@ -1263,43 +1257,33 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
 /// The owner role is created automatically when the team is created,
 /// so it is not included here.
 ///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
-/// Writes the number of roles that would have been returned to `roles_len`.
+/// Returns the total number of default roles on the team in
+/// `num_default_roles_out`, including the owner role which is
+/// created automatically when the team is created. Use
+/// [`team_roles`] to obtain the full list of roles after calling
+/// this function.
 ///
 /// N.B. this function is meant to be called once to set up the default roles.
 /// Subsequent calls will result in an error if the default roles were already created.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[in] roles_out returns a list of default roles
-/// @param[in,out] roles_len the number of roles written to the buffer.
+/// @param[out] num_default_roles_out the total number of default roles on the
+///     team, which can be used as a hint to allocate a buffer before querying
+///     for default roles with [`team_default_roles`]
 ///
 /// @relates AranyaClient.
-pub unsafe fn setup_default_roles(
+pub fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
-    roles_out: *mut MaybeUninit<Role>,
-    roles_len: &mut usize,
+    num_default_roles_out: &mut usize,
 ) -> Result<(), imp::Error> {
-    let default_roles = client
+    let created_roles = client
         .rt
-        .block_on(client.inner.team(team.into()).setup_default_roles())?
-        .__into_data();
+        .block_on(client.inner.team(team.into()).setup_default_roles())?;
 
-    if DEFAULT_ROLES_LEN != default_roles.len() {
-        bug!("DEFAULT_ROLES_LEN does not match actual default roles count");
-    }
-
-    if *roles_len < default_roles.len() {
-        *roles_len = default_roles.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *roles_len = default_roles.len();
-    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
-
-    for (dst, src) in out.iter_mut().zip(default_roles) {
-        Role::init(dst, src);
-    }
+    // +1 for the owner role, which is already created at team creation time.
+    *num_default_roles_out = created_roles.iter().count() + 1;
 
     Ok(())
 }
@@ -1383,14 +1367,55 @@ pub unsafe fn team_roles(
         .block_on(client.inner.team(team.into()).roles())?
         .__into_data();
 
-    if *roles_out_len < roles.len() {
-        *roles_out_len = roles.len();
+    let count = roles.len();
+    if *roles_out_len < count {
+        *roles_out_len = count;
         return Err(imp::Error::BufferTooSmall);
     }
-    *roles_out_len = roles.len();
+    *roles_out_len = count;
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
 
     for (dst, src) in out.iter_mut().zip(roles) {
+        Role::init(dst, src);
+    }
+
+    Ok(())
+}
+
+/// Returns only the default roles for this team.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of default roles that would have been returned to `roles_out_len`.
+/// The application can use `roles_out_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[out] roles_out returns a list of default roles on the team
+/// @param[in,out] roles_out_len the number of roles written to the buffer.
+///
+/// @relates AranyaClient.
+pub unsafe fn team_default_roles(
+    client: &Client,
+    team: &TeamId,
+    roles_out: *mut MaybeUninit<Role>,
+    roles_out_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let default_roles: Vec<_> = client
+        .rt
+        .block_on(client.inner.team(team.into()).roles())?
+        .into_iter()
+        .filter(|r| r.default)
+        .collect();
+
+    let count = default_roles.len();
+    if *roles_out_len < count {
+        *roles_out_len = count;
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_out_len = count;
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
+
+    for (dst, src) in out.iter_mut().zip(default_roles) {
         Role::init(dst, src);
     }
 
