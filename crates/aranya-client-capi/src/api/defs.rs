@@ -1283,7 +1283,8 @@ pub fn setup_default_roles(
         .block_on(client.inner.team(team.into()).setup_default_roles())?;
 
     // +1 for the owner role, which is already created at team creation time.
-    *num_default_roles_out = created_roles.iter().count() + 1;
+    let count = created_roles.iter().count();
+    *num_default_roles_out = count.checked_add(1).expect("role count overflow");
 
     Ok(())
 }
@@ -1448,7 +1449,7 @@ pub fn create_role(
         client
             .inner
             .team(team.into())
-            .create_role(role_name, rank.into()),
+            .create_role(role_name, aranya_client::Rank::new(rank)),
     )?;
     Role::init(role_out, role);
     Ok(())
@@ -1689,7 +1690,7 @@ pub fn create_label_with_rank(
         client
             .inner
             .team(team.into())
-            .create_label_with_rank(name, rank.into()),
+            .create_label_with_rank(name, aranya_client::Rank::new(rank)),
     )?;
     Ok(label_id.into())
 }
@@ -1748,8 +1749,8 @@ pub fn change_rank(
         .rt
         .block_on(client.inner.team(team.into()).change_rank(
             object_id.into(),
-            old_rank.into(),
-            new_rank.into(),
+            aranya_client::Rank::new(old_rank),
+            aranya_client::Rank::new(new_rank),
         ))?;
     Ok(())
 }
@@ -2007,7 +2008,7 @@ pub unsafe fn add_device_to_team_with_rank(
         .block_on(client.inner.team(team.into()).add_device_with_rank(
             keybundle,
             role_id.map(Into::into),
-            rank.into(),
+            aranya_client::Rank::new(rank),
         ))?;
     Ok(())
 }

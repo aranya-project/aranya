@@ -43,7 +43,7 @@ pub use self::{
     device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
-    team::{Team, TeamId},
+    team::{ObjectId, Rank, Team, TeamId},
 };
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig},

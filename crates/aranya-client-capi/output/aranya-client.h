@@ -1811,7 +1811,9 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[out] num_default_roles_out the total number of default roles on the team
+ * @param[out] num_default_roles_out the total number of default roles on the
+ *     team, which can be used as a hint to allocate a buffer before querying
+ *     for default roles with [`aranya_team_default_roles`](@ref aranya_team_default_roles)
  *
  * @relates AranyaClient.
  */
@@ -1842,7 +1844,9 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[out] num_default_roles_out the total number of default roles on the team
+ * @param[out] num_default_roles_out the total number of default roles on the
+ *     team, which can be used as a hint to allocate a buffer before querying
+ *     for default roles with [`aranya_team_default_roles`](@ref aranya_team_default_roles)
  *
  * @relates AranyaClient.
  */

@@ -4,14 +4,14 @@ use anyhow::{anyhow, Context, Result};
 use aranya_client::{
     client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
     config::CreateTeamConfig,
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, ObjectId, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank, SyncPeerConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{Rank, SEED_IKM_SIZE};
+use aranya_daemon_api::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -78,7 +78,7 @@ impl DevicesCtx {
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         let admin_role_rank = owner_team
-            .query_rank(ObjectId::transmute(roles.admin().id))
+            .query_rank(roles.admin().id.into())
             .await?;
         owner_team
             .add_device_with_rank(
@@ -91,7 +91,7 @@ impl DevicesCtx {
         // Add the operator as a new device.
         info!("adding operator to team");
         let operator_role_rank = owner_team
-            .query_rank(ObjectId::transmute(roles.operator().id))
+            .query_rank(roles.operator().id.into())
             .await?;
         owner_team
             .add_device_with_rank(
@@ -104,7 +104,7 @@ impl DevicesCtx {
         // Add member A as a new device.
         info!("adding membera to team");
         let member_role_rank = owner_team
-            .query_rank(ObjectId::transmute(roles.member().id))
+            .query_rank(roles.member().id.into())
             .await?;
         owner_team
             .add_device_with_rank(

@@ -32,7 +32,6 @@ pub mod config;
 pub mod error;
 mod util;
 
-pub use aranya_daemon_api::{ObjectId, Rank};
 pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
@@ -45,8 +44,8 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle, Role,
-        RoleId, Roles, Team, TeamId,
+        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, ObjectId,
+        PublicKeyBundle, Rank, Role, RoleId, Roles, Team, TeamId,
     },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,

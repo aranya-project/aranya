@@ -284,7 +284,7 @@ async fn main() -> Result<()> {
     // setup sync peers.
     info!("adding admin to team");
     let admin_role_rank = owner_team
-        .query_rank(ObjectId::transmute(admin_role.id))
+        .query_rank(admin_role.id.into())
         .await?;
     owner_team
         .add_device_with_rank(
@@ -296,7 +296,7 @@ async fn main() -> Result<()> {
 
     info!("adding operator to team");
     let operator_role_rank = owner_team
-        .query_rank(ObjectId::transmute(operator_role.id))
+        .query_rank(operator_role.id.into())
         .await?;
     owner_team
         .add_device_with_rank(
@@ -399,7 +399,7 @@ async fn main() -> Result<()> {
     // add membera to team.
     info!("adding membera to team");
     let member_role_rank = owner_team
-        .query_rank(ObjectId::transmute(member_role.id))
+        .query_rank(member_role.id.into())
         .await?;
     owner_team
         .add_device_with_rank(
@@ -467,13 +467,12 @@ async fn main() -> Result<()> {
 
     // Demo query_rank: verify the role has the rank it was created with.
     // Note: Role ranks are immutable after creation.
-    let role_object_id = ObjectId::transmute(custom_role.id);
-    let current_rank = owner_team.query_rank(role_object_id).await?;
+    let current_rank = owner_team.query_rank(custom_role.id.into()).await?;
     info!("custom role rank: {}", current_rank);
     assert_eq!(current_rank, custom_role_rank);
 
     // Demo change_rank on a device: change the custom device's rank.
-    let device_object_id = ObjectId::transmute(custom.id);
+    let device_object_id: ObjectId = custom.id.into();
     let device_rank = owner_team.query_rank(device_object_id).await?;
     info!("custom device rank before change: {}", device_rank);
 
@@ -517,7 +516,7 @@ async fn main() -> Result<()> {
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
-    let owner_device_rank = owner_team.query_rank(ObjectId::transmute(owner.id)).await?;
+    let owner_device_rank = owner_team.query_rank(owner.id.into()).await?;
     // Label rank must be lower than the owner's device rank so the owner can operate on it.
     let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
     let label3 = owner_team
