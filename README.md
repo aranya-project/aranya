@@ -239,6 +239,8 @@ see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-start
 Find information on contributing to the Aranya project in
 [`CONTRIBUTING.md`](https://github.com/aranya-project/.github/blob/main/CONTRIBUTING.md).
 
+For development you might want to install [`pre-commit`](https://pre-commit.com/) tool to install pre-commit hooks defined in the [`.pre-commit-config.yaml`](.pre-commit-config.yaml) file - then run `pre-commit install`.
+
 ## Maintainers
 
 This repository is maintained by software engineers employed at [SpiderOak](https://spideroak.com/)
