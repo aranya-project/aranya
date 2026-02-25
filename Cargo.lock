@@ -362,7 +362,6 @@ dependencies = [
  "aranya-runtime",
  "aranya-util",
  "buggy",
- "bytes",
  "ciborium",
  "clap",
  "derive-where",
