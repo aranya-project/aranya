@@ -858,9 +858,8 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 #[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn create_team_quic_sync_config_generate(
-    cfg: &mut CreateTeamQuicSyncConfigBuilder,
+    _cfg: &mut CreateTeamQuicSyncConfigBuilder,
 ) -> Result<(), imp::Error> {
-    cfg.generate();
     Ok(())
 }
 
@@ -873,10 +872,9 @@ pub fn create_team_quic_sync_config_generate(
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn add_team_quic_sync_config_wrapped_seed(
-    cfg: &mut AddTeamQuicSyncConfigBuilder,
-    encap_seed: &[u8],
+    _cfg: &mut AddTeamQuicSyncConfigBuilder,
+    _encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed)?;
     Ok(())
 }
 
@@ -905,10 +903,9 @@ pub struct SeedIkm {
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn create_team_quic_sync_config_raw_seed_ikm(
-    cfg: &mut CreateTeamQuicSyncConfigBuilder,
-    ikm: &SeedIkm,
+    _cfg: &mut CreateTeamQuicSyncConfigBuilder,
+    _ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
@@ -921,10 +918,9 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn add_team_quic_sync_config_raw_seed_ikm(
-    cfg: &mut AddTeamQuicSyncConfigBuilder,
-    ikm: &SeedIkm,
+    _cfg: &mut AddTeamQuicSyncConfigBuilder,
+    _ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
@@ -944,11 +940,9 @@ pub fn add_team_quic_sync_config_raw_seed_ikm(
 #[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn create_team_quic_sync_config_build(
-    cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
+    _cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
+    _out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -968,11 +962,9 @@ pub fn create_team_quic_sync_config_build(
 #[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn add_team_quic_sync_config_build(
-    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
+    _cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
+    _out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -1035,12 +1027,9 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 #[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn add_team_config_builder_set_quic_syncer(
-    cfg: &mut AddTeamConfigBuilder,
-    quic: OwnedPtr<AddTeamQuicSyncConfig>,
+    _cfg: &mut AddTeamConfigBuilder,
+    _quic: OwnedPtr<AddTeamQuicSyncConfig>,
 ) {
-    // SAFETY: the user is responsible for passing in a valid AddTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
 }
 
 /// Configures team ID field for [`AddTeamConfigBuilder`].
@@ -1100,12 +1089,9 @@ pub fn add_team_config_build(
 #[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[allow(deprecated)]
 pub fn create_team_config_builder_set_quic_syncer(
-    cfg: &mut CreateTeamConfigBuilder,
-    quic: OwnedPtr<CreateTeamQuicSyncConfig>,
+    _cfg: &mut CreateTeamConfigBuilder,
+    _quic: OwnedPtr<CreateTeamQuicSyncConfig>,
 ) {
-    // SAFETY: the user is responsible for passing in a valid CreateTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
 }
 
 /// Attempts to construct a [`CreateTeamConfig`].

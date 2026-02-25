@@ -11,8 +11,7 @@ use aranya_client::{
 // These deprecated types are only used in create_and_add_team for backward compatibility testing.
 #[allow(deprecated)]
 use aranya_client::{
-    config::{CreateTeamConfig, SEED_IKM_SIZE},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
@@ -188,7 +187,7 @@ impl DevicesCtx {
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         let seed_ikm = {
-            let mut buf = [0; SEED_IKM_SIZE];
+            let mut buf = [0; _];
             self.owner.client.rand(&mut buf).await;
             buf
         };

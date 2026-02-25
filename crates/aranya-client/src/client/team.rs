@@ -54,6 +54,7 @@ impl Team<'_> {
     ///
     /// This method is deprecated. With mTLS authentication, PSK seeds are no longer used.
     /// Returns an empty vector for backward compatibility.
+    #[deprecated]
     #[instrument(skip(self))]
     pub async fn encrypt_psk_seed_for_peer(&self, _peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         // With mTLS authentication, PSK seeds are no longer used.

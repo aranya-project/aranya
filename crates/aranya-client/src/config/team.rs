@@ -16,8 +16,8 @@ use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 pub mod quic_sync;
 #[allow(deprecated)]
 pub use quic_sync::{
-    AddSeedMode, AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateSeedMode,
-    CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder, SEED_IKM_SIZE,
+    AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfigBuilder,
 };
 
 /// Builder for [`CreateTeamConfig`].
@@ -26,11 +26,9 @@ pub use quic_sync::{
 ///
 /// This type is deprecated. With mTLS authentication, config types are no longer needed.
 #[deprecated(note = "Config types are no longer needed with mTLS authentication")]
-#[allow(deprecated)]
+#[non_exhaustive]
 #[derive(Debug, Default)]
-pub struct CreateTeamConfigBuilder {
-    quic_sync: Option<CreateTeamQuicSyncConfig>,
-}
+pub struct CreateTeamConfigBuilder {}
 
 #[allow(deprecated)]
 impl CreateTeamConfigBuilder {
@@ -39,17 +37,14 @@ impl CreateTeamConfigBuilder {
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
     #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
-    pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
+    pub fn quic_sync(self, _cfg: CreateTeamQuicSyncConfig) -> Self {
         self
     }
 
     /// Builds the configuration for creating a new team.
     #[deprecated(note = "Config types are no longer needed with mTLS authentication")]
     pub fn build(self) -> Result<CreateTeamConfig> {
-        Ok(CreateTeamConfig {
-            quic_sync: self.quic_sync,
-        })
+        Ok(CreateTeamConfig {})
     }
 }
 
@@ -60,11 +55,10 @@ impl CreateTeamConfigBuilder {
 /// This type is deprecated. With mTLS authentication, use the team ID directly
 /// instead of this config type.
 #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
-#[allow(deprecated)]
+#[non_exhaustive]
 #[derive(Debug, Default)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
 #[allow(deprecated)]
@@ -81,8 +75,7 @@ impl AddTeamConfigBuilder {
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
     #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
-    pub fn quic_sync(mut self, cfg: AddTeamQuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
+    pub fn quic_sync(self, _cfg: AddTeamQuicSyncConfig) -> Self {
         self
     }
 
@@ -96,10 +89,7 @@ impl AddTeamConfigBuilder {
             ))
         })?;
 
-        Ok(AddTeamConfig {
-            id,
-            quic_sync: self.quic_sync,
-        })
+        Ok(AddTeamConfig { id })
     }
 }
 
@@ -109,14 +99,9 @@ impl AddTeamConfigBuilder {
 ///
 /// This type is deprecated. With mTLS authentication, config types are no longer needed.
 #[deprecated(note = "Config types are no longer needed with mTLS authentication")]
-#[allow(deprecated)]
+#[non_exhaustive]
 #[derive(Clone, Debug, Default)]
-pub struct CreateTeamConfig {
-    // Field is unused because PSK seeds are deprecated with mTLS authentication.
-    // Kept for backward compatibility with existing API consumers.
-    #[allow(dead_code)]
-    quic_sync: Option<CreateTeamQuicSyncConfig>,
-}
+pub struct CreateTeamConfig {}
 
 #[allow(deprecated)]
 impl CreateTeamConfig {
@@ -134,14 +119,10 @@ impl CreateTeamConfig {
 /// This type is deprecated. With mTLS authentication, use the team ID directly
 /// instead of this config type.
 #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
-#[allow(deprecated)]
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub struct AddTeamConfig {
     pub(crate) id: TeamId,
-    // Field is unused because PSK seeds are deprecated with mTLS authentication.
-    // Kept for backward compatibility with existing API consumers.
-    #[allow(dead_code)]
-    quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
 #[allow(deprecated)]

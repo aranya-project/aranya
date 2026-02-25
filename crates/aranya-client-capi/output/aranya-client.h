@@ -1216,7 +1216,7 @@ AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCre
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg);
+AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg);
 
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
@@ -1230,7 +1230,7 @@ AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeam
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
+AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
                                                              struct AranyaExtError *__ext_err);
 
 /**
@@ -1242,9 +1242,9 @@ AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreate
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
-AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
-                                                          const uint8_t *encap_seed,
-                                                          size_t encap_seed_len);
+AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
+                                                          const uint8_t *_encap_seed,
+                                                          size_t _encap_seed_len);
 
 /**
  * Attempts to set wrapped PSK seed value on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
@@ -1255,9 +1255,9 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQu
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
-AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
-                                                              const uint8_t *encap_seed,
-                                                              size_t encap_seed_len,
+AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
+                                                              const uint8_t *_encap_seed,
+                                                              size_t _encap_seed_len,
                                                               struct AranyaExtError *__ext_err);
 
 /**
@@ -1269,8 +1269,8 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTe
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
-AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
-                                                             const struct AranyaSeedIkm *ikm);
+AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
+                                                             const struct AranyaSeedIkm *_ikm);
 
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder).
@@ -1281,8 +1281,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreate
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
-AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
-                                                                 const struct AranyaSeedIkm *ikm,
+AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
+                                                                 const struct AranyaSeedIkm *_ikm,
                                                                  struct AranyaExtError *__ext_err);
 
 /**
@@ -1294,8 +1294,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCr
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
-AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
-                                                          const struct AranyaSeedIkm *ikm);
+AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
+                                                          const struct AranyaSeedIkm *_ikm);
 
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
@@ -1306,8 +1306,8 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQu
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
-AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
-                                                              const struct AranyaSeedIkm *ikm,
+AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
+                                                              const struct AranyaSeedIkm *_ikm,
                                                               struct AranyaExtError *__ext_err);
 
 /**
@@ -1326,8 +1326,8 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTe
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
-                                                      struct AranyaCreateTeamQuicSyncConfig *out);
+AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
+                                                      struct AranyaCreateTeamQuicSyncConfig *_out);
 
 /**
  * Attempts to construct a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
@@ -1345,8 +1345,8 @@ AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQui
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *cfg,
-                                                          struct AranyaCreateTeamQuicSyncConfig *out,
+AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
+                                                          struct AranyaCreateTeamQuicSyncConfig *_out,
                                                           struct AranyaExtError *__ext_err);
 
 /**
@@ -1365,8 +1365,8 @@ AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTea
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
-                                                   struct AranyaAddTeamQuicSyncConfig *out);
+AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
+                                                   struct AranyaAddTeamQuicSyncConfig *_out);
 
 /**
  * Attempts to construct an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
@@ -1384,8 +1384,8 @@ AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncC
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_add_team_quic_sync_config_build_ext(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
-                                                       struct AranyaAddTeamQuicSyncConfig *out,
+AranyaError aranya_add_team_quic_sync_config_build_ext(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
+                                                       struct AranyaAddTeamQuicSyncConfig *_out,
                                                        struct AranyaExtError *__ext_err);
 
 /**
@@ -1441,8 +1441,8 @@ AranyaError aranya_create_team_config_builder_cleanup(struct AranyaCreateTeamCon
  * @relates AranyaAddTeamConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamConfigBuilder *cfg,
-                                                           struct AranyaAddTeamQuicSyncConfig *quic);
+AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamConfigBuilder *_cfg,
+                                                           struct AranyaAddTeamQuicSyncConfig *_quic);
 
 /**
  * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
@@ -1459,8 +1459,8 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  * @relates AranyaAddTeamConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddTeamConfigBuilder *cfg,
-                                                               struct AranyaAddTeamQuicSyncConfig *quic,
+AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddTeamConfigBuilder *_cfg,
+                                                               struct AranyaAddTeamQuicSyncConfig *_quic,
                                                                struct AranyaExtError *__ext_err);
 
 /**
@@ -1554,8 +1554,8 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  * @relates AranyaCreateTeamConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreateTeamConfigBuilder *cfg,
-                                                              struct AranyaCreateTeamQuicSyncConfig *quic);
+AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreateTeamConfigBuilder *_cfg,
+                                                              struct AranyaCreateTeamQuicSyncConfig *_quic);
 
 /**
  * Configures QUIC syncer for [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder).
@@ -1572,8 +1572,8 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  * @relates AranyaCreateTeamConfigBuilder.
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
-AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaCreateTeamConfigBuilder *cfg,
-                                                                  struct AranyaCreateTeamQuicSyncConfig *quic,
+AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaCreateTeamConfigBuilder *_cfg,
+                                                                  struct AranyaCreateTeamQuicSyncConfig *_quic,
                                                                   struct AranyaExtError *__ext_err);
 
 /**
