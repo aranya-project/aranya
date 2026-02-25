@@ -887,7 +887,6 @@ pub fn add_team_quic_sync_config_wrapped_seed(
 /// With mTLS authentication, PSK seeds are no longer used for QUIC sync.
 /// This type exists for backward compatibility but will be removed in a future release.
 /// The functions using this type are deprecated.
-#[expect(deprecated)]
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct SeedIkm {
