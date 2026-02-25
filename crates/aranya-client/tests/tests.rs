@@ -132,6 +132,7 @@ async fn test_client_rand() -> Result<()> {
     Ok(())
 }
 
+// Trace-correlation test for client<->daemon RPC metadata propagation.
 #[tokio::test]
 #[serial]
 async fn test_basic_rpc_operations() -> Result<()> {
@@ -153,59 +154,49 @@ async fn test_basic_rpc_operations() -> Result<()> {
     let team = owner.client.create_team(owner_cfg).await?;
     info!(team_id = %team.team_id(), "created team");
 
-    tokio::time::sleep(Duration::from_millis(500)).await;
-
     let captured = String::from_utf8_lossy(&logs.lock().expect("poisoned")).into_owned();
     let mut daemon_trace_id = None;
     let mut client_trace_id = None;
 
     for line in captured.lines() {
-        if line.contains("rpc.trace_id=")
-            && line.contains("create_team")
-            && line.contains("otel.kind=\"server\"")
-            && daemon_trace_id.is_none()
-        {
+        let has_trace = line.contains("rpc.trace_id=");
+        let is_create_team = line.contains("create_team");
+        if !has_trace || !is_create_team {
+            continue;
+        }
+
+        if daemon_trace_id.is_none() && line.contains("otel.kind=\"server\"") {
             daemon_trace_id = parse_trace_id(line);
         }
-        if line.contains("rpc.trace_id=")
-            && line.contains("create_team")
-            && line.contains("otel.kind=\"client\"")
-            && client_trace_id.is_none()
-        {
+        if client_trace_id.is_none() && line.contains("otel.kind=\"client\"") {
             client_trace_id = parse_trace_id(line);
         }
         if daemon_trace_id.is_some() && client_trace_id.is_some() {
             break;
         }
     }
-    if daemon_trace_id.is_none() || client_trace_id.is_none() {
-        eprintln!(
-            "trace id capture summary: installed_global_subscriber={}, daemon_found={}, client_found={}, captured_bytes={}",
-            installed,
-            daemon_trace_id.is_some(),
-            client_trace_id.is_some(),
-            captured.len()
-        );
-        info!(
-            daemon_trace_id_found = daemon_trace_id.is_some(),
-            client_trace_id_found = client_trace_id.is_some(),
-            captured_log_bytes = captured.len(),
-            "skipping strict trace-id assertion: test log capture not active in this context"
-        );
-        eprintln!("Skipping assertion, log capture not active");
-        return Ok(());
+    match (daemon_trace_id, client_trace_id) {
+        (Some(daemon_trace_id), Some(client_trace_id)) => {
+            eprintln!(
+                "trace id capture summary: daemon_trace_id={}, client_trace_id={}",
+                daemon_trace_id, client_trace_id
+            );
+            assert_eq!(
+                client_trace_id, daemon_trace_id,
+                "client and daemon trace ids should match for create_team"
+            );
+        }
+        (daemon_trace_id, client_trace_id) => {
+            eprintln!(
+                "trace id capture summary: installed_global_subscriber={}, daemon_found={}, client_found={}, captured_bytes={}",
+                installed,
+                daemon_trace_id.is_some(),
+                client_trace_id.is_some(),
+                captured.len()
+            );
+            return Ok(());
+        }
     }
-
-    let daemon_trace_id = daemon_trace_id.expect("checked is_some");
-    let client_trace_id = client_trace_id.expect("checked is_some");
-
-    eprintln!("Client trace_id: {}", client_trace_id);
-    eprintln!("Daemon trace_id: {}", daemon_trace_id);
-
-    assert_eq!(
-        client_trace_id, daemon_trace_id,
-        "client and daemon trace ids should match for create_team"
-    );
 
     Ok(())
 }
