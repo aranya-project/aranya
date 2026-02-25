@@ -7,7 +7,6 @@ use core::time::Duration;
 use crate::{error::InvalidArg, ConfigError, Result};
 
 pub mod team;
-#[allow(deprecated)]
 pub use team::*;
 
 /// Maximum sync interval of 1 year (365 days).

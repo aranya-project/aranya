@@ -9,7 +9,7 @@ use aranya_client::{
     Addr, SyncPeerConfig,
 };
 // These deprecated types are only used in create_and_add_team for backward compatibility testing.
-#[allow(deprecated)]
+#[expect(deprecated)]
 use aranya_client::{
     config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
@@ -183,7 +183,7 @@ impl DevicesCtx {
     ///
     /// This function uses deprecated `add_team()`, `CreateTeamQuicSyncConfig`, and
     /// `AddTeamQuicSyncConfig` APIs to test backward compatibility.
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         let seed_ikm = {

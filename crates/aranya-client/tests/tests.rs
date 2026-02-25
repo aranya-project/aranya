@@ -20,7 +20,7 @@ use aranya_client::{
     config::{HelloSubscriptionConfig, SyncPeerConfig},
 };
 // These deprecated types are only used in test_add_team for backward compatibility testing.
-#[allow(deprecated)]
+#[expect(deprecated)]
 use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
 };
@@ -612,7 +612,7 @@ async fn test_query_functions() -> Result<()> {
 /// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
 /// to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
-#[allow(deprecated)]
+#[expect(deprecated)]
 async fn test_deprecated_create_and_add_team() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_deprecated_create_and_add_team").await?;

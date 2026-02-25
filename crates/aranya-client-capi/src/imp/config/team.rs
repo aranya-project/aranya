@@ -1,6 +1,6 @@
 // Allow deprecated types in this module - it provides backward compatibility
 // for the deprecated team config types during the mTLS migration.
-#![allow(deprecated)]
+#![expect(deprecated)]
 
 use core::mem::MaybeUninit;
 

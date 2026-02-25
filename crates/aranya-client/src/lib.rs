@@ -43,7 +43,7 @@ pub use crate::client::KeyBundle;
 #[doc(inline)]
 pub use crate::client::{Permission, RoleManagementPermission};
 // Re-export deprecated config types for backward compatibility
-#[allow(deprecated)]
+#[expect(deprecated)]
 #[doc(inline)]
 pub use crate::config::{
     AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,

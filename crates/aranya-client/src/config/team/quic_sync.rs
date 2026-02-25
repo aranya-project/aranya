@@ -9,7 +9,7 @@
 //! Note: With mTLS authentication, PSK seeds are no longer used.
 //! These types exist for backward compatibility but are ignored internally.
 
-#![allow(deprecated)]
+#![expect(deprecated)]
 
 use crate::Result;
 
@@ -44,7 +44,7 @@ impl CreateTeamQuicSyncConfig {
 #[derive(Clone, Debug)]
 pub struct AddTeamQuicSyncConfig {}
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl AddTeamQuicSyncConfig {
     /// Creates a new builder for team member addition configuration.
     #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
@@ -97,7 +97,7 @@ impl CreateTeamQuicSyncConfigBuilder {
 #[derive(Debug, Default)]
 pub struct AddTeamQuicSyncConfigBuilder {}
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl AddTeamQuicSyncConfigBuilder {
     /// Sets the seed mode to 'IKM'.
     ///

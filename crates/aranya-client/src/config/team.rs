@@ -14,7 +14,7 @@
 use crate::{client::TeamId, error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
-#[allow(deprecated)]
+#[expect(deprecated)]
 pub use quic_sync::{
     AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig,
     CreateTeamQuicSyncConfigBuilder,
@@ -30,7 +30,7 @@ pub use quic_sync::{
 #[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {}
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl CreateTeamConfigBuilder {
     /// Configures the quic_sync config..
     ///
@@ -61,7 +61,7 @@ pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
 }
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl AddTeamConfigBuilder {
     /// Sets the ID of the team to add.
     #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
@@ -103,7 +103,7 @@ impl AddTeamConfigBuilder {
 #[derive(Clone, Debug, Default)]
 pub struct CreateTeamConfig {}
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl CreateTeamConfig {
     /// Creates a default [`CreateTeamConfigBuilder`].
     #[deprecated(note = "Config types are no longer needed with mTLS authentication")]
@@ -125,7 +125,7 @@ pub struct AddTeamConfig {
     pub(crate) id: TeamId,
 }
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl AddTeamConfig {
     /// Creates a default [`AddTeamConfigBuilder`].
     #[deprecated(note = "Use `Client::team` instead - config types are no longer needed with mTLS")]
