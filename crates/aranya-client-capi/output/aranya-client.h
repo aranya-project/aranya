@@ -562,11 +562,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfig {
 
 /**
  * A builder for initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
- *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, use the team ID directly
- * instead of this config type.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfigBuilder {
     /**
@@ -579,10 +574,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfigBuilder {
 
 /**
  * A builder for initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
- *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, config types are no longer needed.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfigBuilder {
     /**
@@ -604,11 +595,6 @@ typedef struct AranyaTeamId {
  * Team configuration used when joining a team.
  *
  * Use an [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder) to construct this object.
- *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, use the team ID directly
- * instead of this config type.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfig {
     /**
@@ -623,10 +609,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfig {
  * Team configuration used when creating a team.
  *
  * Use a [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder) to construct this object.
- *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, config types are no longer needed.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfig {
     /**
@@ -1471,13 +1453,8 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddT
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] id a pointer to a
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, use the team ID directly.
- *
  * @relates AranyaAddTeamConfigBuilder.
  */
-ARANYA_DEPRECATED_MSG("Use team ID directly - config types are no longer needed with mTLS")
 AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuilder *cfg,
                                                   const struct AranyaTeamId *team_id);
 
@@ -1489,13 +1466,8 @@ AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuil
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] id a pointer to a
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, use the team ID directly.
- *
  * @relates AranyaAddTeamConfigBuilder.
  */
-ARANYA_DEPRECATED_MSG("Use team ID directly - config types are no longer needed with mTLS")
 AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfigBuilder *cfg,
                                                       const struct AranyaTeamId *team_id,
                                                       struct AranyaExtError *__ext_err);
@@ -1509,13 +1481,8 @@ AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfig
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, use the team ID directly.
- *
  * @relates AranyaAddTeamConfigBuilder.
  */
-ARANYA_DEPRECATED_MSG("Use team ID directly - config types are no longer needed with mTLS")
 AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
                                          struct AranyaAddTeamConfig *out);
 
@@ -1528,13 +1495,8 @@ AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, use the team ID directly.
- *
  * @relates AranyaAddTeamConfigBuilder.
  */
-ARANYA_DEPRECATED_MSG("Use team ID directly - config types are no longer needed with mTLS")
 AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *cfg,
                                              struct AranyaAddTeamConfig *out,
                                              struct AranyaExtError *__ext_err);
@@ -1585,13 +1547,8 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaC
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, config types are no longer needed.
- *
  * @relates AranyaCreateTeamConfigBuilder.
  */
-ARANYA_DEPRECATED_MSG("Config types are no longer needed with mTLS authentication")
 AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder *cfg,
                                             struct AranyaCreateTeamConfig *out);
 
@@ -1604,13 +1561,8 @@ AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder
  * @param[in] cfg a pointer to the team config builder
  * @param[out] out a pointer to write the team config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, config types are no longer needed.
- *
  * @relates AranyaCreateTeamConfigBuilder.
  */
-ARANYA_DEPRECATED_MSG("Config types are no longer needed with mTLS authentication")
 AranyaError aranya_create_team_config_build_ext(struct AranyaCreateTeamConfigBuilder *cfg,
                                                 struct AranyaCreateTeamConfig *out,
                                                 struct AranyaExtError *__ext_err);
@@ -2810,14 +2762,8 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(const struct AranyaClient *clie
  * @param[in] client the Aranya Client
  * @param[in] cfg the Team Configuration
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, use the team ID directly
- * instead of adding teams via config.
- *
  * @relates AranyaClient.
  */
-ARANYA_DEPRECATED_MSG("Use team ID directly - add_team is no longer needed with mTLS")
 AranyaError aranya_add_team(const struct AranyaClient *client,
                             const struct AranyaAddTeamConfig *cfg);
 
@@ -2827,14 +2773,8 @@ AranyaError aranya_add_team(const struct AranyaClient *client,
  * @param[in] client the Aranya Client
  * @param[in] cfg the Team Configuration
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, use the team ID directly
- * instead of adding teams via config.
- *
  * @relates AranyaClient.
  */
-ARANYA_DEPRECATED_MSG("Use team ID directly - add_team is no longer needed with mTLS")
 AranyaError aranya_add_team_ext(const struct AranyaClient *client,
                                 const struct AranyaAddTeamConfig *cfg,
                                 struct AranyaExtError *__ext_err);

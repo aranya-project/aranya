@@ -8,7 +8,9 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{afc, text, Addr, ChanOp, Client, DeviceId, PublicKeyBundle};
+use aranya_client::{
+    afc, text, AddTeamConfig, Addr, ChanOp, Client, CreateTeamConfig, DeviceId, PublicKeyBundle,
+};
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::{
@@ -254,7 +256,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let owner = ctx
         .owner
         .client
-        .create_team(Default::default())
+        .create_team(CreateTeamConfig::default())
         .await
         .context("expected to create team")?;
     let team_id = owner.team_id();
@@ -285,12 +287,13 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no member role"))?
         .clone();
 
-    // With mTLS, devices can use the team ID directly without add_team.
+    let add_team_cfg = AddTeamConfig::builder().team_id(team_id).build()?;
+
     // TODO: Delegate to admin and operator.
-    let _admin = ctx.admin.client.team(team_id);
-    let _operator = ctx.operator.client.team(team_id);
-    let membera = ctx.membera.client.team(team_id);
-    let memberb = ctx.memberb.client.team(team_id);
+    let _admin = ctx.admin.client.add_team(add_team_cfg.clone()).await?;
+    let _operator = ctx.operator.client.add_team(add_team_cfg.clone()).await?;
+    let membera = ctx.membera.client.add_team(add_team_cfg.clone()).await?;
+    let memberb = ctx.memberb.client.add_team(add_team_cfg).await?;
 
     // get sync addresses.
     let owner_addr = ctx.owner.aranya_local_addr().await?;

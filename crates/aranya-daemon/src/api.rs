@@ -513,6 +513,15 @@ impl DaemonApi for Api {
     // Local team management
     //
 
+    #[instrument(skip(self))]
+    async fn add_team(self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
+        let team = cfg.team_id;
+        self.check_team_valid(team).await?;
+
+        // TODO(jdygert): Mark team usable
+        Ok(())
+    }
+
     #[instrument(skip(self), err)]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         self.client
@@ -525,7 +534,11 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn create_team(self, _: context::Context) -> api::Result<api::TeamId> {
+    async fn create_team(
+        self,
+        _: context::Context,
+        cfg: api::CreateTeamConfig,
+    ) -> api::Result<api::TeamId> {
         info!("create_team");
 
         let nonce = &mut [0u8; 16];
@@ -538,6 +551,8 @@ impl DaemonApi for Api {
             .context("unable to create team")?;
         debug!(?graph_id);
         let team_id = api::TeamId::transmute(graph_id);
+
+        // TODO(jdygert): Mark team usable
 
         Ok(team_id)
     }

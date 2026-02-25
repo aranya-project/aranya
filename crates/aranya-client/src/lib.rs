@@ -46,8 +46,7 @@ pub use crate::client::{Permission, RoleManagementPermission};
 #[expect(deprecated)]
 #[doc(inline)]
 pub use crate::config::{
-    AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
 };
 #[cfg(feature = "preview")]
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
@@ -59,6 +58,9 @@ pub use crate::{
         ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle, Role,
         RoleId, Roles, Team, TeamId,
     },
-    config::{SyncPeerConfig, SyncPeerConfigBuilder},
+    config::{
+        AddTeamConfig, AddTeamConfigBuilder, CreateTeamConfig, CreateTeamConfigBuilder,
+        SyncPeerConfig, SyncPeerConfigBuilder,
+    },
     error::{ConfigError, Error, Result},
 };

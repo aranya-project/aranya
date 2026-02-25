@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{afc::Channels, Client, SyncPeerConfig};
+use aranya_client::{afc::Channels, AddTeamConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     get_member_peer,
@@ -55,10 +55,15 @@ async fn main() -> Result<()> {
     let team_info: TeamInfo = onboard.recv().await?;
     info!("membera: received team info from owner");
 
-    // Get team handle.
-    // With mTLS authentication, devices authenticate via certificates configured in the daemon.
-    let team = client.team(team_info.team_id);
-    info!("membera: got team handle");
+    // Add team.
+    let add_team_cfg = AddTeamConfig::builder()
+        .team_id(team_info.team_id)
+        .build()?;
+    let team = client
+        .add_team(add_team_cfg)
+        .await
+        .expect("expected to add team");
+    info!("membera: added team");
 
     // Send device info to owner.
     info!("membera: sending device info to owner");

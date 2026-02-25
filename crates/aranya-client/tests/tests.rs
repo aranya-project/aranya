@@ -17,12 +17,7 @@ use std::{ptr, time::Duration};
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::{ChanOp, Permission, RoleId, RoleManagementPermission},
-    config::{HelloSubscriptionConfig, SyncPeerConfig},
-};
-// These deprecated types are only used in test_add_team for backward compatibility testing.
-#[expect(deprecated)]
-use aranya_client::{
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    config::{AddTeamConfig, CreateTeamConfig, HelloSubscriptionConfig, SyncPeerConfig},
 };
 use aranya_daemon_api::text;
 use test_log::test;
@@ -220,7 +215,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     let owner = devices
         .owner
         .client
-        .create_team(Default::default())
+        .create_team(CreateTeamConfig::default())
         .await
         .expect("expected to create team");
     let team_id = owner.team_id();
@@ -248,6 +243,13 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     // Add the admin as a new device.
     info!("adding admin to team");
     owner.add_device(devices.admin.pk.clone(), None).await?;
+
+    // Add team to admin device.
+    devices
+        .admin
+        .client
+        .add_team(AddTeamConfig::builder().team_id(team_id).build()?)
+        .await?;
 
     // Admin sync with owner.
     admin_team
@@ -609,13 +611,14 @@ async fn test_query_functions() -> Result<()> {
 /// Tests add_team() by demonstrating that syncing can only occur after
 /// a peer calls the add_team() API.
 ///
-/// This test uses deprecated `add_team()` and `encrypt_psk_seed_for_peer()` APIs
-/// to verify backward compatibility.
+/// This test uses deprecated APIs to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[expect(deprecated)]
-async fn test_deprecated_create_and_add_team() -> Result<()> {
+async fn test_create_and_add_team() -> Result<()> {
+    use aranya_client::{AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig};
+
     // Set up our team context so we can run the test.
-    let devices = DevicesCtx::new("test_deprecated_create_and_add_team").await?;
+    let devices = DevicesCtx::new("test_create_and_add_team").await?;
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -650,10 +653,23 @@ async fn test_deprecated_create_and_add_team() -> Result<()> {
         .assign_role(roles.admin().id)
         .await?;
 
-    // Note: With mTLS, sync_now will succeed even without add_team() being called,
-    // because authentication is handled via certificates. However, the admin won't
-    // have the PSK seed needed for the deprecated PSK-based sync flow.
-    // This test verifies the deprecated add_team() API still works for backward compatibility.
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    {
+        let admin = devices.admin.client.team(team_id);
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        let err = admin
+            .device(devices.operator.id)
+            .assign_role(roles.operator().id)
+            .await
+            .expect_err("role assignment should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+    }
 
     let admin_seed = owner
         .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
@@ -761,7 +777,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team1 = devices
         .owner
         .client
-        .create_team(Default::default())
+        .create_team(CreateTeamConfig::default())
         .await
         .expect("expected to create team1");
     let team_id1 = team1.team_id();
@@ -771,7 +787,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team2 = devices
         .owner
         .client
-        .create_team(Default::default())
+        .create_team(CreateTeamConfig::default())
         .await
         .expect("expected to create team2");
     let team_id2 = team2.team_id();
@@ -811,33 +827,73 @@ async fn test_multi_team_sync() -> Result<()> {
         .assign_role(roles2.admin().id)
         .await?;
 
-    // With mTLS, admin can sync with team1 without calling add_team.
-    let admin1 = devices.admin.client.team(team_id1);
-    admin1
-        .sync_now(owner_addr, None)
-        .await
-        .context("admin unable to sync team1 with owner")?;
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    {
+        let admin = devices.admin.client.team(team_id1);
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing team1 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
-    // Admin should be able to assign a role on team1 after syncing.
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        let err = admin
+            .device(devices.operator.id)
+            .assign_role(roles1.operator().id)
+            .await
+            .expect_err("role assignment on team1 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+    }
+
+    devices
+        .admin
+        .client
+        .add_team(AddTeamConfig::builder().team_id(team_id1).build()?)
+        .await?;
+
+    let admin1 = devices.admin.client.team(team_id1);
+    admin1.sync_now(owner_addr, None).await?;
+
+    // Now we should be able to successfully assign a role.
     admin1
         .device(devices.operator.id)
         .assign_role(roles1.operator().id)
         .await
-        .context("admin unable to assign operator role on team1")?;
+        .context("Assigning a role should not fail here!")?;
 
-    // With mTLS, admin can sync with team2 without calling add_team.
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    {
+        let admin = devices.admin.client.team(team_id2);
+        let err = admin
+            .sync_now(owner_addr, None)
+            .await
+            .expect_err("syncing team2 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        let err = admin
+            .device(devices.operator.id)
+            .assign_role(roles2.operator().id)
+            .await
+            .expect_err("role assignment on team2 should fail before add_team()");
+        assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
+    }
+
+    devices
+        .admin
+        .client
+        .add_team(AddTeamConfig::builder().team_id(team_id2).build()?)
+        .await?;
+
     let admin2 = devices.admin.client.team(team_id2);
-    admin2
-        .sync_now(owner_addr, None)
-        .await
-        .context("admin unable to sync team2 with owner")?;
+    admin2.sync_now(owner_addr, None).await?;
 
-    // Admin should be able to assign a role on team2 after syncing.
+    // Now we should be able to successfully assign a role.
     admin2
         .device(devices.operator.id)
         .assign_role(roles2.operator().id)
         .await
-        .context("admin unable to assign operator role on team2")?;
+        .context("Assigning a role should not fail here!")?;
 
     Ok(())
 }
@@ -1359,6 +1415,10 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     )
     .await?;
     owner_team.add_device(device.pk.clone(), None).await?;
+    device
+        .client
+        .add_team(AddTeamConfig::builder().team_id(team_id).build()?)
+        .await?;
 
     // Owner creates malicious role on team:
     let role = owner_team

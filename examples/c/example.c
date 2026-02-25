@@ -420,6 +420,44 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
+    // add_team() for each non-owner device
+    for (int i = 1; i < NUM_CLIENTS; i++) {
+        printf("add_team() client: %s\n", client_names[i]);
+
+        AranyaTeamId team_id_from_peer = t->id;
+
+        AranyaAddTeamConfigBuilder build;
+        err = aranya_add_team_config_builder_init(&build);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder`\n");
+            return err;
+        }
+
+        err = aranya_add_team_config_builder_set_id(&build, &team_id_from_peer);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `Id` for `AranyaAddTeamConfigBuilder`\n");
+            return err;
+        }
+
+        // NB: A builder's "_build" method consumes the builder, so
+        // do _not_ call "_cleanup" afterward.
+        AranyaAddTeamConfig cfg;
+        err = aranya_add_team_config_build(&build, &cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaAddTeamConfig`\n");
+            return err;
+        }
+
+        Client *client = &t->clients_arr[i];
+        err = aranya_add_team(&client->client, &cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to add_team() for client: %s\n",
+                    client_names[i]);
+            return err;
+        }
+    }
+
     // assign role management permissions.
     err = aranya_assign_role_management_permission(
         &owner->client, &t->id, &operator_role_id, &admin_role_id,

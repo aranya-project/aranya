@@ -9,7 +9,7 @@ use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, PublicKeyBundle},
-    text, Addr, SyncPeerConfig,
+    text, AddTeamConfig, Addr, CreateTeamConfig, SyncPeerConfig,
 };
 #[cfg(feature = "preview")]
 use aranya_client::{HelloSubscriptionConfig, Permission, RoleManagementPermission};
@@ -291,7 +291,7 @@ async fn main() -> Result<()> {
     info!("creating team");
     let owner_team = owner
         .client
-        .create_team(Default::default())
+        .create_team(CreateTeamConfig::default())
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
@@ -324,12 +324,12 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no member role"))?
         .clone();
 
-    // Get team handles for each client.
-    // With mTLS authentication, devices authenticate via certificates configured in the daemon.
-    let admin_team = admin.client.team(team_id);
-    let operator_team = operator.client.team(team_id);
-    let membera_team = membera.client.team(team_id);
-    let memberb_team = memberb.client.team(team_id);
+    let add_team_cfg = AddTeamConfig::builder().team_id(team_id).build()?;
+
+    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
+    let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
+    let memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
     // setup sync peers.
     info!("adding admin to team");
