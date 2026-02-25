@@ -1,4 +1,4 @@
-//! Aranya multi-node example lib.
+//! Aranya onboarding example lib.
 
 pub mod config;
 pub mod env;

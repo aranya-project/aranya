@@ -68,6 +68,16 @@ impl DevicesCtx {
         team_id: TeamId,
         roles: &DefaultRoles,
     ) -> Result<()> {
+        self.add_all_device_roles_with_delegation(team_id, roles, true)
+            .await
+    }
+
+    pub async fn add_all_device_roles_with_delegation(
+        &mut self,
+        team_id: TeamId,
+        roles: &DefaultRoles,
+        has_delegation: bool,
+    ) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let owner_team = self.owner.client.team(team_id);
         let admin_team = self.admin.client.team(team_id);
@@ -98,23 +108,38 @@ impl DevicesCtx {
             .await?;
 
         // Add member A as a new device.
+        // Without delegation, admin doesn't have CanAssignRole(member),
+        // so owner must add members directly.
         info!("adding membera to team");
-        admin_team
+        let member_adder = if has_delegation {
+            &admin_team
+        } else {
+            &owner_team
+        };
+        member_adder
             .add_device(self.membera.pk.clone(), Some(roles.member().id))
             .await?;
 
         // Add member B as a new device.
         info!("adding memberb to team");
-        admin_team
+        member_adder
             .add_device(self.memberb.pk.clone(), Some(roles.member().id))
             .await?;
 
         // Make sure all see the configuration change.
-        let admin_addr = self.admin.aranya_local_addr().await?;
-        owner_team.sync_now(admin_addr, None).await?;
-        operator_team.sync_now(admin_addr, None).await?;
-        membera_team.sync_now(admin_addr, None).await?;
-        memberb_team.sync_now(admin_addr, None).await?;
+        if has_delegation {
+            // Admin sync with all others.
+            let sync_addr = self.admin.aranya_local_addr().await?;
+            for team in [&owner_team, &operator_team, &membera_team, &memberb_team] {
+                team.sync_now(sync_addr, None).await?;
+            }
+        } else {
+            // Owner sync with all others but itself.
+            let sync_addr = self.owner.aranya_local_addr().await?;
+            for team in [&operator_team, &membera_team, &memberb_team] {
+                team.sync_now(sync_addr, None).await?;
+            }
+        }
 
         Ok(())
     }

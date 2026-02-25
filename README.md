@@ -65,6 +65,7 @@ Testing Aranya:
 Examples (these are run as part of the CICD pipeline to ensure they do not break):
 - `cargo make run-rust-example` - runs the default Rust example
 - `cargo make run-rust-example-multi-node` - runs the multi-node Rust example
+- `cargo make run-rust-example-onboarding` - runs the onboarding Rust example
 - `cargo make run-capi-example` - runs the C example
 
 A complete list of examples can be found at [examples](examples/):

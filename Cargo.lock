@@ -452,12 +452,41 @@ dependencies = [
 ]
 
 [[package]]
-name = "aranya-example-multi-node"
+name = "aranya-example-common"
 version = "0.0.0"
 dependencies = [
  "age",
  "anyhow",
+]
+
+[[package]]
+name = "aranya-example-multi-node"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
  "aranya-client",
+ "aranya-example-common",
+ "backon",
+ "clap",
+ "postcard",
+ "rustix 1.1.2",
+ "serde",
+ "serial_test",
+ "tempfile",
+ "test-log",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "aranya-example-onboarding"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aranya-client",
+ "aranya-example-common",
+ "aranya-util",
  "backon",
  "clap",
  "postcard",

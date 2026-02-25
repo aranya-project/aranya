@@ -3,8 +3,8 @@
 use std::{env, fmt::Write, net::Ipv4Addr, path::Path, str::FromStr};
 
 use anyhow::{Context, Result};
-use aranya_client::Addr;
 use aranya_example_common::{ExposeSecret, SecretString};
+use aranya_util::Addr;
 use tokio::fs;
 
 /// Environment variable name constants.
@@ -14,13 +14,7 @@ const AFC_ADDR_ENV_VAR: &str = "ARANYA_AFC_ADDR";
 const TCP_ADDR_ENV_VAR: &str = "ARANYA_TCP_ADDR";
 const SYNC_ADDR_ENV_VAR: &str = "ARANYA_SYNC_ADDR";
 
-const DEVICE_LIST: [(&str, &str); 5] = [
-    ("owner", "owner"),
-    ("admin", "admin"),
-    ("operator", "operator"),
-    ("membera", "member"),
-    ("memberb", "member"),
-];
+const DEVICE_LIST: [(&str, &str); 2] = [("owner", "owner"), ("admin", "admin")];
 
 /// Environment variables.
 #[derive(Debug, Clone)]
@@ -33,12 +27,6 @@ pub struct EnvVars {
     pub owner: Device,
     /// Admin device
     pub admin: Device,
-    /// Operator device
-    pub operator: Device,
-    /// Member A device
-    pub membera: Device,
-    /// Member B device
-    pub memberb: Device,
 }
 
 impl EnvVars {
@@ -57,9 +45,6 @@ impl EnvVars {
             };
             devices.push(device);
         }
-        let memberb = devices.pop().expect("expected device");
-        let membera = devices.pop().expect("expected device");
-        let operator = devices.pop().expect("expected device");
         let admin = devices.pop().expect("expected device");
         let owner = devices.pop().expect("expected device");
         Ok(Self {
@@ -67,9 +52,6 @@ impl EnvVars {
             passphrase,
             owner,
             admin,
-            operator,
-            membera,
-            memberb,
         })
     }
 
@@ -136,14 +118,7 @@ impl EnvVars {
 
     /// Return an Iterator to the list of devices.
     pub fn devices(&self) -> impl Iterator<Item = &Device> {
-        vec![
-            &self.owner,
-            &self.admin,
-            &self.operator,
-            &self.membera,
-            &self.memberb,
-        ]
-        .into_iter()
+        vec![&self.owner, &self.admin].into_iter()
     }
 }
 
@@ -151,7 +126,7 @@ impl EnvVars {
 impl Default for EnvVars {
     fn default() -> Self {
         Self {
-            level: "info".into(),
+            level: "off".into(),
             passphrase: "passphrase".into(),
             owner: Device {
                 name: "owner".into(),
@@ -166,27 +141,6 @@ impl Default for EnvVars {
                 tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
                 sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
                 role: "admin".to_string(),
-            },
-            operator: Device {
-                name: "operator".into(),
-                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
-                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
-                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
-                role: "operator".to_string(),
-            },
-            membera: Device {
-                name: "membera".into(),
-                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
-                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
-                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10011)),
-                role: "member".to_string(),
-            },
-            memberb: Device {
-                name: "memberb".into(),
-                afc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10012)),
-                tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10013)),
-                sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10014)),
-                role: "member".to_string(),
             },
         }
     }

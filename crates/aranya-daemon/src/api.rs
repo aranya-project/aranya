@@ -416,6 +416,22 @@ impl Api {
         }
         Ok(GraphId::transmute(team))
     }
+
+    /// Process ephemeral command.
+    /// This is a general-purpose helper for handling ephemeral commands,
+    /// ensuring session_new and session_receive are utilized.
+    #[allow(dead_code)]
+    async fn process_ephemeral_command(
+        &self,
+        team: api::TeamId,
+        command: &[u8],
+    ) -> anyhow::Result<Vec<Effect>> {
+        let graph = self.check_team_valid(team).await?;
+        let mut session = self.client.session_new(graph).await?;
+        let effects = self.client.session_receive(&mut session, command).await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
+        Ok(effects)
+    }
 }
 
 impl DaemonApi for Api {
