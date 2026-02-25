@@ -52,7 +52,7 @@ Rather than requiring feature flags to be manually specified with `cargo build -
 
 ## Cargo Make
 
-We rely heavely on `cargo make` targets to build software, run integration tests, perform unit tests, and run CICD checks. Here's how to install `cargo make`:
+We rely heavily on `cargo make` targets to build software, run integration tests, perform unit tests, and run CICD checks. Here's how to install `cargo make`:
 [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation)
 
 Building Aranya:
