@@ -40,7 +40,7 @@ use crate::{
 ///
 /// `MAX_SYNC_MESSAGE_SIZE` bounds runtime sync payloads; the wire envelope adds a small
 /// serialization overhead.
-const MAX_SYNC_WIRE_MESSAGE_SIZE: usize = MAX_SYNC_MESSAGE_SIZE.saturating_add(1024);
+pub(super) const MAX_SYNC_WIRE_MESSAGE_SIZE: usize = MAX_SYNC_MESSAGE_SIZE.saturating_add(1024);
 
 /// The Aranya QUIC sync server.
 ///
@@ -243,10 +243,20 @@ where
 
         let mut recv_buf = Vec::new();
         let (recv, mut send) = stream.split();
-        recv.take((MAX_SYNC_WIRE_MESSAGE_SIZE as u64) + 1)
+        let cap_plus_one = MAX_SYNC_WIRE_MESSAGE_SIZE + 1;
+
+        recv.take(cap_plus_one as u64)
             .read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
+
+        debug_assert!(
+            recv_buf.len() <= cap_plus_one,
+            "bounded read invariant violated: len={} cap_plus_one={}",
+            recv_buf.len(),
+            cap_plus_one
+        );
+
         if recv_buf.len() > MAX_SYNC_WIRE_MESSAGE_SIZE {
             return Err(anyhow!(
                 "sync request too large: {} > {} bytes",

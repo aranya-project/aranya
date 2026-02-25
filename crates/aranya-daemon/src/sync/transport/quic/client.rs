@@ -28,8 +28,7 @@ use super::{PskStore, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic, Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer,
-        SyncResponse,
+        Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer, SyncResponse, quic::server::MAX_SYNC_WIRE_MESSAGE_SIZE, transport::quic
     },
 };
 
@@ -44,12 +43,6 @@ pub(crate) struct QuicState {
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
 }
-
-/// Upper bound for wire-encoded sync request/response envelopes.
-///
-/// `MAX_SYNC_MESSAGE_SIZE` bounds runtime sync payloads; the wire envelope adds a small
-/// serialization overhead.
-const MAX_SYNC_WIRE_MESSAGE_SIZE: usize = MAX_SYNC_MESSAGE_SIZE.saturating_add(1024);
 
 impl QuicState {
     /// Get a reference to the PSK store
@@ -344,10 +337,20 @@ where
         trace!("client receiving sync response from QUIC sync server");
 
         let mut recv_buf = Vec::new();
-        recv.take((MAX_SYNC_WIRE_MESSAGE_SIZE as u64) + 1)
+        let cap_plus_one = MAX_SYNC_WIRE_MESSAGE_SIZE + 1;
+
+        recv.take(cap_plus_one as u64)
             .read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
+
+        debug_assert!(
+            recv_buf.len() <= cap_plus_one,
+            "bounded read invariant violated: len={} cap_plus_one={}",
+            recv_buf.len(),
+            cap_plus_one
+        );
+
         if recv_buf.len() > MAX_SYNC_WIRE_MESSAGE_SIZE {
             return Err(anyhow!(
                 "sync response too large: {} > {} bytes",

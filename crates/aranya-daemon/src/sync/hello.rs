@@ -171,10 +171,20 @@ where
         };
         // Read the response to avoid race condition with server
         let mut response_buf = Vec::new();
-        recv.take((MAX_HELLO_WIRE_MESSAGE_SIZE as u64) + 1)
+        let cap_plus_one = MAX_HELLO_WIRE_MESSAGE_SIZE + 1;
+
+        recv.take(cap_plus_one as u64)
             .read_to_end(&mut response_buf)
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
+
+        debug_assert!(
+            response_buf.len() <= cap_plus_one,
+            "bounded read invariant violated: len={} cap_plus_one={}",
+            response_buf.len(),
+            cap_plus_one
+        );
+
         if response_buf.len() > MAX_HELLO_WIRE_MESSAGE_SIZE {
             return Err(anyhow!(
                 "hello {operation_name} response too large: {} > {} bytes",
@@ -314,8 +324,10 @@ where
 
             // Read the response to avoid race condition with server
             let mut response_buf = Vec::new();
+            let cap_plus_one = MAX_HELLO_WIRE_MESSAGE_SIZE + 1;
+
             if let Err(e) = recv
-                .take((MAX_HELLO_WIRE_MESSAGE_SIZE as u64) + 1)
+                .take(cap_plus_one as u64)
                 .read_to_end(&mut response_buf)
                 .await
             {
@@ -326,6 +338,14 @@ where
                 );
                 return;
             }
+
+            debug_assert!(
+                response_buf.len() <= cap_plus_one,
+                "bounded read invariant violated: len={} cap_plus_one={}",
+                response_buf.len(),
+                cap_plus_one
+            );
+
             if response_buf.len() > MAX_HELLO_WIRE_MESSAGE_SIZE {
                 warn!(
                     ?peer,
