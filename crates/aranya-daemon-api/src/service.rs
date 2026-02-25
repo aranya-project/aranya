@@ -311,6 +311,10 @@ pub enum ChanOp {
 /// compiler warnings when used. They remain in the enum for backward
 /// compatibility — see the deprecation note on each variant for the
 /// migration path.
+// This enum is re-exported as `aranya_client::Permission`. New
+// permissions may be added as the policy evolves, so `non_exhaustive`
+// ensures downstream match statements continue to compile.
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Perm {
     // # Team management

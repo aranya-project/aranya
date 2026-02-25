@@ -608,6 +608,7 @@ impl From<Permission> for aranya_client::client::Permission {
     }
 }
 
+#[allow(clippy::disallowed_macros)] // `From` is infallible so we cannot use `bug!`
 impl From<aranya_client::client::Permission> for Permission {
     fn from(perm: aranya_client::client::Permission) -> Self {
         use aranya_client::client::Permission as P;
@@ -628,6 +629,7 @@ impl From<aranya_client::client::Permission> for Permission {
             P::RevokeLabel => Self::RevokeLabel,
             P::CanUseAfc => Self::CanUseAfc,
             P::CreateAfcUniChannel => Self::CreateAfcUniChannel,
+            _ => unreachable!("C API Permission enum is out of sync with aranya_client::Permission"),
         }
     }
 }

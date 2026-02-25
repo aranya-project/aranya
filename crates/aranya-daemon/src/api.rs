@@ -1434,6 +1434,7 @@ impl From<ChanOp> for api::ChanOp {
     }
 }
 
+#[allow(clippy::disallowed_macros)] // `From` is infallible so we cannot use `bug!`
 impl From<api::Perm> for Perm {
     fn from(value: api::Perm) -> Self {
         match value {
@@ -1453,6 +1454,7 @@ impl From<api::Perm> for Perm {
             api::Perm::RevokeLabel => Perm::RevokeLabel,
             api::Perm::CanUseAfc => Perm::CanUseAfc,
             api::Perm::CreateAfcUniChannel => Perm::CreateAfcUniChannel,
+            _ => unreachable!("daemon Perm enum is out of sync with aranya_daemon_api::Perm"),
         }
     }
 }
