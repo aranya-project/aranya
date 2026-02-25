@@ -42,30 +42,30 @@ fn transport_config() -> Arc<TransportConfig> {
 #[allow(clippy::enum_variant_names)]
 pub(crate) enum Error {
     /// QUIC Connection error
-    #[error("QUIC connection error: {0}")]
-    QuicConnectionError(#[from] quinn::ConnectionError),
+    #[error("QUIC connection error")]
+    Connection(#[from] quinn::ConnectionError),
     /// QUIC Write error
-    #[error("QUIC write error: {0}")]
-    QuicWriteError(#[from] quinn::WriteError),
+    #[error("QUIC write error")]
+    Write(#[from] quinn::WriteError),
     /// QUIC Read error
-    #[error("QUIC read error: {0}")]
-    QuicReadError(#[from] quinn::ReadToEndError),
+    #[error("QUIC read error")]
+    Read(#[from] quinn::ReadToEndError),
     /// QUIC Connect error
-    #[error("QUIC connect error: {0}")]
-    QuicConnectError(#[from] quinn::ConnectError),
+    #[error("QUIC connect error")]
+    Connect(#[from] quinn::ConnectError),
     /// Certificate or TLS configuration error
     #[error(transparent)]
     Cert(#[from] certs::CertError),
     /// QUIC endpoint error
     #[error("QUIC endpoint error: {0}")]
-    EndpointError(String),
+    Endpoint(String),
     /// QUIC connection timeout
     ///
     /// This occurs when the connection attempt takes too long, typically due to
     /// an unresponsive peer or network issues. Quinn doesn't provide a built-in
     /// handshake timeout, so we wrap connections with tokio::time::timeout.
     #[error("QUIC connection timed out")]
-    QuicConnectionTimeout,
+    ConnectionTimeout,
 }
 
 impl From<Infallible> for Error {

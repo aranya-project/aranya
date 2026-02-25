@@ -321,9 +321,9 @@ impl EffectHandler {
         // TODO: Don't fire off a spawn here.
         let syncer = self.syncer.clone();
         drop(tokio::spawn(async move {
-            if let Err(e) = syncer.broadcast_hello(graph_id, head).await {
+            if let Err(err) = syncer.broadcast_hello(graph_id, head).await {
                 warn!(
-                    error = %e,
+                    error = %err.report(),
                     ?graph_id,
                     ?head,
                     "peers.broadcast_hello failed"

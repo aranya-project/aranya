@@ -97,7 +97,7 @@ where
 
         let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_tls_config)
-                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
+                .map_err(|e| Error::Endpoint(format!("invalid QUIC TLS config: {e}")))?,
         ));
 
         server_config.transport_config(transport_config());
@@ -110,7 +110,7 @@ where
 
         let mut client_config = quinn::ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_tls_config)
-                .map_err(|e| Error::EndpointError(format!("invalid QUIC TLS config: {e}")))?,
+                .map_err(|e| Error::Endpoint(format!("invalid QUIC TLS config: {e}")))?,
         ));
 
         client_config.transport_config(transport_config());
@@ -122,11 +122,11 @@ where
             .assume("invalid server address")?;
 
         let endpoint = Endpoint::server(server_config, bind_addr)
-            .map_err(|e| Error::EndpointError(format!("failed to create server endpoint: {e}")))?;
+            .map_err(|e| Error::Endpoint(format!("failed to create server endpoint: {e}")))?;
 
         let local_addr = endpoint
             .local_addr()
-            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
+            .map_err(|e| Error::Endpoint(format!("unable to get local address: {e}")))?;
 
         debug!("created unified QUIC endpoint with mTLS at {}", local_addr);
 
@@ -199,8 +199,8 @@ where
                     // Serve the connection
                     Self::serve_connection_inner(key, conn, client, sync_peers).await;
                 }
-                Err(e) => {
-                    error!(error = %e, "failed to accept QUIC connection");
+                Err(err) => {
+                    error!(error = %err.report(), "failed to accept QUIC connection");
                 }
             }
         });
@@ -227,17 +227,17 @@ where
             // Accept incoming streams.
             while let Ok((send, recv)) = conn.accept_bi().await {
                 trace!("received incoming QUIC stream");
-                if let Err(e) =
+                if let Err(err) =
                     Self::sync(client.clone(), peer.into(), send, recv, sync_peers.clone()).await
                 {
-                    error!(error = %e.report(), "failed to process sync request");
+                    error!(error = %err.report(), "failed to process sync request");
                 }
             }
             debug!("connection closed");
             anyhow::Ok(())
         }
         .unwrap_or_else(|err: anyhow::Error| {
-            error!(error = %err, "server unable to respond to sync request from peer");
+            error!(error = ?err, "server unable to respond to sync request from peer");
         })
         .instrument(info_span!("serve_connection", %peer))
         .await
@@ -257,7 +257,7 @@ where
         let recv_buf = recv
             .read_to_end(MAX_SYNC_MESSAGE_SIZE)
             .await
-            .map_err(Error::QuicReadError)?;
+            .map_err(Error::Read)?;
         trace!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
@@ -274,7 +274,7 @@ where
         let data_len = {
             let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
             let data_len = data.len();
-            send.write_all(&data).await.map_err(Error::QuicWriteError)?;
+            send.write_all(&data).await.map_err(Error::Write)?;
             data_len
         };
         send.finish().ok();
@@ -293,14 +293,14 @@ where
     ) -> Result<Box<[u8]>> {
         trace!("server responding to sync request");
 
-        let sync_type: SyncType = postcard::from_bytes(request_data).map_err(|e| {
+        let sync_type: SyncType = postcard::from_bytes(request_data).map_err(|err| {
             error!(
-                error = %e,
+                error = %err.report(),
                 request_data_len = request_data.len(),
                 ?addr,
                 "Failed to deserialize sync request"
             );
-            anyhow::anyhow!(e)
+            anyhow::anyhow!(err)
         })?;
 
         match sync_type {

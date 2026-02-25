@@ -12,6 +12,7 @@ use anyhow::Context as _;
 use aranya_runtime::{
     Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
 };
+use aranya_util::error::ReportExt as _;
 use quinn::{ConnectionError, WriteError};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument, trace, warn};
@@ -116,11 +117,11 @@ where
                         warn!(?peer, "Failed to find subscription to update last_notified");
                     }
                 }
-                Err(error) => {
+                Err(err) => {
                     warn!(
                         ?peer,
                         ?head,
-                        %error,
+                        error = %err.report(),
                         "Failed to send hello notification"
                     );
                 }
@@ -157,9 +158,9 @@ where
         let (mut send, mut recv) = self.connect(peer).await?;
 
         // Send the message
-        send.write_all(&data).await.map_err(Error::QuicWriteError)?;
+        send.write_all(&data).await.map_err(Error::Write)?;
         send.finish().map_err(|_| {
-            Error::QuicWriteError(WriteError::ConnectionLost(ConnectionError::LocallyClosed))
+            Error::Write(WriteError::ConnectionLost(ConnectionError::LocallyClosed))
         })?;
 
         // Determine operation name from sync_type
@@ -268,30 +269,29 @@ where
 
         let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
 
-        let (mut send, mut recv) = self.connect(peer).await.map_err(|error| {
+        let (mut send, mut recv) = self.connect(peer).await.inspect_err(|err| {
             warn!(
                 ?peer,
-                %error,
+                error = %err.report(),
                 "Failed to connect to peer"
             );
-            error
         })?;
 
         // Spawn async task to send the notification
         self.hello_tasks.spawn(async move {
-            if let Err(error) = send.write_all(&data).await {
+            if let Err(err) = send.write_all(&data).await {
                 warn!(
                     ?peer,
-                    %error,
+                    error = %err.report(),
                     "Failed to send hello message"
                 );
                 return;
             }
 
-            if let Err(error) = send.finish() {
+            if let Err(err) = send.finish() {
                 warn!(
                     ?peer,
-                    %error,
+                    error = %err.report(),
                     "Failed to finish send stream"
                 );
                 return;
@@ -305,9 +305,9 @@ where
                         "received hello notification response"
                     );
                 }
-                Err(e) => {
+                Err(err) => {
                     warn!(
-                        error = %e,
+                        error = %err.report(),
                         ?peer,
                         "Failed to read hello notification response"
                     );
@@ -347,19 +347,19 @@ fn spawn_scheduled_hello_sender<PS, SP>(
                         match aranya.provider().get_storage(peer.graph_id) {
                             Ok(storage) => match storage.get_head_address() {
                                 Ok(addr) => addr,
-                                Err(error) => {
+                                Err(err) => {
                                     warn!(
                                         ?peer,
-                                        %error,
+                                        error = %err.report(),
                                         "Failed to get head address for scheduled hello"
                                     );
                                     continue;
                                 }
                             },
-                            Err(error) => {
+                            Err(err) => {
                                 warn!(
                                     ?peer,
-                                    %error,
+                                    error = %err.report(),
                                     "Failed to get storage for scheduled hello"
                                 );
                                 continue;
@@ -370,7 +370,7 @@ fn spawn_scheduled_hello_sender<PS, SP>(
                     // Send scheduled hello notification
                     match handle.broadcast_hello(peer.graph_id, head).await {
                         Ok(_) => trace!(?peer, ?head, "Sent scheduled hello notification"),
-                        Err(error) => warn!(?peer, %error, "Failed to broadcast scheduled hello"),
+                        Err(err) => warn!(?peer, error = %err.report(), "Failed to broadcast scheduled hello"),
                     }
                 }
                 _ = tokio::time::sleep_until(expires_at.into()) => {
@@ -479,10 +479,10 @@ where
                 if !client.lock_aranya().await.command_exists(graph_id, head) {
                     match sync_peers.sync_on_hello(peer).await {
                         Ok(()) => debug!(?peer, ?head, "sent sync_on_hello request"),
-                        Err(error) => warn!(
+                        Err(err) => warn!(
                             ?peer,
                             ?head,
-                            %error,
+                            error = %err.report(),
                             "unable to send sync_on_hello request"
                         ),
                     }
@@ -495,10 +495,10 @@ where
                 // Update the cache with the received head_id
                 match aranya.update_heads(graph_id, [head], cache) {
                     Ok(_) => debug!(?peer, ?head, "updated peer cache with new graph head"),
-                    Err(error) => warn!(
+                    Err(err) => warn!(
                         ?peer,
                         ?head,
-                        %error,
+                        error = %err.report(),
                         "unable to update peer cache with new graph head"
                     ),
                 }

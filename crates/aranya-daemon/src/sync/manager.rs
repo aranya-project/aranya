@@ -206,9 +206,9 @@ where
                         if let Some((cfg, _)) = self.peers.get(&peer) {
                             if cfg.sync_on_hello {
                                 self.sync(peer).await
-                                    .inspect_err(|e| {
+                                    .inspect_err(|err| {
                                         warn!(
-                                            error = %e,
+                                            error = %err.report(),
                                             ?peer,
                                             "SyncOnHello sync failed"
                                         );
@@ -261,7 +261,7 @@ where
             .await
             .inspect_err(|err| {
                 warn!(
-                    error = %err,
+                    error = %err.report(),
                     ?peer,
                     "ST::sync_impl failed"
                 );

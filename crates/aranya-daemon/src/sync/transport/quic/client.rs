@@ -96,7 +96,7 @@ where
         let (mut send, mut recv) = syncer
             .connect(peer)
             .await
-            .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
+            .inspect_err(|err| error!(error = %err.report(), "Could not create connection"))?;
 
         let mut sync_requester = SyncRequester::new(peer.graph_id, Rng);
 
@@ -209,7 +209,7 @@ where
 
         let local_addr = endpoint
             .local_addr()
-            .map_err(|e| Error::EndpointError(format!("unable to get local address: {e}")))?;
+            .map_err(|e| Error::Endpoint(format!("unable to get local address: {e}")))?;
 
         let addrs = tokio::net::lookup_host(peer.addr.to_socket_addrs())
             .await
@@ -237,7 +237,7 @@ where
                 // require this timeout.
                 let conn = tokio::time::timeout(Duration::from_secs(5), connecting)
                     .await
-                    .map_err(|_| Error::QuicConnectionTimeout)?
+                    .map_err(|_| Error::ConnectionTimeout)?
                     .map_err(Error::from)?;
 
                 debug!(%addr, "established new QUIC connection to peer");
@@ -250,7 +250,7 @@ where
         let (send, recv) = conn
             .open_bi()
             .await
-            .inspect_err(|e| error!(error = %e, "unable to open bidi stream"))
+            .inspect_err(|err| error!(error = %err.report(), "unable to open bidi stream"))
             .map_err(|e| {
                 // If the stream fails to open, the connection may be closed
                 if conn.close_reason().is_some() {
@@ -261,7 +261,7 @@ where
                         conns.remove(key, conn_clone).await;
                     });
                 }
-                SyncError::QuicSync(Error::QuicConnectionError(e))
+                SyncError::QuicSync(Error::Connection(e))
             })?;
 
         trace!("client opened bidi stream with QUIC sync server");
@@ -303,11 +303,9 @@ where
         };
         send_buf.truncate(len);
 
-        send.write_all(&send_buf)
-            .await
-            .map_err(Error::QuicWriteError)?;
+        send.write_all(&send_buf).await.map_err(Error::Write)?;
         send.finish().map_err(|_| {
-            Error::QuicWriteError(quinn::WriteError::ConnectionLost(
+            Error::Write(quinn::WriteError::ConnectionLost(
                 quinn::ConnectionError::LocallyClosed,
             ))
         })?;
@@ -335,7 +333,7 @@ where
         let recv_buf = recv
             .read_to_end(MAX_SYNC_MESSAGE_SIZE)
             .await
-            .map_err(Error::QuicReadError)?;
+            .map_err(Error::Read)?;
         trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.
