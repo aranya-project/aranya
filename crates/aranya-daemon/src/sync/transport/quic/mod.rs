@@ -8,7 +8,7 @@ mod transport;
 
 use self::{
     super::{SyncListener, SyncStream, SyncTransport},
-    connections::{ConnectionReceiver, SharedConnectionMap},
+    connections::{ConnectionUpdate, SharedConnectionMap},
     stream::QuicStream,
 };
 pub(crate) use self::{

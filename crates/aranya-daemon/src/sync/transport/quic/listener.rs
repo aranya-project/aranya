@@ -16,11 +16,11 @@ use s2n_quic::{
     },
     stream::BidirectionalStream,
 };
-use tokio::{task::JoinSet, time::Duration};
+use tokio::{sync::mpsc, task::JoinSet, time::Duration};
 use tracing::{debug, error, trace, warn};
 
 use super::{
-    ConnectionReceiver, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
+    ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
     ALPN_QUIC_SYNC,
 };
 use crate::sync::{Addr, GraphId, SyncPeer};
@@ -29,12 +29,18 @@ type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
 
 #[derive(Debug)]
 pub(crate) struct QuicListener {
-    server: s2n_quic::Server,
-    server_keys: Arc<PskStore>,
-    conns: SharedConnectionMap,
-    conn_rx: ConnectionReceiver,
-    pending_accepts: JoinSet<AcceptResult>,
+    /// The local address of the server, since it should be infallible.
     local_addr: Addr,
+    /// The QUIC server we use to accept raw connections.
+    server: s2n_quic::Server,
+    /// Allows authenticating the identity of a given `GraphId`.
+    server_keys: Arc<PskStore>,
+    /// Handle to the `SharedConnectionMap` to register new connections with the `QuicTransport`.
+    conns: SharedConnectionMap,
+    /// Receives new acceptors from the [`QuicTransport`] so we can listen for connections back.
+    conn_rx: mpsc::Receiver<ConnectionUpdate>,
+    /// Queue to allow awaiting a number of potential streams concurrently until one resolves.
+    pending_accepts: JoinSet<AcceptResult>,
 }
 
 impl QuicListener {
@@ -42,9 +48,10 @@ impl QuicListener {
     pub(crate) async fn new(
         addr: Addr,
         server_keys: Arc<PskStore>,
-    ) -> Result<(Self, SharedConnectionMap), Error> {
+    ) -> Result<(Self, SharedConnectionMap, mpsc::Sender<ConnectionUpdate>), Error> {
         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        let (conns, conn_rx) = SharedConnectionMap::new(32);
+        let conns = SharedConnectionMap::new();
+        let (conn_tx, conn_rx) = mpsc::channel(32);
 
         // Build up the `ServerConfig` so we can initialize the TLS server.
         let mut server_config = ServerConfig::builder()
@@ -81,14 +88,15 @@ impl QuicListener {
 
         Ok((
             Self {
+                local_addr,
                 server,
                 server_keys,
                 conns: conns.clone(),
                 conn_rx,
                 pending_accepts: JoinSet::new(),
-                local_addr,
             },
             conns,
+            conn_tx,
         ))
     }
 
@@ -100,7 +108,7 @@ impl QuicListener {
 
     /// Sets up the connection with a keep alive, constructs and validates a [`SyncPeer`], and
     /// registers it as a new connection.
-    async fn register_connection(&self, mut conn: s2n_quic::Connection) -> Result<(), Error> {
+    async fn register_connection(&mut self, mut conn: s2n_quic::Connection) -> Result<(), Error> {
         trace!("received incoming QUIC connection");
 
         conn.keep_alive(true).assume("connection is still alive")?;
@@ -118,7 +126,11 @@ impl QuicListener {
                 .context("unable to extract return address")?;
         let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
 
-        self.conns.insert(peer, conn).await;
+        let (_handle, acceptor) = self.conns.insert(peer, conn).await;
+        if let Some(acceptor) = acceptor {
+            self.pending_accepts
+                .spawn(Self::accept_pending_stream(peer, acceptor));
+        }
 
         debug!(?peer, "accepted and inserted QUIC connection");
         Ok(())
@@ -160,7 +172,7 @@ impl SyncListener for QuicListener {
                     }
                 }
 
-                Some((peer, acceptor)) = self.conn_rx.next() => {
+                Some((peer, acceptor)) = self.conn_rx.recv() => {
                     debug!(?peer, "registering connection for stream accepts");
                     self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                 }

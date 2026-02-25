@@ -14,7 +14,7 @@ use s2n_quic::{
     connection::{Handle, StreamAcceptor},
     Connection,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::sync::SyncPeer;
@@ -24,39 +24,18 @@ use crate::sync::SyncPeer;
 pub(crate) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 type ConnectionMap = BTreeMap<SyncPeer, Handle>;
 
-// NB: Used to hide implementation details wrt mpsc
-/// Used to receive new connections from the [`SharedConnectionMap`].
-#[derive(Debug)]
-pub(super) struct ConnectionReceiver {
-    rx: mpsc::Receiver<ConnectionUpdate>,
-}
-
-impl ConnectionReceiver {
-    /// Waits until it receives a new connection from the [`SharedConnectionMap`].
-    pub(super) async fn next(&mut self) -> Option<ConnectionUpdate> {
-        self.rx.recv().await
-    }
-}
-
 /// Thread-safe map that stores a [`Handle`] to the connection to allow for reuse across multiple
 /// connection requests to a peer.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct SharedConnectionMap {
-    tx: mpsc::Sender<ConnectionUpdate>,
+    /// Shared [`ConnectionMap`] to allow for cloning/shared references.
     handles: Arc<Mutex<ConnectionMap>>,
 }
 
 impl SharedConnectionMap {
     /// Creates a new [`SharedConnectionMap`].
-    pub(super) fn new(buffer: usize) -> (Self, ConnectionReceiver) {
-        let (tx, rx) = mpsc::channel(buffer);
-        (
-            Self {
-                tx,
-                handles: Arc::default(),
-            },
-            ConnectionReceiver { rx },
-        )
+    pub(super) fn new() -> Self {
+        Self::default()
     }
 
     /// Tries to remove a connection from the map and close it.
@@ -89,17 +68,21 @@ impl SharedConnectionMap {
         &self,
         peer: SyncPeer,
         make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
-    ) -> Result<Handle, super::Error> {
+    ) -> Result<(Handle, Option<StreamAcceptor>), super::Error> {
         let mut map = self.handles.lock().await;
 
         match map.get_mut(&peer) {
             Some(existing) => {
                 debug!("existing connection found");
 
+                // Check if the existing handle is still alive.
                 if existing.ping().is_ok() {
                     debug!("reusing the existing connection");
-                    return Ok(existing.clone());
+                    return Ok((existing.clone(), None));
                 }
+
+                // Close the handle to clean up any trailing data.
+                existing.close(AppError::UNKNOWN);
             }
             None => debug!("existing connection not found"),
         }
@@ -109,26 +92,33 @@ impl SharedConnectionMap {
         debug!("created new quic connection");
         drop(map);
 
-        self.tx.send((peer, acceptor)).await.ok();
-        Ok(handle)
+        Ok((handle, Some(acceptor)))
     }
 
     /// Tries to insert a connection into the map, returning the handle to it.
     ///
     /// If a handle already exists and is able to be pinged, this will close the passed connection
     /// and keep the existing one. Otherwise, it will insert the connection into the map.
-    pub(super) async fn insert(&self, peer: SyncPeer, conn: Connection) -> Handle {
+    pub(super) async fn insert(
+        &self,
+        peer: SyncPeer,
+        conn: Connection,
+    ) -> (Handle, Option<StreamAcceptor>) {
         let mut map = self.handles.lock().await;
 
         match map.get_mut(&peer) {
             Some(existing) => {
                 debug!("existing connection found");
 
+                // Check if the existing handle is still alive.
                 if existing.ping().is_ok() {
                     debug!(connection_key = ?peer, "closing the passed connection and reusing the existing one");
                     conn.close(AppError::UNKNOWN);
-                    return existing.clone();
+                    return (existing.clone(), None);
                 }
+
+                // Close the handle to clean up any trailing data.
+                existing.close(AppError::UNKNOWN);
             }
             None => debug!("existing connection not found"),
         }
@@ -138,7 +128,6 @@ impl SharedConnectionMap {
         debug!("created new connection");
         drop(map);
 
-        self.tx.send((peer, acceptor)).await.ok();
-        handle
+        (handle, Some(acceptor))
     }
 }

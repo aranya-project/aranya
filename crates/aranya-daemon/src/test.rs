@@ -239,13 +239,15 @@ impl TestCtx {
 
             let (handle, recv) = sync::SyncHandle::channel(128);
 
-            let (listener, conns) = QuicListener::new(any_local_addr, psk_store.clone()).await?;
+            let (listener, conns, conn_tx) =
+                QuicListener::new(any_local_addr, psk_store.clone()).await?;
             let server = TestServer::new(listener, client.clone(), handle);
 
             let transport = QuicTransport::new(
                 any_local_addr,
                 server.local_addr(),
                 conns,
+                conn_tx,
                 psk_store.clone(),
             )?;
             let syncer = TestSyncer::new(client.clone(), transport, recv, send_effects)?;
