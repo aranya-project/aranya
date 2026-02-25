@@ -1422,9 +1422,11 @@ command RemovePermFromRole {
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
 
-        // TODO: should the author only be allowed to remove a permission it also has?
-        // A device could attempt to remove a permission from a role assigned to a higher ranked device.
-        // Current recommendation is for the application to not set up roles and ranks in a way that allows this.
+        // The author does not need to hold the permission being removed.
+        // The rank hierarchy already prevents abuse: a device can only
+        // modify permissions on roles it outranks, and role_rank > device_rank
+        // is enforced for role assignments. This means a device cannot
+        // remove permissions from a role assigned to a higher-ranked device.
 
         // It is an error to remove a permission not assigned to
         // the role.
