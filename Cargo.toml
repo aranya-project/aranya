@@ -95,7 +95,6 @@ tokio = { version = "1.44" }
 tokio-util = { version = "0.7.12" }
 toml = { version = "0.9", default-features = false, features = ["std", "serde", "parse"] }
 tracing = { version = "0.1.40" }
-tracing-test = { version = "0.2.6" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [profile.dev]
