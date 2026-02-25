@@ -97,7 +97,10 @@ mod tests {
     use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Duration};
 
     use aranya_certgen::{CaCert, CertPaths, SaveOptions, SignedCert};
-    use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+    use quinn::rustls::{
+        self,
+        pki_types::{CertificateDer, PrivateKeyDer},
+    };
     use tempfile::TempDir;
 
     use super::{

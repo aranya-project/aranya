@@ -57,7 +57,6 @@ derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
 quinn = { workspace = true }
-rustls = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }

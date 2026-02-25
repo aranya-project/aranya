@@ -370,7 +370,6 @@ dependencies = [
  "postcard",
  "pretty_assertions",
  "quinn",
- "rustls",
  "serde",
  "serial_test",
  "tarpc",

@@ -9,7 +9,10 @@ use std::{
     sync::Arc,
 };
 
-use rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
+use quinn::rustls::{
+    self,
+    pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer},
+};
 use thiserror::Error;
 use tracing::debug;
 
