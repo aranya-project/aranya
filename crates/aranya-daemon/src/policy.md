@@ -918,11 +918,11 @@ rank and permissions, migrate devices to it, then delete the old role.
 // Default maximum rank for the team creator device.
 let MAX_RANK = 1000000
 
-// TODO: aranya-core#582 use const expression once supported by the
+// TODO: aranya-core#589 use const expression once supported by the
 // policy language. E.g.:
 //   let DEFAULT_OWNER_DEVICE_RANK = MAX_RANK
 let DEFAULT_OWNER_DEVICE_RANK = 1000000
-// TODO: aranya-core#582 use const expression once supported by the
+// TODO: aranya-core#589 use const expression once supported by the
 // policy language. E.g.:
 //   let DEFAULT_OWNER_ROLE_RANK = saturating_sub(MAX_RANK, 1)
 let DEFAULT_OWNER_ROLE_RANK = 999999
