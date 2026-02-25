@@ -18,10 +18,11 @@ daemon_pids=()
 tmpdir=""
 
 # Track all child processes for cleanup
+# shellcheck disable=SC2329
 cleanup() {
     local exit_code=$?
     echo "Cleaning up processes..."
-    
+
     # First attempt: SIGTERM for clean shutdown
     # Kill tracked daemon PIDs
     for pid in "${daemon_pids[@]}"; do
@@ -29,22 +30,22 @@ cleanup() {
     done
     # Also kill any orphaned test daemons by pattern
     pkill -f "aranya-daemon.*test-.*-daemon" 2>/dev/null || true
-    
+
     # Wait briefly for clean shutdown
     sleep 1
-    
+
     # Second attempt: SIGKILL for any remaining processes
     for pid in "${daemon_pids[@]}"; do
         kill -9 "$pid" 2>/dev/null || true
     done
     pkill -9 -f "aranya-daemon.*test-.*-daemon" 2>/dev/null || true
-    
+
     # Remove temp directory
     if [ -n "$tmpdir" ] && [ -d "$tmpdir" ]; then
         rm -rf "$tmpdir"
     fi
-    
-    exit $exit_code
+
+    exit "$exit_code"
 }
 
 # Set up cleanup trap
@@ -89,7 +90,7 @@ EOF
         "$daemon_path" --config "$run_dir/daemon.toml" &
 
     local pid=$!
-    daemon_pids+=($pid)
+    daemon_pids+=("$pid")
     echo "Spawned daemon '$daemon_name' (PID: $pid) at $run_dir"
 }
 
