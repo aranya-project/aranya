@@ -233,8 +233,7 @@ impl TestCtx {
             ));
 
             let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-            let psk_store = PskStore::new([]);
-            let psk_store = Arc::new(psk_store);
+            let psk_store: Arc<PskStore> = Arc::default();
 
             let (send_effects, effects_recv) = mpsc::channel(1);
 

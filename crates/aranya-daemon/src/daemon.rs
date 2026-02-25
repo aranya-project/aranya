@@ -28,7 +28,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicListener, QuicTransport, SyncParams},
+        quic::{PskStore, QuicListener, QuicTransport},
         SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -133,10 +133,8 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                SyncParams {
-                    psk_store: Arc::clone(&psk_store),
-                    server_addr: qs_config.addr,
-                },
+                Arc::clone(&psk_store),
+                qs_config.addr,
                 qs_client_addr,
             )
             .await?;
@@ -264,10 +262,8 @@ impl Daemon {
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        SyncParams {
-            psk_store,
-            server_addr,
-        }: SyncParams,
+        psk_store: Arc<PskStore>,
+        server_addr: Addr,
         client_addr: Addr,
     ) -> Result<(
         Client,

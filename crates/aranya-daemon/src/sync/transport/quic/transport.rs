@@ -8,8 +8,8 @@ use bytes::Bytes;
 use s2n_quic::{client::Connect, provider::tls::rustls::rustls::ClientConfig};
 use tracing::trace;
 
-use super::{Error, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
-use crate::sync::{quic::QuicStream, transport::SyncTransport, Addr, SyncPeer};
+use super::{Error, PskStore, QuicStream, SharedConnectionMap, SyncTransport, ALPN_QUIC_SYNC};
+use crate::sync::{Addr, SyncPeer};
 
 #[derive(Clone, Debug)]
 pub(crate) struct QuicTransport {

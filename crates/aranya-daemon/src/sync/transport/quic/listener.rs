@@ -1,3 +1,4 @@
+//! This module implements [`QuicListener`] to allow accepting connections from QUIC clients.
 use std::sync::Arc;
 
 use anyhow::Context as _;
@@ -15,11 +16,14 @@ use s2n_quic::{
     },
     stream::BidirectionalStream,
 };
-use tokio::{sync::mpsc, task::JoinSet};
+use tokio::{task::JoinSet, time::Duration};
 use tracing::{debug, error, trace, warn};
 
-use super::{ConnectionUpdate, Error, PskStore, SharedConnectionMap, ALPN_QUIC_SYNC};
-use crate::sync::{quic::QuicStream, transport::SyncListener, Addr, GraphId, SyncPeer};
+use super::{
+    ConnectionReceiver, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
+    ALPN_QUIC_SYNC,
+};
+use crate::sync::{Addr, GraphId, SyncPeer};
 
 type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
 
@@ -28,20 +32,21 @@ pub(crate) struct QuicListener {
     server: s2n_quic::Server,
     server_keys: Arc<PskStore>,
     conns: SharedConnectionMap,
-    conn_rx: mpsc::Receiver<ConnectionUpdate>,
+    conn_rx: ConnectionReceiver,
     pending_accepts: JoinSet<AcceptResult>,
     local_addr: Addr,
 }
 
 impl QuicListener {
+    /// Creates a new [`QuicListener`].
     pub(crate) async fn new(
         addr: Addr,
         server_keys: Arc<PskStore>,
     ) -> Result<(Self, SharedConnectionMap), Error> {
-        // Create shared connection map and channel for connection updates
+        // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
         let (conns, conn_rx) = SharedConnectionMap::new(32);
 
-        // Create Server Config
+        // Build up the `ServerConfig` so we can initialize the TLS server.
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
             .with_cert_resolver(Arc::new(NoCertResolver::default()));
@@ -52,12 +57,14 @@ impl QuicListener {
         #[allow(deprecated)]
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
+        // Obtain the address for the server.
         let addr = tokio::net::lookup_host(addr.to_socket_addrs())
             .await
             .context("DNS lookup on for peer address")?
             .next()
             .assume("invalid server address")?;
-        // Use the rustls server provider
+
+        // Start up a new QUIC server.
         let server = s2n_quic::Server::builder()
             .with_tls(tls_server_provider)?
             .with_io(addr)
@@ -66,63 +73,55 @@ impl QuicListener {
             .start()
             .map_err(Error::ServerStart)?;
 
+        // Grab our local address now that we've binded to a specific port.
         let local_addr = server
             .local_addr()
             .context("unable to get server local address")?
             .into();
 
-        let server_instance = Self {
-            server,
-            server_keys,
-            conns: conns.clone(),
-            conn_rx,
-            pending_accepts: JoinSet::new(),
-            local_addr,
-        };
-
-        Ok((server_instance, conns))
+        Ok((
+            Self {
+                server,
+                server_keys,
+                conns: conns.clone(),
+                conn_rx,
+                pending_accepts: JoinSet::new(),
+                local_addr,
+            },
+            conns,
+        ))
     }
 
-    fn spawn_stream_accept(&mut self, peer: SyncPeer, mut acceptor: StreamAcceptor) {
-        self.pending_accepts.spawn(async move {
-            let stream = acceptor.accept_bidirectional_stream().await.ok().flatten();
-            (peer, acceptor, stream)
-        });
+    /// Accepts an incoming bidirectional stream from this [`SyncPeer`].
+    async fn accept_pending_stream(peer: SyncPeer, mut acceptor: StreamAcceptor) -> AcceptResult {
+        let stream = acceptor.accept_bidirectional_stream().await.ok().flatten();
+        (peer, acceptor, stream)
     }
 
-    async fn accept_connection(&self, mut conn: s2n_quic::Connection) -> Result<(), Error> {
-        let handle = conn.handle();
+    /// Sets up the connection with a keep alive, constructs and validates a [`SyncPeer`], and
+    /// registers it as a new connection.
+    async fn register_connection(&self, mut conn: s2n_quic::Connection) -> Result<(), Error> {
+        trace!("received incoming QUIC connection");
 
-        let result: Result<(), anyhow::Error> = async {
-            trace!("received incoming QUIC connection");
+        conn.keep_alive(true).assume("connection is still alive")?;
 
-            conn.keep_alive(true)
-                .context("unable to keep connection alive")?;
+        let identity = get_conn_identity(&mut conn)?;
+        let active_team = self
+            .server_keys
+            .get_team_for_identity(&identity)
+            .context("no active team for accepted connection")?;
 
-            let identity = get_conn_identity(&mut conn)?;
-            let active_team = self
-                .server_keys
-                .get_team_for_identity(&identity)
-                .context("no active team for accepted connection")?;
-
-            let peer_addr = extract_return_address(&mut conn)
+        let peer_addr =
+            tokio::time::timeout(Duration::from_secs(5), extract_return_address(&mut conn))
                 .await
-                .context("could not get peer's return address")?;
-            let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
+                .context("timed out waiting for return address")?
+                .context("unable to extract return address")?;
+        let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
 
-            self.conns.insert(peer, conn).await;
+        self.conns.insert(peer, conn).await;
 
-            debug!(?peer, "accepted and inserted QUIC connection");
-            Ok(())
-        }
-        .await;
-
-        if let Err(error) = &result {
-            error!(?error, "failed to accept connection");
-            handle.close(application::Error::UNKNOWN);
-        }
-
-        result.map_err(Into::into)
+        debug!(?peer, "accepted and inserted QUIC connection");
+        Ok(())
     }
 }
 
@@ -144,7 +143,7 @@ impl SyncListener for QuicListener {
                 Some(result) = self.pending_accepts.join_next() => {
                     match result {
                         Ok((peer, acceptor, Some(stream))) => {
-                            self.spawn_stream_accept(peer, acceptor);
+                            self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                             return Some(Ok(QuicStream::new(peer, stream)));
                         }
                         Ok((peer, _acceptor, None)) => debug!(?peer, "connection closed"),
@@ -153,14 +152,17 @@ impl SyncListener for QuicListener {
                 }
 
                 Some(conn) = self.server.accept() => {
-                    if let Err(error) = self.accept_connection(conn).await {
-                        warn!(%error, "stream acceptor task panicked");
+                    let handle = conn.handle();
+
+                    if let Err(error) = self.register_connection(conn).await {
+                        error!(?error, "failed to accept connection");
+                        handle.close(application::Error::UNKNOWN);
                     }
                 }
 
-                Some((peer, acceptor)) = self.conn_rx.recv() => {
+                Some((peer, acceptor)) = self.conn_rx.next() => {
                     debug!(?peer, "registering connection for stream accepts");
-                    self.spawn_stream_accept(peer, acceptor);
+                    self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                 }
 
                 else => return None,
@@ -169,23 +171,17 @@ impl SyncListener for QuicListener {
     }
 }
 
+/// Grabs the remote address of the connected peer, and accepts a message containing the port they
+/// want to be connected on.
 async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Result<Addr> {
-    let ip = conn
-        .remote_addr()
-        .context("cannot get remote address")?
-        .ip();
-    let port = {
-        let mut recv = conn
-            .accept_receive_stream()
-            .await?
-            .context("no stream for return port")?;
-        let bytes = recv.receive().await?.context("no return port sent")?;
-        u16::from_be_bytes(
-            bytes
-                .as_ref()
-                .try_into()
-                .context("bad return port message")?,
-        )
-    };
+    let ip = conn.remote_addr().assume("valid connection")?.ip();
+    let bytes = conn
+        .accept_receive_stream()
+        .await?
+        .context("unable to accept receive stream")?
+        .receive()
+        .await?
+        .context("peer didn't sent return port")?;
+    let port = u16::from_be_bytes(bytes.as_ref().try_into().context("invalid return port")?);
     Ok(Addr::from((ip, port)))
 }

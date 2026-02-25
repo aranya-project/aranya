@@ -24,6 +24,20 @@ use crate::sync::SyncPeer;
 pub(crate) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 type ConnectionMap = BTreeMap<SyncPeer, Handle>;
 
+// NB: Used to hide implementation details wrt mpsc
+/// Used to receive new connections from the [`SharedConnectionMap`].
+#[derive(Debug)]
+pub(super) struct ConnectionReceiver {
+    rx: mpsc::Receiver<ConnectionUpdate>,
+}
+
+impl ConnectionReceiver {
+    /// Waits until it receives a new connection from the [`SharedConnectionMap`].
+    pub(super) async fn next(&mut self) -> Option<ConnectionUpdate> {
+        self.rx.recv().await
+    }
+}
+
 /// Thread-safe map that stores a [`Handle`] to the connection to allow for reuse across multiple
 /// connection requests to a peer.
 #[derive(Clone, Debug)]
@@ -34,14 +48,14 @@ pub(crate) struct SharedConnectionMap {
 
 impl SharedConnectionMap {
     /// Creates a new [`SharedConnectionMap`].
-    pub(super) fn new(buffer: usize) -> (Self, mpsc::Receiver<ConnectionUpdate>) {
+    pub(super) fn new(buffer: usize) -> (Self, ConnectionReceiver) {
         let (tx, rx) = mpsc::channel(buffer);
         (
             Self {
                 tx,
                 handles: Arc::default(),
             },
-            rx,
+            ConnectionReceiver { rx },
         )
     }
 

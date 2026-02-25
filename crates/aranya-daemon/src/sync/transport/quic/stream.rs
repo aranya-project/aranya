@@ -3,8 +3,8 @@ use bytes::Bytes;
 use futures_util::AsyncReadExt as _;
 use s2n_quic::stream::{BidirectionalStream, ReceiveStream, SendStream};
 
-use super::Error;
-use crate::sync::{transport::SyncStream, SyncPeer};
+use super::{Error, SyncStream};
+use crate::sync::SyncPeer;
 
 pub(crate) struct QuicStream {
     peer: SyncPeer,
