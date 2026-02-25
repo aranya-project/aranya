@@ -1292,7 +1292,7 @@ pub fn setup_default_roles(
 
     // +1 for the owner role, which is already created at team creation time.
     let count = created_roles.iter().count();
-    *num_default_roles_out = count.checked_add(1).expect("role count overflow");
+    *num_default_roles_out = count.saturating_add(1);
 
     Ok(())
 }
@@ -1409,6 +1409,7 @@ pub unsafe fn team_default_roles(
     roles_out: *mut MaybeUninit<Role>,
     roles_out_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    // Filter to only return default roles (owner, admin, operator, member).
     let default_roles: Vec<_> = client
         .rt
         .block_on(client.inner.team(team.into()).roles())?
