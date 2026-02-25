@@ -371,7 +371,6 @@ dependencies = [
  "pretty_assertions",
  "quinn",
  "rustls",
- "rustls-pki-types",
  "serde",
  "serial_test",
  "tarpc",
