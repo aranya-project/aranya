@@ -703,6 +703,8 @@ When a team is created, the default ranks are:
 | Operator Role | `DEFAULT_OPERATOR_ROLE_RANK` (700) |
 | Member Role | `DEFAULT_MEMBER_ROLE_RANK` (600) |
 
+Note: The owner device intentionally outranks its own role. This is a special case because the owner is a superuser and needs to be able to modify the owner role's permissions. For all other roles, `role_rank > device_rank` is enforced during role assignment.
+
 ### Rank Examples
 
 #### Example 1: Simple Role Assignment (3 objects)
@@ -880,6 +882,9 @@ finish function set_object_rank(object_id id, rank int) {
 // which uses strict greater-than (>). This allows a device to be assigned a role of equal
 // rank, which is safe because the device still cannot modify that role (since modification
 // requires strictly outranking the target).
+//
+// The owner device is exempt from this check because its role is assigned
+// directly during team creation (see CreateTeam), bypassing AssignRole.
 function role_rank_gte_device_rank(role_id id, device_id id) bool {
     let role_rank = get_object_rank(role_id)
     let device_rank = get_object_rank(device_id)
@@ -900,14 +905,17 @@ function object_exists(object_id id) bool {
 Command for changing the rank of a device or label.
 
 If the target object is a device with an assigned role, the new rank must not
-exceed the role's rank. This maintains the invariant that `role_rank > device_rank`
+exceed the role's rank. This maintains the invariant that `role_rank >= device_rank`
 which was established at role assignment time. To promote a device above its
 current role's rank, first change the device's role to one with a higher rank.
+
+The owner device is the sole exception: its rank intentionally exceeds its role's
+rank so it can modify the owner role's permissions (see [Default Hierarchy](#default-hierarchy)).
 
 #### Role Ranks Are Immutable
 
 Role ranks cannot be changed after creation. This design decision maintains the
-invariant that `role_rank > device_rank` for all devices assigned to the role
+invariant that `role_rank >= device_rank` for all devices assigned to the role
 without requiring complex checks that would need to iterate over all assigned
 devices.
 
@@ -925,6 +933,10 @@ let DEFAULT_OWNER_DEVICE_RANK = 1000000
 // TODO: aranya-core#589 use const expression once supported by the
 // policy language. E.g.:
 //   let DEFAULT_OWNER_ROLE_RANK = saturating_sub(MAX_RANK, 1)
+// Note: The owner device intentionally outranks its own role. This is
+// a special case because the owner is a superuser and needs to be able
+// to modify the owner role's permissions. For all other roles,
+// role_rank > device_rank is enforced during role assignment.
 let DEFAULT_OWNER_ROLE_RANK = 999999
 let DEFAULT_ADMIN_ROLE_RANK = 800
 let DEFAULT_OPERATOR_ROLE_RANK = 700
@@ -1128,7 +1140,11 @@ function derive_role_id(evp struct Envelope) id {
 
 > **Note**: Upon team creation, the only role that exists is the
 > `owner` role. Therefore, the `owner` role is managed by itself.
-> It's [roles all the way down][all-the-way-down].
+> It's [roles all the way down][all-the-way-down]. The owner device's
+> rank intentionally exceeds its role's rank so it can modify the
+> owner role's permissions. This is the sole exception to the
+> `role_rank >= device_rank` invariant enforced for all other role
+> assignments.
 
 ### Privilege Escalation Mitigations
 
@@ -1583,10 +1599,13 @@ roles with fixed names.
     - Can create and delete AFC channels (for labels they have been
       granted permission to use)
 
-**Important**: The owner role (created during team creation) should
-be used sparingly. After setting up default roles, the owner
-credentials should be stored securely (e.g., in an HSM) and only
-used for emergency "break glass" scenarios.
+**Important**: The owner role (created during team creation) is a
+superuser with all permissions. Its device rank intentionally exceeds
+its role rank so it can manage its own role's permissions (see
+[Default Hierarchy](#default-hierarchy)). The owner role should be
+used sparingly. After setting up default roles, the owner credentials
+should be stored securely (e.g., in an HSM) and only used for
+emergency "break glass" scenarios.
 
 To guard against accidental replays, each default role records a
 `DefaultRoleSeeded` fact the first time it is created. Subsequent
@@ -2500,8 +2519,10 @@ command CreateTeam {
             assign_perm_to_role(owner_role_id, Perm::CanUseAfc)
             assign_perm_to_role(owner_role_id, Perm::CreateAfcUniChannel)
 
-            // And now make sure that the creator has the owner
-            // role, of course.
+            // Assign the owner role directly, bypassing the normal
+            // AssignRole command. This is the sole place where
+            // device_rank > role_rank is allowed, giving the owner
+            // device the ability to modify its own role.
             create_role_assignment(author_id, owner_role_id)
 
             // We don't have to emit the effects in a particular
