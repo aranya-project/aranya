@@ -99,16 +99,7 @@ impl<PS, SP> Client<PS, SP> {
         (aranya, caches)
     }
 
-    /// Returns a clone of the hello subscriptions Arc.
-    ///
-    /// Use this when you need to share the subscriptions across tasks.
-    #[cfg(feature = "preview")]
-    #[allow(dead_code)]
-    pub(crate) fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
-        Arc::clone(&self.hello_subscriptions)
-    }
-
-    /// Returns a locked reference to the hello subscriptions.
+    /// Returns a reference to the hello subscriptions.
     ///
     /// Use this when you need to access or modify hello subscriptions.
     #[cfg(feature = "preview")]

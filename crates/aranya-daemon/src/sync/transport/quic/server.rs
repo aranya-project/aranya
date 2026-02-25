@@ -13,16 +13,12 @@ use derive_where::derive_where;
 use futures_util::TryFutureExt;
 use quinn::{Connection, Endpoint, RecvStream, SendStream};
 use tokio::sync::mpsc;
-#[cfg(feature = "preview")]
-use tokio::sync::Mutex;
 use tracing::{debug, error, info, info_span, instrument, trace, warn, Instrument as _};
 
 use super::{
     certs, transport_config, CertConfig, ConnectionKey, ConnectionUpdate, Error,
     SharedConnectionMap, ALPN_QUIC_SYNC,
 };
-#[cfg(feature = "preview")]
-use crate::sync::HelloSubscriptions;
 use crate::{
     aranya::Client,
     sync::{Callback, Result, SyncHandle, SyncPeer, SyncResponse},
@@ -54,13 +50,6 @@ where
     /// Returns the local address the server is listening on.
     pub(crate) fn local_addr(&self) -> std::io::Result<SocketAddr> {
         self.endpoint.local_addr()
-    }
-
-    /// Returns a reference to the hello subscriptions for hello notification broadcasting.
-    #[cfg(feature = "preview")]
-    #[allow(dead_code)]
-    pub fn hello_subscriptions(&self) -> Arc<Mutex<HelloSubscriptions>> {
-        self.client.hello_subscriptions()
     }
 
     /// Creates a new `Server`.

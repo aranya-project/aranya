@@ -5,9 +5,7 @@
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 #[cfg(feature = "preview")]
-use std::collections::HashMap;
-#[cfg(feature = "preview")]
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
@@ -39,12 +37,6 @@ use tokio::sync::Mutex;
 use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(feature = "afc")]
-use crate::actions::SessionData;
-#[cfg(feature = "afc")]
-use crate::afc::Afc;
-#[cfg(feature = "afc")]
-use crate::daemon::{CE, KS};
 use crate::{
     actions::Actions,
     daemon::CS,
@@ -52,6 +44,12 @@ use crate::{
     sync::{SyncHandle, SyncPeer},
     util::TeamConfigStore,
     Client, EF,
+};
+#[cfg(feature = "afc")]
+use crate::{
+    actions::SessionData,
+    afc::Afc,
+    daemon::{CE, KS},
 };
 
 /// Find the first effect matching a given pattern.
