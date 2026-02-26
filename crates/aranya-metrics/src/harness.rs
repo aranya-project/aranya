@@ -329,27 +329,22 @@ impl ProcessMetricsCollector {
         // Aggregate this process's metrics towards the total.
         metrics.cpu_user_time_us = metrics
             .cpu_user_time_us
-            .checked_add(process_metrics.cpu_user_time_us)
-            .ok_or_else(|| anyhow!("overflow in cpu_user_time_us"))?;
+            .saturating_add(process_metrics.cpu_user_time_us);
         metrics.cpu_system_time_us = metrics
             .cpu_system_time_us
-            .checked_add(process_metrics.cpu_system_time_us)
-            .ok_or_else(|| anyhow!("overflow in cpu_system_time_us"))?;
+            .saturating_add(process_metrics.cpu_system_time_us);
         metrics.physical_memory_bytes = metrics
             .physical_memory_bytes
-            .checked_add(process_metrics.physical_memory_bytes)
-            .ok_or_else(|| anyhow!("overflow in physical_memory_bytes"))?;
+            .saturating_add(process_metrics.physical_memory_bytes);
         metrics.virtual_memory_bytes = metrics
             .virtual_memory_bytes
             .max(process_metrics.virtual_memory_bytes);
         metrics.disk_read_bytes = metrics
             .disk_read_bytes
-            .checked_add(process_metrics.disk_read_bytes)
-            .ok_or_else(|| anyhow!("overflow in disk_read_bytes"))?;
+            .saturating_add(process_metrics.disk_read_bytes);
         metrics.disk_write_bytes = metrics
             .disk_write_bytes
-            .checked_add(process_metrics.disk_write_bytes)
-            .ok_or_else(|| anyhow!("overflow in disk_write_bytes"))?;
+            .saturating_add(process_metrics.disk_write_bytes);
 
         // Store the latest per-process metrics
         let result = match self.individual_metrics.entry(pid) {
@@ -359,12 +354,10 @@ impl ProcessMetricsCollector {
                 process_metrics.timestamp = stored.timestamp;
                 process_metrics.disk_read_bytes = process_metrics
                     .disk_read_bytes
-                    .checked_add(stored.disk_read_bytes)
-                    .ok_or_else(|| anyhow!("overflow in per-process disk_read_bytes"))?;
+                    .saturating_add(stored.disk_read_bytes);
                 process_metrics.disk_write_bytes = process_metrics
                     .disk_write_bytes
-                    .checked_add(stored.disk_write_bytes)
-                    .ok_or_else(|| anyhow!("overflow in per-process disk_write_bytes"))?;
+                    .saturating_add(stored.disk_write_bytes);
 
                 &mut entry.insert(process_metrics)
             }
@@ -398,27 +391,22 @@ impl ProcessMetricsCollector {
         // Aggregate this process's metrics towards the total.
         metrics.cpu_user_time_us = metrics
             .cpu_user_time_us
-            .checked_add(process_metrics.cpu_user_time_us)
-            .ok_or_else(|| anyhow!("overflow in cpu_user_time_us"))?;
+            .saturating_add(process_metrics.cpu_user_time_us);
         metrics.cpu_system_time_us = metrics
             .cpu_system_time_us
-            .checked_add(process_metrics.cpu_system_time_us)
-            .ok_or_else(|| anyhow!("overflow in cpu_system_time_us"))?;
+            .saturating_add(process_metrics.cpu_system_time_us);
         metrics.physical_memory_bytes = metrics
             .physical_memory_bytes
-            .checked_add(process_metrics.physical_memory_bytes)
-            .ok_or_else(|| anyhow!("overflow in physical_memory_bytes"))?;
+            .saturating_add(process_metrics.physical_memory_bytes);
         metrics.virtual_memory_bytes = metrics
             .virtual_memory_bytes
             .max(process_metrics.virtual_memory_bytes);
         metrics.disk_read_bytes = metrics
             .disk_read_bytes
-            .checked_add(process_metrics.disk_read_bytes)
-            .ok_or_else(|| anyhow!("overflow in disk_read_bytes"))?;
+            .saturating_add(process_metrics.disk_read_bytes);
         metrics.disk_write_bytes = metrics
             .disk_write_bytes
-            .checked_add(process_metrics.disk_write_bytes)
-            .ok_or_else(|| anyhow!("overflow in disk_write_bytes"))?;
+            .saturating_add(process_metrics.disk_write_bytes);
 
         // Store the latest per-process metrics
         let result = match self.individual_metrics.entry(pid) {
@@ -428,12 +416,10 @@ impl ProcessMetricsCollector {
                 process_metrics.timestamp = stored.timestamp;
                 process_metrics.disk_read_bytes = process_metrics
                     .disk_read_bytes
-                    .checked_add(stored.disk_read_bytes)
-                    .ok_or_else(|| anyhow!("overflow in per-process disk_read_bytes"))?;
+                    .saturating_add(stored.disk_read_bytes);
                 process_metrics.disk_write_bytes = process_metrics
                     .disk_write_bytes
-                    .checked_add(stored.disk_write_bytes)
-                    .ok_or_else(|| anyhow!("overflow in per-process disk_write_bytes"))?;
+                    .saturating_add(stored.disk_write_bytes);
 
                 &mut entry.insert(process_metrics)
             }
