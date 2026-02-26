@@ -26,9 +26,7 @@ use derive_where::derive_where;
 use futures_util::StreamExt as _;
 use tokio::{sync::mpsc, time::Instant};
 use tokio_util::time::{delay_queue, DelayQueue};
-#[cfg(feature = "preview")]
-use tracing::{debug, trace};
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(doc)]
 use super::SyncHandle;
