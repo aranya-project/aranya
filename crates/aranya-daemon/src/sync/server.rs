@@ -168,7 +168,12 @@ where
             }
             SyncRequestMessage::RequestMissing { .. }
             | SyncRequestMessage::SyncResume { .. }
-            | SyncRequestMessage::EndSession { .. } => bug!("should be a SyncRequest"),
+            | SyncRequestMessage::EndSession { .. } => {
+                warn!(?peer, "received an unexpected SyncRequestMessage variant");
+                Err(Error::Other(anyhow::anyhow!(
+                    "received an unexpected SyncRequestMessage variant"
+                )))
+            }
         }
     }
 

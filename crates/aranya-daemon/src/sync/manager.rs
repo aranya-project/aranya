@@ -140,7 +140,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         // Schedule a hello sync immediately after we register a subscription.
         let queue_key = self
             .queue
-            .insert_at(ScheduledTask::Sync(peer), Instant::now());
+            .insert_at(ScheduledTask::HelloNotify(peer), Instant::now());
         let subscription = HelloSubscription {
             graph_change_debounce,
             schedule_delay,
