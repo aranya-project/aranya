@@ -111,10 +111,7 @@
 /**
  * The size in bytes of a PSK seed IKM.
  *
- * # Deprecation Notice
- *
- * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
- * This constant exists for backward compatibility but will be removed in a future release.
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 #define ARANYA_SEED_IKM_LEN 32
 
@@ -478,9 +475,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
  *
  * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
  *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
     /**
@@ -496,9 +491,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
  *
  * The [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig) is an optional part of initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
     /**
@@ -514,13 +507,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
  *
  * PSK seed Input Key Material.
  *
- * # Deprecation Notice
- *
- * With mTLS authentication, PSK seeds are no longer used for QUIC sync.
- * This type exists for backward compatibility but will be removed in a future release.
- * The functions using this type are deprecated.
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
-typedef struct AranyaSeedIkm {
+typedef struct ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication") AranyaSeedIkm {
     uint8_t bytes[ARANYA_SEED_IKM_LEN];
 } AranyaSeedIkm;
 
@@ -529,9 +518,7 @@ typedef struct AranyaSeedIkm {
  *
  * Use a [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder) to construct this object.
  *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
     /**
@@ -547,9 +534,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
  *
  * Use an [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder) to construct this object.
  *
- * # Deprecated
- *
- * This type is deprecated. With mTLS authentication, PSK seeds are no longer used.
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfig {
     /**
@@ -1007,6 +992,8 @@ AranyaError aranya_get_public_key_bundle_ext(const struct AranyaClient *client,
  * @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
  *
  * @relates AranyaClient.
+ *
+ * @deprecated Use `aranya_get_public_key_bundle`.
  */
 ARANYA_DEPRECATED_MSG("Use `aranya_get_public_key_bundle`.")
 AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
@@ -1023,6 +1010,8 @@ AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
  * @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
  *
  * @relates AranyaClient.
+ *
+ * @deprecated Use `aranya_get_public_key_bundle`.
  */
 ARANYA_DEPRECATED_MSG("Use `aranya_get_public_key_bundle`.")
 AranyaError aranya_get_key_bundle_ext(const struct AranyaClient *client,
@@ -1191,11 +1180,9 @@ AranyaError aranya_create_team_quic_sync_config_builder_cleanup(struct AranyaCre
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
- *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg);
@@ -1205,11 +1192,9 @@ AranyaError aranya_create_team_quic_sync_config_generate(struct AranyaCreateTeam
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
- *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
@@ -1222,6 +1207,8 @@ AranyaError aranya_create_team_quic_sync_config_generate_ext(struct AranyaCreate
  * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
@@ -1235,6 +1222,8 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed(struct AranyaAddTeamQu
  * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
@@ -1249,6 +1238,8 @@ AranyaError aranya_add_team_quic_sync_config_wrapped_seed_ext(struct AranyaAddTe
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
@@ -1261,6 +1252,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm(struct AranyaCreate
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
@@ -1274,6 +1267,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCr
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
@@ -1286,6 +1281,8 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQu
  * @param[in] ikm a pointer the raw PSK seed IKM
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
@@ -1301,11 +1298,9 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTe
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
- *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
@@ -1320,11 +1315,9 @@ AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQui
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
- *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTeamQuicSyncConfigBuilder *_cfg,
@@ -1340,11 +1333,9 @@ AranyaError aranya_create_team_quic_sync_config_build_ext(struct AranyaCreateTea
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
- *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
@@ -1359,11 +1350,9 @@ AranyaError aranya_add_team_quic_sync_config_build(struct AranyaAddTeamQuicSyncC
  * @param[in] cfg a pointer to the QUIC sync config builder
  * @param[out] out a pointer to write the QUIC sync config to
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, PSK seeds are no longer used.
- *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_add_team_quic_sync_config_build_ext(struct AranyaAddTeamQuicSyncConfigBuilder *_cfg,
@@ -1416,11 +1405,9 @@ AranyaError aranya_create_team_config_builder_cleanup(struct AranyaCreateTeamCon
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
- *
  * @relates AranyaAddTeamConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamConfigBuilder *_cfg,
@@ -1434,11 +1421,9 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
- *
  * @relates AranyaAddTeamConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddTeamConfigBuilder *_cfg,
@@ -1509,11 +1494,9 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
- *
  * @relates AranyaCreateTeamConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreateTeamConfigBuilder *_cfg,
@@ -1527,11 +1510,9 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  * @param[in,out] cfg a pointer to the builder for a team config
  * @param[in] quic set the QUIC syncer config
  *
- * # Deprecated
- *
- * This function is deprecated. With mTLS authentication, QUIC sync config is no longer used.
- *
  * @relates AranyaCreateTeamConfigBuilder.
+ *
+ * @deprecated QUIC sync config is no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("QUIC sync config is no longer used with mTLS authentication")
 AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaCreateTeamConfigBuilder *_cfg,
@@ -2720,6 +2701,8 @@ AranyaError aranya_rand_ext(const struct AranyaClient *client,
  * @param[in,out] seed_len the number of bytes written to the seed buffer.
  *
  * @relates AranyaClient.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
@@ -2746,6 +2729,8 @@ AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
  * @param[in,out] seed_len the number of bytes written to the seed buffer.
  *
  * @relates AranyaClient.
+ *
+ * @deprecated PSK seeds are no longer used with mTLS authentication
  */
 ARANYA_DEPRECATED_MSG("PSK seeds are no longer used with mTLS authentication")
 AranyaError aranya_encrypt_psk_seed_for_peer_ext(const struct AranyaClient *client,
@@ -3201,6 +3186,8 @@ AranyaError aranya_team_device_public_key_bundle_ext(const struct AranyaClient *
  * @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
  *
  * @relates AranyaClient.
+ *
+ * @deprecated Use `aranya_team_device_public_key_bundle`.
  */
 ARANYA_DEPRECATED_MSG("Use `aranya_team_device_public_key_bundle`.")
 AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
@@ -3221,6 +3208,8 @@ AranyaError aranya_team_device_keybundle(const struct AranyaClient *client,
  * @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
  *
  * @relates AranyaClient.
+ *
+ * @deprecated Use `aranya_team_device_public_key_bundle`.
  */
 ARANYA_DEPRECATED_MSG("Use `aranya_team_device_public_key_bundle`.")
 AranyaError aranya_team_device_keybundle_ext(const struct AranyaClient *client,
