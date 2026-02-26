@@ -645,10 +645,14 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn collect_linux_metrics_for_self() {
-        // Burn some CPU so we have nonzero tick counts at 100Hz granularity.
+        // Burn CPU for at least 100ms of wall-clock time so we accumulate
+        // multiple clock ticks at 100Hz granularity (1 tick = 10ms).
+        let deadline = Instant::now() + std::time::Duration::from_millis(100);
         let mut x: u64 = 0;
-        for i in 0..10_000_000u64 {
+        let mut i: u64 = 0;
+        while Instant::now() < deadline {
             x = std::hint::black_box(x).wrapping_add(std::hint::black_box(i));
+            i = i.wrapping_add(1);
         }
         std::hint::black_box(x);
 
