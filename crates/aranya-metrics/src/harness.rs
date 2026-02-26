@@ -464,9 +464,16 @@ impl ProcessMetricsCollector {
 
         let parsed = parse_proc_stat(&stat_contents, pid.pid)?;
 
-        // SAFETY: sysconf with _SC_CLK_TCK is always a valid call.
+        // SAFETY: `sysconf` is a read-only, side-effect-free libc function.
+        // `_SC_CLK_TCK` is required by POSIX.1-1996 and guaranteed to return a
+        // positive value on Linux (always USER_HZ = 100, a stable kernel ABI
+        // since 2.6). The only reason this is `unsafe` is the FFI boundary;
+        // no pointers are passed and no memory is accessed.
         let clock_ticks_per_sec = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
-        // SAFETY: sysconf with _SC_PAGESIZE is always a valid call.
+        // SAFETY: Same justification as above. `_SC_PAGESIZE` is required by
+        // POSIX.1-2001 and always returns a positive value on Linux (typically
+        // 4096 on x86_64). This module is compiled only on Linux
+        // (`#[cfg(target_os = "linux")]`), so both constants are always defined.
         let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
 
         if clock_ticks_per_sec <= 0 || page_size <= 0 {
