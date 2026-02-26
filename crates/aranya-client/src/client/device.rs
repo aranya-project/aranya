@@ -21,13 +21,11 @@ pub struct PublicKeyBundle(api::PublicKeyBundle);
 pub type KeyBundle = PublicKeyBundle;
 
 impl PublicKeyBundle {
-    #[doc(hidden)]
-    pub fn from_api(api: api::PublicKeyBundle) -> Self {
+    pub(crate) fn from_api(api: api::PublicKeyBundle) -> Self {
         Self(api)
     }
 
-    #[doc(hidden)]
-    pub fn into_api(self) -> api::PublicKeyBundle {
+    pub(crate) fn into_api(self) -> api::PublicKeyBundle {
         self.0
     }
 
@@ -55,8 +53,9 @@ impl Devices {
         IterDevices(self.data.iter())
     }
 
-    #[doc(hidden)]
-    pub fn __data(&self) -> &[DeviceId] {
+    /// Returns the underlying device ID slice.
+    #[cfg(feature = "capi")]
+    pub fn data(&self) -> &[DeviceId] {
         &self.data
     }
 }

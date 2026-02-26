@@ -45,7 +45,7 @@ pub struct CreateTeamQuicSyncConfigBuilder {
 
 impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    #[doc(hidden)]
+    #[cfg(feature = "capi")]
     pub fn mode(mut self, mode: CreateSeedMode) -> Self {
         self.mode = mode;
         self
@@ -81,7 +81,7 @@ pub struct AddTeamQuicSyncConfigBuilder {
 
 impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    #[doc(hidden)]
+    #[cfg(feature = "capi")]
     pub fn mode(mut self, mode: AddSeedMode) -> Self {
         self.mode = Some(mode);
         self

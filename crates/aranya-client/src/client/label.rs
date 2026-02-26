@@ -49,14 +49,10 @@ impl Labels {
         self.labels.iter()
     }
 
-    #[doc(hidden)]
-    pub fn __data(&self) -> &[Label] {
+    /// Returns the underlying label slice.
+    #[cfg(feature = "capi")]
+    pub fn data(&self) -> &[Label] {
         &self.labels
-    }
-
-    #[doc(hidden)]
-    pub fn __into_data(self) -> Box<[Label]> {
-        self.labels
     }
 }
 

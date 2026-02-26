@@ -21,6 +21,7 @@ doctest = false
 [features]
 default = [
     "afc",
+    "aranya-client/capi",
     "aranya-client/default",
     "aranya-daemon-api/default",
 ]

@@ -632,7 +632,7 @@ impl From<afc::ChannelId> for AfcChannelId {
     fn from(value: afc::ChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.__id.into(),
+                bytes: value.into_api().into(),
             },
         }
     }
@@ -641,9 +641,7 @@ impl From<afc::ChannelId> for AfcChannelId {
 #[cfg(feature = "afc")]
 impl From<&AfcChannelId> for afc::ChannelId {
     fn from(value: &AfcChannelId) -> Self {
-        Self {
-            __id: aranya_daemon_api::AfcChannelId::from_bytes(value.id.bytes),
-        }
+        afc::ChannelId::from_api(aranya_daemon_api::AfcChannelId::from_bytes(value.id.bytes))
     }
 }
 
@@ -1245,7 +1243,7 @@ pub unsafe fn setup_default_roles(
                 .team(team.into())
                 .setup_default_roles(owning_role.into()),
         )?
-        .__into_data();
+        .into_data();
 
     debug_assert_eq!(DEFAULT_ROLES_LEN, default_roles.len());
 
@@ -1336,7 +1334,7 @@ pub unsafe fn role_owners(
     let owning_roles = client
         .rt
         .block_on(client.inner.team(team.into()).role_owners(role.into()))?
-        .__into_data();
+        .into_data();
 
     if *roles_len < owning_roles.len() {
         *roles_len = owning_roles.len();
@@ -1458,7 +1456,7 @@ pub unsafe fn team_roles(
     let roles = client
         .rt
         .block_on(client.inner.team(team.into()).roles())?
-        .__into_data();
+        .into_data();
 
     if *roles_out_len < roles.len() {
         *roles_out_len = roles.len();
@@ -2084,7 +2082,7 @@ pub unsafe fn team_devices(
     let data = client
         .rt
         .block_on(client.inner.team(team.into()).devices())?;
-    let data = data.__data();
+    let data = data.data();
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     if *devices_len < data.len() {
         *devices_len = data.len();
@@ -2218,7 +2216,7 @@ pub unsafe fn team_device_label_assignments(
             .device(device.into())
             .label_assignments(),
     )?;
-    let data = data.__data();
+    let data = data.data();
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -2252,7 +2250,7 @@ pub unsafe fn team_labels(
     let data = client
         .rt
         .block_on(client.inner.team(team.into()).labels())?;
-    let data = data.__data();
+    let data = data.data();
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);

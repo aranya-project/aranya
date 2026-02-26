@@ -52,8 +52,9 @@ impl Roles {
         IterRoles(self.roles.iter())
     }
 
-    #[doc(hidden)]
-    pub fn __into_data(self) -> Box<[Role]> {
+    /// Converts into the underlying role data.
+    #[cfg(feature = "capi")]
+    pub fn into_data(self) -> Box<[Role]> {
         self.roles
     }
 }

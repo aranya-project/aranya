@@ -30,6 +30,10 @@ afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 # Experimental features
 experimental = ["aranya-daemon-api/experimental"]
 
+# Internal feature for C API bindings. Do not enable directly;
+# this is only intended for use by aranya-client-capi.
+capi = []
+
 
 [dependencies]
 aranya-daemon-api = { workspace = true, default-features = false }

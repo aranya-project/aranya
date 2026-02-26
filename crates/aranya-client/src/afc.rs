@@ -64,13 +64,26 @@ impl From<Box<[u8]>> for CtrlMsg {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ChannelId {
-    #[doc(hidden)]
-    pub __id: AfcChannelId,
+    pub(crate) id: AfcChannelId,
+}
+
+impl ChannelId {
+    /// Returns the underlying API channel ID.
+    #[cfg(feature = "capi")]
+    pub fn into_api(self) -> AfcChannelId {
+        self.id
+    }
+
+    /// Creates a `ChannelId` from an API channel ID.
+    #[cfg(feature = "capi")]
+    pub fn from_api(id: AfcChannelId) -> Self {
+        Self { id }
+    }
 }
 
 impl Display for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.__id, f)
+        Display::fmt(&self.id, f)
     }
 }
 
@@ -191,7 +204,7 @@ impl Channels {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
             channel_id: ChannelId {
-                __id: info.channel_id,
+                id: info.channel_id,
             },
             local_channel_id: info.local_channel_id,
             label_id,
@@ -219,7 +232,7 @@ impl Channels {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
             channel_id: ChannelId {
-                __id: info.channel_id,
+                id: info.channel_id,
             },
             local_channel_id: info.local_channel_id,
             label_id: LabelId::from_api(info.label_id),
