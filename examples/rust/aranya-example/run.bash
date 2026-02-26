@@ -31,4 +31,5 @@ daemon="${current_dir}/target/release/aranya-daemon"
 example="${current_dir}/target/release/aranya-example"
 
 echo "Running aranya-example with daemon: ${daemon}"
-"${example}" "${daemon}"
+# Enable logging to see trace_id and other useful output from both daemon and example
+ARANYA_EXAMPLE=info ARANYA_DAEMON=info "${example}" "${daemon}"

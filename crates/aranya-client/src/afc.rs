@@ -21,9 +21,8 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    client::create_ctx,
     error::{aranya_error, IpcError},
-    util::ApiConv as _,
+    util::{rpc_context, ApiConv as _},
     DeviceId, LabelId, Result, TeamId,
 };
 
@@ -173,7 +172,7 @@ impl Channels {
         let info = self
             .daemon
             .create_afc_channel(
-                create_ctx(),
+                rpc_context(),
                 team_id.into_api(),
                 peer_id.into_api(),
                 label_id.into_api(),
@@ -205,7 +204,7 @@ impl Channels {
     pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let info = self
             .daemon
-            .accept_afc_channel(create_ctx(), team_id.into_api(), ctrl.0)
+            .accept_afc_channel(rpc_context(), team_id.into_api(), ctrl.0)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -282,7 +281,7 @@ impl SendChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(create_ctx(), self.local_channel_id)
+            .delete_afc_channel(rpc_context(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -354,7 +353,7 @@ impl ReceiveChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(create_ctx(), self.local_channel_id)
+            .delete_afc_channel(rpc_context(), self.local_channel_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
