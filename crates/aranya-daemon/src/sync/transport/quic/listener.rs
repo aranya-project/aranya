@@ -102,7 +102,14 @@ impl QuicListener {
 
     /// Accepts an incoming bidirectional stream from this [`SyncPeer`].
     async fn accept_pending_stream(peer: SyncPeer, mut acceptor: StreamAcceptor) -> AcceptResult {
-        let stream = acceptor.accept_bidirectional_stream().await.ok().flatten();
+        let stream = tokio::time::timeout(
+            Duration::from_secs(30),
+            acceptor.accept_bidirectional_stream(),
+        )
+        .await
+        .ok()
+        .and_then(|r| r.ok().flatten());
+
         (peer, acceptor, stream)
     }
 

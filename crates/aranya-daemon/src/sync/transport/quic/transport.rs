@@ -115,15 +115,6 @@ impl SyncTransport for QuicTransport {
         // Open a new bidirectional stream on our new connection.
         let stream = match handle.open_bidirectional_stream().await {
             Ok(stream) => stream,
-            // Retry for these errors?
-            Err(
-                e @ (s2n_quic::connection::Error::StatelessReset { .. }
-                | s2n_quic::connection::Error::StreamIdExhausted { .. }
-                | s2n_quic::connection::Error::MaxHandshakeDurationExceeded { .. }),
-            ) => {
-                return Err(Error::QuicConnection(e));
-            }
-            // Other errors means the stream has closed
             Err(e) => {
                 self.conns.remove(peer, handle).await;
                 return Err(Error::QuicConnection(e));

@@ -69,9 +69,7 @@ impl SharedConnectionMap {
         peer: SyncPeer,
         make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
     ) -> Result<(Handle, Option<StreamAcceptor>), super::Error> {
-        let mut map = self.handles.lock().await;
-
-        match map.get_mut(&peer) {
+        match self.handles.lock().await.get_mut(&peer) {
             Some(existing) => {
                 debug!("existing connection found");
 
@@ -88,9 +86,8 @@ impl SharedConnectionMap {
         }
 
         let (handle, acceptor) = make_conn().await?.split();
-        map.insert(peer, handle.clone());
+        self.handles.lock().await.insert(peer, handle.clone());
         debug!("created new quic connection");
-        drop(map);
 
         Ok((handle, Some(acceptor)))
     }
@@ -104,9 +101,7 @@ impl SharedConnectionMap {
         peer: SyncPeer,
         conn: Connection,
     ) -> (Handle, Option<StreamAcceptor>) {
-        let mut map = self.handles.lock().await;
-
-        match map.get_mut(&peer) {
+        match self.handles.lock().await.get_mut(&peer) {
             Some(existing) => {
                 debug!("existing connection found");
 
@@ -124,9 +119,8 @@ impl SharedConnectionMap {
         }
 
         let (handle, acceptor) = conn.split();
-        map.insert(peer, handle.clone());
+        self.handles.lock().await.insert(peer, handle.clone());
         debug!("created new connection");
-        drop(map);
 
         (handle, Some(acceptor))
     }
