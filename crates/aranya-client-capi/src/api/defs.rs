@@ -632,7 +632,7 @@ impl From<afc::ChannelId> for AfcChannelId {
     fn from(value: afc::ChannelId) -> Self {
         Self {
             id: Id {
-                bytes: value.__id.into(),
+                bytes: value.into(),
             },
         }
     }
@@ -641,9 +641,7 @@ impl From<afc::ChannelId> for AfcChannelId {
 #[cfg(feature = "afc")]
 impl From<&AfcChannelId> for afc::ChannelId {
     fn from(value: &AfcChannelId) -> Self {
-        Self {
-            __id: aranya_daemon_api::AfcChannelId::from_bytes(value.id.bytes),
-        }
+        value.id.bytes.into()
     }
 }
 
