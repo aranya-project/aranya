@@ -19,6 +19,8 @@ use s2n_quic::{
 use tokio::{sync::mpsc, task::JoinSet, time::Duration};
 use tracing::{debug, error, trace, warn};
 
+#[cfg(doc)]
+use super::QuicTransport;
 use super::{
     ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
     ALPN_QUIC_SYNC,
@@ -35,7 +37,7 @@ pub(crate) struct QuicListener {
     server: s2n_quic::Server,
     /// Allows authenticating the identity of a given `GraphId`.
     server_keys: Arc<PskStore>,
-    /// Handle to the `SharedConnectionMap` to register new connections with the `QuicTransport`.
+    /// Handle to the `SharedConnectionMap` to register new connections with the [`QuicTransport`].
     conns: SharedConnectionMap,
     /// Receives new acceptors from the [`QuicTransport`] so we can listen for connections back.
     conn_rx: mpsc::Receiver<ConnectionUpdate>,

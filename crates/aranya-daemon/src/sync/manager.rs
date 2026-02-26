@@ -30,6 +30,8 @@ use tokio_util::time::{delay_queue, DelayQueue};
 use tracing::{debug, trace};
 use tracing::{error, info, instrument, warn};
 
+#[cfg(doc)]
+use super::SyncHandle;
 use super::{
     handle::{Callback, ManagerMessage},
     GraphId, Result, SyncPeer,

@@ -15,6 +15,8 @@ use buggy::{bug, BugExt as _};
 use derive_where::derive_where;
 use tracing::{error, info, instrument, trace, warn};
 
+#[cfg(doc)]
+use super::SyncManager;
 use super::{
     transport::{SyncListener, SyncStream},
     Addr, Error, SyncHandle, SyncPeer,
