@@ -535,6 +535,11 @@ impl DaemonApi for Api {
             return Err(anyhow!("team {team} was not present").into());
         }
 
+        self.syncer
+            .remove_graph(GraphId::transmute(team))
+            .await
+            .context("unable to remove sync data for graph")?;
+
         self.client
             .lock_aranya()
             .await

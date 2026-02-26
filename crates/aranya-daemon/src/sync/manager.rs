@@ -174,6 +174,9 @@ where
             // receive added/removed peers.
             Some((msg, tx)) = self.recv.recv() => {
                 let reply = match msg {
+                    ManagerMessage::RemoveGraph { graph_id } => {
+                        todo!("remove {graph_id} from sync manager");
+                    },
                     ManagerMessage::SyncNow { peer, cfg: _cfg } => {
                         // sync with peer right now.
                         self.sync(peer).await.map(|_| ())

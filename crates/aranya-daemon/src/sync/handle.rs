@@ -24,6 +24,12 @@ use super::{Result, SyncPeer};
 /// Holds all possible messages that the [`SyncManager`] can process.
 #[derive(Clone, Debug)]
 pub(crate) enum ManagerMessage {
+    /// Remove all data associated with this graph.
+    RemoveGraph {
+        /// The ID of the graph to remove.
+        graph_id: GraphId,
+    },
+
     /// Add a peer to the [`SyncManager`]'s schedule.
     AddPeer {
         /// The unique [`SyncPeer`] to send a message to.
@@ -93,6 +99,11 @@ impl SyncHandle {
     /// Creates a new [`SyncHandle`] for sending messages.
     pub(crate) fn new(sender: mpsc::Sender<Callback>) -> Self {
         Self { sender }
+    }
+
+    /// Remove all data associated with this graph.
+    pub(crate) async fn remove_graph(&self, graph_id: GraphId) -> Response {
+        self.send(ManagerMessage::RemoveGraph { graph_id }).await
     }
 
     /// Add a peer to the [`SyncManager`]'s schedule.
