@@ -1,10 +1,7 @@
-use anyhow::Context as _;
-use aranya_crypto::EncryptionPublicKey;
-use aranya_daemon_api::{self as api, CS};
+use aranya_daemon_api::{self as api};
 use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
-use buggy::BugExt as _;
 use tracing::instrument;
 
 #[cfg(feature = "preview")]
@@ -15,7 +12,7 @@ use crate::{
         Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
-    error::{self, aranya_error, IpcError, Result},
+    error::{aranya_error, IpcError, Result},
     util::{ApiConv as _, ApiId},
 };
 
@@ -52,22 +49,12 @@ impl Team<'_> {
 
 impl Team<'_> {
     /// Encrypts the team's QUIC syncer PSK seed for a peer.
-    /// `peer_enc_pk` is the public encryption key of the peer device.
-    /// See [`PublicKeyBundle::encryption`].
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
     #[instrument(skip(self))]
-    pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
-        let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
-            .context("bad peer_enc_pk")
-            .map_err(error::other)?;
-        let wrapped = self
-            .client
-            .daemon
-            .encrypt_psk_seed_for_peer(create_ctx(), self.id, peer_enc_pk)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        let wrapped = postcard::to_allocvec(&wrapped).assume("can serialize")?;
-        Ok(wrapped)
+    pub async fn encrypt_psk_seed_for_peer(&self, _peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
+        // With mTLS authentication, PSK seeds are no longer used.
+        // Return empty vector for backward compatibility.
+        Ok(Vec::new())
     }
 
     /// Adds a peer for automatic periodic Aranya state syncing.

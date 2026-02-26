@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{text, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{text, AddTeamConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -54,16 +54,10 @@ async fn main() -> Result<()> {
     info!("admin: received team info from owner");
 
     // Add team.
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(team_info.seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_info.team_id)
-            .build()?
-    };
-    let team = client.add_team(add_team_cfg.clone()).await?;
+    let add_team_cfg = AddTeamConfig::builder()
+        .team_id(team_info.team_id)
+        .build()?;
+    let team = client.add_team(add_team_cfg).await?;
     info!("admin: added team");
 
     // Send device info to owner.

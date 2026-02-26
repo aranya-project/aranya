@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{afc::Channels, AddTeamConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
     get_member_peer,
@@ -56,17 +56,11 @@ async fn main() -> Result<()> {
     info!("memberb: received team info from owner");
 
     // Add team.
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(team_info.seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_info.team_id)
-            .build()?
-    };
+    let add_team_cfg = AddTeamConfig::builder()
+        .team_id(team_info.team_id)
+        .build()?;
     let team = client
-        .add_team(add_team_cfg.clone())
+        .add_team(add_team_cfg)
         .await
         .expect("expected to add team");
     info!("memberb: added team");

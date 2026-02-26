@@ -374,6 +374,12 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
+[[audits.rustls-pki-types]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.11.0 -> 1.14.0"
+notes = "Makes zeroization of private keys part of `alloc` feature which we need. Minor updates to crypto algorithm and certificate parsing code. No new unsafe, networking, or file I/O code introduced."
+
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -1017,7 +1023,7 @@ end = "2026-07-09"
 
 [[trusted.wasi]]
 criteria = "safe-to-deploy"
-user-id = 6825 # Dan Gohman (sunfishcode)
+user-id = 6825
 start = "2019-07-22"
 end = "2026-05-16"
 

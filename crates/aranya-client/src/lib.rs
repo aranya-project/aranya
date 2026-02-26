@@ -42,6 +42,12 @@ pub use crate::client::KeyBundle;
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
 pub use crate::client::{Permission, RoleManagementPermission};
+// Re-export deprecated config types for backward compatibility
+#[expect(deprecated)]
+#[doc(inline)]
+pub use crate::config::{
+    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+};
 #[cfg(feature = "preview")]
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
@@ -53,8 +59,7 @@ pub use crate::{
         RoleId, Roles, Team, TeamId,
     },
     config::{
-        AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
-        CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+        AddTeamConfig, AddTeamConfigBuilder, CreateTeamConfig, CreateTeamConfigBuilder,
         SyncPeerConfig, SyncPeerConfigBuilder,
     },
     error::{ConfigError, Error, Result},

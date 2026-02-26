@@ -37,7 +37,6 @@ use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{PolicyStore, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
-use bytes::Bytes;
 use derive_where::derive_where;
 use futures_util::StreamExt as _;
 #[cfg(feature = "preview")]
@@ -74,8 +73,6 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Additional state used by the syncer.
     pub(super) state: ST,
-    /// Sync server port. Peers will make incoming connections to us on this port.
-    pub(super) return_port: Bytes,
     /// Tracks spawned hello notification tasks for lifecycle management.
     #[cfg(feature = "preview")]
     pub(super) hello_tasks: JoinSet<()>,
@@ -209,9 +206,9 @@ where
                         if let Some((cfg, _)) = self.peers.get(&peer) {
                             if cfg.sync_on_hello {
                                 self.sync(peer).await
-                                    .inspect_err(|e| {
+                                    .inspect_err(|err| {
                                         warn!(
-                                            error = %e,
+                                            error = %err.report(),
                                             ?peer,
                                             "SyncOnHello sync failed"
                                         );
@@ -264,7 +261,7 @@ where
             .await
             .inspect_err(|err| {
                 warn!(
-                    error = %err,
+                    error = %err.report(),
                     ?peer,
                     "ST::sync_impl failed"
                 );

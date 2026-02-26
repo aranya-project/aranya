@@ -31,6 +31,17 @@ corrosion_import_crate(
 
 add_executable(Aranya::Daemon ALIAS aranya-daemon)
 
+# ==== Certgen executable (for test certificate generation) ====
+
+corrosion_import_crate(
+    MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../aranya-certgen/Cargo.toml
+    CRATES aranya-certgen
+    CRATE_TYPE bin
+    FEATURES cli
+)
+
+add_executable(Aranya::Certgen ALIAS aranya-certgen)
+
 
 # ==== Client library ====
 

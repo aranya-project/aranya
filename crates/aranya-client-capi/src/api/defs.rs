@@ -1,4 +1,7 @@
 #![allow(rustdoc::broken_intra_doc_links)]
+// Allow deprecated types in this module - it contains the deprecated PSK sync types
+// that are kept for backward compatibility during the mTLS migration.
+#![expect(deprecated)]
 use core::{
     ffi::{c_char, CStr},
     ops::Deref,
@@ -304,6 +307,9 @@ impl From<aranya_id::BaseId> for Id {
 }
 
 /// The size in bytes of a PSK seed IKM.
+///
+/// @deprecated PSK seeds are no longer used with mTLS authentication
+#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 pub const ARANYA_SEED_IKM_LEN: usize = 32;
 
 /// Team ID.
@@ -690,6 +696,8 @@ pub unsafe fn get_public_key_bundle(
 /// @param[in,out] public_key_bundle_len returns the length of the serialized key bundle.
 ///
 /// @relates AranyaClient.
+///
+/// @deprecated Use `aranya_get_public_key_bundle`.
 #[deprecated(note = "Use `aranya_get_public_key_bundle`.")]
 pub unsafe fn get_key_bundle(
     client: &Client,
@@ -794,18 +802,27 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// QUIC syncer configuration.
 ///
 /// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
 ///
 /// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
 
 /// A builder for initializing an [`AddTeamQuicSyncConfig`].
 ///
 /// The [`AddTeamQuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`].
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
@@ -813,6 +830,9 @@ pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 /// A builder for initializing a [`CreateTeamQuicSyncConfig`].
 ///
 /// The [`CreateTeamQuicSyncConfig`] is an optional part of initializing a [`CreateTeamConfig`].
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
@@ -821,13 +841,14 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn create_team_quic_sync_config_generate(
-    cfg: &mut CreateTeamQuicSyncConfigBuilder,
+    _cfg: &mut CreateTeamQuicSyncConfigBuilder,
 ) -> Result<(), imp::Error> {
-    cfg.generate();
     Ok(())
 }
 
@@ -836,18 +857,24 @@ pub fn create_team_quic_sync_config_generate(
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
+///
+/// @deprecated PSK seeds are no longer used with mTLS authentication
+#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn add_team_quic_sync_config_wrapped_seed(
-    cfg: &mut AddTeamQuicSyncConfigBuilder,
-    encap_seed: &[u8],
+    _cfg: &mut AddTeamQuicSyncConfigBuilder,
+    _encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed)?;
     Ok(())
 }
 
 /// Raw PSK seed IKM for QUIC syncer.
+///
+/// PSK seed Input Key Material.
+///
+/// @deprecated PSK seeds are no longer used with mTLS authentication
+#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct SeedIkm {
@@ -859,14 +886,15 @@ pub struct SeedIkm {
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+///
+/// @deprecated PSK seeds are no longer used with mTLS authentication
+#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn create_team_quic_sync_config_raw_seed_ikm(
-    cfg: &mut CreateTeamQuicSyncConfigBuilder,
-    ikm: &SeedIkm,
+    _cfg: &mut CreateTeamQuicSyncConfigBuilder,
+    _ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
@@ -875,14 +903,15 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] ikm a pointer the raw PSK seed IKM
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
+///
+/// @deprecated PSK seeds are no longer used with mTLS authentication
+#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn add_team_quic_sync_config_raw_seed_ikm(
-    cfg: &mut AddTeamQuicSyncConfigBuilder,
-    ikm: &SeedIkm,
+    _cfg: &mut AddTeamQuicSyncConfigBuilder,
+    _ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
@@ -895,12 +924,14 @@ pub fn add_team_quic_sync_config_raw_seed_ikm(
 /// @param[out] out a pointer to write the QUIC sync config to
 ///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn create_team_quic_sync_config_build(
-    cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
+    _cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
+    _out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -913,12 +944,14 @@ pub fn create_team_quic_sync_config_build(
 /// @param[out] out a pointer to write the QUIC sync config to
 ///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn add_team_quic_sync_config_build(
-    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
+    _cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
+    _out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -952,13 +985,14 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 /// @param[in] quic set the QUIC syncer config
 ///
 /// @relates AranyaAddTeamConfigBuilder.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn add_team_config_builder_set_quic_syncer(
-    cfg: &mut AddTeamConfigBuilder,
-    quic: OwnedPtr<AddTeamQuicSyncConfig>,
+    _cfg: &mut AddTeamConfigBuilder,
+    _quic: OwnedPtr<AddTeamQuicSyncConfig>,
 ) {
-    // SAFETY: the user is responsible for passing in a valid AddTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
 }
 
 /// Configures team ID field for [`AddTeamConfigBuilder`].
@@ -999,13 +1033,14 @@ pub fn add_team_config_build(
 /// @param[in] quic set the QUIC syncer config
 ///
 /// @relates AranyaCreateTeamConfigBuilder.
+///
+/// @deprecated QUIC sync config is no longer used with mTLS authentication
+#[deprecated(note = "QUIC sync config is no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub fn create_team_config_builder_set_quic_syncer(
-    cfg: &mut CreateTeamConfigBuilder,
-    quic: OwnedPtr<CreateTeamQuicSyncConfig>,
+    _cfg: &mut CreateTeamConfigBuilder,
+    _quic: OwnedPtr<CreateTeamQuicSyncConfig>,
 ) {
-    // SAFETY: the user is responsible for passing in a valid CreateTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
 }
 
 /// Attempts to construct a [`CreateTeamConfig`].
@@ -1808,9 +1843,11 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
 ///
-/// This method will be removed soon since certificates will be used instead of PSKs in the future.
-///
 /// @relates AranyaClient.
+///
+/// @deprecated PSK seeds are no longer used with mTLS authentication
+#[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+#[expect(deprecated)]
 pub unsafe fn encrypt_psk_seed_for_peer(
     client: &Client,
     team_id: &TeamId,
@@ -2171,6 +2208,8 @@ pub unsafe fn team_device_public_key_bundle(
 /// @param[in,out] public_key_bundle_len returns the length of the serialized public key bundle.
 ///
 /// @relates AranyaClient.
+///
+/// @deprecated Use `aranya_team_device_public_key_bundle`.
 #[deprecated(note = "Use `aranya_team_device_public_key_bundle`.")]
 pub unsafe fn team_device_keybundle(
     client: &Client,

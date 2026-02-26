@@ -79,8 +79,6 @@ ignore = [
     # The `paste` crate is unmaintained. There isn't anything we
     # can do here.
     "RUSTSEC-2024-0436",
-    # The `rustls-pemfile` crate is unmaintained. We're not using certs anyways.
-    "RUSTSEC-2025-0134",
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -142,7 +140,6 @@ exceptions = [
     { allow = ["AGPL-3.0-only"], crate = "aranya-policy-vm" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-runtime" },
 
-    { allow = ["AGPL-3.0-only"], crate = "aranya-certgen" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-client" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-daemon" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-daemon-api" },
@@ -245,17 +242,16 @@ skip = [
     "base64@0.21.7",
     "generic-array@0.14.7",
     "getrandom@0.2.15",
+    "getrandom@0.3.1",
+    "hashbrown@0.15.2",
     "heapless@0.7.17",
     "hash32@0.2.1",
-    "hashbrown@0.15.2",
     "linux-raw-sys@0.4.15",
     "petgraph@0.7.1",
     "rand@0.7.3",
     "rand@0.8.5",
-    "rand_chacha@0.2.2",
     "rand_chacha@0.3.1",
     "rand_core@0.6.4",
-    "rand_core@0.5.1",
     "rustix@0.38.44",
     "rustc-hash@1.1.0",
     "socket2@0.5.8",
@@ -263,11 +259,6 @@ skip = [
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
     "toml@0.5.11",
-    "untrusted@0.7.1",
-    "getrandom@0.1.16",
-    "getrandom@0.2.15",
-    "hash32@0.2.1",
-    "heapless@0.7.17",
     "zerocopy@0.7.35",
     "zerocopy-derive@0.7.35",
 ] # Certain crates/versions that will be skipped when doing duplicate detection.

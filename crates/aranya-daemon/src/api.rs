@@ -5,22 +5,19 @@
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 #[cfg(feature = "preview")]
-use std::collections::HashMap;
-#[cfg(feature = "preview")]
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey,
-    policy::{GroupId, LabelId, RoleId},
-    Csprng, DeviceId, EncryptionKey, EncryptionPublicKey, KeyStore as _, KeyStoreExt as _, Rng,
+    policy::{LabelId, RoleId},
+    Csprng, DeviceId, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, Text, WrappedSeed,
+    DaemonApi, Text,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -31,32 +28,29 @@ use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 use buggy::bug;
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
-pub(crate) use quic_sync::Data as QSData;
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::{
-    net::UnixListener,
-    sync::{mpsc, Mutex},
-};
+#[cfg(feature = "preview")]
+use tokio::sync::Mutex;
+use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(feature = "afc")]
-use crate::actions::SessionData;
-#[cfg(feature = "afc")]
-use crate::afc::Afc;
 use crate::{
     actions::Actions,
-    daemon::{CE, CS, KS},
-    keystore::LocalStore,
+    daemon::CS,
     policy::{ChanOp, Effect, PublicKeyBundle, RoleCreated, RoleManagementPerm, SimplePerm},
-    sync::{quic as qs, SyncHandle, SyncPeer},
-    util::SeedDir,
-    AranyaStore, Client, EF,
+    sync::{SyncHandle, SyncPeer},
+    util::TeamConfigStore,
+    Client, EF,
 };
-
-mod quic_sync;
+#[cfg(feature = "afc")]
+use crate::{
+    actions::SessionData,
+    afc::Afc,
+    daemon::{CE, KS},
+};
 
 /// Find the first effect matching a given pattern.
 ///
@@ -95,9 +89,6 @@ pub(crate) struct DaemonApiServerArgs {
     pub(crate) recv_effects: mpsc::Receiver<(GraphId, Vec<EF>)>,
     #[cfg(feature = "afc")]
     pub(crate) afc: Afc<CE, CS, KS>,
-    pub(crate) crypto: Crypto,
-    pub(crate) seed_id_dir: SeedDir,
-    pub(crate) quic: Option<quic_sync::Data>,
 }
 
 impl DaemonApiServer {
@@ -114,9 +105,6 @@ impl DaemonApiServer {
             recv_effects,
             #[cfg(feature = "afc")]
             afc,
-            crypto,
-            seed_id_dir,
-            quic,
         }: DaemonApiServerArgs,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
@@ -145,9 +133,7 @@ impl DaemonApiServer {
             effect_handler,
             #[cfg(feature = "afc")]
             afc,
-            crypto: Mutex::new(crypto),
-            seed_id_dir,
-            quic,
+            teams: TeamConfigStore::new(),
         }));
         Ok(Self {
             uds_path,
@@ -335,9 +321,9 @@ impl EffectHandler {
         // TODO: Don't fire off a spawn here.
         let syncer = self.syncer.clone();
         drop(tokio::spawn(async move {
-            if let Err(e) = syncer.broadcast_hello(graph_id, head).await {
+            if let Err(err) = syncer.broadcast_hello(graph_id, head).await {
                 warn!(
-                    error = %e,
+                    error = %err.report(),
                     ?graph_id,
                     ?head,
                     "peers.broadcast_hello failed"
@@ -365,16 +351,7 @@ struct ApiInner {
     effect_handler: EffectHandler,
     #[cfg(feature = "afc")]
     afc: Arc<Afc<CE, CS, KS>>,
-    #[derive_where(skip(Debug))]
-    crypto: Mutex<Crypto>,
-    seed_id_dir: SeedDir,
-    quic: Option<quic_sync::Data>,
-}
-
-pub(crate) struct Crypto {
-    pub(crate) engine: CE,
-    pub(crate) local_store: LocalStore<KS>,
-    pub(crate) aranya_store: AranyaStore<KS>,
+    teams: TeamConfigStore,
 }
 
 impl ApiInner {
@@ -406,6 +383,9 @@ impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<GraphId> {
+        if !self.teams.contains(team) {
+            anyhow::bail!("team {team} not created or added")
+        }
         if self
             .client
             .invalid_graphs()
@@ -538,23 +518,22 @@ impl DaemonApi for Api {
     //
 
     #[instrument(skip(self))]
-    async fn add_team(mut self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
+    async fn add_team(self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
         let team = cfg.team_id;
+
+        if !self.teams.add(team) {
+            return Err(anyhow!("team {team} is already present").into());
+        }
         self.check_team_valid(team).await?;
 
-        match cfg.quic_sync {
-            Some(cfg) => self.add_team_quic_sync(team, cfg).await,
-            None => Err(anyhow!("Missing QUIC sync config").into()),
-        }
+        Ok(())
     }
 
     #[instrument(skip(self), err)]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        if let Some(data) = &self.quic {
-            self.remove_team_quic_sync(team, data)?;
+        if !self.teams.remove(team) {
+            return Err(anyhow!("team {team} was not present").into());
         }
-
-        self.seed_id_dir.remove(team).await?;
 
         self.client
             .lock_aranya()
@@ -567,7 +546,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn create_team(
-        mut self,
+        self,
         _: context::Context,
         cfg: api::CreateTeamConfig,
     ) -> api::Result<api::TeamId> {
@@ -584,16 +563,10 @@ impl DaemonApi for Api {
         debug!(?graph_id);
         let team_id = api::TeamId::transmute(graph_id);
 
-        match cfg.quic_sync {
-            Some(qs_cfg) => {
-                self.create_team_quic_sync(team_id, qs_cfg).await?;
-            }
-            None => {
-                warn!("Missing QUIC sync config");
-
-                let seed = qs::PskSeed::new(Rng, team_id);
-                self.add_seed(team_id, seed).await?;
-            }
+        if !self.teams.add(team_id) {
+            return Err(
+                anyhow!("new team {team_id} with random nonce should not be present").into(),
+            );
         }
 
         Ok(team_id)
@@ -609,42 +582,6 @@ impl DaemonApi for Api {
     //
     // Device onboarding
     //
-
-    #[instrument(skip(self), err)]
-    async fn encrypt_psk_seed_for_peer(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer_enc_pk: EncryptionPublicKey<CS>,
-    ) -> aranya_daemon_api::Result<WrappedSeed> {
-        let enc_pk = self.pk.lock().expect("poisoned").enc_pk.clone();
-
-        let (seed, enc_sk) = {
-            let crypto = &mut *self.crypto.lock().await;
-            let seed = {
-                let seed_id = self.seed_id_dir.get(team).await?;
-                qs::PskSeed::load(&crypto.engine, &crypto.local_store, seed_id)?
-                    .context("no seed in dir")?
-            };
-            let enc_sk: EncryptionKey<CS> = crypto
-                .aranya_store
-                .get_key(&crypto.engine, enc_pk.id()?)
-                .context("keystore error")?
-                .context("missing enc_sk for encrypt seed")?;
-            (seed, enc_sk)
-        };
-
-        let group = GroupId::transmute(team);
-        let (encap_key, encrypted_seed) = enc_sk
-            .seal_psk_seed(Rng, &seed.0, &peer_enc_pk, &group)
-            .context("could not seal psk seed")?;
-
-        Ok(WrappedSeed {
-            sender_pk: enc_pk,
-            encap_key,
-            encrypted_seed,
-        })
-    }
 
     #[instrument(skip(self), err)]
     async fn add_device_to_team(
@@ -1447,35 +1384,6 @@ impl DaemonApi for Api {
             .await
             .context("unable to revoke role management permission")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
-
-        Ok(())
-    }
-}
-
-impl Api {
-    async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
-        let crypto = &mut *self.crypto.lock().await;
-
-        let id = crypto
-            .local_store
-            .insert_key(&crypto.engine, seed.into_inner())
-            .context("inserting seed")?;
-
-        if let Err(e) = self
-            .seed_id_dir
-            .append(team, id)
-            .await
-            .context("could not write seed id to file")
-        {
-            match crypto
-                .local_store
-                .remove::<WrappedKey<CS>>(id.as_base())
-                .context("could not remove seed from keystore")
-            {
-                Ok(_) => return Err(e),
-                Err(inner) => return Err(e).context(inner),
-            }
-        };
 
         Ok(())
     }
