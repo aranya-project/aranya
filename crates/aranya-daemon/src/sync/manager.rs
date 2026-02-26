@@ -111,15 +111,23 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
             Some(interval) => Some(self.queue.insert(ScheduledTask::Sync(peer), interval)),
             None => None,
         };
-        if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
+        if let Some((_, Some(key))) = self.peers.insert(peer, (cfg.clone(), new_key)) {
             self.queue.remove(&key);
+            info!(?peer, ?cfg, "replaced existing peer registration");
+        } else {
+            info!(?peer, ?cfg, "registered new peer");
         }
     }
 
     /// Unregisters a peer with the manager.
     fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some((_, Some(key))) = self.peers.remove(&peer) {
-            self.queue.remove(&key);
+        match self.peers.remove(&peer) {
+            Some((_, Some(key))) => {
+                self.queue.remove(&key);
+                info!(?peer, "removed peer and cancelled scheduled sync");
+            }
+            Some((_, None)) => info!(?peer, "removed peer (no scheduled sync)"),
+            None => warn!(?peer, "attempted to remove unknown peer"),
         }
     }
 
@@ -165,7 +173,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
     /// Handles checking for parallel finalization errors, as they're considered a fatal error.
     fn handle_sync_error(&mut self, peer: SyncPeer, err: &Error) {
         if err.is_parallel_finalize() {
-            warn!(?peer, "parallel finalize error, removing all peers");
+            error!(?peer, "parallel finalize error, removing all peers");
 
             // Unregister all sync peers for the graph, and remove them from the `DelayQueue`.
             self.peers.retain(|p, (_, key)| {
@@ -388,6 +396,8 @@ where
 {
     /// Runs the [`SyncManager`], processing [`SyncHandle`] requests and scheduled tasks.
     pub(crate) async fn run(mut self, ready: ready::Notifier) {
+        info!("sync manager starting");
+
         ready.notify();
         loop {
             if let Err(err) = self.next().await {
@@ -403,6 +413,8 @@ where
             biased;
             // Received a message from the [`SyncHandle`], handle it.
             Some((msg, tx)) = self.recv.recv() => {
+                debug!(?msg, "processing handle message");
+
                 let reply = match msg {
                     // NOTE: cfg is unused but included to avoid needing to change the API surface.
                     ManagerMessage::SyncNow { peer, cfg: _cfg } => self.sync(peer).await.map(|_| ()),
@@ -448,9 +460,15 @@ where
             // Get the next peer from the `DelayQueue` and handle it.
             Some(expired) = self.queue.next() => {
                 match expired.into_inner() {
-                    ScheduledTask::Sync(peer) => self.handle_scheduled_sync(peer).await?,
+                    ScheduledTask::Sync(peer) => {
+                        debug!(?peer, "scheduled sync triggered");
+                        self.handle_scheduled_sync(peer).await?;
+                    }
                     #[cfg(feature = "preview")]
-                    ScheduledTask::HelloNotify(peer) => self.handle_scheduled_hello(peer).await?,
+                    ScheduledTask::HelloNotify(peer) => {
+                        debug!(?peer, "scheduled hello triggered");
+                        self.handle_scheduled_hello(peer).await?;
+                    }
                 }
             }
         }
@@ -460,12 +478,13 @@ where
     /// Handles a sync exchange with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     pub(crate) async fn sync(&mut self, peer: SyncPeer) -> Result<usize> {
+        debug!(?peer, "starting sync");
+
         // Connect to the peer.
-        let mut stream = self
-            .transport
-            .connect(peer)
-            .await
-            .map_err(Error::transport)?;
+        let mut stream = self.transport.connect(peer).await.map_err(|error| {
+            warn!(?peer, %error, "failed to connect to peer");
+            Error::transport(error)
+        })?;
 
         let mut requester = SyncRequester::new(peer.graph_id, &mut Rng);
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
@@ -480,18 +499,24 @@ where
 
         // Send along our request message.
         let buffer = buf.get(..len).assume("valid offset")?;
+        trace!(?peer, request_bytes = len, "sending sync request");
         stream.send(buffer).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         // Process the response message.
         let len = stream.receive(&mut buf).await.map_err(Error::transport)?;
+        trace!(?peer, response_bytes = len, "received sync response");
+
         let buffer = buf.get(..len).assume("valid offset")?;
         let resp = postcard::from_bytes(buffer).context("failed to deserialize sync response")?;
 
         // Destructure the sync response.
         let data = match resp {
             SyncResponse::Ok(data) => data,
-            SyncResponse::Err(msg) => return Err(anyhow::anyhow!("sync error: {msg}").into()),
+            SyncResponse::Err(msg) => {
+                error!(?peer, %msg, "peer returned sync error");
+                return Err(anyhow::anyhow!("sync error: {msg}").into());
+            }
         };
 
         // Process the response data.
@@ -527,14 +552,24 @@ where
     ) -> Result<usize> {
         // Check if there's even anything to process
         if data.is_empty() {
+            debug!(?peer, "sync response contained no data");
             return Ok(0);
         }
 
         // Check if we actually received any command data.
         let cmds = match requester.receive(data)? {
             Some(cmds) if !cmds.is_empty() => cmds,
-            _ => return Ok(0),
+            _ => {
+                debug!(?peer, "sync response contained no new commands");
+                return Ok(0);
+            }
         };
+
+        trace!(
+            ?peer,
+            cmd_count = cmds.len(),
+            "processing received commands"
+        );
 
         // Create a new transaction and add all received commands.
         let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
@@ -553,6 +588,11 @@ where
             )
             .context("failed to update cache heads")?;
 
+        debug!(
+            ?peer,
+            cmd_count = cmds.len(),
+            "committed commands from sync"
+        );
         Ok(cmds.len())
     }
 
@@ -560,9 +600,11 @@ where
     async fn handle_scheduled_sync(&mut self, peer: SyncPeer) -> Result<()> {
         let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
         // Re-insert into queue if interval is still configured
-        *key = cfg
-            .interval
-            .map(|interval| self.queue.insert(ScheduledTask::Sync(peer), interval));
+        *key = cfg.interval.map(|interval| {
+            trace!(?peer, ?interval, "rescheduling next sync");
+            self.queue.insert(ScheduledTask::Sync(peer), interval)
+        });
+
         self.sync(peer).await?;
         Ok(())
     }

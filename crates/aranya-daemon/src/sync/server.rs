@@ -13,7 +13,7 @@ use aranya_runtime::{
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::{bug, BugExt as _};
 use derive_where::derive_where;
-use tracing::{error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(doc)]
 use super::SyncManager;
@@ -68,6 +68,7 @@ where
             match stream_result {
                 Ok(stream) => {
                     let peer = stream.peer();
+                    trace!(?peer, "accepted stream");
                     if let Err(e) = self.handle_stream(stream).await {
                         warn!(?peer, error = %e.report(), "error handling sync request");
                     }
@@ -91,13 +92,18 @@ where
         let buffer = buf.get(..len).assume("valid offset")?;
         let sync_type = postcard::from_bytes(buffer).context("failed to deserialize request")?;
 
+        debug!(sync_type = ?std::mem::discriminant(&sync_type), "processing request");
+
         let response = match sync_type {
             SyncType::Poll { request } => {
                 match self
                     .process_poll_request(stream.peer(), request, &mut buf)
                     .await
                 {
-                    Ok(len) => SyncResponse::Ok(buf.get(..len).assume("valid offset")?.into()),
+                    Ok(len) => {
+                        debug!(response_bytes = len, "poll request succeeded");
+                        SyncResponse::Ok(buf.get(..len).assume("valid offset")?.into())
+                    }
                     Err(e) => {
                         error!(error = %e.report(), "error processing poll message");
                         SyncResponse::Err(e.report().to_string())
@@ -113,7 +119,10 @@ where
                 #[cfg(feature = "preview")]
                 {
                     match self.process_hello_request(stream.peer(), hello_msg).await {
-                        Ok(()) => SyncResponse::Ok(Box::new([])),
+                        Ok(()) => {
+                            debug!("hello request succeeded");
+                            SyncResponse::Ok(Box::new([]))
+                        }
                         Err(e) => {
                             error!(error = %e.report(), "error processing hello message");
                             SyncResponse::Err(e.report().to_string())
@@ -152,7 +161,8 @@ where
                 let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
                 let cache = caches.entry(peer).or_default();
 
-                resp.poll(buf, aranya.provider(), cache)
+                let len = resp
+                    .poll(buf, aranya.provider(), cache)
                     .or_else(|err| {
                         if matches!(
                             err,
@@ -164,12 +174,16 @@ where
                             Err(err)
                         }
                     })
-                    .map_err(Error::Runtime)
+                    .map_err(Error::Runtime)?;
+
+                trace!(response_bytes = len, "generated poll response");
+                Ok(len)
             }
-            SyncRequestMessage::RequestMissing { .. }
-            | SyncRequestMessage::SyncResume { .. }
-            | SyncRequestMessage::EndSession { .. } => {
-                warn!(?peer, "received an unexpected SyncRequestMessage variant");
+            other => {
+                warn!(
+                    variant = ?std::mem::discriminant(&other),
+                    "received an unexpected SyncRequestMessage variant"
+                );
                 Err(Error::Other(anyhow::anyhow!(
                     "received an unexpected SyncRequestMessage variant"
                 )))

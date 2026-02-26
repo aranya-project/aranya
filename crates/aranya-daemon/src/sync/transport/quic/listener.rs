@@ -104,6 +104,8 @@ impl QuicListener {
 
     /// Accepts an incoming bidirectional stream from this [`SyncPeer`].
     async fn accept_pending_stream(peer: SyncPeer, mut acceptor: StreamAcceptor) -> AcceptResult {
+        trace!(?peer, "waiting for bidirectional stream");
+
         let stream = tokio::time::timeout(
             Duration::from_secs(30),
             acceptor.accept_bidirectional_stream(),
@@ -112,13 +114,20 @@ impl QuicListener {
         .ok()
         .and_then(|r| r.ok().flatten());
 
+        if stream.is_some() {
+            debug!(?peer, "accepted bidirectional stream");
+        } else {
+            debug!(?peer, "stream accept returned None or timed out");
+        }
+
         (peer, acceptor, stream)
     }
 
     /// Sets up the connection with a keep alive, constructs and validates a [`SyncPeer`], and
     /// registers it as a new connection.
     async fn register_connection(&mut self, mut conn: s2n_quic::Connection) -> Result<(), Error> {
-        trace!("received incoming QUIC connection");
+        let remote = conn.remote_addr().ok();
+        trace!(?remote, "received incoming QUIC connection");
 
         conn.keep_alive(true).assume("connection is still alive")?;
 
@@ -127,6 +136,8 @@ impl QuicListener {
             .server_keys
             .get_team_for_identity(&identity)
             .context("no active team for accepted connection")?;
+
+        debug!(?remote, ?active_team, "authenticated incoming connection");
 
         let peer_addr =
             tokio::time::timeout(Duration::from_secs(5), extract_return_address(&mut conn))
@@ -164,19 +175,24 @@ impl SyncListener for QuicListener {
                 Some(result) = self.pending_accepts.join_next() => {
                     match result {
                         Ok((peer, acceptor, Some(stream))) => {
+                            debug!(?peer, "accepted stream, re-queueing acceptor");
                             self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                             return Some(Ok(QuicStream::new(peer, stream)));
                         }
-                        Ok((peer, _acceptor, None)) => debug!(?peer, "connection closed"),
+                        Ok((peer, _acceptor, None)) => {
+                            debug!(?peer, "stream acceptor completed with no stream");
+                        }
                         Err(error) => warn!(%error, "stream acceptor task panicked"),
                     }
                 }
 
                 Some(conn) = self.server.accept() => {
                     let handle = conn.handle();
+                    let remote = conn.remote_addr().ok();
+                    trace!(?remote, "raw connection accepted from server");
 
                     if let Err(error) = self.register_connection(conn).await {
-                        error!(?error, "failed to accept connection");
+                        error!(?remote, ?error, "failed to accept connection");
                         handle.close(application::Error::UNKNOWN);
                     }
                 }
@@ -186,7 +202,10 @@ impl SyncListener for QuicListener {
                     self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                 }
 
-                else => return None,
+                else => {
+                    debug!("all accept sources exhausted, shutting down listener");
+                    return None;
+                }
             }
         }
     }
@@ -196,6 +215,8 @@ impl SyncListener for QuicListener {
 /// want to be connected on.
 async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Result<Addr> {
     let ip = conn.remote_addr().assume("valid connection")?.ip();
+    trace!(%ip, "extracting return address");
+
     let bytes = conn
         .accept_receive_stream()
         .await?
@@ -204,5 +225,7 @@ async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Resu
         .await?
         .context("peer didn't sent return port")?;
     let port = u16::from_be_bytes(bytes.as_ref().try_into().context("invalid return port")?);
+
+    debug!(%ip, %port, "resolved return address");
     Ok(Addr::from((ip, port)))
 }

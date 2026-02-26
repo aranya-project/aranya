@@ -8,7 +8,7 @@ use buggy::BugExt as _;
 use bytes::Bytes;
 use s2n_quic::{client::Connect, provider::tls::rustls::rustls::ClientConfig};
 use tokio::sync::mpsc;
-use tracing::trace;
+use tracing::{debug, error, trace};
 
 use super::{
     ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncTransport,
@@ -79,7 +79,7 @@ impl SyncTransport for QuicTransport {
         // Set the current `GraphId` we're operating on in the PSK store.
         self.psk_store.set_team(TeamId::transmute(peer.graph_id));
 
-        trace!("client connecting to QUIC sync server");
+        debug!(?peer, "connecting to peer");
 
         // Obtain the address for the other peer.
         let addr = tokio::net::lookup_host(peer.addr.to_socket_addrs())
@@ -88,10 +88,13 @@ impl SyncTransport for QuicTransport {
             .next()
             .context("could not resolve peer address")?;
 
+        trace!(?peer, %addr, "resolved peer address");
+
         // Obtain the handle and acceptor for this peer, potentially reusing a connection.
         let (mut handle, acceptor) = self
             .conns
             .get_or_try_insert_with(peer, async || {
+                trace!(?peer, "establishing new QUIC connection");
                 let mut conn = self
                     .client
                     .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
@@ -101,12 +104,14 @@ impl SyncTransport for QuicTransport {
                     .await?
                     .send(self.return_port.clone())
                     .await?;
+                debug!(?peer, "QUIC handshake complete, sent return port");
                 Ok(conn)
             })
             .await?;
 
         // If this is a new connection, forward an acceptor to the `QuicListener`.
         if let Some(acceptor) = acceptor {
+            trace!(?peer, "forwarding acceptor to listener");
             self.conn_tx.send((peer, acceptor)).await.ok();
         }
 
@@ -115,13 +120,14 @@ impl SyncTransport for QuicTransport {
         // Open a new bidirectional stream on our new connection.
         let stream = match handle.open_bidirectional_stream().await {
             Ok(stream) => stream,
-            Err(e) => {
+            Err(error) => {
+                error!(?peer, %error, "failed to open bidirectional stream");
                 self.conns.remove(peer, handle).await;
-                return Err(Error::QuicConnection(e));
+                return Err(Error::QuicConnection(error));
             }
         };
 
-        trace!("client opened bidi stream with QUIC sync server");
+        debug!(?peer, "connected and opened stream");
 
         Ok(QuicStream::new(peer, stream))
     }

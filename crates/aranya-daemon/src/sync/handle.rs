@@ -14,6 +14,7 @@ use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::Address;
 use buggy::BugExt as _;
 use tokio::sync::{mpsc, oneshot};
+use tracing::trace;
 
 #[cfg(feature = "preview")]
 use super::GraphId;
@@ -205,6 +206,7 @@ impl SyncHandle {
 
     /// Helper method for sending a message via the channel.
     async fn send(&self, msg: ManagerMessage) -> Response {
+        trace!(?msg, "sending message to sync manager");
         let (tx, rx) = oneshot::channel();
         self.sender
             .send((msg, tx))

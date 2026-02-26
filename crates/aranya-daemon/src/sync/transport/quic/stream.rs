@@ -3,6 +3,7 @@ use buggy::BugExt as _;
 use bytes::Bytes;
 use futures_util::AsyncReadExt as _;
 use s2n_quic::stream::BidirectionalStream;
+use tracing::{debug, trace, warn};
 
 use super::{Error, SyncStream};
 use crate::sync::SyncPeer;
@@ -30,6 +31,8 @@ impl SyncStream for QuicStream {
 
     async fn send(&mut self, data: &[u8]) -> Result<(), Self::Error> {
         let len: u32 = data.len().try_into().map_err(|_| Error::MessageTooLarge)?;
+        trace!(peer = ?self.peer, bytes = len, "sending message");
+
         self.stream
             .send(Bytes::copy_from_slice(&len.to_be_bytes()))
             .await
@@ -37,7 +40,10 @@ impl SyncStream for QuicStream {
         self.stream
             .send(Bytes::copy_from_slice(data))
             .await
-            .map_err(Error::Send)
+            .map_err(|error| {
+                warn!(peer = ?self.peer, %error, "send failed");
+                Error::Send(error)
+            })
     }
 
     async fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, Self::Error> {
@@ -47,18 +53,32 @@ impl SyncStream for QuicStream {
             .await
             .map_err(Error::Receive)?;
         let len = u32::from_be_bytes(len_buf) as usize;
+        trace!(peer = ?self.peer, bytes = len, "receiving message");
 
         if len > buffer.len() {
+            warn!(
+                peer = ?self.peer,
+                msg_len = len,
+                buf_cap = buffer.len(),
+                "message exceeds buffer capacity"
+            );
             return Err(Error::MessageTooLarge);
         }
 
         let buf = buffer.get_mut(..len).assume("valid offset")?;
-        self.stream.read_exact(buf).await.map_err(Error::Receive)?;
+        self.stream.read_exact(buf).await.map_err(|error| {
+            warn!(peer = ?self.peer, %error, "receive failed");
+            Error::Receive(error)
+        })?;
         Ok(len)
     }
 
     async fn finish(&mut self) -> Result<(), Self::Error> {
-        self.stream.close().await.map_err(Error::Finish)?;
+        debug!(peer = ?self.peer, "closing stream");
+        self.stream.close().await.map_err(|error| {
+            warn!(peer = ?self.peer, %error, "stream finish failed");
+            Error::Finish(error)
+        })?;
         Ok(())
     }
 }
