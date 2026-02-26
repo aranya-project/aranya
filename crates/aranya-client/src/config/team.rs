@@ -21,10 +21,6 @@ pub use quic_sync::{
 };
 
 /// Builder for [`CreateTeamConfig`].
-///
-/// # Deprecated
-///
-/// This type is deprecated. With mTLS authentication, config types are no longer needed.
 #[non_exhaustive]
 #[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {}

@@ -17,10 +17,6 @@ use crate::Result;
 const SEED_IKM_SIZE: usize = 32;
 
 /// Configuration for creating a new team with QUIC synchronization.
-///
-/// # Deprecated
-///
-/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
 #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[non_exhaustive]
 #[derive(Clone, Debug)]
@@ -35,10 +31,6 @@ impl CreateTeamQuicSyncConfig {
 }
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
-///
-/// # Deprecated
-///
-/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
 #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[non_exhaustive]
 #[derive(Clone, Debug)]
@@ -54,10 +46,6 @@ impl AddTeamQuicSyncConfig {
 }
 
 /// Builder for [`CreateTeamQuicSyncConfig`]
-///
-/// # Deprecated
-///
-/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
 #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[non_exhaustive]
 #[derive(Debug, Default)]
@@ -81,17 +69,13 @@ impl CreateTeamQuicSyncConfigBuilder {
     }
 
     /// Builds the config.
-    #[deprecated]
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn build(self) -> Result<CreateTeamQuicSyncConfig> {
         Ok(CreateTeamQuicSyncConfig {})
     }
 }
 
 /// Builder for [`AddTeamQuicSyncConfig`]
-///
-/// # Deprecated
-///
-/// This type is deprecated. With mTLS authentication, QUIC sync config is no longer needed.
 #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
 #[non_exhaustive]
 #[derive(Debug, Default)]
@@ -116,7 +100,7 @@ impl AddTeamQuicSyncConfigBuilder {
     }
 
     /// Builds the config.
-    #[deprecated]
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn build(self) -> Result<AddTeamQuicSyncConfig> {
         Ok(AddTeamQuicSyncConfig {})
     }

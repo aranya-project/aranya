@@ -49,12 +49,7 @@ impl Team<'_> {
 
 impl Team<'_> {
     /// Encrypts the team's QUIC syncer PSK seed for a peer.
-    ///
-    /// # Deprecated
-    ///
-    /// This method is deprecated. With mTLS authentication, PSK seeds are no longer used.
-    /// Returns an empty vector for backward compatibility.
-    #[deprecated]
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
     #[instrument(skip(self))]
     pub async fn encrypt_psk_seed_for_peer(&self, _peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         // With mTLS authentication, PSK seeds are no longer used.
