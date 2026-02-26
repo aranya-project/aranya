@@ -22,12 +22,12 @@ pub type KeyBundle = PublicKeyBundle;
 
 impl PublicKeyBundle {
     #[doc(hidden)]
-    pub fn from_api(api: api::PublicKeyBundle) -> Self {
+    pub fn __from_api(api: api::PublicKeyBundle) -> Self {
         Self(api)
     }
 
     #[doc(hidden)]
-    pub fn into_api(self) -> api::PublicKeyBundle {
+    pub fn __into_api(self) -> api::PublicKeyBundle {
         self.0
     }
 
@@ -95,7 +95,7 @@ impl Device<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-            .map(PublicKeyBundle::from_api)
+            .map(PublicKeyBundle::__from_api)
     }
 
     /// Removes `device` from the team.

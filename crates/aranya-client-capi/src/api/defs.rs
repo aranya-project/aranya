@@ -476,12 +476,6 @@ impl From<&ObjectId> for aranya_client::ObjectId {
     }
 }
 
-impl aranya_client::AsObjectId for &ObjectId {
-    fn to_object_id(self) -> aranya_client::ObjectId {
-        self.into()
-    }
-}
-
 /// A label name.
 ///
 /// E.g. "TELEMETRY_LABEL"
@@ -1757,7 +1751,7 @@ pub fn change_rank(
     client
         .rt
         .block_on(client.inner.team(team.into()).change_rank(
-            object_id,
+            aranya_client::ObjectId::from(object_id),
             aranya_client::Rank::new(old_rank),
             aranya_client::Rank::new(new_rank),
         ))?;
@@ -1773,9 +1767,12 @@ pub fn change_rank(
 ///
 /// @relates AranyaClient.
 pub fn query_rank(client: &Client, team: &TeamId, object_id: &ObjectId) -> Result<i64, imp::Error> {
-    let rank = client
-        .rt
-        .block_on(client.inner.team(team.into()).query_rank(object_id))?;
+    let rank = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .query_rank(aranya_client::ObjectId::from(object_id)),
+    )?;
     Ok(rank.value())
 }
 

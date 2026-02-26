@@ -225,7 +225,7 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-            .map(PublicKeyBundle::from_api)
+            .map(PublicKeyBundle::__from_api)
     }
 
     /// Gets the public device ID for this device.
