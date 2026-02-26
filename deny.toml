@@ -249,6 +249,7 @@ skip = [
     "hash32@0.2.1",
     "hashbrown@0.15.2",
     "linux-raw-sys@0.4.15",
+    "petgraph@0.7.1",
     "rand@0.7.3",
     "rand@0.8.5",
     "rand_chacha@0.2.2",

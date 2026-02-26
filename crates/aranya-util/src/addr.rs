@@ -1,3 +1,6 @@
+// This module was carefully written to ensure no arithmetic path can
+// panic, so we suppress the lint rather than add checked-math noise.
+#![allow(clippy::arithmetic_side_effects)]
 //! Network address handling and utilities.
 //!
 //! This module provides the [`Addr`] type for representing network addresses

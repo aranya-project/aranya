@@ -11,6 +11,8 @@ use syn::parse_quote;
 fn main() -> anyhow::Result<()> {
     println!("cargo::rustc-check-cfg=cfg(cbindgen)");
 
+    println!("cargo::rerun-if-changed=cbindgen.toml");
+
     let in_path = Path::new("src/api/defs.rs");
     println!("cargo::rerun-if-changed={}", in_path.display());
 

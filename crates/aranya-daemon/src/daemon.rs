@@ -7,7 +7,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_keygen::{KeyBundle, PublicKeys};
+use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
@@ -107,13 +107,13 @@ impl Daemon {
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
-            let mut eng = Self::load_crypto_engine(&cfg).await?;
-            let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
+            let eng = Self::load_crypto_engine(&cfg).await?;
+            let pks = Self::load_or_gen_public_keys(&cfg, &eng, &mut aranya_store).await?;
 
             let mut local_store = Self::load_local_keystore(&cfg).await?;
 
             // Generate a fresh API key at startup.
-            let api_sk = ApiKey::generate(&mut eng);
+            let api_sk = ApiKey::generate(&eng);
             aranya_util::write_file(cfg.api_pk_path(), &api_sk.public()?.encode()?)
                 .await
                 .context("unable to write API public key")?;
@@ -121,8 +121,7 @@ impl Daemon {
 
             // Initialize the PSK store used by the syncer and sync server
             let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
-            let initial_keys =
-                load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
+            let initial_keys = load_team_psk_pairs(&eng, &mut local_store, &seed_id_dir).await?;
             let psk_store = Arc::new(PskStore::new(initial_keys));
 
             // Initialize Aranya client, sync client,and sync server.
@@ -330,23 +329,23 @@ impl Daemon {
     /// Loads the daemon's [`PublicKeys`].
     async fn load_or_gen_public_keys<CE, KS>(
         cfg: &Config,
-        eng: &mut CE,
+        eng: &CE,
         store: &mut AranyaStore<KS>,
     ) -> Result<PublicKeys<CE::CS>>
     where
         CE: Engine,
         KS: KeyStore,
     {
-        let path = cfg.key_bundle_path();
+        let path = cfg.public_key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,
             None => {
-                let bundle =
-                    KeyBundle::generate(eng, store).context("unable to generate key bundle")?;
+                let bundle = PublicKeyBundle::generate(eng, store)
+                    .context("unable to generate key bundle")?;
                 info!("generated key bundle");
                 write_cbor(&path, &bundle)
                     .await
-                    .context("unable to write `KeyBundle` to disk")?;
+                    .context("unable to write `PublicKeyBundle` to disk")?;
                 bundle
             }
         };
@@ -382,7 +381,7 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 tracing::info!("generating key");
-                let key = K::random(&mut Rng);
+                let key = K::random(Rng);
                 let bytes = key
                     .try_export_secret()
                     .context("unable to export new key")?;
@@ -403,7 +402,12 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+    #![allow(
+        clippy::arithmetic_side_effects,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing
+    )]
 
     use std::time::Duration;
 

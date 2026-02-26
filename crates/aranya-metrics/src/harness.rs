@@ -123,7 +123,9 @@ fn scale_bytes(bytes: u64) -> String {
 
     while value >= 1024.0 && unit_index < UNITS.len() {
         value /= 1024.0;
-        unit_index += 1;
+        unit_index = unit_index
+            .checked_add(1)
+            .expect("unit index should not overflow");
     }
 
     if unit_index == 0 {
@@ -204,8 +206,14 @@ impl ProcessMetricsCollector {
             physical_memory_bytes: current.physical_memory_bytes,
             virtual_memory_bytes: current.virtual_memory_bytes,
             // These need to be cumulative since sysinfo only returns bytes since last refresh.
-            disk_read_bytes: self.total_metrics.disk_read_bytes + current.disk_read_bytes,
-            disk_write_bytes: self.total_metrics.disk_write_bytes + current.disk_write_bytes,
+            disk_read_bytes: self
+                .total_metrics
+                .disk_read_bytes
+                .saturating_add(current.disk_read_bytes),
+            disk_write_bytes: self
+                .total_metrics
+                .disk_write_bytes
+                .saturating_add(current.disk_write_bytes),
         };
 
         debug!("Total Metrics: {}", self.total_metrics);
@@ -259,14 +267,24 @@ impl ProcessMetricsCollector {
         self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
 
         // Aggregate this process's metrics towards the total.
-        metrics.cpu_user_time_us += process_metrics.cpu_user_time_us;
-        metrics.cpu_system_time_us += process_metrics.cpu_system_time_us;
-        metrics.physical_memory_bytes += process_metrics.physical_memory_bytes;
+        metrics.cpu_user_time_us = metrics
+            .cpu_user_time_us
+            .saturating_add(process_metrics.cpu_user_time_us);
+        metrics.cpu_system_time_us = metrics
+            .cpu_system_time_us
+            .saturating_add(process_metrics.cpu_system_time_us);
+        metrics.physical_memory_bytes = metrics
+            .physical_memory_bytes
+            .saturating_add(process_metrics.physical_memory_bytes);
         metrics.virtual_memory_bytes = metrics
             .virtual_memory_bytes
             .max(process_metrics.virtual_memory_bytes);
-        metrics.disk_read_bytes += process_metrics.disk_read_bytes;
-        metrics.disk_write_bytes += process_metrics.disk_write_bytes;
+        metrics.disk_read_bytes = metrics
+            .disk_read_bytes
+            .saturating_add(process_metrics.disk_read_bytes);
+        metrics.disk_write_bytes = metrics
+            .disk_write_bytes
+            .saturating_add(process_metrics.disk_write_bytes);
 
         // Store the latest per-process metrics
         let result = match self.individual_metrics.entry(pid) {
@@ -274,8 +292,12 @@ impl ProcessMetricsCollector {
                 // Update the entries we need to accumulate
                 let stored = entry.get_mut();
                 process_metrics.timestamp = stored.timestamp;
-                process_metrics.disk_read_bytes += stored.disk_read_bytes;
-                process_metrics.disk_write_bytes += stored.disk_write_bytes;
+                process_metrics.disk_read_bytes = process_metrics
+                    .disk_read_bytes
+                    .saturating_add(stored.disk_read_bytes);
+                process_metrics.disk_write_bytes = process_metrics
+                    .disk_write_bytes
+                    .saturating_add(stored.disk_write_bytes);
 
                 &mut entry.insert(process_metrics)
             }
