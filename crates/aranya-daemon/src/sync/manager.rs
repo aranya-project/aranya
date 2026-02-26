@@ -139,7 +139,7 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
-    ) {
+    ) -> Result<()> {
         // Check if there was an existing subscription for this peer and remove it.
         if let Some(sub) = self.hello_subscriptions.remove(&peer) {
             self.queue.remove(&sub.queue_key);
@@ -152,13 +152,18 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
         let subscription = HelloSubscription {
             graph_change_debounce,
             schedule_delay,
-            last_notified: Instant::now() - graph_change_debounce,
-            expires_at: Instant::now() + duration,
+            last_notified: Instant::now()
+                .checked_sub(graph_change_debounce)
+                .context("subscription notify overflow")?,
+            expires_at: Instant::now()
+                .checked_add(duration)
+                .context("subscription expiry overflow")?,
             queue_key,
         };
 
         debug!(?peer, ?subscription, "created hello subscription");
         self.hello_subscriptions.insert(peer, subscription);
+        Ok(())
     }
 
     /// Unregisters a hello subscription with the manager.
@@ -328,7 +333,11 @@ where
             }
 
             // Check if enough time has passed since last notification.
-            if now - sub.last_notified >= sub.graph_change_debounce {
+            if now
+                .checked_duration_since(sub.last_notified)
+                .unwrap_or_default()
+                >= sub.graph_change_debounce
+            {
                 // This is for the correct GraphId and hasn't expired or throttled.
                 subscribers.push(*peer);
             }
@@ -373,7 +382,11 @@ where
 
         if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
             // Check if the subscription will expire before our next scheduled sync.
-            if Instant::now() + sub.schedule_delay < sub.expires_at {
+            if Instant::now()
+                .checked_add(sub.schedule_delay)
+                .context("subscription expiry overflow")?
+                < sub.expires_at
+            {
                 sub.queue_key = self
                     .queue
                     .insert(ScheduledTask::HelloNotify(peer), sub.schedule_delay);
@@ -439,7 +452,7 @@ where
                     }
                     #[cfg(feature = "preview")]
                     ManagerMessage::HelloSubscribeRequest { peer, graph_change_debounce, duration, schedule_delay } => {
-                        self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay);
+                        self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay)?;
                         Ok(())
                     }
                     #[cfg(feature = "preview")]
@@ -486,7 +499,7 @@ where
             Error::transport(error)
         })?;
 
-        let mut requester = SyncRequester::new(peer.graph_id, &mut Rng);
+        let mut requester = SyncRequester::new(peer.graph_id, Rng);
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
 
         // Process a poll request, and get back the length/number of commands.
