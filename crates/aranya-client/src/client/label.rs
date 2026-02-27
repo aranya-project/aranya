@@ -53,11 +53,6 @@ impl Labels {
     pub fn __data(&self) -> &[Label] {
         &self.labels
     }
-
-    #[doc(hidden)]
-    pub fn __into_data(self) -> Box<[Label]> {
-        self.labels
-    }
 }
 
 impl IntoIterator for Labels {
