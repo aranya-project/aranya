@@ -1,8 +1,12 @@
-//! This module contains the [`SyncServer`] that handles incoming sync requests from peers.
+//! This module contains the [`SyncServer`] that handles accepting and responding to incoming sync
+//! requests.
 //!
-//! The server listens for incoming connections and processes requests. This includes poll syncing,
-//! in which we respond with a sampling of missing commands, as well as hello syncing, which we
-//! defer to the [`SyncManager`] for scheduling.
+//! The main operations the syncer has to respond to include poll syncing, which requires responding
+//! with a number of commands that the peer may be missing, as well as hello sync, where the peer is
+//! requesting to subscribe to our hello notifications or sending us their own hello notification.
+//!
+//! See the [`SyncManager`](super::SyncManager) for the other half of the syncer, which is
+//! responsible for initiating syncs.
 use anyhow::Context as _;
 #[cfg(feature = "preview")]
 use aranya_runtime::SyncHelloType;

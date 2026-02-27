@@ -5,9 +5,8 @@ pub(crate) mod quic;
 
 /// A reliable, ordered, bidirectional byte stream tied to a specific peer.
 ///
-/// A single stream can be used for an entire sync request/response handshake, dictated by the two peers'
-/// [`SyncManager`]. The protocol currently only needs one round trip, but this may change as the sync
-/// protocol evolves.
+/// A single stream can be used for an entire sync request/response handshake, dictated by the two
+/// peers' [`SyncManager`].
 ///
 /// Abstracts over any reliable, ordered transport (QUIC, TCP, WebSocket, UDS, etc). Unreliable
 /// protocols like raw UDP are not suitable without an additional reliability layer.
@@ -22,7 +21,9 @@ pub(crate) trait SyncStream: Send + Sync + 'static {
 
     /// Sends a message to the peer.
     async fn send(&mut self, data: &[u8]) -> Result<(), Self::Error>;
-    /// Receives a message from the peer, returning the number of bytes written.
+    /// Receives a message from the peer, returning the number of bytes written. The caller
+    /// allocates a fixed-size buffer, and if the received message is too large, the implementation
+    /// is expected to throw an error.
     async fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, Self::Error>;
     /// Signals that no more data will be sent on this stream.
     ///
@@ -65,5 +66,10 @@ pub(crate) trait SyncListener: Send + Sync + 'static {
     fn local_addr(&self) -> super::Addr;
 
     /// Accept a connection from a peer to send and receive data.
+    ///
+    /// Returns:
+    /// - `Some(Ok(stream))` - a new stream was accepted successfully.
+    /// - `Some(Err(e))` - a single accept failed, but the listener can still be polled.
+    /// - `None` - the listener has shut down and won't yield any more connections.
     async fn accept(&mut self) -> Option<Result<Self::Stream, Self::Error>>;
 }

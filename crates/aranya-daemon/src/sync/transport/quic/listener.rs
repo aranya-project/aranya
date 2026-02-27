@@ -35,6 +35,14 @@ pub(super) type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Handle>>>;
 pub(super) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
 
+/// The amount of time we wait trying to accept a bidirectional stream from the peer connecting to
+/// us before we time out (they may be really really slow, or busy doing other things).
+const PENDING_ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The amount of time we wait trying to resolve the connecting peer's address (and waiting for them
+/// to send the port they want) before we time out.
+const RESOLVE_PEER_ADDR_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[derive(Debug)]
 pub(crate) struct QuicListener {
     /// The local address of the server, since it should be infallible.
@@ -113,7 +121,7 @@ impl QuicListener {
         trace!(?peer, "waiting for bidirectional stream");
 
         let stream = tokio::time::timeout(
-            Duration::from_secs(30),
+            PENDING_ACCEPT_TIMEOUT,
             acceptor.accept_bidirectional_stream(),
         )
         .await
@@ -146,7 +154,7 @@ impl QuicListener {
         debug!(?remote, ?active_team, "authenticated incoming connection");
 
         let peer_addr =
-            tokio::time::timeout(Duration::from_secs(5), extract_return_address(&mut conn))
+            tokio::time::timeout(RESOLVE_PEER_ADDR_TIMEOUT, extract_return_address(&mut conn))
                 .await
                 .context("timed out waiting for return address")?
                 .context("unable to extract return address")?;

@@ -1,6 +1,9 @@
 //! This module contains the [`SyncManager`] that drives the majority of the syncer, including all
 //! client-side tasks.
 //!
+//! See the [`SyncServer`](super::SyncServer) for the other half of the syncer, which is responsible
+//! for responding to syncs.
+//!
 //! # Architecture
 //! The manager operates by continually syncing with peers, as well as additional requests sent by
 //! the [`SyncHandle`]. This includes both "poll sync" tasks, that simply sync on an interval, as
