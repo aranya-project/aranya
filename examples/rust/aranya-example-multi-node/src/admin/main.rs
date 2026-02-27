@@ -3,7 +3,9 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aranya_client::{text, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use aranya_client::{
+    text, AddTeamConfig, AddTeamQuicSyncConfig, Client, Rank, Role, SyncPeerConfig,
+};
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -111,22 +113,18 @@ async fn main() -> Result<()> {
 
     // Create label.
     info!("admin: creating label");
-    let label1 = team.create_label(text!("label1"), admin_role.id).await?;
-    info!("admin: created label");
-
-    info!("admin: finding operator role");
-    let operator_role = loop {
-        if let Ok(roles) = team.roles().await {
-            if let Some(role) = roles.into_iter().find(|role| role.name == "operator") {
-                break role;
-            }
-        }
-        sleep(SLEEP_INTERVAL).await;
-    };
-
-    info!("admin: assigning operator role to manage label1");
-    team.add_label_managing_role(label1, operator_role.id)
+    let member_role = team
+        .roles()
+        .await?
+        .into_iter()
+        .find(|r: &Role| r.name == "member")
+        .ok_or_else(|| anyhow::anyhow!("member role not found"))?;
+    let member_role_rank = team.query_rank(member_role.id).await?;
+    // Label rank must be lower than the member role rank so all team members can operate on it.
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    team.create_label_with_rank(text!("label1"), label_rank)
         .await?;
+    info!("admin: created label");
 
     info!("admin: complete");
 

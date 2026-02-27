@@ -30,29 +30,21 @@ pub enum ChanOp {
     SendOnly,
     SendRecv,
 }
-/// RoleManagementPerm policy enum.
+/// Perm policy enum.
 #[value]
-pub enum RoleManagementPerm {
-    CanAssignRole,
-    CanRevokeRole,
-    CanChangeRolePerms,
-}
-/// SimplePerm policy enum.
-#[value]
-pub enum SimplePerm {
+pub enum Perm {
     AddDevice,
     RemoveDevice,
     TerminateTeam,
+    ChangeRank,
     CreateRole,
     DeleteRole,
     AssignRole,
     RevokeRole,
-    ChangeRoleManagementPerms,
+    ChangeRolePerms,
     SetupDefaultRole,
-    ChangeRoleManagingRole,
     CreateLabel,
     DeleteLabel,
-    ChangeLabelManagingRole,
     AssignLabel,
     RevokeLabel,
     CanUseAfc,
@@ -69,8 +61,6 @@ pub enum Effect {
     DeviceRemoved(DeviceRemoved),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
-    LabelManagingRoleAdded(LabelManagingRoleAdded),
-    LabelManagingRoleRevoked(LabelManagingRoleRevoked),
     LabelRevokedFromDevice(LabelRevokedFromDevice),
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
@@ -81,16 +71,15 @@ pub enum Effect {
     QueryLabelResult(QueryLabelResult),
     QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     QueryLabelsResult(QueryLabelsResult),
-    QueryRoleOwnersResult(QueryRoleOwnersResult),
+    QueryRankResult(QueryRankResult),
+    QueryRoleHasPermResult(QueryRoleHasPermResult),
+    QueryRolePermsResult(QueryRolePermsResult),
     QueryTeamRolesResult(QueryTeamRolesResult),
+    RankChanged(RankChanged),
     RoleAssigned(RoleAssigned),
     RoleChanged(RoleChanged),
     RoleCreated(RoleCreated),
     RoleDeleted(RoleDeleted),
-    RoleManagementPermAssigned(RoleManagementPermAssigned),
-    RoleManagementPermRevoked(RoleManagementPermRevoked),
-    RoleOwnerAdded(RoleOwnerAdded),
-    RoleOwnerRemoved(RoleOwnerRemoved),
     RoleRevoked(RoleRevoked),
     TeamCreated(TeamCreated),
     TeamTerminated(TeamTerminated),
@@ -131,6 +120,7 @@ pub struct CheckValidAfcChannels {}
 pub struct DeviceAdded {
     pub device_id: BaseId,
     pub device_keys: PublicKeyBundle,
+    pub rank: i64,
 }
 /// DeviceRemoved policy effect.
 #[effect]
@@ -143,8 +133,8 @@ pub struct DeviceRemoved {
 pub struct LabelCreated {
     pub label_id: BaseId,
     pub label_name: Text,
+    pub rank: i64,
     pub label_author_id: BaseId,
-    pub managing_role_id: BaseId,
 }
 /// LabelDeleted policy effect.
 #[effect]
@@ -152,20 +142,6 @@ pub struct LabelDeleted {
     pub label_name: Text,
     pub label_author_id: BaseId,
     pub label_id: BaseId,
-    pub author_id: BaseId,
-}
-/// LabelManagingRoleAdded policy effect.
-#[effect]
-pub struct LabelManagingRoleAdded {
-    pub label_id: BaseId,
-    pub managing_role_id: BaseId,
-    pub author_id: BaseId,
-}
-/// LabelManagingRoleRevoked policy effect.
-#[effect]
-pub struct LabelManagingRoleRevoked {
-    pub label_id: BaseId,
-    pub managing_role_id: BaseId,
     pub author_id: BaseId,
 }
 /// LabelRevokedFromDevice policy effect.
@@ -181,14 +157,14 @@ pub struct LabelRevokedFromDevice {
 #[effect]
 pub struct PermAddedToRole {
     pub role_id: BaseId,
-    pub perm: SimplePerm,
+    pub perm: Perm,
     pub author_id: BaseId,
 }
 /// PermRemovedFromRole policy effect.
 #[effect]
 pub struct PermRemovedFromRole {
     pub role_id: BaseId,
-    pub perm: SimplePerm,
+    pub perm: Perm,
     pub author_id: BaseId,
 }
 /// QueryAfcChannelIsValidResult policy effect.
@@ -239,13 +215,23 @@ pub struct QueryLabelsResult {
     pub label_name: Text,
     pub label_author_id: BaseId,
 }
-/// QueryRoleOwnersResult policy effect.
+/// QueryRankResult policy effect.
 #[effect]
-pub struct QueryRoleOwnersResult {
+pub struct QueryRankResult {
+    pub object_id: BaseId,
+    pub rank: i64,
+}
+/// QueryRoleHasPermResult policy effect.
+#[effect]
+pub struct QueryRoleHasPermResult {
     pub role_id: BaseId,
-    pub name: Text,
-    pub author_id: BaseId,
-    pub default: bool,
+    pub perm: Perm,
+}
+/// QueryRolePermsResult policy effect.
+#[effect]
+pub struct QueryRolePermsResult {
+    pub role_id: BaseId,
+    pub perm: Perm,
 }
 /// QueryTeamRolesResult policy effect.
 #[effect]
@@ -254,6 +240,13 @@ pub struct QueryTeamRolesResult {
     pub name: Text,
     pub author_id: BaseId,
     pub default: bool,
+}
+/// RankChanged policy effect.
+#[effect]
+pub struct RankChanged {
+    pub object_id: BaseId,
+    pub old_rank: i64,
+    pub new_rank: i64,
 }
 /// RoleAssigned policy effect.
 #[effect]
@@ -276,7 +269,7 @@ pub struct RoleCreated {
     pub role_id: BaseId,
     pub name: Text,
     pub author_id: BaseId,
-    pub owning_role_id: BaseId,
+    pub rank: i64,
     pub default: bool,
 }
 /// RoleDeleted policy effect.
@@ -284,36 +277,6 @@ pub struct RoleCreated {
 pub struct RoleDeleted {
     pub name: Text,
     pub role_id: BaseId,
-}
-/// RoleManagementPermAssigned policy effect.
-#[effect]
-pub struct RoleManagementPermAssigned {
-    pub target_role_id: BaseId,
-    pub managing_role_id: BaseId,
-    pub perm: RoleManagementPerm,
-    pub author_id: BaseId,
-}
-/// RoleManagementPermRevoked policy effect.
-#[effect]
-pub struct RoleManagementPermRevoked {
-    pub target_role_id: BaseId,
-    pub managing_role_id: BaseId,
-    pub perm: RoleManagementPerm,
-    pub author_id: BaseId,
-}
-/// RoleOwnerAdded policy effect.
-#[effect]
-pub struct RoleOwnerAdded {
-    pub target_role_id: BaseId,
-    pub new_role_owner: BaseId,
-    pub author_id: BaseId,
-}
-/// RoleOwnerRemoved policy effect.
-#[effect]
-pub struct RoleOwnerRemoved {
-    pub target_role_id: BaseId,
-    pub owning_role_id: BaseId,
-    pub author_id: BaseId,
 }
 /// RoleRevoked policy effect.
 #[effect]
@@ -336,12 +299,9 @@ pub struct TeamTerminated {
 }
 #[actions(interface = Persistent)]
 pub enum PersistentAction {
+    change_rank(change_rank),
     add_perm_to_role(add_perm_to_role),
     remove_perm_from_role(remove_perm_from_role),
-    add_role_owner(add_role_owner),
-    remove_role_owner(remove_role_owner),
-    assign_role_management_perm(assign_role_management_perm),
-    revoke_role_management_perm(revoke_role_management_perm),
     create_role(create_role),
     setup_default_roles(setup_default_roles),
     delete_role(delete_role),
@@ -350,11 +310,9 @@ pub enum PersistentAction {
     revoke_role(revoke_role),
     create_team(create_team),
     terminate_team(terminate_team),
-    add_device(add_device),
+    add_device_with_rank(add_device_with_rank),
     remove_device(remove_device),
-    add_label_managing_role(add_label_managing_role),
-    revoke_label_managing_role(revoke_label_managing_role),
-    create_label(create_label),
+    create_label_with_rank(create_label_with_rank),
     delete_label(delete_label),
     assign_label_to_device(assign_label_to_device),
     revoke_label_from_device(revoke_label_from_device),
@@ -365,8 +323,10 @@ pub enum EphemeralAction {
     query_afc_channel_is_valid(query_afc_channel_is_valid),
     query_device_role(query_device_role),
     query_device_public_key_bundle(query_device_public_key_bundle),
+    query_rank(query_rank),
     query_team_roles(query_team_roles),
-    query_role_owners(query_role_owners),
+    query_role_has_perm(query_role_has_perm),
+    query_role_perms(query_role_perms),
     query_label(query_label),
     query_labels(query_labels),
     query_labels_assigned_to_device(query_labels_assigned_to_device),
@@ -392,55 +352,39 @@ pub struct query_device_role {
 pub struct query_device_public_key_bundle {
     pub device_id: BaseId,
 }
+/// change_rank policy action.
+#[action(interface = Persistent)]
+pub struct change_rank {
+    pub object_id: BaseId,
+    pub old_rank: i64,
+    pub new_rank: i64,
+}
+/// query_rank policy action.
+#[action(interface = Ephemeral)]
+pub struct query_rank {
+    pub object_id: BaseId,
+}
 /// add_perm_to_role policy action.
 #[action(interface = Persistent)]
 pub struct add_perm_to_role {
     pub role_id: BaseId,
-    pub perm: SimplePerm,
+    pub perm: Perm,
 }
 /// remove_perm_from_role policy action.
 #[action(interface = Persistent)]
 pub struct remove_perm_from_role {
     pub role_id: BaseId,
-    pub perm: SimplePerm,
-}
-/// add_role_owner policy action.
-#[action(interface = Persistent)]
-pub struct add_role_owner {
-    pub target_role_id: BaseId,
-    pub new_owning_role: BaseId,
-}
-/// remove_role_owner policy action.
-#[action(interface = Persistent)]
-pub struct remove_role_owner {
-    pub target_role_id: BaseId,
-    pub owning_role_id: BaseId,
-}
-/// assign_role_management_perm policy action.
-#[action(interface = Persistent)]
-pub struct assign_role_management_perm {
-    pub target_role_id: BaseId,
-    pub managing_role_id: BaseId,
-    pub perm: RoleManagementPerm,
-}
-/// revoke_role_management_perm policy action.
-#[action(interface = Persistent)]
-pub struct revoke_role_management_perm {
-    pub target_role_id: BaseId,
-    pub managing_role_id: BaseId,
-    pub perm: RoleManagementPerm,
+    pub perm: Perm,
 }
 /// create_role policy action.
 #[action(interface = Persistent)]
 pub struct create_role {
     pub role_name: Text,
-    pub owning_role_id: BaseId,
+    pub rank: i64,
 }
 /// setup_default_roles policy action.
 #[action(interface = Persistent)]
-pub struct setup_default_roles {
-    pub owning_role_id: BaseId,
-}
+pub struct setup_default_roles {}
 /// delete_role policy action.
 #[action(interface = Persistent)]
 pub struct delete_role {
@@ -468,11 +412,6 @@ pub struct revoke_role {
 /// query_team_roles policy action.
 #[action(interface = Ephemeral)]
 pub struct query_team_roles {}
-/// query_role_owners policy action.
-#[action(interface = Ephemeral)]
-pub struct query_role_owners {
-    pub role_id: BaseId,
-}
 /// create_team policy action.
 #[action(interface = Persistent)]
 pub struct create_team {
@@ -484,34 +423,23 @@ pub struct create_team {
 pub struct terminate_team {
     pub team_id: BaseId,
 }
-/// add_device policy action.
+/// add_device_with_rank policy action.
 #[action(interface = Persistent)]
-pub struct add_device {
+pub struct add_device_with_rank {
     pub device_keys: PublicKeyBundle,
     pub initial_role_id: Option<BaseId>,
+    pub rank: i64,
 }
 /// remove_device policy action.
 #[action(interface = Persistent)]
 pub struct remove_device {
     pub device_id: BaseId,
 }
-/// add_label_managing_role policy action.
+/// create_label_with_rank policy action.
 #[action(interface = Persistent)]
-pub struct add_label_managing_role {
-    pub label_id: BaseId,
-    pub managing_role_id: BaseId,
-}
-/// revoke_label_managing_role policy action.
-#[action(interface = Persistent)]
-pub struct revoke_label_managing_role {
-    pub label_id: BaseId,
-    pub managing_role_id: BaseId,
-}
-/// create_label policy action.
-#[action(interface = Persistent)]
-pub struct create_label {
+pub struct create_label_with_rank {
     pub name: Text,
-    pub managing_role_id: BaseId,
+    pub rank: i64,
 }
 /// delete_label policy action.
 #[action(interface = Persistent)]
@@ -530,6 +458,17 @@ pub struct assign_label_to_device {
 pub struct revoke_label_from_device {
     pub device_id: BaseId,
     pub label_id: BaseId,
+}
+/// query_role_has_perm policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_has_perm {
+    pub role_id: BaseId,
+    pub perm: Perm,
+}
+/// query_role_perms policy action.
+#[action(interface = Ephemeral)]
+pub struct query_role_perms {
+    pub role_id: BaseId,
 }
 /// query_label policy action.
 #[action(interface = Ephemeral)]

@@ -36,12 +36,7 @@ pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
 #[doc(inline)]
-#[expect(deprecated)]
-pub use crate::client::KeyBundle;
-#[cfg(feature = "preview")]
-#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
-#[doc(inline)]
-pub use crate::client::{Permission, RoleManagementPermission};
+pub use crate::client::Permission;
 #[cfg(feature = "preview")]
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
@@ -49,8 +44,8 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle, Role,
-        RoleId, Roles, Team, TeamId,
+        AsObjectId, ChanOp, Client, Device, DeviceId, Devices, IsObjectId, Label, LabelId, Labels,
+        ObjectId, PublicKeyBundle, Rank, Role, RoleId, Roles, Team, TeamId,
     },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,

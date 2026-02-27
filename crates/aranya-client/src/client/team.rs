@@ -7,12 +7,10 @@ use aranya_util::Addr;
 use buggy::BugExt as _;
 use tracing::instrument;
 
-#[cfg(feature = "preview")]
-use crate::client::{Permission, RoleManagementPermission};
 use crate::{
     client::{
-        create_ctx, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle,
-        Role, RoleId, Roles,
+        create_ctx, AsObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
+        Permission, PublicKeyBundle, Rank, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -109,19 +107,72 @@ impl Team<'_> {
 
 impl Team<'_> {
     /// Adds a device to the team with an optional initial role.
+    ///
+    /// Since this API does not allow specifying a rank, the device is
+    /// assigned a default rank based on:
+    /// - If an initial role is provided: the role's rank minus one
+    /// - If no initial role is provided: the command author's rank minus one
+    ///
+    /// Requires:
+    /// - `AddDevice` permission
+    /// - `caller_rank >= rank`
+    ///
+    /// Use [`Self::add_device_with_rank`] to specify an explicit rank.
+    #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
     pub async fn add_device(
         &self,
         keys: PublicKeyBundle,
         initial_role: Option<RoleId>,
     ) -> Result<()> {
+        // Default to role_rank - 1 when an initial_role is provided,
+        // otherwise fall back to author_rank - 1.
+        let rank = match &initial_role {
+            Some(role_id) => {
+                let role_rank = self.query_rank(*role_id).await?;
+                Rank::new(role_rank.value().saturating_sub(1))
+            }
+            None => {
+                let device_id = self.client.get_device_id().await?;
+                let author_rank = self.query_rank(device_id).await?;
+                Rank::new(author_rank.value().saturating_sub(1))
+            }
+        };
         self.client
             .daemon
-            .add_device_to_team(
+            .add_device_to_team_with_rank(
                 create_ctx(),
                 self.id,
                 keys.into_api(),
                 initial_role.map(RoleId::into_api),
+                rank.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Adds a device to the team with an optional initial role and
+    /// explicit rank.
+    ///
+    /// Requires:
+    /// - `AddDevice` permission
+    /// - `caller_rank >= rank`
+    #[instrument(skip(self))]
+    pub async fn add_device_with_rank(
+        &self,
+        keys: PublicKeyBundle,
+        initial_role: Option<RoleId>,
+        rank: Rank,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .add_device_to_team_with_rank(
+                create_ctx(),
+                self.id,
+                keys.into_api(),
+                initial_role.map(RoleId::into_api),
+                rank.into_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -208,18 +259,33 @@ impl Team<'_> {
 }
 
 impl Team<'_> {
-    /// Sets up the default team roles.
+    /// Sets up the default team roles (admin, operator, member).
     ///
-    /// `owning_role` will be the initial owner of the default
-    /// roles.
+    /// The owner role is created automatically when the team is created,
+    /// so it is not included here.
     ///
-    /// It returns the the roles that were created.
+    /// # Breaking change
+    ///
+    /// This method previously required an `owning_role` parameter.
+    /// Owning roles no longer exist in the rank-based authorization
+    /// model, so the parameter has been removed. Callers that
+    /// previously passed an owning role can simply remove it:
+    ///
+    /// ```ignore
+    /// // Before:
+    /// team.setup_default_roles(owner_role_id).await?;
+    ///
+    /// // After:
+    /// team.setup_default_roles().await?;
+    /// ```
+    ///
+    /// It returns the roles that were created.
     #[instrument(skip(self))]
-    pub async fn setup_default_roles(&self, owning_role: RoleId) -> Result<Roles> {
+    pub async fn setup_default_roles(&self) -> Result<Roles> {
         let roles = self
             .client
             .daemon
-            .setup_default_roles(create_ctx(), self.id, owning_role.into_api())
+            .setup_default_roles(create_ctx(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -233,19 +299,19 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
-    /// Creates a new role.
+    /// Creates a new role with the given rank.
     ///
-    /// `owning_role` will be the initial owner of the new role.
+    /// Requires:
+    /// - `CreateRole` permission
+    /// - `caller_rank >= rank`
     ///
     /// It returns the Role that was created.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
     #[instrument(skip(self))]
-    pub async fn create_role(&self, role_name: Text, owning_role: RoleId) -> Result<Role> {
+    pub async fn create_role(&self, role_name: Text, rank: Rank) -> Result<Role> {
         let role = self
             .client
             .daemon
-            .create_role(create_ctx(), self.id, role_name, owning_role.into_api())
+            .create_role(create_ctx(), self.id, role_name, rank.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -254,10 +320,11 @@ impl Team<'_> {
 
     /// Deletes a role.
     ///
-    /// The role must not be assigned to any devices, nor should it own
-    /// any other roles.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    /// The role must not be assigned to any devices.
+    ///
+    /// Requires:
+    /// - `DeleteRole` permission
+    /// - `caller_rank > role_rank`
     #[instrument(skip(self))]
     pub async fn delete_role(&self, role_id: RoleId) -> Result<()> {
         self.client
@@ -270,8 +337,10 @@ impl Team<'_> {
     }
 
     /// Adds a permission to a role.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    ///
+    /// Requires:
+    /// - `ChangeRolePerms` permission
+    /// - `caller_rank > role_rank`
     #[instrument(skip(self))]
     pub async fn add_perm_to_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
@@ -284,8 +353,10 @@ impl Team<'_> {
     }
 
     /// Removes a permission from a role.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    ///
+    /// Requires:
+    /// - `ChangeRolePerms` permission
+    /// - `caller_rank > role_rank`
     #[instrument(skip(self))]
     pub async fn remove_perm_from_role(&self, role_id: RoleId, perm: Permission) -> Result<()> {
         self.client
@@ -297,109 +368,60 @@ impl Team<'_> {
         Ok(())
     }
 
-    /// Adds `owning_role` as an owner of `role`.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    /// Queries all permissions assigned to a role.
     #[instrument(skip(self))]
-    pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .add_role_owner(
-                create_ctx(),
-                self.id,
-                role.into_api(),
-                owning_role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Removes an `owning_role` as an owner of `role`.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
-    #[instrument(skip(self))]
-    pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .remove_role_owner(
-                create_ctx(),
-                self.id,
-                role.into_api(),
-                owning_role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Returns the roles that own `role`.
-    #[instrument(skip(self))]
-    pub async fn role_owners(&self, role: RoleId) -> Result<Roles> {
-        let roles = self
+    pub async fn query_role_perms(&self, role_id: RoleId) -> Result<Vec<Permission>> {
+        let perms = self
             .client
             .daemon
-            .role_owners(create_ctx(), self.id, role.into_api())
+            .query_role_perms(create_ctx(), self.id, role_id.into_api())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            // This _should_ just be `into_iter`, but the
-            // compiler chooses the `&Box` impl. It's the same
-            // end result, though.
-            .into_vec()
-            .into_iter()
-            .map(Role::from_api)
-            .collect();
-        Ok(Roles { roles })
+            .map_err(aranya_error)?;
+        Ok(perms)
     }
 
-    /// Assigns a role management permission to a managing role.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    /// Changes the rank of an object (device or label).
+    ///
+    /// Requires:
+    /// - `ChangeRank` permission
+    /// - `caller_rank > object_rank` (unless changing own rank)
+    /// - `caller_rank >= new_rank`
+    ///
+    /// Note: Role ranks cannot be changed after creation. This maintains the
+    /// invariant that `role_rank >= device_rank` for all devices assigned to
+    /// the role.
     #[instrument(skip(self))]
-    pub async fn assign_role_management_permission(
+    pub async fn change_rank(
         &self,
-        role: RoleId,
-        managing_role: RoleId,
-        perm: RoleManagementPermission,
+        object_id: impl AsObjectId,
+        old_rank: Rank,
+        new_rank: Rank,
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_role_management_perm(
+            .change_rank(
                 create_ctx(),
                 self.id,
-                role.into_api(),
-                managing_role.into_api(),
-                perm,
+                object_id.to_object_id().into_api(),
+                old_rank.into_api(),
+                new_rank.into_api(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
-    /// Revokes a role management permission from a managing
-    /// role.
-    #[cfg(feature = "preview")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    /// Queries the rank of an object.
     #[instrument(skip(self))]
-    pub async fn revoke_role_management_permission(
-        &self,
-        role: RoleId,
-        managing_role: RoleId,
-        perm: RoleManagementPermission,
-    ) -> Result<()> {
+    pub async fn query_rank(&self, object_id: impl AsObjectId) -> Result<Rank> {
         self.client
             .daemon
-            .revoke_role_management_perm(
-                create_ctx(),
-                self.id,
-                role.into_api(),
-                managing_role.into_api(),
-                perm,
-            )
+            .query_rank(create_ctx(), self.id, object_id.to_object_id().into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+            .map(Rank::from_api)
     }
 
     /// Returns all of the roles for this team.
@@ -421,56 +443,91 @@ impl Team<'_> {
             .collect();
         Ok(Roles { roles })
     }
+
+    /// Deprecated: owning roles no longer exist in the rank-based
+    /// authorization model. This method is a no-op that always returns
+    /// an empty [`Roles`].
+    #[deprecated(note = "owning roles no longer exist in the rank-based authorization model")]
+    pub async fn role_owners(&self, _role: RoleId) -> Result<Roles> {
+        tracing::warn!("role_owners is deprecated: owning roles no longer exist");
+        Ok(Roles {
+            roles: Vec::new().into(),
+        })
+    }
 }
 
 impl Team<'_> {
     /// Create a label.
+    ///
+    /// The `managing_role_id` parameter is accepted for backward
+    /// compatibility but is ignored in the rank-based authorization
+    /// model. Since this API does not allow the user to specify a rank,
+    /// the label is created with a default rank of the command author's
+    /// rank minus one.
+    ///
+    /// Requires:
+    /// - `CreateLabel` permission
+    /// - `caller_rank >= rank`
+    ///
+    /// Use [`Self::create_label_with_rank`] to specify an explicit rank.
+    #[deprecated(note = "use `create_label_with_rank` to specify an explicit rank")]
     #[instrument(skip(self))]
     pub async fn create_label(
         &self,
         label_name: Text,
-        managing_role_id: RoleId,
+        _managing_role_id: RoleId,
     ) -> Result<LabelId> {
+        // Default to author_rank - 1.
+        let device_id = self.client.get_device_id().await?;
+        let author_rank = self.query_rank(device_id).await?;
+        let rank = Rank::new(author_rank.value().saturating_sub(1));
         self.client
             .daemon
-            .create_label(
-                create_ctx(),
-                self.id,
-                label_name,
-                managing_role_id.into_api(),
-            )
+            .create_label_with_rank(create_ctx(), self.id, label_name, rank.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
             .map(LabelId::from_api)
     }
 
+    /// Create a label with an explicit rank.
+    ///
+    /// Requires:
+    /// - `CreateLabel` permission
+    /// - `caller_rank >= rank`
+    #[instrument(skip(self))]
+    pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
+        self.client
+            .daemon
+            .create_label_with_rank(create_ctx(), self.id, label_name, rank.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+            .map(LabelId::from_api)
+    }
+
+    /// Deprecated: managing roles no longer exist in the rank-based
+    /// authorization model. This method is a no-op.
+    #[deprecated(note = "managing roles no longer exist in the rank-based authorization model")]
+    pub async fn add_label_managing_role(
+        &self,
+        _label_id: LabelId,
+        _managing_role: RoleId,
+    ) -> Result<()> {
+        tracing::warn!("add_label_managing_role is deprecated: managing roles no longer exist");
+        Ok(())
+    }
+
     /// Delete a label.
+    ///
+    /// Requires:
+    /// - `DeleteLabel` permission
+    /// - `caller_rank > label_rank`
     #[instrument(skip(self))]
     pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
             .delete_label(create_ctx(), self.id, label_id.into_api())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Add label managing role
-    #[instrument(skip(self))]
-    pub async fn add_label_managing_role(
-        &self,
-        label_id: LabelId,
-        managing_role_id: RoleId,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .add_label_managing_role(
-                create_ctx(),
-                self.id,
-                label_id.into_api(),
-                managing_role_id.into_api(),
-            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

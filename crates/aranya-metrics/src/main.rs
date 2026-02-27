@@ -10,7 +10,7 @@ use std::{
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, PublicKeyBundle,
+    CreateTeamQuicSyncConfig, DeviceId, PublicKeyBundle, Rank,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -279,13 +279,13 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Create default roles
     info!("creating default roles");
-    let owner_role = owner
+    owner
         .roles()
         .await?
         .into_iter()
         .find(|role| role.name == "owner" && role.default)
         .context("unable to find owner role")?;
-    let roles = owner.setup_default_roles(owner_role.id).await?;
+    let roles = owner.setup_default_roles().await?;
     let admin_role = roles
         .iter()
         .find(|r| r.name == "admin")
@@ -312,59 +312,87 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
             .build()?
     };
 
-    // TODO: Delegate to admin and operator.
-    let _admin = ctx.admin.client.add_team(add_team_cfg.clone()).await?;
-    let _operator = ctx.operator.client.add_team(add_team_cfg.clone()).await?;
+    let admin = ctx.admin.client.add_team(add_team_cfg.clone()).await?;
+    let operator = ctx.operator.client.add_team(add_team_cfg.clone()).await?;
     let membera = ctx.membera.client.add_team(add_team_cfg.clone()).await?;
     let memberb = ctx.memberb.client.add_team(add_team_cfg).await?;
 
     // get sync addresses.
     let owner_addr = ctx.owner.aranya_local_addr().await?;
-    let _admin_addr = ctx.admin.aranya_local_addr().await?;
-    let _operator_addr = ctx.operator.aranya_local_addr().await?;
 
-    // setup sync peers.
+    // Owner adds admin and operator to the team, then delegates
+    // remaining operations to them.
     info!("adding admin to team");
-    owner.add_device(ctx.admin.pk, Some(admin_role.id)).await?;
+    let admin_role_rank = owner.query_rank(admin_role.id).await?;
+    owner
+        .add_device_with_rank(
+            ctx.admin.pk,
+            Some(admin_role.id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
+    admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
+    let operator_role_rank = owner.query_rank(operator_role.id).await?;
     owner
-        .add_device(ctx.operator.pk, Some(operator_role.id))
+        .add_device_with_rank(
+            ctx.operator.pk,
+            Some(operator_role.id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
         .await?;
+    operator.sync_now(owner_addr, None).await?;
 
-    // add membera to team.
-    info!("adding membera to team");
-    owner
-        .add_device(ctx.membera.pk.clone(), Some(member_role.id))
+    // Admin adds membera and memberb to the team.
+    info!("admin adding membera to team");
+    let member_role_rank = admin.query_rank(member_role.id).await?;
+    admin
+        .add_device_with_rank(
+            ctx.membera.pk.clone(),
+            Some(member_role.id),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
+        )
         .await?;
     membera.sync_now(owner_addr, None).await?;
 
-    // add memberb to team.
-    info!("adding memberb to team");
-    owner
-        .add_device(ctx.memberb.pk.clone(), Some(member_role.id))
+    info!("admin adding memberb to team");
+    admin
+        .add_device_with_rank(
+            ctx.memberb.pk.clone(),
+            Some(member_role.id),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
+        )
         .await?;
     memberb.sync_now(owner_addr, None).await?;
 
     // fact database queries
     let devices = membera.devices().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
-    let owner_device = owner.device(ctx.owner.id);
-    let owner_role = owner_device.role().await?.expect("expected owner role");
-    info!("owner role: {:?}", owner_role);
-    let keybundle = owner_device.public_key_bundle().await?;
-    info!("owner keybundle: {:?}", keybundle);
+    let admin_device = admin.device(ctx.admin.id);
+    let admin_device_role = admin_device.role().await?.expect("expected admin role");
+    info!("admin role: {:?}", admin_device_role);
 
-    info!("creating label");
-    let label3 = owner.create_label(text!("label3"), owner_role.id).await?;
+    // Admin creates a label.
+    info!("admin creating label");
+    let admin_device_rank = admin.query_rank(ctx.admin.id).await?;
+    // Label rank must be lower than the admin's device rank so the admin can operate on it.
+    let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
+    let label3 = admin
+        .create_label_with_rank(text!("label3"), label_rank)
+        .await?;
+
+    // Operator assigns the label to membera and memberb.
     let op = ChanOp::SendRecv;
-    info!("assigning label to membera");
-    owner
+    operator.sync_now(owner_addr, None).await?;
+
+    info!("operator assigning label to membera");
+    operator
         .device(ctx.membera.id)
         .assign_label(label3, op)
         .await?;
-    info!("assigning label to memberb");
-    owner
+    info!("operator assigning label to memberb");
+    operator
         .device(ctx.memberb.id)
         .assign_label(label3, op)
         .await?;
