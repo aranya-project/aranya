@@ -143,7 +143,7 @@ impl Team<'_> {
             .add_device_to_team_with_rank(
                 create_ctx(),
                 self.id,
-                keys.__into_api(),
+                keys.into_api(),
                 initial_role.map(RoleId::into_api),
                 rank.into_api(),
             )
@@ -170,7 +170,7 @@ impl Team<'_> {
             .add_device_to_team_with_rank(
                 create_ctx(),
                 self.id,
-                keys.__into_api(),
+                keys.into_api(),
                 initial_role.map(RoleId::into_api),
                 rank.into_api(),
             )

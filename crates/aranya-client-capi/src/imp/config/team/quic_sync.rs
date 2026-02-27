@@ -79,7 +79,6 @@ impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
-    #[doc(hidden)]
     pub fn mode(&mut self, mode: CreateSeedMode) {
         self.mode = mode;
     }
@@ -126,7 +125,6 @@ impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     ///
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
-    #[doc(hidden)]
     pub fn mode(&mut self, mode: AddSeedMode) {
         self.mode = Some(mode);
     }
