@@ -476,6 +476,11 @@ impl From<&ObjectId> for aranya_client::ObjectId {
     }
 }
 
+/// A numerical rank used for authorization in the rank-based
+/// hierarchy. Arithmetic can be performed directly on ranks
+/// since they are plain integers.
+pub type Rank = i64;
+
 /// A label name.
 ///
 /// E.g. "TELEMETRY_LABEL"
@@ -1443,7 +1448,7 @@ pub fn create_role(
     client: &Client,
     team: &TeamId,
     role_name: RoleName,
-    rank: i64,
+    rank: Rank,
     role_out: &mut MaybeUninit<Role>,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `name` is a valid C String.
@@ -1685,7 +1690,7 @@ pub fn create_label_with_rank(
     client: &Client,
     team: &TeamId,
     name: LabelName,
-    rank: i64,
+    rank: Rank,
 ) -> Result<LabelId, imp::Error> {
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
@@ -1745,8 +1750,8 @@ pub fn change_rank(
     client: &Client,
     team: &TeamId,
     object_id: &ObjectId,
-    old_rank: i64,
-    new_rank: i64,
+    old_rank: Rank,
+    new_rank: Rank,
 ) -> Result<(), imp::Error> {
     client
         .rt
@@ -1766,7 +1771,11 @@ pub fn change_rank(
 /// @param[out] __output the rank of the object
 ///
 /// @relates AranyaClient.
-pub fn query_rank(client: &Client, team: &TeamId, object_id: &ObjectId) -> Result<i64, imp::Error> {
+pub fn query_rank(
+    client: &Client,
+    team: &TeamId,
+    object_id: &ObjectId,
+) -> Result<Rank, imp::Error> {
     let rank = client.rt.block_on(
         client
             .inner
@@ -2005,7 +2014,7 @@ pub unsafe fn add_device_to_team_with_rank(
     team: &TeamId,
     keybundle: &[u8],
     role_id: Option<&RoleId>,
-    rank: i64,
+    rank: Rank,
 ) -> Result<(), imp::Error> {
     let keybundle = imp::public_key_bundle_deserialize(keybundle)?;
 

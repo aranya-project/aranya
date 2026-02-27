@@ -1,9 +1,7 @@
-use core::fmt;
-
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
-use aranya_id::{custom_id, Id, IdTag};
+use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
 use buggy::BugExt as _;
@@ -11,8 +9,8 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        create_ctx, Client, Device, DeviceId, Devices, Label, LabelId, Labels, Permission,
-        PublicKeyBundle, Role, RoleId, Roles,
+        create_ctx, AsObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
+        Permission, PublicKeyBundle, Rank, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
@@ -24,92 +22,6 @@ custom_id! {
     pub struct TeamId;
 }
 impl ApiId<api::TeamId> for TeamId {}
-
-custom_id! {
-    /// An identifier for any object with a unique Aranya ID defined in the policy.
-    pub struct ObjectId;
-}
-impl ApiId<api::ObjectId> for ObjectId {}
-
-/// Marker trait for ID types that can be converted to [`ObjectId`].
-///
-/// Implemented for [`RoleId`], [`DeviceId`], [`LabelId`], and [`TeamId`].
-pub trait IsObjectId: sealed::Sealed {}
-impl IsObjectId for RoleId {}
-impl IsObjectId for DeviceId {}
-impl IsObjectId for LabelId {}
-impl IsObjectId for TeamId {}
-impl IsObjectId for ObjectId {}
-
-/// Extension trait for converting typed IDs into [`ObjectId`].
-///
-/// Roles, devices, labels, and teams all have unique Aranya IDs
-/// that can be treated as generic object IDs for rank queries and
-/// other operations that accept any object type.
-pub trait AsObjectId: sealed::Sealed + fmt::Debug {
-    /// Converts this ID into an [`ObjectId`].
-    fn to_object_id(self) -> ObjectId;
-}
-
-impl<Tag> AsObjectId for Id<Tag>
-where
-    Tag: IdTag,
-    Id<Tag>: IsObjectId,
-{
-    fn to_object_id(self) -> ObjectId {
-        ObjectId::transmute(self)
-    }
-}
-
-mod sealed {
-    use super::{DeviceId, LabelId, ObjectId, RoleId, TeamId};
-
-    pub trait Sealed {}
-
-    impl Sealed for RoleId {}
-    impl Sealed for DeviceId {}
-    impl Sealed for LabelId {}
-    impl Sealed for TeamId {}
-    impl Sealed for ObjectId {}
-}
-
-/// A numerical rank used for authorization in the rank-based hierarchy.
-///
-/// Higher-ranked objects can operate on lower-ranked objects.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Rank(api::Rank);
-
-impl Rank {
-    /// Creates a new rank from a raw value.
-    pub const fn new(value: i64) -> Self {
-        Self(api::Rank::new(value))
-    }
-
-    /// Returns the raw rank value.
-    pub const fn value(self) -> i64 {
-        self.0.value()
-    }
-
-    pub(crate) fn into_api(self) -> api::Rank {
-        self.0
-    }
-
-    pub(crate) fn from_api(r: api::Rank) -> Self {
-        Self(r)
-    }
-}
-
-impl From<i64> for Rank {
-    fn from(value: i64) -> Self {
-        Self::new(value)
-    }
-}
-
-impl fmt::Display for Rank {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 /// Represents an Aranya Team.
 #[derive(Debug)]
@@ -352,6 +264,21 @@ impl Team<'_> {
     /// The owner role is created automatically when the team is created,
     /// so it is not included here.
     ///
+    /// # Breaking change
+    ///
+    /// This method previously required an `owning_role` parameter.
+    /// Owning roles no longer exist in the rank-based authorization
+    /// model, so the parameter has been removed. Callers that
+    /// previously passed an owning role can simply remove it:
+    ///
+    /// ```ignore
+    /// // Before:
+    /// team.setup_default_roles(owner_role_id).await?;
+    ///
+    /// // After:
+    /// team.setup_default_roles().await?;
+    /// ```
+    ///
     /// It returns the roles that were created.
     #[instrument(skip(self))]
     pub async fn setup_default_roles(&self) -> Result<Roles> {
@@ -517,11 +444,12 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
-    /// Deprecated: the `role` parameter is ignored and the returned
-    /// [`Roles`] is always empty.
-    #[deprecated(note = "role_owners is deprecated")]
+    /// Deprecated: owning roles no longer exist in the rank-based
+    /// authorization model. This method is a no-op that always returns
+    /// an empty [`Roles`].
+    #[deprecated(note = "owning roles no longer exist in the rank-based authorization model")]
     pub async fn role_owners(&self, _role: RoleId) -> Result<Roles> {
-        tracing::warn!("role_owners is deprecated");
+        tracing::warn!("role_owners is deprecated: owning roles no longer exist");
         Ok(Roles {
             roles: Vec::new().into(),
         })
@@ -578,16 +506,15 @@ impl Team<'_> {
             .map(LabelId::from_api)
     }
 
-    /// Adds a managing role to a label.
-    ///
-    /// Deprecated: this method is a no-op.
-    #[deprecated(note = "add_label_managing_role is deprecated")]
+    /// Deprecated: managing roles no longer exist in the rank-based
+    /// authorization model. This method is a no-op.
+    #[deprecated(note = "managing roles no longer exist in the rank-based authorization model")]
     pub async fn add_label_managing_role(
         &self,
         _label_id: LabelId,
         _managing_role: RoleId,
     ) -> Result<()> {
-        tracing::warn!("add_label_managing_role is deprecated and is a no-op");
+        tracing::warn!("add_label_managing_role is deprecated: managing roles no longer exist");
         Ok(())
     }
 

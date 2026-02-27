@@ -2,6 +2,7 @@
 
 mod device;
 mod label;
+mod object;
 mod role;
 mod team;
 
@@ -42,8 +43,9 @@ pub use self::device::KeyBundle;
 pub use self::{
     device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
+    object::{AsObjectId, IsObjectId, ObjectId, Rank},
     role::{Role, RoleId, Roles},
-    team::{AsObjectId, IsObjectId, ObjectId, Rank, Team, TeamId},
+    team::{Team, TeamId},
 };
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig},

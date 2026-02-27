@@ -49,7 +49,7 @@ use crate::{
 };
 
 /// Queries the rank of an object via the policy engine, returning the raw i64 value.
-async fn query_rank(device: &TestDevice, object_id: aranya_policy_ifgen::BaseId) -> Result<i64> {
+async fn query_rank(device: &TestDevice, object_id: aranya_daemon_api::ObjectId) -> Result<i64> {
     let effects = device.actions().query_rank(object_id).await?;
     effects
         .into_iter()
@@ -386,7 +386,8 @@ impl TestCtx {
             .find(|role| role.name.as_str() == "member" && role.default)
             .context("member role not found after setup")?;
 
-        let admin_role_rank = query_rank(owner, admin_role.id.as_base()).await?;
+        let admin_role_rank =
+            query_rank(owner, aranya_daemon_api::ObjectId::transmute(admin_role.id)).await?;
         owner
             .actions()
             .add_device_with_rank(
@@ -414,7 +415,11 @@ impl TestCtx {
             .len();
         assert!(admin_cache_size > 0);
 
-        let operator_role_rank = query_rank(owner, operator_role.id.as_base()).await?;
+        let operator_role_rank = query_rank(
+            owner,
+            aranya_daemon_api::ObjectId::transmute(operator_role.id),
+        )
+        .await?;
         owner
             .actions()
             .add_device_with_rank(
@@ -444,7 +449,11 @@ impl TestCtx {
             .len();
         assert!(operator_cache_size > 0);
 
-        let member_role_rank = query_rank(owner, member_role.id.as_base()).await?;
+        let member_role_rank = query_rank(
+            owner,
+            aranya_daemon_api::ObjectId::transmute(member_role.id),
+        )
+        .await?;
         admin
             .actions()
             .add_device_with_rank(
@@ -633,7 +642,8 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
-    let member_role_rank = query_rank(owner, member_role.as_base()).await?;
+    let member_role_rank =
+        query_rank(owner, aranya_daemon_api::ObjectId::transmute(member_role)).await?;
 
     owner
         .actions()
@@ -672,7 +682,8 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
 
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
-    let member_role_rank = query_rank(owner, member_role.as_base()).await?;
+    let member_role_rank =
+        query_rank(owner, aranya_daemon_api::ObjectId::transmute(member_role)).await?;
 
     // Assign member role to membera
     owner
@@ -821,7 +832,8 @@ async fn test_create_label_requires_valid_rank() -> Result<()> {
     // Create a label with owner role rank
     let roles = load_default_roles(owner).await?;
     let owner_role = role_id_by_name(&roles, "owner");
-    let owner_role_rank = query_rank(owner, owner_role.as_base()).await?;
+    let owner_role_rank =
+        query_rank(owner, aranya_daemon_api::ObjectId::transmute(owner_role)).await?;
     owner
         .actions()
         .create_label_with_rank(text!("TEST_LABEL"), owner_role_rank.into())
@@ -844,7 +856,8 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
 
     let roles = load_default_roles(owner).await?;
     let owner_role = role_id_by_name(&roles, "owner");
-    let owner_role_rank = query_rank(owner, owner_role.as_base()).await?;
+    let owner_role_rank =
+        query_rank(owner, aranya_daemon_api::ObjectId::transmute(owner_role)).await?;
 
     let effects = owner
         .actions()

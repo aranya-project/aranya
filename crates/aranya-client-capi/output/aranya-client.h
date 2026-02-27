@@ -613,6 +613,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaHelloSubscriptionConfig {
 typedef const char *AranyaRoleName;
 
 /**
+ * A numerical rank used for authorization in the rank-based
+ * hierarchy. Arithmetic can be performed directly on ranks
+ * since they are plain integers.
+ */
+typedef Rank AranyaRank;
+
+/**
  * A label name.
  *
  * E.g. "TELEMETRY_LABEL"
@@ -2039,7 +2046,7 @@ AranyaError aranya_team_default_roles_ext(const struct AranyaClient *client,
 AranyaError aranya_create_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                AranyaRoleName role_name,
-                               int64_t rank,
+                               AranyaRank rank,
                                struct AranyaRole *role_out);
 
 /**
@@ -2060,7 +2067,7 @@ AranyaError aranya_create_role(const struct AranyaClient *client,
 AranyaError aranya_create_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    AranyaRoleName role_name,
-                                   int64_t rank,
+                                   AranyaRank rank,
                                    struct AranyaRole *role_out,
                                    struct AranyaExtError *__ext_err);
 
@@ -2378,7 +2385,7 @@ AranyaError aranya_create_label_ext(const struct AranyaClient *client,
 AranyaError aranya_create_label_with_rank(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           AranyaLabelName name,
-                                          int64_t rank,
+                                          AranyaRank rank,
                                           struct AranyaLabelId *__output);
 
 /**
@@ -2398,7 +2405,7 @@ AranyaError aranya_create_label_with_rank(const struct AranyaClient *client,
 AranyaError aranya_create_label_with_rank_ext(const struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               AranyaLabelName name,
-                                              int64_t rank,
+                                              AranyaRank rank,
                                               struct AranyaLabelId *__output,
                                               struct AranyaExtError *__ext_err);
 
@@ -2467,8 +2474,8 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
 AranyaError aranya_change_rank(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaObjectId *object_id,
-                               int64_t old_rank,
-                               int64_t new_rank);
+                               AranyaRank old_rank,
+                               AranyaRank new_rank);
 
 /**
  * Change the rank of an object (device or label).
@@ -2500,8 +2507,8 @@ AranyaError aranya_change_rank(const struct AranyaClient *client,
 AranyaError aranya_change_rank_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaObjectId *object_id,
-                                   int64_t old_rank,
-                                   int64_t new_rank,
+                                   AranyaRank old_rank,
+                                   AranyaRank new_rank,
                                    struct AranyaExtError *__ext_err);
 
 /**
@@ -2517,7 +2524,7 @@ AranyaError aranya_change_rank_ext(const struct AranyaClient *client,
 AranyaError aranya_query_rank(const struct AranyaClient *client,
                               const struct AranyaTeamId *team,
                               const struct AranyaObjectId *object_id,
-                              int64_t *__output);
+                              AranyaRank *__output);
 
 /**
  * Query the rank of an object.
@@ -2532,7 +2539,7 @@ AranyaError aranya_query_rank(const struct AranyaClient *client,
 AranyaError aranya_query_rank_ext(const struct AranyaClient *client,
                                   const struct AranyaTeamId *team,
                                   const struct AranyaObjectId *object_id,
-                                  int64_t *__output,
+                                  AranyaRank *__output,
                                   struct AranyaExtError *__ext_err);
 
 /**
@@ -2871,7 +2878,7 @@ AranyaError aranya_add_device_to_team_with_rank(const struct AranyaClient *clien
                                                 const uint8_t *keybundle,
                                                 size_t keybundle_len,
                                                 const struct AranyaRoleId *role_id,
-                                                int64_t rank);
+                                                AranyaRank rank);
 
 /**
  * Add a device to the team with an explicit rank.
@@ -2894,7 +2901,7 @@ AranyaError aranya_add_device_to_team_with_rank_ext(const struct AranyaClient *c
                                                     const uint8_t *keybundle,
                                                     size_t keybundle_len,
                                                     const struct AranyaRoleId *role_id,
-                                                    int64_t rank,
+                                                    AranyaRank rank,
                                                     struct AranyaExtError *__ext_err);
 
 /**

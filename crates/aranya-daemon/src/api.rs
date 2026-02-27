@@ -1328,7 +1328,7 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(graph)
-            .change_rank(object_id.as_base(), old_rank, new_rank)
+            .change_rank(object_id, old_rank, new_rank)
             .await
             .context("unable to change rank")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1352,7 +1352,7 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(graph)
-            .query_rank(object_id.as_base())
+            .query_rank(object_id)
             .await
             .context("unable to query rank")?;
 
