@@ -146,11 +146,9 @@ impl QuicListener {
                 .context("unable to extract return address")?;
         let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
 
-        let (_handle, acceptor) = self.conns.insert(peer, conn).await;
-        if let Some(acceptor) = acceptor {
-            self.pending_accepts
-                .spawn(Self::accept_pending_stream(peer, acceptor));
-        }
+        let (_handle, acceptor) = self.conns.insert_incoming(peer, conn).await;
+        self.pending_accepts
+            .spawn(Self::accept_pending_stream(peer, acceptor));
 
         debug!(?peer, "accepted and inserted QUIC connection");
         Ok(())

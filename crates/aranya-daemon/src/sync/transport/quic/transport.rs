@@ -93,7 +93,7 @@ impl SyncTransport for QuicTransport {
         // Obtain the handle and acceptor for this peer, potentially reusing a connection.
         let (mut handle, acceptor) = self
             .conns
-            .get_or_try_insert_with(peer, async || {
+            .get_or_connect(peer, async || {
                 trace!(?peer, "establishing new QUIC connection");
                 let mut conn = self
                     .client

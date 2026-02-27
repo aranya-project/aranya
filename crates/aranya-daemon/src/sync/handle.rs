@@ -12,7 +12,6 @@ use std::time::Duration;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use buggy::BugExt as _;
 use tokio::sync::{mpsc, oneshot};
 use tracing::trace;
 
@@ -20,7 +19,7 @@ use tracing::trace;
 use super::GraphId;
 #[cfg(doc)]
 use super::SyncManager;
-use super::{Result, SyncPeer};
+use super::{Error, Result, SyncPeer};
 
 /// Holds all possible messages that the [`SyncManager`] can process.
 #[derive(Clone, Debug)]
@@ -211,8 +210,8 @@ impl SyncHandle {
         self.sender
             .send((msg, tx))
             .await
-            .assume("syncer peer channel closed")?;
-        rx.await.assume("no syncer reply")?
+            .map_err(|_| Error::SyncerShutdown)?;
+        rx.await.map_err(|_| Error::SyncerShutdown)?
     }
 }
 

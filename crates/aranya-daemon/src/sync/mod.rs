@@ -37,6 +37,9 @@ pub(crate) enum Error {
     #[error(transparent)]
     AranyaClient(#[from] aranya_runtime::ClientError),
 
+    #[error("the sync manager has shut down")]
+    SyncerShutdown,
+
     /// Encountered a bug in the program.
     #[error(transparent)]
     Bug(#[from] buggy::Bug),

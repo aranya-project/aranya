@@ -410,8 +410,13 @@ where
 
         ready.notify();
         loop {
-            if let Err(err) = self.next().await {
-                error!(error = %err.report(), "unable to sync with peer");
+            match self.next().await {
+                Ok(()) => {}
+                Err(Error::SyncerShutdown) => {
+                    info!("sync manager shutting down");
+                    break;
+                }
+                Err(err) => error!(error = %err.report(), "unable to sync with peer"),
             }
         }
     }
@@ -422,48 +427,55 @@ where
         tokio::select! {
             biased;
             // Received a message from the [`SyncHandle`], handle it.
-            Some((msg, tx)) = self.recv.recv() => {
-                debug!(?msg, "processing handle message");
+            msg = self.recv.recv() => {
+                match msg {
+                    Some((msg, tx)) => {
+                        debug!(?msg, "processing handle message");
 
-                let reply = match msg {
-                    // NOTE: cfg is unused but included to avoid needing to change the API surface.
-                    ManagerMessage::SyncNow { peer, cfg: _cfg } => self.sync(peer).await.map(|_| ()),
-                    ManagerMessage::AddPeer { peer, cfg } => {
-                        self.add_peer(peer, cfg);
-                        Ok(())
-                    }
-                    ManagerMessage::RemovePeer { peer } => {
-                        self.remove_peer(peer);
-                        Ok(())
-                    }
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::HelloSubscribe { peer, graph_change_debounce, duration, schedule_delay } => {
-                        self.send_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay).await
-                    }
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::HelloUnsubscribe { peer } => self.send_hello_unsubscribe(peer).await,
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::BroadcastHello { graph_id, head } => {
-                        self.broadcast_hello(graph_id, head).await;
-                        Ok(())
-                    }
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::HelloSubscribeRequest { peer, graph_change_debounce, duration, schedule_delay } => {
-                        self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay)?;
-                        Ok(())
-                    }
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::HelloUnsubscribeRequest { peer } => {
-                        self.remove_hello_subscription(peer);
-                        Ok(())
-                    }
-                    #[cfg(feature = "preview")]
-                    ManagerMessage::SyncOnHello { peer, head } => self.sync_on_hello(peer, head).await,
-                };
+                        let reply = match msg {
+                            // NOTE: cfg is unused but included to avoid needing to change the API surface.
+                            ManagerMessage::SyncNow { peer, cfg: _cfg } => self.sync(peer).await.map(|_| ()),
+                            ManagerMessage::AddPeer { peer, cfg } => {
+                                self.add_peer(peer, cfg);
+                                Ok(())
+                            }
+                            ManagerMessage::RemovePeer { peer } => {
+                                self.remove_peer(peer);
+                                Ok(())
+                            }
+                            #[cfg(feature = "preview")]
+                            ManagerMessage::HelloSubscribe { peer, graph_change_debounce, duration, schedule_delay } => {
+                                self.send_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay).await
+                            }
+                            #[cfg(feature = "preview")]
+                            ManagerMessage::HelloUnsubscribe { peer } => self.send_hello_unsubscribe(peer).await,
+                            #[cfg(feature = "preview")]
+                            ManagerMessage::BroadcastHello { graph_id, head } => {
+                                self.broadcast_hello(graph_id, head).await;
+                                Ok(())
+                            }
+                            #[cfg(feature = "preview")]
+                            ManagerMessage::HelloSubscribeRequest { peer, graph_change_debounce, duration, schedule_delay } => {
+                                self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay)?;
+                                Ok(())
+                            }
+                            #[cfg(feature = "preview")]
+                            ManagerMessage::HelloUnsubscribeRequest { peer } => {
+                                self.remove_hello_subscription(peer);
+                                Ok(())
+                            }
+                            #[cfg(feature = "preview")]
+                            ManagerMessage::SyncOnHello { peer, head } => self.sync_on_hello(peer, head).await,
+                        };
 
-                if let Err(reply) = tx.send(reply) {
-                    warn!("syncer operation did not wait for reply");
-                    reply?;
+                        if let Err(reply) = tx.send(reply) {
+                            warn!("syncer operation did not wait for reply");
+                            reply?;
+                        }
+                    }
+                    None => {
+                        return Err(Error::SyncerShutdown);
+                    }
                 }
             }
 
@@ -538,10 +550,9 @@ where
         // Send all processed effects to the Daemon API.
         let effects = sink.collect().context("could not collect effects")?;
         let effects_count = effects.len();
-        self.send_effects
-            .send((peer.graph_id, effects))
-            .await
-            .context("unable to send effects")?;
+        if let Err(error) = self.send_effects.send((peer.graph_id, effects)).await {
+            debug!(?error, "effect handler closed, discarding effects");
+        }
 
         // Handle any sync error (including parallel finalization).
         let cmd_count = cmd_result.inspect_err(|err| {

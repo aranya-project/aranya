@@ -72,7 +72,7 @@ impl SharedConnectionMap {
     ///
     /// Note that the `make_conn` function can fail and return an error, but otherwise this function
     /// is infallible.
-    pub(super) async fn get_or_try_insert_with(
+    pub(super) async fn get_or_connect(
         &self,
         peer: SyncPeer,
         make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
@@ -107,40 +107,21 @@ impl SharedConnectionMap {
         Ok((handle, Some(acceptor)))
     }
 
-    /// Tries to insert a connection into the map, returning the handle to it.
+    /// Inserts a connection into the map, returning the handle to it.
     ///
     /// If a handle already exists and is able to be pinged, this will close the passed connection
     /// and keep the existing one. Otherwise, it will insert the connection into the map.
-    pub(super) async fn insert(
+    pub(super) async fn insert_incoming(
         &self,
         peer: SyncPeer,
         conn: Connection,
-    ) -> (Handle, Option<StreamAcceptor>) {
-        match self.handles.lock().await.get_mut(&peer) {
-            Some(existing) => {
-                debug!(?peer, "existing connection found");
-
-                // Check if the existing handle is still alive.
-                if existing.ping().is_ok() {
-                    debug!(?peer, "closing incoming connection, reusing existing");
-                    conn.close(AppError::UNKNOWN);
-                    return (existing.clone(), None);
-                }
-
-                // Close the handle to clean up any trailing data.
-                warn!(
-                    ?peer,
-                    "existing connection failed ping, replacing with incoming"
-                );
-                existing.close(AppError::UNKNOWN);
-            }
-            None => debug!("existing connection not found"),
-        }
-
+    ) -> (Handle, StreamAcceptor) {
         let (handle, acceptor) = conn.split();
-        self.handles.lock().await.insert(peer, handle.clone());
-        debug!(?peer, "created new connection");
-
-        (handle, Some(acceptor))
+        if let Some(old) = self.handles.lock().await.insert(peer, handle.clone()) {
+            debug!(?peer, "replaced existing connection with incoming");
+            drop(old);
+        }
+        debug!(?peer, "inserted incoming connection");
+        (handle, acceptor)
     }
 }
