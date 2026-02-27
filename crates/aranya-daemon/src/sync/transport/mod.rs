@@ -5,7 +5,7 @@ pub(crate) mod quic;
 
 /// A reliable, ordered, bidirectional byte stream tied to a specific peer.
 ///
-/// A single stream can be used for an entire sync conversation/exchange, dictated by the two peers'
+/// A single stream can be used for an entire sync request/response handshake, dictated by the two peers'
 /// [`SyncManager`]. The protocol currently only needs one round trip, but this may change as the sync
 /// protocol evolves.
 ///
