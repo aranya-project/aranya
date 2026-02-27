@@ -1,12 +1,15 @@
 //! This module implements [`QuicListener`] to allow accepting connections from QUIC clients.
-use std::sync::Arc;
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    sync::Arc,
+};
 
 use anyhow::Context as _;
 use aranya_util::{rustls::NoCertResolver, s2n_quic::get_conn_identity};
 use buggy::BugExt as _;
 use s2n_quic::{
-    application,
-    connection::StreamAcceptor,
+    application::{self, Error as AppError},
+    connection::{Handle, StreamAcceptor},
     provider::{
         congestion_controller::Bbr,
         tls::rustls::{
@@ -16,17 +19,20 @@ use s2n_quic::{
     },
     stream::BidirectionalStream,
 };
-use tokio::{sync::mpsc, task::JoinSet, time::Duration};
+use tokio::{
+    sync::{mpsc, Mutex},
+    task::JoinSet,
+    time::Duration,
+};
 use tracing::{debug, error, trace, warn};
 
 #[cfg(doc)]
 use super::QuicTransport;
-use super::{
-    ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
-    ALPN_QUIC_SYNC,
-};
+use super::{Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
+pub(super) type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Handle>>>;
+pub(super) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
 
 #[derive(Debug)]
@@ -52,7 +58,7 @@ impl QuicListener {
         server_keys: Arc<PskStore>,
     ) -> Result<(Self, SharedConnectionMap, mpsc::Sender<ConnectionUpdate>), Error> {
         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        let conns = SharedConnectionMap::new();
+        let conns: SharedConnectionMap = Arc::default();
         let (conn_tx, conn_rx) = mpsc::channel(32);
 
         // Build up the `ServerConfig` so we can initialize the TLS server.
@@ -146,9 +152,40 @@ impl QuicListener {
                 .context("unable to extract return address")?;
         let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
 
-        let (_handle, acceptor) = self.conns.insert_incoming(peer, conn).await;
-        self.pending_accepts
-            .spawn(Self::accept_pending_stream(peer, acceptor));
+        // Insert with tie-breaking. The peer initiated this connection,
+        // so it wins if peer.addr < local_addr.
+        let (new_handle, new_acceptor) = conn.split();
+        let acceptor = {
+            let mut map = self.conns.lock().await;
+            match map.entry(peer) {
+                Entry::Vacant(e) => {
+                    e.insert(new_handle.clone());
+                    Some(new_acceptor)
+                }
+                Entry::Occupied(mut e) => {
+                    let existing_alive = e.get_mut().ping().is_ok();
+                    let inbound_wins = !existing_alive || peer.addr < self.local_addr;
+                    if inbound_wins {
+                        if existing_alive {
+                            debug!(?peer, "replacing existing connection (tie-break)");
+                            e.get_mut().close(AppError::UNKNOWN);
+                        }
+                        e.insert(new_handle.clone());
+                        Some(new_acceptor)
+                    } else {
+                        debug!(?peer, "keeping existing outbound connection (tie-break)");
+                        new_handle.close(AppError::UNKNOWN);
+                        None
+                    }
+                }
+            }
+        };
+
+        if let Some(acceptor) = acceptor {
+            self.pending_accepts
+                .spawn(Self::accept_pending_stream(peer, acceptor));
+            debug!(?peer, "accepted and inserted QUIC connection");
+        }
 
         debug!(?peer, "accepted and inserted QUIC connection");
         Ok(())

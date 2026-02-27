@@ -1,6 +1,5 @@
 //! This module contains the QUIC transport code to allow syncing with other clients.
 
-mod connections;
 mod listener;
 mod psk;
 mod stream;
@@ -8,7 +7,6 @@ mod transport;
 
 use self::{
     super::{SyncListener, SyncStream, SyncTransport},
-    connections::{ConnectionUpdate, SharedConnectionMap},
     stream::QuicStream,
 };
 pub(crate) use self::{

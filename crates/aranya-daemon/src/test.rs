@@ -250,6 +250,7 @@ impl TestCtx {
                 conns,
                 conn_tx,
                 psk_store.clone(),
+                server.local_addr(),
             )?;
             let syncer = TestSyncer::new(client.clone(), transport, recv, send_effects)?;
 
