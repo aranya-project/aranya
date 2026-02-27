@@ -204,7 +204,7 @@ typedef uint32_t AranyaError;
 /**
  * Simple permission.
  *
- * See [`aranya_daemon_api::Perm`] for stability and deprecation policy.
+ * See [`aranya_client::Permission`] for stability and deprecation policy.
  */
 enum AranyaPermission
 #ifdef __cplusplus
@@ -617,7 +617,7 @@ typedef const char *AranyaRoleName;
  * hierarchy. Arithmetic can be performed directly on ranks
  * since they are plain integers.
  */
-typedef Rank AranyaRank;
+typedef int64_t AranyaRank;
 
 /**
  * A label name.

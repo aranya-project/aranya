@@ -479,7 +479,9 @@ impl From<&ObjectId> for aranya_client::ObjectId {
 /// A numerical rank used for authorization in the rank-based
 /// hierarchy. Arithmetic can be performed directly on ranks
 /// since they are plain integers.
-pub type Rank = i64;
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct Rank(pub i64);
 
 /// A label name.
 ///
@@ -528,7 +530,7 @@ impl Addr {
 
 /// Simple permission.
 ///
-/// See [`aranya_daemon_api::Perm`] for stability and deprecation policy.
+/// See [`aranya_client::Permission`] for stability and deprecation policy.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum Permission {
@@ -607,7 +609,10 @@ impl From<Permission> for aranya_client::client::Permission {
     }
 }
 
-#[allow(clippy::disallowed_macros)] // `From` is infallible so we cannot use `bug!`
+#[allow(
+    clippy::disallowed_macros,
+    reason = "`From` is infallible so we cannot use `bug!`"
+)]
 impl From<aranya_client::client::Permission> for Permission {
     fn from(perm: aranya_client::client::Permission) -> Self {
         use aranya_client::client::Permission as P;
@@ -1457,7 +1462,7 @@ pub fn create_role(
         client
             .inner
             .team(team.into())
-            .create_role(role_name, aranya_client::Rank::new(rank)),
+            .create_role(role_name, aranya_client::Rank::new(rank.0)),
     )?;
     Role::init(role_out, role);
     Ok(())
@@ -1698,7 +1703,7 @@ pub fn create_label_with_rank(
         client
             .inner
             .team(team.into())
-            .create_label_with_rank(name, aranya_client::Rank::new(rank)),
+            .create_label_with_rank(name, aranya_client::Rank::new(rank.0)),
     )?;
     Ok(label_id.into())
 }
@@ -1757,8 +1762,8 @@ pub fn change_rank(
         .rt
         .block_on(client.inner.team(team.into()).change_rank(
             aranya_client::ObjectId::from(object_id),
-            aranya_client::Rank::new(old_rank),
-            aranya_client::Rank::new(new_rank),
+            aranya_client::Rank::new(old_rank.0),
+            aranya_client::Rank::new(new_rank.0),
         ))?;
     Ok(())
 }
@@ -1782,7 +1787,7 @@ pub fn query_rank(
             .team(team.into())
             .query_rank(aranya_client::ObjectId::from(object_id)),
     )?;
-    Ok(rank.value())
+    Ok(Rank(rank.value()))
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -2023,7 +2028,7 @@ pub unsafe fn add_device_to_team_with_rank(
         .block_on(client.inner.team(team.into()).add_device_with_rank(
             keybundle,
             role_id.map(Into::into),
-            aranya_client::Rank::new(rank),
+            aranya_client::Rank::new(rank.0),
         ))?;
     Ok(())
 }
