@@ -143,7 +143,10 @@ impl QuicListener {
         let remote = conn.remote_addr().ok();
         trace!(?remote, "received incoming QUIC connection");
 
-        conn.keep_alive(true).assume("connection is still alive")?;
+        if let Err(error) = conn.keep_alive(true) {
+            debug!(?remote, %error, "connection already closed, skipping");
+            return Ok(());
+        }
 
         let identity = get_conn_identity(&mut conn)?;
         let active_team = self
@@ -195,7 +198,6 @@ impl QuicListener {
             debug!(?peer, "accepted and inserted QUIC connection");
         }
 
-        debug!(?peer, "accepted and inserted QUIC connection");
         Ok(())
     }
 }
