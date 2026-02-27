@@ -1,0 +1,30 @@
+'$schema' = "https://awslabs.github.io/duvet/config/v0.4.0.json"
+
+# Source files to scan for annotations
+[[source]]
+pattern = "crates/aranya-client/tests/scale/**/*.rs"
+type = "implementation"
+
+[[source]]
+pattern = "crates/aranya-client/tests/ring_convergence.rs"
+type = "test"
+
+# Specification document
+[[specification]]
+source = "https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md"
+format = "markdown"
+
+# Report configuration
+[report.html]
+enabled = true
+path = ".duvet/reports/report.html"
+blob-link = "https://github.com/aranya-project/aranya/blob/main"
+issue-link = "https://github.com/aranya-project/aranya/issues"
+
+[report.json]
+enabled = true
+path = ".duvet/reports/report.json"
+
+[report.snapshot]
+enabled = true
+path = ".duvet/snapshot.txt"

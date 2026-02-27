@@ -1,0 +1,8 @@
+# Generated reports (not committed)
+reports/
+
+# Requirements extraction output
+requirements/
+
+# Downloaded specification cache
+specifications/
