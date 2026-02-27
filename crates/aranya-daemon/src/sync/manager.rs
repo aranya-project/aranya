@@ -143,10 +143,12 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
             self.queue.remove(&sub.queue_key);
         }
 
-        // Schedule a hello sync immediately after we register a subscription.
+        // Schedule the next hello sync.
         let queue_key = self
             .queue
-            .insert_at(ScheduledTask::HelloNotify(peer), Instant::now());
+            .insert(ScheduledTask::HelloNotify(peer), schedule_delay);
+
+        // Note that last_notified is ~now, since we send a hello request after this function.
         let subscription = HelloSubscription {
             graph_change_debounce,
             schedule_delay,
@@ -302,11 +304,6 @@ where
         });
         self.send_hello_request(peer, message).await?;
 
-        // Update the last time we notified the peer.
-        if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
-            sub.last_notified = Instant::now();
-        }
-
         Ok(())
     }
 
@@ -346,6 +343,8 @@ where
         for peer in &subscribers {
             if let Err(error) = self.send_hello_notification(*peer, head).await {
                 warn!(?peer, %error, "failed to send hello notification");
+            } else if let Some(sub) = self.hello_subscriptions.get_mut(peer) {
+                sub.last_notified = Instant::now();
             }
         }
 
