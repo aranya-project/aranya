@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use aranya_client::{afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     })
     .retry(ExponentialBuilder::default())
     .await
-    .expect("expected to initialize client");
+    .context("expected to initialize client")?;
     info!("memberb: initialized client");
 
     // Get team info from owner.
@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
     let team = client
         .add_team(add_team_cfg.clone())
         .await
-        .expect("expected to add team");
+        .context("expected to add team")?;
     info!("memberb: added team");
 
     // Send device info to owner.
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
     info!("memberb: adding operator sync peer");
     team.add_sync_peer(env.operator.sync_addr, sync_cfg.clone())
         .await
-        .expect("expected to add sync peer");
+        .context("expected to add sync peer")?;
 
     // wait for syncing.
     sleep(SLEEP_INTERVAL).await;
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
+        sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
     info!("memberb: detected that all devices have been added to team");
 
@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(const { SLEEP_INTERVAL.checked_mul(3).unwrap() }).await;
+        sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
 
     // Remove operator sync peer.
@@ -170,7 +170,7 @@ async fn main() -> Result<()> {
         0u8;
         resp.len()
             .checked_sub(Channels::OVERHEAD)
-            .expect("ciphertext must be larger than overhead")
+            .context("ciphertext must be larger than overhead")?
     ];
     opener.open(&mut msg_recv, &resp)?;
     info!("memberb: received AFC data");
@@ -189,7 +189,7 @@ async fn main() -> Result<()> {
         msg_send
             .len()
             .checked_add(Channels::OVERHEAD)
-            .expect("AFC overhead should not overflow")
+            .context("AFC overhead should not overflow")?
     ];
     sealer.seal(&mut req, msg_send)?;
     sender.send(env.membera.afc_addr, &req).await?;
