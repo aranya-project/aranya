@@ -159,7 +159,7 @@ impl Device<'_> {
         Ok(role)
     }
 
-    /// Returns a list of labels assiged to the device.
+    /// Returns a list of labels assigned to the device.
     pub async fn label_assignments(&self) -> Result<Labels> {
         let data = self
             .client

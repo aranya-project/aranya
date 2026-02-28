@@ -212,7 +212,7 @@ struct ExportedData<CS, T>
 where
     CS: CipherSuite,
 {
-    /// Uniquely idenitifies the chosen algorithms.
+    /// Uniquely identifies the chosen algorithms.
     #[serde(bound = "CS: CipherSuite")]
     oids: Oids<CS>,
     /// Uniquely idenitifes the type of data.
