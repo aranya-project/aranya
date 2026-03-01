@@ -3,11 +3,9 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use aranya_client::{
-    client::{DeviceId, PublicKeyBundle, TeamId},
-    Addr,
-};
+use aranya_client::client::{DeviceId, KeyBundle, TeamId};
 use aranya_example_common::{AgeEncryptor, SecretString};
+use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 
 use crate::tcp::{TcpClient, TcpServer};
@@ -34,7 +32,7 @@ pub struct DeviceInfo {
     /// Device ID.
     pub device_id: DeviceId,
     /// Device public key bundle.
-    pub pk: PublicKeyBundle,
+    pub pk: KeyBundle,
 }
 
 /// Object for simplifying Aranya team onboarding.
