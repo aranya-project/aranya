@@ -30,9 +30,16 @@ mod topology;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeIndex(pub usize);
 
+impl NodeIndex {
+    /// Returns the underlying index value.
+    pub fn value(self) -> usize {
+        self.0
+    }
+}
+
 impl std::fmt::Display for NodeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.value())
     }
 }
 
@@ -354,9 +361,9 @@ impl ConvergenceTracker {
 
     /// Records that a node has converged.
     pub fn mark_converged(&mut self, node_index: NodeIndex) {
-        if !self.node_status[node_index.0].has_label {
-            self.node_status[node_index.0].has_label = true;
-            self.node_status[node_index.0].convergence_time = Some(Instant::now());
+        if !self.node_status[node_index.value()].has_label {
+            self.node_status[node_index.value()].has_label = true;
+            self.node_status[node_index.value()].convergence_time = Some(Instant::now());
 
             //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#conv-003
             //# The test MUST track when each node receives the convergence label.
@@ -428,7 +435,7 @@ impl TestCtx {
     //# `TestCtx` MUST provide an `add_sync_peer` method that adds a sync peer relationship between two nodes identified by `NodeIndex`.
     pub async fn add_sync_peer(&mut self, from: NodeIndex, to: NodeIndex) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;
-        let to_addr = self.nodes[to.0].aranya_local_addr().await?;
+        let to_addr = self.nodes[to.value()].aranya_local_addr().await?;
 
         let peer_config = match &self.sync_mode {
             SyncMode::Poll { interval } => aranya_client::SyncPeerConfig::builder()
@@ -441,7 +448,7 @@ impl TestCtx {
                 .context("unable to build sync peer config")?,
         };
 
-        self.nodes[from.0]
+        self.nodes[from.value()]
             .client
             .team(team_id)
             .add_sync_peer(to_addr, peer_config)
@@ -458,7 +465,7 @@ impl TestCtx {
                 .expiration(*subscription_duration)
                 .build()
                 .context("unable to build hello subscription config")?;
-            self.nodes[from.0]
+            self.nodes[from.value()]
                 .client
                 .team(team_id)
                 .sync_hello_subscribe(to_addr, hello_cfg)
@@ -471,7 +478,7 @@ impl TestCtx {
                 })?;
         }
 
-        self.nodes[from.0].peers.push(to);
+        self.nodes[from.value()].peers.push(to);
         Ok(())
     }
 
@@ -481,9 +488,9 @@ impl TestCtx {
     #[allow(dead_code)]
     pub async fn remove_sync_peer(&mut self, from: NodeIndex, to: NodeIndex) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;
-        let to_addr = self.nodes[to.0].aranya_local_addr().await?;
+        let to_addr = self.nodes[to.value()].aranya_local_addr().await?;
 
-        self.nodes[from.0]
+        self.nodes[from.value()]
             .client
             .team(team_id)
             .remove_sync_peer(to_addr)
@@ -491,7 +498,7 @@ impl TestCtx {
             .with_context(|| format!("node {} unable to remove sync peer {}", from, to))?;
 
         if matches!(self.sync_mode, SyncMode::Hello { .. }) {
-            self.nodes[from.0]
+            self.nodes[from.value()]
                 .client
                 .team(team_id)
                 .sync_hello_unsubscribe(to_addr)
@@ -504,7 +511,7 @@ impl TestCtx {
                 })?;
         }
 
-        self.nodes[from.0].peers.retain(|&p| p != to);
+        self.nodes[from.value()].peers.retain(|&p| p != to);
         Ok(())
     }
 }

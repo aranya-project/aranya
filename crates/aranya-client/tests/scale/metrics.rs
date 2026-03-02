@@ -57,7 +57,7 @@ impl TestCtx {
             .node_status
             .iter()
             .enumerate()
-            .filter(|(i, s)| *i != self.tracker.source_node.0 && s.convergence_time.is_some())
+            .filter(|(i, s)| *i != self.tracker.source_node.value() && s.convergence_time.is_some())
             .map(|(_, s)| {
                 s.convergence_time
                     .expect("convergence_time must be set when filter passes")

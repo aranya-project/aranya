@@ -22,7 +22,7 @@ impl TestCtx {
     pub async fn issue_test_command(&mut self, source_node: NodeIndex) -> Result<()> {
         let team_id = self.team_id.context("Team not created")?;
 
-        if source_node.0 >= self.nodes.len() {
+        if source_node.value() >= self.nodes.len() {
             bail!(
                 "Source node {} out of range (max: {})",
                 source_node,
@@ -33,7 +33,7 @@ impl TestCtx {
         // Generate unique label name for this test run using Aranya's CSPRNG
         let rand_hex = {
             let mut buf = [0u8; 16];
-            self.nodes[source_node.0].client.rand(&mut buf).await;
+            self.nodes[source_node.value()].client.rand(&mut buf).await;
             buf.iter().map(|b| format!("{b:02x}")).collect::<String>()
         };
         let label_name = format!("convergence_test_{rand_hex}");
@@ -51,7 +51,7 @@ impl TestCtx {
         self.tracker.set_convergence_label(label_name.clone());
 
         // Get the owner role for label creation
-        let owner_role = self.nodes[source_node.0]
+        let owner_role = self.nodes[source_node.value()]
             .client
             .team(team_id)
             .roles()
@@ -62,7 +62,7 @@ impl TestCtx {
 
         // Create the label - this is our observable command
         let label_text: Text = label_name.parse().context("invalid label name")?;
-        let label_id = self.nodes[source_node.0]
+        let label_id = self.nodes[source_node.value()]
             .client
             .team(team_id)
             .create_label(label_text, owner_role.id)
