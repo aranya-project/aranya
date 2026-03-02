@@ -25,6 +25,8 @@ pub struct ConvergenceMetrics {
     pub p95_time: Duration,
     /// 99th percentile convergence time.
     pub p99_time: Duration,
+    /// Number of nodes that actually converged.
+    pub converged_count: usize,
     /// Standard deviation of convergence times.
     pub std_dev: Duration,
     /// Total time from command issuance to full convergence.
@@ -110,6 +112,7 @@ impl TestCtx {
 
         Some(ConvergenceMetrics {
             node_count: self.nodes.len(),
+            converged_count: times.len(),
             min_time,
             max_time,
             mean_time,
@@ -162,7 +165,10 @@ impl TestCtx {
         match self.calculate_metrics() {
             Some(metrics) => {
                 println!("\n=== Convergence Metrics [{}] ===", self.config.test_name);
-                println!("Nodes: {}", metrics.node_count);
+                println!(
+                    "Nodes: {} ({} converged)",
+                    metrics.node_count, metrics.converged_count
+                );
                 println!("Min convergence time:    {:?}", metrics.min_time);
                 println!("Max convergence time:    {:?}", metrics.max_time);
                 println!("Mean convergence time:   {:?}", metrics.mean_time);
@@ -179,6 +185,7 @@ impl TestCtx {
 
                 info!(
                     node_count = metrics.node_count,
+                    converged_count = metrics.converged_count,
                     min_time_ms = metrics.min_time.as_millis(),
                     max_time_ms = metrics.max_time.as_millis(),
                     mean_time_ms = metrics.mean_time.as_millis(),
@@ -193,7 +200,7 @@ impl TestCtx {
             }
             None => {
                 println!("\n=== Convergence Metrics [{}] ===", self.config.test_name);
-                println!("No convergence data available");
+                println!("Nodes: {} (0 converged)", self.nodes.len());
                 println!("================================\n");
             }
         }

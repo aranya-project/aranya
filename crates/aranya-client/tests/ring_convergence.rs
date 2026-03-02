@@ -38,10 +38,9 @@ async fn run_convergence(config: TestConfig) -> Result<()> {
     ctx.verify_team_propagation().await?;
 
     ctx.issue_test_command(NodeIndex(0)).await?;
-    ctx.wait_for_convergence().await?;
+    let result = ctx.wait_for_convergence().await;
     ctx.report_metrics();
-
-    Ok(())
+    result
 }
 
 // ---------------------------------------------------------------------------
