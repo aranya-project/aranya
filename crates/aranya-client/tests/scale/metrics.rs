@@ -91,18 +91,7 @@ impl TestCtx {
         let p95_time = Self::percentile(&times, 95.0);
         let p99_time = Self::percentile(&times, 99.0);
 
-        // Standard deviation
-        let n = u32::try_from(times.len()).expect("node count fits in u32");
-        let mean_secs = mean_time.as_secs_f64();
-        let variance: f64 = times
-            .iter()
-            .map(|t| {
-                let diff = t.as_secs_f64() - mean_secs;
-                diff * diff
-            })
-            .sum::<f64>()
-            / f64::from(n);
-        let std_dev = Duration::from_secs_f64(variance.sqrt());
+        let std_dev = Self::calculate_std_dev(&times, mean_time);
 
         let total_convergence_time = self
             .tracker
@@ -158,6 +147,24 @@ impl TestCtx {
         let rank = (pct / 100.0 * times.len() as f64).ceil() as usize;
         let index = rank.min(times.len()).saturating_sub(1);
         times[index]
+    }
+
+    /// Calculates the population standard deviation of convergence times.
+    fn calculate_std_dev(times: &[Duration], mean: Duration) -> Duration {
+        if times.is_empty() {
+            return Duration::ZERO;
+        }
+        let n = u32::try_from(times.len()).expect("node count fits in u32");
+        let mean_secs = mean.as_secs_f64();
+        let variance: f64 = times
+            .iter()
+            .map(|t| {
+                let diff = t.as_secs_f64() - mean_secs;
+                diff * diff
+            })
+            .sum::<f64>()
+            / f64::from(n);
+        Duration::from_secs_f64(variance.sqrt())
     }
 
     /// Reports performance metrics to the console.
