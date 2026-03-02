@@ -386,37 +386,7 @@ impl ConvergenceTracker {
     }
 }
 
-/// A function that takes the total node count and returns the peer list
-/// for each node. `peers[i]` contains the `NodeIndex`s of node `i`'s sync peers.
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-001
-//# The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-002
-//# The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
-pub type TopologyConnectFn = fn(usize) -> Vec<Vec<NodeIndex>>;
-
-/// The topology used to connect nodes.
-///
-/// The enum is expected to grow as additional topologies (star, mesh, etc.)
-/// are added in future extensions.
-//= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#topo-003
-//# The initial implementation MUST include at least the Ring and Custom topologies.
-#[derive(Clone)]
-#[allow(dead_code)]
-pub enum Topology {
-    Ring,
-    //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#cust-003
-    //# The Custom topology MUST allow defining arbitrary peer relationships between nodes, including topologies such as star, mesh, and hierarchical.
-    Custom { connect: TopologyConnectFn },
-}
-
-impl std::fmt::Debug for Topology {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Topology::Ring => write!(f, "Ring"),
-            Topology::Custom { .. } => write!(f, "Custom"),
-        }
-    }
-}
+pub use topology::{dual_ring_bridge_topology, Topology};
 
 /// Main context for scale convergence tests.
 ///

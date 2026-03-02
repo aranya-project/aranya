@@ -23,7 +23,9 @@ use serial_test::serial;
 use test_log::test;
 use tracing::info;
 
-use crate::scale::{NodeIndex, SyncMode, TestConfig, TestCtx, Topology};
+use crate::scale::{
+    dual_ring_bridge_topology, NodeIndex, SyncMode, TestConfig, TestCtx, Topology,
+};
 
 // ---------------------------------------------------------------------------
 // Helper: run a convergence test with the given config
@@ -41,65 +43,6 @@ async fn run_convergence(config: TestConfig) -> Result<()> {
     let result = ctx.wait_for_convergence().await;
     ctx.report_metrics();
     result
-}
-
-// ---------------------------------------------------------------------------
-// Custom topology: dual ring with bridge
-// ---------------------------------------------------------------------------
-
-/// Builds a topology of two rings connected by a single bidirectional bridge.
-///
-/// Nodes are split evenly into two rings (ring A = first half, ring B = second
-/// half). Within each ring, every node connects to its clockwise and
-/// counter-clockwise neighbor. A single bridge connects the last node of
-/// ring A to the first node of ring B (bidirectional).
-///
-/// ```text
-///   Ring A: 0 - 1 - 2 - 3 - 4
-///           |               |
-///           +-------+-------+
-///                   |
-///               bridge (4 <-> 5)
-///                   |
-///           +-------+-------+
-///           |               |
-///   Ring B: 5 - 6 - 7 - 8 - 9
-/// ```
-///
-/// Requires `n` to be even and `n >= 6` (each ring needs at least 3 nodes).
-fn dual_ring_bridge_topology(n: usize) -> Vec<Vec<NodeIndex>> {
-    assert!(n >= 6, "dual ring bridge requires at least 6 nodes");
-    assert!(
-        n.is_multiple_of(2),
-        "dual ring bridge requires an even node count"
-    );
-
-    let half = n / 2;
-    let mut peers = vec![vec![]; n];
-
-    // Ring A: nodes [0, half)
-    for (i, node_peers) in peers[..half].iter_mut().enumerate() {
-        let cw = (i + 1) % half;
-        let ccw = (i + half - 1) % half;
-        node_peers.push(NodeIndex(cw));
-        node_peers.push(NodeIndex(ccw));
-    }
-
-    // Ring B: nodes [half, n)
-    for (i, node_peers) in peers[half..].iter_mut().enumerate() {
-        let cw = half + (i + 1) % half;
-        let ccw = half + (i + half - 1) % half;
-        node_peers.push(NodeIndex(cw));
-        node_peers.push(NodeIndex(ccw));
-    }
-
-    // Bridge: last node of ring A <-> first node of ring B
-    let bridge_a = half - 1;
-    let bridge_b = half;
-    peers[bridge_a].push(NodeIndex(bridge_b));
-    peers[bridge_b].push(NodeIndex(bridge_a));
-
-    peers
 }
 
 /// Tests convergence with 10 nodes arranged in two 5-node rings connected
