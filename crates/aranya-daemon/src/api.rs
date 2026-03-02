@@ -425,7 +425,7 @@ impl Api {
     fn setup_trace_context(&self, ctx: &context::Context, method: &'static str) -> TraceId {
         let trace_id = trace::extract_trace_id(ctx);
         trace::record_current_span_trace_id(trace_id);
-        trace!(rpc.method = method, rpc.trace_id = %trace_id, "RPC: ReceiveRequest");
+        info!(rpc.method = method, rpc.trace_id = %trace_id, "RPC: ReceiveRequest");
         trace_id
     }
 }
