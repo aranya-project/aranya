@@ -6,14 +6,9 @@
 pub use tarpc::trace::TraceId;
 use tracing::Span;
 
-/// Records the trace ID on the provided span.
-pub fn record_trace_id(span: &Span, trace_id: TraceId) {
-    span.record("trace_id", tracing::field::display(trace_id));
-}
-
 /// Records the trace ID on the current span.
 pub fn record_current_span_trace_id(trace_id: TraceId) {
-    record_trace_id(&Span::current(), trace_id);
+    Span::current().record("trace_id", tracing::field::display(trace_id));
 }
 
 #[cfg(test)]
