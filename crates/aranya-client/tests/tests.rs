@@ -25,7 +25,7 @@ use aranya_client::{
     config::{CreateTeamConfig, HelloSubscriptionConfig, SyncPeerConfig},
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
-use aranya_daemon_api::{text, SEED_IKM_SIZE};
+use aranya_daemon_api::text;
 use serial_test::serial;
 use tracing::{debug, info};
 use tracing_subscriber::fmt::MakeWriter;
@@ -139,20 +139,8 @@ async fn test_basic_rpc_operations() -> Result<()> {
     let (logs, installed) = init_global_log_capture();
 
     let work_dir = tempfile::tempdir()?;
-    let owner = DeviceCtx::new("trace-test", "owner", work_dir.path().join("owner")).await?;
-
-    let seed_ikm = {
-        let mut buf = [0u8; SEED_IKM_SIZE];
-        owner.client.rand(&mut buf).await;
-        buf
-    };
-    let qs_cfg = CreateTeamQuicSyncConfig::builder()
-        .seed_ikm(seed_ikm)
-        .build()?;
-    let owner_cfg = CreateTeamConfig::builder().quic_sync(qs_cfg).build()?;
-
-    let team = owner.client.create_team(owner_cfg).await?;
-    info!(team_id = %team.team_id(), "created team");
+    // DeviceCtx::new performs client<->daemon connect, which includes a version() RPC.
+    let _owner = DeviceCtx::new("trace-test", "owner", work_dir.path().join("owner")).await?;
 
     let captured = String::from_utf8_lossy(&logs.lock().expect("poisoned")).into_owned();
     let mut daemon_trace_id = None;
@@ -160,8 +148,8 @@ async fn test_basic_rpc_operations() -> Result<()> {
 
     for line in captured.lines() {
         let has_trace = line.contains("rpc.trace_id=");
-        let is_create_team = line.contains("create_team");
-        if !has_trace || !is_create_team {
+        let is_version = line.contains("DaemonApi.version") || line.contains("version");
+        if !has_trace || !is_version {
             continue;
         }
 
@@ -183,7 +171,7 @@ async fn test_basic_rpc_operations() -> Result<()> {
             );
             assert_eq!(
                 client_trace_id, daemon_trace_id,
-                "client and daemon trace ids should match for create_team"
+                "client and daemon trace ids should match for version RPC"
             );
         }
         (daemon_trace_id, client_trace_id) => {
