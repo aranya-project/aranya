@@ -120,8 +120,7 @@ async fn main() -> Result<()> {
         let role_rank = team.query_rank(role.id).await?;
         let device_rank = aranya_client::Rank::new(role_rank.value().saturating_sub(1));
 
-        team.add_device_with_rank(info.pk.clone(), None, device_rank)
-            .await?;
+        team.add_device(info.pk.clone(), None, device_rank).await?;
         info!(
             "owner: added device to team {} with rank {}",
             device.name,

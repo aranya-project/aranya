@@ -325,7 +325,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("adding admin to team");
     let admin_role_rank = owner.query_rank(admin_role.id).await?;
     owner
-        .add_device_with_rank(
+        .add_device(
             ctx.admin.pk,
             Some(admin_role.id),
             Rank::new(admin_role_rank.value().saturating_sub(1)),
@@ -336,7 +336,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("adding operator to team");
     let operator_role_rank = owner.query_rank(operator_role.id).await?;
     owner
-        .add_device_with_rank(
+        .add_device(
             ctx.operator.pk,
             Some(operator_role.id),
             Rank::new(operator_role_rank.value().saturating_sub(1)),
@@ -348,7 +348,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("admin adding membera to team");
     let member_role_rank = admin.query_rank(member_role.id).await?;
     admin
-        .add_device_with_rank(
+        .add_device(
             ctx.membera.pk.clone(),
             Some(member_role.id),
             Rank::new(member_role_rank.value().saturating_sub(1)),
@@ -358,7 +358,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     info!("admin adding memberb to team");
     admin
-        .add_device_with_rank(
+        .add_device(
             ctx.memberb.pk.clone(),
             Some(member_role.id),
             Rank::new(member_role_rank.value().saturating_sub(1)),
@@ -378,9 +378,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let admin_device_rank = admin.query_rank(ctx.admin.id).await?;
     // Label rank must be lower than the admin's device rank so the admin can operate on it.
     let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
-    let label3 = admin
-        .create_label_with_rank(text!("label3"), label_rank)
-        .await?;
+    let label3 = admin.create_label(text!("label3"), label_rank).await?;
 
     // Operator assigns the label to membera and memberb.
     let op = ChanOp::SendRecv;

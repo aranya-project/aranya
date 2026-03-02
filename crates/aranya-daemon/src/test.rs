@@ -390,7 +390,7 @@ impl TestCtx {
             query_rank(owner, aranya_daemon_api::ObjectId::transmute(admin_role.id)).await?;
         owner
             .actions()
-            .add_device_with_rank(
+            .add_device(
                 DeviceKeyBundle::try_from(&admin.pk)?,
                 None,
                 (admin_role_rank.saturating_sub(1)).into(),
@@ -422,7 +422,7 @@ impl TestCtx {
         .await?;
         owner
             .actions()
-            .add_device_with_rank(
+            .add_device(
                 DeviceKeyBundle::try_from(&operator.pk)?,
                 None,
                 (operator_role_rank.saturating_sub(1)).into(),
@@ -456,7 +456,7 @@ impl TestCtx {
         .await?;
         admin
             .actions()
-            .add_device_with_rank(
+            .add_device(
                 DeviceKeyBundle::try_from(&membera.pk)?,
                 None,
                 (member_role_rank.saturating_sub(1)).into(),
@@ -466,7 +466,7 @@ impl TestCtx {
         membera.sync_expect(admin, None).await?;
         admin
             .actions()
-            .add_device_with_rank(
+            .add_device(
                 DeviceKeyBundle::try_from(&memberb.pk)?,
                 None,
                 (member_role_rank.saturating_sub(1)).into(),
@@ -647,7 +647,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     owner
         .actions()
-        .add_device_with_rank(
+        .add_device(
             DeviceKeyBundle::try_from(&extra.pk)?,
             None,
             (member_role_rank.saturating_sub(1)).into(),
@@ -657,7 +657,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     let err = owner
         .actions()
-        .add_device_with_rank(
+        .add_device(
             DeviceKeyBundle::try_from(&extra.pk)?,
             None,
             (member_role_rank.saturating_sub(1)).into(),
@@ -705,7 +705,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
     // Member lacks AddDevice permission, so this should fail
     let err = membera
         .actions()
-        .add_device_with_rank(
+        .add_device(
             DeviceKeyBundle::try_from(&candidate.pk)?,
             Some(member_role),
             (member_role_rank.saturating_sub(1)).into(),
@@ -819,7 +819,7 @@ async fn test_assign_role_self_assignment_rejected() -> Result<()> {
     Ok(())
 }
 
-/// Requires create_label_with_rank to use a valid rank.
+/// Requires create_label to use a valid rank.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_create_label_requires_valid_rank() -> Result<()> {
@@ -836,7 +836,7 @@ async fn test_create_label_requires_valid_rank() -> Result<()> {
         query_rank(owner, aranya_daemon_api::ObjectId::transmute(owner_role)).await?;
     owner
         .actions()
-        .create_label_with_rank(text!("TEST_LABEL"), owner_role_rank.into())
+        .create_label(text!("TEST_LABEL"), owner_role_rank.into())
         .await
         .context("label creation with valid rank should succeed")?;
 
@@ -861,7 +861,7 @@ async fn test_delete_label_enforces_permissions_and_removes_access() -> Result<(
 
     let effects = owner
         .actions()
-        .create_label_with_rank(text!("DELETE_LABEL_GUARD"), owner_role_rank.into())
+        .create_label(text!("DELETE_LABEL_GUARD"), owner_role_rank.into())
         .await
         .context("label creation should succeed")?;
     let label_id = effects

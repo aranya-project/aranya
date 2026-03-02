@@ -43,9 +43,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
 
     // Query team labels to confirm the label was created.
@@ -166,9 +164,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -236,9 +232,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -316,9 +310,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -404,9 +396,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -511,9 +501,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -624,9 +612,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -746,9 +732,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -866,9 +850,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
     let member_role_rank = owner_team.query_rank(default_roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
     let op = ChanOp::SendRecv;
     owner_team
         .device(devices.membera.id)
@@ -991,9 +973,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
 
     // First label.
     let op = ChanOp::SendRecv;
-    let label_id1 = owner_team
-        .create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    let label_id1 = owner_team.create_label(text!("label1"), label_rank).await?;
     owner_team
         .device(devices.membera.id)
         .assign_label(label_id1, op)
@@ -1004,9 +984,7 @@ async fn test_afc_uni_multi_send_chans() -> Result<()> {
         .await?;
 
     // Second label.
-    let label_id2 = owner_team
-        .create_label_with_rank(text!("label2"), label_rank)
-        .await?;
+    let label_id2 = owner_team.create_label(text!("label2"), label_rank).await?;
     owner_team
         .device(devices.membera.id)
         .assign_label(label_id2, op)

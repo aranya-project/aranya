@@ -644,7 +644,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn add_device_to_team_with_rank(
+    async fn add_device_to_team(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -657,7 +657,7 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(graph)
-            .add_device_with_rank(keys.into(), initial_role.map(RoleId::transmute), rank)
+            .add_device(keys.into(), initial_role.map(RoleId::transmute), rank)
             .await
             .context("unable to add device to team")?;
         self.effect_handler.handle_effects(graph, &effects).await?;
@@ -1012,7 +1012,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn create_label_with_rank(
+    async fn create_label(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -1024,7 +1024,7 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(graph)
-            .create_label_with_rank(label_name, rank)
+            .create_label(label_name, rank)
             .await
             .context("unable to create label")?;
         self.effect_handler.handle_effects(graph, &effects).await?;

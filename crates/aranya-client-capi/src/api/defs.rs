@@ -1256,6 +1256,15 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
     cfg.periodic_interval(interval);
 }
 
+// TODO: aranya-core#582 use the policy-generated constant directly
+// once policy globals are exposed in the generated interface.
+/// Number of roles created by [`setup_default_roles`] (admin, operator, member).
+/// The owner role is created at team creation time and is not included.
+// Note: cbindgen copies this constant into the generated code where it is
+// unused, producing a dead_code warning.
+#[allow(dead_code)]
+const NUM_DEFAULT_ROLES: usize = 3;
+
 /// Setup default roles on team.
 ///
 /// This sets up the following roles with default permissions as
@@ -1267,56 +1276,46 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
 /// The owner role is created automatically when the team is created,
 /// so it is not included here.
 ///
-/// Returns the total number of default roles on the team in
-/// `num_default_roles_out`, including the owner role which is
-/// created automatically when the team is created. Use
-/// [`team_roles`] to obtain the full list of roles after calling
-/// this function.
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer and retry.
 ///
 /// N.B. this function is meant to be called once to set up the default roles.
 /// Subsequent calls will result in an error if the default roles were already created.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[out] num_default_roles_out the total number of default roles on the
-///     team, which can be used as a hint to allocate a buffer before querying
-///     for default roles with [`team_default_roles`]
+/// @param[out] roles_out returns a list of the created default roles
+/// @param[in,out] roles_len the number of roles written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn setup_default_roles(
+pub unsafe fn setup_default_roles(
     client: &mut Client,
     team: &TeamId,
-    num_default_roles_out: &mut usize,
-) -> Result<(), imp::Error> {
-    let created_roles = client
-        .rt
-        .block_on(client.inner.team(team.into()).setup_default_roles())?;
-
-    // +1 for the owner role, which is already created at team creation time.
-    let count = created_roles.iter().count();
-    *num_default_roles_out = count.saturating_add(1);
-
-    Ok(())
-}
-
-/// Deprecated: always returns an empty list.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] role the ID of the subject role
-/// @param[out] roles_out unused, always returns an empty list
-/// @param[in,out] roles_len set to 0 on return
-///
-/// @relates AranyaClient.
-#[deprecated(note = "role_owners is deprecated")]
-pub unsafe fn role_owners(
-    _client: &Client,
-    _team: &TeamId,
-    _role: &RoleId,
-    _roles_out: *mut MaybeUninit<Role>,
+    roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    *roles_len = 0;
+    if *roles_len < NUM_DEFAULT_ROLES {
+        *roles_len = NUM_DEFAULT_ROLES;
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    let created_roles = client
+        .rt
+        .block_on(client.inner.team(team.into()).setup_default_roles())?
+        .__into_data();
+
+    // TODO: aranya-core#582 remove once NUM_DEFAULT_ROLES is replaced
+    // with the policy-generated constant.
+    debug_assert_eq!(NUM_DEFAULT_ROLES, created_roles.len());
+
+    *roles_len = created_roles.len();
+    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
+
+    for (dst, src) in out.iter_mut().zip(created_roles) {
+        Role::init(dst, src);
+    }
+
     Ok(())
 }
 
@@ -1387,47 +1386,6 @@ pub unsafe fn team_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
 
     for (dst, src) in out.iter_mut().zip(roles) {
-        Role::init(dst, src);
-    }
-
-    Ok(())
-}
-
-/// Returns only the default roles for this team.
-///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
-/// Writes the number of default roles that would have been returned to `roles_out_len`.
-/// The application can use `roles_out_len` to allocate a larger buffer.
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[out] roles_out returns a list of default roles on the team
-/// @param[in,out] roles_out_len the number of roles written to the buffer.
-///
-/// @relates AranyaClient.
-pub unsafe fn team_default_roles(
-    client: &Client,
-    team: &TeamId,
-    roles_out: *mut MaybeUninit<Role>,
-    roles_out_len: &mut usize,
-) -> Result<(), imp::Error> {
-    // Filter to only return default roles (owner, admin, operator, member).
-    let default_roles: Vec<_> = client
-        .rt
-        .block_on(client.inner.team(team.into()).roles())?
-        .into_iter()
-        .filter(|r| r.default)
-        .collect();
-
-    let count = default_roles.len();
-    if *roles_out_len < count {
-        *roles_out_len = count;
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *roles_out_len = count;
-    let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
-
-    for (dst, src) in out.iter_mut().zip(default_roles) {
         Role::init(dst, src);
     }
 
@@ -1642,41 +1600,6 @@ pub fn revoke_role(
     Ok(())
 }
 
-/// Create a channel label.
-///
-/// The `managing_role_id` parameter is accepted for backward compatibility
-/// but is ignored in the rank-based authorization model. Since this API
-/// does not allow the user to specify a rank, the label is created with
-/// a default rank of the command author's rank minus one.
-///
-/// Requires:
-/// - `CreateLabel` permission
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] name label name string
-/// @param[in] managing_role_id (ignored) formerly the managing role
-///
-/// @relates AranyaClient.
-#[deprecated(note = "use `create_label_with_rank` to specify an explicit rank")]
-#[allow(deprecated)]
-pub fn create_label(
-    client: &Client,
-    team: &TeamId,
-    name: LabelName,
-    managing_role_id: &RoleId,
-) -> Result<LabelId, imp::Error> {
-    // SAFETY: Caller must ensure `name` is a valid C String.
-    let name = unsafe { name.as_underlying() }?;
-    let label_id = client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .create_label(name, managing_role_id.into()),
-    )?;
-    Ok(label_id.into())
-}
-
 /// Create a channel label with an explicit rank.
 ///
 /// Requires:
@@ -1689,7 +1612,7 @@ pub fn create_label(
 /// @param[in] rank the rank to assign to the label
 ///
 /// @relates AranyaClient.
-pub fn create_label_with_rank(
+pub fn create_label(
     client: &Client,
     team: &TeamId,
     name: LabelName,
@@ -1701,7 +1624,7 @@ pub fn create_label_with_rank(
         client
             .inner
             .team(team.into())
-            .create_label_with_rank(name, aranya_client::Rank::new(rank.0)),
+            .create_label(name, aranya_client::Rank::new(rank.0)),
     )?;
     Ok(label_id.into())
 }
@@ -1962,42 +1885,6 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     Ok(())
 }
 
-/// Add a device to the team with an optional initial role.
-///
-/// Since this API does not allow specifying a rank, the device is
-/// assigned a default rank based on:
-/// - If a role is provided: the role's rank minus one
-/// - If no role is provided: the command author's rank minus one
-///
-/// Requires:
-/// - `AddDevice` permission
-///
-/// @param[in] client the Aranya Client
-/// @param[in] team the team's ID
-/// @param[in] public_key_bundle serialized key bundle bytes
-/// @param[in] public_key_bundle_len is the length of the serialized public key bundle.
-/// @param[in] role_id (optional) the ID of the role to assign to the device.
-///
-/// @relates AranyaClient.
-#[deprecated(note = "use `add_device_to_team_with_rank` to specify an explicit rank")]
-#[allow(deprecated)]
-pub unsafe fn add_device_to_team(
-    client: &Client,
-    team: &TeamId,
-    public_key_bundle: &[u8],
-    role_id: Option<&RoleId>,
-) -> Result<(), imp::Error> {
-    let public_key_bundle = imp::public_key_bundle_deserialize(public_key_bundle)?;
-
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .add_device(public_key_bundle, role_id.map(Into::into)),
-    )?;
-    Ok(())
-}
-
 /// Add a device to the team with an explicit rank.
 ///
 /// Requires:
@@ -2012,7 +1899,7 @@ pub unsafe fn add_device_to_team(
 /// @param[in] rank the rank to assign to the device.
 ///
 /// @relates AranyaClient.
-pub unsafe fn add_device_to_team_with_rank(
+pub unsafe fn add_device_to_team(
     client: &Client,
     team: &TeamId,
     keybundle: &[u8],
@@ -2023,7 +1910,7 @@ pub unsafe fn add_device_to_team_with_rank(
 
     client
         .rt
-        .block_on(client.inner.team(team.into()).add_device_with_rank(
+        .block_on(client.inner.team(team.into()).add_device(
             keybundle,
             role_id.map(Into::into),
             aranya_client::Rank::new(rank.0),

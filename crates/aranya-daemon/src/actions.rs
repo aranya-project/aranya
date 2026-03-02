@@ -171,15 +171,15 @@ where
         act: impl Actionable<Interface = policy::Ephemeral> + Send,
     ) -> impl Future<Output = Result<SessionData>> + Send;
 
-    /// Invokes `add_device_with_rank`.
+    /// Invokes `add_device`.
     #[instrument(skip_all)]
-    fn add_device_with_rank(
+    fn add_device(
         &self,
         keys: PublicKeyBundle,
         initial_role_id: Option<RoleId>,
         rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::add_device_with_rank(
+        self.call_persistent_action(policy::add_device(
             keys,
             initial_role_id.map(|id| id.as_base()),
             rank.value(),
@@ -309,14 +309,14 @@ where
         .in_current_span()
     }
 
-    /// Invokes `create_label_with_rank`.
+    /// Invokes `create_label`.
     #[instrument(skip(self), fields(%name))]
-    fn create_label_with_rank(
+    fn create_label(
         &self,
         name: Text,
         rank: Rank,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.call_persistent_action(policy::create_label_with_rank(name, rank.value()))
+        self.call_persistent_action(policy::create_label(name, rank.value()))
             .in_current_span()
     }
 

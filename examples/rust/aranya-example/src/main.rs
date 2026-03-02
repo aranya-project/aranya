@@ -285,7 +285,7 @@ async fn main() -> Result<()> {
     info!("adding admin to team");
     let admin_role_rank = owner_team.query_rank(admin_role.id).await?;
     owner_team
-        .add_device_with_rank(
+        .add_device(
             admin.pk,
             Some(admin_role.id),
             Rank::new(admin_role_rank.value().saturating_sub(1)),
@@ -295,7 +295,7 @@ async fn main() -> Result<()> {
     info!("adding operator to team");
     let operator_role_rank = owner_team.query_rank(operator_role.id).await?;
     owner_team
-        .add_device_with_rank(
+        .add_device(
             operator.pk,
             Some(operator_role.id),
             Rank::new(operator_role_rank.value().saturating_sub(1)),
@@ -396,7 +396,7 @@ async fn main() -> Result<()> {
     info!("adding membera to team");
     let member_role_rank = owner_team.query_rank(member_role.id).await?;
     owner_team
-        .add_device_with_rank(
+        .add_device(
             membera.pk.clone(),
             Some(member_role.id),
             Rank::new(member_role_rank.value().saturating_sub(1)),
@@ -406,7 +406,7 @@ async fn main() -> Result<()> {
     // add memberb to team.
     info!("adding memberb to team");
     owner_team
-        .add_device_with_rank(
+        .add_device(
             memberb.pk.clone(),
             Some(member_role.id),
             Rank::new(member_role_rank.value().saturating_sub(1)),
@@ -431,7 +431,7 @@ async fn main() -> Result<()> {
     // Add device to team to assign custom role to.
     info!("adding device to team to assign custom role to");
     owner_team
-        .add_device_with_rank(custom.pk.clone(), None, custom_role_rank)
+        .add_device(custom.pk.clone(), None, custom_role_rank)
         .await?;
 
     // Add `CanUseAfc` permission to the custom role.
@@ -512,9 +512,7 @@ async fn main() -> Result<()> {
     let owner_device_rank = owner_team.query_rank(owner.id).await?;
     // Label rank must be lower than the owner's device rank so the owner can operate on it.
     let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
-    let label3 = owner_team
-        .create_label_with_rank(text!("label3"), label_rank)
-        .await?;
+    let label3 = owner_team.create_label(text!("label3"), label_rank).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     owner_team

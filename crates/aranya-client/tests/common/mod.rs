@@ -79,7 +79,7 @@ impl DevicesCtx {
         info!("adding admin to team");
         let admin_role_rank = owner_team.query_rank(roles.admin().id).await?;
         owner_team
-            .add_device_with_rank(
+            .add_device(
                 self.admin.pk.clone(),
                 Some(roles.admin().id),
                 Rank::new(admin_role_rank.value().saturating_sub(1)),
@@ -90,7 +90,7 @@ impl DevicesCtx {
         info!("adding operator to team");
         let operator_role_rank = owner_team.query_rank(roles.operator().id).await?;
         owner_team
-            .add_device_with_rank(
+            .add_device(
                 self.operator.pk.clone(),
                 Some(roles.operator().id),
                 Rank::new(operator_role_rank.value().saturating_sub(1)),
@@ -101,7 +101,7 @@ impl DevicesCtx {
         info!("adding membera to team");
         let member_role_rank = owner_team.query_rank(roles.member().id).await?;
         owner_team
-            .add_device_with_rank(
+            .add_device(
                 self.membera.pk.clone(),
                 Some(roles.member().id),
                 Rank::new(member_role_rank.value().saturating_sub(1)),
@@ -111,7 +111,7 @@ impl DevicesCtx {
         // Add member B as a new device.
         info!("adding memberb to team");
         owner_team
-            .add_device_with_rank(
+            .add_device(
                 self.memberb.pk.clone(),
                 Some(roles.member().id),
                 Rank::new(member_role_rank.value().saturating_sub(1)),

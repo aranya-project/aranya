@@ -108,50 +108,6 @@ impl Team<'_> {
 impl Team<'_> {
     /// Adds a device to the team with an optional initial role.
     ///
-    /// Since this API does not allow specifying a rank, the device is
-    /// assigned a default rank based on:
-    /// - If an initial role is provided: the role's rank minus one
-    /// - If no initial role is provided: the command author's rank minus one
-    ///
-    /// Requires:
-    /// - `AddDevice` permission
-    /// - `caller_rank >= rank`
-    ///
-    /// Use [`Self::add_device_with_rank`] to specify an explicit rank.
-    #[deprecated(note = "use `add_device_with_rank` to specify an explicit rank")]
-    #[instrument(skip(self))]
-    pub async fn add_device(
-        &self,
-        keys: PublicKeyBundle,
-        initial_role: Option<RoleId>,
-    ) -> Result<()> {
-        // Default to role_rank - 1 when an initial_role is provided,
-        // otherwise fall back to author_rank - 1.
-        let rank = match &initial_role {
-            Some(role_id) => {
-                let role_rank = self.query_rank(*role_id).await?;
-                Rank::new(role_rank.value().saturating_sub(1))
-            }
-            None => {
-                let device_id = self.client.get_device_id().await?;
-                let author_rank = self.query_rank(device_id).await?;
-                Rank::new(author_rank.value().saturating_sub(1))
-            }
-        };
-        self.client
-            .daemon
-            .add_device_to_team_with_rank(
-                create_ctx(),
-                self.id,
-                keys.into_api(),
-                initial_role.map(RoleId::into_api),
-                rank.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Adds a device to the team with an optional initial role and
     /// explicit rank.
     ///
@@ -159,7 +115,7 @@ impl Team<'_> {
     /// - `AddDevice` permission
     /// - `caller_rank >= rank`
     #[instrument(skip(self))]
-    pub async fn add_device_with_rank(
+    pub async fn add_device(
         &self,
         keys: PublicKeyBundle,
         initial_role: Option<RoleId>,
@@ -167,7 +123,7 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team_with_rank(
+            .add_device_to_team(
                 create_ctx(),
                 self.id,
                 keys.into_api(),
@@ -443,79 +399,23 @@ impl Team<'_> {
             .collect();
         Ok(Roles { roles })
     }
-
-    /// Deprecated: owning roles no longer exist in the rank-based
-    /// authorization model. This method is a no-op that always returns
-    /// an empty [`Roles`].
-    #[deprecated(note = "owning roles no longer exist in the rank-based authorization model")]
-    pub async fn role_owners(&self, _role: RoleId) -> Result<Roles> {
-        tracing::warn!("role_owners is deprecated: owning roles no longer exist");
-        Ok(Roles {
-            roles: Vec::new().into(),
-        })
-    }
 }
 
 impl Team<'_> {
-    /// Create a label.
-    ///
-    /// The `managing_role_id` parameter is accepted for backward
-    /// compatibility but is ignored in the rank-based authorization
-    /// model. Since this API does not allow the user to specify a rank,
-    /// the label is created with a default rank of the command author's
-    /// rank minus one.
-    ///
-    /// Requires:
-    /// - `CreateLabel` permission
-    /// - `caller_rank >= rank`
-    ///
-    /// Use [`Self::create_label_with_rank`] to specify an explicit rank.
-    #[deprecated(note = "use `create_label_with_rank` to specify an explicit rank")]
-    #[instrument(skip(self))]
-    pub async fn create_label(
-        &self,
-        label_name: Text,
-        _managing_role_id: RoleId,
-    ) -> Result<LabelId> {
-        // Default to author_rank - 1.
-        let device_id = self.client.get_device_id().await?;
-        let author_rank = self.query_rank(device_id).await?;
-        let rank = Rank::new(author_rank.value().saturating_sub(1));
-        self.client
-            .daemon
-            .create_label_with_rank(create_ctx(), self.id, label_name, rank.into_api())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-            .map(LabelId::from_api)
-    }
-
     /// Create a label with an explicit rank.
     ///
     /// Requires:
     /// - `CreateLabel` permission
     /// - `caller_rank >= rank`
     #[instrument(skip(self))]
-    pub async fn create_label_with_rank(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
+    pub async fn create_label(&self, label_name: Text, rank: Rank) -> Result<LabelId> {
         self.client
             .daemon
-            .create_label_with_rank(create_ctx(), self.id, label_name, rank.into_api())
+            .create_label(create_ctx(), self.id, label_name, rank.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
             .map(LabelId::from_api)
-    }
-
-    /// Deprecated: managing roles no longer exist in the rank-based
-    /// authorization model. This method is a no-op.
-    #[deprecated(note = "managing roles no longer exist in the rank-based authorization model")]
-    pub async fn add_label_managing_role(
-        &self,
-        _label_id: LabelId,
-        _managing_role: RoleId,
-    ) -> Result<()> {
-        tracing::warn!("add_label_managing_role is deprecated: managing roles no longer exist");
-        Ok(())
     }
 
     /// Delete a label.

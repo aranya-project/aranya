@@ -1807,26 +1807,24 @@ AranyaError aranya_hello_subscription_config_builder_set_periodic_interval_ext(s
  * The owner role is created automatically when the team is created,
  * so it is not included here.
  *
- * Returns the total number of default roles on the team in
- * `num_default_roles_out`, including the owner role which is
- * created automatically when the team is created. Use
- * [`aranya_team_roles`](@ref aranya_team_roles) to obtain the full list of roles after calling
- * this function.
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer and retry.
  *
  * N.B. this function is meant to be called once to set up the default roles.
  * Subsequent calls will result in an error if the default roles were already created.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[out] num_default_roles_out the total number of default roles on the
- *     team, which can be used as a hint to allocate a buffer before querying
- *     for default roles with [`aranya_team_default_roles`](@ref aranya_team_default_roles)
+ * @param[out] roles_out returns a list of the created default roles
+ * @param[in,out] roles_len the number of roles written to the buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
                                        const struct AranyaTeamId *team,
-                                       size_t *num_default_roles_out);
+                                       struct AranyaRole *roles_out,
+                                       size_t *roles_len);
 
 /**
  * Setup default roles on team.
@@ -1840,64 +1838,25 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  * The owner role is created automatically when the team is created,
  * so it is not included here.
  *
- * Returns the total number of default roles on the team in
- * `num_default_roles_out`, including the owner role which is
- * created automatically when the team is created. Use
- * [`aranya_team_roles`](@ref aranya_team_roles) to obtain the full list of roles after calling
- * this function.
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+ * Writes the number of roles that would have been returned to `roles_len`.
+ * The application can use `roles_len` to allocate a larger buffer and retry.
  *
  * N.B. this function is meant to be called once to set up the default roles.
  * Subsequent calls will result in an error if the default roles were already created.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[out] num_default_roles_out the total number of default roles on the
- *     team, which can be used as a hint to allocate a buffer before querying
- *     for default roles with [`aranya_team_default_roles`](@ref aranya_team_default_roles)
+ * @param[out] roles_out returns a list of the created default roles
+ * @param[in,out] roles_len the number of roles written to the buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
-                                           size_t *num_default_roles_out,
+                                           struct AranyaRole *roles_out,
+                                           size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
-
-/**
- * Deprecated: always returns an empty list.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[out] roles_out unused, always returns an empty list
- * @param[in,out] roles_len set to 0 on return
- *
- * @relates AranyaClient.
- */
-ARANYA_DEPRECATED_MSG("role_owners is deprecated")
-AranyaError aranya_role_owners(const struct AranyaClient *_client,
-                               const struct AranyaTeamId *_team,
-                               const struct AranyaRoleId *_role,
-                               struct AranyaRole *_roles_out,
-                               size_t *roles_len);
-
-/**
- * Deprecated: always returns an empty list.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] role the ID of the subject role
- * @param[out] roles_out unused, always returns an empty list
- * @param[in,out] roles_len set to 0 on return
- *
- * @relates AranyaClient.
- */
-ARANYA_DEPRECATED_MSG("role_owners is deprecated")
-AranyaError aranya_role_owners_ext(const struct AranyaClient *_client,
-                                   const struct AranyaTeamId *_team,
-                                   const struct AranyaRoleId *_role,
-                                   struct AranyaRole *_roles_out,
-                                   size_t *roles_len,
-                                   struct AranyaExtError *__ext_err);
 
 /**
  * Changes the `role` on a `device`.
@@ -1988,45 +1947,6 @@ AranyaError aranya_team_roles_ext(const struct AranyaClient *client,
                                   struct AranyaRole *roles_out,
                                   size_t *roles_out_len,
                                   struct AranyaExtError *__ext_err);
-
-/**
- * Returns only the default roles for this team.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of default roles that would have been returned to `roles_out_len`.
- * The application can use `roles_out_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[out] roles_out returns a list of default roles on the team
- * @param[in,out] roles_out_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_team_default_roles(const struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      struct AranyaRole *roles_out,
-                                      size_t *roles_out_len);
-
-/**
- * Returns only the default roles for this team.
- *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
- * Writes the number of default roles that would have been returned to `roles_out_len`.
- * The application can use `roles_out_len` to allocate a larger buffer.
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[out] roles_out returns a list of default roles on the team
- * @param[in,out] roles_out_len the number of roles written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_team_default_roles_ext(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          struct AranyaRole *roles_out,
-                                          size_t *roles_out_len,
-                                          struct AranyaExtError *__ext_err);
 
 /**
  * Create a role.
@@ -2318,96 +2238,45 @@ AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Create a channel label.
- *
- * The `managing_role_id` parameter is accepted for backward compatibility
- * but is ignored in the rank-based authorization model. Since this API
- * does not allow the user to specify a rank, the label is created with
- * a default rank of the command author's rank minus one.
+ * Create a channel label with an explicit rank.
  *
  * Requires:
  * - `CreateLabel` permission
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id (ignored) formerly the managing role
+ * @param[in] rank the rank to assign to the label
  *
  * @relates AranyaClient.
  */
-ARANYA_DEPRECATED_MSG("use `create_label_with_rank` to specify an explicit rank")
 AranyaError aranya_create_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
-                                const struct AranyaRoleId *managing_role_id,
+                                AranyaRank rank,
                                 struct AranyaLabelId *__output);
 
 /**
- * Create a channel label.
- *
- * The `managing_role_id` parameter is accepted for backward compatibility
- * but is ignored in the rank-based authorization model. Since this API
- * does not allow the user to specify a rank, the label is created with
- * a default rank of the command author's rank minus one.
+ * Create a channel label with an explicit rank.
  *
  * Requires:
  * - `CreateLabel` permission
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] name label name string
- * @param[in] managing_role_id (ignored) formerly the managing role
+ * @param[in] rank the rank to assign to the label
  *
  * @relates AranyaClient.
  */
-ARANYA_DEPRECATED_MSG("use `create_label_with_rank` to specify an explicit rank")
 AranyaError aranya_create_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
-                                    const struct AranyaRoleId *managing_role_id,
+                                    AranyaRank rank,
                                     struct AranyaLabelId *__output,
                                     struct AranyaExtError *__ext_err);
-
-/**
- * Create a channel label with an explicit rank.
- *
- * Requires:
- * - `CreateLabel` permission
- * - `caller_rank >= rank`
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] name label name string
- * @param[in] rank the rank to assign to the label
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_create_label_with_rank(const struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          AranyaLabelName name,
-                                          AranyaRank rank,
-                                          struct AranyaLabelId *__output);
-
-/**
- * Create a channel label with an explicit rank.
- *
- * Requires:
- * - `CreateLabel` permission
- * - `caller_rank >= rank`
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] name label name string
- * @param[in] rank the rank to assign to the label
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_create_label_with_rank_ext(const struct AranyaClient *client,
-                                              const struct AranyaTeamId *team,
-                                              AranyaLabelName name,
-                                              AranyaRank rank,
-                                              struct AranyaLabelId *__output,
-                                              struct AranyaExtError *__ext_err);
 
 /**
  * Delete a channel label.
@@ -2805,104 +2674,51 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
- * Add a device to the team with an optional initial role.
- *
- * Since this API does not allow specifying a rank, the device is
- * assigned a default rank based on:
- * - If a role is provided: the role's rank minus one
- * - If no role is provided: the command author's rank minus one
+ * Add a device to the team with an explicit rank.
  *
  * Requires:
  * - `AddDevice` permission
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] public_key_bundle serialized key bundle bytes
- * @param[in] public_key_bundle_len is the length of the serialized public key bundle.
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
  * @param[in] role_id (optional) the ID of the role to assign to the device.
+ * @param[in] rank the rank to assign to the device.
  *
  * @relates AranyaClient.
  */
-ARANYA_DEPRECATED_MSG("use `add_device_to_team_with_rank` to specify an explicit rank")
 AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
-                                      const uint8_t *public_key_bundle,
-                                      size_t public_key_bundle_len,
-                                      const struct AranyaRoleId *role_id);
+                                      const uint8_t *keybundle,
+                                      size_t keybundle_len,
+                                      const struct AranyaRoleId *role_id,
+                                      AranyaRank rank);
 
 /**
- * Add a device to the team with an optional initial role.
- *
- * Since this API does not allow specifying a rank, the device is
- * assigned a default rank based on:
- * - If a role is provided: the role's rank minus one
- * - If no role is provided: the command author's rank minus one
+ * Add a device to the team with an explicit rank.
  *
  * Requires:
  * - `AddDevice` permission
+ * - `caller_rank >= rank`
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] public_key_bundle serialized key bundle bytes
- * @param[in] public_key_bundle_len is the length of the serialized public key bundle.
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
  * @param[in] role_id (optional) the ID of the role to assign to the device.
+ * @param[in] rank the rank to assign to the device.
  *
  * @relates AranyaClient.
  */
-ARANYA_DEPRECATED_MSG("use `add_device_to_team_with_rank` to specify an explicit rank")
 AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
-                                          const uint8_t *public_key_bundle,
-                                          size_t public_key_bundle_len,
+                                          const uint8_t *keybundle,
+                                          size_t keybundle_len,
                                           const struct AranyaRoleId *role_id,
+                                          AranyaRank rank,
                                           struct AranyaExtError *__ext_err);
-
-/**
- * Add a device to the team with an explicit rank.
- *
- * Requires:
- * - `AddDevice` permission
- * - `caller_rank >= rank`
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
- * @param[in] keybundle_len is the length of the serialized keybundle.
- * @param[in] role_id (optional) the ID of the role to assign to the device.
- * @param[in] rank the rank to assign to the device.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_device_to_team_with_rank(const struct AranyaClient *client,
-                                                const struct AranyaTeamId *team,
-                                                const uint8_t *keybundle,
-                                                size_t keybundle_len,
-                                                const struct AranyaRoleId *role_id,
-                                                AranyaRank rank);
-
-/**
- * Add a device to the team with an explicit rank.
- *
- * Requires:
- * - `AddDevice` permission
- * - `caller_rank >= rank`
- *
- * @param[in] client the Aranya Client
- * @param[in] team the team's ID
- * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
- * @param[in] keybundle_len is the length of the serialized keybundle.
- * @param[in] role_id (optional) the ID of the role to assign to the device.
- * @param[in] rank the rank to assign to the device.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_device_to_team_with_rank_ext(const struct AranyaClient *client,
-                                                    const struct AranyaTeamId *team,
-                                                    const uint8_t *keybundle,
-                                                    size_t keybundle_len,
-                                                    const struct AranyaRoleId *role_id,
-                                                    AranyaRank rank,
-                                                    struct AranyaExtError *__ext_err);
 
 /**
  * Remove a device from the team.

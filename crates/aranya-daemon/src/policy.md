@@ -2661,7 +2661,7 @@ command TerminateTeam {
 //
 // - `AddDevice`
 // - `AssignRole` (if assigned an initial role)
-action add_device_with_rank(device_keys struct PublicKeyBundle, initial_role_id optional id, rank int) {
+action add_device(device_keys struct PublicKeyBundle, initial_role_id optional id, rank int) {
     publish AddDevice {
         device_keys: device_keys,
         rank: rank,
@@ -2934,7 +2934,7 @@ function derive_label_id(evp struct Envelope) id {
 // # Required Permissions
 //
 // - `CreateLabel`
-action create_label_with_rank(name string, rank int) {
+action create_label(name string, rank int) {
     publish CreateLabel {
         label_name: name,
         rank: rank,

@@ -99,9 +99,9 @@ static int test_create_team_and_onboard_member(const char *tmpdir) {
 
     /* Add member to team with rank below owner's device rank */
     CLIENT_EXPECT("Failed to add member to team", "",
-                  aranya_add_device_to_team_with_rank(
-                      &owner_client, &team_id, member_pk, member_pk_len, NULL,
-                      owner_device_rank - 1));
+                  aranya_add_device_to_team(&owner_client, &team_id, member_pk,
+                                            member_pk_len, NULL,
+                                            owner_device_rank - 1));
 
     printf("Member added to team successfully\n");
 

@@ -385,35 +385,23 @@ AranyaError init_team(Team *t) {
     // real world scenario, the keys would be exchanged outside of Aranya using
     // something like `scp`.
 
-    // Setup default roles.
-    size_t num_default_roles = 0;
-    err =
-        aranya_setup_default_roles(&owner->client, &t->id, &num_default_roles);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set up default roles\n");
-        return err;
+    // Setup default roles. First call with a zero-length buffer to
+    // get the required size, then allocate and retry.
+    size_t roles_len = 0;
+    err = aranya_setup_default_roles(&owner->client, &t->id, NULL, &roles_len);
+    if (err != ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        fprintf(stderr, "expected BufferTooSmall from setup_default_roles\n");
+        return err == ARANYA_ERROR_SUCCESS ? ARANYA_ERROR_OTHER : err;
     }
 
-    // Query default roles on the team. Use the BufferTooSmall retry
-    // pattern since the count is dynamic.
-    size_t roles_len = num_default_roles;
     AranyaRole *roles = calloc(roles_len, sizeof(AranyaRole));
     if (roles == NULL) {
         abort();
     }
-    err = aranya_team_default_roles(&owner->client, &t->id, (void *)roles,
-                                    &roles_len);
-    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-        // No need to realloc and retry since we used the hint from
-        // setup_default_roles for the initial allocation. A mismatch
-        // means something unexpected changed.
-        fprintf(stderr, "expected %zu default roles but found %zu\n",
-                num_default_roles, roles_len);
-        free(roles);
-        return ARANYA_ERROR_OTHER;
-    }
+    err = aranya_setup_default_roles(&owner->client, &t->id, (void *)roles,
+                                     &roles_len);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to query default roles\n");
+        fprintf(stderr, "unable to set up default roles\n");
         free(roles);
         return err;
     }
@@ -451,9 +439,9 @@ AranyaError init_team(Team *t) {
         fprintf(stderr, "unable to query rank of 'admin' role\n");
         return err;
     }
-    err = aranya_add_device_to_team_with_rank(&owner->client, &t->id, admin->pk,
-                                              admin->pk_len, &admin_role_id,
-                                              admin_role_rank - 1);
+    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
+                                    admin->pk_len, &admin_role_id,
+                                    admin_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add admin to team\n");
         return err;
@@ -468,9 +456,9 @@ AranyaError init_team(Team *t) {
         fprintf(stderr, "unable to query rank of 'operator' role\n");
         return err;
     }
-    err = aranya_add_device_to_team_with_rank(
-        &owner->client, &t->id, operator->pk, operator->pk_len,
-        &operator_role_id, operator_role_rank - 1);
+    err = aranya_add_device_to_team(&owner->client, &t->id, operator->pk,
+                                    operator->pk_len, &operator_role_id,
+                                    operator_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add operator to team\n");
         return err;
@@ -485,18 +473,18 @@ AranyaError init_team(Team *t) {
         fprintf(stderr, "unable to query rank of 'member' role\n");
         return err;
     }
-    err = aranya_add_device_to_team_with_rank(
-        &owner->client, &t->id, membera->pk, membera->pk_len, &member_role_id,
-        member_role_rank - 1);
+    err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
+                                    membera->pk_len, &member_role_id,
+                                    member_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add membera to team\n");
         return err;
     }
 
     // add memberb to team.
-    err = aranya_add_device_to_team_with_rank(
-        &owner->client, &t->id, memberb->pk, memberb->pk_len, &member_role_id,
-        member_role_rank - 1);
+    err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
+                                    memberb->pk_len, &member_role_id,
+                                    member_role_rank - 1);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to add memberb to team\n");
         return err;
@@ -814,7 +802,7 @@ AranyaError aranya_create_assign_label(AranyaClient *client, AranyaTeamId *id,
                                        int num_peers) {
     AranyaError err;
 
-    err = aranya_create_label_with_rank(client, id, label_name, rank, label_id);
+    err = aranya_create_label(client, id, label_name, rank, label_id);
     EXPECT("error creating label", err);
 
     for (int i = 0; i < num_peers; i++) {

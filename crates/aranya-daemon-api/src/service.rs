@@ -441,7 +441,7 @@ pub trait DaemonApi {
 
     /// Adds a device to the team with an optional initial role and
     /// explicit rank.
-    async fn add_device_to_team_with_rank(
+    async fn add_device_to_team(
         team: TeamId,
         keys: PublicKeyBundle,
         initial_role: Option<RoleId>,
@@ -516,7 +516,7 @@ pub trait DaemonApi {
     //
 
     /// Creates a label with an explicit rank.
-    async fn create_label_with_rank(team: TeamId, name: Text, rank: Rank) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: Text, rank: Rank) -> Result<LabelId>;
     /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     /// Returns a specific label.

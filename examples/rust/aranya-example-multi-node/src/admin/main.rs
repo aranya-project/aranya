@@ -122,8 +122,7 @@ async fn main() -> Result<()> {
     let member_role_rank = team.query_rank(member_role.id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    team.create_label_with_rank(text!("label1"), label_rank)
-        .await?;
+    team.create_label(text!("label1"), label_rank).await?;
     info!("admin: created label");
 
     info!("admin: complete");
