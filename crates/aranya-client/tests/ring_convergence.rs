@@ -23,9 +23,7 @@ use serial_test::serial;
 use test_log::test;
 use tracing::info;
 
-use crate::scale::{
-    dual_ring_bridge_topology, NodeIndex, SyncMode, TestConfig, TestCtx, Topology,
-};
+use crate::scale::{dual_ring_bridge_topology, NodeIndex, SyncMode, TestConfig, TestCtx, Topology};
 
 // ---------------------------------------------------------------------------
 // Helper: run a convergence test with the given config
