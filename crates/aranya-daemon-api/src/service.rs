@@ -1,6 +1,7 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{error, fmt, hash::Hash, time::Duration};
+use std::time::SystemTime;
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
@@ -248,6 +249,24 @@ pub struct SyncPeerConfig {
     pub sync_on_hello: bool,
 }
 
+/// Information about a sync peer returned by [`DaemonApi::list_sync_peers`].
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SyncPeerInfo {
+    /// The peer's address.
+    pub addr: Addr,
+    /// The peer's sync configuration, or `None` if this peer is only known via
+    /// a hello subscription (not added via `add_sync_peer`).
+    pub config: Option<SyncPeerConfig>,
+    /// The last time this peer was successfully synced.
+    pub last_synced_at: Option<SystemTime>,
+    /// Whether this peer has an active inbound hello subscription to us.
+    #[cfg(feature = "preview")]
+    pub has_hello_subscription: bool,
+    /// Remaining duration until the hello subscription expires.
+    #[cfg(feature = "preview")]
+    pub hello_subscription_expires_in: Option<Duration>,
+}
+
 /// Valid channel operations for a label assignment.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum ChanOp {
@@ -390,6 +409,10 @@ pub trait DaemonApi {
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
+
+    /// Lists the current sync peers for a team, including hello subscription state.
+    async fn list_sync_peers(team: TeamId) -> Result<Vec<SyncPeerInfo>>;
+
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
     async fn add_team(cfg: AddTeamConfig) -> Result<()>;
 

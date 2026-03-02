@@ -50,7 +50,7 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 pub use crate::{
     client::{
         ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, PublicKeyBundle, Role,
-        RoleId, Roles, Team, TeamId,
+        RoleId, Roles, SyncPeerInfo, SyncPeers, Team, TeamId,
     },
     config::{
         AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,

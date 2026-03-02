@@ -2030,6 +2030,202 @@ pub unsafe fn sync_hello_unsubscribe(
     Ok(())
 }
 
+/// An opaque list of sync peers.
+///
+/// Returned by [`list_sync_peers`].
+/// Use the `sync_peer_list_*` accessor functions to read individual fields.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type SyncPeerList = Safe<aranya_client::SyncPeers>;
+
+/// Lists the current sync peers for a team.
+///
+/// Returns information about each peer including address, sync interval,
+/// last sync time, and hello subscription state.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[out] out the resulting sync peer list
+///
+/// @relates AranyaClient.
+pub fn list_sync_peers(
+    client: &Client,
+    team: &TeamId,
+    out: &mut MaybeUninit<SyncPeerList>,
+) -> Result<(), imp::Error> {
+    let peers = client
+        .rt
+        .block_on(client.inner.team(team.into()).list_sync_peers())?;
+    SyncPeerList::init(out, peers);
+    Ok(())
+}
+
+/// Returns the number of sync peers in the list.
+///
+/// @param[in] list the sync peer list
+///
+/// @relates AranyaSyncPeerList.
+pub fn sync_peer_list_len(list: &SyncPeerList) -> usize {
+    list.len()
+}
+
+/// Copies the address of the sync peer at `index` into `buf` as a null-terminated C string.
+///
+/// On input, `buf_len` should be the size of `buf` in bytes.
+/// On output, `buf_len` will contain the number of bytes written (including the null terminator).
+/// Returns `AranyaBufferTooSmall` if `buf` is too small.
+///
+/// @param[in] list the sync peer list
+/// @param[in] index the zero-based index of the peer
+/// @param[out] buf the buffer to write the address to
+/// @param[in,out] buf_len the size of `buf` / bytes written
+///
+/// @relates AranyaSyncPeerList.
+#[allow(clippy::cast_possible_wrap)]
+pub unsafe fn sync_peer_list_get_addr(
+    list: &SyncPeerList,
+    index: usize,
+    buf: *mut c_char,
+    buf_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let data = list.__data();
+    if index >= data.len() {
+        return Err(InvalidArg::new("index", "out of bounds").into());
+    }
+    let addr_str = data[index].addr.to_string();
+    let addr_bytes = addr_str.as_bytes();
+    // Need room for the string plus a null terminator.
+    if buf.is_null() || *buf_len <= addr_bytes.len() {
+        *buf_len = addr_bytes.len().saturating_add(1);
+        return Err(imp::Error::BufferTooSmall);
+    }
+    // SAFETY: Caller ensures `buf` points to at least `*buf_len` bytes.
+    unsafe {
+        ptr::copy_nonoverlapping(addr_bytes.as_ptr().cast::<c_char>(), buf, addr_bytes.len());
+        *buf.add(addr_bytes.len()) = 0; // null terminator
+    }
+    *buf_len = addr_bytes.len().saturating_add(1);
+    Ok(())
+}
+
+/// Returns the sync interval for the peer at `index`.
+///
+/// @param[in] list the sync peer list
+/// @param[in] index the zero-based index of the peer
+/// @param[out] has_interval whether the peer has an interval configured (0 = no, 1 = yes)
+/// @param[out] interval_ms the interval in milliseconds (only valid if `has_interval` is non-zero)
+///
+/// @relates AranyaSyncPeerList.
+pub fn sync_peer_list_get_interval(
+    list: &SyncPeerList,
+    index: usize,
+    has_interval: &mut u32,
+    interval_ms: &mut u64,
+) -> Result<(), imp::Error> {
+    let data = list.__data();
+    if index >= data.len() {
+        return Err(InvalidArg::new("index", "out of bounds").into());
+    }
+    match data[index].interval {
+        Some(d) => {
+            *has_interval = 1;
+            *interval_ms = d.as_millis().min(u128::from(u64::MAX)) as u64;
+        }
+        None => {
+            *has_interval = 0;
+            *interval_ms = 0;
+        }
+    }
+    Ok(())
+}
+
+/// Returns the last sync timestamp for the peer at `index`.
+///
+/// @param[in] list the sync peer list
+/// @param[in] index the zero-based index of the peer
+/// @param[out] has_value whether the peer has been synced (0 = no, 1 = yes)
+/// @param[out] secs seconds since the Unix epoch (only valid if `has_value` is non-zero)
+///
+/// @relates AranyaSyncPeerList.
+pub fn sync_peer_list_get_last_synced_at(
+    list: &SyncPeerList,
+    index: usize,
+    has_value: &mut u32,
+    secs: &mut u64,
+) -> Result<(), imp::Error> {
+    let data = list.__data();
+    if index >= data.len() {
+        return Err(InvalidArg::new("index", "out of bounds").into());
+    }
+    match data[index].last_synced_at {
+        Some(t) => {
+            *has_value = 1;
+            *secs = t
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+        }
+        None => {
+            *has_value = 0;
+            *secs = 0;
+        }
+    }
+    Ok(())
+}
+
+/// Returns whether the peer at `index` has an active inbound hello subscription.
+///
+/// @param[in] list the sync peer list
+/// @param[in] index the zero-based index of the peer
+/// @param[out] value whether the peer has a hello subscription (0 = no, 1 = yes)
+///
+/// @relates AranyaSyncPeerList.
+#[cfg(feature = "preview")]
+pub fn sync_peer_list_get_has_hello_subscription(
+    list: &SyncPeerList,
+    index: usize,
+    value: &mut u32,
+) -> Result<(), imp::Error> {
+    let data = list.__data();
+    if index >= data.len() {
+        return Err(InvalidArg::new("index", "out of bounds").into());
+    }
+    *value = u32::from(data[index].has_hello_subscription);
+    Ok(())
+}
+
+/// Returns the remaining hello subscription duration for the peer at `index`.
+///
+/// @param[in] list the sync peer list
+/// @param[in] index the zero-based index of the peer
+/// @param[out] has_value whether the peer has a hello subscription (0 = no, 1 = yes)
+/// @param[out] secs remaining seconds until expiry (only valid if `has_value` is non-zero)
+///
+/// @relates AranyaSyncPeerList.
+#[cfg(feature = "preview")]
+pub fn sync_peer_list_get_hello_expires_in(
+    list: &SyncPeerList,
+    index: usize,
+    has_value: &mut u32,
+    secs: &mut u64,
+) -> Result<(), imp::Error> {
+    let data = list.__data();
+    if index >= data.len() {
+        return Err(InvalidArg::new("index", "out of bounds").into());
+    }
+    match data[index].hello_subscription_expires_in {
+        Some(d) => {
+            *has_value = 1;
+            *secs = d.as_secs();
+        }
+        None => {
+            *has_value = 0;
+            *secs = 0;
+        }
+    }
+    Ok(())
+}
+
 /// Sync with peer immediately.
 ///
 /// If a peer is not reachable on the network, sync errors

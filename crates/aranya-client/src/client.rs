@@ -47,7 +47,7 @@ pub use self::{
     device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
     role::{Role, RoleId, Roles},
-    team::{Team, TeamId},
+    team::{SyncPeerInfo, SyncPeers, Team, TeamId},
 };
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig},

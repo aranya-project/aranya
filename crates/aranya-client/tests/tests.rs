@@ -2101,3 +2101,94 @@ async fn test_role_owners_query() -> Result<()> {
 
     Ok(())
 }
+
+/// Tests listing sync peers returns correct information.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_list_sync_peers() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_list_sync_peers").await?;
+    let team_id = devices
+        .create_and_add_team()
+        .await
+        .expect("expected to create team");
+
+    let roles = devices.setup_default_roles(team_id).await?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // List sync peers before adding any — should be empty.
+    let peers = owner_team.list_sync_peers().await?;
+    assert!(peers.is_empty(), "expected no sync peers initially");
+
+    // Add sync peers from owner to membera and memberb.
+    let membera_addr = devices.membera.aranya_local_addr().await?;
+    let memberb_addr = devices.memberb.aranya_local_addr().await?;
+
+    let config = SyncPeerConfig::builder()
+        .interval(Duration::from_millis(100))
+        .sync_now(true)
+        .build()?;
+    owner_team.add_sync_peer(membera_addr, config).await?;
+
+    let config2 = SyncPeerConfig::builder()
+        .interval(Duration::from_millis(200))
+        .sync_now(true)
+        .build()?;
+    owner_team.add_sync_peer(memberb_addr, config2).await?;
+
+    // List sync peers — should see both.
+    let peers = owner_team.list_sync_peers().await?;
+    assert_eq!(peers.len(), 2, "expected 2 sync peers");
+
+    // Verify the peers have the correct addresses and intervals.
+    let peer_addrs: Vec<_> = peers.iter().map(|p| p.addr).collect();
+    assert!(
+        peer_addrs.contains(&membera_addr),
+        "expected membera in peer list"
+    );
+    assert!(
+        peer_addrs.contains(&memberb_addr),
+        "expected memberb in peer list"
+    );
+
+    for peer in peers.iter() {
+        assert!(peer.interval.is_some(), "expected interval to be set");
+    }
+
+    // Wait for sync to happen so last_synced_at gets populated.
+    // Also add sync peers on membera so we can actually complete a sync with owner.
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let membera_team = devices.membera.client.team(team_id);
+    let sync_back = SyncPeerConfig::builder()
+        .interval(Duration::from_millis(100))
+        .sync_now(true)
+        .build()?;
+    membera_team.add_sync_peer(owner_addr, sync_back).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    let peers = owner_team.list_sync_peers().await?;
+    let membera_peer = peers.iter().find(|p| p.addr == membera_addr);
+    assert!(
+        membera_peer.is_some(),
+        "expected membera peer in list after sync"
+    );
+    // After a successful sync the timestamp should be set.
+    if let Some(p) = membera_peer {
+        assert!(
+            p.last_synced_at.is_some(),
+            "expected last_synced_at to be populated after sync"
+        );
+    }
+
+    // Remove a sync peer and verify it disappears.
+    owner_team.remove_sync_peer(memberb_addr).await?;
+    let peers = owner_team.list_sync_peers().await?;
+    assert_eq!(peers.len(), 1, "expected 1 sync peer after removal");
+    assert_eq!(
+        peers.iter().next().unwrap().addr,
+        membera_addr,
+        "remaining peer should be membera"
+    );
+
+    Ok(())
+}

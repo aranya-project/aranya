@@ -31,9 +31,10 @@
 use std::collections::HashMap;
 #[cfg(feature = "preview")]
 use std::time::Duration;
+use std::time::SystemTime;
 
 use anyhow::Context as _;
-use aranya_daemon_api::SyncPeerConfig;
+use aranya_daemon_api::{SyncPeerConfig, SyncPeerInfo};
 use aranya_runtime::{PolicyStore, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
@@ -54,6 +55,14 @@ use super::{
 };
 use crate::{aranya::Client, vm_policy::VecSink};
 
+/// State for a tracked sync peer.
+#[derive(Debug)]
+pub(super) struct PeerState {
+    pub(super) config: SyncPeerConfig,
+    pub(super) queue_key: Option<delay_queue::Key>,
+    pub(super) last_synced_at: Option<SystemTime>,
+}
+
 /// Syncs with each peer after the specified interval.
 ///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
@@ -64,8 +73,8 @@ use crate::{aranya::Client, vm_policy::VecSink};
 pub(crate) struct SyncManager<ST, PS, SP, EF> {
     /// Aranya client paired with caches and hello subscriptions, ensuring safe lock ordering.
     pub(super) client: Client<PS, SP>,
-    /// Keeps track of peer info. The Key is None if the peer has no interval configured.
-    pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
+    /// Keeps track of peer info.
+    pub(super) peers: HashMap<SyncPeer, PeerState>,
     /// Receives added/removed peers.
     pub(super) recv: mpsc::Receiver<Callback>,
     /// Delay queue for getting the next peer to sync with.
@@ -90,14 +99,32 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
             Some(interval) => Some(self.queue.insert(peer, interval)),
             None => None,
         };
-        if let Some((_, Some(key))) = self.peers.insert(peer, (cfg, new_key)) {
+        // Preserve last_synced_at from a previous entry if re-adding.
+        let prev_last_synced = self.peers.get(&peer).and_then(|s| s.last_synced_at);
+        let old = self.peers.insert(
+            peer,
+            PeerState {
+                config: cfg,
+                queue_key: new_key,
+                last_synced_at: prev_last_synced,
+            },
+        );
+        if let Some(PeerState {
+            queue_key: Some(key),
+            ..
+        }) = old
+        {
             self.queue.remove(&key);
         }
     }
 
     /// Remove a peer from the delay queue.
     fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some((_, Some(key))) = self.peers.remove(&peer) {
+        if let Some(PeerState {
+            queue_key: Some(key),
+            ..
+        }) = self.peers.remove(&peer)
+        {
             self.queue.remove(&key);
         }
     }
@@ -118,6 +145,63 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
     #[cfg(test)]
     pub(crate) fn client_mut(&mut self) -> &mut Client<PS, SP> {
         &mut self.client
+    }
+
+    /// Collects sync peer info for a graph, merging interval-based peers
+    /// with hello subscription state.
+    async fn collect_peers_for_graph(&self, graph_id: GraphId) -> Vec<SyncPeerInfo> {
+        #[allow(unused_mut)]
+        let mut result: HashMap<super::Addr, SyncPeerInfo> = self
+            .peers
+            .iter()
+            .filter(|(peer, _)| peer.graph_id == graph_id)
+            .map(|(peer, state)| {
+                (
+                    peer.addr,
+                    SyncPeerInfo {
+                        addr: peer.addr,
+                        config: Some(state.config.clone()),
+                        last_synced_at: state.last_synced_at,
+                        #[cfg(feature = "preview")]
+                        has_hello_subscription: false,
+                        #[cfg(feature = "preview")]
+                        hello_subscription_expires_in: None,
+                    },
+                )
+            })
+            .collect();
+
+        #[cfg(feature = "preview")]
+        {
+            let now = std::time::Instant::now();
+            let subscriptions = self.client.lock_hello_subscriptions().await;
+            for (peer, sub) in subscriptions.iter() {
+                if peer.graph_id != graph_id {
+                    continue;
+                }
+                if now >= sub.expires_at {
+                    continue;
+                }
+                let expires_in = sub.expires_at.duration_since(now);
+                if let Some(info) = result.get_mut(&peer.addr) {
+                    info.has_hello_subscription = true;
+                    info.hello_subscription_expires_in = Some(expires_in);
+                } else {
+                    result.insert(
+                        peer.addr,
+                        SyncPeerInfo {
+                            addr: peer.addr,
+                            config: None,
+                            last_synced_at: None,
+                            has_hello_subscription: true,
+                            hello_subscription_expires_in: Some(expires_in),
+                        },
+                    );
+                }
+            }
+        }
+
+        result.into_values().collect()
     }
 }
 
@@ -206,8 +290,8 @@ where
                     #[cfg(feature = "preview")]
                     ManagerMessage::SyncOnHello { peer } => {
                         // Check if sync_on_hello is enabled for this peer
-                        if let Some((cfg, _)) = self.peers.get(&peer) {
-                            if cfg.sync_on_hello {
+                        if let Some(state) = self.peers.get(&peer) {
+                            if state.config.sync_on_hello {
                                 self.sync(peer).await
                                     .inspect_err(|e| {
                                         warn!(
@@ -236,6 +320,11 @@ where
                     ManagerMessage::BroadcastHello { graph_id, head } => {
                         ST::broadcast_hello_notifications_impl(self, graph_id, head).await
                     }
+                    ManagerMessage::ListPeers { graph_id, reply } => {
+                        let peers = self.collect_peers_for_graph(graph_id).await;
+                        let _ = reply.send(Ok(peers));
+                        Ok(())
+                    }
                 };
                 if let Err(reply) = tx.send(reply) {
                     warn!("syncer operation did not wait for reply");
@@ -245,9 +334,9 @@ where
             // get next peer from delay queue.
             Some(expired) = self.queue.next() => {
                 let peer = expired.into_inner();
-                let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
+                let state = self.peers.get_mut(&peer).assume("peer must exist")?;
                 // Re-insert into queue if interval is still configured
-                *key = cfg.interval.map(|interval| self.queue.insert(peer, interval));
+                state.queue_key = state.config.interval.map(|interval| self.queue.insert(peer, interval));
                 // sync with peer.
                 self.sync(peer).await?;
             }
@@ -275,10 +364,10 @@ where
                         "Parallel finalize error, removing sync peers for graph"
                     );
                     // Remove sync peers for graph that had finalization error.
-                    self.peers.retain(|p, (_, key)| {
+                    self.peers.retain(|p, state| {
                         let keep = p.graph_id != peer.graph_id;
                         if !keep {
-                            if let Some(k) = key {
+                            if let Some(k) = &state.queue_key {
                                 self.queue.remove(k);
                             }
                         }
@@ -288,6 +377,11 @@ where
                 }
             })
             .with_context(|| format!("peer addr: {}", peer.addr))?;
+
+        // Record successful sync timestamp.
+        if let Some(state) = self.peers.get_mut(&peer) {
+            state.last_synced_at = Some(SystemTime::now());
+        }
 
         let effects = sink
             .collect()

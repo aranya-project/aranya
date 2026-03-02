@@ -9,20 +9,19 @@
 #[cfg(feature = "preview")]
 use std::time::Duration;
 
-use aranya_daemon_api::SyncPeerConfig;
+use aranya_daemon_api::{SyncPeerConfig, SyncPeerInfo};
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use buggy::BugExt as _;
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(feature = "preview")]
 use super::GraphId;
 #[cfg(doc)]
 use super::SyncManager;
 use super::{Result, SyncPeer};
 
 /// Holds all possible messages that the [`SyncManager`] can process.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) enum ManagerMessage {
     /// Add a peer to the [`SyncManager`]'s schedule.
     AddPeer {
@@ -80,6 +79,14 @@ pub(crate) enum ManagerMessage {
         graph_id: GraphId,
         /// The current head to notify subscribers about.
         head: Address,
+    },
+
+    /// List sync peers for a graph.
+    ListPeers {
+        /// The graph to list peers for.
+        graph_id: GraphId,
+        /// Channel for returning the peer list.
+        reply: oneshot::Sender<Result<Vec<SyncPeerInfo>>>,
     },
 }
 
@@ -146,6 +153,23 @@ impl SyncHandle {
     pub(crate) async fn broadcast_hello(&self, graph_id: GraphId, head: Address) -> Response {
         self.send(ManagerMessage::BroadcastHello { graph_id, head })
             .await
+    }
+
+    /// Lists sync peers for a graph, including hello subscription state.
+    pub(crate) async fn list_peers(&self, graph_id: GraphId) -> Result<Vec<SyncPeerInfo>> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        let (ack_tx, _ack_rx) = oneshot::channel();
+        self.sender
+            .send((
+                ManagerMessage::ListPeers {
+                    graph_id,
+                    reply: reply_tx,
+                },
+                ack_tx,
+            ))
+            .await
+            .assume("syncer peer channel closed")?;
+        reply_rx.await.assume("no syncer reply")?
     }
 
     /// Helper method for sending a message via the channel.

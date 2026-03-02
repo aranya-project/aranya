@@ -533,6 +533,17 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    #[instrument(skip(self), err)]
+    async fn list_sync_peers(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Vec<api::SyncPeerInfo>> {
+        let graph = self.check_team_valid(team).await?;
+        let peers = self.syncer.list_peers(graph).await?;
+        Ok(peers)
+    }
+
     //
     // Local team management
     //

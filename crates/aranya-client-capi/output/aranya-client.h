@@ -679,6 +679,21 @@ typedef struct AranyaLabelId {
  */
 typedef const char *AranyaAddr;
 
+/**
+ * An opaque list of sync peers.
+ *
+ * Returned by [`aranya_list_sync_peers`](@ref aranya_list_sync_peers).
+ * Use the `sync_peer_list_*` accessor functions to read individual fields.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerList {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[40];
+} AranyaSyncPeerList;
+
 #if defined(ENABLE_ARANYA_AFC)
 /**
  * An AFC Sending Channel Object.
@@ -2966,6 +2981,236 @@ AranyaError aranya_sync_hello_unsubscribe_ext(const struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               AranyaAddr peer,
                                               struct AranyaExtError *__ext_err);
+#endif
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_sync_peer_list_init`.
+ *
+ * @relates AranyaSyncPeerList
+ */
+AranyaError aranya_sync_peer_list_cleanup(struct AranyaSyncPeerList *ptr);
+
+/**
+ * Lists the current sync peers for a team.
+ *
+ * Returns information about each peer including address, sync interval,
+ * last sync time, and hello subscription state.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] out the resulting sync peer list
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_list_sync_peers(const struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   struct AranyaSyncPeerList *out);
+
+/**
+ * Lists the current sync peers for a team.
+ *
+ * Returns information about each peer including address, sync interval,
+ * last sync time, and hello subscription state.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[out] out the resulting sync peer list
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_list_sync_peers_ext(const struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       struct AranyaSyncPeerList *out,
+                                       struct AranyaExtError *__ext_err);
+
+/**
+ * Returns the number of sync peers in the list.
+ *
+ * @param[in] list the sync peer list
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_len(const struct AranyaSyncPeerList *list,
+                                      size_t *__output);
+
+/**
+ * Returns the number of sync peers in the list.
+ *
+ * @param[in] list the sync peer list
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_len_ext(const struct AranyaSyncPeerList *list,
+                                          size_t *__output,
+                                          struct AranyaExtError *__ext_err);
+
+/**
+ * Copies the address of the sync peer at `index` into `buf` as a null-terminated C string.
+ *
+ * On input, `buf_len` should be the size of `buf` in bytes.
+ * On output, `buf_len` will contain the number of bytes written (including the null terminator).
+ * Returns `AranyaBufferTooSmall` if `buf` is too small.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] buf the buffer to write the address to
+ * @param[in,out] buf_len the size of `buf` / bytes written
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_addr(const struct AranyaSyncPeerList *list,
+                                           size_t index,
+                                           char *buf,
+                                           size_t *buf_len);
+
+/**
+ * Copies the address of the sync peer at `index` into `buf` as a null-terminated C string.
+ *
+ * On input, `buf_len` should be the size of `buf` in bytes.
+ * On output, `buf_len` will contain the number of bytes written (including the null terminator).
+ * Returns `AranyaBufferTooSmall` if `buf` is too small.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] buf the buffer to write the address to
+ * @param[in,out] buf_len the size of `buf` / bytes written
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_addr_ext(const struct AranyaSyncPeerList *list,
+                                               size_t index,
+                                               char *buf,
+                                               size_t *buf_len,
+                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Returns the sync interval for the peer at `index`.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] has_interval whether the peer has an interval configured (0 = no, 1 = yes)
+ * @param[out] interval_ms the interval in milliseconds (only valid if `has_interval` is non-zero)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_interval(const struct AranyaSyncPeerList *list,
+                                               size_t index,
+                                               uint32_t *has_interval,
+                                               uint64_t *interval_ms);
+
+/**
+ * Returns the sync interval for the peer at `index`.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] has_interval whether the peer has an interval configured (0 = no, 1 = yes)
+ * @param[out] interval_ms the interval in milliseconds (only valid if `has_interval` is non-zero)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_interval_ext(const struct AranyaSyncPeerList *list,
+                                                   size_t index,
+                                                   uint32_t *has_interval,
+                                                   uint64_t *interval_ms,
+                                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Returns the last sync timestamp for the peer at `index`.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] has_value whether the peer has been synced (0 = no, 1 = yes)
+ * @param[out] secs seconds since the Unix epoch (only valid if `has_value` is non-zero)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_last_synced_at(const struct AranyaSyncPeerList *list,
+                                                     size_t index,
+                                                     uint32_t *has_value,
+                                                     uint64_t *secs);
+
+/**
+ * Returns the last sync timestamp for the peer at `index`.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] has_value whether the peer has been synced (0 = no, 1 = yes)
+ * @param[out] secs seconds since the Unix epoch (only valid if `has_value` is non-zero)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_last_synced_at_ext(const struct AranyaSyncPeerList *list,
+                                                         size_t index,
+                                                         uint32_t *has_value,
+                                                         uint64_t *secs,
+                                                         struct AranyaExtError *__ext_err);
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Returns whether the peer at `index` has an active inbound hello subscription.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] value whether the peer has a hello subscription (0 = no, 1 = yes)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_has_hello_subscription(const struct AranyaSyncPeerList *list,
+                                                             size_t index,
+                                                             uint32_t *value);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Returns whether the peer at `index` has an active inbound hello subscription.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] value whether the peer has a hello subscription (0 = no, 1 = yes)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_has_hello_subscription_ext(const struct AranyaSyncPeerList *list,
+                                                                 size_t index,
+                                                                 uint32_t *value,
+                                                                 struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Returns the remaining hello subscription duration for the peer at `index`.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] has_value whether the peer has a hello subscription (0 = no, 1 = yes)
+ * @param[out] secs remaining seconds until expiry (only valid if `has_value` is non-zero)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_hello_expires_in(const struct AranyaSyncPeerList *list,
+                                                       size_t index,
+                                                       uint32_t *has_value,
+                                                       uint64_t *secs);
+#endif
+
+#if defined(ENABLE_ARANYA_PREVIEW)
+/**
+ * Returns the remaining hello subscription duration for the peer at `index`.
+ *
+ * @param[in] list the sync peer list
+ * @param[in] index the zero-based index of the peer
+ * @param[out] has_value whether the peer has a hello subscription (0 = no, 1 = yes)
+ * @param[out] secs remaining seconds until expiry (only valid if `has_value` is non-zero)
+ *
+ * @relates AranyaSyncPeerList.
+ */
+AranyaError aranya_sync_peer_list_get_hello_expires_in_ext(const struct AranyaSyncPeerList *list,
+                                                           size_t index,
+                                                           uint32_t *has_value,
+                                                           uint64_t *secs,
+                                                           struct AranyaExtError *__ext_err);
 #endif
 
 /**

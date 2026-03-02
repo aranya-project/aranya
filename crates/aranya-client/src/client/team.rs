@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use anyhow::Context as _;
 use aranya_crypto::EncryptionPublicKey;
 use aranya_daemon_api::{self as api, CS};
@@ -18,6 +20,54 @@ use crate::{
     error::{self, aranya_error, IpcError, Result},
     util::{ApiConv as _, ApiId},
 };
+
+/// Information about a sync peer.
+#[derive(Debug)]
+pub struct SyncPeerInfo {
+    /// The peer's address.
+    pub addr: Addr,
+    /// The sync interval, or `None` if the peer is not periodically synced.
+    pub interval: Option<core::time::Duration>,
+    /// The last time this peer was successfully synced.
+    pub last_synced_at: Option<SystemTime>,
+    /// Whether this peer has an active inbound hello subscription to us.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    pub has_hello_subscription: bool,
+    /// Remaining duration until the hello subscription expires.
+    #[cfg(feature = "preview")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
+    pub hello_subscription_expires_in: Option<core::time::Duration>,
+}
+
+/// A list of sync peers. Returned by [`Team::list_sync_peers`].
+#[derive(Debug)]
+pub struct SyncPeers {
+    peers: Vec<SyncPeerInfo>,
+}
+
+impl SyncPeers {
+    /// Returns the number of sync peers.
+    pub fn len(&self) -> usize {
+        self.peers.len()
+    }
+
+    /// Returns `true` if the list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.peers.is_empty()
+    }
+
+    /// Returns an iterator over the sync peers.
+    pub fn iter(&self) -> impl Iterator<Item = &SyncPeerInfo> {
+        self.peers.iter()
+    }
+
+    /// Returns a reference to the underlying data (for C API).
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[SyncPeerInfo] {
+        &self.peers
+    }
+}
 
 custom_id! {
     /// Uniquely identifies an Aranya team.
@@ -104,6 +154,34 @@ impl Team<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+    }
+
+    /// Lists the current sync peers for this team.
+    ///
+    /// Returns information about each peer including its address, sync interval,
+    /// last sync time, and hello subscription state.
+    #[instrument(skip(self))]
+    pub async fn list_sync_peers(&self) -> Result<SyncPeers> {
+        let api_peers = self
+            .client
+            .daemon
+            .list_sync_peers(create_ctx(), self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        let peers = api_peers
+            .into_iter()
+            .map(|p| SyncPeerInfo {
+                addr: p.addr,
+                interval: p.config.as_ref().and_then(|c| c.interval),
+                last_synced_at: p.last_synced_at,
+                #[cfg(feature = "preview")]
+                has_hello_subscription: p.has_hello_subscription,
+                #[cfg(feature = "preview")]
+                hello_subscription_expires_in: p.hello_subscription_expires_in,
+            })
+            .collect();
+        Ok(SyncPeers { peers })
     }
 }
 

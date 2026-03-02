@@ -33,7 +33,7 @@ pub(crate) struct HelloSubscription {
     /// The last time we notified a peer about our current graph.
     last_notified: Option<Instant>,
     /// How long until the subscription is no longer valid.
-    expires_at: Instant,
+    pub(crate) expires_at: Instant,
     /// Token to cancel the spawned sync task.
     cancel_token: CancellationToken,
 }
