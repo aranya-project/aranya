@@ -124,6 +124,9 @@ pub struct TestConfig {
 
     /// Batch size for parallel node initialization.
     pub init_batch_size: usize,
+
+    /// The test topology
+    pub topology: Topology,
 }
 
 impl Default for TestConfig {
@@ -144,6 +147,7 @@ impl Default for TestConfig {
             poll_interval: Duration::from_millis(250),
             init_timeout: Duration::from_secs(60),
             init_batch_size: 10,
+            topology: Topology::Ring,
         }
     }
 }
@@ -175,6 +179,7 @@ pub struct TestConfigBuilder {
     poll_interval: Option<Duration>,
     init_timeout: Option<Duration>,
     init_batch_size: Option<usize>,
+    topology: Option<Topology>,
 }
 
 #[allow(dead_code)]
@@ -221,6 +226,12 @@ impl TestConfigBuilder {
         self
     }
 
+    /// Sets the test topology.
+    pub fn topology(mut self, topology: Topology) -> Self {
+        self.topology = Some(topology);
+        self
+    }
+
     /// Builds the configuration, applying defaults for unset values.
     pub fn build(self) -> Result<TestConfig> {
         let default = TestConfig::default();
@@ -232,6 +243,7 @@ impl TestConfigBuilder {
             poll_interval: self.poll_interval.unwrap_or(default.poll_interval),
             init_timeout: self.init_timeout.unwrap_or(default.init_timeout),
             init_batch_size: self.init_batch_size.unwrap_or(default.init_batch_size),
+            topology: self.topology.unwrap_or(default.topology),
         };
         config.validate()?;
         Ok(config)

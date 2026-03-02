@@ -26,11 +26,11 @@ use tracing::info;
 use crate::scale::{NodeIndex, SyncMode, TestConfig, TestCtx, Topology};
 
 // ---------------------------------------------------------------------------
-// Helper: run a convergence test with the given config and topology
+// Helper: run a convergence test with the given config
 // ---------------------------------------------------------------------------
 
-async fn run_convergence(config: TestConfig, topology: Topology, team_name: &str) -> Result<()> {
-    let mut ctx = TestCtx::new(config, Some(vec![topology]), team_name).await?;
+async fn run_convergence(config: TestConfig) -> Result<()> {
+    let mut ctx = TestCtx::new(config).await?;
 
     ctx.setup_team().await?;
     ctx.sync_team_from_owner().await?;
@@ -109,26 +109,22 @@ fn dual_ring_bridge_topology(n: usize) -> Vec<Vec<NodeIndex>> {
 #[serial]
 async fn test_dual_ring_bridge_10_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("10-node dual ring bridge (poll)")
+        .test_name("dual_bridge_10n_poll")
         .node_count(10)
         .sync_mode(SyncMode::Poll {
             interval: Duration::from_secs(1),
         })
         .max_duration(Duration::from_secs(120))
+        .topology(Topology::Custom {
+            connect: dual_ring_bridge_topology,
+        })
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 10-node dual ring bridge test (poll mode)"
     );
-    run_convergence(
-        config,
-        Topology::Custom {
-            connect: dual_ring_bridge_topology,
-        },
-        "dual_bridge_10n_poll",
-    )
-    .await?;
+    run_convergence(config).await?;
     info!("10-node dual ring bridge convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -139,27 +135,23 @@ async fn test_dual_ring_bridge_10_nodes() -> Result<()> {
 #[serial]
 async fn test_dual_ring_bridge_10_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("10-node dual ring bridge (hello)")
+        .test_name("dual_bridge_10n_hello")
         .node_count(10)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(120))
+        .topology(Topology::Custom {
+            connect: dual_ring_bridge_topology,
+        })
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 10-node dual ring bridge test (hello mode)"
     );
-    run_convergence(
-        config,
-        Topology::Custom {
-            connect: dual_ring_bridge_topology,
-        },
-        "dual_bridge_10n_hello",
-    )
-    .await?;
+    run_convergence(config).await?;
     info!("10-node dual ring bridge convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -178,17 +170,18 @@ async fn test_dual_ring_bridge_10_nodes_hello() -> Result<()> {
 #[serial]
 async fn test_ring_minimum_3_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("3-node ring (poll)")
+        .test_name("ring_3n_poll")
         .node_count(3)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(60))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 3-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_3n_poll").await?;
+    run_convergence(config).await?;
     info!("3-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -203,20 +196,21 @@ async fn test_ring_minimum_3_nodes() -> Result<()> {
 #[serial]
 async fn test_ring_minimum_3_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("3-node ring (hello)")
+        .test_name("ring_3n_hello")
         .node_count(3)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(60))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 3-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_3n_hello").await?;
+    run_convergence(config).await?;
     info!("3-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -235,17 +229,18 @@ async fn test_ring_minimum_3_nodes_hello() -> Result<()> {
 #[serial]
 async fn test_ring_convergence_10_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("10-node ring (poll)")
+        .test_name("ring_10n_poll")
         .node_count(10)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(120))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 10-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_10n_poll").await?;
+    run_convergence(config).await?;
     info!("10-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -260,20 +255,21 @@ async fn test_ring_convergence_10_nodes() -> Result<()> {
 #[serial]
 async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("10-node ring (hello)")
+        .test_name("ring_10n_hello")
         .node_count(10)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(120))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 10-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_10n_hello").await?;
+    run_convergence(config).await?;
     info!("10-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -288,17 +284,18 @@ async fn test_ring_convergence_10_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_20_nodes -- --ignored"]
 async fn test_ring_convergence_20_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("20-node ring (poll)")
+        .test_name("ring_20n_poll")
         .node_count(20)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(200))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 20-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_20n_poll").await?;
+    run_convergence(config).await?;
     info!("20-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -309,20 +306,21 @@ async fn test_ring_convergence_20_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_20_nodes_hello -- --ignored"]
 async fn test_ring_convergence_20_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("20-node ring (hello)")
+        .test_name("ring_20n_hello")
         .node_count(20)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(200))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 20-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_20n_hello").await?;
+    run_convergence(config).await?;
     info!("20-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -337,17 +335,18 @@ async fn test_ring_convergence_20_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_30_nodes -- --ignored"]
 async fn test_ring_convergence_30_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("30-node ring (poll)")
+        .test_name("ring_30n_poll")
         .node_count(30)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(300))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 30-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_30n_poll").await?;
+    run_convergence(config).await?;
     info!("30-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -358,20 +357,21 @@ async fn test_ring_convergence_30_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_30_nodes_hello -- --ignored"]
 async fn test_ring_convergence_30_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("30-node ring (hello)")
+        .test_name("ring_30n_hello")
         .node_count(30)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(300))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 30-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_30n_hello").await?;
+    run_convergence(config).await?;
     info!("30-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -386,17 +386,18 @@ async fn test_ring_convergence_30_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_40_nodes -- --ignored"]
 async fn test_ring_convergence_40_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("40-node ring (poll)")
+        .test_name("ring_40n_poll")
         .node_count(40)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(400))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 40-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_40n_poll").await?;
+    run_convergence(config).await?;
     info!("40-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -407,20 +408,21 @@ async fn test_ring_convergence_40_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_40_nodes_hello -- --ignored"]
 async fn test_ring_convergence_40_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("40-node ring (hello)")
+        .test_name("ring_40n_hello")
         .node_count(40)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(400))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 40-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_40n_hello").await?;
+    run_convergence(config).await?;
     info!("40-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -435,17 +437,18 @@ async fn test_ring_convergence_40_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_50_nodes -- --ignored"]
 async fn test_ring_convergence_50_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("50-node ring (poll)")
+        .test_name("ring_50n_poll")
         .node_count(50)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(400))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 50-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_50n_poll").await?;
+    run_convergence(config).await?;
     info!("50-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -456,20 +459,21 @@ async fn test_ring_convergence_50_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_50_nodes_hello -- --ignored"]
 async fn test_ring_convergence_50_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("50-node ring (hello)")
+        .test_name("ring_50n_hello")
         .node_count(50)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(400))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 50-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_50n_hello").await?;
+    run_convergence(config).await?;
     info!("50-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -484,17 +488,18 @@ async fn test_ring_convergence_50_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_60_nodes -- --ignored"]
 async fn test_ring_convergence_60_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("60-node ring (poll)")
+        .test_name("ring_60n_poll")
         .node_count(60)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 60-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_60n_poll").await?;
+    run_convergence(config).await?;
     info!("60-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -505,20 +510,21 @@ async fn test_ring_convergence_60_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_60_nodes_hello -- --ignored"]
 async fn test_ring_convergence_60_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("60-node ring (hello)")
+        .test_name("ring_60n_hello")
         .node_count(60)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 60-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_60n_hello").await?;
+    run_convergence(config).await?;
     info!("60-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -536,17 +542,18 @@ async fn test_ring_convergence_60_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_70_nodes -- --ignored"]
 async fn test_ring_convergence_70_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("70-node ring (poll)")
+        .test_name("ring_70n_poll")
         .node_count(70)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 70-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_70n_poll").await?;
+    run_convergence(config).await?;
     info!("70-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -557,20 +564,21 @@ async fn test_ring_convergence_70_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_70_nodes_hello -- --ignored"]
 async fn test_ring_convergence_70_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("70-node ring (hello)")
+        .test_name("ring_70n_hello")
         .node_count(70)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 70-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_70n_hello").await?;
+    run_convergence(config).await?;
     info!("70-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -585,17 +593,18 @@ async fn test_ring_convergence_70_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_80_nodes -- --ignored"]
 async fn test_ring_convergence_80_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("80-node ring (poll)")
+        .test_name("ring_80n_poll")
         .node_count(80)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 80-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_80n_poll").await?;
+    run_convergence(config).await?;
     info!("80-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -606,20 +615,21 @@ async fn test_ring_convergence_80_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_80_nodes_hello -- --ignored"]
 async fn test_ring_convergence_80_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("80-node ring (hello)")
+        .test_name("ring_80n_hello")
         .node_count(80)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 80-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_80n_hello").await?;
+    run_convergence(config).await?;
     info!("80-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -634,17 +644,18 @@ async fn test_ring_convergence_80_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_90_nodes -- --ignored"]
 async fn test_ring_convergence_90_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("90-node ring (poll)")
+        .test_name("ring_90n_poll")
         .node_count(90)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 90-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_90n_poll").await?;
+    run_convergence(config).await?;
     info!("90-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -655,20 +666,21 @@ async fn test_ring_convergence_90_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_90_nodes_hello -- --ignored"]
 async fn test_ring_convergence_90_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("90-node ring (hello)")
+        .test_name("ring_90n_hello")
         .node_count(90)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 90-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_90n_hello").await?;
+    run_convergence(config).await?;
     info!("90-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }
@@ -688,17 +700,18 @@ async fn test_ring_convergence_90_nodes_hello() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_100_nodes -- --ignored"]
 async fn test_ring_convergence_100_nodes() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("100-node ring (poll)")
+        .test_name("ring_100n_poll")
         .node_count(100)
         .sync_mode(SyncMode::poll_default())
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 100-node ring test (poll mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_100n_poll").await?;
+    run_convergence(config).await?;
     info!("100-node ring convergence test (poll mode) completed successfully");
     Ok(())
 }
@@ -709,20 +722,21 @@ async fn test_ring_convergence_100_nodes() -> Result<()> {
 #[ignore = "Long-running test - run with: cargo test --test ring_convergence test_ring_convergence_100_nodes_hello -- --ignored"]
 async fn test_ring_convergence_100_nodes_hello() -> Result<()> {
     let config = TestConfig::builder()
-        .test_name("100-node ring (hello)")
+        .test_name("ring_100n_hello")
         .node_count(100)
         .sync_mode(SyncMode::Hello {
             debounce: Duration::from_millis(100),
             subscription_duration: Duration::from_secs(600),
         })
         .max_duration(Duration::from_secs(600))
+        .topology(Topology::Ring)
         .build()?;
 
     info!(
         node_count = config.node_count,
         "Starting 100-node ring test (hello mode)"
     );
-    run_convergence(config, Topology::Ring, "ring_100n_hello").await?;
+    run_convergence(config).await?;
     info!("100-node ring convergence test (hello mode) completed successfully");
     Ok(())
 }

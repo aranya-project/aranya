@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use tokio::fs;
 use tracing::{info, instrument};
 
-use crate::scale::{ConvergenceTracker, NodeCtx, TestConfig, TestCtx, Topology};
+use crate::scale::{ConvergenceTracker, NodeCtx, TestConfig, TestCtx};
 
 impl NodeCtx {
     /// Creates a new node context.
@@ -116,11 +116,7 @@ impl TestCtx {
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-004
     //# Node initialization MUST occur in parallel batches to avoid resource exhaustion.
     #[instrument(skip(config), fields(node_count = config.node_count))]
-    pub async fn new(
-        config: TestConfig,
-        topology: Option<Vec<Topology>>,
-        team_name: &str,
-    ) -> Result<Self> {
+    pub async fn new(config: TestConfig) -> Result<Self> {
         config.validate()?;
 
         let work_dir = TempDir::new().context("unable to create temp dir")?;
@@ -145,10 +141,11 @@ impl TestCtx {
                 "Initializing batch"
             );
 
+            let team_name = config.test_name.clone();
             let batch_futures: Vec<_> = (batch_start..batch_end)
                 .map(|i| {
                     let node_dir = work_dir.path().join(format!("node_{i:03}"));
-                    NodeCtx::new(i, node_dir, team_name)
+                    NodeCtx::new(i, node_dir, &team_name)
                 })
                 .collect();
 
@@ -194,7 +191,7 @@ impl TestCtx {
 
         Ok(Self {
             nodes,
-            topology,
+            topology: Some(vec![config.topology.clone()]),
             sync_mode: config.sync_mode.clone(),
             config: config.clone(),
             team_id: None,
