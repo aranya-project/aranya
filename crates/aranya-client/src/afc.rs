@@ -10,19 +10,20 @@ use std::{
 };
 
 use anyhow::Context;
-use aranya_daemon_api::{AfcChannelId, AfcLocalChannelId, AfcShmInfo, DaemonApiClient, CS};
+use aranya_daemon_api::{AfcLocalChannelId, AfcShmInfo, DaemonApiClient, CS};
 use aranya_fast_channels::{
     self as afc,
     shm::{Flag, Mode, ReadState},
     AfcState, Client as AfcClient,
 };
+use aranya_id::custom_id;
 use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
     error::{aranya_error, IpcError},
-    util::{rpc_context, ApiConv as _},
+    util::{rpc_context, ApiConv as _, ApiId},
     DeviceId, LabelId, Result, TeamId,
 };
 
@@ -59,19 +60,11 @@ impl From<Box<[u8]>> for CtrlMsg {
     }
 }
 
-/// A globally unique channel ID.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ChannelId {
-    #[doc(hidden)]
-    pub __id: AfcChannelId,
+custom_id! {
+    /// A globally unique channel ID.
+    pub struct ChannelId;
 }
-
-impl Display for ChannelId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.__id, f)
-    }
-}
+impl ApiId<aranya_daemon_api::AfcChannelId> for ChannelId {}
 
 /// AFC seal error.
 #[derive(Debug, thiserror::Error)]
@@ -189,9 +182,7 @@ impl Channels {
         let chan = SendChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id: ChannelId {
-                __id: info.channel_id,
-            },
+            channel_id: ChannelId::from_api(info.channel_id),
             local_channel_id: info.local_channel_id,
             label_id,
             peer_id,
@@ -217,9 +208,7 @@ impl Channels {
         Ok(ReceiveChannel {
             daemon: self.daemon.clone(),
             keys: self.keys.clone(),
-            channel_id: ChannelId {
-                __id: info.channel_id,
-            },
+            channel_id: ChannelId::from_api(info.channel_id),
             local_channel_id: info.local_channel_id,
             label_id: LabelId::from_api(info.label_id),
             peer_id: DeviceId::from_api(info.peer_id),
