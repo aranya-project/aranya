@@ -4,7 +4,7 @@ use std::{collections::HashMap, time::Duration};
 
 use tracing::{info, warn};
 
-use crate::scale::TestCtx;
+use crate::scale::ConvergenceTracker;
 
 /// Performance metrics from a convergence test run.
 #[derive(Clone, Debug)]
@@ -33,7 +33,7 @@ pub struct ConvergenceMetrics {
     pub total_convergence_time: Option<Duration>,
 }
 
-impl TestCtx {
+impl ConvergenceTracker {
     /// Calculates and reports performance metrics.
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-002
     //# The test MUST record the timestamp when each node achieves convergence.
@@ -48,16 +48,15 @@ impl TestCtx {
     //# - 99th percentile convergence time (p99)
     //# - Standard deviation of convergence times
     pub fn calculate_metrics(&self) -> Option<ConvergenceMetrics> {
-        let command_issued = self.tracker.timestamps.command_issued;
+        let command_issued = self.timestamps.command_issued;
 
         // Collect convergence times relative to command issuance
         // Exclude the source node from metrics (it already has the command)
         let mut times: Vec<Duration> = self
-            .tracker
             .node_status
             .iter()
             .enumerate()
-            .filter(|(i, s)| *i != self.tracker.source_node.value() && s.convergence_time.is_some())
+            .filter(|(i, s)| *i != self.source_node.value() && s.convergence_time.is_some())
             .map(|(_, s)| {
                 s.convergence_time
                     .expect("convergence_time must be set when filter passes")
@@ -94,13 +93,12 @@ impl TestCtx {
         let std_dev = Self::calculate_std_dev(&times, mean_time);
 
         let total_convergence_time = self
-            .tracker
             .timestamps
             .full_convergence
             .map(|fc| fc.duration_since(command_issued));
 
         Some(ConvergenceMetrics {
-            node_count: self.nodes.len(),
+            node_count: self.node_status.len(),
             converged_count: times.len(),
             min_time,
             max_time,
@@ -171,7 +169,7 @@ impl TestCtx {
     pub fn report_metrics(&self) {
         match self.calculate_metrics() {
             Some(metrics) => {
-                println!("\n=== Convergence Metrics [{}] ===", self.config.test_name);
+                println!("\n=== Convergence Metrics [{}] ===", self.test_name);
                 println!(
                     "Nodes: {} ({} converged)",
                     metrics.node_count, metrics.converged_count
@@ -206,8 +204,8 @@ impl TestCtx {
                 );
             }
             None => {
-                println!("\n=== Convergence Metrics [{}] ===", self.config.test_name);
-                println!("Nodes: {} (0 converged)", self.nodes.len());
+                println!("\n=== Convergence Metrics [{}] ===", self.test_name);
+                println!("Nodes: {} (0 converged)", self.node_status.len());
                 println!("================================\n");
             }
         }
@@ -227,13 +225,13 @@ impl TestCtx {
             _ => return,
         };
 
-        let command_issued = self.tracker.timestamps.command_issued;
+        let command_issued = self.timestamps.command_issued;
 
         //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#perf-006
         //# The CSV output MUST include one row per node with the following columns: node index, label assignment time (T0), node convergence time, and convergence duration (time from T0 to node convergence).
         let mut csv = String::from("node_index,t0_secs,convergence_time_secs,duration_secs\n");
 
-        for (i, status) in self.tracker.node_status.iter().enumerate() {
+        for (i, status) in self.node_status.iter().enumerate() {
             let (conv_time, duration) = match status.convergence_time {
                 Some(ct) => {
                     let dur = ct.duration_since(command_issued).as_secs_f64();

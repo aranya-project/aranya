@@ -41,7 +41,7 @@ async fn run_convergence(config: TestConfig) -> Result<()> {
 
     ctx.issue_test_command(NodeIndex(0)).await?;
     let result = ctx.wait_for_convergence().await;
-    ctx.report_metrics();
+    ctx.tracker.report_metrics();
     result
 }
 

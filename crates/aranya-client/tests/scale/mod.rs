@@ -341,16 +341,19 @@ pub struct ConvergenceTracker {
     pub timestamps: ConvergenceTimestamps,
     /// Index of the source node that issued the command.
     pub source_node: NodeIndex,
+    /// Human-readable test name (for metrics output).
+    pub test_name: String,
 }
 
 impl ConvergenceTracker {
     /// Creates a new tracker for the given number of nodes.
-    pub fn new(node_count: usize) -> Self {
+    pub fn new(node_count: usize, test_name: String) -> Self {
         Self {
             convergence_label: None,
             node_status: vec![ConvergenceStatus::default(); node_count],
             timestamps: ConvergenceTimestamps::default(),
             source_node: NodeIndex(0),
+            test_name,
         }
     }
 

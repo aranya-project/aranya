@@ -195,7 +195,7 @@ impl TestCtx {
             sync_mode: config.sync_mode.clone(),
             config: config.clone(),
             team_id: None,
-            tracker: ConvergenceTracker::new(config.node_count),
+            tracker: ConvergenceTracker::new(config.node_count, config.test_name.clone()),
             seed_ikm,
             _work_dir: work_dir,
         })
