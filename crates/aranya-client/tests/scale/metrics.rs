@@ -219,8 +219,6 @@ impl TestCtx {
         //# The CSV output MUST include one row per node with the following columns: node index, label assignment time (T0), node convergence time, and convergence duration (time from T0 to node convergence).
         let mut csv = String::from("node_index,t0_secs,convergence_time_secs,duration_secs\n");
 
-        let t0 = 0.0_f64; // T0 is the reference point (0)
-
         for (i, status) in self.tracker.node_status.iter().enumerate() {
             let (conv_time, duration) = match status.convergence_time {
                 Some(ct) => {
@@ -229,7 +227,7 @@ impl TestCtx {
                 }
                 None => ("N/A".to_string(), "N/A".to_string()),
             };
-            csv.push_str(&format!("{i},{t0:.6},{conv_time},{duration}\n"));
+            csv.push_str(&format!("{i},0.0,{conv_time},{duration}\n"));
         }
 
         match std::fs::write(&csv_path, &csv) {

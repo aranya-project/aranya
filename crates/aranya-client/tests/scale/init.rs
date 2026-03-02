@@ -116,12 +116,15 @@ impl TestCtx {
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-004
     //# Node initialization MUST occur in parallel batches to avoid resource exhaustion.
     #[instrument(skip(config), fields(node_count = config.node_count))]
-    pub async fn new(config: TestConfig, topology: Option<Vec<Topology>>) -> Result<Self> {
+    pub async fn new(
+        config: TestConfig,
+        topology: Option<Vec<Topology>>,
+        team_name: &str,
+    ) -> Result<Self> {
         config.validate()?;
 
         let work_dir = TempDir::new().context("unable to create temp dir")?;
         let mut nodes = Vec::with_capacity(config.node_count);
-        let team_name = "scale_test";
 
         info!(
             node_count = config.node_count,
