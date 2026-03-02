@@ -423,7 +423,7 @@ impl Api {
     /// This should be called at the start of each API handler to ensure trace ID
     /// is available throughout the request's execution.
     fn setup_trace_context(&self, ctx: &context::Context, method: &'static str) -> TraceId {
-        let trace_id = trace::extract_trace_id(ctx);
+        let trace_id = ctx.trace_context.trace_id;
         trace::record_current_span_trace_id(trace_id);
         info!(rpc.method = method, rpc.trace_id = %trace_id, "RPC: ReceiveRequest");
         trace_id
