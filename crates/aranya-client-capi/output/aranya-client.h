@@ -2330,7 +2330,10 @@ AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
  *
  * Note: Role ranks cannot be changed after creation. This maintains
  * the invariant that `role_rank >= device_rank` for all devices
- * assigned to the role.
+ * assigned to the role. To effectively change a role's rank, create
+ * a new role with matching permissions at the desired rank, assign
+ * the new role to the devices that had the old role, then delete
+ * the old role.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2363,7 +2366,10 @@ AranyaError aranya_change_rank(const struct AranyaClient *client,
  *
  * Note: Role ranks cannot be changed after creation. This maintains
  * the invariant that `role_rank >= device_rank` for all devices
- * assigned to the role.
+ * assigned to the role. To effectively change a role's rank, create
+ * a new role with matching permissions at the desired rank, assign
+ * the new role to the devices that had the old role, then delete
+ * the old role.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
