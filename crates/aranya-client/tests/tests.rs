@@ -12,12 +12,7 @@
 
 mod common;
 
-use std::{
-    io::Write,
-    ptr,
-    sync::{Arc, Mutex, OnceLock},
-    time::Duration,
-};
+use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
@@ -26,83 +21,13 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::text;
-use serde_json::Value;
 use serial_test::serial;
 use tracing::{debug, info};
-use tracing_subscriber::fmt::MakeWriter;
 
-use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
-
-fn find_string_field(v: &Value, key: &str) -> Option<String> {
-    match v {
-        Value::Object(map) => {
-            if let Some(value) = map.get(key).and_then(Value::as_str) {
-                return Some(value.to_owned());
-            }
-            for value in map.values() {
-                if let Some(found) = find_string_field(value, key) {
-                    return Some(found);
-                }
-            }
-            None
-        }
-        Value::Array(values) => values.iter().find_map(|value| find_string_field(value, key)),
-        _ => None,
-    }
-}
-
-#[derive(Clone)]
-struct SharedWriter {
-    buffer: Arc<Mutex<Vec<u8>>>,
-}
-
-impl<'a> MakeWriter<'a> for SharedWriter {
-    type Writer = SharedGuard;
-
-    fn make_writer(&'a self) -> Self::Writer {
-        SharedGuard {
-            buffer: self.buffer.clone(),
-        }
-    }
-}
-
-struct SharedGuard {
-    buffer: Arc<Mutex<Vec<u8>>>,
-}
-
-impl Write for SharedGuard {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.buffer.lock().expect("poisoned").extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-static LOG_BUFFER: OnceLock<Arc<Mutex<Vec<u8>>>> = OnceLock::new();
-
-fn init_global_log_capture() -> (Arc<Mutex<Vec<u8>>>, bool) {
-    let buffer = LOG_BUFFER
-        .get_or_init(|| Arc::new(Mutex::new(Vec::<u8>::new())))
-        .clone();
-
-    buffer.lock().expect("poisoned").clear();
-
-    let writer = SharedWriter {
-        buffer: buffer.clone(),
-    };
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(writer)
-        .with_ansi(false)
-        .with_max_level(tracing::Level::TRACE)
-        .json()
-        .finish();
-
-    let installed = tracing::subscriber::set_global_default(subscriber).is_ok();
-    (buffer, installed)
-}
+use crate::common::{
+    find_rpc_trace_ids_for_api_name, init_global_json_capture, sleep, DeviceCtx, DevicesCtx,
+    SLEEP_INTERVAL,
+};
 
 /// Tests getting keybundle and device ID.
 #[tokio::test(flavor = "multi_thread")]
@@ -143,42 +68,15 @@ async fn test_client_rand() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_basic_rpc_operations() -> Result<()> {
-    let (logs, installed) = init_global_log_capture();
+    let (logs, installed) = init_global_json_capture();
 
     let work_dir = tempfile::tempdir()?;
     // DeviceCtx::new performs client<->daemon connect, which includes a version() RPC.
     let _owner = DeviceCtx::new("trace-test", "owner", work_dir.path().join("owner")).await?;
 
     let captured = String::from_utf8_lossy(&logs.lock().expect("poisoned")).into_owned();
-    let mut daemon_trace_id = None;
-    let mut client_trace_id = None;
-
-    for line in captured.lines() {
-        let Ok(json) = serde_json::from_str::<Value>(line) else {
-            continue;
-        };
-
-        let Some(trace_id) = find_string_field(&json, "rpc.trace_id") else {
-            continue;
-        };
-        let Some(otel_name) = find_string_field(&json, "otel.name") else {
-            continue;
-        };
-        if otel_name != "DaemonApi.version" {
-            continue;
-        }
-        let otel_kind = find_string_field(&json, "otel.kind");
-
-        if daemon_trace_id.is_none() && otel_kind.as_deref() == Some("server") {
-            daemon_trace_id = Some(trace_id.clone());
-        }
-        if client_trace_id.is_none() && otel_kind.as_deref() == Some("client") {
-            client_trace_id = Some(trace_id);
-        }
-        if daemon_trace_id.is_some() && client_trace_id.is_some() {
-            break;
-        }
-    }
+    let (daemon_trace_id, client_trace_id) =
+        find_rpc_trace_ids_for_api_name(&captured, "DaemonApi.version");
     match (daemon_trace_id, client_trace_id) {
         (Some(daemon_trace_id), Some(client_trace_id)) => {
             eprintln!(
