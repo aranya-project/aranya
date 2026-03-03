@@ -1256,15 +1256,6 @@ pub fn hello_subscription_config_builder_set_periodic_interval(
     cfg.periodic_interval(interval);
 }
 
-// TODO: aranya-core#582 use the policy-generated constant directly
-// once policy globals are exposed in the generated interface.
-/// Number of roles created by [`setup_default_roles`] (admin, operator, member).
-/// The owner role is created at team creation time and is not included.
-// Note: cbindgen copies this constant into the generated code where it is
-// unused, producing a dead_code warning.
-#[allow(dead_code)]
-const NUM_DEFAULT_ROLES: usize = 3;
-
 /// Setup default roles on team.
 ///
 /// This sets up the following roles with default permissions as
@@ -1295,6 +1286,13 @@ pub unsafe fn setup_default_roles(
     roles_out: *mut MaybeUninit<Role>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    // TODO: aranya-core#582 use the policy-generated constant directly
+    // once policy globals are exposed in the generated interface.
+    //
+    // Number of roles created by setup_default_roles (admin, operator, member).
+    // The owner role is created at team creation time and is not included.
+    const NUM_DEFAULT_ROLES: usize = 3;
+
     if *roles_len < NUM_DEFAULT_ROLES {
         *roles_len = NUM_DEFAULT_ROLES;
         return Err(imp::Error::BufferTooSmall);
