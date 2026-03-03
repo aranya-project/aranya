@@ -21,13 +21,16 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::text;
-use test_log::test;
+use serial_test::serial;
 use tracing::{debug, info};
 
-use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
+use crate::common::{
+    find_rpc_trace_ids_for_api_name, init_global_json_capture, sleep, DeviceCtx, DevicesCtx,
+    SLEEP_INTERVAL,
+};
 
 /// Tests getting keybundle and device ID.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_keybundle_device_id() -> Result<()> {
     let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
 
@@ -46,7 +49,7 @@ async fn test_get_keybundle_device_id() -> Result<()> {
 }
 
 /// Tests generating random numbers with the aranya client.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_client_rand() -> Result<()> {
     let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
 
@@ -61,8 +64,49 @@ async fn test_client_rand() -> Result<()> {
     Ok(())
 }
 
+// Trace-correlation test for client<->daemon RPC metadata propagation.
+#[tokio::test]
+#[serial]
+async fn test_basic_rpc_operations() -> Result<()> {
+    let (logs, installed) = init_global_json_capture();
+
+    let work_dir = tempfile::tempdir()?;
+    // DeviceCtx::new performs client<->daemon connect, which includes a version() RPC.
+    let _owner = DeviceCtx::new("trace-test", "owner", work_dir.path().join("owner")).await?;
+
+    let captured = String::from_utf8_lossy(&logs.lock().expect("poisoned")).into_owned();
+    let (daemon_trace_id, client_trace_id) =
+        find_rpc_trace_ids_for_api_name(&captured, "DaemonApi.version");
+    match (daemon_trace_id, client_trace_id) {
+        (Some(daemon_trace_id), Some(client_trace_id)) => {
+            assert_eq!(
+                client_trace_id, daemon_trace_id,
+                "client and daemon trace ids should match for version RPC"
+            );
+        }
+        (None, None) => {
+            anyhow::bail!(
+                "trace id capture failed: both daemon and client trace IDs missing (installed_global_subscriber={}, captured_bytes={})",
+                installed,
+                captured.len()
+            );
+        }
+        (daemon_trace_id, client_trace_id) => {
+            anyhow::bail!(
+                "trace id capture incomplete: installed_global_subscriber={}, daemon_found={}, client_found={}, captured_bytes={}",
+                installed,
+                daemon_trace_id.is_some(),
+                client_trace_id.is_some(),
+                captured.len()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_sync_now() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_sync_now").await?;
@@ -124,7 +168,7 @@ async fn test_sync_now() -> Result<()> {
 }
 
 /// Tests adding/removing sync peers.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_add_remove_sync_peers() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_remove_sync_peers").await?;
     let team_id = devices
@@ -204,7 +248,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 /// Tests creating/assigning/revoking a role.
 /// Verifies query indicates correct role assignment status.
 /// Verifies device is only allowed to perform operation when role with permission is assigned to it.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_role_create_assign_revoke() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_role_create_assign_revoke").await?;
@@ -341,7 +385,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 }
 
 /// Tests that a role can be changed after it has been assigned to a device.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_role_change() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_role_change").await?;
@@ -368,7 +412,7 @@ async fn test_role_change() -> Result<()> {
 }
 
 /// Tests that devices can be added to the team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_add_devices() -> Result<()> {
     let mut team = DevicesCtx::new("test_add_devices").await?;
 
@@ -439,7 +483,7 @@ async fn test_add_devices() -> Result<()> {
     Ok(())
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
     let mut devices =
         DevicesCtx::new("test_add_device_with_initial_role_requires_delegation").await?;
@@ -474,7 +518,7 @@ async fn test_add_device_with_initial_role_requires_delegation() -> Result<()> {
 }
 
 /// Tests that devices can be removed from the team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_remove_devices() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_remove_devices").await?;
@@ -522,7 +566,7 @@ async fn test_remove_devices() -> Result<()> {
 }
 
 /// Tests functionality to make sure that we can query the fact database for various things.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_query_functions() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_query_functions").await?;
@@ -627,7 +671,7 @@ async fn test_query_functions() -> Result<()> {
 
 /// Tests add_team() by demonstrating that syncing can only occur after
 /// a peer calls the add_team() API
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_add_team() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_add_team").await?;
@@ -716,7 +760,7 @@ async fn test_add_team() -> Result<()> {
 }
 
 /// Tests that devices can be removed from the team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_remove_team() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_remove_team").await?;
@@ -777,7 +821,7 @@ async fn test_remove_team() -> Result<()> {
 }
 
 /// Tests that a device can create multiple teams and receive sync requests for each team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_multi_team_sync").await?;
@@ -944,7 +988,7 @@ async fn test_multi_team_sync() -> Result<()> {
 
 /// Tests hello subscription functionality by demonstrating that devices can subscribe
 /// to hello notifications from peers and automatically sync when receiving notifications.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "preview")]
 async fn test_hello_subscription() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -1097,7 +1141,7 @@ async fn test_hello_subscription() -> Result<()> {
 /// Tests that schedule_delay parameter in sync_hello_subscribe works correctly.
 /// Verifies that with high schedule_delay, only graph-change-triggered notifications occur,
 /// while with low schedule_delay, scheduled periodic sends pick up all pending changes.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "preview")]
 async fn test_hello_subscription_schedule_delay() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -1302,7 +1346,7 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
 }
 
 /// Enforces that default roles can only be seeded once per team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_setup_default_roles_single_use() -> Result<()> {
     let mut devices = DevicesCtx::new("test_setup_default_roles_single_use").await?;
 
@@ -1323,7 +1367,7 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
 }
 
 /// Verifies that the managing role supplied to setup_default_roles must exist.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
     let mut devices = DevicesCtx::new("test_setup_default_roles_rejects_unknown_owner").await?;
 
@@ -1341,7 +1385,7 @@ async fn test_setup_default_roles_rejects_unknown_owner() -> Result<()> {
 }
 
 /// Tests that role creation works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_create_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role").await?;
 
@@ -1391,7 +1435,7 @@ async fn test_create_role() -> Result<()> {
 }
 
 /// Tests that role creation works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_add_perm_to_created_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
@@ -1433,7 +1477,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
 }
 
 /// Tests that privilege escalation attempt is rejected.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_privilege_escalation_rejected() -> Result<()> {
     let team_name = "test_privilege_escalation_rejected";
     let mut devices = DevicesCtx::new(team_name).await?;
@@ -1506,7 +1550,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 }
 
 /// Tests that role creation works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_remove_perm_from_default_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
@@ -1543,7 +1587,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
 }
 
 /// Tests that role deletion works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_delete_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_role").await?;
 
@@ -1562,7 +1606,7 @@ async fn test_delete_role() -> Result<()> {
 }
 
 /// Prevents devices from assigning roles to themselves.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_assign_role_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
 
@@ -1583,7 +1627,7 @@ async fn test_assign_role_self_rejected() -> Result<()> {
 }
 
 /// Prevents the sole owner from revoking its own owner role.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
 
@@ -1604,7 +1648,7 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
 }
 
 /// Requires role management delegation before assigning a role.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_assign_role_requires_delegation() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_requires_delegation").await?;
 
@@ -1637,7 +1681,7 @@ async fn test_assign_role_requires_delegation() -> Result<()> {
 }
 
 /// Role management changes require the caller to own the role.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_assign_role_management_permission_requires_ownership() -> Result<()> {
     let mut devices =
         DevicesCtx::new("test_assign_role_management_permission_requires_ownership").await?;
@@ -1669,7 +1713,7 @@ async fn test_assign_role_management_permission_requires_ownership() -> Result<(
 }
 
 /// Test that role management permissions can be assigned and revoked correctly.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_and_revoke_role_management_permission").await?;
 
@@ -1739,7 +1783,7 @@ async fn test_assign_and_revoke_role_management_permission() -> Result<()> {
 }
 
 /// Confirms that role can no longer manage another role after it is removed as a role owner.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_owner_removed_permissions_revoked").await?;
 
@@ -1807,7 +1851,7 @@ async fn test_role_owner_removed_permissions_revoked() -> Result<()> {
 }
 
 /// Test that a role cannot be assigned if a role is already assigned.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_cannot_assign_role_twice() -> Result<()> {
     let mut devices = DevicesCtx::new("test_cannot_assign_role_twice").await?;
 
@@ -1828,7 +1872,7 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
 }
 
 /// Deleting a label requires `DeleteLabel` and label management rights.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_delete_label_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_label_requires_permission").await?;
 
@@ -1858,7 +1902,7 @@ async fn test_delete_label_requires_permission() -> Result<()> {
 }
 
 /// Devices cannot assign labels to themselves.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
 
@@ -1883,7 +1927,7 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
 }
 
 /// Ensures the last owner cannot be removed by another device.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     let mut devices = DevicesCtx::new("test_admin_cannot_remove_last_owner").await?;
 
@@ -1903,7 +1947,7 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
 }
 
 /// Confirms that managing-role changes require an explicit permission grant.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_role_owner_change_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_owner_change_requires_permission").await?;
 
@@ -1930,7 +1974,7 @@ async fn test_role_owner_change_requires_permission() -> Result<()> {
 }
 
 /// Duplicate role-owner entries must be rejected before attempting storage writes.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_role_owner_duplicate_rejected").await?;
 
@@ -1952,7 +1996,7 @@ async fn test_add_role_owner_duplicate_rejected() -> Result<()> {
 }
 
 /// Removing a non-existent owning role should produce a policy failure, not a runtime error.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_remove_role_owner_missing_entry() -> Result<()> {
     let mut devices = DevicesCtx::new("test_remove_role_owner_missing_entry").await?;
 
@@ -1970,7 +2014,7 @@ async fn test_remove_role_owner_missing_entry() -> Result<()> {
 }
 
 /// Tests that role_owners returns the correct owning roles.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_role_owners_query() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_owners_query").await?;
 
