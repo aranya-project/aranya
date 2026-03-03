@@ -9,7 +9,7 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        create_ctx, ToObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
+        create_ctx, object::ToObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
         Permission, PublicKeyBundle, Rank, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,

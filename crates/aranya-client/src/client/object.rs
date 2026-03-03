@@ -17,7 +17,7 @@ impl ApiId<api::ObjectId> for ObjectId {}
 /// Marker trait for ID types that can be converted to [`ObjectId`].
 ///
 /// Implemented for [`RoleId`], [`DeviceId`], [`LabelId`], and [`TeamId`].
-pub trait IsObjectId: sealed::Sealed {}
+pub(crate) trait IsObjectId {}
 impl IsObjectId for RoleId {}
 impl IsObjectId for DeviceId {}
 impl IsObjectId for LabelId {}
@@ -29,7 +29,7 @@ impl IsObjectId for ObjectId {}
 /// Roles, devices, labels, and teams all have unique Aranya IDs
 /// that can be treated as generic object IDs for rank queries and
 /// other operations that accept any object type.
-pub trait ToObjectId: sealed::Sealed + fmt::Debug {
+pub(crate) trait ToObjectId: fmt::Debug {
     /// Converts this ID into an [`ObjectId`].
     fn to_object_id(self) -> ObjectId;
 }
@@ -42,18 +42,6 @@ where
     fn to_object_id(self) -> ObjectId {
         ObjectId::transmute(self)
     }
-}
-
-mod sealed {
-    use super::{DeviceId, LabelId, ObjectId, RoleId, TeamId};
-
-    pub trait Sealed {}
-
-    impl Sealed for RoleId {}
-    impl Sealed for DeviceId {}
-    impl Sealed for LabelId {}
-    impl Sealed for TeamId {}
-    impl Sealed for ObjectId {}
 }
 
 /// A numerical rank used for authorization in the rank-based hierarchy.
