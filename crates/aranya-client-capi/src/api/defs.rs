@@ -349,7 +349,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 128, align = 8)]
+#[aranya_capi_core::opaque(size = 112, align = 8)]
 pub type Role = Safe<aranya_client::Role>;
 
 /// Uniquely identifies a [`Role`].

@@ -386,7 +386,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaRole {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[128];
+    uint8_t __for_size_only[112];
 } AranyaRole;
 
 /**
