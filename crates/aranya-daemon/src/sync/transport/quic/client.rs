@@ -1,87 +1,81 @@
-#[cfg(feature = "preview")]
-use std::time::Duration;
-use std::{collections::HashMap, sync::Arc};
+//! QUIC client for syncing Aranya graph commands with peers.
+
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context as _;
 use aranya_crypto::Rng;
-use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use aranya_runtime::{
     Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
 };
-use aranya_util::{error::ReportExt as _, rustls::SkipServerVerification};
-use buggy::BugExt as _;
-use bytes::Bytes;
-use futures_util::AsyncReadExt as _;
-use s2n_quic::{
-    client::Connect,
-    connection,
-    provider::tls::rustls::{self as rustls_provider, rustls::ClientConfig},
-    stream::{BidirectionalStream, ReceiveStream, SendStream},
-};
+use aranya_util::error::ReportExt as _;
+use quinn::{Endpoint, RecvStream, SendStream};
 use tokio::sync::mpsc;
 use tokio_util::time::DelayQueue;
-use tracing::{error, instrument, trace};
+use tracing::{debug, error, instrument, trace};
 
-use super::{PskStore, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
+use super::{ConnectionKey, Error, SharedConnectionMap};
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic, Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer,
+        transport::SyncState, Callback, Error as SyncError, GraphId, Result, SyncManager, SyncPeer,
         SyncResponse,
     },
 };
 
+/// Finds a resolved address that matches the IP version of the local endpoint.
+///
+/// QUIC connections require both endpoints to use the same IP version - an IPv4-bound
+/// endpoint cannot connect to an IPv6 address and vice versa. When a hostname resolves
+/// to multiple addresses (both A and AAAA records), we must select one that matches
+/// our local endpoint's IP version.
+///
+/// # Arguments
+/// * `addrs` - List of resolved socket addresses from DNS lookup
+/// * `local_addr` - The local endpoint's bound address
+///
+/// # Returns
+/// * `Some(SocketAddr)` - A resolved address matching the local IP version
+/// * `None` - No matching address found
+fn find_matching_ip_version(
+    addrs: impl IntoIterator<Item = std::net::SocketAddr>,
+    local_addr: std::net::SocketAddr,
+) -> Option<std::net::SocketAddr> {
+    if local_addr.is_ipv4() {
+        addrs.into_iter().find(|a| a.is_ipv4())
+    } else {
+        addrs.into_iter().find(|a| a.is_ipv6())
+    }
+}
+
 /// QUIC syncer state used for sending sync requests and processing sync responses
 #[derive(Debug)]
 pub(crate) struct QuicState {
-    /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
-    client: s2n_quic::Client,
+    /// QUIC endpoint for both client and server operations.
+    endpoint: Endpoint,
+    /// Client TLS configuration for outbound connections.
+    client_config: quinn::ClientConfig,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
     conns: SharedConnectionMap,
-    /// PSK store shared between the daemon API server and QUIC syncer client and server.
-    /// This store is modified by [`crate::api::DaemonApiServer`].
-    store: Arc<PskStore>,
 }
 
 impl QuicState {
-    /// Get a reference to the PSK store
-    #[cfg(feature = "preview")]
-    pub(crate) fn store(&self) -> &Arc<PskStore> {
-        &self.store
-    }
-
-    /// Creates a new instance
-    fn new(
-        psk_store: Arc<PskStore>,
+    /// Creates a new instance using a shared endpoint.
+    ///
+    /// The endpoint is created by [`Server::new()`] and shared with the SyncManager.
+    /// Using a single endpoint ensures that outbound connections use the server's
+    /// bound address as the source, enabling bidirectional connection reuse.
+    pub(super) fn new(
+        endpoint: Endpoint,
+        client_config: quinn::ClientConfig,
         conns: SharedConnectionMap,
-        client_addr: Addr,
-    ) -> Result<Self> {
-        // Create client config (INSECURE: skips server cert verification)
-        let mut client_config = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(SkipServerVerification::new())
-            .with_no_client_auth();
-        client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        client_config.preshared_keys = psk_store.clone(); // Pass the Arc<ClientPresharedKeys>
-
-        // Client builder doesn't support adding preshared keys
-        #[allow(deprecated)]
-        let provider = rustls_provider::Client::new(client_config);
-
-        let client = s2n_quic::Client::builder()
-            .with_tls(provider)?
-            .with_io((client_addr.host(), client_addr.port()))
-            .assume("can set quic client address")?
-            .start()
-            .map_err(quic::Error::ClientStart)?;
-
-        Ok(Self {
-            client,
+    ) -> Self {
+        Self {
+            endpoint,
+            client_config,
             conns,
-            store: psk_store,
-        })
+        }
     }
 }
 
@@ -99,18 +93,10 @@ where
         peer: SyncPeer,
         sink: &mut S,
     ) -> Result<usize> {
-        // Sets the active team before starting a QUIC connection
-        syncer
-            .state
-            .store
-            .set_team(TeamId::transmute(peer.graph_id));
-
-        let stream = syncer
+        let (mut send, mut recv) = syncer
             .connect(peer)
             .await
-            .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
-        // TODO: spawn a task for send/recv?
-        let (mut recv, mut send) = stream.split();
+            .inspect_err(|err| error!(error = %err.report(), "Could not create connection"))?;
 
         let mut sync_requester = SyncRequester::new(peer.graph_id, Rng);
 
@@ -118,13 +104,13 @@ where
         syncer
             .send_sync_request(&mut send, &mut sync_requester, peer)
             .await
-            .map_err(|e| Error::SendSyncRequest(e.into()))?;
+            .map_err(|e| SyncError::SendSyncRequest(e.into()))?;
 
         // receive sync response.
         let cmd_count = syncer
             .receive_sync_response(&mut recv, &mut sync_requester, sink, peer)
             .await
-            .map_err(|e| Error::ReceiveSyncResponse(e.into()))?;
+            .map_err(|e| SyncError::ReceiveSyncResponse(e.into()))?;
 
         Ok(cmd_count)
     }
@@ -139,10 +125,6 @@ where
         duration: Duration,
         schedule_delay: Duration,
     ) -> Result<()> {
-        syncer
-            .state
-            .store()
-            .set_team(TeamId::transmute(peer.graph_id));
         syncer
             .send_sync_hello_subscribe_request(
                 peer,
@@ -160,10 +142,6 @@ where
         syncer: &mut SyncManager<Self, PS, SP, EF>,
         peer: SyncPeer,
     ) -> Result<()> {
-        syncer
-            .state
-            .store()
-            .set_team(TeamId::transmute(peer.graph_id));
         syncer.send_hello_unsubscribe_request(peer).await
     }
 
@@ -185,29 +163,30 @@ where
     SP: StorageProvider,
 {
     /// Creates a new [`SyncManager`].
+    ///
+    /// The `endpoint` and `client_config` should come from [`Server::new()`] to ensure
+    /// that outbound connections use the same endpoint as the server, enabling
+    /// bidirectional connection reuse.
     pub(crate) fn new(
         client: Client<PS, SP>,
         send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
-        psk_store: Arc<PskStore>,
-        (server_addr, client_addr): (Addr, Addr),
         recv: mpsc::Receiver<Callback>,
         conns: SharedConnectionMap,
-    ) -> Result<Self> {
-        let state = QuicState::new(psk_store, conns.clone(), client_addr)?;
+        endpoint: Endpoint,
+        client_config: quinn::ClientConfig,
+    ) -> Self {
+        let state = QuicState::new(endpoint, client_config, conns);
 
-        let return_port = Bytes::copy_from_slice(&server_addr.port().to_be_bytes());
-
-        Ok(Self {
+        Self {
             client,
             peers: HashMap::new(),
             recv,
             queue: DelayQueue::new(),
             send_effects,
             state,
-            return_port,
             #[cfg(feature = "preview")]
             hello_tasks: tokio::task::JoinSet::new(),
-        })
+        }
     }
 
     /// Establishes a QUIC connection to a peer and opens a bidirectional stream.
@@ -220,61 +199,73 @@ where
     /// * `peer` - The unique identifier of the peer to connect to
     ///
     /// # Returns
-    /// * `Ok(BidirectionalStream)` if the connection and stream were established successfully
+    /// * `Ok((SendStream, RecvStream))` if the connection and stream were established successfully
     /// * `Err(SyncError)` if there was an error connecting or opening the stream
     #[instrument(skip_all)]
-    pub(crate) async fn connect(&mut self, peer: SyncPeer) -> Result<BidirectionalStream> {
+    pub(crate) async fn connect(&mut self, peer: SyncPeer) -> Result<(SendStream, RecvStream)> {
         trace!("client connecting to QUIC sync server");
-        // Check if there is an existing connection with the peer.
-        // If not, create a new connection.
 
-        let addr = tokio::net::lookup_host(peer.addr.to_socket_addrs())
+        let endpoint = &self.state.endpoint;
+
+        let local_addr = endpoint
+            .local_addr()
+            .map_err(|e| Error::Endpoint(format!("unable to get local address: {e}")))?;
+
+        let addrs = tokio::net::lookup_host(peer.addr.to_socket_addrs())
             .await
-            .context("DNS lookup on for peer address")?
-            .next()
-            .context("could not resolve peer address")?;
+            .context("DNS lookup for peer address")?;
 
-        let client = &self.state.client;
+        let addr = find_matching_ip_version(addrs, local_addr)
+            .context("no resolved address matches local endpoint IP version")?;
 
-        let mut handle = self
+        let key = ConnectionKey::new(addr);
+        let client_config = self.state.client_config.clone();
+        let peer_host = peer.addr.host().to_string();
+
+        let conn = self
             .state
             .conns
-            .get_or_try_insert_with(peer, async || {
-                let mut conn = client
-                    .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                    .await?;
-                conn.keep_alive(true)?;
-                conn.open_send_stream()
-                    .await?
-                    .send(self.return_port.clone())
-                    .await?;
-                Ok(conn)
+            .get_or_try_insert_with(key, async || {
+                let connecting = endpoint
+                    .connect_with(client_config, addr, &peer_host)
+                    .map_err(Error::from)?;
+
+                // Add timeout to prevent hanging on unresponsive peers or network issues.
+                // Quinn does not provide a built-in handshake timeout, so without this
+                // the connection attempt could hang indefinitely if the peer is unreachable
+                // or not responding. Note: mTLS verification failures fail fast and don't
+                // require this timeout.
+                let conn = tokio::time::timeout(Duration::from_secs(5), connecting)
+                    .await
+                    .map_err(|_| Error::ConnectionTimeout)?
+                    .map_err(Error::from)?;
+
+                debug!(%addr, "established new QUIC connection to peer");
+                Ok::<_, Error>(conn)
             })
             .await?;
 
         trace!("client connected to QUIC sync server");
 
-        let open_stream_res = handle
-            .open_bidirectional_stream()
+        let (send, recv) = conn
+            .open_bi()
             .await
-            .inspect_err(|e| error!(error = %e.report(), "unable to open bidi stream"));
-        let stream = match open_stream_res {
-            Ok(stream) => stream,
-            // Retry for these errors?
-            Err(e @ connection::Error::StatelessReset { .. })
-            | Err(e @ connection::Error::StreamIdExhausted { .. })
-            | Err(e @ connection::Error::MaxHandshakeDurationExceeded { .. }) => {
-                return Err(Error::QuicSync(e.into()));
-            }
-            // Other errors means the stream has closed
-            Err(e) => {
-                self.state.conns.remove(peer, handle).await;
-                return Err(Error::QuicSync(e.into()));
-            }
-        };
+            .inspect_err(|err| error!(error = %err.report(), "unable to open bidi stream"))
+            .map_err(|e| {
+                // If the stream fails to open, the connection may be closed
+                if conn.close_reason().is_some() {
+                    // Remove the closed connection
+                    let mut conns = self.state.conns.clone();
+                    let conn_clone = conn.clone();
+                    tokio::spawn(async move {
+                        conns.remove(key, conn_clone).await;
+                    });
+                }
+                SyncError::QuicSync(Error::Connection(e))
+            })?;
 
         trace!("client opened bidi stream with QUIC sync server");
-        Ok(stream)
+        Ok((send, recv))
     }
 
     /// Sends a sync request to a peer over an established QUIC stream.
@@ -290,7 +281,7 @@ where
     /// # Returns
     /// * `Ok(())` if the sync request was sent successfully
     /// * `Err(SyncError)` if there was an error generating or sending the request
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(peer = ?peer))]
     async fn send_sync_request(
         &self,
         send: &mut SendStream,
@@ -312,22 +303,24 @@ where
         };
         send_buf.truncate(len);
 
-        send.send(Bytes::from(send_buf))
-            .await
-            .map_err(quic::Error::from)?;
-        send.close().await.map_err(quic::Error::from)?;
+        send.write_all(&send_buf).await.map_err(Error::Write)?;
+        send.finish().map_err(|_| {
+            Error::Write(quinn::WriteError::ConnectionLost(
+                quinn::ConnectionError::LocallyClosed,
+            ))
+        })?;
         trace!("sent sync request");
 
         Ok(())
     }
 
-    #[instrument(skip_all)]
     /// Receives and processes a sync response from the server.
     ///
     /// Returns the number of commands that were received and successfully processed.
+    #[instrument(skip_all, fields(peer = ?peer))]
     async fn receive_sync_response<S>(
         &self,
-        recv: &mut ReceiveStream,
+        recv: &mut RecvStream,
         syncer: &mut SyncRequester,
         sink: &mut S,
         peer: SyncPeer,
@@ -337,10 +330,10 @@ where
     {
         trace!("client receiving sync response from QUIC sync server");
 
-        let mut recv_buf = Vec::new();
-        recv.read_to_end(&mut recv_buf)
+        let recv_buf = recv
+            .read_to_end(MAX_SYNC_MESSAGE_SIZE)
             .await
-            .context("failed to read sync response")?;
+            .map_err(Error::Read)?;
         trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.

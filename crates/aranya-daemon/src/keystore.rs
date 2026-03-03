@@ -100,14 +100,6 @@ impl_typed_keystore! {
     pub struct AranyaStore;
 }
 
-impl_typed_keystore! {
-    /// The local keystore.
-    ///
-    /// The local keystore contains key material for the daemon.
-    /// E.g., its API key.
-    pub(crate) struct LocalStore;
-}
-
 /// A vacant entry.
 #[derive(Debug)]
 pub struct VacantEntry<E>(E);

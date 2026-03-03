@@ -16,9 +16,8 @@ use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{ChanOp, Permission},
-    config::{CreateTeamConfig, HelloSubscriptionConfig, SyncPeerConfig},
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, Rank,
+    client::{ChanOp, Permission, Rank},
+    config::{AddTeamConfig, CreateTeamConfig, HelloSubscriptionConfig, SyncPeerConfig},
 };
 use aranya_daemon_api::text;
 use test_log::test;
@@ -238,11 +237,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     let owner = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(CreateTeamConfig::default())
         .await
         .expect("expected to create team");
     let team_id = owner.team_id();
@@ -287,22 +282,10 @@ async fn test_role_create_assign_revoke() -> Result<()> {
         .await?;
 
     // Add team to admin device.
-    let admin_seed = owner
-        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
-        .await?;
     devices
         .admin
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
+        .add_team(AddTeamConfig::builder().team_id(team_id).build()?)
         .await?;
 
     // Admin sync with owner.
@@ -754,11 +737,16 @@ async fn test_query_functions() -> Result<()> {
 }
 
 /// Tests add_team() by demonstrating that syncing can only occur after
-/// a peer calls the add_team() API
+/// a peer calls the add_team() API.
+///
+/// This test uses deprecated APIs to verify backward compatibility.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_add_team() -> Result<()> {
+#[expect(deprecated)]
+async fn test_create_and_add_team() -> Result<()> {
+    use aranya_client::{AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig};
+
     // Set up our team context so we can run the test.
-    let devices = DevicesCtx::new("test_add_team").await?;
+    let devices = DevicesCtx::new("test_create_and_add_team").await?;
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
@@ -867,7 +855,7 @@ async fn test_add_team() -> Result<()> {
             .context("Creating a label should not fail here!")?;
     }
 
-    return Ok(());
+    Ok(())
 }
 
 /// Tests that devices can be removed from the team.
@@ -963,29 +951,21 @@ async fn test_multi_team_sync() -> Result<()> {
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
 
-    // Create the initial team, and get our TeamId.
+    // Create the initial team.
     let team1 = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(CreateTeamConfig::default())
         .await
         .expect("expected to create team1");
     let team_id1 = team1.team_id();
     info!(?team_id1);
 
-    // Create the second team, and get our TeamId.
+    // Create the second team.
     let team2 = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(CreateTeamConfig::default())
         .await
         .expect("expected to create team2");
     let team_id2 = team2.team_id();
@@ -997,7 +977,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Set up roles for team2
     let roles2 = devices.setup_default_roles(team_id2).await?;
 
-    // Add the admin as a new device.
+    // Add the admin as a new device to team1.
     info!("adding admin to team1");
     let admin_role_rank_t1 = devices
         .owner
@@ -1019,7 +999,7 @@ async fn test_multi_team_sync() -> Result<()> {
         )
         .await?;
 
-    // Add the operator as a new device.
+    // Add the operator as a new device to team1.
     info!("adding operator to team1");
     team1
         .add_device(
@@ -1029,13 +1009,13 @@ async fn test_multi_team_sync() -> Result<()> {
         )
         .await?;
 
-    // Give the admin its role.
+    // Give the admin its role on team1.
     team1
         .device(devices.admin.id)
         .assign_role(roles1.admin().id)
         .await?;
 
-    // Add the admin as a new device.
+    // Add the admin as a new device to team2.
     info!("adding admin to team2");
     let admin_role_rank_t2 = devices
         .owner
@@ -1057,7 +1037,7 @@ async fn test_multi_team_sync() -> Result<()> {
         )
         .await?;
 
-    // Add the operator as a new device.
+    // Add the operator as a new device to team2.
     info!("adding operator to team2");
     team2
         .add_device(
@@ -1067,7 +1047,7 @@ async fn test_multi_team_sync() -> Result<()> {
         )
         .await?;
 
-    // Give the admin its role.
+    // Give the admin its role on team2.
     team2
         .device(devices.admin.id)
         .assign_role(roles2.admin().id)
@@ -1092,22 +1072,10 @@ async fn test_multi_team_sync() -> Result<()> {
         assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
     }
 
-    let admin_seed1 = team1
-        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
-        .await?;
     devices
         .admin
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id1)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed1)?
-                        .build()?,
-                )
-                .build()?
-        })
+        .add_team(AddTeamConfig::builder().team_id(team_id1).build()?)
         .await?;
 
     let admin1 = devices.admin.client.team(team_id1);
@@ -1141,22 +1109,10 @@ async fn test_multi_team_sync() -> Result<()> {
         assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
     }
 
-    let admin_seed2 = team2
-        .encrypt_psk_seed_for_peer(devices.admin.pk.encryption())
-        .await?;
     devices
         .admin
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id2)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed2)?
-                        .build()?,
-                )
-                .build()?
-        })
+        .add_team(AddTeamConfig::builder().team_id(team_id2).build()?)
         .await?;
 
     let admin2 = devices.admin.client.team(team_id2);
@@ -1686,25 +1642,19 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     // Initialize malicious device on team.
     let work_dir = tempfile::tempdir()?;
     let work_dir_path = work_dir.path();
-    let device = DeviceCtx::new(team_name, "malicious", work_dir_path.join("malicious")).await?;
+    let device = DeviceCtx::new(
+        team_name,
+        "malicious",
+        work_dir_path.join("malicious"),
+        devices.ca.clone(),
+    )
+    .await?;
     owner_team
         .add_device(device.pk.clone(), None, malicious_device_rank)
         .await?;
-    let device_seed = owner_team
-        .encrypt_psk_seed_for_peer(device.pk.encryption())
-        .await?;
     device
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&device_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
+        .add_team(AddTeamConfig::builder().team_id(team_id).build()?)
         .await?;
 
     // Owner creates malicious role on team:

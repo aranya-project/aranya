@@ -35,8 +35,15 @@ mod util;
 pub use aranya_policy_text::{text, Text};
 pub use aranya_util::Addr;
 
+#[expect(deprecated)]
 #[doc(inline)]
-pub use crate::client::Permission;
+pub use crate::client::KeyBundle;
+// Re-export deprecated config types for backward compatibility
+#[expect(deprecated)]
+#[doc(inline)]
+pub use crate::config::{
+    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+};
 #[cfg(feature = "preview")]
 #[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
 #[doc(inline)]
@@ -44,12 +51,11 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 #[doc(inline)]
 pub use crate::{
     client::{
-        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, ObjectId,
+        ChanOp, Client, Device, DeviceId, Devices, Label, LabelId, Labels, ObjectId, Permission,
         PublicKeyBundle, Rank, Role, RoleId, Roles, Team, TeamId,
     },
     config::{
-        AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
-        CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+        AddTeamConfig, AddTeamConfigBuilder, CreateTeamConfig, CreateTeamConfigBuilder,
         SyncPeerConfig, SyncPeerConfigBuilder,
     },
     error::{ConfigError, Error, Result},

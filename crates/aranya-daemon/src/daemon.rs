@@ -1,4 +1,4 @@
-use std::{io, path::Path, sync::Arc};
+use std::{io, path::Path};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -12,7 +12,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
 };
-use aranya_util::{ready, Addr};
+use aranya_util::ready;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
@@ -22,16 +22,15 @@ use tracing::{error, info, info_span, Instrument as _};
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
-    api::{self, ApiKey, DaemonApiServer, DaemonApiServerArgs, QSData},
+    api::{ApiKey, DaemonApiServer, DaemonApiServerArgs},
     aranya,
     config::{Config, Toggle},
-    keystore::{AranyaStore, LocalStore},
+    keystore::AranyaStore,
     policy,
     sync::{
-        quic::{PskStore, QuicState, SyncParams},
+        quic::{CertConfig, QuicState, SyncParams},
         SyncHandle, SyncManager,
     },
-    util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
@@ -100,17 +99,11 @@ impl Daemon {
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
-            let qs_client_addr = match qs_config.client_addr {
-                None => Addr::new(qs_config.addr.host(), 0)?,
-                Some(v) => v,
-            };
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let eng = Self::load_crypto_engine(&cfg).await?;
             let pks = Self::load_or_gen_public_keys(&cfg, &eng, &mut aranya_store).await?;
-
-            let mut local_store = Self::load_local_keystore(&cfg).await?;
 
             // Generate a fresh API key at startup.
             let api_sk = ApiKey::generate(&eng);
@@ -119,12 +112,14 @@ impl Daemon {
                 .context("unable to write API public key")?;
             info!(path = %cfg.api_pk_path().display(), "wrote API public key");
 
-            // Initialize the PSK store used by the syncer and sync server
-            let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
-            let initial_keys = load_team_psk_pairs(&eng, &mut local_store, &seed_id_dir).await?;
-            let psk_store = Arc::new(PskStore::new(initial_keys));
+            // Build certificate config for mTLS
+            let cert_config = CertConfig {
+                root_certs_dir: qs_config.root_certs_dir.clone(),
+                device_cert: qs_config.device_cert.clone(),
+                device_key: qs_config.device_key.clone(),
+            };
 
-            // Initialize Aranya client, sync client,and sync server.
+            // Initialize Aranya client, sync client, and sync server.
             let (client, sync_server, manager, syncer, recv_effects) = Self::setup_aranya(
                 &cfg,
                 eng.clone(),
@@ -133,10 +128,9 @@ impl Daemon {
                     .context("unable to clone keystore")?,
                 &pks,
                 SyncParams {
-                    psk_store: Arc::clone(&psk_store),
+                    cert_config,
                     server_addr: qs_config.addr,
                 },
-                qs_client_addr,
             )
             .await?;
 
@@ -158,17 +152,11 @@ impl Daemon {
                 )?
             };
 
-            let data = QSData { psk_store };
-
-            let crypto = api::Crypto {
-                engine: eng,
-                local_store,
-                aranya_store,
-            };
-
             let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
-                local_addr: sync_server.local_addr(),
+                local_addr: sync_server
+                    .local_addr()
+                    .context("unable to get sync server local address")?,
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
@@ -176,9 +164,6 @@ impl Daemon {
                 recv_effects,
                 #[cfg(feature = "afc")]
                 afc,
-                crypto,
-                seed_id_dir,
-                quic: Some(data),
             })?;
             Ok(Self {
                 sync_server,
@@ -264,10 +249,9 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         SyncParams {
-            psk_store,
+            cert_config,
             server_addr,
         }: SyncParams,
-        client_addr: Addr,
     ) -> Result<(
         Client,
         SyncServer,
@@ -287,9 +271,9 @@ impl Daemon {
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = mpsc::channel(256);
 
-        // Create the sync server
-        let (server, peers, conns, syncer_recv) =
-            SyncServer::new(client.clone(), &server_addr, Arc::clone(&psk_store))
+        // Create the sync server with mTLS
+        let (server, peers, conns, syncer_recv, endpoint, client_config) =
+            SyncServer::new(client.clone(), &server_addr, &cert_config)
                 .await
                 .context("unable to initialize QUIC sync server")?;
 
@@ -297,11 +281,11 @@ impl Daemon {
         let syncer = SyncManager::new(
             client.clone(),
             send_effects,
-            psk_store,
-            (server.local_addr().into(), client_addr),
             syncer_recv,
             conns,
-        )?;
+            endpoint,
+            client_config,
+        );
 
         Ok((client, server, syncer, peers, recv_effects))
     }
@@ -321,18 +305,6 @@ impl Daemon {
         KS::open(&dir)
             .context("unable to open Aranya keystore")
             .map(AranyaStore::new)
-    }
-
-    /// Loads the local keystore.
-    ///
-    /// The local keystore contains key material for the daemon.
-    /// E.g., its API key.
-    async fn load_local_keystore(cfg: &Config) -> Result<LocalStore<KS>> {
-        let dir = cfg.local_keystore_path();
-        aranya_util::create_dir_all(&dir).await?;
-        KS::open(&dir)
-            .context("unable to open local keystore")
-            .map(LocalStore::new)
     }
 
     /// Loads the daemon's [`PublicKeys`].
@@ -444,6 +416,39 @@ mod tests {
         };
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
+
+        // Create certificate directories
+        let certs_dir = work_dir.join("certs");
+        let root_certs_dir = certs_dir.join("ca");
+        aranya_util::create_dir_all(&root_certs_dir)
+            .await
+            .expect("should be able to create cert directories");
+
+        // Generate test certificates using aranya-certgen
+        let ca_paths = aranya_certgen::CertPaths::new(root_certs_dir.join("ca"));
+        let device_paths = aranya_certgen::CertPaths::new(certs_dir.join("device"));
+
+        // Generate CA certificate
+        let ca_cert = aranya_certgen::CaCert::new("Test CA", 365)
+            .expect("should be able to generate CA cert");
+        ca_cert
+            .save(
+                &ca_paths,
+                aranya_certgen::SaveOptions::default().create_parents(),
+            )
+            .expect("should be able to save CA cert");
+
+        // Generate device certificate signed by CA
+        let device_cert = ca_cert
+            .generate("localhost", 365)
+            .expect("should be able to generate device cert");
+        device_cert
+            .save(
+                &device_paths,
+                aranya_certgen::SaveOptions::default().create_parents(),
+            )
+            .expect("should be able to save device cert");
+
         let cfg = Config {
             name: "test-daemon-run".into(),
             runtime_dir: work_dir.join("run"),
@@ -454,7 +459,9 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig {
                     addr: any,
-                    client_addr: None,
+                    root_certs_dir,
+                    device_cert: device_paths.cert().to_path_buf(),
+                    device_key: device_paths.key().to_path_buf(),
                 }),
             },
             #[cfg(feature = "afc")]

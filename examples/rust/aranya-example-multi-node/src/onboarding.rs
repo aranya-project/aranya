@@ -25,8 +25,6 @@ pub const SLEEP_INTERVAL: Duration = Duration::from_millis(600);
 pub struct TeamInfo {
     /// Aranya team ID.
     pub team_id: TeamId,
-    /// QUIC syncer seed IKM (initial key material).
-    pub seed_ikm: [u8; 32],
 }
 
 /// Device info sent between peers during onboarding.
