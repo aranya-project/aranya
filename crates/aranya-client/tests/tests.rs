@@ -79,24 +79,26 @@ async fn test_basic_rpc_operations() -> Result<()> {
         find_rpc_trace_ids_for_api_name(&captured, "DaemonApi.version");
     match (daemon_trace_id, client_trace_id) {
         (Some(daemon_trace_id), Some(client_trace_id)) => {
-            eprintln!(
-                "trace id capture summary: daemon_trace_id={}, client_trace_id={}",
-                daemon_trace_id, client_trace_id
-            );
             assert_eq!(
                 client_trace_id, daemon_trace_id,
                 "client and daemon trace ids should match for version RPC"
             );
         }
+        (None, None) => {
+            anyhow::bail!(
+                "trace id capture failed: both daemon and client trace IDs missing (installed_global_subscriber={}, captured_bytes={})",
+                installed,
+                captured.len()
+            );
+        }
         (daemon_trace_id, client_trace_id) => {
-            eprintln!(
-                "trace id capture summary: installed_global_subscriber={}, daemon_found={}, client_found={}, captured_bytes={}",
+            anyhow::bail!(
+                "trace id capture incomplete: installed_global_subscriber={}, daemon_found={}, client_found={}, captured_bytes={}",
                 installed,
                 daemon_trace_id.is_some(),
                 client_trace_id.is_some(),
                 captured.len()
             );
-            return Ok(());
         }
     }
 
