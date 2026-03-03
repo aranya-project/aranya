@@ -6,13 +6,13 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
+#[cfg(feature = "preview")]
+use aranya_client::HelloSubscriptionConfig;
 use aranya_client::{
     afc,
     client::{ChanOp, Client, DeviceId, PublicKeyBundle},
-    text, AddTeamConfig, Addr, CreateTeamConfig, SyncPeerConfig,
+    text, AddTeamConfig, Addr, CreateTeamConfig, Permission, Rank, SyncPeerConfig,
 };
-#[cfg(feature = "preview")]
-use aranya_client::{HelloSubscriptionConfig, Permission, RoleManagementPermission};
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{
@@ -21,6 +21,11 @@ use tokio::{
     time::sleep,
 };
 use tracing::{debug, info, Metadata};
+
+/// Example updated rank for the device rank change demo.
+const EXAMPLE_UPDATED_DEVICE_RANK: i64 = 40;
+/// Example rank for the custom role demo.
+const EXAMPLE_ROLE_RANK: i64 = 50;
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
@@ -230,9 +235,6 @@ async fn main() -> Result<()> {
     };
 
     let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval
-        .checked_mul(6)
-        .expect("sleep interval should not overflow");
     let sync_cfg = {
         let mut builder = SyncPeerConfig::builder();
         builder = builder.interval(sync_interval);
@@ -299,7 +301,7 @@ async fn main() -> Result<()> {
 
     // Create default roles
     info!("creating default roles");
-    let owner_role = owner
+    owner
         .client
         .team(team_id)
         .roles()
@@ -307,7 +309,7 @@ async fn main() -> Result<()> {
         .into_iter()
         .find(|role| role.name == "owner" && role.default)
         .context("unable to find owner role")?;
-    let roles = owner_team.setup_default_roles(owner_role.id).await?;
+    let roles = owner_team.setup_default_roles().await?;
     let admin_role = roles
         .iter()
         .find(|r| r.name == "admin")
@@ -333,11 +335,23 @@ async fn main() -> Result<()> {
 
     // setup sync peers.
     info!("adding admin to team");
-    owner_team.add_device(admin.pk, Some(admin_role.id)).await?;
+    let admin_role_rank = owner_team.query_rank(admin_role.id).await?;
+    owner_team
+        .add_device(
+            admin.pk,
+            Some(admin_role.id),
+            Rank::new(admin_role_rank.value().saturating_sub(1)),
+        )
+        .await?;
 
     info!("adding operator to team");
+    let operator_role_rank = owner_team.query_rank(operator_role.id).await?;
     owner_team
-        .add_device(operator.pk, Some(operator_role.id))
+        .add_device(
+            operator.pk,
+            Some(operator_role.id),
+            Rank::new(operator_role_rank.value().saturating_sub(1)),
+        )
         .await?;
 
     // Demo hello subscription functionality
@@ -357,7 +371,7 @@ async fn main() -> Result<()> {
             .sync_hello_subscribe(admin_addr, HelloSubscriptionConfig::default())
             .await?;
 
-        sleep(sleep_interval).await;
+        sleep(sync_interval).await;
 
         // Later, unsubscribe from hello notifications
         info!("admin unsubscribing from hello notifications from owner");
@@ -366,7 +380,7 @@ async fn main() -> Result<()> {
         info!("operator unsubscribing from hello notifications from admin");
         operator_team.sync_hello_unsubscribe(admin_addr).await?;
 
-        sleep(sleep_interval).await;
+        sleep(sync_interval).await;
     }
 
     info!("adding sync peers");
@@ -424,96 +438,125 @@ async fn main() -> Result<()> {
         .await?;
     memberb_team.add_sync_peer(membera_addr, sync_cfg).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
+    // Sync all devices with owner so they see each other's sync peer state.
+    admin_team.sync_now(owner_addr, None).await?;
+    operator_team.sync_now(owner_addr, None).await?;
+    membera_team.sync_now(owner_addr, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
 
     // add membera to team.
     info!("adding membera to team");
+    let member_role_rank = owner_team.query_rank(member_role.id).await?;
     owner_team
-        .add_device(membera.pk.clone(), Some(member_role.id))
+        .add_device(
+            membera.pk.clone(),
+            Some(member_role.id),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
+        )
         .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     owner_team
-        .add_device(memberb.pk.clone(), Some(member_role.id))
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    #[cfg(feature = "preview")]
-    {
-        // Demo custom roles.
-        info!("demo custom roles functionality");
-
-        // Create a custom role.
-        info!("creating a custom role");
-        let custom = ClientCtx::new(
-            team_name,
-            "custom",
-            &daemon_path,
-            &root_certs_dir,
-            &ca_paths,
+        .add_device(
+            memberb.pk.clone(),
+            Some(member_role.id),
+            Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
-        let custom_role = owner_team
-            .create_role(text!("custom_role"), owner_role.id)
-            .await?;
 
-        // Add device to team to assign custom role to.
-        info!("adding device to team to assign custom role to");
-        owner_team.add_device(custom.pk.clone(), None).await?;
+    // Sync membera and memberb so they see their team membership and roles.
+    membera_team.sync_now(owner_addr, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
 
-        // Add `CanUseAfc` permission to the custom role.
-        owner_team
-            .add_perm_to_role(custom_role.id, Permission::CanUseAfc)
-            .await?;
+    // Demo custom roles.
+    info!("demo custom roles functionality");
 
-        // Assign custom role to a device.
-        info!("assigning custom role to a device");
-        owner_team
-            .device(custom.id)
-            .assign_role(custom_role.id)
-            .await?;
+    // Create a custom role.
+    info!("creating a custom role");
+    let custom = ClientCtx::new(
+        team_name,
+        "custom",
+        &daemon_path,
+        &root_certs_dir,
+        &ca_paths,
+    )
+    .await?;
+    let custom_role_rank = Rank::new(EXAMPLE_ROLE_RANK);
+    let custom_role = owner_team
+        .create_role(text!("custom_role"), custom_role_rank)
+        .await?;
 
-        // Revoke custom role from a device.
-        info!("revoking custom role from a device");
-        owner_team
-            .device(custom.id)
-            .revoke_role(custom_role.id)
-            .await?;
+    // Add device to team to assign custom role to.
+    info!("adding device to team to assign custom role to");
+    owner_team
+        .add_device(custom.pk.clone(), None, custom_role_rank)
+        .await?;
 
-        // Remove `CanUseAfc` permission from the custom role.
-        info!("removing CanUseAfc permission from custom role");
-        owner_team
-            .remove_perm_from_role(custom_role.id, Permission::CanUseAfc)
-            .await?;
+    // Add `CanUseAfc` permission to the custom role.
+    owner_team
+        .add_perm_to_role(custom_role.id, Permission::CanUseAfc)
+        .await?;
 
-        // Assign role management perm.
-        info!("assigning role management perm");
-        owner_team
-            .assign_role_management_permission(
-                custom_role.id,
-                admin_role.id,
-                RoleManagementPermission::CanChangeRolePerms,
-            )
-            .await?;
+    // Query permissions assigned to the custom role.
+    info!("querying permissions for custom role");
+    let role_perms = owner_team.query_role_perms(custom_role.id).await?;
+    info!(
+        "custom role has {} permission(s): {:?}",
+        role_perms.len(),
+        role_perms
+    );
+    assert!(
+        role_perms.contains(&Permission::CanUseAfc),
+        "expected custom role to have CanUseAfc permission"
+    );
 
-        // Revoke role management perm.
-        info!("revoking role management perm");
-        owner_team
-            .revoke_role_management_permission(
-                custom_role.id,
-                admin_role.id,
-                RoleManagementPermission::CanChangeRolePerms,
-            )
-            .await?;
+    // Assign custom role to a device.
+    info!("assigning custom role to a device");
+    owner_team
+        .device(custom.id)
+        .assign_role(custom_role.id)
+        .await?;
 
-        // Delete the custom role.
-        info!("deleting custom role from team");
-        owner_team.delete_role(custom_role.id).await?;
-    }
+    // Demo query_rank: verify the role has the rank it was created with.
+    // Note: Role ranks are immutable after creation.
+    let current_rank = owner_team.query_rank(custom_role.id).await?;
+    info!("custom role rank: {}", current_rank);
+    assert_eq!(current_rank, custom_role_rank);
+
+    // Demo change_rank on a device: change the custom device's rank.
+    let device_rank = owner_team.query_rank(custom.id).await?;
+    info!("custom device rank before change: {}", device_rank);
+
+    let updated_device_rank = Rank::new(EXAMPLE_UPDATED_DEVICE_RANK);
+    info!(
+        "changing custom device rank from {} to {}",
+        device_rank, updated_device_rank
+    );
+    owner_team
+        .change_rank(custom.id, device_rank, updated_device_rank)
+        .await?;
+
+    let new_rank = owner_team.query_rank(custom.id).await?;
+    info!("custom device rank after change: {}", new_rank);
+    assert_eq!(new_rank, updated_device_rank);
+
+    // Revoke custom role from a device.
+    info!("revoking custom role from a device");
+    owner_team
+        .device(custom.id)
+        .revoke_role(custom_role.id)
+        .await?;
+
+    // Remove `CanUseAfc` permission from the custom role.
+    info!("removing CanUseAfc permission from custom role");
+    owner_team
+        .remove_perm_from_role(custom_role.id, Permission::CanUseAfc)
+        .await?;
+
+    // Delete the custom role.
+    info!("deleting custom role from team");
+    owner_team.delete_role(custom_role.id).await?;
 
     // fact database queries
     let devices = membera_team.devices().await?;
@@ -525,9 +568,10 @@ async fn main() -> Result<()> {
     info!("owner keybundle: {:?}", keybundle);
 
     info!("creating label");
-    let label3 = owner_team
-        .create_label(text!("label3"), owner_role.id)
-        .await?;
+    let owner_device_rank = owner_team.query_rank(owner.id).await?;
+    // Label rank must be lower than the owner's device rank so the owner can operate on it.
+    let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
+    let label3 = owner_team.create_label(text!("label3"), label_rank).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     owner_team
@@ -540,8 +584,9 @@ async fn main() -> Result<()> {
         .assign_label(label3, op)
         .await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
+    // Sync membera and memberb so they see the label assignments.
+    membera_team.sync_now(owner_addr, None).await?;
+    memberb_team.sync_now(owner_addr, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");

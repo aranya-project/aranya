@@ -15,11 +15,9 @@ use aranya_runtime::Address;
 use buggy::BugExt as _;
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(feature = "preview")]
-use super::GraphId;
 #[cfg(doc)]
 use super::SyncManager;
-use super::{Result, SyncPeer};
+use super::{GraphId, Result, SyncPeer};
 
 /// Holds all possible messages that the [`SyncManager`] can process.
 #[derive(Clone, Debug)]
