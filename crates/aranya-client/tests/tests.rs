@@ -16,7 +16,7 @@ use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    client::{ChanOp, Permission, RoleId, RoleManagementPermission},
+    client::{ChanOp, Permission, Rank},
     config::{AddTeamConfig, CreateTeamConfig, HelloSubscriptionConfig, SyncPeerConfig},
 };
 use aranya_daemon_api::text;
