@@ -29,12 +29,12 @@ impl IsObjectId for ObjectId {}
 /// Roles, devices, labels, and teams all have unique Aranya IDs
 /// that can be treated as generic object IDs for rank queries and
 /// other operations that accept any object type.
-pub trait AsObjectId: sealed::Sealed + fmt::Debug {
+pub trait ToObjectId: sealed::Sealed + fmt::Debug {
     /// Converts this ID into an [`ObjectId`].
     fn to_object_id(self) -> ObjectId;
 }
 
-impl<Tag> AsObjectId for Id<Tag>
+impl<Tag> ToObjectId for Id<Tag>
 where
     Tag: IdTag,
     Id<Tag>: IsObjectId,

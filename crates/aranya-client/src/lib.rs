@@ -44,7 +44,7 @@ pub use crate::config::{HelloSubscriptionConfig, HelloSubscriptionConfigBuilder}
 #[doc(inline)]
 pub use crate::{
     client::{
-        AsObjectId, ChanOp, Client, Device, DeviceId, Devices, IsObjectId, Label, LabelId, Labels,
+        ToObjectId, ChanOp, Client, Device, DeviceId, Devices, IsObjectId, Label, LabelId, Labels,
         ObjectId, PublicKeyBundle, Rank, Role, RoleId, Roles, Team, TeamId,
     },
     config::{

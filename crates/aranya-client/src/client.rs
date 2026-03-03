@@ -43,7 +43,7 @@ pub use self::device::KeyBundle;
 pub use self::{
     device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
-    object::{AsObjectId, IsObjectId, ObjectId, Rank},
+    object::{ToObjectId, IsObjectId, ObjectId, Rank},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };

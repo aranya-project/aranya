@@ -9,7 +9,7 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        create_ctx, AsObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
+        create_ctx, ToObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
         Permission, PublicKeyBundle, Rank, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
@@ -352,7 +352,7 @@ impl Team<'_> {
     #[instrument(skip(self))]
     pub async fn change_rank(
         &self,
-        object_id: impl AsObjectId,
+        object_id: impl ToObjectId,
         old_rank: Rank,
         new_rank: Rank,
     ) -> Result<()> {
@@ -372,7 +372,7 @@ impl Team<'_> {
 
     /// Queries the rank of an object.
     #[instrument(skip(self))]
-    pub async fn query_rank(&self, object_id: impl AsObjectId) -> Result<Rank> {
+    pub async fn query_rank(&self, object_id: impl ToObjectId) -> Result<Rank> {
         self.client
             .daemon
             .query_rank(create_ctx(), self.id, object_id.to_object_id().into_api())
