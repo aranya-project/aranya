@@ -26,22 +26,28 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::text;
+use serde_json::Value;
 use serial_test::serial;
 use tracing::{debug, info};
 use tracing_subscriber::fmt::MakeWriter;
 
 use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
-fn parse_trace_id(line: &str) -> Option<String> {
-    let marker = "rpc.trace_id=";
-    let start = line.find(marker)?.checked_add(marker.len())?;
-    let rest = &line[start..];
-    let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
-    let raw = rest[..end].trim_matches(|c| c == '"' || c == ',' || c == '}' || c == ':');
-    if raw.is_empty() {
-        None
-    } else {
-        Some(raw.to_string())
+fn find_string_field(v: &Value, key: &str) -> Option<String> {
+    match v {
+        Value::Object(map) => {
+            if let Some(value) = map.get(key).and_then(Value::as_str) {
+                return Some(value.to_owned());
+            }
+            for value in map.values() {
+                if let Some(found) = find_string_field(value, key) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        Value::Array(values) => values.iter().find_map(|value| find_string_field(value, key)),
+        _ => None,
     }
 }
 
@@ -91,6 +97,7 @@ fn init_global_log_capture() -> (Arc<Mutex<Vec<u8>>>, bool) {
         .with_writer(writer)
         .with_ansi(false)
         .with_max_level(tracing::Level::TRACE)
+        .json()
         .finish();
 
     let installed = tracing::subscriber::set_global_default(subscriber).is_ok();
@@ -147,17 +154,26 @@ async fn test_basic_rpc_operations() -> Result<()> {
     let mut client_trace_id = None;
 
     for line in captured.lines() {
-        let has_trace = line.contains("rpc.trace_id=");
-        let is_version = line.contains("DaemonApi.version") || line.contains("version");
-        if !has_trace || !is_version {
+        let Ok(json) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+
+        let Some(trace_id) = find_string_field(&json, "rpc.trace_id") else {
+            continue;
+        };
+        let Some(otel_name) = find_string_field(&json, "otel.name") else {
+            continue;
+        };
+        if otel_name != "DaemonApi.version" {
             continue;
         }
+        let otel_kind = find_string_field(&json, "otel.kind");
 
-        if daemon_trace_id.is_none() && line.contains("otel.kind=\"server\"") {
-            daemon_trace_id = parse_trace_id(line);
+        if daemon_trace_id.is_none() && otel_kind.as_deref() == Some("server") {
+            daemon_trace_id = Some(trace_id.clone());
         }
-        if client_trace_id.is_none() && line.contains("otel.kind=\"client\"") {
-            client_trace_id = parse_trace_id(line);
+        if client_trace_id.is_none() && otel_kind.as_deref() == Some("client") {
+            client_trace_id = Some(trace_id);
         }
         if daemon_trace_id.is_some() && client_trace_id.is_some() {
             break;
