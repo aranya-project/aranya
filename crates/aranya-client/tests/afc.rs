@@ -4,7 +4,10 @@ mod common;
 
 #[cfg(feature = "afc")]
 use {
-    crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL},
+    crate::common::{
+        find_rpc_trace_ids_for_api_name, init_global_json_capture, sleep, DevicesCtx,
+        SLEEP_INTERVAL,
+    },
     anyhow::{Context, Result},
     aranya_client::afc::Channels,
     aranya_client::client::ChanOp,
@@ -15,13 +18,23 @@ use {
 #[cfg(feature = "afc")]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
+    let (logs, _installed) = init_global_json_capture();
+
     let mut devices = DevicesCtx::new("test_afc_create_assign_revoke_delete_label").await?;
+
+    let captured = String::from_utf8_lossy(&logs.lock().expect("poisoned")).into_owned();
+    let _ = find_rpc_trace_ids_for_api_name(&captured, "DaemonApi.version");
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
     // create default roles
     let default_roles = devices.setup_default_roles(team_id).await?;
+
+    devices
+        .add_all_sync_peers(team_id)
+        .await
+        .context("unable to add all sync peers")?;
 
     // Tell all peers to sync with one another, and assign their roles.
     devices

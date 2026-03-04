@@ -30,10 +30,8 @@ use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 use tracing_subscriber::fmt::MakeWriter;
 
-#[allow(dead_code)]
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
-#[allow(dead_code)]
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
 #[instrument(skip_all)]
