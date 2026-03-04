@@ -8,10 +8,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{ensure, Context as _};
+use anyhow::{anyhow, ensure, Context as _};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
@@ -24,6 +25,12 @@ use crate::{
         Addr, Error, GraphId, Result, SyncHandle, SyncManager, SyncPeer,
     },
 };
+
+/// Upper bound for wire-encoded hello request/response envelopes.
+///
+/// `MAX_SYNC_MESSAGE_SIZE` bounds runtime sync payloads; the wire envelope adds a small
+/// serialization overhead.
+const MAX_HELLO_WIRE_MESSAGE_SIZE: usize = MAX_SYNC_MESSAGE_SIZE.saturating_add(1024);
 
 /// Storage for a subscription to hello messages.
 #[derive(Debug, Clone)]
@@ -145,7 +152,7 @@ where
 
         // Connect to the peer
         let stream = self.connect(peer).await?;
-        let (mut recv, mut send) = stream.split();
+        let (recv, mut send) = stream.split();
 
         // Send the message
         send.send(bytes::Bytes::from(data))
@@ -164,9 +171,28 @@ where
         };
         // Read the response to avoid race condition with server
         let mut response_buf = Vec::new();
-        recv.read_to_end(&mut response_buf)
+        let cap_plus_one = MAX_HELLO_WIRE_MESSAGE_SIZE + 1;
+
+        recv.take(cap_plus_one as u64)
+            .read_to_end(&mut response_buf)
             .await
             .with_context(|| format!("failed to read hello {} response", operation_name))?;
+
+        debug_assert!(
+            response_buf.len() <= cap_plus_one,
+            "bounded read invariant violated: len={} cap_plus_one={}",
+            response_buf.len(),
+            cap_plus_one
+        );
+
+        if response_buf.len() > MAX_HELLO_WIRE_MESSAGE_SIZE {
+            return Err(anyhow!(
+                "hello {operation_name} response too large: {} > {} bytes",
+                response_buf.len(),
+                MAX_HELLO_WIRE_MESSAGE_SIZE
+            )
+            .into());
+        }
         if response_buf.is_empty() {
             return Err(Error::EmptyResponse);
         }
@@ -276,7 +302,7 @@ where
 
         // Spawn async task to send the notification
         self.hello_tasks.spawn(async move {
-            let (mut recv, mut send) = stream.split();
+            let (recv, mut send) = stream.split();
 
             if let Err(error) = send.send(bytes::Bytes::from(data)).await {
                 warn!(
@@ -298,11 +324,34 @@ where
 
             // Read the response to avoid race condition with server
             let mut response_buf = Vec::new();
-            if let Err(e) = recv.read_to_end(&mut response_buf).await {
+            let cap_plus_one = MAX_HELLO_WIRE_MESSAGE_SIZE + 1;
+
+            if let Err(e) = recv
+                .take(cap_plus_one as u64)
+                .read_to_end(&mut response_buf)
+                .await
+            {
                 warn!(
                     error = %e,
                     ?peer,
                     "Failed to read hello notification response"
+                );
+                return;
+            }
+
+            debug_assert!(
+                response_buf.len() <= cap_plus_one,
+                "bounded read invariant violated: len={} cap_plus_one={}",
+                response_buf.len(),
+                cap_plus_one
+            );
+
+            if response_buf.len() > MAX_HELLO_WIRE_MESSAGE_SIZE {
+                warn!(
+                    ?peer,
+                    response_len = response_buf.len(),
+                    max_response_len = MAX_HELLO_WIRE_MESSAGE_SIZE,
+                    "hello notification response exceeded max size"
                 );
                 return;
             }
