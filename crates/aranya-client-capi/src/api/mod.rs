@@ -5,6 +5,7 @@ pub mod defs;
 
 #[allow(missing_docs)]
 #[allow(clippy::transmute_ptr_to_ptr)]
+#[allow(deprecated)]
 #[allow(non_upper_case_globals)]
 #[allow(unused_attributes)]
 #[allow(unused_imports)]
