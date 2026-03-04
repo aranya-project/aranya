@@ -51,12 +51,11 @@ impl ConvergenceTracker {
         let command_issued = self.timestamps.command_issued;
 
         // Collect convergence times relative to command issuance
-        // Exclude the source node from metrics (it already has the command)
         let mut times: Vec<Duration> = self
             .node_status
             .iter()
             .enumerate()
-            .filter(|(i, s)| *i != self.source_node.value() && s.convergence_time.is_some())
+            .filter(|(_, s)| s.convergence_time.is_some())
             .map(|(_, s)| {
                 s.convergence_time
                     .expect("convergence_time must be set when filter passes")

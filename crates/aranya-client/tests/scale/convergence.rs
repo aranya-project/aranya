@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::client::TeamId;
+use aranya_client::Rank;
 use aranya_daemon_api::Text;
 use tracing::{debug, info, instrument};
 
@@ -51,21 +52,19 @@ impl TestCtx {
         self.tracker.set_convergence_label(label_name.clone());
 
         // Get the owner role for label creation
-        let owner_role = self.nodes[source_node.value()]
-            .client
-            .team(team_id)
+        let team = self.nodes[source_node.value()].client.team(team_id);
+        let owner_role = team
             .roles()
             .await?
             .into_iter()
             .find(|r| r.name == "owner")
             .context("unable to find owner role")?;
+        let owner_role_rank = team.query_rank(owner_role.id).await?;
 
         // Create the label - this is our observable command
         let label_text: Text = label_name.parse().context("invalid label name")?;
-        let label_id = self.nodes[source_node.value()]
-            .client
-            .team(team_id)
-            .create_label(label_text, owner_role.id)
+        let label_id = team
+            .create_label(label_text, Rank::new(owner_role_rank.value().saturating_sub(1)))
             .await
             .context("unable to create test label")?;
 

@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     client::TeamId, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfig, Rank,
 };
 use tokio::time::sleep;
 use tracing::{info, instrument, warn};
@@ -103,7 +103,7 @@ impl TestCtx {
         //# Each non-owner node MUST be added as a team member by the owner.
         for node in &self.nodes[1..] {
             owner_team
-                .add_device(node.pk.clone(), None)
+                .add_device(node.pk.clone(), None, Rank::new(0))
                 .await
                 .with_context(|| format!("unable to add node {} to team", node.index))?;
         }
