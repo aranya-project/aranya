@@ -251,17 +251,17 @@ async fn main() -> Result<()> {
     let admin_role = roles
         .iter()
         .find(|r| r.name == "admin")
-        .ok_or_else(|| anyhow::anyhow!("no admin role"))?
+        .context("no admin role")?
         .clone();
     let operator_role = roles
         .iter()
         .find(|r| r.name == "operator")
-        .ok_or_else(|| anyhow::anyhow!("no operator role"))?
+        .context("no operator role")?
         .clone();
     let member_role = roles
         .iter()
         .find(|r| r.name == "member")
-        .ok_or_else(|| anyhow::anyhow!("no member role"))?
+        .context("no member role")?
         .clone();
 
     let add_team_cfg = {
