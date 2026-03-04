@@ -3,8 +3,7 @@
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::client::TeamId;
-use aranya_client::Rank;
+use aranya_client::{client::TeamId, Rank};
 use aranya_daemon_api::Text;
 use tracing::{debug, info, instrument};
 
@@ -64,7 +63,10 @@ impl TestCtx {
         // Create the label - this is our observable command
         let label_text: Text = label_name.parse().context("invalid label name")?;
         let label_id = team
-            .create_label(label_text, Rank::new(owner_role_rank.value().saturating_sub(1)))
+            .create_label(
+                label_text,
+                Rank::new(owner_role_rank.value().saturating_sub(1)),
+            )
             .await
             .context("unable to create test label")?;
 
