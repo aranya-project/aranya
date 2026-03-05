@@ -392,10 +392,10 @@ async fn main() -> Result<()> {
     membera_team.sync_now(owner_addr, None).await?;
     memberb_team.sync_now(owner_addr, None).await?;
 
-    // add membera to team.
-    info!("adding membera to team");
-    let member_role_rank = owner_team.query_rank(member_role.id).await?;
-    owner_team
+    // Admin adds membera and memberb to the team.
+    info!("admin adding membera to team");
+    let member_role_rank = admin_team.query_rank(member_role.id).await?;
+    admin_team
         .add_device(
             membera.pk.clone(),
             Some(member_role.id),
@@ -403,9 +403,8 @@ async fn main() -> Result<()> {
         )
         .await?;
 
-    // add memberb to team.
-    info!("adding memberb to team");
-    owner_team
+    info!("admin adding memberb to team");
+    admin_team
         .add_device(
             memberb.pk.clone(),
             Some(member_role.id),
@@ -508,19 +507,24 @@ async fn main() -> Result<()> {
     let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
-    info!("creating label");
-    let owner_device_rank = owner_team.query_rank(owner.id).await?;
-    // Label rank must be lower than the owner's device rank so the owner can operate on it.
-    let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
-    let label3 = owner_team.create_label(text!("label3"), label_rank).await?;
+    // Admin creates a label.
+    info!("admin creating label");
+    let admin_device_rank = admin_team.query_rank(admin.id).await?;
+    // Label rank must be lower than the admin's device rank so the admin can operate on it.
+    let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
+    let label3 = admin_team.create_label(text!("label3"), label_rank).await?;
+
+    // Operator assigns the label to membera and memberb.
     let op = ChanOp::SendRecv;
-    info!("assigning label to membera");
-    owner_team
+    operator_team.sync_now(owner_addr, None).await?;
+
+    info!("operator assigning label to membera");
+    operator_team
         .device(membera.id)
         .assign_label(label3, op)
         .await?;
-    info!("assigning label to memberb");
-    owner_team
+    info!("operator assigning label to memberb");
+    operator_team
         .device(memberb.id)
         .assign_label(label3, op)
         .await?;
