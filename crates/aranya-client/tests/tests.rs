@@ -3043,7 +3043,9 @@ async fn test_duplicate_label_assignment_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let member_role_rank = owner_team.query_rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team.create_label(text!("dup_label"), label_rank).await?;
+    let label_id = owner_team
+        .create_label(text!("dup_label"), label_rank)
+        .await?;
 
     // First assignment should succeed.
     owner_team
@@ -3057,10 +3059,7 @@ async fn test_duplicate_label_assignment_rejected() -> Result<()> {
         .assign_label(label_id, ChanOp::SendRecv)
         .await
         .expect_err("duplicate label assignment should fail");
-    assert!(
-        matches!(err, aranya_client::Error::Aranya(_)),
-        "{err:?}"
-    );
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
@@ -3069,8 +3068,7 @@ async fn test_duplicate_label_assignment_rejected() -> Result<()> {
 /// stale (generation mismatch). Reassigning the label should succeed.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_device_generation_counter_label_reassignment() -> Result<()> {
-    let mut devices =
-        DevicesCtx::new("test_device_generation_counter_label_reassignment").await?;
+    let mut devices = DevicesCtx::new("test_device_generation_counter_label_reassignment").await?;
     let team_id = devices.create_and_add_team().await?;
     let roles = devices
         .setup_default_roles(team_id)
@@ -3081,7 +3079,9 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let member_role_rank = owner_team.query_rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team.create_label(text!("gen_label"), label_rank).await?;
+    let label_id = owner_team
+        .create_label(text!("gen_label"), label_rank)
+        .await?;
 
     // Generation counter should start at 0.
     let gen = owner_team
@@ -3155,7 +3155,11 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
         .device(devices.membera.id)
         .query_device_generation()
         .await?;
-    assert_eq!(gen, Some(1), "generation should still be 1 after reassignment");
+    assert_eq!(
+        gen,
+        Some(1),
+        "generation should still be 1 after reassignment"
+    );
 
     // Label should now be visible.
     let labels = owner_team
@@ -3196,10 +3200,7 @@ async fn test_add_device_to_team_twice_rejected() -> Result<()> {
         )
         .await
         .expect_err("adding same device twice should fail");
-    assert!(
-        matches!(err, aranya_client::Error::Aranya(_)),
-        "{err:?}"
-    );
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
@@ -3208,8 +3209,7 @@ async fn test_add_device_to_team_twice_rejected() -> Result<()> {
 /// re-add) should fail because the generation counter doesn't match.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
-    let mut devices =
-        DevicesCtx::new("test_revoke_stale_label_assignment_rejected").await?;
+    let mut devices = DevicesCtx::new("test_revoke_stale_label_assignment_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
     let roles = devices
         .setup_default_roles(team_id)
@@ -3220,7 +3220,9 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let member_role_rank = owner_team.query_rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team.create_label(text!("stale_label"), label_rank).await?;
+    let label_id = owner_team
+        .create_label(text!("stale_label"), label_rank)
+        .await?;
 
     // Generation should start at 0.
     let gen = owner_team
@@ -3271,10 +3273,7 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
         .revoke_label(label_id)
         .await
         .expect_err("revoking stale label assignment should fail");
-    assert!(
-        matches!(err, aranya_client::Error::Aranya(_)),
-        "{err:?}"
-    );
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     Ok(())
 }
