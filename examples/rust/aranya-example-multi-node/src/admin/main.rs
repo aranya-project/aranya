@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use aranya_client::{
     text, AddTeamConfig, AddTeamQuicSyncConfig, Client, Rank, Role, SyncPeerConfig,
 };
@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     })
     .retry(ExponentialBuilder::default())
     .await
-    .expect("expected to initialize client");
+    .context("expected to initialize client")?;
     info!("admin: initialized client");
 
     // Get team info from owner.

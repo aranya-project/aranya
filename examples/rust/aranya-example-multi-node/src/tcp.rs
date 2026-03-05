@@ -26,10 +26,10 @@ impl TcpServer {
     pub async fn recv(&self) -> Result<Vec<u8>> {
         let mut data = Vec::new();
         let (mut stream, _addr) = self.listener.accept().await?;
-        let _ = stream
+        stream
             .read_to_end(&mut data)
             .await
-            .expect("expected to read_to_end on tcp stream");
+            .context("expected to read_to_end on tcp stream")?;
         Ok(data)
     }
 }
