@@ -414,7 +414,8 @@ async fn main() -> Result<()> {
         .await?;
 
     // Operator assigns the member role to membera and memberb.
-    operator_team.sync_now(owner_addr, None).await?;
+    // Sync with admin to pick up the AddDevice commands.
+    operator_team.sync_now(admin_addr, None).await?;
 
     info!("operator assigning member role to membera");
     operator_team
