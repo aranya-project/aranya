@@ -3207,8 +3207,10 @@ async fn test_add_device_to_team_twice_rejected() -> Result<()> {
 }
 
 /// Revoking a label from a device that was removed from the team should
-/// fail, and revoking a stale label assignment (from before device removal
-/// and re-add) should also fail because the generation counter doesn't match.
+/// fail. Additionally, if a label was assigned before the device was
+/// removed and the device is later re-added, attempting to revoke that
+/// old assignment should also fail because the generation counter no
+/// longer matches.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_revoke_stale_label_assignment_rejected").await?;
