@@ -428,9 +428,10 @@ async fn main() -> Result<()> {
         .assign_role(member_role.id)
         .await?;
 
-    // Sync membera and memberb so they see their team membership and roles.
-    membera_team.sync_now(owner_addr, None).await?;
-    memberb_team.sync_now(owner_addr, None).await?;
+    // Sync membera and memberb with the operator so they see their
+    // team membership (added by admin) and role assignments (by operator).
+    membera_team.sync_now(operator_addr, None).await?;
+    memberb_team.sync_now(operator_addr, None).await?;
 
     // Demo custom roles.
     info!("demo custom roles functionality");
@@ -545,9 +546,9 @@ async fn main() -> Result<()> {
         .assign_label(label3, op)
         .await?;
 
-    // Sync membera and memberb so they see the label assignments.
-    membera_team.sync_now(owner_addr, None).await?;
-    memberb_team.sync_now(owner_addr, None).await?;
+    // Sync membera and memberb with the operator so they see the label assignments.
+    membera_team.sync_now(operator_addr, None).await?;
+    memberb_team.sync_now(operator_addr, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");
