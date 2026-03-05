@@ -65,6 +65,7 @@ pub enum Effect {
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
     QueryAfcChannelIsValidResult(QueryAfcChannelIsValidResult),
+    QueryDeviceGenerationResult(QueryDeviceGenerationResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
@@ -174,6 +175,12 @@ pub struct QueryAfcChannelIsValidResult {
     pub receiver_id: BaseId,
     pub label_id: BaseId,
     pub is_valid: bool,
+}
+/// QueryDeviceGenerationResult policy effect.
+#[effect]
+pub struct QueryDeviceGenerationResult {
+    pub device_id: BaseId,
+    pub generation: i64,
 }
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
@@ -324,6 +331,7 @@ pub enum EphemeralAction {
     query_device_role(query_device_role),
     query_device_public_key_bundle(query_device_public_key_bundle),
     query_rank(query_rank),
+    query_device_generation(query_device_generation),
     query_team_roles(query_team_roles),
     query_role_has_perm(query_role_has_perm),
     query_role_perms(query_role_perms),
@@ -363,6 +371,11 @@ pub struct change_rank {
 #[action(interface = Ephemeral)]
 pub struct query_rank {
     pub object_id: BaseId,
+}
+/// query_device_generation policy action.
+#[action(interface = Ephemeral)]
+pub struct query_device_generation {
+    pub device_id: BaseId,
 }
 /// add_perm_to_role policy action.
 #[action(interface = Persistent)]

@@ -254,6 +254,19 @@ where
         .in_current_span()
     }
 
+    /// Invokes `query_device_generation`.
+    #[cfg(feature = "test-utils")]
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_generation(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_device_generation(device_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
+    }
+
     /// Invokes `query_rank`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]

@@ -225,4 +225,19 @@ impl Device<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
+
+    /// Queries the generation counter for the device.
+    ///
+    /// This is a test-only API and is not part of the public client interface.
+    #[cfg(feature = "test-utils")]
+    pub async fn query_device_generation(&self) -> Result<Option<i64>> {
+        let gen = self
+            .client
+            .daemon
+            .query_device_generation(create_ctx(), self.team_id, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(gen)
+    }
 }

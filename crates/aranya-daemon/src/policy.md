@@ -1088,6 +1088,59 @@ ephemeral command QueryRank {
 }
 ```
 
+### Device Generation Queries
+
+##### `query_device_generation`
+
+Returns the generation counter for a device.
+
+<!-- TODO: Add conditional compilation to the policy language so
+     test-only actions/commands can be gated at the policy level. -->
+
+```policy
+// Emits `QueryDeviceGenerationResult` with the generation counter
+// for the device. If the device does not have a generation counter,
+// then no effect is emitted.
+ephemeral action query_device_generation(device_id id) {
+    publish QueryDeviceGeneration {
+        device_id: device_id,
+    }
+}
+
+effect QueryDeviceGenerationResult {
+    // The device's unique ID.
+    device_id id,
+    // The device's generation counter.
+    generation int,
+}
+
+ephemeral command QueryDeviceGeneration {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let maybe_gen = query DeviceGeneration[device_id: this.device_id]
+        if maybe_gen is None {
+            finish {}
+        } else {
+            let gen = unwrap maybe_gen
+            finish {
+                emit QueryDeviceGenerationResult {
+                    device_id: this.device_id,
+                    generation: gen.generation,
+                }
+            }
+        }
+    }
+}
+```
+
 ## Roles and Permissions
 <!-- Section contains: Role facts, permissions, assignment/revocation, default roles -->
 
@@ -3317,10 +3370,11 @@ command RevokeLabelFromDevice {
         // We need to get label info before deleting
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        check exists LabelAssignedToDevice[
+        let assignment = check_unwrap query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
         ]
+        check label_assignment_matches_gen(this.device_id, assignment.device_gen)
 
         // At this point we believe the following to be true:
         //
@@ -3329,6 +3383,7 @@ command RevokeLabelFromDevice {
         // - `author` outranks `this.device_id`
         // - `author` outranks `this.label_id`
         // - `this.label_id` refers to a label that exists
+        // - the label assignment matches the device's current generation
         finish {
             delete LabelAssignedToDevice[
                 label_id: this.label_id,
