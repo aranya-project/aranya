@@ -3,7 +3,7 @@ name: "Transfer issues to next sprint"
 on:
   # Run at midnight CST (06:00 UTC) every Wednesday
   schedule:
-    - cron: "0 6 * * 3"
+    - cron: "0 6 * * wed"
   workflow_dispatch:
     branches:
       - main
@@ -35,4 +35,9 @@ jobs:
           iteration-field: Sprint
           iteration: last
           new-iteration: current
-          excluded-statuses: "Done,Won't Fix,Duplicate,Cannot Reproduce,Invalid"
+          excluded-statuses: >-
+            ✅ Done,
+            ❌ Won't Do,
+            🖨️ Duplicate,
+            ❓ Cannot Reproduce,
+            ⛔️ Invalid
