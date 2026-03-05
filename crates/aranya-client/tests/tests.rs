@@ -3043,20 +3043,19 @@ async fn test_duplicate_label_assignment_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let member_role_rank = owner_team.query_rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label(text!("dup_label"), label_rank)
-        .await?;
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
 
     // First assignment should succeed.
     owner_team
         .device(devices.membera.id)
-        .assign_label(label_id, ChanOp::SendRecv)
-        .await?;
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect("first label assignment should succeed");
 
     // Second assignment of the same label should fail.
     let err = owner_team
         .device(devices.membera.id)
-        .assign_label(label_id, ChanOp::SendRecv)
+        .assign_label(label, ChanOp::SendRecv)
         .await
         .expect_err("duplicate label assignment should fail");
     assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
@@ -3079,21 +3078,20 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let member_role_rank = owner_team.query_rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label(text!("gen_label"), label_rank)
-        .await?;
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
 
     // Generation counter should start at 0.
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(gen, Some(0), "initial generation should be 0");
 
     // Assign label to membera.
     owner_team
         .device(devices.membera.id)
-        .assign_label(label_id, ChanOp::SendRecv)
+        .assign_label(label, ChanOp::SendRecv)
         .await?;
 
     // Verify label is visible.
@@ -3113,7 +3111,8 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(gen, Some(1), "generation should be 1 after removal");
 
     // Re-add membera with the member role.
@@ -3130,7 +3129,8 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
 
     // Old label assignment should be stale (not visible).
@@ -3147,14 +3147,15 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     // Reassigning the same label should succeed (stale gen < current gen).
     owner_team
         .device(devices.membera.id)
-        .assign_label(label_id, ChanOp::SendRecv)
+        .assign_label(label, ChanOp::SendRecv)
         .await?;
 
     // Generation counter should still be 1 (reassignment doesn't change it).
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(
         gen,
         Some(1),
@@ -3205,8 +3206,9 @@ async fn test_add_device_to_team_twice_rejected() -> Result<()> {
     Ok(())
 }
 
-/// Revoking a stale label assignment (from before device removal and
-/// re-add) should fail because the generation counter doesn't match.
+/// Revoking a label from a device that was removed from the team should
+/// fail, and revoking a stale label assignment (from before device removal
+/// and re-add) should also fail because the generation counter doesn't match.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_revoke_stale_label_assignment_rejected").await?;
@@ -3220,35 +3222,45 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let member_role_rank = owner_team.query_rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
-    let label_id = owner_team
-        .create_label(text!("stale_label"), label_rank)
-        .await?;
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
 
     // Generation should start at 0.
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(gen, Some(0), "initial generation should be 0");
 
     // Assign label to membera.
     owner_team
         .device(devices.membera.id)
-        .assign_label(label_id, ChanOp::SendRecv)
-        .await?;
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect("label assignment should succeed");
 
     // Remove membera from team.
     owner_team
         .device(devices.membera.id)
         .remove_from_team()
-        .await?;
+        .await
+        .expect("remove_from_team should succeed");
 
     // Generation counter increments on removal.
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(gen, Some(1), "generation should be 1 after removal");
+
+    // Revoking a label from a removed device should fail.
+    let err = owner_team
+        .device(devices.membera.id)
+        .revoke_label(label)
+        .await
+        .expect_err("revoking label from removed device should fail");
+    assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
 
     // Re-add membera with the member role.
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
@@ -3258,19 +3270,21 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
             Some(roles.member().id),
             device_rank,
         )
-        .await?;
+        .await
+        .expect("re-adding device should succeed");
 
     // Generation counter should not change on re-add.
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
-        .await?;
+        .await
+        .expect("query_device_generation should succeed");
     assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
 
     // Try to revoke the stale label assignment (generation mismatch).
     let err = owner_team
         .device(devices.membera.id)
-        .revoke_label(label_id)
+        .revoke_label(label)
         .await
         .expect_err("revoking stale label assignment should fail");
     assert!(matches!(err, aranya_client::Error::Aranya(_)), "{err:?}");
@@ -3279,7 +3293,7 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
 }
 
 /// Removing and re-adding a device 10 times should increment the
-/// generation counter each time.
+/// generation counter each time on removal, not on re-add.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_device_generation_counter_increments() -> Result<()> {
     let mut devices = DevicesCtx::new("test_device_generation_counter_increments").await?;
@@ -3288,6 +3302,21 @@ async fn test_device_generation_counter_increments() -> Result<()> {
         .setup_default_roles(team_id)
         .await
         .context("unable to setup default roles")?;
+
+    // Before adding membera, the generation counter should not exist.
+    let gen = devices
+        .owner
+        .client
+        .team(team_id)
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await
+        .expect("query_device_generation should succeed");
+    assert_eq!(
+        gen, None,
+        "generation should be None before device is added"
+    );
+
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
@@ -3295,11 +3324,14 @@ async fn test_device_generation_counter_increments() -> Result<()> {
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
     for i in 0..10 {
+        let expected_next = i + 1;
+
         // Verify generation counter equals loop index before removal.
         let gen = owner_team
             .device(devices.membera.id)
             .query_device_generation()
-            .await?;
+            .await
+            .expect("query_device_generation should succeed");
         assert_eq!(
             gen,
             Some(i),
@@ -3310,18 +3342,19 @@ async fn test_device_generation_counter_increments() -> Result<()> {
         owner_team
             .device(devices.membera.id)
             .remove_from_team()
-            .await?;
+            .await
+            .expect("remove_from_team should succeed");
 
         // Generation increments on removal.
         let gen = owner_team
             .device(devices.membera.id)
             .query_device_generation()
-            .await?;
+            .await
+            .expect("query_device_generation should succeed");
         assert_eq!(
             gen,
-            Some(i + 1),
-            "generation should be {} after removal at iteration {i}",
-            i + 1
+            Some(expected_next),
+            "generation should be {expected_next} after removal at iteration {i}"
         );
 
         // Re-add membera with the member role.
@@ -3331,27 +3364,21 @@ async fn test_device_generation_counter_increments() -> Result<()> {
                 Some(roles.member().id),
                 device_rank,
             )
-            .await?;
+            .await
+            .expect("re-adding device should succeed");
 
         // Generation should not change on re-add.
         let gen = owner_team
             .device(devices.membera.id)
             .query_device_generation()
-            .await?;
+            .await
+            .expect("query_device_generation should succeed");
         assert_eq!(
             gen,
-            Some(i + 1),
-            "generation should still be {} after re-add at iteration {i}",
-            i + 1
+            Some(expected_next),
+            "generation should still be {expected_next} after re-add at iteration {i}"
         );
     }
-
-    // Final check: generation should be 10.
-    let gen = owner_team
-        .device(devices.membera.id)
-        .query_device_generation()
-        .await?;
-    assert_eq!(gen, Some(10), "generation should be 10 after 10 cycles");
 
     Ok(())
 }

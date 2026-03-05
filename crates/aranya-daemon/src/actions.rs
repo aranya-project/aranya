@@ -256,7 +256,6 @@ where
 
     /// Invokes `query_device_generation`.
     #[cfg(feature = "test-utils")]
-    #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
     fn query_device_generation(
         &self,
