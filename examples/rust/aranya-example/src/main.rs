@@ -516,7 +516,7 @@ async fn main() -> Result<()> {
 
     // Operator assigns the label to membera and memberb.
     let op = ChanOp::SendRecv;
-    operator_team.sync_now(owner_addr, None).await?;
+    operator_team.sync_now(admin_addr, None).await?;
 
     info!("operator assigning label to membera");
     operator_team
