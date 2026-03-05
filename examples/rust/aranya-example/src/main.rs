@@ -392,13 +392,14 @@ async fn main() -> Result<()> {
     membera_team.sync_now(owner_addr, None).await?;
     memberb_team.sync_now(owner_addr, None).await?;
 
-    // Admin adds membera and memberb to the team.
+    // Admin adds membera and memberb to the team (without roles, since
+    // the admin does not have AssignRole permission).
     info!("admin adding membera to team");
     let member_role_rank = admin_team.query_rank(member_role.id).await?;
     admin_team
         .add_device(
             membera.pk.clone(),
-            Some(member_role.id),
+            None,
             Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
@@ -407,9 +408,23 @@ async fn main() -> Result<()> {
     admin_team
         .add_device(
             memberb.pk.clone(),
-            Some(member_role.id),
+            None,
             Rank::new(member_role_rank.value().saturating_sub(1)),
         )
+        .await?;
+
+    // Operator assigns the member role to membera and memberb.
+    operator_team.sync_now(owner_addr, None).await?;
+
+    info!("operator assigning member role to membera");
+    operator_team
+        .device(membera.id)
+        .assign_role(member_role.id)
+        .await?;
+    info!("operator assigning member role to memberb");
+    operator_team
+        .device(memberb.id)
+        .assign_role(member_role.id)
         .await?;
 
     // Sync membera and memberb so they see their team membership and roles.
@@ -507,11 +522,11 @@ async fn main() -> Result<()> {
     let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
-    // Admin creates a label.
+    // Admin creates a label. The label rank must be lower than the
+    // operator's device rank so the operator can assign it to devices.
     info!("admin creating label");
-    let admin_device_rank = admin_team.query_rank(admin.id).await?;
-    // Label rank must be lower than the admin's device rank so the admin can operate on it.
-    let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
+    let operator_device_rank = admin_team.query_rank(operator.id).await?;
+    let label_rank = Rank::new(operator_device_rank.value().saturating_sub(1));
     let label3 = admin_team.create_label(text!("label3"), label_rank).await?;
 
     // Operator assigns the label to membera and memberb.
