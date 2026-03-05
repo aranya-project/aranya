@@ -3375,6 +3375,13 @@ command RevokeLabelFromDevice {
             label_id: this.label_id,
             device_id: this.device_id,
         ]
+        // Reject revocations of stale label assignments. When a
+        // device is removed and re-added its generation counter is
+        // incremented, which implicitly invalidates all prior label
+        // assignments. Revoking one of those stale assignments
+        // would delete the fact row and prevent a future (valid)
+        // assign from reusing it via the `device_gen < current_gen`
+        // update path.
         check label_assignment_matches_gen(this.device_id, assignment.device_gen)
 
         // At this point we believe the following to be true:
