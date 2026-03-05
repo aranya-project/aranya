@@ -1095,7 +1095,7 @@ ephemeral command QueryRank {
 Returns the generation counter for a device. This query is intended
 for testing only and should not be exposed via any public APIs.
 
-<!-- TODO(#747): Add conditional compilation to the policy language so
+<!-- TODO: Add conditional compilation to the policy language so
      test-only actions/commands can be gated at the policy level. -->
 
 ```policy
