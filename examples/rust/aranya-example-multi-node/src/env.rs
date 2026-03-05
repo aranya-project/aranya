@@ -57,11 +57,11 @@ impl EnvVars {
             };
             devices.push(device);
         }
-        let memberb = devices.pop().expect("expected device");
-        let membera = devices.pop().expect("expected device");
-        let operator = devices.pop().expect("expected device");
-        let admin = devices.pop().expect("expected device");
-        let owner = devices.pop().expect("expected device");
+        let memberb = devices.pop().context("expected device")?;
+        let membera = devices.pop().context("expected device")?;
+        let operator = devices.pop().context("expected device")?;
+        let admin = devices.pop().context("expected device")?;
+        let owner = devices.pop().context("expected device")?;
         Ok(Self {
             level,
             passphrase,
