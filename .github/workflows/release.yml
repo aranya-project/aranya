@@ -10,7 +10,7 @@ on:
   push:
     branches:
       - main
-      - 'patch/**/*'
+      - 'release/**/*'
 
 jobs:
   # Publish unpublished crates and create a git tag
