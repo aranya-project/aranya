@@ -1,0 +1,43 @@
+name: "Transfer issues to next sprint"
+
+on:
+  # Run at midnight CST (06:00 UTC) every Wednesday
+  schedule:
+    - cron: "0 6 * * wed"
+  workflow_dispatch:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  move-issues:
+    name: Move issues to next sprint iteration
+    runs-on: ubuntu-latest
+    environment: sprint-management
+    steps:
+      - name: Move incomplete issues to next iteration
+        # Pinned to v0.6.1 (https://github.com/blombard/move-to-next-iteration)
+        # TODO: DevOps needs to fork blombard/move-to-next-iteration into aranya-project
+        #   and update this reference to use the forked repo.
+        uses: blombard/move-to-next-iteration@e0d7571f7fa517a8da883e25b797b9d588e16538
+        with:
+          owner: aranya-project
+          number: 1
+          # TODO: DevOps needs to:
+          #   1. Create a GitHub Environment named "sprint-management" with a branch
+          #      protection rule limiting deployment to the main branch
+          #   2. Create a PAT with the following minimum permissions:
+          #      - project (read/write) - required to read project items and update iteration fields
+          #   3. Store the PAT as an environment secret named PROJECT_PAT
+          token: ${{ secrets.PROJECT_PAT }}
+          iteration-field: Sprint
+          iteration: last
+          new-iteration: current
+          excluded-statuses: >-
+            ✅ Done,
+            ❌ Won't Do,
+            🖨️ Duplicate,
+            ❓ Cannot Reproduce,
+            ⛔️ Invalid
