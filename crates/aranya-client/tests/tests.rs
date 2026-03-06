@@ -820,7 +820,7 @@ async fn test_add_team() -> Result<()> {
         .assign_role(roles.admin().id)
         .await?;
 
-    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    // Let's sync immediately. The role change will not propagate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id);
         let err = admin
@@ -1073,7 +1073,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .assign_role(roles2.admin().id)
         .await?;
 
-    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    // Let's sync immediately. The role change will not propagate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id1);
         let err = admin
@@ -1122,7 +1122,7 @@ async fn test_multi_team_sync() -> Result<()> {
         .await
         .context("Creating a label should not fail here!")?;
 
-    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    // Let's sync immediately. The role change will not propagate since add_team() hasn't been called.
     {
         let admin = devices.admin.client.team(team_id2);
         let err = admin

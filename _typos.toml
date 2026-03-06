@@ -1,0 +1,8 @@
+[files]
+extend-exclude = []
+
+[default.extend-identifiers]
+bimap = "bimap"
+PNGs = "PNGs"
+
+[default.extend-words]
