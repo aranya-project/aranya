@@ -392,30 +392,46 @@ async fn main() -> Result<()> {
     membera_team.sync_now(owner_addr, None).await?;
     memberb_team.sync_now(owner_addr, None).await?;
 
-    // add membera to team.
-    info!("adding membera to team");
-    let member_role_rank = owner_team.query_rank(member_role.id).await?;
-    owner_team
+    // Admin adds membera and memberb to the team (without roles, since
+    // the admin does not have AssignRole permission).
+    info!("admin adding membera to team");
+    let member_role_rank = admin_team.query_rank(member_role.id).await?;
+    admin_team
         .add_device(
             membera.pk.clone(),
-            Some(member_role.id),
+            None,
             Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
 
-    // add memberb to team.
-    info!("adding memberb to team");
-    owner_team
+    info!("admin adding memberb to team");
+    admin_team
         .add_device(
             memberb.pk.clone(),
-            Some(member_role.id),
+            None,
             Rank::new(member_role_rank.value().saturating_sub(1)),
         )
         .await?;
 
-    // Sync membera and memberb so they see their team membership and roles.
-    membera_team.sync_now(owner_addr, None).await?;
-    memberb_team.sync_now(owner_addr, None).await?;
+    // Operator assigns the member role to membera and memberb.
+    // Sync with admin to pick up the AddDevice commands.
+    operator_team.sync_now(admin_addr, None).await?;
+
+    info!("operator assigning member role to membera");
+    operator_team
+        .device(membera.id)
+        .assign_role(member_role.id)
+        .await?;
+    info!("operator assigning member role to memberb");
+    operator_team
+        .device(memberb.id)
+        .assign_role(member_role.id)
+        .await?;
+
+    // Sync membera and memberb with the operator so they see their
+    // team membership (added by admin) and role assignments (by operator).
+    membera_team.sync_now(operator_addr, None).await?;
+    memberb_team.sync_now(operator_addr, None).await?;
 
     // Demo custom roles.
     info!("demo custom roles functionality");
@@ -508,26 +524,31 @@ async fn main() -> Result<()> {
     let keybundle = owner_device.public_key_bundle().await?;
     info!("owner keybundle: {:?}", keybundle);
 
-    info!("creating label");
-    let owner_device_rank = owner_team.query_rank(owner.id).await?;
-    // Label rank must be lower than the owner's device rank so the owner can operate on it.
-    let label_rank = Rank::new(owner_device_rank.value().saturating_sub(1));
-    let label3 = owner_team.create_label(text!("label3"), label_rank).await?;
+    // Admin creates a label. The label rank must be lower than the
+    // operator's device rank so the operator can assign it to devices.
+    info!("admin creating label");
+    let operator_device_rank = admin_team.query_rank(operator.id).await?;
+    let label_rank = Rank::new(operator_device_rank.value().saturating_sub(1));
+    let label3 = admin_team.create_label(text!("label3"), label_rank).await?;
+
+    // Operator assigns the label to membera and memberb.
     let op = ChanOp::SendRecv;
-    info!("assigning label to membera");
-    owner_team
+    operator_team.sync_now(admin_addr, None).await?;
+
+    info!("operator assigning label to membera");
+    operator_team
         .device(membera.id)
         .assign_label(label3, op)
         .await?;
-    info!("assigning label to memberb");
-    owner_team
+    info!("operator assigning label to memberb");
+    operator_team
         .device(memberb.id)
         .assign_label(label3, op)
         .await?;
 
-    // Sync membera and memberb so they see the label assignments.
-    membera_team.sync_now(owner_addr, None).await?;
-    memberb_team.sync_now(owner_addr, None).await?;
+    // Sync membera and memberb with the operator so they see the label assignments.
+    membera_team.sync_now(operator_addr, None).await?;
+    memberb_team.sync_now(operator_addr, None).await?;
 
     // Demo AFC.
     info!("demo afc functionality");
