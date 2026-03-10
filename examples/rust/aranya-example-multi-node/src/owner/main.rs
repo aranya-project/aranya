@@ -1,10 +1,8 @@
 //! Owner device.
 
-#![allow(clippy::panic)]
-
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{ensure, Context as _, Result};
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -50,7 +48,7 @@ async fn main() -> Result<()> {
     })
     .retry(ExponentialBuilder::default())
     .await
-    .expect("expected to initialize client");
+    .context("expected to initialize client")?;
     info!("owner: initialized client");
 
     // Create team.
@@ -69,21 +67,23 @@ async fn main() -> Result<()> {
     let team = client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .context("expected to create team")?;
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 
     {
-        let roles = team.roles().await.expect("could not query roles");
+        let roles = team.roles().await.context("could not query roles")?;
         let mut roles = roles.iter();
-        let owner_role = roles.next().expect("missing role");
-        if roles.next().is_some() {
-            panic!("unexpected roles");
-        }
-        assert_eq!(owner_role.name, "owner");
-        team.setup_default_roles(owner_role.id)
+        let owner_role = roles.next().context("missing role")?;
+        ensure!(roles.next().is_none(), "unexpected extra roles");
+        ensure!(
+            owner_role.name == "owner",
+            "expected owner role, got {}",
+            owner_role.name
+        );
+        team.setup_default_roles()
             .await
-            .expect("could not set up default roles");
+            .context("could not set up default roles")?;
     }
 
     // Send team ID and IKM to each device except for itself.
@@ -106,14 +106,7 @@ async fn main() -> Result<()> {
         let info: DeviceInfo = onboard.recv().await?;
         info!("owner: received device ID from {}", device.name);
 
-        team.add_device(info.pk, None).await?;
-        info!("owner: added device to team {}", device.name);
-
-        // We did not assign a role by default, so let's add one.
-        info!(
-            "owner: assigning role {:?} to device {}",
-            device.role, device.name
-        );
+        // Find the role for this device.
         let role = team
             .roles()
             .await?
@@ -121,10 +114,28 @@ async fn main() -> Result<()> {
             .find(|r| *r.name == *device.role)
             .ok_or_else(|| anyhow::anyhow!("role not found"))?
             .clone();
+
+        // Query the role's rank and set device rank to role_rank - 1.
+        // This ensures the device rank is below its role rank as required.
+        let role_rank = team.query_rank(role.id).await?;
+        let device_rank = aranya_client::Rank::new(role_rank.value().saturating_sub(1));
+
+        team.add_device(info.pk.clone(), None, device_rank).await?;
+        info!(
+            "owner: added device to team {} with rank {}",
+            device.name,
+            device_rank.value()
+        );
+
+        // Assign the role to the device.
+        info!(
+            "owner: assigning role {:?} to device {}",
+            device.role, device.name
+        );
         team.device(info.device_id)
             .assign_role(role.id)
             .await
-            .expect("expected to assign role");
+            .context("expected to assign role")?;
         info!(
             "owner: assigned role {:?} to device {}",
             device.role, device.name

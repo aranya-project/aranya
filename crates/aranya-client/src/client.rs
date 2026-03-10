@@ -2,6 +2,7 @@
 
 mod device;
 mod label;
+mod object;
 mod role;
 mod team;
 
@@ -11,18 +12,14 @@ use anyhow::Context as _;
 use aranya_crypto::{Csprng, Rng};
 #[doc(inline)]
 pub use aranya_daemon_api::ChanOp;
+#[doc(inline)]
+pub use aranya_daemon_api::Perm as Permission;
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
     DaemonApiClient, Version, CS,
-};
-#[cfg(feature = "preview")]
-#[cfg_attr(docsrs, doc(cfg(feature = "preview")))]
-#[doc(inline)]
-pub use aranya_daemon_api::{
-    RoleManagementPerm as RoleManagementPermission, SimplePerm as Permission,
 };
 use aranya_util::{error::ReportExt, Addr};
 use tokio::{fs, net::UnixStream};
@@ -40,6 +37,7 @@ pub use self::device::KeyBundle;
 pub use self::{
     device::{Device, DeviceId, Devices, PublicKeyBundle},
     label::{Label, LabelId, Labels},
+    object::{ObjectId, Rank},
     role::{Role, RoleId, Roles},
     team::{Team, TeamId},
 };
