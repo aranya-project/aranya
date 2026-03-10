@@ -9,8 +9,8 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        create_ctx, object::ToObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels,
-        Permission, PublicKeyBundle, Rank, Role, RoleId, Roles,
+        object::ToObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels, Permission,
+        PublicKeyBundle, Rank, Role, RoleId, Roles,
     },
     config::SyncPeerConfig,
     error::{self, aranya_error, IpcError, Result},
