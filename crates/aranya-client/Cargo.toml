@@ -69,6 +69,10 @@ tracing-subscriber = { workspace = true, features = ["json"] }
 name = "tests"
 path = "tests/tests.rs"
 
+[[test]]
+name = "ring_convergence"
+path = "tests/ring_convergence.rs"
+
 
 [package.metadata.cargo-all-features]
 always_include_features = [
