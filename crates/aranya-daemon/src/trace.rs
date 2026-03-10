@@ -20,8 +20,10 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_trace_id_creation() {
-        let trace_id = TraceId::default();
+    async fn test_setup_trace_context_from_tarpc_context() {
+        let ctx = tarpc::context::current();
+        setup_trace_context(&ctx, "DaemonApi.version");
+        let trace_id = ctx.trace_context.trace_id;
         assert!(!trace_id.to_string().is_empty());
     }
 }
