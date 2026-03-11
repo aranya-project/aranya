@@ -2,7 +2,7 @@
 use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
@@ -28,8 +28,7 @@ use super::{PskStore, SharedConnectionMap, SyncState, ALPN_QUIC_SYNC};
 use crate::{
     aranya::Client,
     sync::{
-        transport::quic, Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer,
-        SyncResponse,
+        Addr, Callback, Error, GraphId, Result, SyncManager, SyncPeer, SyncResponse, quic::server::MAX_SYNC_WIRE_MESSAGE_SIZE, transport::quic
     },
 };
 
@@ -338,9 +337,28 @@ where
         trace!("client receiving sync response from QUIC sync server");
 
         let mut recv_buf = Vec::new();
-        recv.read_to_end(&mut recv_buf)
+        let cap_plus_one = MAX_SYNC_WIRE_MESSAGE_SIZE + 1;
+
+        recv.take(cap_plus_one as u64)
+            .read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
+
+        debug_assert!(
+            recv_buf.len() <= cap_plus_one,
+            "bounded read invariant violated: len={} cap_plus_one={}",
+            recv_buf.len(),
+            cap_plus_one
+        );
+
+        if recv_buf.len() > MAX_SYNC_WIRE_MESSAGE_SIZE {
+            return Err(anyhow!(
+                "sync response too large: {} > {} bytes",
+                recv_buf.len(),
+                MAX_SYNC_WIRE_MESSAGE_SIZE
+            )
+            .into());
+        }
         trace!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.
