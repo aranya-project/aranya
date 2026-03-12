@@ -3180,9 +3180,8 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 // - It is an error if the device has already been granted
 //   permission to use this label for its current generation.
 // - It is an error if the device is not permitted to use AFC.
-// - It is an error if the device's generation counter has changed
-//   since the action was authored (e.g. the device was removed
-//   and re-added due to braid reordering).
+// - It is an error if the device's generation has changed since
+//   the action was authored (stale membership epoch).
 //
 // # Required Permissions
 //
@@ -3190,12 +3189,7 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 //
 // Additionally, the target device must have `CanUseAfc` permissions
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
-    // Capture the device's current generation at authoring time so
-    // the command is bound to this specific membership epoch. If
-    // the device is removed and re-added before the command is
-    // evaluated (e.g. due to braid reordering), the generation
-    // mismatch will cause the command to fail rather than silently
-    // assigning the label to a different membership epoch.
+    // Bind the command to this membership epoch.
     let gen = get_device_gen(device_id)
     publish AssignLabelToDevice {
         device_id: device_id,
@@ -3229,10 +3223,7 @@ command AssignLabelToDevice {
         // The channel operations the device is allowed to use
         // the label for.
         op enum ChanOp,
-        // The device's generation counter at the time the action
-        // was authored. This binds the command to a specific
-        // membership epoch so that braid reordering cannot
-        // silently apply the assignment to a different epoch.
+        // Device generation at authoring time; rejects stale epochs.
         device_gen int,
     }
 
@@ -3255,11 +3246,7 @@ command AssignLabelToDevice {
         // The target device must be able to use AFC.
         check device_has_perm(this.device_id, Perm::CanUseAfc)
 
-        // Verify the device's generation has not changed since the
-        // action was authored. If a remove/re-add was reordered
-        // before this command, the generation will have changed and
-        // this check will fail, preventing the label from being
-        // silently assigned to a different membership epoch.
+        // Reject if the device's membership epoch changed (e.g. reordered remove/re-add).
         let current_gen = get_device_gen(this.device_id)
         check this.device_gen == current_gen
 
