@@ -3293,3 +3293,96 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
 
     Ok(())
 }
+
+/// When one device assigns a label and another concurrently removes the
+/// target device (without syncing), the label assignment should be
+/// invalidated after syncing because its embedded generation counter
+/// won't match the device's current generation after reordering.
+///
+/// Timeline:
+///   owner: assign label to membera (captures device_gen=0)
+///   admin: remove membera from team (bumps device_gen to 1)
+///   (no sync between owner and admin during these operations)
+///   sync all -> braid reorders remove before assign
+///   -> assign fails because device_gen=0 != current_gen=1
+///   owner: re-add membera (device_gen stays 1)
+///   -> label should not be assigned
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_concurrent_label_assign_and_device_removal").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Create a label that can be assigned to members.
+    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
+
+    // Sync so admin sees all devices and the label.
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // --- Concurrent operations without syncing ---
+    // Owner assigns the label to membera (captures device_gen=0).
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect("label assignment should succeed locally");
+
+    // Admin removes membera from the team (bumps device_gen to 1).
+    // Admin has not synced with owner, so it doesn't know about the
+    // label assignment.
+    admin_team
+        .device(devices.membera.id)
+        .remove_from_team()
+        .await
+        .expect("remove should succeed locally");
+
+    // --- Sync to trigger braid reordering ---
+    // After syncing, both commands land on both devices. The braid
+    // must order them. Regardless of ordering, the label assignment's
+    // embedded device_gen=0 should not match after the removal bumps
+    // the generation to 1.
+    admin_team.sync_now(owner_addr, None).await?;
+    // Sync back to owner so it sees the removal.
+    owner_team
+        .sync_now(devices.admin.aranya_local_addr().await?, None)
+        .await?;
+    // Allow time for sync to propagate.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Re-add membera so we can query label state for this device.
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await
+        .context("re-adding device should succeed")?;
+
+    // The label should NOT be assigned. The concurrent assignment
+    // was authored with device_gen=0, but the removal changed the
+    // generation to 1, so the assignment should have been rejected
+    // or recalled during braid evaluation.
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        0,
+        "label should not be assigned after concurrent removal invalidated the assignment"
+    );
+
+    Ok(())
+}

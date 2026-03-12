@@ -3180,6 +3180,9 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 // - It is an error if the device has already been granted
 //   permission to use this label for its current generation.
 // - It is an error if the device is not permitted to use AFC.
+// - It is an error if the device's generation counter has changed
+//   since the action was authored (e.g. the device was removed
+//   and re-added due to braid reordering).
 //
 // # Required Permissions
 //
@@ -3187,10 +3190,18 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 //
 // Additionally, the target device must have `CanUseAfc` permissions
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
+    // Capture the device's current generation at authoring time so
+    // the command is bound to this specific membership epoch. If
+    // the device is removed and re-added before the command is
+    // evaluated (e.g. due to braid reordering), the generation
+    // mismatch will cause the command to fail rather than silently
+    // assigning the label to a different membership epoch.
+    let gen = get_device_gen(device_id)
     publish AssignLabelToDevice {
         device_id: device_id,
         label_id: label_id,
         op: op,
+        device_gen: gen,
     }
 }
 
@@ -3218,6 +3229,11 @@ command AssignLabelToDevice {
         // The channel operations the device is allowed to use
         // the label for.
         op enum ChanOp,
+        // The device's generation counter at the time the action
+        // was authored. This binds the command to a specific
+        // membership epoch so that braid reordering cannot
+        // silently apply the assignment to a different epoch.
+        device_gen int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -3239,12 +3255,18 @@ command AssignLabelToDevice {
         // The target device must be able to use AFC.
         check device_has_perm(this.device_id, Perm::CanUseAfc)
 
+        // Verify the device's generation has not changed since the
+        // action was authored. If a remove/re-add was reordered
+        // before this command, the generation will have changed and
+        // this check will fail, preventing the label from being
+        // silently assigned to a different membership epoch.
+        let current_gen = get_device_gen(this.device_id)
+        check this.device_gen == current_gen
+
         let existing_assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
         ]
-
-        let current_gen = get_device_gen(this.device_id)
 
         if existing_assignment is Some {
             // Only allow reuse when the stored assignment is
@@ -3259,6 +3281,7 @@ command AssignLabelToDevice {
             // - `author` outranks `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
+            // - the command's generation matches the device's current generation
             // - the existing assignment is stale because the device has
             //   been re-provisioned
             finish {
@@ -3287,13 +3310,14 @@ command AssignLabelToDevice {
             // - `author` outranks `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
+            // - the command's generation matches the device's current generation
             finish {
                 create LabelAssignedToDevice[
                     label_id: this.label_id,
                     device_id: this.device_id,
                 ]=>{
                     op: this.op,
-                    device_gen: current_gen,
+                    device_gen: this.device_gen,
                 }
 
                 emit AssignedLabelToDevice {
