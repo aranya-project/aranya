@@ -3370,7 +3370,11 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .device(devices.membera.id)
         .query_device_generation()
         .await?;
-    assert_eq!(gen, Some(0), "generation should still be 0 on owner before sync");
+    assert_eq!(
+        gen,
+        Some(0),
+        "generation should still be 0 on owner before sync"
+    );
 
     // Admin removes membera from the team (bumps device_gen to 1).
     // Admin has not synced with owner, so it doesn't know about the
@@ -3386,14 +3390,22 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .device(devices.membera.id)
         .query_device_generation()
         .await?;
-    assert_eq!(gen, Some(1), "generation should be 1 on admin after removal");
+    assert_eq!(
+        gen,
+        Some(1),
+        "generation should be 1 on admin after removal"
+    );
 
     // Owner still sees gen=0 because it hasn't synced the removal yet.
     let gen = owner_team
         .device(devices.membera.id)
         .query_device_generation()
         .await?;
-    assert_eq!(gen, Some(0), "generation should still be 0 on owner before sync");
+    assert_eq!(
+        gen,
+        Some(0),
+        "generation should still be 0 on owner before sync"
+    );
 
     // --- Sync to trigger braid reordering ---
     // RemoveDevice (priority 400) is ordered before AssignLabelToDevice
