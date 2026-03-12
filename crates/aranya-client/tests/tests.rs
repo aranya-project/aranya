@@ -3367,9 +3367,6 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
     owner_team
         .sync_now(devices.admin.aranya_local_addr().await?, None)
         .await?;
-    // Allow time for sync to propagate.
-    sleep(SLEEP_INTERVAL).await;
-
     // After sync, membera has been removed. The label assignment that
     // was valid on the owner before sync should have been recalled
     // because the embedded device_gen=0 no longer matches the
@@ -3402,7 +3399,6 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
 
     // Verify on the admin's device as well.
     admin_team.sync_now(owner_addr, None).await?;
-    sleep(SLEEP_INTERVAL).await;
     let labels = admin_team
         .device(devices.membera.id)
         .label_assignments()
