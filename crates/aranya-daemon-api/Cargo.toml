@@ -24,6 +24,9 @@ afc = ["dep:aranya-fast-channels"]
 # Experimental features
 experimental = []
 
+# Test utilities (not part of the public API)
+test-utils = []
+
 
 [dependencies]
 aranya-util = { workspace = true }
