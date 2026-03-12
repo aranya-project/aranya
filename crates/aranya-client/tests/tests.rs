@@ -3337,6 +3337,17 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .await
         .expect("label assignment should succeed locally");
 
+    // On the owner's device the label assignment is valid.
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        1,
+        "label should be assigned on owner before sync"
+    );
+
     // Admin removes membera from the team (bumps device_gen to 1).
     // Admin has not synced with owner, so it doesn't know about the
     // label assignment.
@@ -3359,6 +3370,11 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
     // Allow time for sync to propagate.
     sleep(SLEEP_INTERVAL).await;
 
+    // After sync, membera has been removed. The label assignment that
+    // was valid on the owner before sync should have been recalled
+    // because the embedded device_gen=0 no longer matches the
+    // device's current generation (1).
+
     // Re-add membera so we can query label state for this device.
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     owner_team
@@ -3370,10 +3386,10 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .await
         .context("re-adding device should succeed")?;
 
-    // The label should NOT be assigned. The concurrent assignment
-    // was authored with device_gen=0, but the removal changed the
-    // generation to 1, so the assignment should have been rejected
-    // or recalled during braid evaluation.
+    // The label that was previously assigned (and valid before sync)
+    // should NOT be assigned now. The concurrent removal changed the
+    // generation to 1, so the assignment authored with device_gen=0
+    // was rejected during braid evaluation.
     let labels = owner_team
         .device(devices.membera.id)
         .label_assignments()
@@ -3382,6 +3398,19 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         labels.iter().count(),
         0,
         "label should not be assigned after concurrent removal invalidated the assignment"
+    );
+
+    // Verify on the admin's device as well.
+    admin_team.sync_now(owner_addr, None).await?;
+    sleep(SLEEP_INTERVAL).await;
+    let labels = admin_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        0,
+        "label should not be assigned on admin after sync either"
     );
 
     Ok(())
