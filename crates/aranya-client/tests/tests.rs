@@ -3299,11 +3299,18 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
 /// invalidated after syncing because its embedded generation counter
 /// won't match the device's current generation after reordering.
 ///
+/// RemoveDevice has priority 400 and AssignLabelToDevice has priority
+/// 100, so the braid deterministically orders the remove before the
+/// assign when they are concurrent. This means:
+///   1. RemoveDevice runs first, bumping device_gen from 0 to 1.
+///   2. AssignLabelToDevice runs second with embedded device_gen=0,
+///      but the device's current gen is now 1 — the check fails.
+///
 /// Timeline:
 ///   owner: assign label to membera (captures device_gen=0)
 ///   admin: remove membera from team (bumps device_gen to 1)
 ///   (no sync between owner and admin during these operations)
-///   sync all -> braid reorders remove before assign
+///   sync all -> braid reorders remove before assign (priority 400 > 100)
 ///   -> assign fails because device_gen=0 != current_gen=1
 ///   owner: re-add membera (device_gen stays 1)
 ///   -> label should not be assigned
@@ -3329,6 +3336,18 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
     admin_team.sync_now(owner_addr, None).await?;
 
+    // Verify initial generation is 0 on both devices.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(0), "initial generation should be 0 on owner");
+    let gen = admin_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(0), "initial generation should be 0 on admin");
+
     // --- Concurrent operations without syncing ---
     // Owner assigns the label to membera (captures device_gen=0).
     owner_team
@@ -3337,7 +3356,7 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .await
         .expect("label assignment should succeed locally");
 
-    // On the owner's device the label assignment is valid.
+    // On the owner's device the label assignment is valid and gen is still 0.
     let labels = owner_team
         .device(devices.membera.id)
         .label_assignments()
@@ -3347,6 +3366,11 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         1,
         "label should be assigned on owner before sync"
     );
+    let gen = owner_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(0), "generation should still be 0 on owner before sync");
 
     // Admin removes membera from the team (bumps device_gen to 1).
     // Admin has not synced with owner, so it doesn't know about the
@@ -3357,20 +3381,39 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .await
         .expect("remove should succeed locally");
 
+    // On admin, the generation was bumped to 1 by the removal.
+    let gen = admin_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(1), "generation should be 1 on admin after removal");
+
+    // Owner still sees gen=0 because it hasn't synced the removal yet.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(0), "generation should still be 0 on owner before sync");
+
     // --- Sync to trigger braid reordering ---
-    // After syncing, both commands land on both devices. The braid
-    // must order them. Regardless of ordering, the label assignment's
-    // embedded device_gen=0 should not match after the removal bumps
-    // the generation to 1.
+    // RemoveDevice (priority 400) is ordered before AssignLabelToDevice
+    // (priority 100) by the braid. After syncing:
+    //   1. Both devices evaluate RemoveDevice first -> gen bumps to 1.
+    //   2. Both devices evaluate AssignLabelToDevice second -> check
+    //      fails because embedded device_gen=0 != current gen=1.
     admin_team.sync_now(owner_addr, None).await?;
     // Sync back to owner so it sees the removal.
     owner_team
         .sync_now(devices.admin.aranya_local_addr().await?, None)
         .await?;
-    // After sync, membera has been removed. The label assignment that
-    // was valid on the owner before sync should have been recalled
-    // because the embedded device_gen=0 no longer matches the
-    // device's current generation (1).
+
+    // After sync, both devices should agree: gen is 1 because the
+    // remove was processed. The label assignment was rejected.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(1), "generation should be 1 on owner after sync");
 
     // Re-add membera so we can query label state for this device.
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
@@ -3382,6 +3425,13 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         )
         .await
         .context("re-adding device should succeed")?;
+
+    // Generation stays at 1 after re-add (only removal increments it).
+    let gen = owner_team
+        .device(devices.membera.id)
+        .query_device_generation()
+        .await?;
+    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
 
     // The label that was previously assigned (and valid before sync)
     // should NOT be assigned now. The concurrent removal changed the
