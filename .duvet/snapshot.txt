@@ -1,0 +1,205 @@
+SPECIFICATION: [Multi-Daemon Convergence Test Specification](https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md)
+  SECTION: [CONF-001](#conf-001)
+    TEXT[!MUST,implementation,test]: The test MUST support configuring the number of nodes.
+
+  SECTION: [CONF-002](#conf-002)
+    TEXT[!MUST,implementation,test]: The test MUST scale to at least 70 nodes without failure.
+
+  SECTION: [CONF-003](#conf-003)
+    TEXT[!MUST,implementation,test]: The test MUST reject configurations with fewer than 3 nodes (the minimum for a valid ring).
+
+  SECTION: [CONF-004](#conf-004)
+    TEXT[!MUST,implementation]: In poll sync mode, the test MUST support configuring the sync interval between peers.
+
+  SECTION: [CONF-005](#conf-005)
+    TEXT[!MUST,implementation]: In poll sync mode, the default sync interval MUST be 1 second.
+
+  SECTION: [CONF-006](#conf-006)
+    TEXT[!MUST,implementation]: The test MUST support configuring a maximum test duration timeout.
+
+  SECTION: [CONF-007](#conf-007)
+    TEXT[!MUST,implementation]: The default maximum test duration MUST be 600 seconds (10 minutes).
+
+  SECTION: [CONF-008](#conf-008)
+    TEXT[!MUST,implementation,test]: The test MUST support configuring the sync mode (poll or hello).
+
+  SECTION: [CONF-009](#conf-009)
+    TEXT[!MUST,implementation,test]: The default sync mode MUST be hello.
+
+  SECTION: [CONF-010](#conf-010)
+    TEXT[!MUST,implementation]: In hello sync mode, the test MUST support configuring the hello notification debounce duration (minimum time between notifications to the same peer).
+
+  SECTION: [CONF-011](#conf-011)
+    TEXT[!MUST,implementation]: In hello sync mode, the test MUST support configuring the hello subscription duration (how long a subscription remains valid).
+
+  SECTION: [TOPO-001](#topo-001)
+    TEXT[!MUST,implementation]: The test MUST support the Ring topology.
+
+  SECTION: [TOPO-002](#topo-002)
+    TEXT[!MUST,implementation]: The test MUST support the Custom topology.
+
+  SECTION: [TOPO-003](#topo-003)
+    TEXT[!MUST,implementation]: The initial implementation MUST include at least the Ring and Custom topologies.
+
+  SECTION: [TOPO-004](#topo-004)
+    TEXT[!MUST,implementation]: When multiple topologies are configured, the test MUST apply them sequentially, each topology adding its peers on top of any previously configured peers.
+
+  SECTION: [RING-001](#ring-001)
+    TEXT[!MUST,implementation]: In the ring topology, each node MUST connect to exactly two other nodes: its clockwise neighbor and its counter-clockwise neighbor.
+
+  SECTION: [RING-002](#ring-002)
+    TEXT[!MUST,implementation]: The ring topology MUST form a single connected ring (each node's two peers link to form one cycle covering all nodes).
+
+  SECTION: [CUST-001](#cust-001)
+    TEXT[!MUST,implementation]: The Custom topology MUST accept a topology connect function (`TopologyConnectFn`) that takes the total node count and returns the peer list for each node.
+
+  SECTION: [CUST-002](#cust-002)
+    TEXT[!MUST,implementation]: The topology connect function MUST return a peer list of length equal to the node count, where each entry contains the `NodeIndex`s of that node's sync peers.
+
+  SECTION: [CUST-003](#cust-003)
+    TEXT[!MUST,implementation]: The Custom topology MUST allow defining arbitrary peer relationships between nodes, including topologies such as star, mesh, and hierarchical.
+
+  SECTION: [CUST-004](#cust-004)
+    TEXT[!MUST,implementation]: `TestCtx` MUST provide an `add_sync_peer` method that adds a sync peer relationship between two nodes identified by `NodeIndex`.
+
+  SECTION: [CUST-005](#cust-005)
+    TEXT[!MUST,implementation]: `TestCtx` MUST provide a `remove_sync_peer` method that removes a sync peer relationship between two nodes identified by `NodeIndex`.
+
+  SECTION: [INIT-001](#init-001)
+    TEXT[!MUST,implementation]: Each node MUST be initialized with a unique daemon instance.
+
+  SECTION: [INIT-002](#init-002)
+    TEXT[!MUST,implementation]: Each node MUST have its own cryptographic keys.
+
+  SECTION: [INIT-003](#init-003)
+    TEXT[!MUST,implementation]: All nodes MUST have unique device IDs.
+
+  SECTION: [INIT-004](#init-004)
+    TEXT[!MUST,implementation]: Node initialization MUST occur in parallel batches to avoid resource exhaustion.
+
+  SECTION: [INIT-005](#init-005)
+    TEXT[!MUST,implementation]: Node initialization MUST complete within a configurable timeout (default: 60 seconds per node batch).
+
+  SECTION: [INIT-006](#init-006)
+    TEXT[!MUST,implementation]: The test MUST verify that all nodes started successfully.
+
+  SECTION: [TEAM-001](#team-001)
+    TEXT[!MUST,implementation]: A single team MUST be created by node 0 (the designated owner).
+
+  SECTION: [TEAM-002](#team-002)
+    TEXT[!MUST,implementation]: All nodes MUST be added to the team before convergence testing begins.
+
+  SECTION: [TEAM-003](#team-003)
+    TEXT[!MUST,implementation]: A shared QUIC sync seed MUST be distributed to all nodes during team setup.
+
+  SECTION: [TEAM-004](#team-004)
+    TEXT[!MUST,implementation]: Each non-owner node MUST be added as a team member by the owner.
+
+  SECTION: [TEAM-005](#team-005)
+    TEXT[!MUST,implementation]: Team configuration MUST be synchronized to all nodes before the convergence test phase.
+
+  SECTION: [TEAM-006](#team-006)
+    TEXT[!MUST,implementation]: The test MUST verify that all nodes have received the team configuration.
+
+  SECTION: [SYNC-001](#sync-001)
+    TEXT[!MUST,implementation]: Each node MUST add sync peers according to the configured topology.
+
+  SECTION: [SYNC-002](#sync-002)
+    TEXT[!MUST,implementation]: Sync peer configuration MUST specify the sync interval.
+
+  SECTION: [SYNC-003](#sync-003)
+    TEXT[!MUST,implementation]: The sync peer address MUST be obtained from the neighbor node's local address.
+
+  SECTION: [SYNC-004](#sync-004)
+    TEXT[!MUST,implementation]: Sync peer configuration MUST complete before the convergence test phase.
+
+  SECTION: [SYNC-005](#sync-005)
+    TEXT[!MUST,implementation]: In poll sync mode, each node MUST poll its sync peers at the configured sync interval.
+
+  SECTION: [SYNC-006](#sync-006)
+    TEXT[!MUST,implementation]: In hello sync mode, each node MUST subscribe to hello notifications from its sync peers.
+
+  SECTION: [CONV-001](#conv-001)
+    TEXT[!MUST,implementation]: The test MUST assign a label to the source node's graph to mark the start of convergence testing.
+
+  SECTION: [CONV-002](#conv-002)
+    TEXT[!MUST,implementation]: The default source node for label assignment MUST be node 0.
+
+  SECTION: [CONV-003](#conv-003)
+    TEXT[!MUST,implementation]: The test MUST track when each node receives the convergence label.
+
+  SECTION: [CONV-004](#conv-004)
+    TEXT[!MUST,implementation]: Convergence MUST be defined as all nodes having received the convergence label.
+
+  SECTION: [CONV-005](#conv-005)
+    TEXT[!MUST,implementation]: The test MUST measure the total convergence time from label assignment to full convergence.
+
+  SECTION: [CONV-006](#conv-006)
+    TEXT[!MUST,implementation]: The test MUST fail if convergence is not achieved within the maximum test duration.
+
+  SECTION: [CONV-007](#conv-007)
+    TEXT[!MUST,implementation]: The test MUST report which nodes failed to converge if the timeout is reached.
+
+  SECTION: [VERIFY-001](#verify-001)
+    TEXT[!MUST,implementation]: Each node's graph state MUST be queryable to determine whether it has received the convergence label.
+
+  SECTION: [VERIFY-002](#verify-002)
+    TEXT[!MUST,implementation]: The test MUST poll nodes periodically to check convergence status.
+
+  SECTION: [VERIFY-003](#verify-003)
+    TEXT[!MUST,implementation]: The polling interval MUST be configurable (default: 250 milliseconds).
+
+  SECTION: [VERIFY-004](#verify-004)
+    TEXT[!MUST,implementation]: A node MUST be considered converged when it has received the convergence label.
+
+  SECTION: [PERF-001](#perf-001)
+    TEXT[!MUST,implementation]: The test MUST record the timestamp when the convergence label is assigned.
+
+  SECTION: [PERF-002](#perf-002)
+    TEXT[!MUST,implementation]: The test MUST record the timestamp when each node achieves convergence.
+
+  SECTION: [PERF-003](#perf-003)
+    TEXT[!MUST,implementation]: The test MUST calculate and report the following metrics:
+    TEXT[implementation]: - Minimum convergence time (fastest node)
+    TEXT[implementation]: - Maximum convergence time (slowest node)
+    TEXT[implementation]: - Mean convergence time
+    TEXT[implementation]: - Median convergence time
+    TEXT[!SHOULD,implementation]: - Mode convergence time (convergence times SHOULD be bucketed to produce a meaningful mode)
+    TEXT[implementation]: - 95th percentile convergence time (p95)
+    TEXT[implementation]: - 99th percentile convergence time (p99)
+    TEXT[implementation]: - Standard deviation of convergence times
+
+  SECTION: [PERF-004](#perf-004)
+    TEXT[!SHOULD]: The test SHOULD report memory usage per node if available.
+
+  SECTION: [PERF-005](#perf-005)
+    TEXT[!MUST,implementation]: When a CSV export feature flag is enabled, the test MUST output raw convergence data as a CSV file after each test run.
+
+  SECTION: [PERF-006](#perf-006)
+    TEXT[!MUST,implementation]: The CSV output MUST include one row per node with the following columns: node index, label assignment time (T0), node convergence time, and convergence duration (time from T0 to node convergence).
+
+  SECTION: [ERR-001](#err-001)
+    TEXT[!MUST,implementation]: The test MUST fail if any node fails to initialize.
+
+  SECTION: [ERR-002](#err-002)
+    TEXT[!MUST,implementation]: If a node fails to initialize, the test MUST report which node failed and the cause of the failure.
+
+  SECTION: [ERR-003](#err-003)
+    TEXT[!MUST,implementation]: The test MUST handle sync failures between nodes.
+
+  SECTION: [CLEAN-001](#clean-001)
+    TEXT[!MUST,implementation]: All daemon processes MUST be terminated when the test completes.
+
+  SECTION: [CLEAN-002](#clean-002)
+    TEXT[!MUST,implementation]: All temporary directories MUST be removed when the test completes.
+
+  SECTION: [CLEAN-003](#clean-003)
+    TEXT[!MUST,implementation]: Cleanup MUST occur even if the test fails or times out.
+
+  SECTION: [CLEAN-004](#clean-004)
+    TEXT[!MUST,implementation]: The test MUST use RAII patterns to ensure cleanup on panic.
+
+  SECTION: [Duvet Integration](#duvet-integration)
+    TEXT[!MUST]: ```rust
+    TEXT[!MUST]: //= https://github.com/aranya-project/aranya-docs/docs/multi-daemon-convergence-test.md#CONF-002
+    TEXT[!MUST]: //# The test MUST scale to at least 70 nodes without failure.
