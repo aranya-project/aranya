@@ -35,9 +35,4 @@ jobs:
           iteration-field: Sprint
           iteration: last
           new-iteration: current
-          excluded-statuses: >-
-            ✅ Done,
-            ❌ Won't Do,
-            🖨️ Duplicate,
-            ❓ Cannot Reproduce,
-            ⛔️ Invalid
+          excluded-statuses: "✅ Done, ❌ Won't Do, 🖨️ Duplicate, ❓ Cannot Reproduce, ⛔️ Invalid"
