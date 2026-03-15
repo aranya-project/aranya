@@ -484,7 +484,7 @@ delta = "2.0.6 -> 2.0.12"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.3.44"
-notes = "Date & time library compatible with the standard libarary. No networking code. Documented use of unsafe. No file I/O except for reading timezone from libc."
+notes = "Date & time library compatible with the standard library. No networking code. Documented use of unsafe. No file I/O except for reading timezone from libc."
 
 [[audits.time]]
 who = "Steve Sweetney <ssweetney@spideroak.com>"

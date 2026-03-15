@@ -384,7 +384,7 @@ where
             // the server.
             self.as_mut().project().inner.start_send(msg)?;
 
-            // Each call to `start_send` must be preceeded by
+            // Each call to `start_send` must be preceded by
             // a call to `poll_ready`, so call `poll_ready`
             // again.
             ready!(self.as_mut().project().inner.poll_ready(cx)?);
