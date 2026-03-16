@@ -392,6 +392,11 @@ pub trait DaemonApi {
     async fn get_public_key_bundle() -> Result<PublicKeyBundle>;
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
+    /// Returns the trace ID received in the current RPC context.
+    ///
+    /// Intended for test/debug validation of client<->daemon trace propagation.
+    #[cfg(test)]
+    async fn test_trace_id() -> Result<String>;
 
     //
     // Syncing

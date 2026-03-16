@@ -27,7 +27,7 @@ use tracing::{debug, info};
 use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_get_keybundle_device_id() -> Result<()> {
     let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
 
@@ -57,6 +57,21 @@ async fn test_client_rand() -> Result<()> {
 
     // Randomly generated numbers should never match.
     assert_ne!(buf1, buf2);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_trace_id_round_trip() -> Result<()> {
+    let work_dir = tempfile::tempdir()?;
+    let owner = DeviceCtx::new("trace-roundtrip", "owner", work_dir.path().join("owner")).await?;
+
+    let (client_trace_id, daemon_trace_id) = owner.client.test_trace_id().await?;
+    info!("client trace_id: {client_trace_id}");
+    info!("daemon trace_id: {daemon_trace_id}");
+
+    assert_eq!(client_trace_id, daemon_trace_id);
+    assert_ne!(client_trace_id, "00");
 
     Ok(())
 }
