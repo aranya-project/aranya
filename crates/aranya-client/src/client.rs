@@ -229,6 +229,20 @@ impl Client {
             .map(DeviceId::from_api)
     }
 
+    /// Returns a pair of trace IDs `(client_sent, daemon_received)` for
+    /// validating RPC trace propagation.
+    pub async fn test_trace_id(&self) -> Result<(String, String)> {
+        let ctx = rpc_context();
+        let client_trace_id = ctx.trace_context.trace_id.to_string();
+        let daemon_trace_id = self
+            .daemon
+            .test_trace_id(ctx)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok((client_trace_id, daemon_trace_id))
+    }
+
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self

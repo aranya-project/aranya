@@ -451,6 +451,14 @@ impl DaemonApi for Api {
         self.device_id().map(api::DeviceId::transmute)
     }
 
+    #[instrument(skip(self), err)]
+    async fn test_trace_id(self, ctx: context::Context) -> api::Result<String> {
+        trace::setup_trace_context(&ctx);
+        let trace_id = ctx.trace_context.trace_id.to_string();
+        info!(rpc.trace_id = %trace_id, "RPC: TestTraceId");
+        Ok(trace_id)
+    }
+
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
     async fn afc_shm_info(self, ctx: context::Context) -> api::Result<api::AfcShmInfo> {

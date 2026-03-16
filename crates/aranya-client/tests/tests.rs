@@ -106,6 +106,21 @@ async fn test_basic_rpc_operations() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_trace_id_round_trip() -> Result<()> {
+    let work_dir = tempfile::tempdir()?;
+    let owner = DeviceCtx::new("trace-roundtrip", "owner", work_dir.path().join("owner")).await?;
+
+    let (client_trace_id, daemon_trace_id) = owner.client.test_trace_id().await?;
+    println!("client trace_id: {client_trace_id}");
+    println!("daemon trace_id: {daemon_trace_id}");
+
+    assert_eq!(client_trace_id, daemon_trace_id);
+    assert_ne!(client_trace_id, "00");
+
+    Ok(())
+}
+
 /// Tests sync_now() by showing that an admin cannot perform operations until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
