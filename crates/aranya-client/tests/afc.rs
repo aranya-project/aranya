@@ -24,11 +24,6 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     // create default roles
     let default_roles = devices.setup_default_roles(team_id).await?;
 
-    devices
-        .add_all_sync_peers(team_id)
-        .await
-        .context("unable to add all sync peers")?;
-
     // Tell all peers to sync with one another, and assign their roles.
     devices
         .add_all_device_roles(team_id, &default_roles)
