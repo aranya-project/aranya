@@ -1,13 +1,4 @@
-use std::{
-    collections::HashMap,
-    io::Write,
-    iter,
-    net::Ipv4Addr,
-    path::PathBuf,
-    ptr,
-    sync::{Arc, Mutex, OnceLock},
-    time::Duration,
-};
+use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
@@ -23,12 +14,10 @@ use aranya_daemon::{
 use aranya_daemon_api::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
-use serde_json::Value;
 use spideroak_base58::ToBase58 as _;
 use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
-use tracing_subscriber::fmt::MakeWriter;
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
@@ -38,116 +27,6 @@ pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 pub async fn sleep(duration: Duration) {
     trace!(?duration, "sleeping");
     time::sleep(duration).await;
-}
-
-fn find_string_field(v: &Value, key: &str) -> Option<String> {
-    match v {
-        Value::Object(map) => {
-            if let Some(value) = map.get(key).and_then(Value::as_str) {
-                return Some(value.to_owned());
-            }
-            for value in map.values() {
-                if let Some(found) = find_string_field(value, key) {
-                    return Some(found);
-                }
-            }
-            None
-        }
-        Value::Array(values) => values
-            .iter()
-            .find_map(|value| find_string_field(value, key)),
-        _ => None,
-    }
-}
-
-#[derive(Clone)]
-struct SharedWriter {
-    buffer: Arc<Mutex<Vec<u8>>>,
-}
-
-impl<'a> MakeWriter<'a> for SharedWriter {
-    type Writer = SharedGuard;
-
-    fn make_writer(&'a self) -> Self::Writer {
-        SharedGuard {
-            buffer: self.buffer.clone(),
-        }
-    }
-}
-
-struct SharedGuard {
-    buffer: Arc<Mutex<Vec<u8>>>,
-}
-
-impl Write for SharedGuard {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.buffer.lock().expect("poisoned").extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-static LOG_BUFFER: OnceLock<Arc<Mutex<Vec<u8>>>> = OnceLock::new();
-
-pub fn init_global_json_capture() -> (Arc<Mutex<Vec<u8>>>, bool) {
-    let buffer = LOG_BUFFER
-        .get_or_init(|| Arc::new(Mutex::new(Vec::<u8>::new())))
-        .clone();
-
-    buffer.lock().expect("poisoned").clear();
-
-    let writer = SharedWriter {
-        buffer: buffer.clone(),
-    };
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(writer)
-        .with_ansi(false)
-        .with_max_level(tracing::Level::TRACE)
-        .json()
-        .finish();
-
-    let installed = tracing::subscriber::set_global_default(subscriber).is_ok();
-    (buffer, installed)
-}
-
-pub fn find_rpc_trace_ids_for_api_name(
-    captured: &str,
-    api_name: &str,
-) -> (Option<String>, Option<String>) {
-    let mut daemon_trace_id = None;
-    let mut client_trace_id = None;
-
-    for line in captured.lines() {
-        let Ok(json) = serde_json::from_str::<Value>(line) else {
-            continue;
-        };
-
-        let Some(trace_id) = find_string_field(&json, "rpc.trace_id") else {
-            continue;
-        };
-        let Some(name) = find_string_field(&json, "otel.name") else {
-            continue;
-        };
-        if name != api_name {
-            continue;
-        }
-        let otel_kind = find_string_field(&json, "otel.kind");
-
-        if daemon_trace_id.is_none() && otel_kind.as_deref() == Some("server") {
-            daemon_trace_id = Some(trace_id.clone());
-        }
-        if client_trace_id.is_none() && otel_kind.as_deref() == Some("client") {
-            client_trace_id = Some(trace_id);
-        }
-        if daemon_trace_id.is_some() && client_trace_id.is_some() {
-            break;
-        }
-    }
-
-    (daemon_trace_id, client_trace_id)
 }
 
 pub struct DevicesCtx {

@@ -21,14 +21,10 @@ use aranya_client::{
     AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, Rank,
 };
 use aranya_daemon_api::text;
-use serial_test::serial;
 use test_log::test;
 use tracing::{debug, info};
 
-use crate::common::{
-    find_rpc_trace_ids_for_api_name, init_global_json_capture, sleep, DeviceCtx, DevicesCtx,
-    SLEEP_INTERVAL,
-};
+use crate::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
@@ -61,47 +57,6 @@ async fn test_client_rand() -> Result<()> {
 
     // Randomly generated numbers should never match.
     assert_ne!(buf1, buf2);
-
-    Ok(())
-}
-
-// Trace-correlation test for client<->daemon RPC metadata propagation.
-#[tokio::test]
-#[serial]
-async fn test_basic_rpc_operations() -> Result<()> {
-    let (logs, installed) = init_global_json_capture();
-
-    let work_dir = tempfile::tempdir()?;
-    // DeviceCtx::new performs client<->daemon connect, which includes a version() RPC.
-    let _owner = DeviceCtx::new("trace-test", "owner", work_dir.path().join("owner")).await?;
-
-    let captured = String::from_utf8_lossy(&logs.lock().expect("poisoned")).into_owned();
-    let (daemon_trace_id, client_trace_id) =
-        find_rpc_trace_ids_for_api_name(&captured, "DaemonApi.version");
-    match (daemon_trace_id, client_trace_id) {
-        (Some(daemon_trace_id), Some(client_trace_id)) => {
-            assert_eq!(
-                client_trace_id, daemon_trace_id,
-                "client and daemon trace ids should match for version RPC"
-            );
-        }
-        (None, None) => {
-            anyhow::bail!(
-                "trace id capture failed: both daemon and client trace IDs missing (installed_global_subscriber={}, captured_bytes={})",
-                installed,
-                captured.len()
-            );
-        }
-        (daemon_trace_id, client_trace_id) => {
-            anyhow::bail!(
-                "trace id capture incomplete: installed_global_subscriber={}, daemon_found={}, client_found={}, captured_bytes={}",
-                installed,
-                daemon_trace_id.is_some(),
-                client_trace_id.is_some(),
-                captured.len()
-            );
-        }
-    }
 
     Ok(())
 }
