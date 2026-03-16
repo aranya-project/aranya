@@ -18,7 +18,7 @@ use super::{
 };
 use crate::sync::{Addr, SyncPeer};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct QuicConnector {
     /// The QUIC client we use to connect to other peers.
     client: s2n_quic::Client,
@@ -42,7 +42,6 @@ impl QuicConnector {
         conns: SharedConnectionMap,
         conn_tx: mpsc::Sender<ConnectionUpdate>,
         psk_store: Arc<PskStore>,
-        local_addr: Addr,
     ) -> Result<Self, Error> {
         // Build up the `ClientConfig` so we can initialize the TLS client.
         let mut client_config = ClientConfig::builder()
@@ -72,7 +71,7 @@ impl QuicConnector {
             conn_tx,
             psk_store,
             return_port,
-            local_addr,
+            local_addr: server_addr,
         })
     }
 }

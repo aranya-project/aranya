@@ -119,7 +119,7 @@ impl SyncHandle {
         Self { sender }
     }
 
-    /// Crates a new mpsc channel and [`SyncHandle`] for sending messages.
+    /// Creates a new mpsc channel and [`SyncHandle`] for sending messages.
     pub(crate) fn channel(buffer: usize) -> (Self, mpsc::Receiver<Callback>) {
         let (tx, rx) = mpsc::channel(buffer);
         (Self { sender: tx }, rx)
@@ -189,7 +189,7 @@ impl SyncHandle {
         .await
     }
 
-    /// Tell the [`SyncManager`] to add this peer to their subscriptions.
+    /// Tell the [`SyncManager`] to remove this peer from their subscriptions.
     #[cfg(feature = "preview")]
     pub(super) async fn hello_unsubscribe_request(&self, peer: SyncPeer) -> Response {
         self.send(ManagerMessage::HelloUnsubscribeRequest { peer })

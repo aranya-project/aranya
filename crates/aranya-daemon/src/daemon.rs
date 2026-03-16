@@ -290,14 +290,8 @@ impl Daemon {
             .context("unable to initialize QUIC sync listener")?;
         let server = SyncServer::new(listener, client.clone(), handle.clone());
 
-        let connector = QuicConnector::new(
-            client_addr,
-            server.local_addr(),
-            conns,
-            conn_tx,
-            psk_store,
-            server.local_addr(),
-        )?;
+        let connector =
+            QuicConnector::new(client_addr, server.local_addr(), conns, conn_tx, psk_store)?;
         let sync_client = SyncClient::new(client.clone(), connector, send_effects);
         let manager = SyncManager::new(sync_client, recv)?;
 

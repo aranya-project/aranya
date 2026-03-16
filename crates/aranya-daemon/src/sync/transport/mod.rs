@@ -11,6 +11,9 @@ pub(crate) mod quic;
 /// Abstracts over any reliable, ordered transport (QUIC, TCP, WebSocket, UDS, etc). Unreliable
 /// protocols like raw UDP are not suitable without an additional reliability layer.
 ///
+/// Note that this is considered to be message-based, and each message should be length-prefixed if
+/// the transport does not provide that natively.
+///
 /// [`SyncManager`]: super::SyncManager
 pub(crate) trait SyncStream: Send + Sync + 'static {
     /// The specific error type this stream uses.
