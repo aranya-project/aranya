@@ -15,38 +15,35 @@ use std::collections::HashMap;
 #[cfg(feature = "preview")]
 use std::time::Duration;
 
+#[cfg(feature = "preview")]
 use anyhow::Context as _;
-use aranya_crypto::Rng;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
-use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
-use aranya_runtime::{
-    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
-};
+use aranya_runtime::Address;
+use aranya_runtime::{PolicyStore, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use derive_where::derive_where;
 use futures_util::StreamExt as _;
 use tokio::{sync::mpsc, time::Instant};
 use tokio_util::time::{delay_queue, DelayQueue};
-use tracing::{debug, error, info, instrument, trace, warn};
+#[cfg(feature = "preview")]
+use tracing::instrument;
+use tracing::{debug, error, info, trace, warn};
 
+#[cfg(feature = "preview")]
+use super::GraphId;
 #[cfg(doc)]
 use super::SyncHandle;
 use super::{
     handle::{Callback, ManagerMessage},
-    GraphId, Result, SyncPeer,
+    Result, SyncClient, SyncPeer,
 };
+#[cfg(test)]
+use crate::aranya::Client;
 #[cfg(feature = "preview")]
 use crate::sync::HelloSubscription;
-use crate::{
-    aranya::Client,
-    sync::{
-        transport::{SyncStream as _, SyncTransport},
-        Error, SyncResponse,
-    },
-    vm_policy::VecSink,
-};
+use crate::sync::{transport::SyncConnector, Error};
 
 #[derive(Debug)]
 pub(super) enum ScheduledTask {
@@ -59,17 +56,12 @@ pub(super) enum ScheduledTask {
 ///
 /// Uses a [`DelayQueue`] to handle scheduling sync tasks, and uses [`SyncHandle`] to receive
 /// requests from the server and any clients.
-#[derive_where(Debug; ST)]
-pub(crate) struct SyncManager<ST, PS, SP, EF> {
-    /// The Aranya client and peer cache, alongside invalid graph tracking.
-    pub(super) client: Client<PS, SP>,
-    /// The transport used to send and receive sync data.
-    pub(super) transport: ST,
+#[derive_where(Debug; C)]
+pub(crate) struct SyncManager<C, PS, SP, EF> {
+    pub(crate) client: SyncClient<C, PS, SP, EF>,
 
     /// Receives requests from the [`SyncHandle`].
     pub(super) recv: mpsc::Receiver<Callback>,
-    /// Used to send effects to the API to be processed.
-    pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
 
     /// Sync peer lookup info, used for storing configuration and delay queue info.
     pub(super) peers: HashMap<SyncPeer, (SyncPeerConfig, Option<delay_queue::Key>)>,
@@ -81,19 +73,15 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
     pub(super) hello_subscriptions: HashMap<SyncPeer, HelloSubscription>,
 }
 
-impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
+impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
     /// Creates a new [`SyncManager`].
     pub(crate) fn new(
-        client: Client<PS, SP>,
-        transport: ST,
+        client: SyncClient<C, PS, SP, EF>,
         recv: mpsc::Receiver<Callback>,
-        send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     ) -> Result<Self> {
         Ok(Self {
             client,
-            transport,
             recv,
-            send_effects,
             peers: HashMap::new(),
             queue: DelayQueue::new(),
             #[cfg(feature = "preview")]
@@ -212,100 +200,215 @@ impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF> {
     /// Returns the peer cache map for tests that need it.
     #[cfg(test)]
     pub(crate) fn get_peer_caches(&self) -> crate::aranya::PeerCacheMap {
-        self.client.caches_for_test()
+        self.client.client.caches_for_test()
     }
 
     /// Returns a reference to the Aranya client for tests that need it.
     #[cfg(test)]
     pub(crate) const fn client(&self) -> &Client<PS, SP> {
-        &self.client
+        &self.client.client
     }
 
     /// Returns a mutable reference to the Aranya client for tests that need it.
     #[cfg(test)]
     pub(crate) const fn client_mut(&mut self) -> &mut Client<PS, SP> {
-        &mut self.client
+        &mut self.client.client
     }
 }
 
-impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
+impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF>
 where
-    ST: SyncTransport,
+    C: SyncConnector,
+    PS: PolicyStore,
     SP: StorageProvider,
+    EF: Send + Sync + 'static + TryFrom<PS::Effect>,
+    EF::Error: Send + Sync + 'static + std::error::Error,
 {
-    /// Send a hello message to a peer and wait for a response.
-    #[cfg(feature = "preview")]
-    pub(super) async fn send_hello_request(
-        &self,
-        peer: SyncPeer,
-        sync_type: SyncType,
-    ) -> Result<()> {
-        // Connect to the peer
-        let mut stream = self
-            .transport
-            .connect(peer)
-            .await
-            .map_err(Error::transport)?;
+    /// Runs the [`SyncManager`], processing [`SyncHandle`] requests and scheduled tasks.
+    pub(crate) async fn run(mut self, ready: ready::Notifier) {
+        info!("sync manager starting");
 
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
-
-        // Send the message
-        let data =
-            postcard::to_slice(&sync_type, &mut buf).context("postcard serialization failed")?;
-        stream.send(data).await.map_err(Error::transport)?;
-        stream.finish().await.map_err(Error::transport)?;
-
-        // Read the response to avoid a race condition with the server
-        match stream.receive(&mut buf).await {
-            Ok(0) => Err(Error::EmptyResponse),
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::transport(e)),
+        ready.notify();
+        loop {
+            match self.next().await {
+                Ok(()) => {}
+                Err(Error::SyncerShutdown) => {
+                    info!("sync manager shutting down");
+                    break;
+                }
+                Err(err) => error!(error = %err.report(), "unable to sync with peer"),
+            }
         }
     }
 
-    /// Subscribe to hello notifications from a sync peer.
-    #[cfg(feature = "preview")]
-    async fn send_hello_subscribe(
-        &self,
-        peer: SyncPeer,
-        graph_change_debounce: Duration,
-        duration: Duration,
-        schedule_delay: Duration,
-    ) -> Result<()> {
-        trace!(?peer, "subscribing to hello notifications from peer");
-        // TODO(nikki): update aranya_core with the new name.
-        let message = SyncType::Hello(SyncHelloType::Subscribe {
-            graph_change_delay: graph_change_debounce,
-            duration,
-            schedule_delay,
-            graph_id: peer.graph_id,
-        });
+    /// Handles either a [`SyncHandle`] request or a scheduled task.
+    async fn next(&mut self) -> Result<()> {
+        #![allow(clippy::disallowed_macros)]
+        tokio::select! {
+            biased;
+            // Received a message from the [`SyncHandle`], handle it.
+            msg = self.recv.recv() => {
+                match msg {
+                    Some((msg, tx)) => {
+                        let reply = self.handle_message(msg).await;
+                        if let Err(reply) = tx.send(reply) {
+                            warn!("syncer operation did not wait for reply");
+                            reply?;
+                        }
+                    }
+                    None => return Err(Error::SyncerShutdown),
+                }
+            }
 
-        self.send_hello_request(peer, message).await
+            // Get the next peer from the `DelayQueue` and handle it.
+            Some(expired) = self.queue.next() => {
+                self.handle_scheduled(expired.into_inner()).await?;
+            }
+        }
+        Ok(())
     }
 
-    /// Unsubscribe from hello notifications from a sync peer.
-    #[cfg(feature = "preview")]
-    async fn send_hello_unsubscribe(&self, peer: SyncPeer) -> Result<()> {
-        trace!(?peer, "unsubscribing from hello notifications from peer");
-        let message = SyncType::Hello(SyncHelloType::Unsubscribe {
-            graph_id: peer.graph_id,
-        });
-
-        self.send_hello_request(peer, message).await
+    async fn handle_message(&mut self, msg: ManagerMessage) -> Result<()> {
+        debug!(?msg, "processing handle message");
+        match msg {
+            ManagerMessage::AddPeer { peer, cfg } => {
+                self.add_peer(peer, cfg);
+                Ok(())
+            }
+            ManagerMessage::RemovePeer { peer } => {
+                self.remove_peer(peer);
+                Ok(())
+            }
+            // NOTE: cfg is unused but included to avoid needing to change the API surface.
+            ManagerMessage::SyncNow { peer, cfg: _cfg } => {
+                self.do_sync(peer).await?;
+                Ok(())
+            }
+            #[cfg(feature = "preview")]
+            ManagerMessage::HelloSubscribe {
+                peer,
+                graph_change_debounce,
+                duration,
+                schedule_delay,
+            } => {
+                self.client
+                    .send_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay)
+                    .await
+            }
+            #[cfg(feature = "preview")]
+            ManagerMessage::HelloUnsubscribe { peer } => {
+                self.client.send_hello_unsubscribe(peer).await
+            }
+            #[cfg(feature = "preview")]
+            ManagerMessage::BroadcastHello { graph_id, head } => {
+                self.broadcast_hello(graph_id, head).await;
+                Ok(())
+            }
+            #[cfg(feature = "preview")]
+            ManagerMessage::HelloSubscribeRequest {
+                peer,
+                graph_change_debounce,
+                duration,
+                schedule_delay,
+            } => self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay),
+            #[cfg(feature = "preview")]
+            ManagerMessage::HelloUnsubscribeRequest { peer } => {
+                self.remove_hello_subscription(peer);
+                Ok(())
+            }
+            #[cfg(feature = "preview")]
+            ManagerMessage::SyncOnHello { peer, head } => self.sync_on_hello(peer, head).await,
+        }
     }
 
-    /// Send a hello notification to a sync peer.
-    #[cfg(feature = "preview")]
-    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    async fn send_hello_notification(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
-        trace!(?peer, "sending hello notifications to peer");
+    async fn handle_scheduled(&mut self, task: ScheduledTask) -> Result<()> {
+        match task {
+            ScheduledTask::Sync(peer) => {
+                debug!(?peer, "scheduled sync triggered");
+                self.handle_scheduled_sync(peer).await
+            }
+            #[cfg(feature = "preview")]
+            ScheduledTask::HelloNotify(peer) => {
+                debug!(?peer, "scheduled hello triggered");
+                self.handle_scheduled_hello(peer).await
+            }
+        }
+    }
 
-        let message = SyncType::Hello(SyncHelloType::Hello {
-            head,
-            graph_id: peer.graph_id,
+    // Handle a scheduled sync task, updating the `DelayQueue` and syncing.
+    async fn handle_scheduled_sync(&mut self, peer: SyncPeer) -> Result<()> {
+        let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
+        // Re-insert into queue if interval is still configured
+        *key = cfg.interval.map(|interval| {
+            trace!(?peer, ?interval, "rescheduling next sync");
+            self.queue.insert(ScheduledTask::Sync(peer), interval)
         });
-        self.send_hello_request(peer, message).await?;
+
+        self.do_sync(peer).await?;
+        Ok(())
+    }
+
+    // Handle sending a hello notification to a scheduled peer (possibly from initial registration).
+    #[cfg(feature = "preview")]
+    async fn handle_scheduled_hello(&mut self, peer: SyncPeer) -> Result<()> {
+        // Get the current head for the peer's graph.
+        let head = self.client.get_head(peer.graph_id).await;
+
+        // If it's valid, send them a hello notification.
+        if let Some(head) = head {
+            if let Err(error) = self.client.send_hello_notification(peer, head).await {
+                warn!(?peer, %error, "failed to send hello notification");
+            }
+        } else {
+            warn!(?peer, "tried to send hello notification, no head exists!");
+        }
+
+        if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
+            // Check if the subscription will expire before our next scheduled sync.
+            if Instant::now()
+                .checked_add(sub.schedule_delay)
+                .context("subscription expiry overflow")?
+                < sub.expires_at
+            {
+                sub.queue_key = self
+                    .queue
+                    .insert(ScheduledTask::HelloNotify(peer), sub.schedule_delay);
+            } else {
+                self.hello_subscriptions.remove(&peer);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Sync with a peer, handling errors (including parallel finalize).
+    async fn do_sync(&mut self, peer: SyncPeer) -> Result<usize> {
+        self.client.sync(peer).await.inspect_err(|err| {
+            self.handle_sync_error(peer, err);
+        })
+    }
+
+    /// Handle a received hello message by syncing with the peer if we're missing their current head.
+    #[cfg(feature = "preview")]
+    async fn sync_on_hello(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
+        debug!(?peer, ?head, "received hello notification message");
+
+        // Update the peer cache with the received head_id.
+        self.client.update_heads(peer, head).await?;
+
+        // Check if we're missing this head and need it synced.
+        let dominated = self.client.command_exists(peer.graph_id, head).await;
+        if !dominated {
+            match self.peers.get(&peer) {
+                Some((cfg, _)) if cfg.sync_on_hello => {
+                    if let Err(error) = self.do_sync(peer).await {
+                        warn!(%error, ?peer, "failed to sync with peer");
+                    }
+                }
+                Some(_) => trace!(?peer, "SyncOnHello is not enabled, ignoring"),
+                None => warn!(?peer, "Peer not found, ignoring SyncOnHello"),
+            }
+        }
 
         Ok(())
     }
@@ -344,7 +447,7 @@ where
 
         // Loop through all subscribers and send them a hello notification.
         for peer in &subscribers {
-            if let Err(error) = self.send_hello_notification(*peer, head).await {
+            if let Err(error) = self.client.send_hello_notification(*peer, head).await {
                 warn!(?peer, %error, "failed to send hello notification");
             } else if let Some(sub) = self.hello_subscriptions.get_mut(peer) {
                 sub.last_notified = Instant::now();
@@ -357,312 +460,5 @@ where
             subscriber_count = subscribers.len(),
             "Completed broadcast_hello_notifications"
         );
-    }
-
-    // Handle sending a hello notification to a scheduled peer (possibly from initial registration).
-    #[cfg(feature = "preview")]
-    async fn handle_scheduled_hello(&mut self, peer: SyncPeer) -> Result<()> {
-        // Get the current head for the peer's graph.
-        let head = self
-            .client
-            .lock_aranya()
-            .await
-            .provider()
-            .get_storage(peer.graph_id)
-            .map_or(None, |storage| storage.get_head_address().ok());
-
-        // If it's valid, send them a hello notification.
-        if let Some(head) = head {
-            if let Err(error) = self.send_hello_notification(peer, head).await {
-                warn!(?peer, %error, "failed to send hello notification");
-            }
-        } else {
-            warn!(?peer, "tried to send hello notification, no head exists!");
-        }
-
-        if let Some(sub) = self.hello_subscriptions.get_mut(&peer) {
-            // Check if the subscription will expire before our next scheduled sync.
-            if Instant::now()
-                .checked_add(sub.schedule_delay)
-                .context("subscription expiry overflow")?
-                < sub.expires_at
-            {
-                sub.queue_key = self
-                    .queue
-                    .insert(ScheduledTask::HelloNotify(peer), sub.schedule_delay);
-            } else {
-                self.hello_subscriptions.remove(&peer);
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl<ST, PS, SP, EF> SyncManager<ST, PS, SP, EF>
-where
-    ST: SyncTransport,
-    PS: PolicyStore,
-    SP: StorageProvider,
-    EF: Send + Sync + 'static + TryFrom<PS::Effect>,
-    EF::Error: Send + Sync + 'static + std::error::Error,
-{
-    /// Runs the [`SyncManager`], processing [`SyncHandle`] requests and scheduled tasks.
-    pub(crate) async fn run(mut self, ready: ready::Notifier) {
-        info!("sync manager starting");
-
-        ready.notify();
-        loop {
-            match self.next().await {
-                Ok(()) => {}
-                Err(Error::SyncerShutdown) => {
-                    info!("sync manager shutting down");
-                    break;
-                }
-                Err(err) => error!(error = %err.report(), "unable to sync with peer"),
-            }
-        }
-    }
-
-    /// Handles either a [`SyncHandle`] request or a scheduled task.
-    async fn next(&mut self) -> Result<()> {
-        #![allow(clippy::disallowed_macros)]
-        tokio::select! {
-            biased;
-            // Received a message from the [`SyncHandle`], handle it.
-            msg = self.recv.recv() => {
-                match msg {
-                    Some((msg, tx)) => {
-                        debug!(?msg, "processing handle message");
-
-                        let reply = match msg {
-                            // NOTE: cfg is unused but included to avoid needing to change the API surface.
-                            ManagerMessage::SyncNow { peer, cfg: _cfg } => self.sync(peer).await.map(|_| ()),
-                            ManagerMessage::AddPeer { peer, cfg } => {
-                                self.add_peer(peer, cfg);
-                                Ok(())
-                            }
-                            ManagerMessage::RemovePeer { peer } => {
-                                self.remove_peer(peer);
-                                Ok(())
-                            }
-                            #[cfg(feature = "preview")]
-                            ManagerMessage::HelloSubscribe { peer, graph_change_debounce, duration, schedule_delay } => {
-                                self.send_hello_subscribe(peer, graph_change_debounce, duration, schedule_delay).await
-                            }
-                            #[cfg(feature = "preview")]
-                            ManagerMessage::HelloUnsubscribe { peer } => self.send_hello_unsubscribe(peer).await,
-                            #[cfg(feature = "preview")]
-                            ManagerMessage::BroadcastHello { graph_id, head } => {
-                                self.broadcast_hello(graph_id, head).await;
-                                Ok(())
-                            }
-                            #[cfg(feature = "preview")]
-                            ManagerMessage::HelloSubscribeRequest { peer, graph_change_debounce, duration, schedule_delay } => {
-                                self.add_hello_subscription(peer, graph_change_debounce, duration, schedule_delay)?;
-                                Ok(())
-                            }
-                            #[cfg(feature = "preview")]
-                            ManagerMessage::HelloUnsubscribeRequest { peer } => {
-                                self.remove_hello_subscription(peer);
-                                Ok(())
-                            }
-                            #[cfg(feature = "preview")]
-                            ManagerMessage::SyncOnHello { peer, head } => self.sync_on_hello(peer, head).await,
-                        };
-
-                        if let Err(reply) = tx.send(reply) {
-                            warn!("syncer operation did not wait for reply");
-                            reply?;
-                        }
-                    }
-                    None => {
-                        return Err(Error::SyncerShutdown);
-                    }
-                }
-            }
-
-            // Get the next peer from the `DelayQueue` and handle it.
-            Some(expired) = self.queue.next() => {
-                match expired.into_inner() {
-                    ScheduledTask::Sync(peer) => {
-                        debug!(?peer, "scheduled sync triggered");
-                        self.handle_scheduled_sync(peer).await?;
-                    }
-                    #[cfg(feature = "preview")]
-                    ScheduledTask::HelloNotify(peer) => {
-                        debug!(?peer, "scheduled hello triggered");
-                        self.handle_scheduled_hello(peer).await?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Handles a sync exchange with a peer.
-    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    pub(crate) async fn sync(&mut self, peer: SyncPeer) -> Result<usize> {
-        debug!(?peer, "starting sync");
-
-        // Connect to the peer.
-        let mut stream = self.transport.connect(peer).await.map_err(|error| {
-            warn!(?peer, %error, "failed to connect to peer");
-            Error::transport(error)
-        })?;
-
-        let mut requester = SyncRequester::new(peer.graph_id, Rng);
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
-
-        // Process a poll request, and get back the length/number of commands.
-        let (len, _cmds) = {
-            let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-            requester
-                .poll(&mut buf, aranya.provider(), caches.entry(peer).or_default())
-                .context("failed to process poll sync request")
-        }?;
-
-        // Send along our request message.
-        let buffer = buf.get(..len).assume("valid offset")?;
-        trace!(?peer, request_bytes = len, "sending sync request");
-        stream.send(buffer).await.map_err(Error::transport)?;
-        stream.finish().await.map_err(Error::transport)?;
-
-        // Process the response message.
-        let len = stream.receive(&mut buf).await.map_err(Error::transport)?;
-        trace!(?peer, response_bytes = len, "received sync response");
-
-        let buffer = buf.get(..len).assume("valid offset")?;
-        let resp = postcard::from_bytes(buffer).context("failed to deserialize sync response")?;
-
-        // Destructure the sync response.
-        let data = match resp {
-            SyncResponse::Ok(data) => data,
-            SyncResponse::Err(msg) => {
-                error!(?peer, %msg, "peer returned sync error");
-                return Err(anyhow::anyhow!("sync error: {msg}").into());
-            }
-        };
-
-        // Process the response data.
-        let mut sink = VecSink::new();
-        let cmd_result = self
-            .process_sync_data(peer, &data, &mut requester, &mut sink)
-            .await;
-
-        // Send all processed effects to the Daemon API.
-        let effects = sink.collect().context("could not collect effects")?;
-        let effects_count = effects.len();
-        if let Err(error) = self.send_effects.send((peer.graph_id, effects)).await {
-            debug!(?error, "effect handler closed, discarding effects");
-        }
-
-        // Handle any sync error (including parallel finalization).
-        let cmd_count = cmd_result.inspect_err(|err| {
-            self.handle_sync_error(peer, err);
-        })?;
-
-        info!(?peer, cmd_count, effects_count, "sync completed");
-        Ok(cmd_count)
-    }
-
-    // Process the sync response data and add a new transaction to the Aranya client.
-    async fn process_sync_data<S: Sink<PS::Effect>>(
-        &self,
-        peer: SyncPeer,
-        data: &[u8],
-        requester: &mut SyncRequester,
-        sink: &mut S,
-    ) -> Result<usize> {
-        // Check if there's even anything to process
-        if data.is_empty() {
-            debug!(?peer, "sync response contained no data");
-            return Ok(0);
-        }
-
-        // Check if we actually received any command data.
-        let cmds = match requester.receive(data)? {
-            Some(cmds) if !cmds.is_empty() => cmds,
-            _ => {
-                debug!(?peer, "sync response contained no new commands");
-                return Ok(0);
-            }
-        };
-
-        trace!(
-            ?peer,
-            cmd_count = cmds.len(),
-            "processing received commands"
-        );
-
-        // Create a new transaction and add all received commands.
-        let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-        let mut trx = aranya.transaction(peer.graph_id);
-        aranya
-            .add_commands(&mut trx, sink, &cmds)
-            .context("unable to add received commands")?;
-        aranya.commit(&mut trx, sink).context("commit failed")?;
-
-        // Update our peer cache with the new commands.
-        aranya
-            .update_heads(
-                peer.graph_id,
-                cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                caches.entry(peer).or_default(),
-            )
-            .context("failed to update cache heads")?;
-
-        debug!(
-            ?peer,
-            cmd_count = cmds.len(),
-            "committed commands from sync"
-        );
-        Ok(cmds.len())
-    }
-
-    // Handle a scheduled sync task, updating the `DelayQueue` and syncing.
-    async fn handle_scheduled_sync(&mut self, peer: SyncPeer) -> Result<()> {
-        let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
-        // Re-insert into queue if interval is still configured
-        *key = cfg.interval.map(|interval| {
-            trace!(?peer, ?interval, "rescheduling next sync");
-            self.queue.insert(ScheduledTask::Sync(peer), interval)
-        });
-
-        self.sync(peer).await?;
-        Ok(())
-    }
-
-    /// Handle a received hello message by syncing with the peer if we're missing their current head.
-    #[cfg(feature = "preview")]
-    async fn sync_on_hello(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
-        debug!(?peer, ?head, "received hello notification message");
-
-        // Update the peer cache with the received head_id.
-        {
-            let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-            let cache = caches.entry(peer).or_default();
-            aranya.update_heads(peer.graph_id, [head], cache)?;
-        }
-
-        // Check if we're missing this head and need it synced.
-        let dominated = self
-            .client
-            .lock_aranya()
-            .await
-            .command_exists(peer.graph_id, head);
-        if !dominated {
-            match self.peers.get(&peer) {
-                Some((cfg, _)) if cfg.sync_on_hello => {
-                    if let Err(error) = self.sync(peer).await {
-                        warn!(%error, ?peer, "failed to sync with peer");
-                    }
-                }
-                Some(_) => trace!(?peer, "SyncOnHello is not enabled, ignoring"),
-                None => warn!(?peer, "Peer not found, ignoring SyncOnHello"),
-            }
-        }
-
-        Ok(())
     }
 }

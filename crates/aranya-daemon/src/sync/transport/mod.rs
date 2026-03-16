@@ -40,7 +40,7 @@ pub(crate) trait SyncStream: Send + Sync + 'static {
 ///
 /// [`SyncManager`]: super::SyncManager
 /// [`connect`]: Self::connect
-pub(crate) trait SyncTransport: Send + Sync + 'static {
+pub(crate) trait SyncConnector: Send + Sync + 'static {
     /// The specific error type this stream uses.
     type Error: std::error::Error + Send + Sync + 'static;
     /// The stream type returned from connecting to a peer.
@@ -52,7 +52,7 @@ pub(crate) trait SyncTransport: Send + Sync + 'static {
 
 /// Accepts inbound connections from sync peers.
 ///
-/// This is the server-side counterpart to [`SyncTransport`]. The [`SyncServer`] drives this
+/// This is the server-side counterpart to [`SyncConnector`]. The [`SyncServer`] drives this
 /// listener and handles the protocol; implementations only need to yield connected streams.
 ///
 /// [`SyncServer`]: super::SyncServer

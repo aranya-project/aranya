@@ -1,4 +1,4 @@
-//! This module implements [`QuicTransport`] to allow connecting to other peers.
+//! This module implements [`QuicConnector`] to allow connecting to other peers.
 use std::{collections::btree_map::Entry, sync::Arc};
 
 use anyhow::Context as _;
@@ -14,12 +14,12 @@ use tracing::{debug, error, trace, warn};
 
 use super::{
     listener::{ConnectionUpdate, SharedConnectionMap},
-    Error, PskStore, QuicStream, SyncTransport, ALPN_QUIC_SYNC,
+    Error, PskStore, QuicStream, SyncConnector, ALPN_QUIC_SYNC,
 };
 use crate::sync::{Addr, SyncPeer};
 
 #[derive(Clone, Debug)]
-pub(crate) struct QuicTransport {
+pub(crate) struct QuicConnector {
     /// The QUIC client we use to connect to other peers.
     client: s2n_quic::Client,
     /// Handle to the `SharedConnectionMap` to send new acceptors to the `QuicListener`.
@@ -34,8 +34,8 @@ pub(crate) struct QuicTransport {
     local_addr: Addr,
 }
 
-impl QuicTransport {
-    /// Creates a new [`QuicTransport`].
+impl QuicConnector {
+    /// Creates a new [`QuicConnector`].
     pub(crate) fn new(
         client_addr: Addr,
         server_addr: Addr,
@@ -77,7 +77,7 @@ impl QuicTransport {
     }
 }
 
-impl SyncTransport for QuicTransport {
+impl SyncConnector for QuicConnector {
     type Error = Error;
     type Stream = QuicStream;
 

@@ -1,18 +1,18 @@
 //! This module contains the QUIC transport code to allow syncing with other clients.
 
+mod connector;
 mod listener;
 mod psk;
 mod stream;
-mod transport;
 
 use self::{
-    super::{SyncListener, SyncStream, SyncTransport},
+    super::{SyncConnector, SyncListener, SyncStream},
     stream::QuicStream,
 };
 pub(crate) use self::{
+    connector::QuicConnector,
     listener::QuicListener,
     psk::{PskSeed, PskStore},
-    transport::QuicTransport,
 };
 
 /// ALPN protocol identifier for Aranya QUIC sync.

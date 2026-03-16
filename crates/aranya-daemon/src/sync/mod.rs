@@ -1,5 +1,6 @@
 //! Aranya syncer used to send/receive graph commands to other peers.
 
+mod client;
 mod handle;
 mod manager;
 mod server;
@@ -13,7 +14,8 @@ use aranya_util::Addr;
 pub(crate) use self::types::HelloSubscription;
 pub(super) use self::types::SyncResponse;
 pub(crate) use self::{
-    handle::SyncHandle, manager::SyncManager, server::SyncServer, transport::quic, types::SyncPeer,
+    client::SyncClient, handle::SyncHandle, manager::SyncManager, server::SyncServer,
+    transport::quic, types::SyncPeer,
 };
 
 /// The error type which is returned from syncing with peers.

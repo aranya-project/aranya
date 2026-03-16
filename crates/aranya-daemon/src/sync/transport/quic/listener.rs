@@ -27,7 +27,7 @@ use tokio::{
 use tracing::{debug, error, trace, warn};
 
 #[cfg(doc)]
-use super::QuicTransport;
+use super::QuicConnector;
 use super::{Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
@@ -51,9 +51,9 @@ pub(crate) struct QuicListener {
     server: s2n_quic::Server,
     /// Allows authenticating the identity of a given `GraphId`.
     server_keys: Arc<PskStore>,
-    /// Handle to the `SharedConnectionMap` to register new connections with the [`QuicTransport`].
+    /// Handle to the `SharedConnectionMap` to register new connections with the [`QuicConnector`].
     conns: SharedConnectionMap,
-    /// Receives new acceptors from the [`QuicTransport`] so we can listen for connections back.
+    /// Receives new acceptors from the [`QuicConnector`] so we can listen for connections back.
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
     /// Queue to allow awaiting a number of potential streams concurrently until one resolves.
     pending_accepts: JoinSet<AcceptResult>,

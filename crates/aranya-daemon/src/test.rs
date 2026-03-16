@@ -45,8 +45,8 @@ use crate::{
     policy::{Effect, PublicKeyBundle as DeviceKeyBundle, RoleManagementPerm, SimplePerm},
     sync::{
         self,
-        quic::{PskStore, QuicListener, QuicTransport},
-        SyncPeer,
+        quic::{PskStore, QuicConnector, QuicListener},
+        SyncClient, SyncPeer,
     },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
@@ -57,7 +57,7 @@ type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<QuicTransport, crate::PS, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<QuicConnector, crate::PS, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
 type TestServer = sync::SyncServer<QuicListener, crate::PS, crate::SP>;
@@ -111,6 +111,7 @@ impl TestDevice {
     ) -> Result<Vec<Effect>> {
         let cmd_count = self
             .syncer
+            .client
             .sync(SyncPeer::new(device.sync_local_addr, self.graph_id))
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
@@ -244,7 +245,7 @@ impl TestCtx {
                 QuicListener::new(any_local_addr, psk_store.clone()).await?;
             let server = TestServer::new(listener, client.clone(), handle);
 
-            let transport = QuicTransport::new(
+            let connector = QuicConnector::new(
                 any_local_addr,
                 server.local_addr(),
                 conns,
@@ -252,7 +253,8 @@ impl TestCtx {
                 psk_store.clone(),
                 server.local_addr(),
             )?;
-            let syncer = TestSyncer::new(client.clone(), transport, recv, send_effects)?;
+            let sync_client = SyncClient::new(client.clone(), connector, send_effects);
+            let syncer = TestSyncer::new(sync_client, recv)?;
 
             (syncer, server, pk, psk_store, effects_recv)
         };

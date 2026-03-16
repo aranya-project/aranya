@@ -28,8 +28,8 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicListener, QuicTransport},
-        SyncHandle, SyncManager,
+        quic::{PskStore, QuicConnector, QuicListener},
+        SyncClient, SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -83,7 +83,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicTransport, PS, SP, EF>,
+    manager: SyncManager<QuicConnector, PS, SP, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -267,7 +267,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicTransport, PS, SP, EF>,
+        SyncManager<QuicConnector, PS, SP, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {
@@ -290,7 +290,7 @@ impl Daemon {
             .context("unable to initialize QUIC sync listener")?;
         let server = SyncServer::new(listener, client.clone(), handle.clone());
 
-        let transport = QuicTransport::new(
+        let connector = QuicConnector::new(
             client_addr,
             server.local_addr(),
             conns,
@@ -298,7 +298,8 @@ impl Daemon {
             psk_store,
             server.local_addr(),
         )?;
-        let manager = SyncManager::new(client.clone(), transport, recv, send_effects)?;
+        let sync_client = SyncClient::new(client.clone(), connector, send_effects);
+        let manager = SyncManager::new(sync_client, recv)?;
 
         Ok((client, server, manager, handle, recv_effects))
     }
