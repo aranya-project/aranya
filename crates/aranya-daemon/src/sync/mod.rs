@@ -31,14 +31,24 @@ pub(crate) enum Error {
     #[error(transparent)]
     Runtime(#[from] aranya_runtime::SyncError),
 
+    /// Something went wrong in the Aranya Client.
+    #[error(transparent)]
+    AranyaClient(#[from] aranya_runtime::ClientError),
+
+    /// `postcard` was unable to de/serialize a message into a `SyncType`.
+    #[error("postcard failed to de/serialize a message")]
+    Postcard(#[from] postcard::Error),
+
     /// Peer sent an empty response.
     #[cfg(feature = "preview")]
     #[error("peer sent empty response")]
     EmptyResponse,
 
-    #[error(transparent)]
-    AranyaClient(#[from] aranya_runtime::ClientError),
+    /// Failed to collect effects from the sink.
+    #[error("failed to collect effects")]
+    EffectsSink(#[source] Box<dyn std::error::Error + Send + Sync>),
 
+    /// The syncer is in the middle of shutting down at the end of runtime.
     #[error("the sync manager has shut down")]
     SyncerShutdown,
 
@@ -74,13 +84,13 @@ impl Error {
     /// Returns whether a `ParallelFinalize` error occurred, which needs to be resolved manually.
     fn is_parallel_finalize(&self) -> bool {
         use aranya_runtime::ClientError;
-        match self {
-            Self::AranyaClient(ClientError::ParallelFinalize) => true,
-            Self::Other(err) => err
-                .downcast_ref::<ClientError>()
-                .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
-            _ => false,
-        }
+        debug_assert!(
+            !matches!(self, Self::Other(err) if err
+            .downcast_ref::<ClientError>()
+            .is_some_and(|e| matches!(e, ClientError::ParallelFinalize))),
+            "ParallelFinalize should not be wrapped in Other"
+        );
+        matches!(self, Self::AranyaClient(ClientError::ParallelFinalize))
     }
 }
 

@@ -1,7 +1,6 @@
 #[cfg(feature = "preview")]
 use std::time::Duration;
 
-use anyhow::Context as _;
 use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
@@ -125,8 +124,7 @@ where
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
 
         // Send the message
-        let data =
-            postcard::to_slice(&sync_type, &mut buf).context("postcard serialization failed")?;
+        let data = postcard::to_slice(&sync_type, &mut buf)?;
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
@@ -205,19 +203,15 @@ where
         // Create a new transaction and add all received commands.
         let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
         let mut trx = aranya.transaction(peer.graph_id);
-        aranya
-            .add_commands(&mut trx, sink, &cmds)
-            .context("unable to add received commands")?;
-        aranya.commit(&mut trx, sink).context("commit failed")?;
+        aranya.add_commands(&mut trx, sink, &cmds)?;
+        aranya.commit(&mut trx, sink)?;
 
         // Update our peer cache with the new commands.
-        aranya
-            .update_heads(
-                peer.graph_id,
-                cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                caches.entry(peer).or_default(),
-            )
-            .context("failed to update cache heads")?;
+        aranya.update_heads(
+            peer.graph_id,
+            cmds.iter().filter_map(|cmd| cmd.address().ok()),
+            caches.entry(peer).or_default(),
+        )?;
 
         debug!(
             ?peer,
@@ -253,9 +247,7 @@ where
         // Process a poll request, and get back the length/number of commands.
         let (len, _cmds) = {
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-            requester
-                .poll(&mut buf, aranya.provider(), caches.entry(peer).or_default())
-                .context("failed to process poll sync request")
+            requester.poll(&mut buf, aranya.provider(), caches.entry(peer).or_default())
         }?;
 
         // Send along our request message.
@@ -268,7 +260,7 @@ where
         let len = stream.receive(&mut buf).await.map_err(Error::transport)?;
         trace!(?peer, response_bytes = len, "received sync response");
         let buffer = buf.get(..len).assume("valid offset")?;
-        let resp = postcard::from_bytes(buffer).context("failed to deserialize sync response")?;
+        let resp = postcard::from_bytes(buffer)?;
 
         // Destructure the sync response.
         let data = match resp {
@@ -286,7 +278,9 @@ where
             .await?;
 
         // Send all processed effects to the Daemon API.
-        let effects = sink.collect().context("could not collect effects")?;
+        let effects = sink
+            .collect()
+            .map_err(|e| Error::EffectsSink(Box::new(e)))?;
         let effects_count = effects.len();
         if let Err(error) = self.send_effects.send((peer.graph_id, effects)).await {
             debug!(?error, "effect handler closed, discarding effects");

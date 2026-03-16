@@ -7,7 +7,6 @@
 //!
 //! See the [`SyncManager`](super::SyncManager) for the other half of the syncer, which is
 //! responsible for initiating syncs.
-use anyhow::Context as _;
 #[cfg(feature = "preview")]
 use aranya_runtime::SyncHelloType;
 use aranya_runtime::{
@@ -94,7 +93,7 @@ where
         trace!(len, "received request bytes");
 
         let buffer = buf.get(..len).assume("valid offset")?;
-        let sync_type = postcard::from_bytes(buffer).context("failed to deserialize request")?;
+        let sync_type = postcard::from_bytes(buffer)?;
 
         debug!(sync_type = ?std::mem::discriminant(&sync_type), "processing request");
 
@@ -139,8 +138,7 @@ where
             }
         };
 
-        let data =
-            postcard::to_slice(&response, &mut buf).context("postcard serialization failed")?;
+        let data = postcard::to_slice(&response, &mut buf)?;
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
@@ -160,7 +158,7 @@ where
                 peer.check_request(graph_id)?;
 
                 let mut resp = SyncResponder::new();
-                resp.receive(request).context("sync recv failed")?;
+                resp.receive(request)?;
 
                 let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
                 let cache = caches.entry(peer).or_default();
