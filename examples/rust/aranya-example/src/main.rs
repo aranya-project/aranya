@@ -630,6 +630,10 @@ async fn main() -> Result<()> {
 
     info!("completed afc demo");
 
+    // Sync owner before revocation/deletion so it has the latest label and rank facts.
+    owner_team.sync_now(admin_addr, None).await?;
+    owner_team.sync_now(operator_addr, None).await?;
+
     info!("revoking label from membera");
     owner_team.device(membera.id).revoke_label(label3).await?;
     info!("revoking label from memberb");
