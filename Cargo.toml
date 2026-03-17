@@ -37,24 +37,24 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-fast-channels = { version = "0.18.0", features = ["alloc"] }
-aranya-afc-util = { version = "0.21.0", features = ["alloc"] }
-aranya-capi-core = { version = "0.8.0" }
-aranya-capi-codegen = { version = "0.7.0" }
-aranya-crypto = { version = "0.13.0", features = ["alloc", "fs-keystore", "clone-aead", "std", "tls"] }
-aranya-crypto-ffi = { version = "0.19.0" }
-aranya-device-ffi = { version = "0.19.0" }
-aranya-envelope-ffi = { version = "0.19.0" }
-aranya-id = { version = "0.2.1" }
-aranya-idam-ffi = { version = "0.19.0" }
-aranya-perspective-ffi = { version = "0.19.0" }
-aranya-policy-compiler = { version = "0.20.0" }
-aranya-policy-ifgen = { version = "0.20.0", features = ["serde"] }
-aranya-policy-ifgen-build = { version = "0.13.0" }
-aranya-policy-lang = { version = "0.13.0" }
+aranya-fast-channels = { version = "0.19.0", features = ["alloc"] }
+aranya-afc-util = { version = "0.22.0", features = ["alloc"] }
+aranya-capi-core = { version = "0.8.1" }
+aranya-capi-codegen = { version = "0.7.1" }
+aranya-crypto = { version = "0.14.0", features = ["alloc", "fs-keystore", "clone-aead", "std", "tls"] }
+aranya-crypto-ffi = { version = "0.20.0" }
+aranya-device-ffi = { version = "0.20.0" }
+aranya-envelope-ffi = { version = "0.20.0" }
+aranya-id = { version = "0.2.2" }
+aranya-idam-ffi = { version = "0.20.0" }
+aranya-perspective-ffi = { version = "0.20.0" }
+aranya-policy-compiler = { version = "0.21.0" }
+aranya-policy-ifgen = { version = "0.21.0", features = ["serde"] }
+aranya-policy-ifgen-build = { version = "0.14.0" }
+aranya-policy-lang = { version = "0.14.0" }
 aranya-policy-text = { version = "0.1.4" }
-aranya-policy-vm = { version = "0.19.0", features = ["std"] }
-aranya-runtime = { version = "0.20.0", features = ["std", "libc"] }
+aranya-policy-vm = { version = "0.20.0", features = ["std"] }
+aranya-runtime = { version = "0.21.0", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
 spideroak-base58 = { version = "0.2.0" }
@@ -112,21 +112,24 @@ tag-message = ""
 tag-prefix = ""
 
 [patch.crates-io]
-aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-crypto = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-id = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-policy-text = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core" }
-aranya-runtime = { git = "https://github.com/aranya-project/aranya-core" }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-id = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+aranya-runtime = { git = "https://github.com/aranya-project/aranya-core", branch = "release-2026-03-17" }
+
+[patch."https://github.com/aranya-project/aranya-core"]
+aranya-libc = { version = "0.4.0", registry = "crates-io" }
+aranya-policy-text = { version = "0.1.4", registry = "crates-io" }
