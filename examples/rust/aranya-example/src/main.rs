@@ -268,7 +268,6 @@ async fn main() -> Result<()> {
     let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
     let memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
-    // setup sync peers.
     info!("adding admin to team");
     let admin_role_rank = owner_team.query_rank(admin_role.id).await?;
     owner_team
@@ -313,6 +312,19 @@ async fn main() -> Result<()> {
         info!("operator unsubscribing from hello notifications from admin");
         operator_team.sync_hello_unsubscribe(admin_addr).await?;
     }
+
+    // Demonstrate adding and removing sync peers
+    let sync_cfg = {
+        let mut builder = SyncPeerConfig::builder();
+        builder = builder.interval(Duration::from_millis(100));
+        #[cfg(feature = "preview")]
+        {
+            builder = builder.sync_on_hello(true);
+        }
+        builder.build()?
+    };
+    owner_team.add_sync_peer(admin_addr, sync_cfg).await?;
+    owner_team.remove_sync_peer(admin_addr).await?;
 
     // Sync all devices with owner so they see each other's sync peer state.
     admin_team.sync_now(owner_addr, None).await?;
