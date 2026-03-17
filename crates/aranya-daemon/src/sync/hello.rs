@@ -11,7 +11,7 @@ use std::{
 use anyhow::{ensure, Context as _};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType,
+    Address, PolicyStore, Storage as _, StorageProvider, SyncHelloType, SyncType, TraversalBuffer,
 };
 use futures_util::AsyncReadExt as _;
 use tokio_util::sync::CancellationToken;
@@ -479,7 +479,13 @@ where
                 let peer = SyncPeer::new(address, graph_id);
                 debug!(?peer, ?head, "received hello notification message");
 
-                if !client.lock_aranya().await.command_exists(graph_id, head) {
+                let mut buffer = TraversalBuffer::new();
+
+                if !client
+                    .lock_aranya()
+                    .await
+                    .command_exists(graph_id, head, &mut buffer)
+                {
                     match handle.sync_on_hello(peer).await {
                         Ok(()) => debug!(?peer, ?head, "sent sync_on_hello request"),
                         Err(error) => warn!(
@@ -495,8 +501,10 @@ where
                 let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
                 let cache = caches.entry(peer).or_default();
 
+                let mut buffer = TraversalBuffer::new();
+
                 // Update the cache with the received head_id
-                match aranya.update_heads(graph_id, [head], cache) {
+                match aranya.update_heads(graph_id, [head], cache, &mut buffer) {
                     Ok(_) => debug!(?peer, ?head, "updated peer cache with new graph head"),
                     Err(error) => warn!(
                         ?peer,

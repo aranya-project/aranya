@@ -8,7 +8,8 @@ use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use aranya_runtime::{
-    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
+    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, TraversalBuffer,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, rustls::SkipServerVerification};
 use buggy::BugExt as _;
@@ -305,7 +306,12 @@ where
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
             let cache = caches.entry(peer).or_default();
             let (len, _) = syncer
-                .poll(&mut send_buf, aranya.provider(), cache)
+                .poll(
+                    &mut send_buf,
+                    aranya.provider(),
+                    cache,
+                    &mut TraversalBuffer::new(),
+                )
                 .context("sync poll failed")?;
             trace!(?len, "sync poll finished");
             len
@@ -360,10 +366,13 @@ where
                 // Lock both aranya and caches in the correct order.
                 let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
                 let mut trx = aranya.transaction(peer.graph_id);
+                let mut buffer = TraversalBuffer::new();
                 aranya
-                    .add_commands(&mut trx, sink, &cmds)
+                    .add_commands(&mut trx, sink, &cmds, &mut buffer)
                     .context("unable to add received commands")?;
-                aranya.commit(&mut trx, sink).context("commit failed")?;
+                aranya
+                    .commit(trx, sink, &mut buffer)
+                    .context("commit failed")?;
                 trace!("committed");
                 let cache = caches.entry(peer).or_default();
                 aranya
@@ -371,6 +380,7 @@ where
                         peer.graph_id,
                         cmds.iter().filter_map(|cmd| cmd.address().ok()),
                         cache,
+                        &mut buffer,
                     )
                     .context("failed to update cache heads")?;
                 return Ok(cmds.len());
