@@ -393,9 +393,6 @@ where
     async fn sync_on_hello(&mut self, peer: SyncPeer, head: Address) -> Result<()> {
         debug!(?peer, ?head, "received hello notification message");
 
-        // Update the peer cache with the received head_id.
-        self.client.update_heads(peer, head).await?;
-
         // Check if we're missing this head and need it synced.
         let dominated = self.client.command_exists(peer.graph_id, head).await;
         if !dominated {

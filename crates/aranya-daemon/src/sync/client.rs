@@ -162,15 +162,6 @@ where
             .map_or(None, |storage| storage.get_head_address().ok())
     }
 
-    /// Update peer cache heads after a hello notification.
-    #[cfg(feature = "preview")]
-    pub(super) async fn update_heads(&self, peer: SyncPeer, head: Address) -> Result<()> {
-        let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-        let cache = caches.entry(peer).or_default();
-        aranya.update_heads(peer.graph_id, [head], cache)?;
-        Ok(())
-    }
-
     // Process the sync response data and add a new transaction to the Aranya client.
     async fn process_sync_data<S: Sink<PS::Effect>>(
         &self,
