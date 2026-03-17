@@ -102,7 +102,20 @@ where
             head,
             graph_id: peer.graph_id,
         });
-        self.send_hello_request(peer, message).await?;
+
+        // Connect to the peer
+        let mut stream = self
+            .connector
+            .connect(peer)
+            .await
+            .map_err(Error::transport)?;
+
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
+
+        // Send the message
+        let data = postcard::to_slice(&message, &mut buf)?;
+        stream.send(data).await.map_err(Error::transport)?;
+        stream.finish().await.map_err(Error::transport)?;
 
         Ok(())
     }
