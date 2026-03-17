@@ -34,7 +34,7 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{PolicyStore, StorageProvider};
+use aranya_runtime::{PolicyStore, StorageProvider, TraversalBuffers};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use bytes::Bytes;
@@ -72,6 +72,9 @@ pub(crate) struct SyncManager<ST, PS, SP, EF> {
     pub(super) queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     pub(super) send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
+    /// Used for traversing the graph.
+    #[derive_where(skip(Debug))]
+    pub(super) traversal_buffers: TraversalBuffers,
     /// Additional state used by the syncer.
     pub(super) state: ST,
     /// Sync server port. Peers will make incoming connections to us on this port.

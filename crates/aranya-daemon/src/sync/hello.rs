@@ -501,8 +501,6 @@ where
                 let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
                 let cache = caches.entry(peer).or_default();
 
-                let mut buffer = TraversalBuffer::new();
-
                 // Update the cache with the received head_id
                 match aranya.update_heads(graph_id, [head], cache, &mut buffer) {
                     Ok(_) => debug!(?peer, ?head, "updated peer cache with new graph head"),
