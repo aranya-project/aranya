@@ -4,9 +4,7 @@ use std::time::Duration;
 use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
-use aranya_runtime::{
-    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
-};
+use aranya_runtime::{Command as _, PolicyStore, Sink, StorageProvider, SyncRequester};
 use buggy::BugExt as _;
 use derive_where::derive_where;
 use tokio::sync::mpsc;
@@ -64,6 +62,7 @@ where
         graph_change_debounce: Duration,
         duration: Duration,
         schedule_delay: Duration,
+        buffer: &mut [u8],
     ) -> Result<()> {
         trace!(?peer, "subscribing to hello notifications from peer");
         // TODO(nikki): update aranya_core with the new name.
@@ -74,18 +73,22 @@ where
             graph_id: peer.graph_id,
         });
 
-        self.send_hello_request(peer, message).await
+        self.send_hello_request(peer, message, buffer).await
     }
 
     /// Unsubscribe from hello notifications from a sync peer.
     #[cfg(feature = "preview")]
-    pub(super) async fn send_hello_unsubscribe(&self, peer: SyncPeer) -> Result<()> {
+    pub(super) async fn send_hello_unsubscribe(
+        &self,
+        peer: SyncPeer,
+        buffer: &mut [u8],
+    ) -> Result<()> {
         trace!(?peer, "unsubscribing from hello notifications from peer");
         let message = SyncType::Hello(SyncHelloType::Unsubscribe {
             graph_id: peer.graph_id,
         });
 
-        self.send_hello_request(peer, message).await
+        self.send_hello_request(peer, message, buffer).await
     }
 
     /// Send a hello notification to a sync peer.
@@ -95,6 +98,7 @@ where
         &mut self,
         peer: SyncPeer,
         head: Address,
+        buffer: &mut [u8],
     ) -> Result<()> {
         trace!(?peer, "sending hello notifications to peer");
 
@@ -110,10 +114,8 @@ where
             .await
             .map_err(Error::transport)?;
 
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
-
         // Send the message
-        let data = postcard::to_slice(&message, &mut buf)?;
+        let data = postcard::to_slice(&message, buffer)?;
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
@@ -126,6 +128,7 @@ where
         &self,
         peer: SyncPeer,
         sync_type: SyncType,
+        buffer: &mut [u8],
     ) -> Result<()> {
         // Connect to the peer
         let mut stream = self
@@ -134,15 +137,13 @@ where
             .await
             .map_err(Error::transport)?;
 
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
-
         // Send the message
-        let data = postcard::to_slice(&sync_type, &mut buf)?;
+        let data = postcard::to_slice(&sync_type, buffer)?;
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         // Read the response to avoid a race condition with the server
-        match stream.receive(&mut buf).await {
+        match stream.receive(buffer).await {
             Ok(0) => Err(Error::EmptyResponse),
             Ok(_) => Ok(()),
             Err(e) => Err(Error::transport(e)),
@@ -236,7 +237,7 @@ where
 {
     /// Handles a sync exchange with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    pub(crate) async fn sync(&mut self, peer: SyncPeer) -> Result<usize> {
+    pub(crate) async fn sync(&mut self, peer: SyncPeer, buffer: &mut [u8]) -> Result<usize> {
         debug!(?peer, "starting sync");
 
         // Connect to the peer.
@@ -246,25 +247,24 @@ where
         })?;
 
         let mut requester = SyncRequester::new(peer.graph_id, Rng);
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
 
         // Process a poll request, and get back the length/number of commands.
         let (len, _cmds) = {
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-            requester.poll(&mut buf, aranya.provider(), caches.entry(peer).or_default())
+            requester.poll(buffer, aranya.provider(), caches.entry(peer).or_default())
         }?;
 
         // Send along our request message.
-        let buffer = buf.get(..len).assume("valid offset")?;
+        let buf = buffer.get(..len).assume("valid offset")?;
         trace!(?peer, request_bytes = len, "sending sync request");
-        stream.send(buffer).await.map_err(Error::transport)?;
+        stream.send(buf).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         // Process the response message.
-        let len = stream.receive(&mut buf).await.map_err(Error::transport)?;
+        let len = stream.receive(buffer).await.map_err(Error::transport)?;
         trace!(?peer, response_bytes = len, "received sync response");
-        let buffer = buf.get(..len).assume("valid offset")?;
-        let resp = postcard::from_bytes(buffer)?;
+        let buf = buffer.get(..len).assume("valid offset")?;
+        let resp = postcard::from_bytes(buf)?;
 
         // Destructure the sync response.
         let data = match resp {

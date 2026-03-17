@@ -75,7 +75,7 @@ impl SyncStream for QuicStream {
 
     async fn finish(&mut self) -> Result<(), Self::Error> {
         debug!(peer = ?self.peer, "closing stream");
-        self.stream.close().await.map_err(|error| {
+        self.stream.finish().map_err(|error| {
             warn!(peer = ?self.peer, %error, "stream finish failed");
             Error::Finish(error)
         })?;

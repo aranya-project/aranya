@@ -27,7 +27,7 @@ use aranya_daemon_api::{text, TeamId};
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientError, ClientState, GraphId,
+    ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{ready, Addr};
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
@@ -45,7 +45,7 @@ use crate::{
     policy::{Effect, Perm, PublicKeyBundle as DeviceKeyBundle},
     sync::{
         self,
-        quic::{PskStore, QuicConnector, QuicListener},
+        quic::{PskStore, QuicConnector, QuicListener, SharedConnectionMap},
         SyncClient, SyncPeer,
     },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -121,10 +121,14 @@ impl TestDevice {
         device: &TestDevice,
         must_receive: Option<usize>,
     ) -> Result<Vec<Effect>> {
+        let mut buffer = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
         let cmd_count = self
             .syncer
             .client
-            .sync(SyncPeer::new(device.sync_local_addr, self.graph_id))
+            .sync(
+                SyncPeer::new(device.sync_local_addr, self.graph_id),
+                &mut buffer,
+            )
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
         if let Some(must_receive) = must_receive {
@@ -250,11 +254,19 @@ impl TestCtx {
             let psk_store: Arc<PskStore> = Arc::default();
 
             let (send_effects, effects_recv) = mpsc::channel(1);
-
             let (handle, recv) = sync::SyncHandle::channel(128);
 
-            let (listener, conns, conn_tx) =
-                QuicListener::new(any_local_addr, psk_store.clone()).await?;
+            // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
+            let conns: SharedConnectionMap = Arc::default();
+            let (conn_tx, conn_rx) = mpsc::channel(32);
+
+            let listener = QuicListener::new(
+                any_local_addr,
+                psk_store.clone(),
+                Arc::clone(&conns),
+                conn_rx,
+            )
+            .await?;
             let server = TestServer::new(listener, client.clone(), handle);
 
             let connector = QuicConnector::new(

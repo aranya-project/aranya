@@ -1,15 +1,12 @@
 //! This module implements [`QuicListener`] to allow accepting connections from QUIC clients.
-use std::{
-    collections::{btree_map::Entry, BTreeMap},
-    sync::Arc,
-};
+use std::{collections::btree_map::Entry, sync::Arc};
 
 use anyhow::Context as _;
 use aranya_util::{rustls::NoCertResolver, s2n_quic::get_conn_identity};
 use buggy::BugExt as _;
 use s2n_quic::{
     application::{self, Error as AppError},
-    connection::{Handle, StreamAcceptor},
+    connection::StreamAcceptor,
     provider::{
         congestion_controller::Bbr,
         tls::rustls::{
@@ -19,20 +16,17 @@ use s2n_quic::{
     },
     stream::BidirectionalStream,
 };
-use tokio::{
-    sync::{mpsc, Mutex},
-    task::JoinSet,
-    time::Duration,
-};
-use tracing::{debug, error, trace, warn};
+use tokio::{sync::mpsc, task::JoinSet, time::Duration};
+use tracing::{debug, error, trace};
 
 #[cfg(doc)]
 use super::QuicConnector;
-use super::{Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
+use super::{
+    ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
+    ALPN_QUIC_SYNC,
+};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
-pub(super) type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Handle>>>;
-pub(super) type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
 
 /// The amount of time we wait trying to accept a bidirectional stream from the peer connecting to
@@ -64,11 +58,9 @@ impl QuicListener {
     pub(crate) async fn new(
         addr: Addr,
         server_keys: Arc<PskStore>,
-    ) -> Result<(Self, SharedConnectionMap, mpsc::Sender<ConnectionUpdate>), Error> {
-        // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        let conns: SharedConnectionMap = Arc::default();
-        let (conn_tx, conn_rx) = mpsc::channel(32);
-
+        conns: SharedConnectionMap,
+        conn_rx: mpsc::Receiver<ConnectionUpdate>,
+    ) -> Result<Self, Error> {
         // Build up the `ServerConfig` so we can initialize the TLS server.
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
@@ -102,18 +94,14 @@ impl QuicListener {
             .context("unable to get server local address")?
             .into();
 
-        Ok((
-            Self {
-                local_addr,
-                server,
-                server_keys,
-                conns: conns.clone(),
-                conn_rx,
-                pending_accepts: JoinSet::new(),
-            },
+        Ok(Self {
+            local_addr,
+            server,
+            server_keys,
             conns,
-            conn_tx,
-        ))
+            conn_rx,
+            pending_accepts: JoinSet::new(),
+        })
     }
 
     /// Accepts an incoming bidirectional stream from this [`SyncPeer`].
@@ -227,7 +215,7 @@ impl SyncListener for QuicListener {
                         Ok((peer, _acceptor, None)) => {
                             debug!(?peer, "stream acceptor completed with no stream");
                         }
-                        Err(error) => warn!(%error, "stream acceptor task panicked"),
+                        Err(error) => error!(%error, "stream acceptor task panicked"),
                     }
                 }
 

@@ -13,8 +13,8 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, trace, warn};
 
 use super::{
-    listener::{ConnectionUpdate, SharedConnectionMap},
-    Error, PskStore, QuicStream, SyncConnector, ALPN_QUIC_SYNC,
+    ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncConnector,
+    ALPN_QUIC_SYNC,
 };
 use crate::sync::{Addr, SyncPeer};
 
@@ -143,6 +143,8 @@ impl SyncConnector for QuicConnector {
                     Entry::Occupied(mut e) => {
                         let existing_alive = e.get_mut().ping().is_ok();
                         // We initiated this connection, so it wins if we're the lower-addressed peer.
+                        // TODO(nikki): This semi-fixes an existing bug, but we need a better way
+                        // than raw addresses, this will break with NAT.
                         let outbound_wins = !existing_alive || self.local_addr < peer.addr;
                         if outbound_wins {
                             if existing_alive {
