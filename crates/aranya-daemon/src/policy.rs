@@ -5,13 +5,26 @@
 #![allow(missing_docs)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::vec::Vec;
 use aranya_policy_ifgen::{
     macros::{action, actions, effect, effects, value},
-    BaseId, ClientError, Value, Text,
+    text, BaseId, ClientError, Value, Text,
 };
+/// DEFAULT_ADMIN_ROLE_RANK constant.
+pub const DEFAULT_ADMIN_ROLE_RANK: i64 = 800i64;
+/// DEFAULT_MEMBER_ROLE_RANK constant.
+pub const DEFAULT_MEMBER_ROLE_RANK: i64 = 600i64;
+/// DEFAULT_OPERATOR_ROLE_RANK constant.
+pub const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700i64;
+/// DEFAULT_OWNER_DEVICE_RANK constant.
+pub const DEFAULT_OWNER_DEVICE_RANK: i64 = 1000000i64;
+/// DEFAULT_OWNER_ROLE_RANK constant.
+pub const DEFAULT_OWNER_ROLE_RANK: i64 = 999999i64;
+/// MAX_RANK constant.
+pub const MAX_RANK: i64 = 1000000i64;
 #[derive(Debug)]
 pub enum Persistent {}
 #[derive(Debug)]

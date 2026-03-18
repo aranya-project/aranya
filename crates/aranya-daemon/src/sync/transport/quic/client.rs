@@ -8,7 +8,8 @@ use aranya_daemon_api::TeamId;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
 use aranya_runtime::{
-    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, MAX_SYNC_MESSAGE_SIZE,
+    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, TraversalBuffers,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, rustls::SkipServerVerification};
 use buggy::BugExt as _;
@@ -203,6 +204,7 @@ where
             recv,
             queue: DelayQueue::new(),
             send_effects,
+            traversal_buffers: TraversalBuffers::new(),
             state,
             return_port,
             #[cfg(feature = "preview")]
@@ -292,7 +294,7 @@ where
     /// * `Err(SyncError)` if there was an error generating or sending the request
     #[instrument(skip_all)]
     async fn send_sync_request(
-        &self,
+        &mut self,
         send: &mut SendStream,
         syncer: &mut SyncRequester,
         peer: SyncPeer,
@@ -305,7 +307,12 @@ where
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
             let cache = caches.entry(peer).or_default();
             let (len, _) = syncer
-                .poll(&mut send_buf, aranya.provider(), cache)
+                .poll(
+                    &mut send_buf,
+                    aranya.provider(),
+                    cache,
+                    &mut self.traversal_buffers.primary,
+                )
                 .context("sync poll failed")?;
             trace!(?len, "sync poll finished");
             len
@@ -326,7 +333,7 @@ where
     ///
     /// Returns the number of commands that were received and successfully processed.
     async fn receive_sync_response<S>(
-        &self,
+        &mut self,
         recv: &mut ReceiveStream,
         syncer: &mut SyncRequester,
         sink: &mut S,
@@ -361,9 +368,11 @@ where
                 let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
                 let mut trx = aranya.transaction(peer.graph_id);
                 aranya
-                    .add_commands(&mut trx, sink, &cmds)
+                    .add_commands(&mut trx, sink, &cmds, &mut self.traversal_buffers.primary)
                     .context("unable to add received commands")?;
-                aranya.commit(&mut trx, sink).context("commit failed")?;
+                aranya
+                    .commit(trx, sink, &mut self.traversal_buffers.primary)
+                    .context("commit failed")?;
                 trace!("committed");
                 let cache = caches.entry(peer).or_default();
                 aranya
@@ -371,6 +380,7 @@ where
                         peer.graph_id,
                         cmds.iter().filter_map(|cmd| cmd.address().ok()),
                         cache,
+                        &mut self.traversal_buffers.primary,
                     )
                     .context("failed to update cache heads")?;
                 return Ok(cmds.len());
