@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
     PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
-    MAX_SYNC_MESSAGE_SIZE,
+    TraversalBuffers, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     error::ReportExt as _, ready, rustls::NoCertResolver, s2n_quic::get_conn_identity, task::scope,
@@ -352,7 +352,7 @@ where
             let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
             let cache = caches.entry(peer).or_default();
 
-            resp.poll(&mut buf, aranya.provider(), cache)
+            resp.poll(&mut buf, aranya.provider(), cache, &mut TraversalBuffers::new())
                 .or_else(|err| {
                     if matches!(
                         err,
