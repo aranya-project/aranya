@@ -37,68 +37,68 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.aranya-afc-util]]
-version = "0.21.0"
-when = "2026-02-17"
+version = "0.22.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.7.0"
-when = "2026-02-17"
+version = "0.7.1"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.8.0"
-when = "2026-02-17"
+version = "0.8.1"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-macro]]
-version = "0.7.0"
-when = "2026-02-17"
+version = "0.7.1"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.13.0"
-when = "2026-02-17"
+version = "0.14.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.19.0"
-when = "2026-02-17"
+version = "0.20.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.19.0"
-when = "2026-02-17"
+version = "0.20.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.19.0"
-when = "2026-02-17"
+version = "0.20.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.18.0"
-when = "2026-02-17"
+version = "0.19.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-id]]
-version = "0.2.1"
-when = "2026-01-06"
+version = "0.2.2"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.19.0"
-when = "2026-02-17"
+version = "0.20.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -127,56 +127,56 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.19.0"
-when = "2026-02-17"
+version = "0.20.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ast]]
-version = "0.12.1"
-when = "2026-02-17"
+version = "0.13.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.20.0"
-when = "2026-02-17"
+version = "0.21.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.14.0"
-when = "2026-02-17"
+version = "0.15.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.20.0"
-when = "2026-02-17"
+version = "0.21.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.13.0"
-when = "2026-02-17"
+version = "0.14.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-macro]]
-version = "0.6.0"
-when = "2026-02-17"
+version = "0.7.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.13.0"
-when = "2026-02-17"
+version = "0.14.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.18.1"
-when = "2026-02-17"
+version = "0.19.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -193,14 +193,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.19.0"
-when = "2026-02-17"
+version = "0.20.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.20.0"
-when = "2026-02-17"
+version = "0.21.0"
+when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -335,8 +335,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.unicode-width]]
-version = "0.1.14"
-when = "2024-09-19"
+version = "0.2.2"
+when = "2025-10-06"
 user-id = 1139
 user-login = "Manishearth"
 user-name = "Manish Goregaokar"
@@ -531,6 +531,12 @@ version = "0.3.1"
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.1.4"
+
+[[audits.aranya-core.audits.postcard-core]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "No unsafe or IO. Just simple serialization helpers."
 
 [[audits.aranya-core.audits.sha3-utils]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
@@ -1166,7 +1172,7 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
 delta = "1.14.0 -> 1.15.0"
-notes = "The delta in `lib.rs` only tweaks doc comments and `#[cfg(feature = \"std\")]`."
+notes = 'The delta in `lib.rs` only tweaks doc comments and `#[cfg(feature = "std")]`.'
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.equivalent]]
@@ -1389,8 +1395,8 @@ who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
 version = "1.0.78"
 notes = """
-Grepped for \"crypt\", \"cipher\", \"fs\", \"net\" - there were no hits
-(except for a benign \"fs\" hit in a doc comment)
+Grepped for "crypt", "cipher", "fs", "net" - there were no hits
+(except for a benign "fs" hit in a doc comment)
 
 Notes from the `unsafe` review can be found in https://crrev.com/c/5385745.
 """
@@ -1495,8 +1501,8 @@ who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
 version = "1.0.35"
 notes = """
-Grepped for \"unsafe\", \"crypt\", \"cipher\", \"fs\", \"net\" - there were no hits
-(except for benign \"net\" hit in tests and \"fs\" hit in README.md)
+Grepped for "unsafe", "crypt", "cipher", "fs", "net" - there were no hits
+(except for benign "net" hit in tests and "fs" hit in README.md)
 """
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
@@ -1575,7 +1581,7 @@ and there were no hits except for:
 * Using `unsafe` in a string:
 
     ```
-    src/constfn.rs:            \"unsafe\" => Qualifiers::Unsafe,
+    src/constfn.rs:            "unsafe" => Qualifiers::Unsafe,
     ```
 
 * Using `std::fs` in `build/build.rs` to write `${OUT_DIR}/version.expr`
@@ -1749,7 +1755,7 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
 version = "1.0.197"
-notes = "Grepped for \"unsafe\", \"crypt\", \"cipher\", \"fs\", \"net\" - there were no hits"
+notes = 'Grepped for "unsafe", "crypt", "cipher", "fs", "net" - there were no hits'
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.serde_derive]]
@@ -1768,7 +1774,7 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.202 -> 1.0.203"
-notes = "Grepped for \"unsafe\", \"crypt\", \"cipher\", \"fs\", \"net\" - there were no hits"
+notes = 'Grepped for "unsafe", "crypt", "cipher", "fs", "net" - there were no hits'
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.serde_derive]]
@@ -2373,6 +2379,12 @@ criteria = "safe-to-deploy"
 delta = "0.10.2 -> 0.10.3"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.codespan-reporting]]
+who = "Erich Gubler <erichdongubler@gmail.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.1 -> 0.12.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.crossbeam-channel]]
 who = "Jan-Erik Rediger <jrediger@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -2641,6 +2653,20 @@ notes = """
 A tiny bit of unsafe code to implement functionality that isn't in stable rust
 yet, but it's all valid. Otherwise it's a pretty simple crate.
 """
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.proc-macro-error-attr2]]
+who = "Kagami Sascha Rosylight <saschanaz@outlook.com>"
+criteria = "safe-to-deploy"
+version = "2.0.0"
+notes = "No unsafe block."
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.proc-macro-error2]]
+who = "Kagami Sascha Rosylight <saschanaz@outlook.com>"
+criteria = "safe-to-deploy"
+version = "2.0.1"
+notes = "No unsafe block with a lovely `#![forbid(unsafe_code)]`."
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.rmp]]
