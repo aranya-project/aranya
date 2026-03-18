@@ -11,7 +11,7 @@
 use aranya_runtime::SyncHelloType;
 use aranya_runtime::{
     PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
-    MAX_SYNC_MESSAGE_SIZE,
+    TraversalBuffers, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::{bug, BugExt as _};
@@ -38,6 +38,9 @@ pub(crate) struct SyncServer<SL, PS, SP> {
     /// Handle to allow sending messages to the [`SyncManager`].
     #[allow(dead_code, reason = "only used in preview right now")]
     handle: SyncHandle,
+    /// Used for traversing the graph.
+    #[derive_where(skip(Debug))]
+    traversal: TraversalBuffers,
 }
 
 impl<SL, PS, SP> SyncServer<SL, PS, SP>
@@ -52,6 +55,7 @@ where
             client,
             listener,
             handle,
+            traversal: TraversalBuffers::new(),
         }
     }
 
@@ -85,7 +89,7 @@ where
 
     /// Handles an incoming connection, reading data from the peer and responding as needed.
     #[instrument(skip_all, fields(peer = %stream.peer().addr, graph = %stream.peer().graph_id))]
-    async fn handle_stream<S: SyncStream>(&self, mut stream: S) -> Result<(), Error> {
+    async fn handle_stream<S: SyncStream>(&mut self, mut stream: S) -> Result<(), Error> {
         trace!("received sync request");
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
@@ -148,7 +152,7 @@ where
 
     /// Processes a poll request, generating a response with a sampling of commands.
     async fn process_poll_request(
-        &self,
+        &mut self,
         peer: SyncPeer,
         request: SyncRequestMessage,
         buf: &mut [u8],
@@ -164,7 +168,7 @@ where
                 let cache = caches.entry(peer).or_default();
 
                 let len = resp
-                    .poll(buf, aranya.provider(), cache)
+                    .poll(buf, aranya.provider(), cache, &mut self.traversal)
                     .or_else(|err| {
                         if matches!(
                             err,

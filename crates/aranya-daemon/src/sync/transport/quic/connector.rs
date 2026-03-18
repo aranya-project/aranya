@@ -145,6 +145,7 @@ impl SyncConnector for QuicConnector {
                         // We initiated this connection, so it wins if we're the lower-addressed peer.
                         // TODO(nikki): This semi-fixes an existing bug, but we need a better way
                         // than raw addresses, this will break with NAT.
+                        // https://github.com/aranya-project/aranya/issues/754
                         let outbound_wins = !existing_alive || self.local_addr < peer.addr;
                         if outbound_wins {
                             if existing_alive {

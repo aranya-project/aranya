@@ -4,7 +4,9 @@ use std::time::Duration;
 use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
-use aranya_runtime::{Command as _, PolicyStore, Sink, StorageProvider, SyncRequester};
+use aranya_runtime::{
+    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, TraversalBuffers,
+};
 use buggy::BugExt as _;
 use derive_where::derive_where;
 use tokio::sync::mpsc;
@@ -28,6 +30,9 @@ pub(crate) struct SyncClient<C, PS, SP, EF> {
     connector: C,
     /// Used to send effects to the API to be processed.
     send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
+    /// Used for traversing the graph.
+    #[derive_where(skip(Debug))]
+    traversal: TraversalBuffers,
 }
 
 impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF> {
@@ -41,6 +46,7 @@ impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF> {
             client,
             connector,
             send_effects,
+            traversal: TraversalBuffers::new(),
         }
     }
 
@@ -158,11 +164,11 @@ where
 {
     /// Check whether a given command exists in a graph.
     #[cfg(feature = "preview")]
-    pub(super) async fn command_exists(&self, graph_id: GraphId, head: Address) -> bool {
+    pub(super) async fn command_exists(&mut self, graph_id: GraphId, head: Address) -> bool {
         self.client
             .lock_aranya()
             .await
-            .command_exists(graph_id, head)
+            .command_exists(graph_id, head, &mut self.traversal.primary)
     }
 
     /// Get the current head address for a graph, if any.
@@ -178,7 +184,7 @@ where
 
     // Process the sync response data and add a new transaction to the Aranya client.
     async fn process_sync_data<S: Sink<PS::Effect>>(
-        &self,
+        &mut self,
         peer: SyncPeer,
         data: &[u8],
         requester: &mut SyncRequester,
@@ -208,14 +214,15 @@ where
         // Create a new transaction and add all received commands.
         let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
         let mut trx = aranya.transaction(peer.graph_id);
-        aranya.add_commands(&mut trx, sink, &cmds)?;
-        aranya.commit(&mut trx, sink)?;
+        aranya.add_commands(&mut trx, sink, &cmds, &mut self.traversal.primary)?;
+        aranya.commit(trx, sink, &mut self.traversal.primary)?;
 
         // Update our peer cache with the new commands.
         aranya.update_heads(
             peer.graph_id,
             cmds.iter().filter_map(|cmd| cmd.address().ok()),
             caches.entry(peer).or_default(),
+            &mut self.traversal.primary,
         )?;
 
         debug!(
@@ -251,7 +258,12 @@ where
         // Process a poll request, and get back the length/number of commands.
         let (len, _cmds) = {
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
-            requester.poll(buffer, aranya.provider(), caches.entry(peer).or_default())
+            requester.poll(
+                buffer,
+                aranya.provider(),
+                caches.entry(peer).or_default(),
+                &mut self.traversal.primary,
+            )
         }?;
 
         // Send along our request message.
