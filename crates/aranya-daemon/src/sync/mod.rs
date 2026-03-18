@@ -1,9 +1,9 @@
 //! Aranya syncer used to send/receive graph commands to other peers.
 
+mod client;
 mod handle;
-#[cfg(feature = "preview")]
-mod hello;
 mod manager;
+mod server;
 mod transport;
 mod types;
 
@@ -11,40 +11,46 @@ use aranya_runtime::GraphId;
 use aranya_util::Addr;
 
 #[cfg(feature = "preview")]
-pub(crate) use self::hello::HelloSubscriptions;
-pub(super) use self::{handle::Callback, types::SyncResponse};
+pub(crate) use self::types::HelloSubscription;
+pub(super) use self::types::SyncResponse;
 pub(crate) use self::{
-    handle::SyncHandle,
-    manager::SyncManager,
-    transport::{quic, SyncState},
-    types::SyncPeer,
+    client::SyncClient, handle::SyncHandle, manager::SyncManager, server::SyncServer,
+    transport::quic, types::SyncPeer,
 };
 
 /// The error type which is returned from syncing with peers.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub(crate) enum Error {
-    // TODO(nikki): generalize for generic transport support.
-    /// Something went wrong inside the QUIC Syncer.
+    // TODO(nikki): decide if we want to add a generic.
+    /// Something went wrong with the transport layer.
     #[error(transparent)]
-    QuicSync(#[from] quic::Error),
+    Transport(Box<dyn std::error::Error + Send + Sync + 'static>),
 
     /// Something went wrong in the Aranya Runtime.
     #[error(transparent)]
     Runtime(#[from] aranya_runtime::SyncError),
 
-    /// Failed to send sync request.
-    #[error("Could not send sync request: {0}")]
-    SendSyncRequest(Box<Error>),
+    /// Something went wrong in the Aranya Client.
+    #[error(transparent)]
+    AranyaClient(#[from] aranya_runtime::ClientError),
 
-    /// Failed to receive sync response.
-    #[error("Could not receive sync response: {0}")]
-    ReceiveSyncResponse(Box<Error>),
+    /// `postcard` was unable to de/serialize a message into a `SyncType`.
+    #[error("postcard failed to de/serialize a message")]
+    Postcard(#[from] postcard::Error),
 
     /// Peer sent an empty response.
     #[cfg(feature = "preview")]
     #[error("peer sent empty response")]
     EmptyResponse,
+
+    /// Failed to collect effects from the sink.
+    #[error("failed to collect effects")]
+    EffectsSink(#[source] Box<dyn std::error::Error + Send + Sync>),
+
+    /// The syncer is in the middle of shutting down at the end of runtime.
+    #[error("the sync manager has shut down")]
+    SyncerShutdown,
 
     /// Encountered a bug in the program.
     #[error(transparent)]
@@ -57,6 +63,7 @@ pub(crate) enum Error {
 
 // Implements this error type to allow it being sent over RPC.
 impl From<Error> for aranya_daemon_api::Error {
+    #[inline]
     fn from(err: Error) -> Self {
         Self::from_err(err)
     }
@@ -70,15 +77,20 @@ impl From<std::convert::Infallible> for Error {
 }
 
 impl Error {
+    fn transport(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::Transport(Box::new(err))
+    }
+
     /// Returns whether a `ParallelFinalize` error occurred, which needs to be resolved manually.
     fn is_parallel_finalize(&self) -> bool {
         use aranya_runtime::ClientError;
-        match self {
-            Self::Other(err) => err
-                .downcast_ref::<ClientError>()
-                .is_some_and(|err| matches!(err, ClientError::ParallelFinalize)),
-            _ => false,
-        }
+        debug_assert!(
+            !matches!(self, Self::Other(err) if err
+            .downcast_ref::<ClientError>()
+            .is_some_and(|e| matches!(e, ClientError::ParallelFinalize))),
+            "ParallelFinalize should not be wrapped in Other"
+        );
+        matches!(self, Self::AranyaClient(ClientError::ParallelFinalize))
     }
 }
 

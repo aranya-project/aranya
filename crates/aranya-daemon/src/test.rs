@@ -27,7 +27,7 @@ use aranya_daemon_api::{text, TeamId};
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientError, ClientState, GraphId,
+    ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{ready, Addr};
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
@@ -43,7 +43,11 @@ use crate::{
     actions::Actions,
     aranya,
     policy::{Effect, Perm, PublicKeyBundle as DeviceKeyBundle},
-    sync::{self, quic::PskStore, SyncPeer},
+    sync::{
+        self,
+        quic::{PskStore, QuicConnector, QuicListener, SharedConnectionMap},
+        SyncClient, SyncPeer,
+    },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
 };
@@ -64,12 +68,11 @@ async fn query_rank(device: &TestDevice, object_id: aranya_daemon_api::ObjectId)
 type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
-type TestState = sync::quic::QuicState;
 // Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<TestState, crate::PS, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<QuicConnector, crate::PS, crate::SP, crate::EF>;
 
 // Aranya sync server for testing.
-type TestServer = sync::quic::Server<crate::PS, crate::SP>;
+type TestServer = sync::SyncServer<QuicListener, crate::PS, crate::SP>;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -95,7 +98,7 @@ impl TestDevice {
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
-        let sync_local_addr = server.local_addr().into();
+        let sync_local_addr = server.local_addr();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
@@ -118,9 +121,14 @@ impl TestDevice {
         device: &TestDevice,
         must_receive: Option<usize>,
     ) -> Result<Vec<Effect>> {
+        let mut buffer = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
         let cmd_count = self
             .syncer
-            .sync(SyncPeer::new(device.sync_local_addr, self.graph_id))
+            .client
+            .sync(
+                SyncPeer::new(device.sync_local_addr, self.graph_id),
+                &mut buffer,
+            )
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
         if let Some(must_receive) = must_receive {
@@ -243,24 +251,33 @@ impl TestCtx {
             ));
 
             let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-            let psk_store = PskStore::new([]);
-            let psk_store = Arc::new(psk_store);
+            let psk_store: Arc<PskStore> = Arc::default();
 
             let (send_effects, effects_recv) = mpsc::channel(1);
+            let (handle, recv) = sync::SyncHandle::channel(128);
 
-            // Create server first to get the actual listening address
-            let (server, _sync_peers, conn_map, syncer_recv) =
-                TestServer::new(client.clone(), &any_local_addr, psk_store.clone()).await?;
+            // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
+            let conns: SharedConnectionMap = Arc::default();
+            let (conn_tx, conn_rx) = mpsc::channel(32);
 
-            // Create syncer with the actual server address
-            let syncer = TestSyncer::new(
-                client.clone(),
-                send_effects,
+            let listener = QuicListener::new(
+                any_local_addr,
                 psk_store.clone(),
-                (server.local_addr().into(), any_local_addr),
-                syncer_recv,
-                conn_map,
+                Arc::clone(&conns),
+                conn_rx,
+            )
+            .await?;
+            let server = TestServer::new(listener, client.clone(), handle);
+
+            let connector = QuicConnector::new(
+                any_local_addr,
+                server.local_addr(),
+                conns,
+                conn_tx,
+                psk_store.clone(),
             )?;
+            let sync_client = SyncClient::new(client.clone(), connector, send_effects);
+            let syncer = TestSyncer::new(sync_client, recv)?;
 
             (syncer, server, pk, psk_store, effects_recv)
         };
