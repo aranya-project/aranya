@@ -19,8 +19,8 @@ default = [
     "aranya-daemon-api/default",
 ]
 
-# Enable debugging.
-debug = []
+# Test utilities (not part of the public API)
+test-utils = ["aranya-daemon-api/test-utils"]
 
 # Preview features
 preview = ["aranya-daemon-api/preview"]
@@ -52,8 +52,8 @@ tracing = { workspace = true }
 
 
 [dev-dependencies]
-aranya-client = { path = ".", features = ["preview"] }
-aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview"] }
+aranya-client = { path = ".", features = ["preview", "test-utils"] }
+aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview", "test-utils"] }
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
@@ -76,4 +76,5 @@ always_include_features = [
     "default", # TODO: remove in #448
     "experimental",
     "preview",
+    "test-utils",
 ]

@@ -1088,6 +1088,60 @@ ephemeral command QueryRank {
 }
 ```
 
+### Device Generation Queries
+
+##### `query_device_generation`
+
+Returns the generation counter for a device. This query is intended
+for testing only and should not be exposed via any public APIs.
+
+<!-- TODO: Add conditional compilation to the policy language so
+     test-only actions/commands can be gated at the policy level. -->
+
+```policy
+// Emits `QueryDeviceGenerationResult` with the generation counter
+// for the device. If the device does not have a generation counter,
+// then no effect is emitted.
+ephemeral action query_device_generation(device_id id) {
+    publish QueryDeviceGeneration {
+        device_id: device_id,
+    }
+}
+
+effect QueryDeviceGenerationResult {
+    // The device's unique ID.
+    device_id id,
+    // The device's generation counter.
+    generation int,
+}
+
+ephemeral command QueryDeviceGeneration {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let maybe_gen = query DeviceGeneration[device_id: this.device_id]
+        if maybe_gen is None {
+            finish {}
+        } else {
+            let gen = unwrap maybe_gen
+            finish {
+                emit QueryDeviceGenerationResult {
+                    device_id: this.device_id,
+                    generation: gen.generation,
+                }
+            }
+        }
+    }
+}
+```
+
 ## Roles and Permissions
 <!-- Section contains: Role facts, permissions, assignment/revocation, default roles -->
 
@@ -3126,6 +3180,8 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 // - It is an error if the device has already been granted
 //   permission to use this label for its current generation.
 // - It is an error if the device is not permitted to use AFC.
+// - It is an error if the device's generation has changed since
+//   the action was authored (stale membership epoch).
 //
 // # Required Permissions
 //
@@ -3133,10 +3189,13 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 //
 // Additionally, the target device must have `CanUseAfc` permissions
 action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
+    // Bind the command to this membership epoch.
+    let gen = get_device_gen(device_id)
     publish AssignLabelToDevice {
         device_id: device_id,
         label_id: label_id,
         op: op,
+        device_gen: gen,
     }
 }
 
@@ -3164,6 +3223,8 @@ command AssignLabelToDevice {
         // The channel operations the device is allowed to use
         // the label for.
         op enum ChanOp,
+        // Device generation at authoring time; rejects stale epochs.
+        device_gen int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -3185,12 +3246,14 @@ command AssignLabelToDevice {
         // The target device must be able to use AFC.
         check device_has_perm(this.device_id, Perm::CanUseAfc)
 
+        // Reject if the device's membership epoch changed (e.g. reordered remove/re-add).
+        let current_gen = get_device_gen(this.device_id)
+        check this.device_gen == current_gen
+
         let existing_assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
         ]
-
-        let current_gen = get_device_gen(this.device_id)
 
         if existing_assignment is Some {
             // Only allow reuse when the stored assignment is
@@ -3205,6 +3268,7 @@ command AssignLabelToDevice {
             // - `author` outranks `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
+            // - the command's generation matches the device's current generation
             // - the existing assignment is stale because the device has
             //   been re-provisioned
             finish {
@@ -3233,13 +3297,14 @@ command AssignLabelToDevice {
             // - `author` outranks `this.device_id`
             // - `this.device_id` refers to a device that exists
             // - `this.label_id` refers to a label that exists
+            // - the command's generation matches the device's current generation
             finish {
                 create LabelAssignedToDevice[
                     label_id: this.label_id,
                     device_id: this.device_id,
                 ]=>{
                     op: this.op,
-                    device_gen: current_gen,
+                    device_gen: this.device_gen,
                 }
 
                 emit AssignedLabelToDevice {
@@ -3317,10 +3382,18 @@ command RevokeLabelFromDevice {
         // We need to get label info before deleting
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        check exists LabelAssignedToDevice[
+        let assignment = check_unwrap query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
         ]
+        // Reject revocations of stale label assignments. When a
+        // device is removed and re-added its generation counter is
+        // incremented, which implicitly invalidates all prior label
+        // assignments. Revoking one of those stale assignments
+        // would delete the fact row and prevent a future (valid)
+        // assign from reusing it via the `device_gen < current_gen`
+        // update path.
+        check label_assignment_matches_gen(this.device_id, assignment.device_gen)
 
         // At this point we believe the following to be true:
         //
@@ -3329,6 +3402,7 @@ command RevokeLabelFromDevice {
         // - `author` outranks `this.device_id`
         // - `author` outranks `this.label_id`
         // - `this.label_id` refers to a label that exists
+        // - the label assignment matches the device's current generation
         finish {
             delete LabelAssignedToDevice[
                 label_id: this.label_id,
