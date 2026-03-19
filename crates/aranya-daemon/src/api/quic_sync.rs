@@ -13,7 +13,7 @@ pub(crate) struct Data {
 
 impl Api {
     pub(super) async fn create_team_quic_sync(
-        &mut self,
+        &self,
         team_id: api::TeamId,
         qs_cfg: CreateTeamQuicSyncConfig,
     ) -> api::Result<()> {
@@ -40,7 +40,7 @@ impl Api {
     }
 
     pub(super) async fn add_team_quic_sync(
-        &mut self,
+        &self,
         team: api::TeamId,
         cfg: api::AddTeamQuicSyncConfig,
     ) -> api::Result<()> {

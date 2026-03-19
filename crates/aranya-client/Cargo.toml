@@ -45,9 +45,9 @@ derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
+tokio-util = { workspace = true, features = ["codec"] }
 tracing = { workspace = true }
 
 

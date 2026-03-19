@@ -10,15 +10,15 @@ Aranya is a zero-trust security framework for decentralized applications.
 - There is no central authority -- every device stores a copy of the graph containing all commands it has generated or synced so far, and independently enforces the same policy. When all devices sync without generating new commands they converge to the same full graph, but at any point in time a device may have only a partial view. Devices converge via CRDT sync.
 - Separation of duties is enforced: no device can self-promote or bypass the role hierarchy.
 - The system has two planes:
-  - **Control plane (on-graph):** commands stored in the DAG, broadcast to all devices via sync. Used for access-control operations (add device, assign role, manage labels). Low throughput (~100s msgs/sec), high resilience.
-  - **Data plane (off-graph/AFC):** encrypted point-to-point channels between devices, governed by labels in policy. High throughput, low latency. Keys are negotiated on-graph but data flows off-graph.
+    - **Control plane (on-graph):** commands stored in the DAG, broadcast to all devices via sync. Used for access-control operations (add device, assign role, manage labels). Low throughput (~100s msgs/sec), high resilience.
+    - **Data plane (off-graph/AFC):** encrypted point-to-point channels between devices, governed by labels in policy. High throughput, low latency. Keys are negotiated on-graph but data flows off-graph.
 
 For full documentation see <https://github.com/aranya-project/aranya-docs/> (includes guides, architecture deep-dives, and API reference; clone the repo for offline access).
 
 ## How It Fits Together
 
 ```
-Application -> Client lib (tarpc RPC) -> Daemon -> Policy engine / Keystore / Sync
+Application -> Client lib (RPC) -> Daemon -> Policy engine / Keystore / Sync
 ```
 
 - One daemon per device; it owns crypto, policy enforcement, and graph sync.
@@ -29,16 +29,16 @@ Application -> Client lib (tarpc RPC) -> Daemon -> Policy engine / Keystore / Sy
 
 ## Crate Map
 
-| Crate | Purpose |
-|---|---|
-| `aranya-daemon` | Long-running daemon: policy, crypto, sync, device/team state |
-| `aranya-client` | Rust client library (tarpc RPC to daemon) |
-| `aranya-client-capi` | C bindings (cdylib) for aranya-client |
-| `aranya-daemon-api` | Shared RPC/service definitions |
-| `aranya-keygen` | CLI for generating device keys |
-| `aranya-certgen` | CLI for generating root CA / signed P-256 certs |
-| `aranya-util` | Shared utilities (QUIC helpers, async) |
-| `aranya-metrics` | Observability: Datadog/Prometheus/TCP exporters |
+| Crate                | Purpose                                                      |
+| -------------------- | ------------------------------------------------------------ |
+| `aranya-daemon`      | Long-running daemon: policy, crypto, sync, device/team state |
+| `aranya-client`      | Rust client library (RPC to daemon)                          |
+| `aranya-client-capi` | C bindings (cdylib) for aranya-client                        |
+| `aranya-daemon-api`  | Shared RPC/service definitions                               |
+| `aranya-keygen`      | CLI for generating device keys                               |
+| `aranya-certgen`     | CLI for generating root CA / signed P-256 certs              |
+| `aranya-util`        | Shared utilities (QUIC helpers, async)                       |
+| `aranya-metrics`     | Observability: Datadog/Prometheus/TCP exporters              |
 
 Examples live in `examples/rust/` and `examples/c/`.
 
@@ -59,6 +59,7 @@ Key sections in the policy: Devices & Identity, Roles & Permissions, Teams, AFC/
 ### Execution model
 
 On the **authoring device** (runs once):
+
 1. Application calls an **action** via the client library.
 2. The action runs locally: it can do sensitive work, iterate facts, and `publish` zero or more **commands**.
 3. For each command, the `seal` block serializes it into an envelope.
@@ -66,9 +67,7 @@ On the **authoring device** (runs once):
 5. The `finish` block performs fact mutations (`create`/`update`/`delete`) and `emit`s **effects**. Effects are the mechanism for communicating outcomes back to the application -- e.g. `RoleCreated`, `LabelDeleted`, `AfcUniChannelCreated`. The application subscribes to effects and reacts accordingly.
 6. If all commands succeed, the action is committed atomically. If any command fails, the entire action is rolled back.
 
-On **every other device** (runs on sync):
-7. The command envelope arrives via sync. The `open` block deserializes it.
-8. The `policy` block runs again -- same checks, same finish logic. Effects are emitted on the receiving device too, so every device can react to the outcome. The receiving device must be able to fully evaluate the command with only the command fields and its local FactDB. This is why command fields cannot contain plaintext secrets.
+On **every other device** (runs on sync): 7. The command envelope arrives via sync. The `open` block deserializes it. 8. The `policy` block runs again -- same checks, same finish logic. Effects are emitted on the receiving device too, so every device can react to the outcome. The receiving device must be able to fully evaluate the command with only the command fields and its local FactDB. This is why command fields cannot contain plaintext secrets.
 
 ### Ordering and recall
 
@@ -94,9 +93,11 @@ Policy Language v2. The language guarantees **bounded execution** -- there are n
 ### Changing the policy
 
 Changing the policy regenerates Rust bindings during build. Validate with:
+
 ```
 cargo test -p aranya-client
 ```
+
 This spins up daemons and exercises the integration suite against the new policy.
 
 ### AFC (Aranya Fast Channels)

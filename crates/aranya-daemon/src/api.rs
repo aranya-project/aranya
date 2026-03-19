@@ -1,9 +1,9 @@
-//! Implementation of daemon's `tarpc` API.
+//! Implementation of daemon's RPC API.
 //! Trait for API interface is defined in `crates/aranya-daemon-api`
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{future, net::SocketAddr, ops::Deref, pin::pin};
+use core::{net::SocketAddr, ops::Deref};
 #[cfg(feature = "preview")]
 use std::collections::HashMap;
 #[cfg(feature = "preview")]
@@ -19,7 +19,7 @@ use aranya_crypto::{
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
-    crypto::txp::{self, LengthDelimitedCodec},
+    crypto::txp::{self},
     DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
@@ -30,16 +30,12 @@ use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
 #[cfg(feature = "afc")]
 use buggy::bug;
 use derive_where::derive_where;
-use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
-use tarpc::{
-    context,
-    server::{incoming::Incoming, BaseChannel, Channel},
-};
 use tokio::{
     net::UnixListener,
     sync::{mpsc, Mutex},
 };
+use tokio_util::codec::LengthDelimitedCodec;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "afc")]
@@ -173,7 +169,7 @@ impl DaemonApiServer {
                 }
             });
 
-            let server = {
+            let mut server = {
                 let info = self.uds_path.as_os_str().as_encoded_bytes();
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
@@ -183,27 +179,34 @@ impl DaemonApiServer {
             };
             info!(path = ?self.uds_path, "listening");
 
-            let mut incoming = server
-                .inspect_err(|err| warn!(error = %err.report(), "accept error"))
-                .filter_map(|r| future::ready(r.ok()))
-                .map(BaseChannel::with_defaults)
-                .max_concurrent_requests_per_channel(10);
-
             ready.notify();
 
-            while let Some(ch) = incoming.next().await {
-                let api = self.api.clone();
-                s.spawn(scope(async move |reqs| {
-                    let requests = ch
-                        .requests()
-                        .inspect_err(|err| warn!(error = %err.report(), "channel failure"))
-                        .take_while(|r| future::ready(r.is_ok()))
-                        .filter_map(|r| async { r.ok() });
-                    let mut requests = pin!(requests);
-                    while let Some(req) = requests.next().await {
-                        reqs.spawn(req.execute(api.clone().serve()));
+            while let Some(conn) = server.accept().await {
+                let mut conn = match conn {
+                    Ok(conn) => conn,
+                    Err(err) => {
+                        warn!(error = %err.report(), "accept error");
+                        continue;
                     }
-                }));
+                };
+                let api = self.api.clone();
+                s.spawn(async move {
+                    loop {
+                        let req = match conn.recv().await {
+                            Ok(Some(req)) => req,
+                            Ok(None) => break, // client disconnected
+                            Err(err) => {
+                                warn!(error = %err.report(), "channel failure");
+                                break;
+                            }
+                        };
+                        let resp = api.dispatch(req).await;
+                        if let Err(err) = conn.send(resp).await {
+                            warn!(error = %err.report(), "send error");
+                            break;
+                        }
+                    }
+                });
             }
         })
         .await;
@@ -421,17 +424,17 @@ impl DaemonApi for Api {
     //
 
     #[instrument(skip(self), err)]
-    async fn version(self, context: context::Context) -> api::Result<api::Version> {
+    async fn version(&self) -> api::Result<api::Version> {
         api::Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
     }
 
     #[instrument(skip(self), err)]
-    async fn aranya_local_addr(self, context: context::Context) -> api::Result<Addr> {
+    async fn aranya_local_addr(&self) -> api::Result<Addr> {
         Ok(self.local_addr.into())
     }
 
     #[instrument(skip(self), err)]
-    async fn get_public_key_bundle(self, _: context::Context) -> api::Result<api::PublicKeyBundle> {
+    async fn get_public_key_bundle(&self) -> api::Result<api::PublicKeyBundle> {
         Ok(self
             .get_pk()
             .context("unable to get device public keys")?
@@ -439,13 +442,13 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
+    async fn get_device_id(&self) -> api::Result<api::DeviceId> {
         self.device_id().map(api::DeviceId::transmute)
     }
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn afc_shm_info(self, context: context::Context) -> api::Result<api::AfcShmInfo> {
+    async fn afc_shm_info(&self) -> api::Result<api::AfcShmInfo> {
         Ok(self.afc.get_shm_info().await)
     }
 
@@ -455,8 +458,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn add_sync_peer(
-        self,
-        _: context::Context,
+        &self,
         peer: Addr,
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
@@ -469,8 +471,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn sync_now(
-        self,
-        _: context::Context,
+        &self,
         peer: Addr,
         team: api::TeamId,
         cfg: Option<api::SyncPeerConfig>,
@@ -484,8 +485,7 @@ impl DaemonApi for Api {
     #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
     async fn sync_hello_subscribe(
-        self,
-        _: context::Context,
+        &self,
         peer: Addr,
         team: api::TeamId,
         graph_change_debounce: Duration,
@@ -502,12 +502,7 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "preview")]
     #[instrument(skip(self), err)]
-    async fn sync_hello_unsubscribe(
-        self,
-        _: context::Context,
-        peer: Addr,
-        team: api::TeamId,
-    ) -> api::Result<()> {
+    async fn sync_hello_unsubscribe(&self, peer: Addr, team: api::TeamId) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer.sync_hello_unsubscribe(peer).await?;
@@ -515,12 +510,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn remove_sync_peer(
-        self,
-        _: context::Context,
-        peer: Addr,
-        team: api::TeamId,
-    ) -> api::Result<()> {
+    async fn remove_sync_peer(&self, peer: Addr, team: api::TeamId) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer
@@ -535,7 +525,7 @@ impl DaemonApi for Api {
     //
 
     #[instrument(skip(self))]
-    async fn add_team(mut self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
+    async fn add_team(&self, cfg: api::AddTeamConfig) -> api::Result<()> {
         let team = cfg.team_id;
         self.check_team_valid(team).await?;
 
@@ -546,7 +536,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+    async fn remove_team(&self, team: api::TeamId) -> api::Result<()> {
         if let Some(data) = &self.quic {
             self.remove_team_quic_sync(team, data)?;
         }
@@ -563,11 +553,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn create_team(
-        mut self,
-        _: context::Context,
-        cfg: api::CreateTeamConfig,
-    ) -> api::Result<api::TeamId> {
+    async fn create_team(&self, cfg: api::CreateTeamConfig) -> api::Result<api::TeamId> {
         info!("create_team");
 
         let nonce = &mut [0u8; 16];
@@ -597,7 +583,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+    async fn close_team(&self, team: api::TeamId) -> api::Result<()> {
         let _graph = self.check_team_valid(team).await?;
 
         todo!();
@@ -609,8 +595,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn encrypt_psk_seed_for_peer(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> aranya_daemon_api::Result<WrappedSeed> {
@@ -645,8 +630,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn add_device_to_team(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         keys: api::PublicKeyBundle,
         initial_role: Option<api::RoleId>,
@@ -666,8 +650,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn remove_device_from_team(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<()> {
@@ -685,11 +668,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
-    async fn devices_on_team(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-    ) -> api::Result<Box<[api::DeviceId]>> {
+    async fn devices_on_team(&self, team: api::TeamId) -> api::Result<Box<[api::DeviceId]>> {
         let graph = self.check_team_valid(team).await?;
 
         let devices = self
@@ -714,8 +693,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn device_public_key_bundle(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::PublicKeyBundle> {
@@ -738,8 +716,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn labels_assigned_to_device(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Box<[api::Label]>> {
@@ -767,8 +744,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn device_role(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Option<api::Role>> {
@@ -796,8 +772,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn create_role(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         role_name: Text,
         rank: api::Rank,
@@ -825,12 +800,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn delete_role(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role_id: api::RoleId,
-    ) -> api::Result<()> {
+    async fn delete_role(&self, team: api::TeamId, role_id: api::RoleId) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -851,8 +821,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn assign_role(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
         role: api::RoleId,
@@ -876,8 +845,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn revoke_role(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
         role: api::RoleId,
@@ -901,8 +869,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn change_role(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device_id: api::DeviceId,
         old_role_id: api::RoleId,
@@ -932,8 +899,7 @@ impl DaemonApi for Api {
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
     async fn create_afc_channel(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         peer_id: api::DeviceId,
         label: api::LabelId,
@@ -971,11 +937,7 @@ impl DaemonApi for Api {
 
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
-    async fn delete_afc_channel(
-        self,
-        _: context::Context,
-        chan: api::AfcLocalChannelId,
-    ) -> api::Result<()> {
+    async fn delete_afc_channel(&self, chan: api::AfcLocalChannelId) -> api::Result<()> {
         self.afc.delete_channel(chan).await?;
         info!("afc channel deleted");
         Ok(())
@@ -984,8 +946,7 @@ impl DaemonApi for Api {
     #[cfg(feature = "afc")]
     #[instrument(skip(self), err)]
     async fn accept_afc_channel(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         ctrl: api::AfcCtrl,
     ) -> api::Result<api::AfcReceiveChannelInfo> {
@@ -1013,8 +974,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn create_label(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         label_name: Text,
         rank: api::Rank,
@@ -1037,12 +997,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn delete_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label_id: api::LabelId,
-    ) -> api::Result<()> {
+    async fn delete_label(&self, team: api::TeamId, label_id: api::LabelId) -> api::Result<()> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1062,8 +1017,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn assign_label_to_device(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
         label_id: api::LabelId,
@@ -1094,8 +1048,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn revoke_label_from_device(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         device: api::DeviceId,
         label_id: api::LabelId,
@@ -1121,8 +1074,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn label(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<Option<api::Label>> {
@@ -1148,7 +1100,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn labels(self, _: context::Context, team: api::TeamId) -> api::Result<Vec<api::Label>> {
+    async fn labels(&self, team: api::TeamId) -> api::Result<Vec<api::Label>> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1172,11 +1124,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn setup_default_roles(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-    ) -> api::Result<Box<[api::Role]>> {
+    async fn setup_default_roles(&self, team: api::TeamId) -> api::Result<Box<[api::Role]>> {
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1208,11 +1156,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn team_roles(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-    ) -> api::Result<Box<[api::Role]>> {
+    async fn team_roles(&self, team: api::TeamId) -> api::Result<Box<[api::Role]>> {
         let graph = self.check_team_valid(team).await?;
 
         let roles = self
@@ -1245,8 +1189,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn add_perm_to_role(
-        self,
-        context: context::Context,
+        &self,
         team: api::TeamId,
         role: api::RoleId,
         perm: api::Perm,
@@ -1266,8 +1209,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn remove_perm_from_role(
-        self,
-        context: context::Context,
+        &self,
         team: api::TeamId,
         role: api::RoleId,
         perm: api::Perm,
@@ -1287,8 +1229,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn query_role_perms(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         role: api::RoleId,
     ) -> api::Result<Vec<api::Perm>> {
@@ -1316,8 +1257,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn change_rank(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         object_id: api::ObjectId,
         old_rank: api::Rank,
@@ -1342,8 +1282,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self), err)]
     async fn query_rank(
-        self,
-        _: context::Context,
+        &self,
         team: api::TeamId,
         object_id: api::ObjectId,
     ) -> api::Result<api::Rank> {
@@ -1366,7 +1305,7 @@ impl DaemonApi for Api {
 }
 
 impl Api {
-    async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
+    async fn add_seed(&self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
         let crypto = &mut *self.crypto.lock().await;
 
         let id = crypto
@@ -1388,7 +1327,7 @@ impl Api {
                 Ok(_) => return Err(e),
                 Err(inner) => return Err(e).context(inner),
             }
-        };
+        }
 
         Ok(())
     }

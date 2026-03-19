@@ -1,14 +1,6 @@
-//! Encrypted tarpc [`Transport`]s.
-//!
-//! [`Transport`][tarpc::Transport]
+//! Encrypted RPC transport wrapper.
 
-use core::{
-    borrow::Borrow,
-    error, fmt,
-    marker::PhantomData,
-    pin::{pin, Pin},
-    task::{Context, Poll},
-};
+use core::{borrow::Borrow, error, fmt};
 use std::{iter, sync::Arc};
 
 use aranya_crypto::{
@@ -22,16 +14,10 @@ use aranya_crypto::{
 };
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use futures_util::{ready, Sink, Stream, TryStream};
-use pin_project::pin_project;
+use futures_util::{SinkExt as _, Stream, StreamExt as _};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-pub use tarpc::tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
-use tarpc::{
-    serde_transport::{self, Transport},
-    tokio_serde::{formats::MessagePack, Deserializer, Serializer},
-    tokio_util::codec::Framed,
-};
 use tokio::io::{self, AsyncRead, AsyncWrite};
+use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 use crate::crypto::{ApiKey, PublicApiKey};
 
@@ -123,12 +109,9 @@ impl<CS: CipherSuite> Ctx<CS> {
     ///
     /// `side` represents the current side performing the
     /// encryption.
-    fn encrypt<Item, SinkItem>(&mut self, item: SinkItem, side: Side) -> io::Result<Data>
-    where
-        SinkItem: Serialize,
-    {
-        let codec = MessagePack::<Item, SinkItem>::default();
-        let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
+    fn encrypt<T: Serialize>(&mut self, item: &T, side: Side) -> io::Result<Data> {
+        let serialized = postcard::to_allocvec(item).map_err(other)?;
+        let mut plaintext = BytesMut::from(serialized.as_slice());
         let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
         let ad = auth_data(self.seal.seq(), side);
         let seq = self
@@ -146,10 +129,7 @@ impl<CS: CipherSuite> Ctx<CS> {
     /// resulting plaintext and returns the resulting `Item`.
     ///
     /// `side` represents the side that created `data`.
-    fn decrypt<Item, SinkItem>(&mut self, data: Data, side: Side) -> io::Result<Item>
-    where
-        Item: DeserializeOwned,
-    {
+    fn decrypt<T: DeserializeOwned>(&mut self, data: Data, side: Side) -> io::Result<T> {
         let Data {
             seq,
             mut ciphertext,
@@ -159,8 +139,7 @@ impl<CS: CipherSuite> Ctx<CS> {
         self.open
             .open_in_place_at(&mut ciphertext, &tag, &ad, Seq::new(seq))
             .map_err(other)?;
-        let codec = MessagePack::<Item, SinkItem>::default();
-        let item = pin!(codec).deserialize(&ciphertext)?;
+        let item = postcard::from_bytes(&ciphertext).map_err(other)?;
         Ok(item)
     }
 }
@@ -196,238 +175,19 @@ enum Side {
     Client,
 }
 
-/// Creates a client-side transport.
-pub fn client<S, R, CS, Item, SinkItem>(
-    io: S,
-    codec: LengthDelimitedCodec,
-    rng: R,
-    pk: PublicApiKey<CS>,
-    info: &[u8],
-) -> ClientConn<S, R, CS, Item, SinkItem>
-where
-    S: AsyncRead + AsyncWrite,
-    CS: CipherSuite,
-{
-    ClientConn {
-        inner: serde_transport::new(Framed::new(io, codec), MessagePack::default()),
-        rng,
-        pk,
-        info: Box::from(info),
-        ctx: None,
-        rekeys: 0,
-        _marker: PhantomData,
-    }
-}
-
-/// An encrypted [`Transport`][tarpc::Transport] for the client.
-///
-/// It is created by [`client`].
-#[pin_project]
-pub struct ClientConn<S, R, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
-    /// The underlying transport.
-    #[pin]
-    inner: Transport<S, ServerMsg, ClientMsg, MessagePack<ServerMsg, ClientMsg>>,
-    /// For rekeying.
-    rng: R,
-    /// The server's public key.
-    pk: PublicApiKey<CS>,
-    /// The "info" parameter when rekeying.
-    info: Box<[u8]>,
-    /// This is set to `Some` the first time the conn (as
-    /// a `Sink`) is polled for readiness.
-    ///
-    /// It is periodically updated via rekeying in order to keep
-    /// the keys fresh.
-    ctx: Option<Ctx<CS>>,
-    /// The number of times we've rekeyed, including the initial
-    /// keying.
-    ///
-    /// Mostly for debugging purposes.
-    rekeys: usize,
-    _marker: PhantomData<fn() -> (Item, SinkItem)>,
-}
-
-impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
-where
-    S: AsyncRead + AsyncWrite,
-    CS: CipherSuite,
-    SinkItem: Serialize,
-{
-    /// Serializes `item`, encrypts and authenticates the
-    /// resulting bytes, and returns the ciphertext.
-    ///
-    /// It is an error if `self.ctx` has not yet been
-    /// initialized.
-    fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
-        self.ctx
-            .as_mut()
-            .assume("`self.ctx` should be `Some`")
-            .map_err(other)?
-            .encrypt::<Item, SinkItem>(item, Side::Client)
-            .map_err(other)
-    }
-}
-
-impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-    Item: DeserializeOwned,
-{
-    /// Decrypts and authenticates `data`, then deserializes the
-    /// resulting plaintext and returns the resulting `Item`.
-    ///
-    /// It is an error if `self.ctx` has not yet been
-    /// initialized.
-    fn decrypt(&mut self, data: Data) -> io::Result<Item> {
-        self.ctx
-            .as_mut()
-            .assume("`self.ctx` should be `Some`")
-            .map_err(other)?
-            .decrypt::<Item, SinkItem>(data, Side::Server)
-            .map_err(other)
-    }
-}
-
-impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
-where
-    R: Csprng,
-    CS: CipherSuite,
-{
-    /// Returns `Some` with the `Rekey` message to send to the
-    /// server if we need to rekey, or `None` otherwise.
-    fn try_rekey(&mut self) -> Result<Option<ClientMsg>, HpkeError> {
-        if !self.need_rekey() {
-            return Ok(None);
-        }
-        let enc = self.rekey()?;
-        let msg = ClientMsg::Rekey(Rekey {
-            enc: Bytes::from(enc.borrow().to_vec()),
-        });
-        Ok(Some(msg))
-    }
-
-    /// Reports whether we need to generate a new HPKE encryption
-    /// context.
-    fn need_rekey(&self) -> bool {
-        let Some(ctx) = self.ctx.as_ref() else {
-            return true;
-        };
-        // To prevent us from reaching the end of the sequence,
-        // rekey when we're halfway there.
-        let max = Seq::max::<<CS::Aead as Aead>::NonceSize>();
-        let seq = ctx.seal.seq().to_u64();
-        seq >= max / 2
-    }
-
-    /// Generates a new HPKE encryption context and returns the
-    /// resulting peer encapsulation.
-    fn rekey(&mut self) -> Result<Encap<CS>, HpkeError> {
-        let (ctx, enc) = Ctx::client(&mut self.rng, &self.pk, &self.info)?;
-        self.ctx = Some(ctx);
-        // Rekeying takes so long (relatively speaking, anyway)
-        // that this should never overflow.
-        self.rekeys = self
-            .rekeys
-            .checked_add(1)
-            .assume("rekey count should not overflow")?;
-        Ok(enc)
-    }
-}
-
-impl<S, R, CS, Item, SinkItem> Stream for ClientConn<S, R, CS, Item, SinkItem>
-where
-    S: AsyncRead + AsyncWrite + Unpin,
-    R: Csprng,
-    CS: CipherSuite,
-    Item: DeserializeOwned,
-{
-    type Item = io::Result<Item>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.ctx.is_none() {
-            // In tarpc the client always writes first. We create
-            // our encryption context the first time we write, so
-            // if we get here we haven't written yet.
-            // TODO(eric): should we return an error instead?
-            return Poll::Pending;
-        }
-        let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
-            return Poll::Ready(None);
-        };
-        match msg {
-            ServerMsg::Data(data) => {
-                let pt = self.decrypt(data)?;
-                Poll::Ready(Some(Ok(pt)))
-            }
-        }
-    }
-}
-
-impl<S, R, CS, Item, SinkItem> Sink<SinkItem> for ClientConn<S, R, CS, Item, SinkItem>
-where
-    S: AsyncRead + AsyncWrite + Unpin,
-    R: Csprng,
-    CS: CipherSuite,
-    SinkItem: Serialize,
-{
-    type Error = io::Error;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        ready!(self.as_mut().project().inner.poll_ready(cx)?);
-
-        // Do we need to rekey?
-        if let Some(msg) = self.try_rekey().map_err(other)? {
-            // We updated our keys, so forward the message on to
-            // the server.
-            self.as_mut().project().inner.start_send(msg)?;
-
-            // Each call to `start_send` must be preceeded by
-            // a call to `poll_ready`, so call `poll_ready`
-            // again.
-            ready!(self.as_mut().project().inner.poll_ready(cx)?);
-        }
-
-        Poll::Ready(Ok(()))
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: SinkItem) -> Result<(), Self::Error> {
-        let data = self.encrypt(item)?;
-        self.project().inner.start_send(ClientMsg::Data(data))?;
-        Ok(())
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
-}
-
-impl<S, R, CS, Item, SinkItem> fmt::Debug for ClientConn<S, R, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Server")
-            .field("pk", &self.pk)
-            .field("info", &self.info)
-            .field("ctx", &self.ctx)
-            .field("rekeys", &self.rekeys)
-            .finish_non_exhaustive()
-    }
-}
-
 /// A message (request) sent by the client to the server.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 enum ClientMsg {
     Data(Data),
     Rekey(Rekey),
+}
+
+/// A message (response) sent by the server to the client.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+enum ServerMsg {
+    Data(Data),
 }
 
 /// Some encrypted data.
@@ -449,219 +209,277 @@ struct Rekey {
     enc: Bytes,
 }
 
+/// Serialize a message and send it as a length-delimited frame.
+async fn frame_send<S, T>(framed: &mut Framed<S, LengthDelimitedCodec>, msg: T) -> io::Result<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    T: Serialize,
+{
+    let bytes = postcard::to_allocvec(&msg).map_err(other)?;
+    framed.send(Bytes::from(bytes)).await
+}
+
+/// Receive a length-delimited frame and deserialize it.
+async fn frame_recv<S, T>(framed: &mut Framed<S, LengthDelimitedCodec>) -> io::Result<Option<T>>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    T: DeserializeOwned,
+{
+    let Some(frame) = framed.next().await else {
+        return Ok(None);
+    };
+    let msg = postcard::from_bytes(&frame?).map_err(other)?;
+    Ok(Some(msg))
+}
+
+/// Creates a client-side transport.
+pub fn client<S, R, CS>(
+    io: S,
+    codec: LengthDelimitedCodec,
+    rng: R,
+    pk: PublicApiKey<CS>,
+    info: &[u8],
+) -> ClientConn<S, R, CS>
+where
+    S: AsyncRead + AsyncWrite,
+    CS: CipherSuite,
+{
+    ClientConn {
+        inner: Framed::new(io, codec),
+        rng,
+        pk,
+        info: Box::from(info),
+        ctx: None,
+        rekeys: 0,
+    }
+}
+
+/// An encrypted connection for the client.
+///
+/// It is created by [`client`].
+pub struct ClientConn<S, R, CS>
+where
+    CS: CipherSuite,
+{
+    /// The underlying length-delimited transport.
+    inner: Framed<S, LengthDelimitedCodec>,
+    /// For rekeying.
+    rng: R,
+    /// The server's public key.
+    pk: PublicApiKey<CS>,
+    /// The "info" parameter when rekeying.
+    info: Box<[u8]>,
+    /// HPKE encryption context. Set on first send, updated on rekey.
+    ctx: Option<Ctx<CS>>,
+    /// The number of times we've rekeyed, including the initial keying.
+    ///
+    /// Mostly for debugging purposes.
+    rekeys: usize,
+}
+
+impl<S, R, CS> ClientConn<S, R, CS>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    R: Csprng,
+    CS: CipherSuite,
+{
+    /// Send a message to the server.
+    ///
+    /// Handles rekeying automatically before sending.
+    pub async fn send<T: Serialize>(&mut self, item: T) -> io::Result<()> {
+        if self.need_rekey() {
+            let enc = self.rekey().map_err(other)?;
+            let rekey_msg = ClientMsg::Rekey(Rekey {
+                enc: Bytes::from(enc.borrow().to_vec()),
+            });
+            frame_send(&mut self.inner, &rekey_msg).await?;
+        }
+
+        let data = self
+            .ctx
+            .as_mut()
+            .assume("`self.ctx` should be `Some`")
+            .map_err(other)?
+            .encrypt(&item, Side::Client)?;
+
+        frame_send(&mut self.inner, &ClientMsg::Data(data)).await
+    }
+
+    /// Receive a message from the server.
+    ///
+    /// Returns `Ok(None)` if the connection was closed.
+    pub async fn recv<T: DeserializeOwned>(&mut self) -> io::Result<Option<T>> {
+        let Some(ServerMsg::Data(data)) = frame_recv(&mut self.inner).await? else {
+            return Ok(None);
+        };
+        let item = self
+            .ctx
+            .as_mut()
+            .assume("`self.ctx` should be `Some`")
+            .map_err(other)?
+            .decrypt(data, Side::Server)?;
+        Ok(Some(item))
+    }
+
+    /// Reports whether we need to generate a new HPKE encryption context.
+    fn need_rekey(&self) -> bool {
+        let Some(ctx) = self.ctx.as_ref() else {
+            return true;
+        };
+        // To prevent us from reaching the end of the sequence, rekey when we're halfway there.
+        let max = Seq::max::<<CS::Aead as Aead>::NonceSize>();
+        let seq = ctx.seal.seq().to_u64();
+        seq >= max / 2
+    }
+
+    /// Generates a new HPKE encryption context and returns the resulting peer encapsulation.
+    fn rekey(&mut self) -> Result<Encap<CS>, HpkeError> {
+        let (ctx, enc) = Ctx::client(&mut self.rng, &self.pk, &self.info)?;
+        self.ctx = Some(ctx);
+        // Rekeying takes so long (relatively speaking, anyway) that this should never overflow.
+        self.rekeys = self
+            .rekeys
+            .checked_add(1)
+            .assume("rekey count should not overflow")?;
+        Ok(enc)
+    }
+}
+
+impl<S, R, CS: CipherSuite> fmt::Debug for ClientConn<S, R, CS> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ClientConn")
+            .field("pk", &self.pk)
+            .field("info", &self.info)
+            .field("ctx", &self.ctx)
+            .field("rekeys", &self.rekeys)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Creates a server-side transport.
-pub fn server<L, CS, Item, SinkItem>(
+pub fn server<L, CS: CipherSuite>(
     listener: L,
     codec: LengthDelimitedCodec,
     sk: ApiKey<CS>,
     info: &[u8],
-) -> Server<L, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
+) -> Server<L, CS> {
     Server {
         listener,
         codec,
         sk: Arc::new(sk),
         info: Arc::from(info),
-        _marker: PhantomData,
     }
 }
 
-/// Creates [`ServerConn`]s.
+/// Accepts incoming connections and wraps them in [`ServerConn`]s.
 ///
 /// It is created by [`server`]
 #[derive(Debug)]
-#[pin_project]
-pub struct Server<L, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
-    #[pin]
+pub struct Server<L, CS: CipherSuite> {
     listener: L,
     codec: LengthDelimitedCodec,
     /// The server's secret key.
     sk: Arc<ApiKey<CS>>,
     /// The "info" parameter when rekeying.
     info: Arc<[u8]>,
-    _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
-impl<S, L, CS, Item, SinkItem> Stream for Server<L, CS, Item, SinkItem>
+impl<S, L, CS> Server<L, CS>
 where
     S: AsyncRead + AsyncWrite,
-    L: TryStream<Ok = S, Error = io::Error>,
+    L: Stream<Item = io::Result<S>> + Unpin,
     CS: CipherSuite,
 {
-    type Item = io::Result<ServerConn<S, CS, Item, SinkItem>>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let Some(io) = ready!(self.as_mut().project().listener.try_poll_next(cx)?) else {
-            return Poll::Ready(None);
+    /// Accept the next incoming connection.
+    ///
+    /// Returns `None` when the listener is exhausted.
+    pub async fn accept(&mut self) -> Option<io::Result<ServerConn<S, CS>>> {
+        let io = match self.listener.next().await? {
+            Ok(io) => io,
+            Err(err) => return Some(Err(err)),
         };
         let conn = ServerConn {
-            inner: serde_transport::new(
-                Framed::new(io, self.codec.clone()),
-                MessagePack::default(),
-            ),
+            inner: Framed::new(io, self.codec.clone()),
             sk: Arc::clone(&self.sk),
             info: Arc::clone(&self.info),
             ctx: None,
-            _marker: PhantomData,
         };
-        Poll::Ready(Some(Ok(conn)))
+        Some(Ok(conn))
     }
 }
 
-/// An encrypted [`Transport`][tarpc::Transport] for the server.
+/// An encrypted transport for the server.
 ///
 /// It is created by reading from [`Server`], which is
 /// a [`Stream`].
-#[pin_project]
-pub struct ServerConn<S, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
-    /// The underlying transport.
-    #[pin]
-    inner: Transport<S, ClientMsg, ServerMsg, MessagePack<ClientMsg, ServerMsg>>,
+pub struct ServerConn<S, CS: CipherSuite> {
+    /// The underlying length-delimited transport.
+    inner: Framed<S, LengthDelimitedCodec>,
     /// The server's secret key.
     sk: Arc<ApiKey<CS>>,
     /// The "info" parameter when rekeying.
     info: Arc<[u8]>,
     /// The HPKE encryption context.
     ///
-    /// This is set to `Some` after the client sends the first
-    /// `Rekey` message.
+    /// This is set to `Some` after the client sends the first `Rekey` message.
     ///
-    /// It is periodically updated via rekeying in order to keep
-    /// the keys fresh.
+    /// It is periodically updated via rekeying in order to keep the keys fresh.
     ctx: Option<Ctx<CS>>,
-    _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
-impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-    SinkItem: Serialize,
-{
-    /// Serializes `item`, encrypts and authenticates the
-    /// resulting bytes, and returns the ciphertext.
-    ///
-    /// It is an error if `self.ctx` has not yet been
-    /// initialized.
-    fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
-        self.ctx
-            .as_mut()
-            .assume("`self.ctx` should be `Some`")
-            .map_err(other)?
-            .encrypt::<Item, SinkItem>(item, Side::Server)
-            .map_err(other)
-    }
-}
-
-impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-    Item: DeserializeOwned,
-{
-    /// Decrypts and authenticates `data`, then deserializes the
-    /// resulting plaintext and returns the resulting `Item`.
-    ///
-    /// It is an error if `self.ctx` has not yet been
-    /// initialized.
-    fn decrypt(&mut self, data: Data) -> io::Result<Item> {
-        self.ctx
-            .as_mut()
-            .assume("`self.ctx` should be `Some`")
-            .map_err(other)?
-            .decrypt::<Item, SinkItem>(data, Side::Client)
-            .map_err(other)
-    }
-}
-
-impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
-    /// Updates the HPKE encryption context per the peer's
-    /// encapsulation.
-    fn rekey(&mut self, msg: Rekey) -> Result<(), HpkeError> {
-        let ctx = Ctx::server(&self.sk, &self.info, &msg.enc)?;
-        self.ctx = Some(ctx);
-        Ok(())
-    }
-}
-
-impl<S, CS, Item, SinkItem> Stream for ServerConn<S, CS, Item, SinkItem>
+impl<S, CS> ServerConn<S, CS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     CS: CipherSuite,
-    Item: DeserializeOwned,
 {
-    type Item = io::Result<Item>;
+    /// Send a message to the client.
+    pub async fn send<T: Serialize>(&mut self, item: T) -> io::Result<()> {
+        let data = self
+            .ctx
+            .as_mut()
+            .assume("`self.ctx` should be `Some`")
+            .map_err(other)?
+            .encrypt(&item, Side::Server)?;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // Skip past control (i.e., non-`Data`) messages.
+        frame_send(&mut self.inner, &ServerMsg::Data(data)).await
+    }
+
+    /// Receive a message from the client.
+    ///
+    /// Handles rekey messages automatically.
+    pub async fn recv<T: DeserializeOwned>(&mut self) -> io::Result<Option<T>> {
+        // Loop to skip past control messages (rekeying)
         loop {
-            let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
-                return Poll::Ready(None);
+            let Some(msg) = frame_recv(&mut self.inner).await? else {
+                return Ok(None);
             };
             match msg {
                 ClientMsg::Data(data) => {
-                    let pt = self.decrypt(data)?;
-                    return Poll::Ready(Some(Ok(pt)));
+                    let item = self
+                        .ctx
+                        .as_mut()
+                        .assume("`self.ctx` should be `Some`")
+                        .map_err(other)?
+                        .decrypt(data, Side::Client)?;
+                    return Ok(Some(item));
                 }
-                ClientMsg::Rekey(rekey) => self.rekey(rekey).map_err(other)?,
+                ClientMsg::Rekey(rekey) => {
+                    let ctx = Ctx::server(&self.sk, &self.info, &rekey.enc).map_err(other)?;
+                    self.ctx = Some(ctx);
+                }
             }
         }
     }
 }
 
-impl<S, CS, Item, SinkItem> Sink<SinkItem> for ServerConn<S, CS, Item, SinkItem>
-where
-    S: AsyncRead + AsyncWrite + Unpin,
-    CS: CipherSuite,
-    SinkItem: Serialize,
-{
-    type Error = io::Error;
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_ready(cx)
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: SinkItem) -> Result<(), Self::Error> {
-        let data = self.encrypt(item)?;
-        self.project().inner.start_send(ServerMsg::Data(data))
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
-}
-
-impl<S, CS, Item, SinkItem> fmt::Debug for ServerConn<S, CS, Item, SinkItem>
-where
-    CS: CipherSuite,
-{
+impl<S, CS: CipherSuite> fmt::Debug for ServerConn<S, CS> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Server")
+        f.debug_struct("ServerConn")
             .field("sk", &self.sk)
             .field("info", &self.info)
             .field("ctx", &self.ctx)
             .finish_non_exhaustive()
     }
-}
-
-/// A message (response) sent by the server to the client.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[non_exhaustive]
-enum ServerMsg {
-    Data(Data),
 }
 
 /// Unix utilities.
@@ -705,7 +523,7 @@ pub mod unix {
 
 #[cfg(test)]
 #[cfg(unix)]
-#[allow(clippy::arithmetic_side_effects, clippy::panic)]
+#[allow(clippy::panic)]
 mod tests {
     use std::panic;
 
@@ -714,7 +532,6 @@ mod tests {
         Rng,
     };
     use backon::{ExponentialBuilder, Retryable as _};
-    use futures_util::{SinkExt, TryStreamExt};
     use tokio::{
         net::{UnixListener, UnixStream},
         task::JoinSet,
@@ -722,7 +539,7 @@ mod tests {
 
     use super::*;
 
-    impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
+    impl<S, R, CS> ClientConn<S, R, CS>
     where
         S: AsyncRead + AsyncWrite + Unpin,
         CS: CipherSuite,
@@ -767,16 +584,11 @@ mod tests {
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
                     .new_codec();
-                let mut server = server::<_, _, Ping, Pong>(
-                    unix::UnixListenerStream::from(listener),
-                    codec.clone(),
-                    sk,
-                    &info,
-                );
+                let mut server = server(unix::UnixListenerStream::from(listener), codec, sk, &info);
 
-                let mut conn = server.try_next().await.unwrap().unwrap();
+                let mut conn = server.accept().await.unwrap()?;
                 for v in 0..MAX_PING_PONGS {
-                    let got = conn.try_next().await?.ok_or_else(|| {
+                    let got: Ping = conn.recv().await?.ok_or_else(|| {
                         io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
                     })?;
                     assert_eq!(got, Ping { v });
@@ -800,10 +612,10 @@ mod tests {
                     .retry(ExponentialBuilder::default())
                     .await
                     .unwrap();
-                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
+                let mut client = client(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
                     client.send(Ping { v }).await?;
-                    let got = client.try_next().await?.ok_or_else(|| {
+                    let got: Pong = client.recv().await?.ok_or_else(|| {
                         io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
                     })?;
                     let want = Pong {
@@ -851,15 +663,15 @@ mod tests {
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
                     .new_codec();
-                let mut server = server::<_, _, Ping, Pong>(
+                let mut server = server(
                     unix::UnixListenerStream::from(listener),
                     codec.clone(),
                     sk,
                     &info,
                 );
-                let mut conn = server.try_next().await.unwrap().unwrap();
+                let mut conn = server.accept().await.unwrap().unwrap();
                 for v in 0..MAX_PING_PONGS {
-                    let got = conn.try_next().await?.ok_or_else(|| {
+                    let got: Ping = conn.recv().await?.ok_or_else(|| {
                         io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
                     })?;
                     // In this test the client rekeys each time
@@ -893,13 +705,13 @@ mod tests {
                     .retry(ExponentialBuilder::default())
                     .await
                     .unwrap();
-                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
+                let mut client = client(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
                     let last = client.rekeys;
                     client.force_rekey();
                     client.send(Ping { v }).await.unwrap();
                     assert_eq!(client.rekeys, last + 1);
-                    let got = client.try_next().await?.ok_or_else(|| {
+                    let got: Pong = client.recv().await?.ok_or_else(|| {
                         io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
                     })?;
                     let want = Pong {
@@ -948,7 +760,7 @@ mod tests {
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
                     .new_codec();
-                let mut server = server::<_, _, Ping, Pong>(
+                let mut server = server(
                     unix::UnixListenerStream::from(listener),
                     codec.clone(),
                     sk,
@@ -956,10 +768,10 @@ mod tests {
                 );
                 let mut set = JoinSet::new();
                 for _ in 0..MAX_CLIENTS {
-                    let mut conn = server.try_next().await?.unwrap();
+                    let mut conn = server.accept().await.unwrap()?;
                     set.spawn(async move {
                         for v in 0..MAX_PING_PONGS {
-                            let got = conn.try_next().await?.ok_or_else(|| {
+                            let got: Ping = conn.recv().await?.ok_or_else(|| {
                                 io::Error::new(
                                     io::ErrorKind::UnexpectedEof,
                                     "client stream finished early",
@@ -994,10 +806,10 @@ mod tests {
                     .retry(ExponentialBuilder::default())
                     .await
                     .unwrap();
-                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
+                let mut client = client(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
                     client.send(Ping { v }).await?;
-                    let got = client.try_next().await?.ok_or_else(|| {
+                    let got: Pong = client.recv().await?.ok_or_else(|| {
                         io::Error::new(io::ErrorKind::UnexpectedEof, "server stream finished early")
                     })?;
                     let want = Pong {
