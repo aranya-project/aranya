@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use test_log::test;
 
-use crate::{afc::Channels, client::ChanOp, Rank};
 use super::{sleep, DevicesCtx, SLEEP_INTERVAL};
+use crate::{afc::Channels, client::ChanOp, Rank};
 use aranya_daemon_api::text;
 
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
