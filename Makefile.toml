@@ -186,7 +186,7 @@ args = ["deny", "check"]
 [tasks.cargo-vet]
 category = "security"
 toolchain = "stable"
-install_crate = { crate_name = "cargo-vet", version = "0.10.1", binary = "cargo-vet", test_arg = "-V" }
+install_crate = { crate_name = "cargo-vet", version = "0.10.2", binary = "cargo-vet", test_arg = "-V" }
 command = "cargo"
 args = ["vet", "check"]
 
