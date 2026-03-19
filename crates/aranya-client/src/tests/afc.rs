@@ -1,14 +1,8 @@
-#![allow(clippy::arithmetic_side_effects, clippy::panic)]
-
 use anyhow::{Context, Result};
 use test_log::test;
 
-use crate::{
-    afc::Channels,
-    client::ChanOp,
-    tests::{sleep, DevicesCtx, SLEEP_INTERVAL},
-    Rank,
-};
+use crate::{afc::Channels, client::ChanOp, Rank};
+use super::{sleep, DevicesCtx, SLEEP_INTERVAL};
 use aranya_daemon_api::text;
 
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.

@@ -10,6 +10,9 @@
     rust_2018_idioms
 )]
 
+#[cfg(feature = "afc")]
+mod afc;
+
 use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
 
 use anyhow::{anyhow, bail, Context, Result};

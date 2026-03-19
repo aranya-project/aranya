@@ -57,6 +57,3 @@ pub use crate::{
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(all(test, feature = "afc"))]
-mod afc_tests;
