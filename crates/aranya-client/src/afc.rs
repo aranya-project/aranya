@@ -22,8 +22,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    client::create_ctx,
-    error::{aranya_error, IpcError},
+    error::aranya_error,
     util::{ApiConv as _, ApiId},
     DeviceId, LabelId, Result, TeamId,
 };
@@ -165,14 +164,8 @@ impl Channels {
     ) -> Result<(SendChannel, CtrlMsg)> {
         let info = self
             .daemon
-            .create_afc_channel(
-                create_ctx(),
-                team_id.into_api(),
-                peer_id.into_api(),
-                label_id.into_api(),
-            )
+            .create_afc_channel(team_id.into_api(), peer_id.into_api(), label_id.into_api())
             .await
-            .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         let seal_ctx = self
             .keys
@@ -196,9 +189,8 @@ impl Channels {
     pub async fn accept_channel(&self, team_id: TeamId, ctrl: CtrlMsg) -> Result<ReceiveChannel> {
         let info = self
             .daemon
-            .accept_afc_channel(create_ctx(), team_id.into_api(), ctrl.0)
+            .accept_afc_channel(team_id.into_api(), ctrl.0)
             .await
-            .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         let open_ctx = self
             .keys
@@ -271,9 +263,8 @@ impl SendChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(create_ctx(), self.local_channel_id)
+            .delete_afc_channel(self.local_channel_id)
             .await
-            .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(())
     }
@@ -343,9 +334,8 @@ impl ReceiveChannel {
     /// Delete the channel.
     pub async fn delete(&self) -> Result<(), crate::Error> {
         self.daemon
-            .delete_afc_channel(create_ctx(), self.local_channel_id)
+            .delete_afc_channel(self.local_channel_id)
             .await
-            .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(())
     }

@@ -1,5 +1,3 @@
-#![allow(clippy::disallowed_macros)] // tarpc uses unreachable
-
 use aranya_crypto::{tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
 

@@ -101,10 +101,6 @@ notes = "This crate is under the rust-lang Github organization"
 version = "1.7.1"
 criteria = "safe-to-run"
 
-[[exemptions.async-trait]]
-version = "0.1.83"
-criteria = "safe-to-deploy"
-
 [[exemptions.atomic-polyfill]]
 version = "1.0.3"
 criteria = "safe-to-deploy"
@@ -281,24 +277,12 @@ criteria = "safe-to-deploy"
 version = "2.1.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.educe]]
-version = "0.5.11"
-criteria = "safe-to-deploy"
-
 [[exemptions.elliptic-curve]]
 version = "0.13.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.endian-type]]
 version = "0.1.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.enum-ordinalize]]
-version = "4.3.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.enum-ordinalize-derive]]
-version = "4.3.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.ff]]
@@ -403,10 +387,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.httparse]]
 version = "1.10.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.humantime]]
-version = "2.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.hyper]]
@@ -561,18 +541,6 @@ criteria = "safe-to-deploy"
 version = "0.1.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.opentelemetry]]
-version = "0.26.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.opentelemetry-semantic-conventions]]
-version = "0.16.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.opentelemetry_sdk]]
-version = "0.26.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.ordered-float]]
 version = "4.6.0"
 criteria = "safe-to-deploy"
@@ -623,11 +591,11 @@ criteria = "safe-to-deploy"
 
 [[exemptions.pin-project]]
 version = "1.1.7"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.pin-project-internal]]
 version = "1.1.7"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.pkcs8]]
 version = "0.10.2"
@@ -917,14 +885,6 @@ criteria = "safe-to-deploy"
 version = "2.0.90"
 criteria = "safe-to-deploy"
 
-[[exemptions.tarpc]]
-version = "0.35.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.tarpc-plugins]]
-version = "0.14.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.tempfile]]
 version = "3.19.1"
 criteria = "safe-to-deploy"
@@ -953,20 +913,12 @@ criteria = "safe-to-deploy"
 version = "0.26.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.tokio-serde]]
-version = "0.9.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.tokio-util]]
 version = "0.7.13"
 criteria = "safe-to-deploy"
 
 [[exemptions.tower-service]]
 version = "0.3.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.tracing-opentelemetry]]
-version = "0.27.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.type-map]]
@@ -1035,10 +987,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.web-sys]]
 version = "0.3.77"
-criteria = "safe-to-deploy"
-
-[[exemptions.web-time]]
-version = "1.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.which]]
