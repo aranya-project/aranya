@@ -54,3 +54,9 @@ pub use crate::{
     },
     error::{ConfigError, Error, Result},
 };
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(all(test, feature = "afc"))]
+mod afc_tests;

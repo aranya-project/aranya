@@ -1,20 +1,18 @@
 #![allow(clippy::arithmetic_side_effects, clippy::panic)]
-#[cfg(feature = "afc")]
-mod common;
 
-#[cfg(feature = "afc")]
-use {
-    crate::common::{sleep, DevicesCtx, SLEEP_INTERVAL},
-    anyhow::{Context, Result},
-    aranya_client::afc::Channels,
-    aranya_client::client::ChanOp,
-    aranya_client::Rank,
-    aranya_daemon_api::text,
+use anyhow::{Context, Result};
+use test_log::test;
+
+use crate::{
+    afc::Channels,
+    client::ChanOp,
+    tests::{sleep, DevicesCtx, SLEEP_INTERVAL},
+    Rank,
 };
+use aranya_daemon_api::text;
 
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_create_assign_revoke_delete_label").await?;
 
@@ -144,8 +142,7 @@ async fn test_afc_create_assign_revoke_delete_label() -> Result<()> {
 }
 
 /// Demonstrate creating a unidirectional AFC channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_create() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_create").await?;
 
@@ -212,8 +209,7 @@ async fn test_afc_uni_chan_create() -> Result<()> {
 }
 
 /// Demonstrate seal/open with unidirectional AFC send channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_send_chan_seal_open").await?;
 
@@ -290,8 +286,7 @@ async fn test_afc_uni_send_chan_seal_open() -> Result<()> {
 }
 
 /// Demonstrate deleting a unidirectional AFC channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_delete() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_delete").await?;
 
@@ -378,8 +373,7 @@ async fn test_afc_uni_chan_delete() -> Result<()> {
 }
 
 /// Demonstrate revoking a label from devices deletes the channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_revoke_label() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_revoke_label").await?;
 
@@ -483,8 +477,7 @@ async fn test_afc_uni_chan_revoke_label() -> Result<()> {
 }
 
 /// Demonstrate deleting a label deletes the channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_delete_label() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_delete_label").await?;
 
@@ -594,8 +587,7 @@ async fn test_afc_uni_chan_delete_label() -> Result<()> {
 }
 
 /// Demonstrate removing channel devices from the team deletes the AFC channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_remove_devices() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_remove_devices").await?;
 
@@ -714,8 +706,7 @@ async fn test_afc_uni_chan_remove_devices() -> Result<()> {
 /// Demonstrate revoking the role from a device deletes the AFC channel.
 /// Each device can only have one role assigned to it.
 /// Therefore, revoking the role implicitly removes the `CanUseAfc` perm.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_revoke_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_revoke_role").await?;
 
@@ -832,8 +823,7 @@ async fn test_afc_uni_chan_revoke_role() -> Result<()> {
 }
 
 /// Demonstrate changing device to a role without `CanUseAfc` perm deletes the AFC channel.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_chan_change_role_without_perm").await?;
 
@@ -950,8 +940,7 @@ async fn test_afc_uni_chan_change_role_without_perm() -> Result<()> {
 }
 
 /// Demonstrate open/seal with multiple unidirectional AFC channels.
-#[cfg(feature = "afc")]
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_uni_multi_send_chans() -> Result<()> {
     let mut devices = DevicesCtx::new("test_afc_uni_multi_chans").await?;
 
