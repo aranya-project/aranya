@@ -39,6 +39,12 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.83 -> 0.1.87"
 
+[[audits.aws-lc-rs]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.13.0 -> 1.16.2"
+notes = "Primarily security patches to fix reported CVEs."
+
 [[audits.backon]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"
@@ -74,6 +80,12 @@ notes = "Code updates align with release notes. Replaced instances of unchecked 
 who = "Ben Zimmerman <bzimmerman@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "1.2.18"
+
+[[audits.cc]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.2.41 -> 1.2.57"
+notes = "No unsafe changes. Bugfixes and improved platform support for C compiler."
 
 [[audits.clap]]
 who = "gknopf <gknopf@spideroak.com>"
