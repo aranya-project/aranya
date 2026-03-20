@@ -20,27 +20,27 @@ use crate::{
     AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank,
 };
 
-pub(crate) const SYNC_INTERVAL: Duration = Duration::from_millis(100);
+pub(super) const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
-pub(crate) const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
+pub(super) const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
 #[instrument(skip_all)]
-pub(crate) async fn sleep(duration: Duration) {
+pub(super) async fn sleep(duration: Duration) {
     trace!(?duration, "sleeping");
     time::sleep(duration).await;
 }
 
-pub(crate) struct DevicesCtx {
-    pub(crate) owner: DeviceCtx,
-    pub(crate) admin: DeviceCtx,
-    pub(crate) operator: DeviceCtx,
-    pub(crate) membera: DeviceCtx,
-    pub(crate) memberb: DeviceCtx,
+pub(super) struct DevicesCtx {
+    pub(super) owner: DeviceCtx,
+    pub(super) admin: DeviceCtx,
+    pub(super) operator: DeviceCtx,
+    pub(super) membera: DeviceCtx,
+    pub(super) memberb: DeviceCtx,
     _work_dir: TempDir,
 }
 
 impl DevicesCtx {
-    pub(crate) async fn new(name: &str) -> Result<Self> {
+    pub(super) async fn new(name: &str) -> Result<Self> {
         let work_dir = tempfile::tempdir()?;
         let work_dir_path = work_dir.path();
 
@@ -62,7 +62,7 @@ impl DevicesCtx {
         })
     }
 
-    pub(crate) async fn add_all_device_roles(
+    pub(super) async fn add_all_device_roles(
         &mut self,
         team_id: TeamId,
         roles: &DefaultRoles,
@@ -127,7 +127,7 @@ impl DevicesCtx {
         Ok(())
     }
 
-    pub(crate) async fn create_and_add_team(&mut self) -> Result<TeamId> {
+    pub(super) async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         let seed_ikm = {
             let mut buf = [0; SEED_IKM_SIZE];
@@ -170,7 +170,7 @@ impl DevicesCtx {
         Ok(team_id)
     }
 
-    pub(crate) fn devices(&self) -> [&DeviceCtx; 5] {
+    pub(super) fn devices(&self) -> [&DeviceCtx; 5] {
         [
             &self.owner,
             &self.admin,
@@ -181,7 +181,7 @@ impl DevicesCtx {
     }
 
     #[instrument(skip(self))]
-    pub(crate) async fn add_all_sync_peers(&self, team_id: TeamId) -> Result<()> {
+    pub(super) async fn add_all_sync_peers(&self, team_id: TeamId) -> Result<()> {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         for device in self.devices() {
             for peer in self.devices() {
@@ -201,21 +201,21 @@ impl DevicesCtx {
     /// NB: This includes the owner role, which is not returned
     /// by [`Client::setup_default_roles`].
     #[instrument(skip(self))]
-    pub(crate) async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
+    pub(super) async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
         self.owner.setup_default_roles(team_id).await
     }
 }
 
-pub(crate) struct DeviceCtx {
-    pub(crate) client: Client,
-    pub(crate) pk: PublicKeyBundle,
-    pub(crate) id: DeviceId,
+pub(super) struct DeviceCtx {
+    pub(super) client: Client,
+    pub(super) pk: PublicKeyBundle,
+    pub(super) id: DeviceId,
     #[expect(unused, reason = "manages tasks")]
     daemon: DaemonHandle,
 }
 
 impl DeviceCtx {
-    pub(crate) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub(super) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // TODO: only compile when 'afc' feature is enabled
@@ -293,7 +293,7 @@ impl DeviceCtx {
         })
     }
 
-    pub(crate) async fn aranya_local_addr(&self) -> Result<Addr> {
+    pub(super) async fn aranya_local_addr(&self) -> Result<Addr> {
         Ok(self.client.local_addr().await?)
     }
 
@@ -357,30 +357,30 @@ where
 // NB: This assumes users cannot delete roles yet, which is true
 // as of MVP.
 #[derive(Clone, Debug)]
-pub(crate) struct DefaultRoles {
+pub(super) struct DefaultRoles {
     roles: HashMap<String, Role>,
 }
 
 impl DefaultRoles {
     /// Returns the 'owner' role.
-    pub(crate) fn owner(&self) -> &Role {
+    pub(super) fn owner(&self) -> &Role {
         self.roles.get("owner").expect("owner role should exist")
     }
 
     /// Returns the 'admin' role.
-    pub(crate) fn admin(&self) -> &Role {
+    pub(super) fn admin(&self) -> &Role {
         self.roles.get("admin").expect("admin role should exist")
     }
 
     /// Returns the 'operator' role.
-    pub(crate) fn operator(&self) -> &Role {
+    pub(super) fn operator(&self) -> &Role {
         self.roles
             .get("operator")
             .expect("operator role should exist")
     }
 
     /// Returns the 'member' role.
-    pub(crate) fn member(&self) -> &Role {
+    pub(super) fn member(&self) -> &Role {
         self.roles.get("member").expect("member role should exist")
     }
 }
