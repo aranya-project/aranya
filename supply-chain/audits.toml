@@ -386,6 +386,18 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
+[[audits.rustls-pki-types]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.11.0 -> 1.14.0"
+notes = "Much of diff is deleted code. Adds new signature code."
+
+[[audits.rustls-webpki]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.103.3 -> 0.103.10"
+notes = "Certificate/crypto fixes to solve reported CVE."
+
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
