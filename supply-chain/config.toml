@@ -117,6 +117,10 @@ criteria = "safe-to-deploy"
 version = "0.39.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.find-msvc-tools]]
+version = "0.1.9"
+criteria = "safe-to-deploy"
+
 [[exemptions.backon]]
 version = "1.2.0"
 criteria = "safe-to-deploy"
