@@ -1,7 +1,6 @@
 use std::{ptr, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use test_log::test;
 use tracing::{debug, info};
 
 use super::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
@@ -14,7 +13,7 @@ use crate::{
 };
 
 /// Tests getting keybundle and device ID.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_get_keybundle_device_id() -> Result<()> {
     let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
 
@@ -33,7 +32,7 @@ async fn test_get_keybundle_device_id() -> Result<()> {
 }
 
 /// Tests generating random numbers with the aranya client.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_client_rand() -> Result<()> {
     let devices = DevicesCtx::new("test_get_keybundle_device_id").await?;
 
@@ -49,7 +48,7 @@ async fn test_client_rand() -> Result<()> {
 }
 
 /// Tests sync_now() by showing that an admin cannot perform operations until it syncs with the owner.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_sync_now").await?;
@@ -134,7 +133,7 @@ async fn test_sync_now() -> Result<()> {
 }
 
 /// Tests adding/removing sync peers.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_remove_sync_peers() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_remove_sync_peers").await?;
     let team_id = devices
@@ -213,7 +212,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 /// Tests creating/assigning/revoking a role.
 /// Verifies query indicates correct role assignment status.
 /// Verifies device is only allowed to perform operation when role with permission is assigned to it.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_role_create_assign_revoke() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_role_create_assign_revoke").await?;
@@ -365,7 +364,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
 }
 
 /// Tests that a role can be changed after it has been assigned to a device.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_role_change() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_role_change").await?;
@@ -392,7 +391,7 @@ async fn test_role_change() -> Result<()> {
 }
 
 /// Tests that devices can be added to the team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_devices() -> Result<()> {
     let mut team = DevicesCtx::new("test_add_devices").await?;
 
@@ -507,7 +506,7 @@ async fn test_add_devices() -> Result<()> {
     Ok(())
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
     let mut devices =
         DevicesCtx::new("test_add_device_with_initial_role_requires_outranking").await?;
@@ -588,7 +587,7 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
 }
 
 /// Tests that devices can be removed from the team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_remove_devices").await?;
@@ -636,7 +635,7 @@ async fn test_remove_devices() -> Result<()> {
 }
 
 /// Tests functionality to make sure that we can query the fact database for various things.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_query_functions() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_query_functions").await?;
@@ -742,7 +741,7 @@ async fn test_query_functions() -> Result<()> {
 
 /// Tests add_team() by demonstrating that syncing can only occur after
 /// a peer calls the add_team() API
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_team() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_add_team").await?;
@@ -858,7 +857,7 @@ async fn test_add_team() -> Result<()> {
 }
 
 /// Tests that devices can be removed from the team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_team() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_remove_team").await?;
@@ -942,7 +941,7 @@ async fn test_remove_team() -> Result<()> {
 }
 
 /// Tests that a device can create multiple teams and receive sync requests for each team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
     let devices = DevicesCtx::new("test_multi_team_sync").await?;
@@ -1163,7 +1162,7 @@ async fn test_multi_team_sync() -> Result<()> {
 
 /// Tests hello subscription functionality by demonstrating that devices can subscribe
 /// to hello notifications from peers and automatically sync when receiving notifications.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 #[cfg(feature = "preview")]
 async fn test_hello_subscription() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -1319,7 +1318,7 @@ async fn test_hello_subscription() -> Result<()> {
 /// Tests that schedule_delay parameter in sync_hello_subscribe works correctly.
 /// Verifies that with high schedule_delay, only graph-change-triggered notifications occur,
 /// while with low schedule_delay, scheduled periodic sends pick up all pending changes.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 #[cfg(feature = "preview")]
 async fn test_hello_subscription_schedule_delay() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -1527,7 +1526,7 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
 }
 
 /// Enforces that default roles can only be seeded once per team.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_setup_default_roles_single_use() -> Result<()> {
     let mut devices = DevicesCtx::new("test_setup_default_roles_single_use").await?;
 
@@ -1548,7 +1547,7 @@ async fn test_setup_default_roles_single_use() -> Result<()> {
 }
 
 /// Tests that role creation works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_create_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role").await?;
 
@@ -1607,7 +1606,7 @@ async fn test_create_role() -> Result<()> {
 }
 
 /// Tests that role creation works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_perm_to_created_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
@@ -1654,7 +1653,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
 }
 
 /// Tests that privilege escalation attempt is rejected.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_privilege_escalation_rejected() -> Result<()> {
     let team_name = "test_privilege_escalation_rejected";
     let mut devices = DevicesCtx::new(team_name).await?;
@@ -1730,7 +1729,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
 }
 
 /// Tests that role creation works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_perm_from_default_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_perm_to_created_role").await?;
 
@@ -1785,7 +1784,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
 }
 
 /// Tests that role deletion works.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_delete_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_role").await?;
 
@@ -1804,7 +1803,7 @@ async fn test_delete_role() -> Result<()> {
 /// A device cannot assign a role to itself. The rank system enforces this:
 /// `author_can_operate_on_target` uses strict `>`, so a device never
 /// outranks itself and the operation is rejected.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_self_rejected").await?;
 
@@ -1827,7 +1826,7 @@ async fn test_assign_role_self_rejected() -> Result<()> {
 /// The sole owner cannot revoke its own owner role. The rank system
 /// prevents self-operations (strict `>` means a device never outranks
 /// itself), and the policy also prevents removing the last owner.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_owner_cannot_revoke_owner_role").await?;
 
@@ -1848,7 +1847,7 @@ async fn test_owner_cannot_revoke_owner_role() -> Result<()> {
 /// A device that already has a role cannot be assigned another role.
 /// The policy rejects the operation because an existing role assignment
 /// already exists for the target device.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_cannot_assign_role_twice() -> Result<()> {
     let mut devices = DevicesCtx::new("test_cannot_assign_role_twice").await?;
 
@@ -1874,7 +1873,7 @@ async fn test_cannot_assign_role_twice() -> Result<()> {
 /// Deleting a label requires `DeleteLabel` permission and sufficient rank.
 /// An operator without `DeleteLabel` cannot delete a label even if it
 /// outranks the label.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_delete_label_requires_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_delete_label_requires_permission").await?;
 
@@ -1909,7 +1908,7 @@ async fn test_delete_label_requires_permission() -> Result<()> {
 /// A device cannot assign a label to itself. The rank system enforces this:
 /// `author_can_operate_on_target` uses strict `>`, so a device never
 /// outranks itself and the operation is rejected.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_label_to_device_self_rejected").await?;
 
@@ -1940,7 +1939,7 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
 }
 
 /// Ensures the last owner cannot be removed by another device.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_admin_cannot_remove_last_owner() -> Result<()> {
     let mut devices = DevicesCtx::new("test_admin_cannot_remove_last_owner").await?;
 
@@ -1965,7 +1964,7 @@ async fn test_admin_cannot_remove_last_owner() -> Result<()> {
 
 /// Tests that a label can be created with a specific rank and that the rank
 /// can be queried back.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_create_label() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_label").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -1985,7 +1984,7 @@ async fn test_create_label() -> Result<()> {
 }
 
 /// Tests that the rank of a label can be changed with a valid old_rank.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2011,7 +2010,7 @@ async fn test_change_rank() -> Result<()> {
 
 /// Tests that a lower-ranked device cannot change the rank of a higher-ranked
 /// object (author_rank must be > target_rank).
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_requires_sufficient_author_rank").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2070,7 +2069,7 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
 
 /// Tests that an admin cannot create a role with a rank higher than the
 /// admin's own rank.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_create_role_rank_too_high_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_role_rank_too_high_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2115,7 +2114,7 @@ async fn test_create_role_rank_too_high_rejected() -> Result<()> {
 
 /// Tests that adding a device with a rank higher than its assigned role's rank
 /// is rejected (role_rank >= device_rank must hold).
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_device_rank_higher_than_role_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_add_device_rank_higher_than_role_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2148,7 +2147,7 @@ async fn test_add_device_rank_higher_than_role_rejected() -> Result<()> {
 }
 
 /// Tests that changing a device rank above its role's rank is rejected.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_above_role_rank_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2198,7 +2197,7 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
 ///
 /// This applies unconditionally to all roles - a device cannot promote or
 /// demote any role's rank, including the rank of its own assigned role.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_role_rank_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_role_rank_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2241,7 +2240,7 @@ async fn test_change_role_rank_rejected() -> Result<()> {
 /// 2. Query and copy permissions from the old role to the new role
 /// 3. Change devices from the old role to the new role
 /// 4. Delete the old role (optional cleanup)
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_role_rank_migration_pattern() -> Result<()> {
     let mut devices = DevicesCtx::new("test_role_rank_migration_pattern").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2331,7 +2330,7 @@ async fn test_role_rank_migration_pattern() -> Result<()> {
 
 /// Tests that a lower-ranked device cannot operate on higher-ranked objects:
 /// removing devices, deleting roles, or deleting labels.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
     let mut devices = DevicesCtx::new("test_insufficient_rank_cannot_operate_on_objects").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2406,7 +2405,7 @@ async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
 }
 
 /// Tests that change_rank fails when the new_rank exceeds the author's own rank.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_new_rank_above_author_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2465,7 +2464,7 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
 
 /// Tests that change_rank fails when the provided old_rank does not match the
 /// object's current rank (stale old_rank).
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_stale_old_rank_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2500,7 +2499,7 @@ async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
 
 /// Tests that a device can demote its own rank (self-demotion is allowed with
 /// just the ChangeRank permission).
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_self_demotion() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_self_demotion").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2553,7 +2552,7 @@ async fn test_change_rank_self_demotion() -> Result<()> {
 ///
 /// This is a critical security control: a device should never be able to
 /// escalate its own privileges by increasing its rank.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_self_promotion_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_self_promotion_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2597,7 +2596,7 @@ async fn test_change_rank_self_promotion_rejected() -> Result<()> {
 
 /// Tests that a device at the same rank as another cannot operate on it
 /// (strict > is required, not >=).
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_equal_rank_cannot_operate() -> Result<()> {
     let mut devices = DevicesCtx::new("test_equal_rank_cannot_operate").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2644,7 +2643,7 @@ async fn test_equal_rank_cannot_operate() -> Result<()> {
 
 /// Tests that assigning a role requires the author to outrank both the role
 /// and the target device.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_requires_outranking_both_role_and_device() -> Result<()> {
     let mut devices = DevicesCtx::new("test_assign_role_requires_outranking_both").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2726,7 +2725,7 @@ async fn test_assign_role_requires_outranking_both_role_and_device() -> Result<(
 
 /// Tests that creating a label with a rank higher than the author's rank is
 /// rejected.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_create_label_rank_too_high_rejected() -> Result<()> {
     let mut devices = DevicesCtx::new("test_create_label_rank_too_high_rejected").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2771,7 +2770,7 @@ async fn test_create_label_rank_too_high_rejected() -> Result<()> {
 
 /// Tests that adding a permission to a role requires the author to outrank
 /// that role.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_perm_change_requires_outranking_role() -> Result<()> {
     let mut devices = DevicesCtx::new("test_perm_change_requires_outranking_role").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2819,7 +2818,7 @@ async fn test_perm_change_requires_outranking_role() -> Result<()> {
 /// The policy uses `role_rank >= device_rank` (not strict `>`). Equal ranks
 /// are safe because a device still cannot modify its own role - modification
 /// requires strictly outranking the target via `author_can_operate_on_target`.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_assign_role_where_role_rank_equals_device_rank_allowed() -> Result<()> {
     let mut devices =
         DevicesCtx::new("test_assign_role_where_role_rank_equals_device_rank_allowed").await?;
@@ -2862,7 +2861,7 @@ async fn test_assign_role_where_role_rank_equals_device_rank_allowed() -> Result
 ///
 /// The policy uses `role_rank >= device_rank` (not strict `>`). Equal ranks
 /// are safe because the device still cannot modify its own role.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_change_rank_device_to_exact_role_rank_allowed() -> Result<()> {
     let mut devices = DevicesCtx::new("test_change_rank_device_to_exact_role_rank_allowed").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2904,7 +2903,7 @@ async fn test_change_rank_device_to_exact_role_rank_allowed() -> Result<()> {
 ///
 /// A device with ChangeRank permission but lower rank than the target
 /// cannot change the target's rank.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_has_permission_but_insufficient_rank() -> Result<()> {
     let mut devices = DevicesCtx::new("test_has_permission_but_insufficient_rank").await?;
     let team_id = devices.create_and_add_team().await?;
@@ -2962,7 +2961,7 @@ async fn test_has_permission_but_insufficient_rank() -> Result<()> {
 ///
 /// A device that outranks a target but lacks ChangeRank permission
 /// cannot change the target's rank.
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_outranks_but_missing_permission() -> Result<()> {
     let mut devices = DevicesCtx::new("test_outranks_but_missing_permission").await?;
     let team_id = devices.create_and_add_team().await?;
