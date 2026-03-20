@@ -1,8 +1,10 @@
+#![cfg(feature = "afc")]
+
 use anyhow::{Context, Result};
 use aranya_daemon_api::text;
 use test_log::test;
 
-use super::{sleep, DevicesCtx, SLEEP_INTERVAL};
+use super::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
 use crate::{afc::Channels, client::ChanOp, Rank};
 
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
