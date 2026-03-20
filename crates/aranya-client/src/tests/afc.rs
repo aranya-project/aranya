@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
+use aranya_daemon_api::text;
 use test_log::test;
 
 use super::{sleep, DevicesCtx, SLEEP_INTERVAL};
 use crate::{afc::Channels, client::ChanOp, Rank};
-use aranya_daemon_api::text;
 
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
 #[test(tokio::test(flavor = "multi_thread"))]

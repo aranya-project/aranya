@@ -4,16 +4,14 @@ use anyhow::{bail, Context, Result};
 use test_log::test;
 use tracing::{debug, info};
 
+use super::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
+#[cfg(feature = "preview")]
+use crate::config::HelloSubscriptionConfig;
 use crate::{
     client::{ChanOp, Permission},
     config::{CreateTeamConfig, SyncPeerConfig},
     text, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, Rank,
 };
-
-#[cfg(feature = "preview")]
-use crate::config::HelloSubscriptionConfig;
-
-use super::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
 
 /// Tests getting keybundle and device ID.
 #[test(tokio::test(flavor = "multi_thread"))]
