@@ -110,11 +110,11 @@ version = "1.0.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-rs]]
-version = "1.13.0"
+version = "1.16.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-sys]]
-version = "0.28.0"
+version = "0.39.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.backon]]
@@ -167,10 +167,6 @@ criteria = "safe-to-run"
 
 [[exemptions.ciborium]]
 version = "0.2.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.clang-sys]]
-version = "1.8.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.clap]]
@@ -308,6 +304,10 @@ criteria = "safe-to-deploy"
 [[exemptions.find-crate]]
 version = "0.6.3"
 criteria = "safe-to-run"
+
+[[exemptions.find-msvc-tools]]
+version = "0.1.9"
+criteria = "safe-to-deploy"
 
 [[exemptions.fixedbitset]]
 version = "0.5.7"
@@ -453,16 +453,8 @@ criteria = "safe-to-deploy"
 version = "0.3.76"
 criteria = "safe-to-deploy"
 
-[[exemptions.lazycell]]
-version = "1.3.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.libc]]
 version = "0.2.174"
-criteria = "safe-to-deploy"
-
-[[exemptions.libloading]]
-version = "0.7.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.libm]]
@@ -1039,10 +1031,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.web-time]]
 version = "1.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.which]]
-version = "4.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.winapi]]

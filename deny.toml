@@ -102,7 +102,6 @@ allow = [
     "ISC",
     "MIT",
     "MPL-2.0",
-    "OpenSSL",
     "Unicode-3.0",
     "Zlib",
 ]
@@ -142,7 +141,6 @@ exceptions = [
     { allow = ["AGPL-3.0-only"], crate = "aranya-policy-vm" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-runtime" },
 
-    { allow = ["AGPL-3.0-only"], crate = "aranya-certgen" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-client" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-daemon" },
     { allow = ["AGPL-3.0-only"], crate = "aranya-daemon-api" },
