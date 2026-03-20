@@ -1,4 +1,4 @@
-//! Tests for the client library (migrated from integration tests).
+//! Tests for the client library.
 
 #![cfg(test)]
 #![allow(
