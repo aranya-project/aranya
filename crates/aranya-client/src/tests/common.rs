@@ -20,7 +20,6 @@ use crate::{
     AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank,
 };
 
-
 pub(crate) const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 pub(crate) const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
