@@ -451,7 +451,7 @@ impl DaemonApi for Api {
         self.device_id().map(api::DeviceId::transmute)
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test-utils")]
     #[instrument(skip(self), err)]
     async fn test_trace_id(self, ctx: context::Context) -> api::Result<String> {
         trace::setup_trace_context(&ctx);

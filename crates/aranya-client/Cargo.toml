@@ -24,6 +24,8 @@ debug = []
 
 # Preview features
 preview = ["aranya-daemon-api/preview"]
+# Test-only utilities
+test-utils = ["aranya-daemon-api/test-utils"]
 # Aranya Fast Channels
 afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 
@@ -53,8 +55,8 @@ tracing = { workspace = true }
 
 
 [dev-dependencies]
-aranya-client = { path = ".", features = ["preview"] }
-aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview"] }
+aranya-client = { path = ".", features = ["preview", "test-utils"] }
+aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview", "test-utils"] }
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }

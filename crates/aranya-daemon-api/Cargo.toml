@@ -18,6 +18,8 @@ default = ["afc"]
 
 # Preview features
 preview = []
+# Test-only utilities
+test-utils = []
 # Aranya Fast Channels
 afc = ["dep:aranya-fast-channels"]
 

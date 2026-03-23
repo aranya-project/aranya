@@ -231,7 +231,7 @@ impl Client {
 
     /// Returns a pair of trace IDs `(client_sent, daemon_received)` for
     /// validating RPC trace propagation.
-    #[cfg(test)]
+    #[cfg(feature = "test-utils")]
     pub async fn test_trace_id(&self) -> Result<(String, String)> {
         let ctx = rpc_context();
         let client_trace_id = ctx.trace_context.trace_id.to_string();

@@ -19,7 +19,6 @@ use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
-const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
@@ -181,7 +180,9 @@ impl DevicesCtx {
 
     #[instrument(skip(self))]
     pub async fn add_all_sync_peers(&self, team_id: TeamId) -> Result<()> {
-        let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
+        let config = SyncPeerConfig::builder()
+            .interval(Duration::from_millis(100))
+            .build()?;
         for device in self.devices() {
             for peer in self.devices() {
                 if ptr::eq(device, peer) {
