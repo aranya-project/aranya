@@ -110,7 +110,7 @@ version = "1.0.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-rs]]
-version = "1.16.2"
+version = "1.13.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-sys]]
@@ -308,6 +308,7 @@ criteria = "safe-to-run"
 [[exemptions.find-msvc-tools]]
 version = "0.1.9"
 criteria = "safe-to-deploy"
+notes = "Build tool used by cc to find MSVC tools on Windows. Published by rust-lang/cc-rs."
 
 [[exemptions.fixedbitset]]
 version = "0.5.7"
