@@ -116,6 +116,7 @@ criteria = "safe-to-deploy"
 [[exemptions.aws-lc-sys]]
 version = "0.39.0"
 criteria = "safe-to-deploy"
+notes = "Vendored C library (AWS-LC, fork of BoringSSL). Diffs between versions are typically 100K+ lines of auto-generated C/asm code, making full audit infeasible. Updating the exemption version is preferred over certifying the diff."
 
 [[exemptions.backon]]
 version = "1.2.0"
