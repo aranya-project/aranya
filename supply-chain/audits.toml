@@ -43,7 +43,13 @@ delta = "0.1.83 -> 0.1.87"
 who = "gknopf-aranya <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.13.0 -> 1.16.2"
-notes = "Primarily security patches to fix reported CVEs."
+notes = "Security patches for 4 CVEs (RUSTSEC-2026-0045/46/47/48). Pointer safety refactoring (raw pointers to wrapper types). New Send/Sync impls for key types. New CMAC and post-quantum DSA modules. 3 unsafe FFI calls in src/lib.rs replaced with safe Rust (matched aws-lc-sys changes). No new networking or file operations in runtime code."
+
+[[audits.aws-lc-sys]]
+who = "gknopf-aranya <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.28.0 -> 0.39.0"
+notes = "Reviewed for aranya targets (x86_64-linux-gnu, aarch64-linux-gnu, aarch64-apple-darwin) with active features (prebuilt-nasm only, all-bindings OFF). src/lib.rs: 3 unsafe FFI calls replaced with safe Rust arithmetic, 1 unchanged (CRYPTO_library_init), BIO_get_mem_data gated behind inactive all-bindings feature. Platform bindings (3 files): verified bindgen 0.72.1 header, no hand-written code, no suspicious patterns. builder/: +6 unsafe (static mut config reads and env::set_var, build-time only, same pattern as existing), 1 new fs::copy in nasm_builder (build-time). No new process execution, no networking code. Prebuilt NASM objects (26 .obj files): reproduced from vendored asm source using nasm, binary diff shows only timestamp and path differences. AI-assisted scan of auto-generated code found no indicators of supply-chain compromise. Vendored C library (aws-lc/) covered by exemption."
 
 [[audits.backon]]
 who = "gknopf <gknopf@spideroak.com>"
