@@ -110,12 +110,13 @@ version = "1.0.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-rs]]
-version = "1.16.2"
+version = "1.13.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-sys]]
-version = "0.39.0"
+version = "0.28.0"
 criteria = "safe-to-deploy"
+notes = "Vendored C library (AWS-LC, fork of BoringSSL). Diffs between versions are typically 100K+ lines of auto-generated C/asm code, making full audit infeasible. Updating the exemption version is preferred over certifying the diff. The reviewable Rust code is limited to src/lib.rs (FFI bindings entry point) and builder/ (build scripts). Auto-generated files: aws-lc/ (vendored C), src/*_crypto.rs (per-platform bindings), generated-include/ (symbol headers), builder/prebuilt-nasm/ (asm objects)."
 
 [[exemptions.backon]]
 version = "1.2.0"
@@ -308,6 +309,7 @@ criteria = "safe-to-run"
 [[exemptions.find-msvc-tools]]
 version = "0.1.9"
 criteria = "safe-to-deploy"
+notes = "Build tool used by cc to find MSVC tools on Windows. Published by rust-lang/cc-rs."
 
 [[exemptions.fixedbitset]]
 version = "0.5.7"
