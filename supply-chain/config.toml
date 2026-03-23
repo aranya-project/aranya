@@ -116,7 +116,7 @@ criteria = "safe-to-deploy"
 [[exemptions.aws-lc-sys]]
 version = "0.28.0"
 criteria = "safe-to-deploy"
-notes = "Vendored C library (AWS-LC, fork of BoringSSL). Diffs between versions are typically 100K+ lines of auto-generated C/asm code, making full audit infeasible. Updating the exemption version is preferred over certifying the diff. The reviewable Rust code is limited to src/lib.rs (FFI bindings entry point) and builder/ (build scripts). Auto-generated files: aws-lc/ (vendored C), src/*_crypto.rs (per-platform bindings), generated-include/ (symbol headers), builder/prebuilt-nasm/ (asm objects)."
+notes = "Vendored C library (AWS-LC, fork of BoringSSL). Diffs between versions are typically 100K+ lines, mostly auto-generated C/asm code. When certifying a delta, focus review on: src/lib.rs (FFI bindings entry point) and builder/ (build scripts). Auto-generated files that can be skipped: aws-lc/ (vendored C), src/*_crypto.rs (per-platform bindings), generated-include/ (symbol headers), builder/prebuilt-nasm/ (asm objects). Note: malicious code could be hidden in auto-generated files — consider additional verification for high-risk updates."
 
 [[exemptions.backon]]
 version = "1.2.0"
