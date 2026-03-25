@@ -393,6 +393,7 @@ dependencies = [
  "test-log",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-stream",
  "tokio-util",
  "toml 0.9.4",
  "tracing",
@@ -413,6 +414,7 @@ dependencies = [
  "buggy",
  "bytes",
  "ciborium",
+ "derive-where",
  "futures-util",
  "postcard",
  "semver",
@@ -421,7 +423,9 @@ dependencies = [
  "test-log",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-stream",
  "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -4349,6 +4353,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e727b36a1a0e8b74c376ac2211e40c2c8af09fb4013c60d910495810f008e9b"
 dependencies = [
  "rustls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-stream"
+version = "0.1.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32da49809aab5c3bc678af03902d4ccddea2a87d028d86392a4b1560c6906c70"
+dependencies = [
+ "futures-core",
+ "pin-project-lite",
  "tokio",
 ]
 

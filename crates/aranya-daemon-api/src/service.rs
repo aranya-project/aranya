@@ -1,14 +1,21 @@
 use core::{error, fmt, hash::Hash, time::Duration};
-use std::{io, sync::Arc};
+use std::{
+    collections::HashMap,
+    io,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
-    dangerous::spideroak_crypto::hex::Hex,
+    dangerous::spideroak_crypto::{csprng::rand::RngCore, hex::Hex},
     default::{DefaultCipherSuite, DefaultEngine},
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    EncryptionPublicKey, Engine, Rng,
+    CipherSuite, EncryptionPublicKey, Engine, Rng,
 };
 use aranya_id::custom_id;
 pub use aranya_policy_text::{text, InvalidText, Text};
@@ -16,7 +23,8 @@ use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
-use tokio::{net::UnixStream, sync::Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
+use tracing::Instrument as _;
 
 pub mod afc;
 pub mod quic_sync;
@@ -25,6 +33,7 @@ pub mod quic_sync;
 pub use self::afc::*;
 pub use self::quic_sync::*;
 use super::crypto::txp;
+use crate::crypto::txp::ServerConn;
 
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
@@ -380,35 +389,240 @@ pub enum ClientError {
     WrongResponse,
 }
 
-/// RPC client wrapping an encrypted conection.
-#[derive(Debug, Clone)]
-pub struct DaemonApiClient {
-    conn: Arc<Mutex<ClientConn>>,
+/// Trace ID for correlating requests between the client and daemon.
+pub type TraceId = u64;
+
+/// Wrapper struct for API requests.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Envelope<T> {
+    /// Unique Request ID, for matching responses to the request.
+    pub id: u64,
+    /// Unique Trace ID, for tracking a request through the daemon.
+    pub trace_id: TraceId,
+    /// The actual payload.
+    pub body: T,
 }
 
-type ClientConn = txp::ClientConn<UnixStream, Rng, DefaultCipherSuite>;
+/// Wrapper struct for API respones.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Reply<T> {
+    /// Unique Request ID, for matching to requests.
+    pub id: u64,
+    /// Unique Trace ID, for tracking a request through the daemon.
+    pub trace_id: TraceId,
+    /// The actual payload.
+    pub body: T,
+}
+
+struct PendingRequest {
+    envelope: Envelope<DaemonApiRequest>,
+    reply_tx: oneshot::Sender<Reply<DaemonApiResponse>>,
+}
+
+/// RPC client wrapping an encrypted conection.
+#[derive(Clone)]
+pub struct DaemonApiClient {
+    tx: mpsc::UnboundedSender<PendingRequest>,
+    next_id: Arc<AtomicU64>,
+}
+
+type ClientConn = txp::ClientConn<DefaultCipherSuite, Rng>;
 
 impl DaemonApiClient {
     /// Creates a new `DaemonApiClient`.
     pub fn new(conn: ClientConn) -> Self {
-        Self {
-            conn: Arc::new(Mutex::new(conn)),
-        }
+        let (tx, rx) = mpsc::unbounded_channel();
+        let client = Self {
+            tx,
+            next_id: Arc::default(),
+        };
+
+        tokio::spawn(client_task(conn, rx));
+
+        client
     }
 
     /// Sends a request to the daemon and waits for a response.
     async fn call(&self, req: DaemonApiRequest) -> Result<DaemonApiResponse, ClientError> {
-        let mut conn = self.conn.lock().await;
-        conn.send(req).await?;
-        conn.recv()
-            .await
-            .map_err(ClientError::Transport)?
-            .ok_or_else(|| {
-                ClientError::Transport(io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "daemon closed connection",
-                ))
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let trace_id: TraceId = Rng::next_u64(&mut Rng);
+
+        tracing::info!(rpc.trace_id = trace_id, rpc.id = id, "RPC: SendRequest");
+
+        let (reply_tx, reply_rx) = oneshot::channel();
+
+        self.tx
+            .send(PendingRequest {
+                envelope: Envelope {
+                    id,
+                    trace_id,
+                    body: req,
+                },
+                reply_tx,
             })
+            .map_err(|_| {
+                ClientError::Transport(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "client background task gone",
+                ))
+            })?;
+
+        let resp = reply_rx.await.map_err(|_| {
+            ClientError::Transport(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "connection closed while awaiting response",
+            ))
+        })?;
+
+        Ok(resp.body)
+    }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    pub async fn test_trace_id(&self) -> Result<(TraceId, TraceId), ClientError> {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let trace_id: TraceId = Rng::next_u64(&mut Rng);
+
+        let (reply_tx, reply_rx) = oneshot::channel();
+
+        self.tx
+            .send(PendingRequest {
+                envelope: Envelope {
+                    id,
+                    trace_id,
+                    body: DaemonApiRequest::version {},
+                },
+                reply_tx,
+            })
+            .map_err(|_| {
+                ClientError::Transport(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "client background task gone",
+                ))
+            })?;
+
+        let resp = reply_rx.await.map_err(|_| {
+            ClientError::Transport(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "connection closed while awaiting response",
+            ))
+        })?;
+
+        Ok((trace_id, resp.trace_id))
+    }
+}
+
+impl fmt::Debug for DaemonApiClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DaemonApiClient")
+            .field("next_id", &self.next_id.load(Ordering::Relaxed))
+            .finish_non_exhaustive()
+    }
+}
+
+#[allow(clippy::disallowed_macros)]
+async fn client_task(conn: ClientConn, mut outgoing: mpsc::UnboundedReceiver<PendingRequest>) {
+    let (mut reader, writer) = conn.into_split();
+    let writer = Arc::new(Mutex::new(writer));
+    let pending = Arc::new(Mutex::new(HashMap::new()));
+
+    let writer_handle = {
+        let pending = Arc::clone(&pending);
+        let writer = Arc::clone(&writer);
+        tokio::spawn(async move {
+            while let Some(req) = outgoing.recv().await {
+                pending.lock().await.insert(req.envelope.id, req.reply_tx);
+
+                if writer.lock().await.send(req.envelope).await.is_err() {
+                    break;
+                }
+            }
+        })
+    };
+
+    let reader_handle = {
+        let pending = Arc::clone(&pending);
+        tokio::spawn(async move {
+            loop {
+                let reply: Reply<DaemonApiResponse> = match reader.recv().await {
+                    Ok(Some(r)) => r,
+                    Ok(None) => break,
+                    Err(error) => {
+                        tracing::warn!(%error, "client reader error");
+                        break;
+                    }
+                };
+
+                if let Some(tx) = pending.lock().await.remove(&reply.id) {
+                    let _ = tx.send(reply);
+                }
+            }
+
+            pending.lock().await.drain();
+        })
+    };
+
+    tokio::select! {
+        _ = writer_handle => {}
+        _ = reader_handle => {}
+    }
+}
+
+pub async fn serve_connection<CS, A>(conn: ServerConn<CS>, api: A, concurrent_reqs: usize)
+where
+    CS: CipherSuite + Send + 'static,
+    CS::Aead: Send,
+    A: DaemonApi + Clone + Send + Sync + 'static,
+    A::Error: Send,
+{
+    let (mut reader, writer) = conn.into_split();
+    let writer = Arc::new(Mutex::new(writer));
+    let sem = Arc::new(Semaphore::new(concurrent_reqs));
+
+    loop {
+        let Envelope {
+            id,
+            trace_id,
+            body: req,
+        }: Envelope<DaemonApiRequest> = match reader.recv().await {
+            Ok(Some(e)) => e,
+            Ok(None) => break,
+            Err(error) => {
+                tracing::warn!(%error, "recv error");
+                break;
+            }
+        };
+
+        let permit = match sem.clone().acquire_owned().await {
+            Ok(p) => p,
+            Err(_) => break,
+        };
+        let api = api.clone();
+        let writer = Arc::clone(&writer);
+
+        tokio::spawn(
+            async move {
+                tracing::info!("RPC: ReceiveRequest");
+
+                let resp = dispatch(&api, req).await;
+
+                let reply = Reply {
+                    id,
+                    trace_id,
+                    body: resp,
+                };
+
+                if let Err(error) = writer.lock().await.send(reply).await {
+                    tracing::warn!(%error, "send error");
+                }
+
+                drop(permit);
+            }
+            .instrument(tracing::info_span!(
+                "rpc",
+                rpc.trace_id = trace_id,
+                rpc.id = id,
+            )),
+        );
     }
 }
 
@@ -431,7 +645,6 @@ macro_rules! rpc {
         #[derive(Debug, Serialize, Deserialize)]
         #[allow(non_camel_case_types)]
         pub enum DaemonApiResponse {
-            UnknownRequest,
             $(
                 $(#[$meta])*
                 $name(Result<$ret>),
@@ -439,26 +652,27 @@ macro_rules! rpc {
         }
 
         /// The handler trait, needs to be implemented server-side.
-        #[allow(unused_variables, async_fn_in_trait)]
+        #[allow(async_fn_in_trait)]
         pub trait DaemonApi {
+            type Error: Into<Error>;
+
             $(
                 $(#[$meta])*
-                async fn $name(&self, $($arg: $ty),*) -> Result<$ret>;
+                fn $name(&self, $($arg: $ty),*) -> impl std::future::Future<Output = Result<$ret, Self::Error>> + std::marker::Send;
             )*
+        }
 
-            async fn dispatch(&self, req: DaemonApiRequest) -> DaemonApiResponse {
-                #[allow(unused_doc_comments)]
-                match req {
-                    $(
-                        $(#[$meta])*
-                        DaemonApiRequest::$name { $($arg),* } => {
-                            DaemonApiResponse::$name(self.$name($($arg),*).await)
-                        }
-                    )*
-                    // cfg'd-out variants need a catch-all
-                    #[allow(unreachable_patterns)]
-                    _ => DaemonApiResponse::UnknownRequest,
-                }
+        async fn dispatch(handler: &(impl DaemonApi + Sync), req: DaemonApiRequest) -> DaemonApiResponse {
+            #[allow(unused_doc_comments)]
+            match req {
+                $(
+                    $(#[$meta])*
+                    DaemonApiRequest::$name { $($arg),* } => {
+                        DaemonApiResponse::$name(
+                            handler.$name($($arg),*).await.map_err(Into::into)
+                        )
+                    }
+                )*
             }
         }
 

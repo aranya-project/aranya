@@ -20,7 +20,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self},
-    DaemonApi, Text, WrappedSeed,
+    serve_connection, DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -35,6 +35,7 @@ use tokio::{
     net::UnixListener,
     sync::{mpsc, Mutex},
 };
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::LengthDelimitedCodec;
 use tracing::{debug, error, info, instrument, trace, warn};
 
@@ -174,7 +175,7 @@ impl DaemonApiServer {
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
                     .new_codec();
-                let listener = txp::unix::UnixListenerStream::from(self.listener);
+                let listener = UnixListenerStream::new(self.listener);
                 txp::server(listener, codec, self.sk, info)
             };
             info!(path = ?self.uds_path, "listening");
@@ -182,7 +183,7 @@ impl DaemonApiServer {
             ready.notify();
 
             while let Some(conn) = server.accept().await {
-                let mut conn = match conn {
+                let conn = match conn {
                     Ok(conn) => conn,
                     Err(err) => {
                         warn!(error = %err.report(), "accept error");
@@ -190,23 +191,7 @@ impl DaemonApiServer {
                     }
                 };
                 let api = self.api.clone();
-                s.spawn(async move {
-                    loop {
-                        let req = match conn.recv().await {
-                            Ok(Some(req)) => req,
-                            Ok(None) => break, // client disconnected
-                            Err(err) => {
-                                warn!(error = %err.report(), "channel failure");
-                                break;
-                            }
-                        };
-                        let resp = api.dispatch(req).await;
-                        if let Err(err) = conn.send(resp).await {
-                            warn!(error = %err.report(), "send error");
-                            break;
-                        }
-                    }
-                });
+                s.spawn(serve_connection(conn, api, 10));
             }
         })
         .await;
@@ -419,6 +404,7 @@ impl Api {
 }
 
 impl DaemonApi for Api {
+    type Error = api::Error;
     //
     // Misc
     //

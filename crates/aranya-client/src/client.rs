@@ -221,6 +221,15 @@ impl Client {
             .map(DeviceId::from_api)
     }
 
+    /// Verifies trace ID propagation by making a version request
+    /// and checking the envelope round-trip.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub async fn test_trace_id(
+        &self,
+    ) -> Result<(aranya_daemon_api::TraceId, aranya_daemon_api::TraceId)> {
+        self.daemon.test_trace_id().await.map_err(aranya_error)
+    }
+
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
