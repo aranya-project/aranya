@@ -68,10 +68,6 @@ tracing-subscriber = { workspace = true, features = ["json"] }
 
 
 [[test]]
-name = "tests"
-path = "tests/tests.rs"
-
-[[test]]
 name = "ring_convergence"
 path = "tests/ring_convergence.rs"
 
