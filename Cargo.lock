@@ -378,6 +378,7 @@ dependencies = [
  "aranya-policy-vm",
  "aranya-runtime",
  "aranya-util",
+ "async-trait",
  "buggy",
  "bytes",
  "ciborium",

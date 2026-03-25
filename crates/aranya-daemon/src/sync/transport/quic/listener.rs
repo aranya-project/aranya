@@ -183,8 +183,8 @@ impl QuicListener {
     }
 }
 
+#[async_trait::async_trait]
 impl SyncListener for QuicListener {
-    type Error = Error;
     type Stream = QuicStream;
 
     fn local_addr(&self) -> Addr {
@@ -195,7 +195,7 @@ impl SyncListener for QuicListener {
         clippy::disallowed_macros,
         reason = "tokio::select! uses core::unreachable"
     )]
-    async fn accept(&mut self) -> Option<Result<Self::Stream, Self::Error>> {
+    async fn accept(&mut self) -> Option<Self::Stream> {
         loop {
             tokio::select! {
                 Some(result) = self.pending_accepts.join_next() => {
@@ -203,7 +203,7 @@ impl SyncListener for QuicListener {
                         Ok((peer, acceptor, Some(stream))) => {
                             debug!(?peer, "accepted stream, re-queueing acceptor");
                             self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
-                            return Some(Ok(QuicStream::new(peer, stream)));
+                            return Some(QuicStream::new(peer, stream));
                         }
                         Ok((peer, _acceptor, None)) => {
                             debug!(?peer, "stream acceptor completed with no stream");

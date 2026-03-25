@@ -52,13 +52,17 @@ pub(crate) enum Error {
     #[error("the sync manager has shut down")]
     SyncerShutdown,
 
+    /// The server received an invalid/unexpected request.
+    #[error("received an invalid request")]
+    InvalidRequest,
+
+    /// The server told us that an error occurred while processing a request.
+    #[error("the server indicated a sync error")]
+    Response(String),
+
     /// Encountered a bug in the program.
     #[error(transparent)]
     Bug(#[from] buggy::Bug),
-
-    /// Something has gone wrong.
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
 }
 
 // Implements this error type to allow it being sent over RPC.
@@ -83,14 +87,10 @@ impl Error {
 
     /// Returns whether a `ParallelFinalize` error occurred, which needs to be resolved manually.
     fn is_parallel_finalize(&self) -> bool {
-        use aranya_runtime::ClientError;
-        debug_assert!(
-            !matches!(self, Self::Other(err) if err
-            .downcast_ref::<ClientError>()
-            .is_some_and(|e| matches!(e, ClientError::ParallelFinalize))),
-            "ParallelFinalize should not be wrapped in Other"
-        );
-        matches!(self, Self::AranyaClient(ClientError::ParallelFinalize))
+        matches!(
+            self,
+            Self::AranyaClient(aranya_runtime::ClientError::ParallelFinalize)
+        )
     }
 }
 

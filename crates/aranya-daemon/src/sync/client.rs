@@ -283,7 +283,7 @@ where
             SyncResponse::Ok(data) => data,
             SyncResponse::Err(msg) => {
                 error!(?peer, %msg, "peer returned sync error");
-                return Err(anyhow::anyhow!("sync error: {msg}").into());
+                return Err(Error::Response(msg));
             }
         };
 
@@ -294,6 +294,7 @@ where
             .await?;
 
         // Send all processed effects to the Daemon API.
+        // TODO(nikki): is there a better way to handle this?
         let effects = sink
             .collect()
             .map_err(|e| Error::EffectsSink(Box::new(e)))?;

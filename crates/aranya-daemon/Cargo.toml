@@ -51,6 +51,7 @@ buggy = { workspace = true }
 
 
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }

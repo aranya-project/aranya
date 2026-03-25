@@ -69,6 +69,7 @@ type TestSyncer = sync::SyncManager<QuicConnector, crate::PS, crate::SP, crate::
 struct TestDevice {
     /// Aranya sync client.
     syncer: TestSyncer,
+    buffer: Box<[u8]>,
     /// The Aranya graph ID.
     graph_id: GraphId,
     /// The address that the sync server is listening on.
@@ -88,10 +89,12 @@ impl TestDevice {
         pk: PublicKeys<DefaultCipherSuite>,
         effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
     ) -> Result<Self> {
+        let buffer = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
         let sync_local_addr = server.local_addr();
         let handle = task::spawn(server.serve(ready::Waiter::new(1).notifier())).abort_handle();
         Ok(Self {
             syncer,
+            buffer,
             graph_id,
             sync_local_addr,
             handle,
@@ -112,13 +115,12 @@ impl TestDevice {
         device: &TestDevice,
         must_receive: Option<usize>,
     ) -> Result<Vec<Effect>> {
-        let mut buffer = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
         let cmd_count = self
             .syncer
             .client
             .sync(
                 SyncPeer::new(device.sync_local_addr, self.graph_id),
-                &mut buffer,
+                &mut self.buffer,
             )
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;

@@ -42,8 +42,8 @@ pub(crate) enum SyncResponse {
 }
 
 /// Storage for a subscription to hello messages.
-#[derive(Debug, Clone)]
 #[cfg(feature = "preview")]
+#[derive(Debug, Clone)]
 pub(crate) struct HelloSubscription {
     /// Rate limiting on how often to notify when a graph changes.
     pub(super) graph_change_debounce: Duration,

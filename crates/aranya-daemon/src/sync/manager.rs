@@ -15,8 +15,6 @@ use std::collections::HashMap;
 #[cfg(feature = "preview")]
 use std::time::Duration;
 
-#[cfg(feature = "preview")]
-use anyhow::Context as _;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
@@ -145,10 +143,10 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
             schedule_delay,
             last_notified: Instant::now()
                 .checked_sub(graph_change_debounce)
-                .context("subscription notify overflow")?,
+                .assume("valid debounce received")?,
             expires_at: Instant::now()
                 .checked_add(duration)
-                .context("subscription expiry overflow")?,
+                .assume("valid duration received")?,
             queue_key,
         };
 
@@ -374,7 +372,7 @@ where
             // Check if the subscription will expire before our next scheduled sync.
             if Instant::now()
                 .checked_add(sub.schedule_delay)
-                .context("subscription expiry overflow")?
+                .assume("valid schedule delay")?
                 < sub.expires_at
             {
                 sub.queue_key = self

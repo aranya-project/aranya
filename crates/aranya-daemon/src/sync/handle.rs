@@ -113,12 +113,6 @@ pub(crate) struct SyncHandle {
 }
 
 impl SyncHandle {
-    /// Creates a new [`SyncHandle`] for sending messages.
-    #[allow(unused)]
-    pub(crate) const fn new(sender: mpsc::Sender<Callback>) -> Self {
-        Self { sender }
-    }
-
     /// Creates a new mpsc channel and [`SyncHandle`] for sending messages.
     pub(crate) fn channel(buffer: usize) -> (Self, mpsc::Receiver<Callback>) {
         let (tx, rx) = mpsc::channel(buffer);

@@ -15,6 +15,7 @@ pub(crate) mod quic;
 /// the transport does not provide that natively.
 ///
 /// [`SyncManager`]: super::SyncManager
+#[async_trait::async_trait]
 pub(crate) trait SyncStream: Send + Sync + 'static {
     /// The specific error type this stream uses.
     type Error: std::error::Error + Send + Sync + 'static;
@@ -43,6 +44,7 @@ pub(crate) trait SyncStream: Send + Sync + 'static {
 ///
 /// [`SyncManager`]: super::SyncManager
 /// [`connect`]: Self::connect
+#[async_trait::async_trait]
 pub(crate) trait SyncConnector: Send + Sync + 'static {
     /// The specific error type this stream uses.
     type Error: std::error::Error + Send + Sync + 'static;
@@ -59,11 +61,10 @@ pub(crate) trait SyncConnector: Send + Sync + 'static {
 /// listener and handles the protocol; implementations only need to yield connected streams.
 ///
 /// [`SyncServer`]: super::SyncServer
+#[async_trait::async_trait]
 pub(crate) trait SyncListener: Send + Sync + 'static {
-    /// The specific error type this stream uses.
-    type Error: std::error::Error + Send + Sync + 'static;
     /// The stream type returned from accepting a connection.
-    type Stream: SyncStream<Error = Self::Error>;
+    type Stream: SyncStream;
 
     /// The local address the listener/server is bound to.
     fn local_addr(&self) -> super::Addr;
@@ -74,5 +75,5 @@ pub(crate) trait SyncListener: Send + Sync + 'static {
     /// - `Some(Ok(stream))` - a new stream was accepted successfully.
     /// - `Some(Err(e))` - a single accept failed, but the listener can still be polled.
     /// - `None` - the listener has shut down and won't yield any more connections.
-    async fn accept(&mut self) -> Option<Result<Self::Stream, Self::Error>>;
+    async fn accept(&mut self) -> Option<Self::Stream>;
 }

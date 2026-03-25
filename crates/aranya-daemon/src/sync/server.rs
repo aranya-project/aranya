@@ -16,6 +16,7 @@ use aranya_runtime::{
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::{bug, BugExt as _};
 use derive_where::derive_where;
+use tokio::task::JoinSet;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(doc)]
@@ -36,11 +37,8 @@ pub(crate) struct SyncServer<SL, PS, SP> {
     /// The listener that yields incoming streams.
     listener: SL,
     /// Handle to allow sending messages to the [`SyncManager`].
-    #[allow(dead_code, reason = "only used in preview right now")]
+    #[cfg_attr(not(feature = "preview"), expect(dead_code))]
     handle: SyncHandle,
-    /// Used for traversing the graph.
-    #[derive_where(skip(Debug))]
-    traversal: TraversalBuffers,
 }
 
 impl<SL, PS, SP> SyncServer<SL, PS, SP>
@@ -55,7 +53,6 @@ where
             client,
             listener,
             handle,
-            traversal: TraversalBuffers::new(),
         }
     }
 
@@ -71,16 +68,35 @@ where
         info!("sync server listening for incoming connections");
         ready.notify();
 
-        while let Some(stream_result) = self.listener.accept().await {
-            match stream_result {
-                Ok(stream) => {
-                    let peer = stream.peer();
-                    trace!(?peer, "accepted stream");
-                    if let Err(e) = self.handle_stream(stream).await {
-                        warn!(?peer, error = %e.report(), "error handling sync request");
+        let mut tasks = JoinSet::new();
+        loop {
+            tokio::select! {
+                biased;
+                Some(result) = tasks.join_next(), if !tasks.is_empty() => {
+                    if let Err(error) = result {
+                        error!(%error, "stream handler panicked");
                     }
                 }
-                Err(error) => warn!(%error, "error accepting stream"),
+
+                Some(stream) = self.listener.accept() => {
+                    let peer = stream.peer();
+                    trace!(?peer, "accepted stream");
+                    let client = self.client.clone();
+                    let handle = self.handle.clone();
+                    tasks.spawn(async move {
+                        if let Err(e) = Self::handle_stream(client, handle, stream).await {
+                            warn!(?peer, error = %e.report(), "error handling sync request");
+                        }
+                    });
+                }
+
+                else => break,
+            }
+        }
+
+        while let Some(result) = tasks.join_next().await {
+            if let Err(error) = result {
+                error!(%error, "stream handler panicked during shutdown");
             }
         }
 
@@ -89,7 +105,11 @@ where
 
     /// Handles an incoming connection, reading data from the peer and responding as needed.
     #[instrument(skip_all, fields(peer = %stream.peer().addr, graph = %stream.peer().graph_id))]
-    async fn handle_stream<S: SyncStream>(&mut self, mut stream: S) -> Result<(), Error> {
+    async fn handle_stream<S: SyncStream>(
+        client: Client<PS, SP>,
+        handle: SyncHandle,
+        mut stream: S,
+    ) -> Result<(), Error> {
         trace!("received sync request");
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
@@ -103,10 +123,7 @@ where
 
         let response = match sync_type {
             SyncType::Poll { request } => {
-                match self
-                    .process_poll_request(stream.peer(), request, &mut buf)
-                    .await
-                {
+                match Self::process_poll_request(&client, stream.peer(), request, &mut buf).await {
                     Ok(len) => {
                         debug!(response_bytes = len, "poll request succeeded");
                         SyncResponse::Ok(buf.get(..len).assume("valid offset")?.into())
@@ -125,7 +142,7 @@ where
                 }
                 #[cfg(feature = "preview")]
                 {
-                    match self.process_hello_request(stream.peer(), hello_msg).await {
+                    match Self::process_hello_request(&handle, stream.peer(), hello_msg).await {
                         Ok(()) => {
                             debug!("hello request succeeded");
                             SyncResponse::Ok(Box::new([]))
@@ -152,7 +169,7 @@ where
 
     /// Processes a poll request, generating a response with a sampling of commands.
     async fn process_poll_request(
-        &mut self,
+        client: &Client<PS, SP>,
         peer: SyncPeer,
         request: SyncRequestMessage,
         buf: &mut [u8],
@@ -164,11 +181,11 @@ where
                 let mut resp = SyncResponder::new();
                 resp.receive(request)?;
 
-                let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+                let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
                 let cache = caches.entry(peer).or_default();
 
                 let len = resp
-                    .poll(buf, aranya.provider(), cache, &mut self.traversal)
+                    .poll(buf, aranya.provider(), cache, &mut TraversalBuffers::new())
                     .or_else(|err| {
                         if matches!(
                             err,
@@ -190,9 +207,7 @@ where
                     variant = ?std::mem::discriminant(&other),
                     "received an unexpected SyncRequestMessage variant"
                 );
-                Err(Error::Other(anyhow::anyhow!(
-                    "received an unexpected SyncRequestMessage variant"
-                )))
+                Err(Error::InvalidRequest)
             }
         }
     }
@@ -200,7 +215,7 @@ where
     /// Processes a hello request, dispatching an internal message to the [`SyncManager`].
     #[cfg(feature = "preview")]
     pub(super) async fn process_hello_request(
-        &self,
+        handle: &SyncHandle,
         peer: SyncPeer,
         hello_msg: SyncHelloType,
     ) -> Result<(), Error> {
@@ -212,17 +227,17 @@ where
                 graph_id,
             } => {
                 peer.check_request(graph_id)?;
-                self.handle
+                handle
                     .hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
                     .await?;
             }
             SyncHelloType::Unsubscribe { graph_id } => {
                 peer.check_request(graph_id)?;
-                self.handle.hello_unsubscribe_request(peer).await?;
+                handle.hello_unsubscribe_request(peer).await?;
             }
             SyncHelloType::Hello { head, graph_id } => {
                 peer.check_request(graph_id)?;
-                self.handle.sync_on_hello(peer, head).await?;
+                handle.sync_on_hello(peer, head).await?;
             }
         }
 
