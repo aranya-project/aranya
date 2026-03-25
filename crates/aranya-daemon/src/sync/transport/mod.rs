@@ -1,6 +1,8 @@
 //! This module contains all generic syncer transport traits, as well as any transport-specific
 //! syncer implementations.
 
+use std::future::Future;
+
 pub(crate) mod quic;
 
 /// A reliable, ordered, bidirectional stream of messages tied to a specific peer.
@@ -15,7 +17,6 @@ pub(crate) mod quic;
 /// the transport does not provide that natively.
 ///
 /// [`SyncManager`]: super::SyncManager
-#[async_trait::async_trait]
 pub(crate) trait SyncStream: Send + Sync + 'static {
     /// The specific error type this stream uses.
     type Error: std::error::Error + Send + Sync + 'static;
@@ -24,16 +25,19 @@ pub(crate) trait SyncStream: Send + Sync + 'static {
     fn peer(&self) -> super::SyncPeer;
 
     /// Sends a message to the peer.
-    async fn send(&mut self, data: &[u8]) -> Result<(), Self::Error>;
+    fn send(&mut self, data: &[u8]) -> impl Future<Output = Result<(), Self::Error>> + Send;
     /// Receives a message from the peer, returning the number of bytes written. The caller
     /// allocates a fixed-size buffer, and if the received message is too large, the implementation
     /// is expected to throw an error.
-    async fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, Self::Error>;
+    fn receive(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> impl Future<Output = Result<usize, Self::Error>> + Send;
     /// Signals that no more data will be sent on this stream.
     ///
     /// For transports that support half-close (e.g. QUIC, TCP), this notifies the remote peer that
     /// sending is complete. Transports without half-close can implement this as a no-op.
-    async fn finish(&mut self) -> Result<(), Self::Error>;
+    fn finish(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 /// Opens outbound connections to sync peers.
@@ -44,7 +48,6 @@ pub(crate) trait SyncStream: Send + Sync + 'static {
 ///
 /// [`SyncManager`]: super::SyncManager
 /// [`connect`]: Self::connect
-#[async_trait::async_trait]
 pub(crate) trait SyncConnector: Send + Sync + 'static {
     /// The specific error type this stream uses.
     type Error: std::error::Error + Send + Sync + 'static;
@@ -61,7 +64,6 @@ pub(crate) trait SyncConnector: Send + Sync + 'static {
 /// listener and handles the protocol; implementations only need to yield connected streams.
 ///
 /// [`SyncServer`]: super::SyncServer
-#[async_trait::async_trait]
 pub(crate) trait SyncListener: Send + Sync + 'static {
     /// The stream type returned from accepting a connection.
     type Stream: SyncStream;

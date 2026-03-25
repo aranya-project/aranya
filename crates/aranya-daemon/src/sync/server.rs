@@ -16,11 +16,8 @@ use aranya_runtime::{
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::{bug, BugExt as _};
 use derive_where::derive_where;
-use tokio::task::JoinSet;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(doc)]
-use super::SyncManager;
 use super::{
     transport::{SyncListener, SyncStream},
     Addr, Error, SyncHandle, SyncPeer,
@@ -29,14 +26,15 @@ use crate::{aranya::Client, sync::SyncResponse};
 
 /// Handles listening for connections from peers and responding to them.
 ///
-/// Uses a [`SyncHandle`] to offload hello sync scheduling and operations to the [`SyncManager`].
+/// Uses a [`SyncHandle`] to offload hello sync scheduling and operations to the
+/// [`SyncManager`](super::SyncManager).
 #[derive_where(Debug; SL)]
 pub(crate) struct SyncServer<SL, PS, SP> {
     /// The Aranya client and peer cache, alongside invalid graph tracking.
     client: Client<PS, SP>,
     /// The listener that yields incoming streams.
     listener: SL,
-    /// Handle to allow sending messages to the [`SyncManager`].
+    /// Handle to allow sending messages to the manager.
     handle: SyncHandle,
 }
 
@@ -67,37 +65,20 @@ where
         info!("sync server listening for incoming connections");
         ready.notify();
 
-        let mut tasks = JoinSet::new();
-        loop {
-            tokio::select! {
-                biased;
-                Some(result) = tasks.join_next(), if !tasks.is_empty() => {
-                    if let Err(error) = result {
-                        error!(%error, "stream handler panicked");
+        aranya_util::task::scope(async |s| {
+            while let Some(stream) = self.listener.accept().await {
+                let peer = stream.peer();
+                trace!(?peer, "accepted stream");
+                let client = self.client.clone();
+                let handle = self.handle.clone();
+                s.spawn(async move {
+                    if let Err(e) = Self::handle_stream(client, handle, stream).await {
+                        warn!(?peer, error = %e.report(), "error handling sync request");
                     }
-                }
-
-                Some(stream) = self.listener.accept() => {
-                    let peer = stream.peer();
-                    trace!(?peer, "accepted stream");
-                    let client = self.client.clone();
-                    let handle = self.handle.clone();
-                    tasks.spawn(async move {
-                        if let Err(e) = Self::handle_stream(client, handle, stream).await {
-                            warn!(?peer, error = %e.report(), "error handling sync request");
-                        }
-                    });
-                }
-
-                else => break,
+                });
             }
-        }
-
-        while let Some(result) = tasks.join_next().await {
-            if let Err(error) = result {
-                error!(%error, "stream handler panicked during shutdown");
-            }
-        }
+        })
+        .await;
 
         error!("sync server terminated");
     }
@@ -212,7 +193,8 @@ where
         }
     }
 
-    /// Processes a hello request, dispatching an internal message to the [`SyncManager`].
+    /// Processes a hello request, dispatching an internal message to the
+    /// [`SyncManager`](super::SyncManager).
     #[cfg(feature = "preview")]
     pub(super) async fn process_hello_request(
         handle: &SyncHandle,

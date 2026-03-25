@@ -17,14 +17,12 @@ use tracing::trace;
 
 #[cfg(feature = "preview")]
 use super::GraphId;
-#[cfg(doc)]
-use super::SyncManager;
 use super::{Error, Result, SyncPeer};
 
-/// Holds all possible messages that the [`SyncManager`] can process.
+/// Holds all possible messages that the [`SyncManager`](super::SyncManager) can process.
 #[derive(Clone, Debug)]
 pub(crate) enum ManagerMessage {
-    /// Add a peer to the [`SyncManager`]'s schedule.
+    /// Add a peer to the `SyncManager`'s schedule.
     AddPeer {
         /// The unique [`SyncPeer`] to send a message to.
         peer: SyncPeer,
@@ -32,7 +30,7 @@ pub(crate) enum ManagerMessage {
         cfg: SyncPeerConfig,
     },
 
-    /// Remove a peer from the [`SyncManager`]'s schedule.
+    /// Remove a peer from the `SyncManager`'s schedule.
     RemovePeer {
         /// The unique [`SyncPeer`] to send a message to.
         peer: SyncPeer,
@@ -106,7 +104,7 @@ pub(crate) enum ManagerMessage {
     },
 }
 
-/// Send messages to the [`SyncManager`] via an mpsc channel.
+/// Send messages to the [`SyncManager`](super::SyncManager) via an mpsc channel.
 #[derive(Clone, Debug)]
 pub(crate) struct SyncHandle {
     sender: mpsc::Sender<Callback>,
@@ -119,12 +117,12 @@ impl SyncHandle {
         (Self { sender: tx }, rx)
     }
 
-    /// Add a peer to the [`SyncManager`]'s schedule.
+    /// Add a peer to the `SyncManager`'s schedule.
     pub(crate) async fn add_peer(&self, peer: SyncPeer, cfg: SyncPeerConfig) -> Response {
         self.send(ManagerMessage::AddPeer { peer, cfg }).await
     }
 
-    /// Remove a peer from the [`SyncManager`]'s schedule.
+    /// Remove a peer from the `SyncManager`'s schedule.
     pub(crate) async fn remove_peer(&self, peer: SyncPeer) -> Response {
         self.send(ManagerMessage::RemovePeer { peer }).await
     }
@@ -165,7 +163,7 @@ impl SyncHandle {
             .await
     }
 
-    /// Tell the [`SyncManager`] to add this peer to their subscriptions.
+    /// Tell the `SyncManager` to add this peer to their subscriptions.
     #[cfg(feature = "preview")]
     pub(super) async fn hello_subscribe_request(
         &self,
@@ -183,7 +181,7 @@ impl SyncHandle {
         .await
     }
 
-    /// Tell the [`SyncManager`] to remove this peer from their subscriptions.
+    /// Tell the `SyncManager` to remove this peer from their subscriptions.
     #[cfg(feature = "preview")]
     pub(super) async fn hello_unsubscribe_request(&self, peer: SyncPeer) -> Response {
         self.send(ManagerMessage::HelloUnsubscribeRequest { peer })

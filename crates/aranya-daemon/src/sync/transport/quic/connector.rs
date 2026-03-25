@@ -70,7 +70,6 @@ impl QuicConnector {
     }
 }
 
-#[async_trait::async_trait]
 impl SyncConnector for QuicConnector {
     type Error = Error;
     type Stream = QuicStream;

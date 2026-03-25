@@ -31,8 +31,6 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "preview")]
 use super::GraphId;
-#[cfg(doc)]
-use super::SyncHandle;
 use super::{
     handle::{Callback, ManagerMessage},
     Result, SyncClient, SyncPeer,
@@ -52,13 +50,13 @@ pub(super) enum ScheduledTask {
 
 /// Manages sync scheduling and sending/receiving data on a transport.
 ///
-/// Uses a [`DelayQueue`] to handle scheduling sync tasks, and uses [`SyncHandle`] to receive
-/// requests from the server and any clients.
+/// Uses a [`DelayQueue`] to handle scheduling sync tasks, and uses
+/// [`SyncHandle`](super::SyncHandle) to receive requests from the server and any clients.
 #[derive_where(Debug; C)]
 pub(crate) struct SyncManager<C, PS, SP, EF> {
     pub(crate) client: SyncClient<C, PS, SP, EF>,
 
-    /// Receives requests from the [`SyncHandle`].
+    /// Receives requests from the `SyncHandle`.
     pub(super) recv: mpsc::Receiver<Callback>,
 
     /// Sync peer lookup info, used for storing configuration and delay queue info.
@@ -216,7 +214,8 @@ where
     EF: Send + Sync + 'static + TryFrom<PS::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,
 {
-    /// Runs the [`SyncManager`], processing [`SyncHandle`] requests and scheduled tasks.
+    /// Runs the [`SyncManager`], processing [`SyncHandle`](super::SyncHandle) requests and
+    /// scheduled tasks.
     pub(crate) async fn run(mut self, ready: ready::Notifier) {
         info!("sync manager starting");
         ready.notify();
@@ -234,12 +233,12 @@ where
         }
     }
 
-    /// Handles either a [`SyncHandle`] request or a scheduled task.
+    /// Handles either a [`SyncHandle`](super::SyncHandle) request or a scheduled task.
     async fn next(&mut self, buffer: &mut [u8]) -> Result<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
-            // Received a message from the [`SyncHandle`], handle it.
+            // Received a message from the SyncHandle, handle it.
             msg = self.recv.recv() => {
                 match msg {
                     Some((msg, tx)) => {

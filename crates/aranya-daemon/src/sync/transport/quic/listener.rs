@@ -17,14 +17,10 @@ use s2n_quic::{
     stream::BidirectionalStream,
 };
 use tokio::{task::JoinSet, time::Duration};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 
-#[cfg(doc)]
-use super::QuicConnector;
 use super::{connections::ListenerPool, Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
 use crate::sync::{Addr, GraphId, SyncPeer};
-
-type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
 
 /// The amount of time we wait trying to accept a bidirectional stream from the peer connecting to
 /// us before we time out (they may be really really slow, or busy doing other things).
@@ -34,6 +30,15 @@ const PENDING_ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
 /// to send the port they want) before we time out.
 const RESOLVE_PEER_ADDR_TIMEOUT: Duration = Duration::from_secs(5);
 
+enum AcceptResult {
+    /// Got a stream, acceptor is still live.
+    Stream(SyncPeer, StreamAcceptor, BidirectionalStream),
+    /// Transient error or timeout, acceptor is still live.
+    Retry(SyncPeer, StreamAcceptor),
+    /// Acceptor returned None, connection is finished.
+    Done(SyncPeer),
+}
+
 #[derive(Debug)]
 pub(crate) struct QuicListener {
     /// The local address of the server, since it should be infallible.
@@ -42,7 +47,7 @@ pub(crate) struct QuicListener {
     server: s2n_quic::Server,
     /// Allows authenticating the identity of a given `GraphId`.
     server_keys: Arc<PskStore>,
-    /// Receiver to register new connections from the [`QuicConnector`].
+    /// Receiver to register new connections from the [`QuicConnector`](super::QuicConnector).
     pool: ListenerPool,
     /// Queue to allow awaiting a number of potential streams concurrently until one resolves.
     pending_accepts: JoinSet<AcceptResult>,
@@ -101,21 +106,29 @@ impl QuicListener {
     async fn accept_pending_stream(peer: SyncPeer, mut acceptor: StreamAcceptor) -> AcceptResult {
         trace!(?peer, "waiting for bidirectional stream");
 
-        let stream = tokio::time::timeout(
+        match tokio::time::timeout(
             PENDING_ACCEPT_TIMEOUT,
             acceptor.accept_bidirectional_stream(),
         )
         .await
-        .ok()
-        .and_then(|r| r.ok().flatten());
-
-        if stream.is_some() {
-            debug!(?peer, "accepted bidirectional stream");
-        } else {
-            debug!(?peer, "stream accept returned None or timed out");
+        {
+            Ok(Ok(Some(stream))) => {
+                debug!(?peer, "accepted bidirectional stream");
+                AcceptResult::Stream(peer, acceptor, stream)
+            }
+            Ok(Ok(None)) => {
+                debug!(?peer, "acceptor returned None, connection finished");
+                AcceptResult::Done(peer)
+            }
+            Ok(Err(error)) => {
+                warn!(?peer, %error, "error accepting bidirectional stream");
+                AcceptResult::Retry(peer, acceptor)
+            }
+            Err(_) => {
+                warn!(?peer, "timed out waiting for bidirectional stream");
+                AcceptResult::Retry(peer, acceptor)
+            }
         }
-
-        (peer, acceptor, stream)
     }
 
     /// Sets up the connection with a keep alive, constructs and validates a [`SyncPeer`], and
@@ -183,7 +196,6 @@ impl QuicListener {
     }
 }
 
-#[async_trait::async_trait]
 impl SyncListener for QuicListener {
     type Stream = QuicStream;
 
@@ -200,13 +212,16 @@ impl SyncListener for QuicListener {
             tokio::select! {
                 Some(result) = self.pending_accepts.join_next() => {
                     match result {
-                        Ok((peer, acceptor, Some(stream))) => {
+                        Ok(AcceptResult::Stream(peer, acceptor, stream)) => {
                             debug!(?peer, "accepted stream, re-queueing acceptor");
                             self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                             return Some(QuicStream::new(peer, stream));
                         }
-                        Ok((peer, _acceptor, None)) => {
-                            debug!(?peer, "stream acceptor completed with no stream");
+                        Ok(AcceptResult::Retry(peer, acceptor)) => {
+                            self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
+                        }
+                        Ok(AcceptResult::Done(peer)) => {
+                            debug!(?peer, "connection finished, dropping acceptor");
                         }
                         Err(error) => error!(%error, "stream acceptor task panicked"),
                     }

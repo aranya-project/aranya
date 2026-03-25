@@ -22,7 +22,6 @@ impl QuicStream {
     }
 }
 
-#[async_trait::async_trait]
 impl SyncStream for QuicStream {
     type Error = Error;
 
