@@ -414,7 +414,6 @@ dependencies = [
  "buggy",
  "bytes",
  "ciborium",
- "derive-where",
  "futures-util",
  "postcard",
  "semver",
