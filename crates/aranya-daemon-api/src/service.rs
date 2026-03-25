@@ -495,6 +495,11 @@ pub trait DaemonApi {
     /// Queries the rank of an object.
     async fn query_rank(team: TeamId, object_id: ObjectId) -> Result<Rank>;
 
+    /// Queries the generation counter for a device.
+    #[cfg(feature = "test-utils")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "test-utils")))]
+    async fn query_device_generation(team: TeamId, device_id: DeviceId) -> Result<Option<i64>>;
+
     //
     // Role assignment
     //
