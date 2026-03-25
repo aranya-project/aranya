@@ -3,7 +3,7 @@
 
 pub(crate) mod quic;
 
-/// A reliable, ordered, bidirectional byte stream tied to a specific peer.
+/// A reliable, ordered, bidirectional stream of messages tied to a specific peer.
 ///
 /// A single stream can be used for an entire sync request/response handshake, dictated by the two
 /// peers' [`SyncManager`].
