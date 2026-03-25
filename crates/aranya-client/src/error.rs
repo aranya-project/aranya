@@ -3,7 +3,6 @@
 use std::io;
 
 use aranya_daemon_api as api;
-use tarpc::client::RpcError;
 
 #[cfg(feature = "afc")]
 use crate::afc::Error as AfcError;
@@ -71,8 +70,16 @@ pub struct AranyaError {
     err: api::Error,
 }
 
-pub(crate) fn aranya_error(err: api::Error) -> Error {
-    Error::Aranya(err.into())
+pub(crate) fn aranya_error(err: api::ClientError) -> Error {
+    match err {
+        api::ClientError::Transport(io_err) => IpcError::new(io_err).into(),
+        api::ClientError::Api(api_err) => Error::Aranya(AranyaError { err: api_err }),
+        api::ClientError::WrongResponse => IpcError::new(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "unexpected response from daemon",
+        ))
+        .into(),
+    }
 }
 
 /// Possible errors that could happen when creating configuration info.
@@ -117,6 +124,5 @@ impl IpcError {
 pub(crate) enum IpcRepr {
     InvalidArg(#[from] InvalidArg),
     Io(#[from] io::Error),
-    Tarpc(#[from] RpcError),
     Other(#[from] anyhow::Error),
 }

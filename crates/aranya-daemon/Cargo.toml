@@ -59,7 +59,6 @@ futures-util = { workspace = true }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }
-tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
@@ -70,6 +69,7 @@ tokio = { workspace = true, features = [
     "sync",
     "time",
 ] }
+tokio-stream = { workspace = true, features = ["net"] }
 tokio-util = { workspace = true, features = ["time"] }
 toml = { workspace = true }
 tracing = { workspace = true }

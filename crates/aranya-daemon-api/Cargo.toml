@@ -18,6 +18,8 @@ default = ["afc"]
 
 # Preview features
 preview = []
+# Test-only utilities
+test-utils = []
 # Aranya Fast Channels
 afc = ["dep:aranya-fast-channels"]
 
@@ -38,12 +40,13 @@ anyhow = { workspace = true }
 bytes = { workspace = true, features = ["serde"] }
 ciborium = { workspace = true }
 futures-util = { workspace = true }
-pin-project = { version = "1.1" }
+postcard = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
-tarpc = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
-tokio-serde = { version = "0.9", features = ["messagepack"] }
+tokio-util = { workspace = true, features = ["codec"] }
+tracing = { workspace = true }
 
 
 [dev-dependencies]
@@ -52,6 +55,7 @@ postcard = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+tokio-stream = { workspace = true, features = ["net"] }
 
 
 [package.metadata.cargo-all-features]
