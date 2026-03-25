@@ -8,13 +8,7 @@
     rust_2018_idioms
 )]
 
-use std::{
-    collections::HashMap,
-    fs,
-    net::Ipv4Addr,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::{collections::HashMap, fs, net::Ipv4Addr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use aranya_crypto::{
@@ -45,8 +39,8 @@ use crate::{
     policy::{Effect, Perm, PublicKeyBundle as DeviceKeyBundle},
     sync::{
         self,
-        quic::{PskStore, QuicConnector, QuicListener, SharedConnectionMap},
-        SyncClient, SyncPeer,
+        quic::{ConnectionPool, PskStore, QuicConnector, QuicListener},
+        SyncPeer,
     },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
     AranyaStore,
@@ -65,14 +59,12 @@ async fn query_rank(device: &TestDevice, object_id: aranya_daemon_api::ObjectId)
 }
 
 // Aranya graph client for testing.
-type TestClient =
-    aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+type TestAranya = aranya::Client<crate::PS, crate::SP>;
 
-// Aranya sync client for testing.
-type TestSyncer = sync::SyncManager<QuicConnector, crate::PS, crate::SP, crate::EF>;
-
-// Aranya sync server for testing.
+// Aranya sync types for testing.
 type TestServer = sync::SyncServer<QuicListener, crate::PS, crate::SP>;
+type TestClient = sync::SyncClient<QuicConnector, crate::PS, crate::SP, crate::EF>;
+type TestSyncer = sync::SyncManager<QuicConnector, crate::PS, crate::SP, crate::EF>;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -91,16 +83,13 @@ struct TestDevice {
 impl TestDevice {
     pub fn new(
         server: TestServer,
-        pk: PublicKeys<DefaultCipherSuite>,
-        graph_id: GraphId,
         syncer: TestSyncer,
+        graph_id: GraphId,
+        pk: PublicKeys<DefaultCipherSuite>,
         effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
     ) -> Result<Self> {
-        let waiter = ready::Waiter::new(1);
-        let notifier = waiter.notifier();
         let sync_local_addr = server.local_addr();
-        let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
-        // let (send_effects, effect_recv) = mpsc::channel(1);
+        let handle = task::spawn(server.serve(ready::Waiter::new(1).notifier())).abort_handle();
         Ok(Self {
             syncer,
             graph_id,
@@ -110,9 +99,11 @@ impl TestDevice {
             effect_recv,
         })
     }
-}
 
-impl TestDevice {
+    fn aranya(&self) -> &TestAranya {
+        self.syncer.client()
+    }
+
     /// Syncs with a device and expects a certain number of commands to be received.
     ///
     /// Returns the effects that were received.
@@ -143,34 +134,14 @@ impl TestDevice {
         bail!("Channel closed or nothing to receive")
     }
 
-    pub fn actions(
-        &self,
-    ) -> impl Actions<
-        PolicyEngine<DefaultEngine<Rng>, Store>,
-        LinearStorageProvider<FileManager>,
-        DefaultEngine<Rng>,
-    > {
-        self.syncer.client().actions(self.graph_id)
+    pub fn actions(&self) -> impl Actions<crate::PS, crate::SP, crate::CE> {
+        self.aranya().actions(self.graph_id)
     }
 }
 
 impl Drop for TestDevice {
     fn drop(&mut self) {
         self.handle.abort();
-    }
-}
-
-impl Deref for TestDevice {
-    type Target = TestClient;
-
-    fn deref(&self) -> &Self::Target {
-        self.syncer.client()
-    }
-}
-
-impl DerefMut for TestDevice {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.syncer.client_mut()
     }
 }
 
@@ -221,82 +192,61 @@ impl TestCtx {
         &mut self,
         name: &str,
         id: GraphId,
-    ) -> Result<(TestDevice, Arc<PskStore>)> {
+        psk_store: Arc<PskStore>,
+    ) -> Result<TestDevice> {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (syncer, server, pk, psk_store, effects_recv) = {
-            let mut store = {
-                let path = root.join("keystore");
-                fs::create_dir_all(&path)?;
-                Store::open(path).map(AranyaStore::new)?
-            };
-            let (eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
-            let bundle = PublicKeyBundle::generate(&eng, &mut store)
-                .context("unable to generate `PublicKeyBundle`")?;
-
-            let storage_dir = root.join("storage");
-            fs::create_dir_all(&storage_dir)?;
-
-            let pk = bundle.public_keys(&eng, &store)?;
-
-            let client = aranya::Client::new(ClientState::new(
-                PolicyEngine::new(
-                    POLICY_SOURCE,
-                    eng,
-                    store.try_clone().context("unable to clone keystore")?,
-                    bundle.device_id,
-                )?,
-                LinearStorageProvider::new(FileManager::new(&storage_dir)?),
-            ));
-
-            let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-            let psk_store: Arc<PskStore> = Arc::default();
-
-            let (send_effects, effects_recv) = mpsc::channel(1);
-            let (handle, recv) = sync::SyncHandle::channel(128);
-
-            // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-            let conns: SharedConnectionMap = Arc::default();
-            let (conn_tx, conn_rx) = mpsc::channel(32);
-
-            let listener = QuicListener::new(
-                any_local_addr,
-                psk_store.clone(),
-                Arc::clone(&conns),
-                conn_rx,
-            )
-            .await?;
-            let server = TestServer::new(listener, client.clone(), handle);
-
-            let connector = QuicConnector::new(
-                any_local_addr,
-                server.local_addr(),
-                conns,
-                conn_tx,
-                psk_store.clone(),
-            )?;
-            let sync_client = SyncClient::new(client.clone(), connector, send_effects);
-            let syncer = TestSyncer::new(sync_client, recv)?;
-
-            (syncer, server, pk, psk_store, effects_recv)
+        let mut store = {
+            let path = root.join("keystore");
+            fs::create_dir_all(&path)?;
+            Store::open(path).map(AranyaStore::new)?
         };
+        let (eng, _) = DefaultEngine::from_entropy(Rng);
+        let bundle = PublicKeyBundle::generate(&eng, &mut store)
+            .context("unable to generate `PublicKeyBundle`")?;
 
-        Ok((
-            TestDevice::new(server, pk, id, syncer, effects_recv)?,
-            psk_store,
-        ))
+        let storage_dir = root.join("storage");
+        fs::create_dir_all(&storage_dir)?;
+
+        let pk = bundle.public_keys(&eng, &store)?;
+
+        let client = aranya::Client::new(ClientState::new(
+            PolicyEngine::new(
+                POLICY_SOURCE,
+                eng,
+                store.try_clone().context("unable to clone keystore")?,
+                bundle.device_id,
+            )?,
+            LinearStorageProvider::new(FileManager::new(&storage_dir)?),
+        ));
+
+        let any_local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
+
+        let (send_effects, effect_recv) = mpsc::channel(1);
+        let (handle, recv) = sync::SyncHandle::channel(128);
+
+        // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
+        let (connector_pool, listener_pool) = ConnectionPool::new(32).split();
+
+        let listener = QuicListener::new(any_local_addr, psk_store.clone(), listener_pool).await?;
+        let server = TestServer::new(listener, client.clone(), handle);
+
+        let connector = QuicConnector::new(
+            any_local_addr,
+            server.local_addr(),
+            connector_pool,
+            psk_store.clone(),
+        )?;
+        let sync_client = TestClient::new(client.clone(), connector, send_effects);
+        let syncer = TestSyncer::new(sync_client, recv)?;
+
+        TestDevice::new(server, syncer, id, pk, effect_recv)
     }
 
     /// Creates `n` members.
     pub async fn new_group(&mut self, n: usize) -> Result<Vec<TestDevice>> {
-        let test_psk = PresharedKey::external(b"test-identity", b"test-secret-key-32-bytes-long!!")
-            .context("failed to create test PSK")?
-            .with_hash_alg(
-                s2n_quic::provider::tls::rustls::rustls::crypto::hash::HashAlgorithm::SHA384,
-            )
-            .context("failed to set hash algorithm")?;
-        let mut stores = Vec::<Arc<PskStore>>::new();
+        let psk_store: Arc<PskStore> = Arc::default();
         let mut clients = Vec::<TestDevice>::new();
         for i in 0..n {
             let name = format!("client_{}", self.id);
@@ -307,26 +257,32 @@ impl TestCtx {
             } else {
                 clients[0].graph_id
             };
-            let (mut client, psk_store) = self
-                .new_client(&name, id)
+            let mut client = self
+                .new_client(&name, id, Arc::clone(&psk_store))
                 .await
                 .with_context(|| format!("unable to create client {name}"))?;
-            stores.push(psk_store);
             // Eww, gross.
             if id == GraphId::default() {
                 let nonce = &mut [0u8; 16];
                 Rng.fill_bytes(nonce);
                 (client.graph_id, _) = client
+                    .aranya()
                     .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
                     .await?;
             }
             clients.push(client)
         }
-        for store in stores {
-            let team_id = TeamId::from(*clients[0].graph_id.as_array());
-            store.insert(team_id, Arc::new(test_psk.clone()));
-            store.set_team(team_id);
-        }
+
+        let test_psk = PresharedKey::external(b"test-identity", b"test-secret-key-32-bytes-long!!")
+            .context("failed to create test PSK")?
+            .with_hash_alg(
+                s2n_quic::provider::tls::rustls::rustls::crypto::hash::HashAlgorithm::SHA384,
+            )
+            .context("failed to set hash algorithm")?;
+        let team_id = TeamId::from(*clients[0].graph_id.as_array());
+        psk_store.insert(team_id, Arc::new(test_psk));
+        psk_store.set_team(team_id);
+
         Ok(clients)
     }
 
@@ -652,8 +608,8 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
     let team = TestTeam::new(clients.as_mut_slice());
 
     let owner = team.owner;
-    let (extra, _extra_store) = ctx
-        .new_client("extra", owner.graph_id)
+    let extra = ctx
+        .new_client("extra", owner.graph_id, Arc::default())
         .await
         .context("unable to create extra device")?;
 
@@ -714,8 +670,8 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
         .await
         .context("membera unable to sync owner state")?;
 
-    let (candidate, _store) = ctx
-        .new_client("candidate", owner.graph_id)
+    let candidate = ctx
+        .new_client("candidate", owner.graph_id, Arc::default())
         .await
         .context("unable to create candidate device")?;
 
@@ -770,8 +726,8 @@ async fn test_assign_role_rejects_unknown_device() -> Result<()> {
     let roles = load_default_roles(owner).await?;
     let member_role = role_id_by_name(&roles, "member");
 
-    let (extra, _store) = ctx
-        .new_client("unknown-device", owner.graph_id)
+    let extra = ctx
+        .new_client("unknown-device", owner.graph_id, Arc::default())
         .await
         .context("unable to create extra device")?;
     let bogus_device_id = extra.pk.ident_pk.id()?;

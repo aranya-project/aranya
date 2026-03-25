@@ -16,15 +16,12 @@ use s2n_quic::{
     },
     stream::BidirectionalStream,
 };
-use tokio::{sync::mpsc, task::JoinSet, time::Duration};
+use tokio::{task::JoinSet, time::Duration};
 use tracing::{debug, error, trace};
 
 #[cfg(doc)]
 use super::QuicConnector;
-use super::{
-    ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncListener,
-    ALPN_QUIC_SYNC,
-};
+use super::{connections::ListenerPool, Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
 type AcceptResult = (SyncPeer, StreamAcceptor, Option<BidirectionalStream>);
@@ -45,10 +42,8 @@ pub(crate) struct QuicListener {
     server: s2n_quic::Server,
     /// Allows authenticating the identity of a given `GraphId`.
     server_keys: Arc<PskStore>,
-    /// Handle to the `SharedConnectionMap` to register new connections with the [`QuicConnector`].
-    conns: SharedConnectionMap,
-    /// Receives new acceptors from the [`QuicConnector`] so we can listen for connections back.
-    conn_rx: mpsc::Receiver<ConnectionUpdate>,
+    /// Receiver to register new connections from the [`QuicConnector`].
+    pool: ListenerPool,
     /// Queue to allow awaiting a number of potential streams concurrently until one resolves.
     pending_accepts: JoinSet<AcceptResult>,
 }
@@ -58,8 +53,7 @@ impl QuicListener {
     pub(crate) async fn new(
         addr: Addr,
         server_keys: Arc<PskStore>,
-        conns: SharedConnectionMap,
-        conn_rx: mpsc::Receiver<ConnectionUpdate>,
+        pool: ListenerPool,
     ) -> Result<Self, Error> {
         // Build up the `ServerConfig` so we can initialize the TLS server.
         let mut server_config = ServerConfig::builder()
@@ -98,8 +92,7 @@ impl QuicListener {
             local_addr,
             server,
             server_keys,
-            conns,
-            conn_rx,
+            pool,
             pending_accepts: JoinSet::new(),
         })
     }
@@ -155,7 +148,7 @@ impl QuicListener {
         // so it wins if peer.addr < local_addr.
         let (new_handle, new_acceptor) = conn.split();
         let acceptor = {
-            let mut map = self.conns.lock().await;
+            let mut map = self.pool.conns.lock().await;
             match map.entry(peer) {
                 Entry::Vacant(e) => {
                     e.insert(new_handle.clone());
@@ -230,7 +223,7 @@ impl SyncListener for QuicListener {
                     }
                 }
 
-                Some((peer, acceptor)) = self.conn_rx.recv() => {
+                Some((peer, acceptor)) = self.pool.rx.recv() => {
                     debug!(?peer, "registering connection for stream accepts");
                     self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                 }

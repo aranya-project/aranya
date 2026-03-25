@@ -208,12 +208,6 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
     pub(crate) const fn client(&self) -> &Client<PS, SP> {
         &self.client.client
     }
-
-    /// Returns a mutable reference to the Aranya client for tests that need it.
-    #[cfg(test)]
-    pub(crate) const fn client_mut(&mut self) -> &mut Client<PS, SP> {
-        &mut self.client.client
-    }
 }
 
 impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF>

@@ -9,12 +9,10 @@ use bytes::Bytes;
 use s2n_quic::{
     application::Error as AppError, client::Connect, provider::tls::rustls::rustls::ClientConfig,
 };
-use tokio::sync::mpsc;
 use tracing::{debug, error, trace, warn};
 
 use super::{
-    ConnectionUpdate, Error, PskStore, QuicStream, SharedConnectionMap, SyncConnector,
-    ALPN_QUIC_SYNC,
+    connections::ConnectorPool, Error, PskStore, QuicStream, SyncConnector, ALPN_QUIC_SYNC,
 };
 use crate::sync::{Addr, SyncPeer};
 
@@ -22,10 +20,8 @@ use crate::sync::{Addr, SyncPeer};
 pub(crate) struct QuicConnector {
     /// The QUIC client we use to connect to other peers.
     client: s2n_quic::Client,
-    /// Handle to the `SharedConnectionMap` to send new acceptors to the `QuicListener`.
-    conns: SharedConnectionMap,
-    /// Sender for forwarding new acceptors to the `SyncListener` for incoming connections.
-    conn_tx: mpsc::Sender<ConnectionUpdate>,
+    /// Allows sending new connections to the [`QuicListener`].
+    pool: ConnectorPool,
     /// Allows authenticating the identity of a given `GraphId`.
     psk_store: Arc<PskStore>,
     /// The return port we want the peer to connect to us on.
@@ -39,8 +35,7 @@ impl QuicConnector {
     pub(crate) fn new(
         client_addr: Addr,
         server_addr: Addr,
-        conns: SharedConnectionMap,
-        conn_tx: mpsc::Sender<ConnectionUpdate>,
+        pool: ConnectorPool,
         psk_store: Arc<PskStore>,
     ) -> Result<Self, Error> {
         // Build up the `ClientConfig` so we can initialize the TLS client.
@@ -67,8 +62,7 @@ impl QuicConnector {
 
         Ok(Self {
             client,
-            conns,
-            conn_tx,
+            pool,
             psk_store,
             return_port,
             local_addr: server_addr,
@@ -97,7 +91,7 @@ impl SyncConnector for QuicConnector {
         // Drops the lock before doing async connection work.
         let reuse = {
             // Hold the lock across this entire operation
-            let mut map = self.conns.lock().await;
+            let mut map = self.pool.conns.lock().await;
             match map.entry(peer) {
                 Entry::Occupied(mut e) => {
                     if e.get_mut().ping().is_ok() {
@@ -134,7 +128,7 @@ impl SyncConnector for QuicConnector {
             let (new_handle, new_acceptor) = conn.split();
             let (handle, acceptor) = {
                 // Hold the lock across this entire operation
-                let mut map = self.conns.lock().await;
+                let mut map = self.pool.conns.lock().await;
                 match map.entry(peer) {
                     Entry::Vacant(e) => {
                         e.insert(new_handle.clone());
@@ -168,7 +162,7 @@ impl SyncConnector for QuicConnector {
             // Forward acceptor to the listener if we kept our connection.
             if let Some(acceptor) = acceptor {
                 trace!(?peer, "forwarding acceptor to listener");
-                self.conn_tx.send((peer, acceptor)).await.ok();
+                self.pool.tx.send((peer, acceptor)).await.ok();
             }
 
             handle
@@ -181,7 +175,7 @@ impl SyncConnector for QuicConnector {
             Ok(stream) => stream,
             Err(error) => {
                 error!(?peer, %error, "failed to open bidirectional stream");
-                let mut map = self.conns.lock().await;
+                let mut map = self.pool.conns.lock().await;
                 if let Entry::Occupied(e) = map.entry(peer) {
                     if e.get().id() == handle.id() {
                         e.remove().close(AppError::UNKNOWN);

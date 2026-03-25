@@ -28,7 +28,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{PskStore, QuicConnector, QuicListener, SharedConnectionMap},
+        quic::{ConnectionPool, PskStore, QuicConnector, QuicListener},
         SyncClient, SyncHandle, SyncManager,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -285,21 +285,15 @@ impl Daemon {
         let (handle, recv) = SyncHandle::channel(128);
 
         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        let conns: SharedConnectionMap = Arc::default();
-        let (conn_tx, conn_rx) = mpsc::channel(32);
+        let (connector_pool, listener_pool) = ConnectionPool::new(32).split();
 
-        let listener = QuicListener::new(
-            server_addr,
-            Arc::clone(&psk_store),
-            Arc::clone(&conns),
-            conn_rx,
-        )
-        .await
-        .context("unable to initialize QUIC sync listener")?;
+        let listener = QuicListener::new(server_addr, Arc::clone(&psk_store), listener_pool)
+            .await
+            .context("unable to initialize QUIC sync listener")?;
         let server = SyncServer::new(listener, client.clone(), handle.clone());
 
         let connector =
-            QuicConnector::new(client_addr, server.local_addr(), conns, conn_tx, psk_store)?;
+            QuicConnector::new(client_addr, server.local_addr(), connector_pool, psk_store)?;
         let sync_client = SyncClient::new(client.clone(), connector, send_effects);
         let manager = SyncManager::new(sync_client, recv)?;
 

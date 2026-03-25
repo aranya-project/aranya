@@ -1,31 +1,24 @@
 //! This module contains the QUIC transport code to allow syncing with other clients.
 
+mod connections;
 mod connector;
 mod listener;
 mod psk;
 mod stream;
-
-use std::{collections::BTreeMap, sync::Arc};
-
-use s2n_quic::connection::{Handle, StreamAcceptor};
-use tokio::sync::Mutex;
 
 use self::{
     super::{SyncConnector, SyncListener, SyncStream},
     stream::QuicStream,
 };
 pub(crate) use self::{
+    connections::ConnectionPool,
     connector::QuicConnector,
     listener::QuicListener,
     psk::{PskSeed, PskStore},
 };
-use crate::sync::SyncPeer;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
-
-pub(crate) type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Handle>>>;
-type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 
 /// Errors specific to the QUIC transport.
 #[derive(Debug, thiserror::Error)]
