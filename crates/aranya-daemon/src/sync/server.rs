@@ -37,7 +37,6 @@ pub(crate) struct SyncServer<SL, PS, SP> {
     /// The listener that yields incoming streams.
     listener: SL,
     /// Handle to allow sending messages to the [`SyncManager`].
-    #[cfg_attr(not(feature = "preview"), expect(dead_code))]
     handle: SyncHandle,
 }
 
@@ -105,6 +104,7 @@ where
 
     /// Handles an incoming connection, reading data from the peer and responding as needed.
     #[instrument(skip_all, fields(peer = %stream.peer().addr, graph = %stream.peer().graph_id))]
+    #[cfg_attr(not(feature = "preview"), expect(unused_variables))]
     async fn handle_stream<S: SyncStream>(
         client: Client<PS, SP>,
         handle: SyncHandle,
