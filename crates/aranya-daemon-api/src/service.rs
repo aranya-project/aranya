@@ -10,12 +10,12 @@ use std::{
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
-    dangerous::spideroak_crypto::{csprng::rand::RngCore, hex::Hex},
+    dangerous::spideroak_crypto::hex::Hex,
     default::{DefaultCipherSuite, DefaultEngine},
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    CipherSuite, EncryptionPublicKey, Engine, Rng,
+    CipherSuite, Csprng as _, EncryptionPublicKey, Engine, Rng,
 };
 use aranya_id::custom_id;
 pub use aranya_policy_text::{text, InvalidText, Text};
@@ -442,10 +442,16 @@ impl DaemonApiClient {
         client
     }
 
+    fn next_trace_id() -> u64 {
+        let mut buf = [0; 8];
+        Rng.fill_bytes(&mut buf);
+        u64::from_le_bytes(buf)
+    }
+
     /// Sends a request to the daemon and waits for a response.
     async fn call(&self, req: DaemonApiRequest) -> Result<DaemonApiResponse, ClientError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let trace_id: TraceId = Rng::next_u64(&mut Rng);
+        let trace_id: TraceId = Self::next_trace_id();
 
         tracing::info!(rpc.trace_id = trace_id, rpc.id = id, "RPC: SendRequest");
 
@@ -480,7 +486,7 @@ impl DaemonApiClient {
     #[cfg(any(test, feature = "test-utils"))]
     pub async fn test_trace_id(&self) -> Result<(TraceId, TraceId), ClientError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let trace_id: TraceId = Rng::next_u64(&mut Rng);
+        let trace_id: TraceId = Self::next_trace_id();
 
         let (reply_tx, reply_rx) = oneshot::channel();
 
