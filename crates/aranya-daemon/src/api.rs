@@ -3,7 +3,7 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{future, net::SocketAddr, ops::Deref, pin::pin};
+use core::{future, ops::Deref, pin::pin};
 #[cfg(feature = "preview")]
 use std::collections::HashMap;
 #[cfg(feature = "preview")]
@@ -88,7 +88,7 @@ pub(crate) struct DaemonApiServer {
 
 pub(crate) struct DaemonApiServerArgs {
     pub(crate) client: Client,
-    pub(crate) local_addr: SocketAddr,
+    pub(crate) local_addr: Addr,
     pub(crate) uds_path: PathBuf,
     pub(crate) sk: ApiKey<CS>,
     pub(crate) pk: PublicKeys<CS>,
@@ -353,8 +353,8 @@ impl EffectHandler {
 #[derive_where(Debug)]
 struct ApiInner {
     client: Client,
-    /// Local socket address of the API.
-    local_addr: SocketAddr,
+    /// Local address of the API.
+    local_addr: Addr,
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Handle to talk with the syncer.
