@@ -265,6 +265,7 @@ impl EffectHandler {
                 QueryRoleHasPermResult(_) => {}
                 QueryRolePermsResult(_) => {}
                 QueryRankResult(_) => {}
+                QueryDeviceGenerationResult(_) => {}
                 RankChanged(_) => {}
                 RoleCreated(_) => {}
                 RoleDeleted(_) => {}
@@ -1361,6 +1362,32 @@ impl DaemonApi for Api {
             Ok(api::Rank::new(e.rank))
         } else {
             Err(anyhow!("rank not found for object").into())
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[instrument(skip(self), err)]
+    async fn query_device_generation(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device_id: api::DeviceId,
+    ) -> api::Result<Option<i64>> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .query_device_generation(DeviceId::transmute(device_id))
+            .await
+            .context("unable to query device generation")?;
+
+        if let Some(Effect::QueryDeviceGenerationResult(e)) =
+            find_effect!(&effects, Effect::QueryDeviceGenerationResult(_))
+        {
+            Ok(Some(e.generation))
+        } else {
+            Ok(None)
         }
     }
 }
