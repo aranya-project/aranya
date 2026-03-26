@@ -25,7 +25,7 @@ use crate::{
 
 /// Container for complex AQC channel creation results.
 #[derive(Debug)]
-pub(crate) struct SessionData {
+pub struct SessionData {
     /// The serialized messages
     #[cfg(feature = "afc")]
     pub ctrl: Vec<Box<[u8]>>,

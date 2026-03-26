@@ -112,7 +112,10 @@ impl SyncConnector for QuicConnector {
             trace!(?peer, "establishing new QUIC connection");
             let mut conn = {
                 // Set the current `GraphId` we're operating on in the PSK store.
-                let _guard = self.psk_store.set_team(TeamId::transmute(peer.graph_id));
+                let _guard = self
+                    .psk_store
+                    .set_team(TeamId::transmute(peer.graph_id))
+                    .await;
                 self.client
                     .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
                     .await?
