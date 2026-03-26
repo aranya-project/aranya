@@ -5,13 +5,26 @@
 #![allow(missing_docs)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::vec::Vec;
 use aranya_policy_ifgen::{
     macros::{action, actions, effect, effects, value},
-    BaseId, ClientError, Value, Text,
+    text, BaseId, ClientError, Value, Text,
 };
+/// DEFAULT_ADMIN_ROLE_RANK constant.
+pub const DEFAULT_ADMIN_ROLE_RANK: i64 = 800i64;
+/// DEFAULT_MEMBER_ROLE_RANK constant.
+pub const DEFAULT_MEMBER_ROLE_RANK: i64 = 600i64;
+/// DEFAULT_OPERATOR_ROLE_RANK constant.
+pub const DEFAULT_OPERATOR_ROLE_RANK: i64 = 700i64;
+/// DEFAULT_OWNER_DEVICE_RANK constant.
+pub const DEFAULT_OWNER_DEVICE_RANK: i64 = 1000000i64;
+/// DEFAULT_OWNER_ROLE_RANK constant.
+pub const DEFAULT_OWNER_ROLE_RANK: i64 = 999999i64;
+/// MAX_RANK constant.
+pub const MAX_RANK: i64 = 1000000i64;
 #[derive(Debug)]
 pub enum Persistent {}
 #[derive(Debug)]
@@ -65,6 +78,7 @@ pub enum Effect {
     PermAddedToRole(PermAddedToRole),
     PermRemovedFromRole(PermRemovedFromRole),
     QueryAfcChannelIsValidResult(QueryAfcChannelIsValidResult),
+    QueryDeviceGenerationResult(QueryDeviceGenerationResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
@@ -174,6 +188,12 @@ pub struct QueryAfcChannelIsValidResult {
     pub receiver_id: BaseId,
     pub label_id: BaseId,
     pub is_valid: bool,
+}
+/// QueryDeviceGenerationResult policy effect.
+#[effect]
+pub struct QueryDeviceGenerationResult {
+    pub device_id: BaseId,
+    pub generation: i64,
 }
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
@@ -324,6 +344,7 @@ pub enum EphemeralAction {
     query_device_role(query_device_role),
     query_device_public_key_bundle(query_device_public_key_bundle),
     query_rank(query_rank),
+    query_device_generation(query_device_generation),
     query_team_roles(query_team_roles),
     query_role_has_perm(query_role_has_perm),
     query_role_perms(query_role_perms),
@@ -363,6 +384,11 @@ pub struct change_rank {
 #[action(interface = Ephemeral)]
 pub struct query_rank {
     pub object_id: BaseId,
+}
+/// query_device_generation policy action.
+#[action(interface = Ephemeral)]
+pub struct query_device_generation {
+    pub device_id: BaseId,
 }
 /// add_perm_to_role policy action.
 #[action(interface = Persistent)]
