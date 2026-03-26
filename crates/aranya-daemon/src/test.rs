@@ -283,7 +283,8 @@ impl TestCtx {
             .context("failed to set hash algorithm")?;
         let team_id = TeamId::from(*clients[0].graph_id.as_array());
         psk_store.insert(team_id, Arc::new(test_psk));
-        psk_store.set_team(team_id);
+        // OK to just set team and ignore guard since we only use one team in these tests.
+        _ = psk_store.set_team(team_id).await;
 
         Ok(clients)
     }

@@ -75,8 +75,6 @@ impl SyncConnector for QuicConnector {
     type Stream = QuicStream;
 
     async fn connect(&self, peer: SyncPeer) -> Result<Self::Stream, Self::Error> {
-        // Set the current `GraphId` we're operating on in the PSK store.
-        self.psk_store.set_team(TeamId::transmute(peer.graph_id));
         debug!(?peer, "connecting to peer");
 
         // Obtain the address for the other peer.
@@ -112,10 +110,13 @@ impl SyncConnector for QuicConnector {
         } else {
             // Create a new outbound connection.
             trace!(?peer, "establishing new QUIC connection");
-            let mut conn = self
-                .client
-                .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                .await?;
+            let mut conn = {
+                // Set the current `GraphId` we're operating on in the PSK store.
+                let _guard = self.psk_store.set_team(TeamId::transmute(peer.graph_id));
+                self.client
+                    .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
+                    .await?
+            };
             conn.keep_alive(true)?;
             conn.open_send_stream()
                 .await?
