@@ -431,7 +431,7 @@ impl DaemonApi for Api {
     #[instrument(skip(self), err)]
     async fn aranya_local_addr(self, ctx: context::Context) -> api::Result<Addr> {
         trace::setup_trace_context(&ctx);
-        Ok(self.local_addr.into())
+        Ok(self.local_addr)
     }
 
     #[instrument(skip(self), err)]
