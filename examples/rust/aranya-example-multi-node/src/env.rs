@@ -110,33 +110,37 @@ impl EnvVars {
         Ok(())
     }
 
-    /// Set environment variables.
-    pub fn set(&self) {
-        // TODO: set_var() is not safe to call in a multi-threaded program.
-        env::set_var("ARANYA_EXAMPLE", self.level.clone());
-        env::set_var(
-            ONBOARDING_PASSPHRASE_ENV_VAR,
-            self.passphrase.expose_secret(),
-        );
-        for device in self.devices() {
-            env::set_var(
-                format!("{}_{}", SYNC_ADDR_ENV_VAR, device.name.to_uppercase()),
-                device.sync_addr.to_string(),
-            );
-            env::set_var(
-                format!("{}_{}", AFC_ADDR_ENV_VAR, device.name.to_uppercase()),
-                device.afc_addr.to_string(),
-            );
-            env::set_var(
-                format!("{}_{}", TCP_ADDR_ENV_VAR, device.name.to_uppercase()),
-                device.tcp_addr.to_string(),
-            );
-        }
+    /// List environment variables.
+    pub fn vars(&self) -> impl Iterator<Item = (String, String)> + use<'_> {
+        self.devices()
+            .flat_map(|device| {
+                [
+                    (
+                        format!("{}_{}", SYNC_ADDR_ENV_VAR, device.name.to_uppercase()),
+                        device.sync_addr.to_string(),
+                    ),
+                    (
+                        format!("{}_{}", AFC_ADDR_ENV_VAR, device.name.to_uppercase()),
+                        device.afc_addr.to_string(),
+                    ),
+                    (
+                        format!("{}_{}", TCP_ADDR_ENV_VAR, device.name.to_uppercase()),
+                        device.tcp_addr.to_string(),
+                    ),
+                ]
+            })
+            .chain([
+                (String::from("ARANYA_EXAMPLE"), self.level.clone()),
+                (
+                    String::from(ONBOARDING_PASSPHRASE_ENV_VAR),
+                    String::from(self.passphrase.expose_secret()),
+                ),
+            ])
     }
 
     /// Return an Iterator to the list of devices.
     pub fn devices(&self) -> impl Iterator<Item = &Device> {
-        vec![
+        [
             &self.owner,
             &self.admin,
             &self.operator,
