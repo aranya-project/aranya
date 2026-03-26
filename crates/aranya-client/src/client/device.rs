@@ -232,7 +232,7 @@ impl Device<'_> {
         let gen = self
             .client
             .daemon
-            .query_device_generation(create_ctx(), self.team_id, self.id)
+            .query_device_generation(rpc_context(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
