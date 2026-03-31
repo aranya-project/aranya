@@ -3,7 +3,7 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{future, net::SocketAddr, ops::Deref, pin::pin};
+use core::{future, ops::Deref, pin::pin};
 #[cfg(feature = "preview")]
 use std::collections::HashMap;
 #[cfg(feature = "preview")]
@@ -88,7 +88,7 @@ pub(crate) struct DaemonApiServer {
 
 pub(crate) struct DaemonApiServerArgs {
     pub(crate) client: Client,
-    pub(crate) local_addr: SocketAddr,
+    pub(crate) local_addr: Addr,
     pub(crate) uds_path: PathBuf,
     pub(crate) sk: ApiKey<CS>,
     pub(crate) pk: PublicKeys<CS>,
@@ -266,6 +266,7 @@ impl EffectHandler {
                 QueryRoleHasPermResult(_) => {}
                 QueryRolePermsResult(_) => {}
                 QueryRankResult(_) => {}
+                QueryDeviceGenerationResult(_) => {}
                 RankChanged(_) => {}
                 RoleCreated(_) => {}
                 RoleDeleted(_) => {}
@@ -352,8 +353,8 @@ impl EffectHandler {
 #[derive_where(Debug)]
 struct ApiInner {
     client: Client,
-    /// Local socket address of the API.
-    local_addr: SocketAddr,
+    /// Local address of the API.
+    local_addr: Addr,
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Handle to talk with the syncer.
@@ -1468,6 +1469,32 @@ impl DaemonApi for Api {
             Ok(api::Rank::new(e.rank))
         } else {
             Err(anyhow!("rank not found for object").into())
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[instrument(skip(self), err)]
+    async fn query_device_generation(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device_id: api::DeviceId,
+    ) -> api::Result<Option<i64>> {
+        let graph = self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(graph)
+            .query_device_generation(DeviceId::transmute(device_id))
+            .await
+            .context("unable to query device generation")?;
+
+        if let Some(Effect::QueryDeviceGenerationResult(e)) =
+            find_effect!(&effects, Effect::QueryDeviceGenerationResult(_))
+        {
+            Ok(Some(e.generation))
+        } else {
+            Ok(None)
         }
     }
 }

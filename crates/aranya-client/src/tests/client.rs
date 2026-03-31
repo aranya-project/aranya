@@ -3028,3 +3028,428 @@ async fn test_outranks_but_missing_permission() -> Result<()> {
 
     Ok(())
 }
+
+/// Assigning the same label to a device twice should fail because the
+/// label assignment already exists with the same generation.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_duplicate_label_assignment_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_duplicate_label_assignment_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
+
+    // First assignment should succeed.
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect("first label assignment should succeed");
+
+    // Second assignment of the same label should fail.
+    let err = owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect_err("duplicate label assignment should fail");
+    assert!(matches!(err, crate::Error::Aranya(_)), "{err:?}");
+
+    Ok(())
+}
+
+/// When a device is removed and re-added, old label assignments become
+/// stale (generation mismatch). Reassigning the label should succeed.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_device_generation_counter_label_reassignment() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_device_generation_counter_label_reassignment").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
+
+    // Generation counter should start at 0.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(gen, Some(0), "initial generation should be 0");
+
+    // Assign label to membera.
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await?;
+
+    // Verify label is visible.
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(labels.iter().count(), 1, "label should be assigned");
+
+    // Remove membera from team.
+    owner_team
+        .device(devices.membera.id)
+        .remove_from_team()
+        .await?;
+
+    // Generation counter increments on removal.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(gen, Some(1), "generation should be 1 after removal");
+
+    // Re-add membera with the member role.
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await?;
+
+    // Generation counter should not change on re-add.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
+
+    // Old label assignment should be stale (not visible).
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        0,
+        "stale label should not be visible"
+    );
+
+    // Reassigning the same label should succeed (stale gen < current gen).
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await?;
+
+    // Generation counter should still be 1 (reassignment doesn't change it).
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(
+        gen,
+        Some(1),
+        "generation should still be 1 after reassignment"
+    );
+
+    // Label should now be visible.
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        1,
+        "reassigned label should be visible"
+    );
+
+    Ok(())
+}
+
+/// Adding the same device to a team twice should fail because the
+/// Device fact already exists.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_device_to_team_twice_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_add_device_to_team_twice_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+
+    // Try to add membera again (already on team).
+    let err = owner_team
+        .add_device(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await
+        .expect_err("adding same device twice should fail");
+    assert!(matches!(err, crate::Error::Aranya(_)), "{err:?}");
+
+    Ok(())
+}
+
+/// Revoking a label from a device that was removed from the team should
+/// fail. Additionally, if a label was assigned before the device was
+/// removed and the device is later re-added, attempting to revoke that
+/// old assignment should also fail because the generation counter no
+/// longer matches.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_revoke_stale_label_assignment_rejected").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
+
+    // Generation should start at 0.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(gen, Some(0), "initial generation should be 0");
+
+    // Assign label to membera.
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect("label assignment should succeed");
+
+    // Remove membera from team.
+    owner_team
+        .device(devices.membera.id)
+        .remove_from_team()
+        .await
+        .expect("remove_from_team should succeed");
+
+    // Generation counter increments on removal.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(gen, Some(1), "generation should be 1 after removal");
+
+    // Revoking a label from a removed device should fail.
+    let err = owner_team
+        .device(devices.membera.id)
+        .revoke_label(label)
+        .await
+        .expect_err("revoking label from removed device should fail");
+    assert!(matches!(err, crate::Error::Aranya(_)), "{err:?}");
+
+    // Re-add membera with the member role.
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await
+        .expect("re-adding device should succeed");
+
+    // Generation counter should not change on re-add.
+    let gen = owner_team
+        .device(devices.membera.id)
+        .generation()
+        .await
+        .expect("generation should succeed");
+    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
+
+    // Try to revoke the stale label assignment (generation mismatch).
+    let err = owner_team
+        .device(devices.membera.id)
+        .revoke_label(label)
+        .await
+        .expect_err("revoking stale label assignment should fail");
+    assert!(matches!(err, crate::Error::Aranya(_)), "{err:?}");
+
+    Ok(())
+}
+
+/// When one device assigns a label and another concurrently removes the
+/// target device (without syncing), the label assignment should be
+/// invalidated after syncing because its embedded generation counter
+/// won't match the device's current generation after reordering.
+///
+/// RemoveDevice has priority 400 and AssignLabelToDevice has priority
+/// 100, so the braid deterministically orders the remove before the
+/// assign when they are concurrent. This means:
+///   1. RemoveDevice runs first, bumping device_gen from 0 to 1.
+///   2. AssignLabelToDevice runs second with embedded device_gen=0,
+///      but the device's current gen is now 1 — the check fails.
+///
+/// Timeline:
+///   owner: assign label to membera (captures device_gen=0)
+///   admin: remove membera from team (bumps device_gen to 1)
+///   (no sync between owner and admin during these operations)
+///   sync all -> braid reorders remove before assign (priority 400 > 100)
+///   -> assign fails because device_gen=0 != current_gen=1
+///   owner: re-add membera (device_gen stays 1)
+///   -> label should not be assigned
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
+    let mut devices = DevicesCtx::new("test_concurrent_label_assign_and_device_removal").await?;
+    let team_id = devices.create_and_add_team().await?;
+    let roles = devices
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
+    devices.add_all_device_roles(team_id, &roles).await?;
+
+    let owner_team = devices.owner.client.team(team_id);
+
+    // Create a label that can be assigned to members.
+    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    let label = owner_team.create_label(text!("label"), label_rank).await?;
+
+    // Sync so admin sees all devices and the label.
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let admin_team = devices.admin.client.team(team_id);
+    admin_team.sync_now(owner_addr, None).await?;
+
+    // Verify initial generation is 0 on both devices.
+    let gen = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(gen, Some(0), "initial generation should be 0 on owner");
+    let gen = admin_team.device(devices.membera.id).generation().await?;
+    assert_eq!(gen, Some(0), "initial generation should be 0 on admin");
+
+    // --- Concurrent operations without syncing ---
+    // Owner assigns the label to membera (captures device_gen=0).
+    owner_team
+        .device(devices.membera.id)
+        .assign_label(label, ChanOp::SendRecv)
+        .await
+        .expect("label assignment should succeed locally");
+
+    // On the owner's device the label assignment is valid and gen is still 0.
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        1,
+        "label should be assigned on owner before sync"
+    );
+    let gen = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        gen,
+        Some(0),
+        "generation should still be 0 on owner before sync"
+    );
+
+    // Admin removes membera from the team (bumps device_gen to 1).
+    // Admin has not synced with owner, so it doesn't know about the
+    // label assignment.
+    admin_team
+        .device(devices.membera.id)
+        .remove_from_team()
+        .await
+        .expect("remove should succeed locally");
+
+    // On admin, the generation was bumped to 1 by the removal.
+    let gen = admin_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        gen,
+        Some(1),
+        "generation should be 1 on admin after removal"
+    );
+
+    // Owner still sees gen=0 because it hasn't synced the removal yet.
+    let gen = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        gen,
+        Some(0),
+        "generation should still be 0 on owner before sync"
+    );
+
+    // --- Sync to trigger braid reordering ---
+    // RemoveDevice (priority 400) is ordered before AssignLabelToDevice
+    // (priority 100) by the braid. After syncing:
+    //   1. Both devices evaluate RemoveDevice first -> gen bumps to 1.
+    //   2. Both devices evaluate AssignLabelToDevice second -> check
+    //      fails because embedded device_gen=0 != current gen=1.
+    admin_team.sync_now(owner_addr, None).await?;
+    // Sync back to owner so it sees the removal.
+    owner_team
+        .sync_now(devices.admin.aranya_local_addr().await?, None)
+        .await?;
+
+    // After sync, both devices should agree: gen is 1 because the
+    // remove was processed. The label assignment was rejected.
+    let gen = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(gen, Some(1), "generation should be 1 on owner after sync");
+
+    // Re-add membera so we can query label state for this device.
+    let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
+    owner_team
+        .add_device(
+            devices.membera.pk.clone(),
+            Some(roles.member().id),
+            device_rank,
+        )
+        .await
+        .context("re-adding device should succeed")?;
+
+    // Generation stays at 1 after re-add (only removal increments it).
+    let gen = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
+
+    // The label that was previously assigned (and valid before sync)
+    // should NOT be assigned now. The concurrent removal changed the
+    // generation to 1, so the assignment authored with device_gen=0
+    // was rejected during braid evaluation.
+    let labels = owner_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        0,
+        "label should not be assigned after concurrent removal invalidated the assignment"
+    );
+
+    // Verify on the admin's device as well.
+    admin_team.sync_now(owner_addr, None).await?;
+    let labels = admin_team
+        .device(devices.membera.id)
+        .label_assignments()
+        .await?;
+    assert_eq!(
+        labels.iter().count(),
+        0,
+        "label should not be assigned on admin after sync either"
+    );
+
+    Ok(())
+}

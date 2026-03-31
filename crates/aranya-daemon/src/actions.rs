@@ -25,7 +25,7 @@ use crate::{
 
 /// Container for complex AQC channel creation results.
 #[derive(Debug)]
-pub(crate) struct SessionData {
+pub struct SessionData {
     /// The serialized messages
     #[cfg(feature = "afc")]
     pub ctrl: Vec<Box<[u8]>>,
@@ -252,6 +252,18 @@ where
             new_rank.value(),
         ))
         .in_current_span()
+    }
+
+    /// Invokes `query_device_generation`.
+    #[cfg(feature = "test-utils")]
+    #[instrument(skip(self))]
+    fn query_device_generation(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.call_session_action(policy::query_device_generation(device_id.as_base()))
+            .map_ok(|SessionData { effects, .. }| effects)
+            .in_current_span()
     }
 
     /// Invokes `query_rank`.
