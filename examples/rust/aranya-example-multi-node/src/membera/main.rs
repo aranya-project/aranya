@@ -100,10 +100,10 @@ async fn main() -> Result<()> {
     // Wait for admin to create label.
     info!("membera: waiting for admin to create label");
     let label1 = loop {
-        if let Ok(labels) = team.labels().await {
-            if let Some(label) = labels.iter().next() {
-                break label.clone();
-            }
+        if let Ok(labels) = team.labels().await
+            && let Some(label) = labels.iter().next()
+        {
+            break label.clone();
         }
         sleep(SLEEP_INTERVAL).await;
     };
@@ -111,10 +111,10 @@ async fn main() -> Result<()> {
     // Loop until all devices have been added to the team.
     info!("membera: waiting for all devices to be added to team");
     loop {
-        if let Ok(devices) = team.devices().await {
-            if devices.iter().count() == 5 {
-                break;
-            }
+        if let Ok(devices) = team.devices().await
+            && devices.iter().count() == 5
+        {
+            break;
         }
         sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
@@ -139,10 +139,10 @@ async fn main() -> Result<()> {
 
     // Check that label has been assigned to membera.
     loop {
-        if let Ok(labels) = team.device(device_id).label_assignments().await {
-            if labels.iter().count() == 1 {
-                break;
-            }
+        if let Ok(labels) = team.device(device_id).label_assignments().await
+            && labels.iter().count() == 1
+        {
+            break;
         }
         sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
