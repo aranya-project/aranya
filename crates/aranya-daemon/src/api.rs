@@ -1199,7 +1199,7 @@ impl DaemonApi for Api {
         ctx: context::Context,
         team: api::TeamId,
         label_id: api::LabelId,
-    ) -> api::Result<Option<api::Label>> {
+    ) -> api::Result<api::Label> {
         trace::setup_trace_context(&ctx);
         let graph = self.check_team_valid(team).await?;
 
@@ -1213,14 +1213,13 @@ impl DaemonApi for Api {
             find_effect!(&effects, Effect::QueryLabelResult(_e))
         {
             trace!(?graph, "queried label");
-            Ok(Some(api::Label {
+            Ok(api::Label {
                 id: api::LabelId::from_base(e.label_id),
                 name: e.label_name.clone(),
                 author_id: api::DeviceId::from_base(e.label_author_id),
-            }))
+            })
         } else {
-            trace!(?graph, "queried label (none)");
-            Ok(None)
+            Err(anyhow!("label not found").into())
         }
     }
 

@@ -437,18 +437,16 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Returns a label if it exists.
+    /// Returns a label.
     #[instrument(skip(self))]
-    pub async fn label(&self, label_id: LabelId) -> Result<Option<Label>> {
-        let label = self
-            .client
+    pub async fn label(&self, label_id: LabelId) -> Result<Label> {
+        self.client
             .daemon
             .label(rpc_context(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            .map(Label::from_api);
-        Ok(label)
+            .map_err(aranya_error)
+            .map(Label::from_api)
     }
 
     /// Returns the list of labels on the team.

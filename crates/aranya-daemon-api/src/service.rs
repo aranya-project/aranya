@@ -532,7 +532,7 @@ pub trait DaemonApi {
     /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     /// Returns a specific label.
-    async fn label(team: TeamId, label: LabelId) -> Result<Option<Label>>;
+    async fn label(team: TeamId, label: LabelId) -> Result<Label>;
     /// Returns all labels on the team.
     async fn labels(team: TeamId) -> Result<Vec<Label>>;
 

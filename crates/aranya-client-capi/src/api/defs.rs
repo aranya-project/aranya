@@ -2286,7 +2286,6 @@ pub unsafe fn team_labels(
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[in] device the device's ID
 /// @param[in] label the label
 /// @param[out] __output boolean indicating whether the label exists.
 ///
@@ -2296,11 +2295,13 @@ pub unsafe fn team_label_exists(
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
-    let label_result = client
+    match client
         .rt
-        .block_on(client.inner.team(team.into()).label(label.into()))?;
-    let exists = label_result.is_some();
-    Ok(exists)
+        .block_on(client.inner.team(team.into()).label(label.into()))
+    {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
 
 /// An AFC Sending Channel Object.
