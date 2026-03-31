@@ -349,6 +349,7 @@ impl Team<'_> {
     /// the role. To effectively change a role's rank, create a new role with
     /// matching permissions at the desired rank, assign the new role to the
     /// devices that had the old role, then delete the old role.
+    #[allow(private_bounds)]
     #[instrument(skip(self))]
     pub async fn change_rank(
         &self,
@@ -371,6 +372,7 @@ impl Team<'_> {
     }
 
     /// Queries the rank of an object.
+    #[allow(private_bounds)]
     #[instrument(skip(self))]
     pub async fn query_rank(&self, object_id: impl ToObjectId) -> Result<Rank> {
         self.client
