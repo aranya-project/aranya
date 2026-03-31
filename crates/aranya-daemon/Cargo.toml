@@ -21,8 +21,6 @@ default = [
 
 # Preview features
 preview = ["aranya-daemon-api/preview"]
-# Test-only utilities
-test-utils = ["aranya-daemon-api/test-utils"]
 # Aranya Fast Channels
 afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 
