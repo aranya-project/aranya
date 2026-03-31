@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-certgen"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "clap",
  "rcgen",
@@ -269,7 +269,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "aranya-afc-util",
@@ -402,7 +402,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",
