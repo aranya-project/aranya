@@ -229,13 +229,11 @@ impl Device<'_> {
     /// Returns the generation counter for the device, if any.
     #[cfg(test)]
     pub async fn generation(&self) -> Result<Option<i64>> {
-        let gen = self
-            .client
+        self.client
             .daemon
             .query_device_generation(rpc_context(), self.team_id, self.id)
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-        Ok(gen)
+            .map_err(aranya_error)
     }
 }

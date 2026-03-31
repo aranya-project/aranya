@@ -136,7 +136,7 @@ impl PublicKeyBundle {
         CE: Engine,
         KS: KeyStore,
     {
-        macro_rules! gen {
+        macro_rules! gen_key {
             ($key:ident) => {{
                 let sk = $key::<CE::CS>::new(eng);
                 store.insert_key(eng, sk).context(concat!(
@@ -147,9 +147,9 @@ impl PublicKeyBundle {
             }};
         }
         Ok(Self {
-            device_id: gen!(IdentityKey),
-            enc_id: gen!(EncryptionKey),
-            sign_id: gen!(SigningKey),
+            device_id: gen_key!(IdentityKey),
+            enc_id: gen_key!(EncryptionKey),
+            sign_id: gen_key!(SigningKey),
         })
     }
 
