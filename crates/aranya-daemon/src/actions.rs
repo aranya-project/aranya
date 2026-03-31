@@ -66,7 +66,7 @@ where
     /// Returns an implementation of [`Actions`] for a particular
     /// storage.
     #[instrument(skip_all, fields(%graph_id))]
-    pub fn actions(&self, graph_id: GraphId) -> impl Actions<PS, SP, CE> {
+    pub fn actions(&self, graph_id: GraphId) -> impl Actions<PS, SP, CE> + use<PS, SP, CE> {
         ActionsImpl {
             client: self.clone(),
             graph_id,
