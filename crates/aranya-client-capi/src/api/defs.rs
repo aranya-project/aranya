@@ -2320,6 +2320,7 @@ pub unsafe fn team_labels(
 /// Query a label.
 ///
 /// Returns the label metadata for the given label ID.
+/// Returns an error if the label does not exist.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
@@ -2353,13 +2354,10 @@ pub unsafe fn team_label_exists(
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
-    match client
+    Ok(client
         .rt
         .block_on(client.inner.team(team.into()).label(label.into()))
-    {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+        .is_ok())
 }
 
 /// An AFC Sending Channel Object.

@@ -3257,6 +3257,7 @@ AranyaError aranya_team_labels_ext(const struct AranyaClient *client,
  * Query a label.
  *
  * Returns the label metadata for the given label ID.
+ * Returns an error if the label does not exist.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -3274,6 +3275,7 @@ AranyaError aranya_team_label(const struct AranyaClient *client,
  * Query a label.
  *
  * Returns the label metadata for the given label ID.
+ * Returns an error if the label does not exist.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID

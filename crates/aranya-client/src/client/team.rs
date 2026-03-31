@@ -437,7 +437,7 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Returns a label.
+    /// Returns a label. Returns an error if the label does not exist.
     #[instrument(skip(self))]
     pub async fn label(&self, label_id: LabelId) -> Result<Label> {
         self.client
