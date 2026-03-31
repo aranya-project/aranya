@@ -1,9 +1,6 @@
 //! PSK setup for rustls for use with QUIC connections
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex as SyncMutex},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{bail, Context as _, Result};
 use aranya_crypto::{policy::GroupId, tls::PskSeedId, Csprng, KeyStoreExt as _, PolicyId};
@@ -84,11 +81,15 @@ fn psk_to_rustls(psk: aranya_crypto::tls::Psk<CS>) -> Result<PresharedKey> {
     Ok(psk)
 }
 
-/// PSK store that's shared between [`super::SyncManager`]
-/// and [`super::Server`]
-#[derive(Debug)]
+/// Shared PSK store that's shared between the [`QuicListener`] and [`QuicConnector`].
+///
+/// [`QuicListener`]: super::QuicListener
+/// [`QuicConnector`]: super::QuicConnector
+#[derive(Debug, Default)]
 pub(crate) struct PskStore {
-    inner: SyncMutex<PskStoreInner>,
+    inner: std::sync::Mutex<PskStoreInner>,
+    /// Lock for active team to avoid doubly setting it.
+    team_lock: tokio::sync::Mutex<()>,
 }
 
 impl PskStore {
@@ -108,11 +109,12 @@ impl PskStore {
         }
 
         Self {
-            inner: SyncMutex::new(PskStoreInner {
+            inner: std::sync::Mutex::new(PskStoreInner {
                 active_team: None,
                 team_identities,
                 identity_team: identity_psk,
             }),
+            team_lock: tokio::sync::Mutex::default(),
         }
     }
 
@@ -134,10 +136,15 @@ impl PskStore {
         inner.identity_team.retain(|_, other| *other != team_id);
     }
 
-    pub(crate) fn set_team(&self, team_id: TeamId) {
+    /// Set the active team used while connecting.
+    ///
+    /// The guard must be held until after the connection is made.
+    pub(crate) async fn set_team(&self, team_id: TeamId) -> tokio::sync::MutexGuard<'_, ()> {
+        let guard = self.team_lock.lock().await;
         #[allow(clippy::expect_used, reason = "poison")]
         let mut inner = self.inner.lock().expect("poisoned");
         let _ = inner.active_team.replace(team_id);
+        guard
     }
 
     pub(super) fn get_team_for_identity(&self, identity: &[u8]) -> Option<TeamId> {
@@ -172,7 +179,7 @@ impl server::SelectsPresharedKeys for PskStore {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct PskStoreInner {
     team_identities: HashMap<TeamId, Vec<Arc<PresharedKey>>>,
     identity_team: HashMap<PskIdAsKey, TeamId>,
