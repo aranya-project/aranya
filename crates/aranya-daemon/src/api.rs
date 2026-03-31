@@ -456,7 +456,12 @@ impl DaemonApi for Api {
     async fn test_trace_id(self, ctx: context::Context) -> api::Result<String> {
         trace::setup_trace_context(&ctx);
         let trace_id = ctx.trace_context.trace_id.to_string();
-        info!(rpc.trace_id = %trace_id, "RPC: TestTraceId");
+        crate::observability::log_rpc_test_trace_id(
+            &trace_id,
+            ctx.deadline,
+            crate::observability::OTEL_KIND_SERVER,
+            crate::observability::ObservabilityEvent::RpcTestTraceId.event_name(),
+        );
         Ok(trace_id)
     }
 
