@@ -155,8 +155,8 @@ pub fn event_satisfies_required_fields(
 
 /// Performs a one-time observability required-fields validation.
 ///
-/// This is intended for startup preflight checks.
-pub fn preflight_required_fields_check() -> Result<(), &'static str> {
+/// This is intended for startup checks.
+pub fn startup_event_check() -> Result<(), &'static str> {
     if REQUIRED_ROOT_FIELDS.is_empty() {
         return Err("required root fields must not be empty");
     }
@@ -380,8 +380,8 @@ mod tests {
     }
 
     #[test]
-    fn test_preflight_required_fields_check() {
-        assert!(preflight_required_fields_check().is_ok());
+    fn test_startup_required_fields_check() {
+        assert!(startup_required_fields_check().is_ok());
     }
 
     #[test]
