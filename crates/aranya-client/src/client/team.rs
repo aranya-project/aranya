@@ -326,7 +326,7 @@ impl Team<'_> {
 
     /// Queries all permissions assigned to a role.
     #[instrument(skip(self))]
-    pub async fn query_role_perms(&self, role_id: RoleId) -> Result<Vec<Permission>> {
+    pub async fn role_perm(&self, role_id: RoleId) -> Result<Vec<Permission>> {
         let perms = self
             .client
             .daemon
@@ -374,7 +374,7 @@ impl Team<'_> {
     /// Queries the rank of an object.
     #[allow(private_bounds)]
     #[instrument(skip(self))]
-    pub async fn query_rank(&self, object_id: impl ToObjectId) -> Result<Rank> {
+    pub async fn rank(&self, object_id: impl ToObjectId) -> Result<Rank> {
         self.client
             .daemon
             .query_rank(create_ctx(), self.id, object_id.to_object_id().into_api())
