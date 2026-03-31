@@ -34,9 +34,9 @@ pub fn init_tracing(mod_path: &str) {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
+                .json()
                 .with_file(false)
                 .with_target(false)
-                .compact()
                 .with_filter(filter),
         )
         .init();
