@@ -157,16 +157,6 @@ pub fn event_satisfies_required_fields(
 ///
 /// This is intended for startup checks.
 pub fn startup_event_check() -> Result<(), &'static str> {
-    if REQUIRED_ROOT_FIELDS.is_empty() {
-        return Err("required root fields must not be empty");
-    }
-    if REQUIRED_BASE_EVENT_FIELDS.is_empty() {
-        return Err("required base event fields must not be empty");
-    }
-    if REQUIRED_RPC_FIELDS.is_empty() {
-        return Err("required rpc fields must not be empty");
-    }
-
     for event in [
         ObservabilityEvent::DaemonStarting,
         ObservabilityEvent::DaemonLoaded,

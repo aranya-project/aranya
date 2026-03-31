@@ -129,6 +129,12 @@ static void example_log_fprintf(FILE *stream, const char *fmt, ...) {
     example_emit_json_log(stream, level, message);
 }
 
+#ifdef printf
+#undef printf
+#endif
+#ifdef fprintf
+#undef fprintf
+#endif
 #define printf(...) example_log_printf(__VA_ARGS__)
 #define fprintf(STREAM, ...) example_log_fprintf((STREAM), __VA_ARGS__)
 
