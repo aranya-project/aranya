@@ -703,7 +703,7 @@ impl From<&AfcChannelId> for afc::ChannelId {
 pub fn init_logging() -> Result<(), imp::Error> {
     use tracing_subscriber::{prelude::*, EnvFilter};
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().json())
         .with(EnvFilter::from_env("ARANYA_CAPI"))
         .try_init()
         .context("unable to initialize logging")?;
