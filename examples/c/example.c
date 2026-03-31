@@ -11,12 +11,12 @@
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
-#include <sys/time.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -31,10 +31,9 @@ static void example_format_timestamp(char *buf, size_t len) {
 
     gettimeofday(&tv, NULL);
     gmtime_r(&tv.tv_sec, &tm);
-    snprintf(buf, len,
-             "%04d-%02d-%02dT%02d:%02d:%02d.%06dZ",
-             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour,
-             tm.tm_min, tm.tm_sec, (int)tv.tv_usec);
+    snprintf(buf, len, "%04d-%02d-%02dT%02d:%02d:%02d.%06dZ", tm.tm_year + 1900,
+             tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+             (int)tv.tv_usec);
 }
 
 static void example_escape_json(char *dst, size_t dst_len, const char *src) {
@@ -103,7 +102,8 @@ static void example_emit_json_log(FILE *stream, const char *level,
     example_format_timestamp(timestamp, sizeof(timestamp));
     example_escape_json(escaped, sizeof(escaped), message);
     fprintf(stream,
-            "{\"timestamp\":\"%s\",\"level\":\"%s\",\"fields\":{\"message\":\"%s\"},\"target\":\"aranya_c_example\"}\n",
+            "{\"timestamp\":\"%s\",\"level\":\"%s\",\"fields\":{\"message\":\"%"
+            "s\"},\"target\":\"aranya_c_example\"}\n",
             timestamp, level, escaped);
     fflush(stream);
 }
