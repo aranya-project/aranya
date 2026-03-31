@@ -411,6 +411,25 @@ typedef struct AranyaDeviceId {
 } AranyaDeviceId;
 
 /**
+ * A label.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaLabel {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[112];
+} AranyaLabel;
+
+/**
+ * Label ID.
+ */
+typedef struct AranyaLabelId {
+    struct AranyaId id;
+} AranyaLabelId;
+
+/**
  * Configuration info builder for an Aranya client config [`AranyaClientConfig`](@ref AranyaClientConfig).
  */
 typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
@@ -625,13 +644,6 @@ typedef int64_t AranyaRank;
  * E.g. "TELEMETRY_LABEL"
  */
 typedef const char *AranyaLabelName;
-
-/**
- * Label ID.
- */
-typedef struct AranyaLabelId {
-    struct AranyaId id;
-} AranyaLabelId;
 
 /**
  * An identifier for any object with a unique Aranya ID defined in the policy.
@@ -892,6 +904,69 @@ AranyaError aranya_role_get_author(const struct AranyaRole *role,
 AranyaError aranya_role_get_author_ext(const struct AranyaRole *role,
                                        struct AranyaDeviceId *__output,
                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_label_init`.
+ *
+ * @relates AranyaLabel
+ */
+AranyaError aranya_label_cleanup(struct AranyaLabel *ptr);
+
+/**
+ * Get ID of label.
+ *
+ * @param[in] label the label
+ *
+ * @relates AranyaLabel
+ */
+AranyaError aranya_label_get_id(const struct AranyaLabel *label,
+                                struct AranyaLabelId *__output);
+
+/**
+ * Get ID of label.
+ *
+ * @param[in] label the label
+ *
+ * @relates AranyaLabel
+ */
+AranyaError aranya_label_get_id_ext(const struct AranyaLabel *label,
+                                    struct AranyaLabelId *__output,
+                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Get name of label.
+ *
+ * The resulting string must not be freed.
+ *
+ * @param[in] label the label
+ *
+ * @relates AranyaLabel
+ */
+AranyaError aranya_label_get_name(const struct AranyaLabel *label,
+                                  const char **__output);
+
+/**
+ * Get the author of a label.
+ *
+ * @param[in] label the label
+ *
+ * @relates AranyaLabel
+ */
+AranyaError aranya_label_get_author(const struct AranyaLabel *label,
+                                    struct AranyaDeviceId *__output);
+
+/**
+ * Get the author of a label.
+ *
+ * @param[in] label the label
+ *
+ * @relates AranyaLabel
+ */
+AranyaError aranya_label_get_author_ext(const struct AranyaLabel *label,
+                                        struct AranyaDeviceId *__output,
+                                        struct AranyaExtError *__ext_err);
 
 /**
  * Returns a human-readable string for an [`AranyaPermission`].
@@ -3179,11 +3254,45 @@ AranyaError aranya_team_labels_ext(const struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
+ * Query a label.
+ *
+ * Returns the label metadata for the given label ID.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] label_id the label ID to query
+ * @param[out] label_out returns the label
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_label(const struct AranyaClient *client,
+                              const struct AranyaTeamId *team,
+                              const struct AranyaLabelId *label_id,
+                              struct AranyaLabel *label_out);
+
+/**
+ * Query a label.
+ *
+ * Returns the label metadata for the given label ID.
+ *
+ * @param[in] client the Aranya Client
+ * @param[in] team the team's ID
+ * @param[in] label_id the label ID to query
+ * @param[out] label_out returns the label
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_team_label_ext(const struct AranyaClient *client,
+                                  const struct AranyaTeamId *team,
+                                  const struct AranyaLabelId *label_id,
+                                  struct AranyaLabel *label_out,
+                                  struct AranyaExtError *__ext_err);
+
+/**
  * Query if a label exists.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] device the device's ID
  * @param[in] label the label
  * @param[out] __output boolean indicating whether the label exists.
  *
@@ -3199,7 +3308,6 @@ AranyaError aranya_team_label_exists(const struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
- * @param[in] device the device's ID
  * @param[in] label the label
  * @param[out] __output boolean indicating whether the label exists.
  *

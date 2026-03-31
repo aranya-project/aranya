@@ -430,6 +430,41 @@ impl From<ChanOp> for aranya_client::ChanOp {
     }
 }
 
+/// A label.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 112, align = 8)]
+pub type Label = Safe<aranya_client::Label>;
+
+/// Get ID of label.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+pub fn label_get_id(label: &Label) -> LabelId {
+    label.deref().id.into()
+}
+
+/// Get name of label.
+///
+/// The resulting string must not be freed.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
+pub fn label_get_name(label: &Label) -> *const c_char {
+    label.deref().name.as_ptr().cast()
+}
+
+/// Get the author of a label.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+pub fn label_get_author(label: &Label) -> DeviceId {
+    label.deref().author_id.into()
+}
+
 /// Label ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -2279,6 +2314,29 @@ pub unsafe fn team_labels(
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write(src.id.into());
     }
+    Ok(())
+}
+
+/// Query a label.
+///
+/// Returns the label metadata for the given label ID.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] label_id the label ID to query
+/// @param[out] label_out returns the label
+///
+/// @relates AranyaClient.
+pub fn team_label(
+    client: &Client,
+    team: &TeamId,
+    label_id: &LabelId,
+    label_out: &mut MaybeUninit<Label>,
+) -> Result<(), imp::Error> {
+    let label = client
+        .rt
+        .block_on(client.inner.team(team.into()).label(label_id.into()))?;
+    Label::init(label_out, label);
     Ok(())
 }
 

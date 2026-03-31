@@ -850,6 +850,20 @@ AranyaError run_afc_example(Team *t) {
         goto exit;
     }
 
+    // Query the label to verify it was created correctly.
+    AranyaLabel label;
+    err = aranya_team_label(&owner->client, &t->id, &label_id, &label);
+    EXPECT("error querying label", err);
+
+    AranyaLabelId queried_label_id;
+    err = aranya_label_get_id(&label, &queried_label_id);
+    EXPECT("error getting label ID", err);
+
+    const char *queried_label_name = aranya_label_get_name(&label);
+    printf("created label '%s'\n", queried_label_name);
+
+    aranya_label_cleanup(&label);
+
     // Tell them both to sync with the owner to see their new label.
     err = aranya_sync_now(&membera->client, &t->id, sync_addrs[OWNER], NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
