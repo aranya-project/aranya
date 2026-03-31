@@ -71,7 +71,7 @@ async fn test_sync_now() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner
         .add_device(
@@ -87,7 +87,7 @@ async fn test_sync_now() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     owner
         .add_device(
@@ -121,7 +121,7 @@ async fn test_sync_now() -> Result<()> {
         .context("admin unable to sync with owner")?;
 
     // Now we should be able to successfully create a label (admin has CreateLabel perm).
-    let member_role_rank = admin.query_rank(roles.member().id).await?;
+    let member_role_rank = admin.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     admin
@@ -155,7 +155,7 @@ async fn test_add_remove_sync_peers() -> Result<()> {
 
     // Add a command to graph by having the owner create a label.
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     owner_team.create_label(text!("label1"), label_rank).await?;
@@ -246,7 +246,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
         .find(|r| r.name == "admin")
         .ok_or_else(|| anyhow::anyhow!("no admin role"))?;
 
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
@@ -262,7 +262,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner
         .add_device(
@@ -422,7 +422,7 @@ async fn test_add_devices() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner
         .add_device(
@@ -443,7 +443,7 @@ async fn test_add_devices() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     admin
         .add_device(
@@ -474,7 +474,7 @@ async fn test_add_devices() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.member().id)
+        .rank(roles.member().id)
         .await?;
     for (name, kb, device_id) in [
         ("membera", team.membera.pk.clone(), team.membera.id),
@@ -533,13 +533,13 @@ async fn test_add_device_with_initial_role_requires_outranking() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     let member_role_rank = devices
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.member().id)
+        .rank(roles.member().id)
         .await?;
     owner_team
         .add_device(
@@ -653,7 +653,7 @@ async fn test_query_functions() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team.create_label(text!("label1"), label_rank).await?;
@@ -764,7 +764,7 @@ async fn test_add_team() -> Result<()> {
     info!(?team_id);
 
     let roles = devices.setup_default_roles(team_id).await?;
-    let member_role_rank = owner.query_rank(roles.member().id).await?;
+    let member_role_rank = owner.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
@@ -774,7 +774,7 @@ async fn test_add_team() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner
         .add_device(
@@ -790,7 +790,7 @@ async fn test_add_team() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     owner
         .add_device(
@@ -871,7 +871,7 @@ async fn test_remove_team() -> Result<()> {
 
     let owner = devices.owner.client.team(team_id);
     let roles = devices.setup_default_roles(team_id).await?;
-    let member_role_rank = owner.query_rank(roles.member().id).await?;
+    let member_role_rank = owner.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
@@ -884,7 +884,7 @@ async fn test_remove_team() -> Result<()> {
             .owner
             .client
             .team(team_id)
-            .query_rank(roles.operator().id)
+            .rank(roles.operator().id)
             .await?;
         owner
             .add_device(
@@ -899,7 +899,7 @@ async fn test_remove_team() -> Result<()> {
             .owner
             .client
             .team(team_id)
-            .query_rank(roles.admin().id)
+            .rank(roles.admin().id)
             .await?;
         owner
             .add_device(
@@ -989,13 +989,13 @@ async fn test_multi_team_sync() -> Result<()> {
         .owner
         .client
         .team(team_id1)
-        .query_rank(roles1.admin().id)
+        .rank(roles1.admin().id)
         .await?;
     let operator_role_rank_t1 = devices
         .owner
         .client
         .team(team_id1)
-        .query_rank(roles1.operator().id)
+        .rank(roles1.operator().id)
         .await?;
     team1
         .add_device(
@@ -1027,13 +1027,13 @@ async fn test_multi_team_sync() -> Result<()> {
         .owner
         .client
         .team(team_id2)
-        .query_rank(roles2.admin().id)
+        .rank(roles2.admin().id)
         .await?;
     let operator_role_rank_t2 = devices
         .owner
         .client
         .team(team_id2)
-        .query_rank(roles2.operator().id)
+        .rank(roles2.operator().id)
         .await?;
     team2
         .add_device(
@@ -1100,7 +1100,7 @@ async fn test_multi_team_sync() -> Result<()> {
     admin1.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully create a label (admin has CreateLabel perm).
-    let member_role_rank_t1 = admin1.query_rank(roles1.member().id).await?;
+    let member_role_rank_t1 = admin1.rank(roles1.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank_t1 = Rank::new(member_role_rank_t1.value().saturating_sub(1));
     admin1
@@ -1149,7 +1149,7 @@ async fn test_multi_team_sync() -> Result<()> {
     admin2.sync_now(owner_addr, None).await?;
 
     // Now we should be able to successfully create a label (admin has CreateLabel perm).
-    let member_role_rank_t2 = admin2.query_rank(roles2.member().id).await?;
+    let member_role_rank_t2 = admin2.rank(roles2.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank_t2 = Rank::new(member_role_rank_t2.value().saturating_sub(1));
     admin2
@@ -1214,7 +1214,7 @@ async fn test_hello_subscription() -> Result<()> {
     // Admin performs an action that will update their graph - create a label
     // (admin has permission to create labels)
     info!("admin creating a test label");
-    let member_role_rank = admin_team.query_rank(roles.member().id).await?;
+    let member_role_rank = admin_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let test_label = admin_team
@@ -1369,7 +1369,7 @@ async fn test_hello_subscription_schedule_delay() -> Result<()> {
 
     // Admin creates first label
     info!("admin creating first test label");
-    let member_role_rank = admin_team.query_rank(roles.member().id).await?;
+    let member_role_rank = admin_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let test_label_1 = admin_team
@@ -1555,7 +1555,7 @@ async fn test_create_role() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
 
     let expected_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let test_role = owner_team
@@ -1564,7 +1564,7 @@ async fn test_create_role() -> Result<()> {
         .expect("expected to create role");
 
     // Verify the rank can be queried back.
-    let rank = owner_team.query_rank(test_role.id).await?;
+    let rank = owner_team.rank(test_role.id).await?;
     assert_eq!(rank, expected_rank);
 
     owner_team
@@ -1580,7 +1580,7 @@ async fn test_create_role() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner_team
         .add_device(
@@ -1615,7 +1615,7 @@ async fn test_add_perm_to_created_role() -> Result<()> {
     let owner_addr = devices.owner.aranya_local_addr().await?;
 
     // Create a custom admin type role with rank derived from the owner's device rank.
-    let owner_device_rank = owner_team.query_rank(devices.owner.id).await?;
+    let owner_device_rank = owner_team.rank(devices.owner.id).await?;
     let custom_role_rank = owner_device_rank.value() / 2;
     let admin_role = owner_team
         .create_role(text!("admin"), custom_role_rank.into())
@@ -1662,7 +1662,7 @@ async fn test_privilege_escalation_rejected() -> Result<()> {
     let team_id = devices.create_and_add_team().await?;
     let owner_team = devices.owner.client.team(team_id);
     let roles = devices.setup_default_roles(team_id).await?;
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
 
     // All custom ranks must be below the lowest default role rank.
     let malicious_role_rank = Rank::new(member_role_rank.value().saturating_sub(1));
@@ -1744,7 +1744,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner_team
         .add_device(
@@ -1769,7 +1769,7 @@ async fn test_remove_perm_from_default_role() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     admin_team
         .add_device(
@@ -1884,7 +1884,7 @@ async fn test_delete_label_requires_permission() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team
@@ -1918,7 +1918,7 @@ async fn test_assign_label_to_device_self_rejected() -> Result<()> {
     let owner_id = devices.owner.id;
     let owner_team = devices.owner.client.team(team_id);
 
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     // Label rank must be lower than the member role rank so all team members can operate on it.
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team
@@ -1971,13 +1971,13 @@ async fn test_create_label() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let expected_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label_id = owner_team
         .create_label(text!("ranked_label"), expected_rank)
         .await?;
 
-    let rank = owner_team.query_rank(label_id).await?;
+    let rank = owner_team.rank(label_id).await?;
     assert_eq!(rank, expected_rank);
 
     Ok(())
@@ -1991,7 +1991,7 @@ async fn test_change_rank() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let initial_rank = Rank::new(member_role_rank.value().saturating_sub(2));
     let updated_rank = Rank::new(initial_rank.value().saturating_add(1));
     let label = owner_team
@@ -2002,7 +2002,7 @@ async fn test_change_rank() -> Result<()> {
         .change_rank(label, initial_rank, updated_rank)
         .await?;
 
-    let new_rank = owner_team.query_rank(label).await?;
+    let new_rank = owner_team.rank(label).await?;
     assert_eq!(new_rank, updated_rank);
 
     Ok(())
@@ -2024,13 +2024,13 @@ async fn test_change_rank_requires_sufficient_author_rank() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     let member_role_rank = devices
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.member().id)
+        .rank(roles.member().id)
         .await?;
     let high_label_rank = Rank::new(operator_role_rank.value().saturating_add(50));
     let high_label = owner_team
@@ -2083,7 +2083,7 @@ async fn test_create_role_rank_too_high_rejected() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner_team
         .add_device(
@@ -2128,7 +2128,7 @@ async fn test_add_device_rank_higher_than_role_rejected() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     match owner_team
         .add_device(
@@ -2160,13 +2160,13 @@ async fn test_change_rank_above_role_rank_rejected() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.member().id)
+        .rank(roles.member().id)
         .await?;
     let operator_role_rank = devices
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     owner_team
@@ -2204,7 +2204,7 @@ async fn test_change_role_rank_rejected() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
 
     // Create a role
     let role_rank = Rank::new(member_role_rank.value().saturating_sub(2));
@@ -2224,7 +2224,7 @@ async fn test_change_role_rank_rejected() -> Result<()> {
     }
 
     // Verify the role rank was not changed
-    let current_role_rank = owner_team.query_rank(role.id).await?;
+    let current_role_rank = owner_team.rank(role.id).await?;
     assert_eq!(
         current_role_rank, role_rank,
         "role rank should not have changed"
@@ -2247,7 +2247,7 @@ async fn test_role_rank_migration_pattern() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
 
     // Step 1: Create original role below member role rank with some permissions
     let old_role_rank = member_role_rank.value().saturating_sub(2);
@@ -2284,7 +2284,7 @@ async fn test_role_rank_migration_pattern() -> Result<()> {
         .await?;
 
     // Step 3: Query permissions from old role and copy to new role
-    let old_perms = owner_team.query_role_perms(old_role.id).await?;
+    let old_perms = owner_team.role_perm(old_role.id).await?;
     assert_eq!(old_perms.len(), 2, "old role should have 2 permissions");
     for &perm in &old_perms {
         owner_team.add_perm_to_role(new_role.id, perm).await?;
@@ -2292,7 +2292,7 @@ async fn test_role_rank_migration_pattern() -> Result<()> {
 
     // Verify new role has the same permissions (sort since fact iteration order
     // is not guaranteed across different roles)
-    let mut new_perms = owner_team.query_role_perms(new_role.id).await?;
+    let mut new_perms = owner_team.role_perm(new_role.id).await?;
     let mut old_sorted = old_perms.clone();
     old_sorted.sort_by_key(|p| format!("{p:?}"));
     new_perms.sort_by_key(|p| format!("{p:?}"));
@@ -2344,13 +2344,13 @@ async fn test_insufficient_rank_cannot_operate_on_objects() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     let operator_role_rank = devices
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     owner_team
         .add_device(
@@ -2414,7 +2414,7 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
     let operator_team = devices.operator.client.team(team_id);
 
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let low_label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
     // Owner creates a label at low rank
@@ -2427,13 +2427,13 @@ async fn test_change_rank_new_rank_above_author_rejected() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     let admin_role_rank = devices
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner_team
         .add_device(
@@ -2471,7 +2471,7 @@ async fn test_change_rank_stale_old_rank_rejected() -> Result<()> {
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
 
     let initial_rank = Rank::new(member_role_rank.value().saturating_sub(3));
     let updated_rank = Rank::new(initial_rank.value().saturating_add(1));
@@ -2513,14 +2513,14 @@ async fn test_change_rank_self_demotion() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     let admin_rank = Rank::new(admin_role_rank.value().saturating_sub(1));
     let member_role_rank = devices
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.member().id)
+        .rank(roles.member().id)
         .await?;
     // Demoted rank must be lower than admin's current rank.
     let demoted_rank = Rank::new(member_role_rank.value().saturating_sub(1));
@@ -2542,7 +2542,7 @@ async fn test_change_rank_self_demotion() -> Result<()> {
     owner_team
         .sync_now(devices.admin.aranya_local_addr().await?, None)
         .await?;
-    let new_rank = owner_team.query_rank(devices.admin.id).await?;
+    let new_rank = owner_team.rank(devices.admin.id).await?;
     assert_eq!(new_rank, demoted_rank);
 
     Ok(())
@@ -2566,7 +2566,7 @@ async fn test_change_rank_self_promotion_rejected() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     let admin_rank = Rank::new(admin_role_rank.value().saturating_sub(1));
     let promoted_rank = Rank::new(admin_rank.value().saturating_add(50));
@@ -2588,7 +2588,7 @@ async fn test_change_rank_self_promotion_rejected() -> Result<()> {
     }
 
     // Verify the rank was not changed
-    let current_rank = admin_team.query_rank(devices.admin.id).await?;
+    let current_rank = admin_team.rank(devices.admin.id).await?;
     assert_eq!(current_rank, admin_rank, "rank should not have changed");
 
     Ok(())
@@ -2610,7 +2610,7 @@ async fn test_equal_rank_cannot_operate() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     let equal_rank = Rank::new(operator_role_rank.value().saturating_sub(1));
     owner_team
@@ -2660,7 +2660,7 @@ async fn test_assign_role_requires_outranking_both_role_and_device() -> Result<(
 
     // Create custom roles and devices with ordered ranks below member role rank.
     // Ordering: low_device < low_role < admin < high_device < high_role < member_role
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let high_role_rank = member_role_rank.value().saturating_sub(1);
     let high_device_rank = high_role_rank.saturating_sub(1);
     let admin_rank = high_device_rank.saturating_sub(1);
@@ -2739,7 +2739,7 @@ async fn test_create_label_rank_too_high_rejected() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner_team
         .add_device(
@@ -2784,7 +2784,7 @@ async fn test_perm_change_requires_outranking_role() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     owner_team
         .add_device(
@@ -2826,7 +2826,7 @@ async fn test_assign_role_where_role_rank_equals_device_rank_allowed() -> Result
     let roles = devices.setup_default_roles(team_id).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
 
     // Create a custom role below the member role rank
     let role_rank = member_role_rank.value().saturating_sub(1);
@@ -2874,7 +2874,7 @@ async fn test_change_rank_device_to_exact_role_rank_allowed() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.member().id)
+        .rank(roles.member().id)
         .await?;
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(100));
     owner_team
@@ -2892,7 +2892,7 @@ async fn test_change_rank_device_to_exact_role_rank_allowed() -> Result<()> {
         .context("changing device rank to equal role rank should succeed")?;
 
     // Verify the rank was changed
-    let new_rank = owner_team.query_rank(devices.admin.id).await?;
+    let new_rank = owner_team.rank(devices.admin.id).await?;
     assert_eq!(new_rank, member_role_rank);
 
     Ok(())
@@ -2917,7 +2917,7 @@ async fn test_has_permission_but_insufficient_rank() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.operator().id)
+        .rank(roles.operator().id)
         .await?;
     let high_label_rank = Rank::new(operator_role_rank.value().saturating_add(100));
     let high_label = owner_team
@@ -2940,7 +2940,7 @@ async fn test_has_permission_but_insufficient_rank() -> Result<()> {
     operator_team.sync_now(owner_addr, None).await?;
 
     // Operator has ChangeRank permission but cannot change higher-ranked label
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let low_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     match operator_team
         .change_rank(high_label, high_label_rank, low_rank)
@@ -2971,7 +2971,7 @@ async fn test_outranks_but_missing_permission() -> Result<()> {
     let admin_team = devices.admin.client.team(team_id);
 
     // Create a label ranked lower than admin
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let low_label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let low_label = owner_team
         .create_label(text!("low_label"), low_label_rank)
@@ -2982,7 +2982,7 @@ async fn test_outranks_but_missing_permission() -> Result<()> {
         .owner
         .client
         .team(team_id)
-        .query_rank(roles.admin().id)
+        .rank(roles.admin().id)
         .await?;
     owner_team
         .add_device(
@@ -3027,7 +3027,7 @@ async fn test_duplicate_label_assignment_rejected() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team.create_label(text!("label"), label_rank).await?;
 
@@ -3062,7 +3062,7 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team.create_label(text!("label"), label_rank).await?;
 
@@ -3175,7 +3175,7 @@ async fn test_add_device_to_team_twice_rejected() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
 
     // Try to add membera again (already on team).
@@ -3208,7 +3208,7 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
     devices.add_all_device_roles(team_id, &roles).await?;
 
     let owner_team = devices.owner.client.team(team_id);
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team.create_label(text!("label"), label_rank).await?;
 
@@ -3313,7 +3313,7 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
     let owner_team = devices.owner.client.team(team_id);
 
     // Create a label that can be assigned to members.
-    let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+    let member_role_rank = owner_team.rank(roles.member().id).await?;
     let label_rank = Rank::new(member_role_rank.value().saturating_sub(1));
     let label = owner_team.create_label(text!("label"), label_rank).await?;
 

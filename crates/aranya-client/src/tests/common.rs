@@ -76,7 +76,7 @@ impl DevicesCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        let admin_role_rank = owner_team.query_rank(roles.admin().id).await?;
+        let admin_role_rank = owner_team.rank(roles.admin().id).await?;
         owner_team
             .add_device(
                 self.admin.pk.clone(),
@@ -87,7 +87,7 @@ impl DevicesCtx {
 
         // Add the operator as a new device.
         info!("adding operator to team");
-        let operator_role_rank = owner_team.query_rank(roles.operator().id).await?;
+        let operator_role_rank = owner_team.rank(roles.operator().id).await?;
         owner_team
             .add_device(
                 self.operator.pk.clone(),
@@ -98,7 +98,7 @@ impl DevicesCtx {
 
         // Add member A as a new device.
         info!("adding membera to team");
-        let member_role_rank = owner_team.query_rank(roles.member().id).await?;
+        let member_role_rank = owner_team.rank(roles.member().id).await?;
         owner_team
             .add_device(
                 self.membera.pk.clone(),

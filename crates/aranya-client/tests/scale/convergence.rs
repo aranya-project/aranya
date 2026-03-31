@@ -58,7 +58,7 @@ impl TestCtx {
             .into_iter()
             .find(|r| r.name == "owner")
             .context("unable to find owner role")?;
-        let owner_role_rank = team.query_rank(owner_role.id).await?;
+        let owner_role_rank = team.rank(owner_role.id).await?;
 
         // Create the label - this is our observable command
         let label_text: Text = label_name.parse().context("invalid label name")?;
