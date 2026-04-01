@@ -10,8 +10,14 @@ jobs:
     steps:
       - name: Authenticate with crates.io
         run: |
+          # Debug: check token length and prefix (without revealing the full token)
+          echo "Token length: ${#CARGO_REGISTRY_TOKEN}"
+          echo "Token prefix: ${CARGO_REGISTRY_TOKEN:0:3}"
+          echo "Token has trailing whitespace: $([ "${CARGO_REGISTRY_TOKEN}" != "$(echo -n "${CARGO_REGISTRY_TOKEN}" | tr -d '[:space:]')" ] && echo yes || echo no)"
+
+          token_trimmed=$(echo -n "$CARGO_REGISTRY_TOKEN" | tr -d '[:space:]')
           response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: $CARGO_REGISTRY_TOKEN" \
+            -H "Authorization: $token_trimmed" \
             https://crates.io/api/v1/me)
           if [ "$response" = "200" ]; then
             echo "✅ crates.io token is valid"
