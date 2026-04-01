@@ -12,7 +12,8 @@ use s2n_quic::{
 use tracing::{debug, error, trace, warn};
 
 use super::{
-    connections::ConnectorPool, Error, PskStore, QuicStream, SyncConnector, ALPN_QUIC_SYNC,
+    connections::ConnectorPool, ConnectionInfo, Error, PskStore, QuicStream, SyncConnector,
+    ALPN_QUIC_SYNC,
 };
 use crate::sync::{Addr, SyncPeer};
 
@@ -24,10 +25,8 @@ pub(crate) struct QuicConnector {
     pool: ConnectorPool,
     /// Allows authenticating the identity of a given `GraphId`.
     psk_store: Arc<PskStore>,
-    /// The return port we want the peer to connect to us on.
-    return_port: Bytes,
-    /// The local address of the server, since it should be infallible.
-    local_addr: Addr,
+    /// Serialized connection info to send to peers.
+    conn_info_bytes: Bytes,
 }
 
 impl QuicConnector {
@@ -57,15 +56,21 @@ impl QuicConnector {
             .start()
             .map_err(Error::ClientStart)?;
 
-        // Build up our return port to send to any peers we connect to.
-        let return_port = Bytes::copy_from_slice(&server_addr.port().to_be_bytes());
+        // Build up the connection info to send to any peers we connect to.
+        let conn_info = ConnectionInfo {
+            port: server_addr.port(),
+            device_id: pool.local_device_id,
+        };
+        let conn_info_bytes = Bytes::from(
+            postcard::to_allocvec(&conn_info)
+                .map_err(|e| Error::Other(anyhow::anyhow!("failed to serialize ConnectionInfo: {e}")))?,
+        );
 
         Ok(Self {
             client,
             pool,
             psk_store,
-            return_port,
-            local_addr: server_addr,
+            conn_info_bytes,
         })
     }
 }
@@ -121,14 +126,29 @@ impl SyncConnector for QuicConnector {
                     .await?
             };
             conn.keep_alive(true)?;
+            // Send our connection info (return port + device ID).
             conn.open_send_stream()
                 .await?
-                .send(self.return_port.clone())
+                .send(self.conn_info_bytes.clone())
                 .await?;
-            debug!(?peer, "QUIC handshake complete, sent return port");
+            // Receive the listener's device ID for tie-breaking.
+            let remote_id_bytes = conn
+                .accept_receive_stream()
+                .await?
+                .context("unable to accept device ID stream")?
+                .receive()
+                .await?
+                .context("peer didn't send device ID")?;
+            let remote_device_id: [u8; 32] = remote_id_bytes
+                .as_ref()
+                .try_into()
+                .context("invalid device ID length")?;
+            debug!(?peer, "QUIC handshake complete, exchanged connection info");
 
             // Re-acquire the lock and insert using tie-breaking logic. Between dropping the lock
             // above and now, the listener may have inserted an inbound connection for this peer.
+            // Tie-break using device IDs — the peer with the lower device ID keeps its outbound.
+            let local_device_id = self.pool.local_device_id;
             let (new_handle, new_acceptor) = conn.split();
             let (handle, acceptor) = {
                 // Hold the lock across this entire operation
@@ -140,11 +160,9 @@ impl SyncConnector for QuicConnector {
                     }
                     Entry::Occupied(mut e) => {
                         let existing_alive = e.get_mut().ping().is_ok();
-                        // We initiated this connection, so it wins if we're the lower-addressed peer.
-                        // TODO(nikki): This semi-fixes an existing bug, but we need a better way
-                        // than raw addresses, this will break with NAT.
-                        // https://github.com/aranya-project/aranya/issues/754
-                        let outbound_wins = !existing_alive || self.local_addr < peer.addr;
+                        // The outbound connection wins if we have the lower device ID.
+                        let outbound_wins =
+                            !existing_alive || local_device_id < remote_device_id;
                         if outbound_wins {
                             if existing_alive {
                                 debug!(?peer, "replacing existing connection (tie-break)");

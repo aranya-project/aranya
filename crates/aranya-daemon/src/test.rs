@@ -229,7 +229,8 @@ impl TestCtx {
         let (handle, recv) = sync::SyncHandle::channel(128);
 
         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        let (connector_pool, listener_pool) = ConnectionPool::new(32).split();
+        let (connector_pool, listener_pool) =
+            ConnectionPool::new(32, *bundle.device_id.as_array()).split();
 
         let listener = QuicListener::new(any_local_addr, psk_store.clone(), listener_pool).await?;
         let server = TestServer::new(listener, client.clone(), handle);

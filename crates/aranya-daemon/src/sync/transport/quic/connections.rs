@@ -11,15 +11,17 @@ type ConnectionUpdate = (SyncPeer, StreamAcceptor);
 /// Shared state for coordinating QUIC connections between connector and listener.
 pub(crate) struct ConnectionPool {
     conns: SharedConnectionMap,
+    local_device_id: [u8; 32],
     tx: mpsc::Sender<ConnectionUpdate>,
     rx: mpsc::Receiver<ConnectionUpdate>,
 }
 
 impl ConnectionPool {
-    pub fn new(buffer: usize) -> Self {
+    pub fn new(buffer: usize, local_device_id: [u8; 32]) -> Self {
         let (tx, rx) = mpsc::channel(buffer);
         Self {
             conns: Arc::default(),
+            local_device_id,
             tx,
             rx,
         }
@@ -29,10 +31,12 @@ impl ConnectionPool {
         (
             ConnectorPool {
                 conns: Arc::clone(&self.conns),
+                local_device_id: self.local_device_id,
                 tx: self.tx,
             },
             ListenerPool {
                 conns: self.conns,
+                local_device_id: self.local_device_id,
                 rx: self.rx,
             },
         )
@@ -42,11 +46,13 @@ impl ConnectionPool {
 #[derive(Debug)]
 pub(crate) struct ConnectorPool {
     pub(super) conns: SharedConnectionMap,
+    pub(super) local_device_id: [u8; 32],
     pub(super) tx: mpsc::Sender<ConnectionUpdate>,
 }
 
 #[derive(Debug)]
 pub(crate) struct ListenerPool {
     pub(super) conns: SharedConnectionMap,
+    pub(super) local_device_id: [u8; 32],
     pub(super) rx: mpsc::Receiver<ConnectionUpdate>,
 }
