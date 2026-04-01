@@ -193,6 +193,10 @@ enum AranyaError
      */
     ARANYA_ERROR_SERIALIZATION,
     /**
+     * The requested resource does not exist.
+     */
+    ARANYA_ERROR_DOES_NOT_EXIST,
+    /**
      * Some other error occurred.
      */
     ARANYA_ERROR_OTHER,

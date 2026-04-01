@@ -1219,7 +1219,7 @@ impl DaemonApi for Api {
                 author_id: api::DeviceId::from_base(e.label_author_id),
             })
         } else {
-            Err(anyhow!("label not found").into())
+            Err(api::Error::DoesNotExist("label not found".into()))
         }
     }
 

@@ -84,6 +84,10 @@ pub enum Error {
     #[capi(msg = "serialization")]
     Serialization,
 
+    /// The requested resource does not exist.
+    #[capi(msg = "does not exist")]
+    DoesNotExist,
+
     /// Some other error occurred.
     #[capi(msg = "other")]
     Other,
@@ -103,6 +107,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Aranya(_) => Self::Aranya,
+                aranya_client::Error::DoesNotExist(_) => Self::DoesNotExist,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
                 aranya_client::Error::Other(_) => Self::Other,
@@ -2354,10 +2359,14 @@ pub unsafe fn team_label_exists(
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
-    Ok(client
+    match client
         .rt
         .block_on(client.inner.team(team.into()).label(label.into()))
-        .is_ok())
+    {
+        Ok(_) => Ok(true),
+        Err(aranya_client::Error::DoesNotExist(_)) => Ok(false),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// An AFC Sending Channel Object.

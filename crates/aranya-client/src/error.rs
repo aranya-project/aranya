@@ -23,6 +23,10 @@ pub enum Error {
     #[error("daemon error")]
     Aranya(#[from] AranyaError),
 
+    /// The requested resource does not exist.
+    #[error("does not exist: {0}")]
+    DoesNotExist(String),
+
     /// A configuration error happened.
     #[error("configuration error")]
     Config(#[from] ConfigError),
@@ -72,7 +76,10 @@ pub struct AranyaError {
 }
 
 pub(crate) fn aranya_error(err: api::Error) -> Error {
-    Error::Aranya(err.into())
+    match err {
+        api::Error::DoesNotExist(msg) => Error::DoesNotExist(msg),
+        err => Error::Aranya(err.into()),
+    }
 }
 
 /// Possible errors that could happen when creating configuration info.
