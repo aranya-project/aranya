@@ -148,16 +148,17 @@ impl SyncConnector for QuicConnector {
                         if outbound_wins {
                             if existing_alive {
                                 debug!(?peer, "replacing existing connection (tie-break)");
-                                e.get_mut().close(AppError::UNKNOWN);
                             }
+                            // The old handle is dropped by `insert`, allowing
+                            // in-flight streams to finish gracefully.
                             e.insert(new_handle.clone());
                             (new_handle, Some(new_acceptor))
                         } else {
-                            // Existing inbound wins — discard ours.
+                            // Existing inbound wins — our handle falls out of
+                            // scope without closing abruptly, so in-flight
+                            // streams can finish.
                             debug!(?peer, "keeping existing inbound connection (tie-break)");
-                            let existing = e.get().clone();
-                            new_handle.close(AppError::UNKNOWN);
-                            (existing, None)
+                            (e.get().clone(), None)
                         }
                     }
                 }
