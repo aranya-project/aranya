@@ -779,7 +779,7 @@ impl DaemonApi for Api {
             trace!(?graph, "queried device public key bundle");
             Ok(api::PublicKeyBundle::from(e.device_keys))
         } else {
-            Err(anyhow!("unable to query device public key bundle").into())
+            Err(api::Error::DoesNotExist("device public key bundle not found".into()))
         }
     }
 
@@ -1463,7 +1463,7 @@ impl DaemonApi for Api {
             trace!(?graph, "queried rank");
             Ok(api::Rank::new(e.rank))
         } else {
-            Err(anyhow!("rank not found for object").into())
+            Err(api::Error::DoesNotExist("rank not found for object".into()))
         }
     }
 
