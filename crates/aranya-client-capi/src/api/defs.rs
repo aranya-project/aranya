@@ -350,7 +350,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type Role = Safe<aranya_client::Role>;
+pub type Role = Safe<imp::Role>;
 
 /// Uniquely identifies a [`Role`].
 #[repr(C)]
@@ -381,7 +381,7 @@ impl From<&RoleId> for aranya_client::RoleId {
 ///
 /// @relates AranyaRole
 pub fn role_get_id(role: &Role) -> RoleId {
-    role.deref().id.into()
+    role.id.into()
 }
 
 /// Get name of role.
@@ -393,7 +393,7 @@ pub fn role_get_id(role: &Role) -> RoleId {
 /// @relates AranyaRole
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
-    role.deref().name.as_ptr().cast()
+    role.name.as_ptr()
 }
 
 /// Get the author of a role.
@@ -402,7 +402,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 ///
 /// @relates AranyaRole
 pub fn role_get_author(role: &Role) -> DeviceId {
-    role.deref().author_id.into()
+    role.author_id.into()
 }
 
 /// Valid channel operations for a label assignment.
@@ -1311,7 +1311,7 @@ pub unsafe fn setup_default_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(created_roles) {
-        Role::init(dst, src);
+        Role::init(dst, imp::Role::from(src));
     }
 
     Ok(())
@@ -1384,7 +1384,7 @@ pub unsafe fn team_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
 
     for (dst, src) in out.iter_mut().zip(roles) {
-        Role::init(dst, src);
+        Role::init(dst, imp::Role::from(src));
     }
 
     Ok(())
@@ -1418,7 +1418,7 @@ pub fn create_role(
             .team(team.into())
             .create_role(role_name, aranya_client::Rank::new(rank.0)),
     )?;
-    Role::init(role_out, role);
+    Role::init(role_out, imp::Role::from(role));
     Ok(())
 }
 
@@ -2137,7 +2137,7 @@ pub fn team_device_role(
 
     match maybe_role {
         Some(role) => {
-            Role::init(role_out, role);
+            Role::init(role_out, imp::Role::from(role));
             has_role.write(true);
         }
         None => {
