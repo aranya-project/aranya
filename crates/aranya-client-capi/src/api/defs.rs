@@ -107,7 +107,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Aranya(_) => Self::Aranya,
-                aranya_client::Error::DoesNotExist(_) => Self::DoesNotExist,
+                aranya_client::Error::DoesNotExist => Self::DoesNotExist,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
                 aranya_client::Error::Other(_) => Self::Other,
@@ -438,27 +438,38 @@ impl From<ChanOp> for aranya_client::ChanOp {
 /// A label.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type Label = Safe<aranya_client::Label>;
+pub type Label = Safe<imp::Label>;
 
 /// Get ID of label.
 ///
 /// @param[in] label the label
 ///
 /// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
 pub fn label_get_id(label: &Label) -> LabelId {
-    label.deref().id.into()
+    label.id.into()
 }
 
-// TODO(#777): add label_get_name once string accessors return
-// null-terminated strings or provide a length.
+/// Get name of label.
+///
+/// The resulting string is null-terminated and must not be freed.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
+pub fn label_get_name(label: &Label) -> *const c_char {
+    label.name.as_ptr()
+}
 
 /// Get the author of a label.
 ///
 /// @param[in] label the label
 ///
 /// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
 pub fn label_get_author(label: &Label) -> DeviceId {
-    label.deref().author_id.into()
+    label.author_id.into()
 }
 
 /// Label ID.
@@ -2333,7 +2344,7 @@ pub fn team_label(
     let label = client
         .rt
         .block_on(client.inner.team(team.into()).label(label_id.into()))?;
-    Label::init(label_out, label);
+    Label::init(label_out, imp::Label::from(label));
     Ok(())
 }
 
@@ -2355,7 +2366,7 @@ pub unsafe fn team_label_exists(
         .block_on(client.inner.team(team.into()).label(label.into()))
     {
         Ok(_) => Ok(true),
-        Err(aranya_client::Error::DoesNotExist(_)) => Ok(false),
+        Err(aranya_client::Error::DoesNotExist) => Ok(false),
         Err(e) => Err(e.into()),
     }
 }

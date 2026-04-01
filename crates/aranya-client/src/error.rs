@@ -24,8 +24,8 @@ pub enum Error {
     Aranya(#[from] AranyaError),
 
     /// The requested resource does not exist.
-    #[error("does not exist: {0}")]
-    DoesNotExist(String),
+    #[error("does not exist")]
+    DoesNotExist,
 
     /// A configuration error happened.
     #[error("configuration error")]
@@ -77,7 +77,7 @@ pub struct AranyaError {
 
 pub(crate) fn aranya_error(err: api::Error) -> Error {
     match err {
-        api::Error::DoesNotExist(msg) => Error::DoesNotExist(msg),
+        api::Error::DoesNotExist(_) => Error::DoesNotExist,
         err => Error::Aranya(err.into()),
     }
 }

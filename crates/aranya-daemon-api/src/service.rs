@@ -31,6 +31,7 @@ pub type CE = DefaultEngine;
 pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
+// TODO: add more error variants as needed for control flow.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Error {
     /// The requested resource does not exist.

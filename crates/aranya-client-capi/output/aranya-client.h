@@ -929,15 +929,16 @@ AranyaError aranya_label_get_id(const struct AranyaLabel *label,
                                 struct AranyaLabelId *__output);
 
 /**
- * Get ID of label.
+ * Get name of label.
+ *
+ * The resulting string is null-terminated and must not be freed.
  *
  * @param[in] label the label
  *
  * @relates AranyaLabel
  */
-AranyaError aranya_label_get_id_ext(const struct AranyaLabel *label,
-                                    struct AranyaLabelId *__output,
-                                    struct AranyaExtError *__ext_err);
+AranyaError aranya_label_get_name(const struct AranyaLabel *label,
+                                  const char **__output);
 
 /**
  * Get the author of a label.
@@ -948,17 +949,6 @@ AranyaError aranya_label_get_id_ext(const struct AranyaLabel *label,
  */
 AranyaError aranya_label_get_author(const struct AranyaLabel *label,
                                     struct AranyaDeviceId *__output);
-
-/**
- * Get the author of a label.
- *
- * @param[in] label the label
- *
- * @relates AranyaLabel
- */
-AranyaError aranya_label_get_author_ext(const struct AranyaLabel *label,
-                                        struct AranyaDeviceId *__output,
-                                        struct AranyaExtError *__ext_err);
 
 /**
  * Returns a human-readable string for an [`AranyaPermission`].
