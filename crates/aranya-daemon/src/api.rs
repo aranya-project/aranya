@@ -611,7 +611,7 @@ impl DaemonApi for Api {
         cfg: api::CreateTeamConfig,
     ) -> api::Result<api::TeamId> {
         trace::setup_trace_context(&ctx);
-        info!("create_team");
+        trace!("create_team");
 
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);

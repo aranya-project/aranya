@@ -24,8 +24,6 @@ pub fn setup_trace_context(ctx: &tarpc::context::Context) {
         observability::OTEL_KIND_SERVER,
         otel_name,
     );
-    Span::current().record("trace_id", tracing::field::display(trace_id));
-    tracing::info!(rpc.trace_id = %trace_id, "RPC: ReceiveRequest");
 }
 
 #[cfg(test)]
