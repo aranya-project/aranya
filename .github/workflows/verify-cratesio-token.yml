@@ -1,0 +1,23 @@
+name: Verify crates.io credentials
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify-token:
+    name: Verify crates.io token
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate with crates.io
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: $CARGO_REGISTRY_TOKEN" \
+            https://crates.io/api/v1/me)
+          if [ "$response" = "200" ]; then
+            echo "✅ crates.io token is valid"
+          else
+            echo "❌ crates.io token returned HTTP $response"
+            exit 1
+          fi
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY }}
