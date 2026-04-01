@@ -779,7 +779,9 @@ impl DaemonApi for Api {
             trace!(?graph, "queried device public key bundle");
             Ok(api::PublicKeyBundle::from(e.device_keys))
         } else {
-            Err(api::Error::DoesNotExist("device public key bundle not found".into()))
+            Err(api::Error::DoesNotExist(
+                "device public key bundle not found".into(),
+            ))
         }
     }
 
@@ -1219,6 +1221,7 @@ impl DaemonApi for Api {
                 author_id: api::DeviceId::from_base(e.label_author_id),
             })
         } else {
+            trace!(?graph, "queried label (not found)");
             Err(api::Error::DoesNotExist("label not found".into()))
         }
     }

@@ -47,7 +47,6 @@ impl Error {
     pub fn from_err<E: error::Error>(err: E) -> Self {
         Self::Other(ReportExt::report(&err).to_string())
     }
-
 }
 
 impl From<Bug> for Error {
