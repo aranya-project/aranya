@@ -859,11 +859,6 @@ AranyaError run_afc_example(Team *t) {
     err = aranya_label_get_id(&label, &queried_label_id);
     EXPECT("error getting label ID", err);
 
-    const char *queried_label_name = NULL;
-    err = aranya_label_get_name(&label, &queried_label_name);
-    EXPECT("error getting label name", err);
-    printf("created label '%s'\n", queried_label_name);
-
     aranya_label_cleanup(&label);
 
     // Tell them both to sync with the owner to see their new label.

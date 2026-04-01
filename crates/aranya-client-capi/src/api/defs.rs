@@ -449,17 +449,8 @@ pub fn label_get_id(label: &Label) -> LabelId {
     label.deref().id.into()
 }
 
-/// Get name of label.
-///
-/// The resulting string must not be freed.
-///
-/// @param[in] label the label
-///
-/// @relates AranyaLabel
-#[aranya_capi_core::no_ext_error]
-pub fn label_get_name(label: &Label) -> *const c_char {
-    label.deref().name.as_ptr().cast()
-}
+// TODO(#777): add label_get_name once string accessors return
+// null-terminated strings or provide a length.
 
 /// Get the author of a label.
 ///

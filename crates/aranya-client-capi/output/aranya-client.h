@@ -940,18 +940,6 @@ AranyaError aranya_label_get_id_ext(const struct AranyaLabel *label,
                                     struct AranyaExtError *__ext_err);
 
 /**
- * Get name of label.
- *
- * The resulting string must not be freed.
- *
- * @param[in] label the label
- *
- * @relates AranyaLabel
- */
-AranyaError aranya_label_get_name(const struct AranyaLabel *label,
-                                  const char **__output);
-
-/**
  * Get the author of a label.
  *
  * @param[in] label the label
