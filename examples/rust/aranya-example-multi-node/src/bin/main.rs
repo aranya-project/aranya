@@ -40,9 +40,6 @@ async fn main() -> Result<()> {
     let example = workspace.join("example.env");
     env.generate(&example).await?;
 
-    // Set environment variables before spawning child processes.
-    env.set();
-
     // Start a daemon for each device.
     let tmp = tempdir()?;
     let mut daemons = Vec::with_capacity(env.devices().count());
@@ -55,7 +52,7 @@ async fn main() -> Result<()> {
 
         // Start daemon.
         info!("starting {} daemon", device.name);
-        let child = daemon(&release, &cfg).context("expected to spawn daemon")?;
+        let child = daemon(&release, &cfg, &env).context("expected to spawn daemon")?;
         daemons.push(child);
     }
     // Wait for daemons to start.
@@ -73,7 +70,7 @@ async fn main() -> Result<()> {
             .join("uds.sock");
 
         let mut child =
-            client(&device.name, &uds_sock, &release).context("expected to spawn client")?;
+            client(&device.name, &uds_sock, &release, &env).context("expected to spawn client")?;
         // Spawn device process and collect exit status.
         processes.spawn(async move {
             let status = child.wait().await.context("expected exit status")?;
@@ -94,21 +91,23 @@ async fn main() -> Result<()> {
 }
 
 // Spawn a daemon child process.
-fn daemon(release: &Path, cfg: &Path) -> Result<Child> {
+fn daemon(release: &Path, cfg: &Path, env: &EnvVars) -> Result<Child> {
     let child = Command::new(release.join("aranya-daemon"))
         .kill_on_drop(true)
         .arg("--config")
         .arg(cfg)
+        .envs(env.vars())
         .spawn()?;
     Ok(child)
 }
 
 // Spawn a client child process.
-fn client(device: &str, uds_sock: &Path, release: &Path) -> Result<Child> {
+fn client(device: &str, uds_sock: &Path, release: &Path, env: &EnvVars) -> Result<Child> {
     let child = Command::new(release.join(format!("aranya-example-multi-node-{device}")))
         .kill_on_drop(true)
         .arg("--uds-sock")
         .arg(uds_sock)
+        .envs(env.vars())
         .spawn()?;
     Ok(child)
 }

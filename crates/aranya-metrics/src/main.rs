@@ -323,7 +323,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // Owner adds admin and operator to the team, then delegates
     // remaining operations to them.
     info!("adding admin to team");
-    let admin_role_rank = owner.query_rank(admin_role.id).await?;
+    let admin_role_rank = owner.rank(admin_role.id).await?;
     owner
         .add_device(
             ctx.admin.pk,
@@ -334,7 +334,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     admin.sync_now(owner_addr, None).await?;
 
     info!("adding operator to team");
-    let operator_role_rank = owner.query_rank(operator_role.id).await?;
+    let operator_role_rank = owner.rank(operator_role.id).await?;
     owner
         .add_device(
             ctx.operator.pk,
@@ -346,7 +346,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Admin adds membera and memberb to the team.
     info!("admin adding membera to team");
-    let member_role_rank = admin.query_rank(member_role.id).await?;
+    let member_role_rank = admin.rank(member_role.id).await?;
     admin
         .add_device(
             ctx.membera.pk.clone(),
@@ -375,7 +375,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
 
     // Admin creates a label.
     info!("admin creating label");
-    let admin_device_rank = admin.query_rank(ctx.admin.id).await?;
+    let admin_device_rank = admin.rank(ctx.admin.id).await?;
     // Label rank must be lower than the admin's device rank so the admin can operate on it.
     let label_rank = Rank::new(admin_device_rank.value().saturating_sub(1));
     let label3 = admin.create_label(text!("label3"), label_rank).await?;

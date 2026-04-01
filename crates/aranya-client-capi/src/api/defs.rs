@@ -1522,7 +1522,7 @@ pub unsafe fn query_role_perms(
 ) -> Result<(), imp::Error> {
     let perms = client
         .rt
-        .block_on(client.inner.team(team.into()).query_role_perms(role.into()))?;
+        .block_on(client.inner.team(team.into()).role_perm(role.into()))?;
 
     if *perms_len < perms.len() {
         *perms_len = perms.len();
@@ -1707,7 +1707,7 @@ pub fn query_rank(
         client
             .inner
             .team(team.into())
-            .query_rank(aranya_client::ObjectId::from(object_id)),
+            .rank(aranya_client::ObjectId::from(object_id)),
     )?;
     Ok(Rank(rank.value()))
 }
