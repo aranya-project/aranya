@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_startup_required_fields_check() {
-        assert!(startup_required_fields_check().is_ok());
+        assert!(startup_event_check().is_ok());
     }
 
     #[test]
