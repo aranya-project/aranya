@@ -179,9 +179,13 @@ impl QuicListener {
                 }
                 Entry::Occupied(mut e) => {
                     let existing_alive = e.get_mut().ping().is_ok();
-                    // The inbound connection wins if the remote peer has the lower
-                    // device ID (they keep their outbound, which is our inbound).
-                    let inbound_wins = !existing_alive || remote_device_id < local_device_id;
+                    // The inbound connection wins if the remote peer wins the
+                    // tie-break (they keep their outbound, which is our inbound).
+                    let inbound_wins = !existing_alive
+                        || super::connections::outbound_wins_tiebreak(
+                            remote_device_id,
+                            local_device_id,
+                        );
                     if inbound_wins {
                         if existing_alive {
                             debug!(?peer, "replacing existing connection (tie-break)");

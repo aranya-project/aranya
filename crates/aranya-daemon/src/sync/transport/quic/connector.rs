@@ -157,8 +157,11 @@ impl SyncConnector for QuicConnector {
                     }
                     Entry::Occupied(mut e) => {
                         let existing_alive = e.get_mut().ping().is_ok();
-                        // The outbound connection wins if we have the lower device ID.
-                        let outbound_wins = !existing_alive || local_device_id < remote_device_id;
+                        let outbound_wins = !existing_alive
+                            || super::connections::outbound_wins_tiebreak(
+                                local_device_id,
+                                remote_device_id,
+                            );
                         if outbound_wins {
                             if existing_alive {
                                 debug!(?peer, "replacing existing connection (tie-break)");
