@@ -24,6 +24,8 @@ debug = []
 
 # Preview features
 preview = ["aranya-daemon-api/preview"]
+# Test-only utilities
+test-utils = ["aranya-daemon-api/test-utils"]
 # Aranya Fast Channels
 afc = ["aranya-daemon-api/afc", "dep:aranya-fast-channels"]
 
@@ -44,6 +46,7 @@ buggy = { workspace = true, features = ["std"] }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
@@ -52,14 +55,16 @@ tracing = { workspace = true }
 
 
 [dev-dependencies]
-aranya-client = { path = ".", features = ["preview"] }
+aranya-client = { path = ".", features = ["preview", "test-utils"] }
 aranya-daemon = { path = "../aranya-daemon", features = ["experimental", "preview", "test-utils"] }
 spideroak-base58 = { workspace = true }
 
 backon = { workspace = true }
+serde_json = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json"] }
 
 
 [[test]]

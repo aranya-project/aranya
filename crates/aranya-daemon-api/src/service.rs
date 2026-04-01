@@ -31,17 +31,22 @@ pub type CE = DefaultEngine;
 pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
-// TODO: enum?
+// TODO: add more error variants as needed for control flow.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Error(String);
+pub enum Error {
+    /// The requested resource does not exist.
+    DoesNotExist(String),
+    /// Any other error.
+    Other(String),
+}
 
 impl Error {
     pub fn from_msg(err: &str) -> Self {
-        Self(err.into())
+        Self::Other(err.into())
     }
 
     pub fn from_err<E: error::Error>(err: E) -> Self {
-        Self(ReportExt::report(&err).to_string())
+        Self::Other(ReportExt::report(&err).to_string())
     }
 }
 
@@ -53,13 +58,13 @@ impl From<Bug> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
-        Self(format!("{err:?}"))
+        Self::Other(format!("{err:?}"))
     }
 }
 
 impl From<InvalidText> for Error {
     fn from(err: InvalidText) -> Self {
-        Self(format!("{err:?}"))
+        Self::Other(format!("{err:?}"))
     }
 }
 
@@ -77,7 +82,9 @@ impl From<IdError> for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        match self {
+            Self::DoesNotExist(msg) | Self::Other(msg) => msg.fmt(f),
+        }
     }
 }
 
@@ -392,6 +399,11 @@ pub trait DaemonApi {
     async fn get_public_key_bundle() -> Result<PublicKeyBundle>;
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
+    /// Returns the trace ID received in the current RPC context.
+    ///
+    /// Intended for test/debug validation of client<->daemon trace propagation.
+    #[cfg(feature = "test-utils")]
+    async fn test_trace_id() -> Result<String>;
 
     //
     // Syncing
@@ -527,7 +539,7 @@ pub trait DaemonApi {
     /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     /// Returns a specific label.
-    async fn label(team: TeamId, label: LabelId) -> Result<Option<Label>>;
+    async fn label(team: TeamId, label: LabelId) -> Result<Label>;
     /// Returns all labels on the team.
     async fn labels(team: TeamId) -> Result<Vec<Label>>;
 

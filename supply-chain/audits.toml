@@ -591,6 +591,11 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.7.13 -> 0.7.15"
 
+[[audits.tracing-serde]]
+who = "Joshua Newell <jnewell@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.2.0"
+
 [[audits.tracing-subscriber]]
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"

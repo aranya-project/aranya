@@ -47,6 +47,21 @@ async fn test_client_rand() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_trace_id_round_trip() -> Result<()> {
+    let work_dir = tempfile::tempdir()?;
+    let owner = DeviceCtx::new("trace-roundtrip", "owner", work_dir.path().join("owner")).await?;
+
+    let (client_trace_id, daemon_trace_id) = owner.client.test_trace_id().await?;
+    info!("client trace_id: {client_trace_id}");
+    info!("daemon trace_id: {daemon_trace_id}");
+
+    assert_eq!(client_trace_id, daemon_trace_id);
+    assert_ne!(client_trace_id, "00");
+
+    Ok(())
+}
+
 /// Tests sync_now() by showing that an admin cannot perform operations until it syncs with the owner.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
@@ -333,7 +348,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     assert_eq!(admin_team.labels().await?.iter().count(), 1);
 
     // Confirm created label exists.
-    assert!(admin_team.label(label1).await?.is_some());
+    admin_team.label(label1).await?;
 
     // Revoke role.
     owner
@@ -718,8 +733,8 @@ async fn test_query_functions() -> Result<()> {
     let team_labels = owner_team.labels().await?;
     assert_eq!(team_labels.iter().count(), 1);
 
-    // Make sure owner can query whether certain labels exist on the team.
-    assert!(owner_team.label(label_id).await?.is_some());
+    // Make sure owner can query the label on the team.
+    owner_team.label(label_id).await?;
 
     // Query role assigned to a device.
     assert_eq!(
