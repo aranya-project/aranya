@@ -2,7 +2,7 @@
 use std::{collections::btree_map::Entry, sync::Arc};
 
 use anyhow::Context as _;
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{DeviceId, TeamId};
 use aranya_util::rustls::SkipServerVerification;
 use buggy::BugExt as _;
 use bytes::Bytes;
@@ -61,10 +61,9 @@ impl QuicConnector {
             port: server_addr.port(),
             device_id: pool.local_device_id,
         };
-        let conn_info_bytes = Bytes::from(
-            postcard::to_allocvec(&conn_info)
-                .map_err(|e| Error::Other(anyhow::anyhow!("failed to serialize ConnectionInfo: {e}")))?,
-        );
+        let conn_info_bytes = Bytes::from(postcard::to_allocvec(&conn_info).map_err(|e| {
+            Error::Other(anyhow::anyhow!("failed to serialize ConnectionInfo: {e}"))
+        })?);
 
         Ok(Self {
             client,
@@ -139,10 +138,8 @@ impl SyncConnector for QuicConnector {
                 .receive()
                 .await?
                 .context("peer didn't send device ID")?;
-            let remote_device_id: [u8; 32] = remote_id_bytes
-                .as_ref()
-                .try_into()
-                .context("invalid device ID length")?;
+            let remote_device_id: DeviceId =
+                postcard::from_bytes(remote_id_bytes.as_ref()).context("invalid device ID")?;
             debug!(?peer, "QUIC handshake complete, exchanged connection info");
 
             // Re-acquire the lock and insert using tie-breaking logic. Between dropping the lock
@@ -161,8 +158,7 @@ impl SyncConnector for QuicConnector {
                     Entry::Occupied(mut e) => {
                         let existing_alive = e.get_mut().ping().is_ok();
                         // The outbound connection wins if we have the lower device ID.
-                        let outbound_wins =
-                            !existing_alive || local_device_id < remote_device_id;
+                        let outbound_wins = !existing_alive || local_device_id < remote_device_id;
                         if outbound_wins {
                             if existing_alive {
                                 debug!(?peer, "replacing existing connection (tie-break)");

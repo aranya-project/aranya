@@ -6,6 +6,8 @@ mod listener;
 mod psk;
 mod stream;
 
+use aranya_daemon_api::DeviceId;
+
 use self::{
     super::{SyncConnector, SyncListener, SyncStream},
     stream::QuicStream,
@@ -29,7 +31,7 @@ struct ConnectionInfo {
     /// The port the sender's listener is bound to.
     port: u16,
     /// The sender's device ID, used for deterministic connection tie-breaking.
-    device_id: [u8; 32],
+    device_id: DeviceId,
 }
 
 /// Errors specific to the QUIC transport.

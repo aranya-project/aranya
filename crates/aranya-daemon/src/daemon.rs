@@ -286,7 +286,7 @@ impl Daemon {
 
         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
         let (connector_pool, listener_pool) =
-            ConnectionPool::new(32, *device_id.as_array()).split();
+            ConnectionPool::new(32, aranya_daemon_api::DeviceId::transmute(device_id)).split();
 
         let listener = QuicListener::new(server_addr, Arc::clone(&psk_store), listener_pool)
             .await

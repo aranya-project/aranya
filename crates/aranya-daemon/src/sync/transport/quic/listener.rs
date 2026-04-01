@@ -2,6 +2,7 @@
 use std::{collections::btree_map::Entry, sync::Arc};
 
 use anyhow::Context as _;
+use aranya_daemon_api::DeviceId;
 use aranya_util::{rustls::NoCertResolver, s2n_quic::get_conn_identity};
 use buggy::BugExt as _;
 use bytes::Bytes;
@@ -180,8 +181,7 @@ impl QuicListener {
                     let existing_alive = e.get_mut().ping().is_ok();
                     // The inbound connection wins if the remote peer has the lower
                     // device ID (they keep their outbound, which is our inbound).
-                    let inbound_wins =
-                        !existing_alive || remote_device_id < local_device_id;
+                    let inbound_wins = !existing_alive || remote_device_id < local_device_id;
                     if inbound_wins {
                         if existing_alive {
                             debug!(?peer, "replacing existing connection (tie-break)");
@@ -270,8 +270,8 @@ impl SyncListener for QuicListener {
 /// sends back the local device ID, and returns the peer's address and device ID.
 async fn exchange_conn_info(
     conn: &mut s2n_quic::Connection,
-    local_device_id: [u8; 32],
-) -> anyhow::Result<(Addr, [u8; 32])> {
+    local_device_id: DeviceId,
+) -> anyhow::Result<(Addr, DeviceId)> {
     let ip = conn.remote_addr().assume("valid connection")?.ip();
     trace!(%ip, "exchanging connection info");
 
@@ -286,9 +286,11 @@ async fn exchange_conn_info(
         postcard::from_bytes(bytes.as_ref()).context("invalid connection info")?;
 
     // Send back our device ID so the connector can tie-break.
+    let id_bytes =
+        postcard::to_allocvec(&local_device_id).context("failed to serialize device ID")?;
     conn.open_send_stream()
         .await?
-        .send(Bytes::copy_from_slice(&local_device_id))
+        .send(Bytes::from(id_bytes))
         .await?;
 
     debug!(%ip, port = %info.port, "resolved peer connection info");
