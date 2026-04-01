@@ -155,13 +155,24 @@ impl QuicListener {
 
         debug!(?remote, ?active_team, "authenticated incoming connection");
 
-        let (peer_addr, remote_device_id) = tokio::time::timeout(
+        let (peer_addr, remote_device_id) = match tokio::time::timeout(
             RESOLVE_PEER_ADDR_TIMEOUT,
             exchange_conn_info(&mut conn, self.pool.local_device_id),
         )
         .await
-        .context("timed out waiting for connection info")?
-        .context("unable to exchange connection info")?;
+        {
+            Ok(Ok(result)) => result,
+            Ok(Err(e)) => {
+                warn!(?remote, error = %e, "failed to exchange connection info, closing");
+                conn.close(application::Error::UNKNOWN);
+                return Err(e.into());
+            }
+            Err(_) => {
+                warn!(?remote, "timed out exchanging connection info, closing");
+                conn.close(application::Error::UNKNOWN);
+                return Err(anyhow::anyhow!("timed out waiting for connection info").into());
+            }
+        };
         let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
 
         // Insert with tie-breaking using device IDs. When both peers connect
@@ -179,13 +190,9 @@ impl QuicListener {
                 }
                 Entry::Occupied(mut e) => {
                     let existing_alive = e.get_mut().ping().is_ok();
-                    // The inbound connection wins if the remote peer wins the
-                    // tie-break (they keep their outbound, which is our inbound).
-                    let inbound_wins = !existing_alive
-                        || super::connections::outbound_wins_tiebreak(
-                            remote_device_id,
-                            local_device_id,
-                        );
+                    // The inbound connection wins if the remote peer has the lower
+                    // device ID (they keep their outbound, which is our inbound).
+                    let inbound_wins = !existing_alive || remote_device_id < local_device_id;
                     if inbound_wins {
                         if existing_alive {
                             debug!(?peer, "replacing existing connection (tie-break)");

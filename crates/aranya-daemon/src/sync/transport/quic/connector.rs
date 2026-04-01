@@ -138,8 +138,14 @@ impl SyncConnector for QuicConnector {
                 .receive()
                 .await?
                 .context("peer didn't send device ID")?;
-            let remote_device_id: DeviceId =
-                postcard::from_bytes(remote_id_bytes.as_ref()).context("invalid device ID")?;
+            let remote_device_id: DeviceId = match postcard::from_bytes(remote_id_bytes.as_ref()) {
+                Ok(id) => id,
+                Err(e) => {
+                    warn!(?peer, error = %e, "peer sent invalid device ID, closing connection");
+                    conn.close(AppError::UNKNOWN);
+                    return Err(anyhow::anyhow!("invalid device ID: {e}").into());
+                }
+            };
             debug!(?peer, "QUIC handshake complete, exchanged connection info");
 
             // Re-acquire the lock and insert using tie-breaking logic. Between dropping the lock
@@ -157,11 +163,8 @@ impl SyncConnector for QuicConnector {
                     }
                     Entry::Occupied(mut e) => {
                         let existing_alive = e.get_mut().ping().is_ok();
-                        let outbound_wins = !existing_alive
-                            || super::connections::outbound_wins_tiebreak(
-                                local_device_id,
-                                remote_device_id,
-                            );
+                        // The outbound connection wins if we have the lower device ID.
+                        let outbound_wins = !existing_alive || local_device_id < remote_device_id;
                         if outbound_wins {
                             if existing_alive {
                                 debug!(?peer, "replacing existing connection (tie-break)");

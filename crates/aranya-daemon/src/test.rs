@@ -189,12 +189,14 @@ impl TestCtx {
         })
     }
 
-    /// Creates a single client.
-    pub async fn new_client(
+    /// Creates a single client with an optional override for the device ID
+    /// used in connection tie-breaking.
+    pub async fn new_client_with_tiebreak_id(
         &mut self,
         name: &str,
         id: GraphId,
         psk_store: Arc<PskStore>,
+        tiebreak_device_id: Option<aranya_daemon_api::DeviceId>,
     ) -> Result<TestDevice> {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
@@ -229,9 +231,10 @@ impl TestCtx {
         let (handle, recv) = sync::SyncHandle::channel(128);
 
         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
+        let pool_device_id = tiebreak_device_id
+            .unwrap_or_else(|| aranya_daemon_api::DeviceId::transmute(bundle.device_id));
         let (connector_pool, listener_pool) =
-            ConnectionPool::new(32, aranya_daemon_api::DeviceId::transmute(bundle.device_id))
-                .split();
+            ConnectionPool::new(32, pool_device_id).split();
 
         let listener = QuicListener::new(any_local_addr, psk_store.clone(), listener_pool).await?;
         let server = TestServer::new(listener, client.clone(), handle);
@@ -246,6 +249,17 @@ impl TestCtx {
         let syncer = TestSyncer::new(sync_client, recv)?;
 
         TestDevice::new(server, syncer, id, pk, effect_recv)
+    }
+
+    /// Creates a single client.
+    pub async fn new_client(
+        &mut self,
+        name: &str,
+        id: GraphId,
+        psk_store: Arc<PskStore>,
+    ) -> Result<TestDevice> {
+        self.new_client_with_tiebreak_id(name, id, psk_store, None)
+            .await
     }
 
     /// Creates `n` members.
@@ -1058,6 +1072,103 @@ async fn test_terminate_team_requires_matching_id() -> Result<()> {
         .await
         .expect_err("expected terminate_team with mismatched id to fail");
     expect_not_authorized(err);
+
+    Ok(())
+}
+
+/// Tests that simultaneous QUIC connections between two peers are resolved
+/// deterministically via device ID tie-breaking.
+///
+/// Both peers connect to each other at the same time, creating two connections.
+/// Tie-breaking ensures both peers agree on which connection to keep, and both
+/// syncs complete successfully.
+///
+/// Note: the old address-based tie-breaking (`self.local_addr < peer.addr`)
+/// was non-deterministic behind NAT because `conn.remote_addr()` returns the
+/// NAT gateway's IP, not the peer's local address. This can't be reproduced
+/// on localhost without a UDP proxy in the QUIC path. This test verifies the
+/// new device ID approach works; see `test_simultaneous_connect_equal_ids_fails`
+/// for proof that the tie-breaking logic is load-bearing.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_simultaneous_connect_tiebreak() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
+
+    let owner = team.owner;
+    let admin = team.admin;
+
+    // Both peers sync with each other simultaneously.
+    // This creates two QUIC connections (one from each side), triggering tie-breaking.
+    let owner_addr = owner.sync_local_addr;
+    let admin_addr = admin.sync_local_addr;
+    let owner_graph = owner.graph_id;
+    let admin_graph = admin.graph_id;
+
+    let (owner_result, admin_result) = tokio::join!(
+        owner
+            .syncer
+            .client
+            .sync(SyncPeer::new(admin_addr, owner_graph), &mut owner.buffer),
+        admin
+            .syncer
+            .client
+            .sync(SyncPeer::new(owner_addr, admin_graph), &mut admin.buffer),
+    );
+
+    // Both syncs should succeed regardless of which connection won the tie-break.
+    owner_result.context("owner sync failed")?;
+    admin_result.context("admin sync failed")?;
+
+    Ok(())
+}
+
+/// Shows that tie-breaking fails when both peers have the same device ID.
+///
+/// With equal device IDs, `local_id < remote_id` is always false, so both
+/// connectors lose the tie-break. Both listeners also reject the inbound
+/// connection (since the existing outbound "wins" by default). This results
+/// in connection failures.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_simultaneous_connect_equal_ids_fails() -> Result<()> {
+    let psk_store: Arc<PskStore> = Arc::default();
+    let mut ctx = TestCtx::new()?;
+
+    // Give both peers the same device ID for tie-breaking.
+    let shared_id = aranya_daemon_api::DeviceId::from_bytes([0xAA; 32]);
+    let graph_id = GraphId::from([0u8; 32]);
+
+    let mut peer_a = ctx
+        .new_client_with_tiebreak_id("peer_a", graph_id, psk_store.clone(), Some(shared_id))
+        .await?;
+    let mut peer_b = ctx
+        .new_client_with_tiebreak_id("peer_b", graph_id, psk_store, Some(shared_id))
+        .await?;
+
+    let a_addr = peer_a.sync_local_addr;
+    let b_addr = peer_b.sync_local_addr;
+    let a_graph = peer_a.graph_id;
+    let b_graph = peer_b.graph_id;
+
+    let (a_result, b_result) = tokio::join!(
+        peer_a
+            .syncer
+            .client
+            .sync(SyncPeer::new(b_addr, a_graph), &mut peer_a.buffer),
+        peer_b
+            .syncer
+            .client
+            .sync(SyncPeer::new(a_addr, b_graph), &mut peer_b.buffer),
+    );
+
+    // With equal device IDs, tie-breaking is non-deterministic.
+    // At least one sync should fail.
+    assert!(
+        a_result.is_err() || b_result.is_err(),
+        "expected at least one sync to fail with equal device IDs"
+    );
 
     Ok(())
 }
