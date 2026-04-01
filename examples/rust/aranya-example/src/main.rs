@@ -269,7 +269,7 @@ async fn main() -> Result<()> {
     let memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
     info!("adding admin to team");
-    let admin_role_rank = owner_team.query_rank(admin_role.id).await?;
+    let admin_role_rank = owner_team.rank(admin_role.id).await?;
     owner_team
         .add_device(
             admin.pk,
@@ -279,7 +279,7 @@ async fn main() -> Result<()> {
         .await?;
 
     info!("adding operator to team");
-    let operator_role_rank = owner_team.query_rank(operator_role.id).await?;
+    let operator_role_rank = owner_team.rank(operator_role.id).await?;
     owner_team
         .add_device(
             operator.pk,
@@ -335,7 +335,7 @@ async fn main() -> Result<()> {
     // Admin adds membera and memberb to the team (without roles, since
     // the admin does not have AssignRole permission).
     info!("admin adding membera to team");
-    let member_role_rank = admin_team.query_rank(member_role.id).await?;
+    let member_role_rank = admin_team.rank(member_role.id).await?;
     admin_team
         .add_device(
             membera.pk.clone(),
@@ -397,7 +397,7 @@ async fn main() -> Result<()> {
 
     // Query permissions assigned to the custom role.
     info!("querying permissions for custom role");
-    let role_perms = owner_team.query_role_perms(custom_role.id).await?;
+    let role_perms = owner_team.role_perm(custom_role.id).await?;
     info!(
         "custom role has {} permission(s): {:?}",
         role_perms.len(),
@@ -417,12 +417,12 @@ async fn main() -> Result<()> {
 
     // Demo query_rank: verify the role has the rank it was created with.
     // Note: Role ranks are immutable after creation.
-    let current_rank = owner_team.query_rank(custom_role.id).await?;
+    let current_rank = owner_team.rank(custom_role.id).await?;
     info!("custom role rank: {}", current_rank);
     assert_eq!(current_rank, custom_role_rank);
 
     // Demo change_rank on a device: change the custom device's rank.
-    let device_rank = owner_team.query_rank(custom.id).await?;
+    let device_rank = owner_team.rank(custom.id).await?;
     info!("custom device rank before change: {}", device_rank);
 
     let updated_device_rank = Rank::new(EXAMPLE_UPDATED_DEVICE_RANK);
@@ -434,7 +434,7 @@ async fn main() -> Result<()> {
         .change_rank(custom.id, device_rank, updated_device_rank)
         .await?;
 
-    let new_rank = owner_team.query_rank(custom.id).await?;
+    let new_rank = owner_team.rank(custom.id).await?;
     info!("custom device rank after change: {}", new_rank);
     assert_eq!(new_rank, updated_device_rank);
 
@@ -467,7 +467,7 @@ async fn main() -> Result<()> {
     // Admin creates a label. The label rank must be lower than the
     // operator's device rank so the operator can assign it to devices.
     info!("admin creating label");
-    let operator_device_rank = admin_team.query_rank(operator.id).await?;
+    let operator_device_rank = admin_team.rank(operator.id).await?;
     let label_rank = Rank::new(operator_device_rank.value().saturating_sub(1));
     let label3 = admin_team.create_label(text!("label3"), label_rank).await?;
 
