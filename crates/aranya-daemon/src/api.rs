@@ -463,6 +463,7 @@ impl DaemonApi for Api {
             crate::observability::OTEL_KIND_SERVER,
             crate::observability::ObservabilityEvent::RpcTestTraceId.event_name(),
         );
+        info!(rpc.trace_id = %trace_id, "RPC: TestTraceId");
         Ok(trace_id)
     }
 
@@ -485,6 +486,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
+        trace::setup_trace_context(&ctx);
         let graph = self.check_team_valid(team).await?;
         let peer = SyncPeer::new(peer, graph);
         self.syncer.add_peer(peer, cfg).await?;
@@ -1476,10 +1478,11 @@ impl DaemonApi for Api {
     #[instrument(skip(self), err)]
     async fn query_device_generation(
         self,
-        _: context::Context,
+        ctx: context::Context,
         team: api::TeamId,
         device_id: api::DeviceId,
     ) -> api::Result<Option<i64>> {
+        trace::setup_trace_context(&ctx);
         let graph = self.check_team_valid(team).await?;
 
         let effects = self
@@ -1492,6 +1495,7 @@ impl DaemonApi for Api {
         if let Some(Effect::QueryDeviceGenerationResult(e)) =
             find_effect!(&effects, Effect::QueryDeviceGenerationResult(_))
         {
+            trace!(?graph, "queried device generation");
             Ok(Some(e.generation))
         } else {
             Ok(None)
