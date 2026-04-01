@@ -348,7 +348,7 @@ async fn test_role_create_assign_revoke() -> Result<()> {
     assert_eq!(admin_team.labels().await?.iter().count(), 1);
 
     // Confirm created label exists.
-    assert!(admin_team.label(label1).await?.is_some());
+    admin_team.label(label1).await?;
 
     // Revoke role.
     owner
@@ -733,8 +733,8 @@ async fn test_query_functions() -> Result<()> {
     let team_labels = owner_team.labels().await?;
     assert_eq!(team_labels.iter().count(), 1);
 
-    // Make sure owner can query whether certain labels exist on the team.
-    assert!(owner_team.label(label_id).await?.is_some());
+    // Make sure owner can query the label on the team.
+    owner_team.label(label_id).await?;
 
     // Query role assigned to a device.
     assert_eq!(

@@ -779,7 +779,9 @@ impl DaemonApi for Api {
             trace!(?graph, "queried device public key bundle");
             Ok(api::PublicKeyBundle::from(e.device_keys))
         } else {
-            Err(anyhow!("unable to query device public key bundle").into())
+            Err(api::Error::DoesNotExist(
+                "device public key bundle not found".into(),
+            ))
         }
     }
 
@@ -1199,7 +1201,7 @@ impl DaemonApi for Api {
         ctx: context::Context,
         team: api::TeamId,
         label_id: api::LabelId,
-    ) -> api::Result<Option<api::Label>> {
+    ) -> api::Result<api::Label> {
         trace::setup_trace_context(&ctx);
         let graph = self.check_team_valid(team).await?;
 
@@ -1213,14 +1215,14 @@ impl DaemonApi for Api {
             find_effect!(&effects, Effect::QueryLabelResult(_e))
         {
             trace!(?graph, "queried label");
-            Ok(Some(api::Label {
+            Ok(api::Label {
                 id: api::LabelId::from_base(e.label_id),
                 name: e.label_name.clone(),
                 author_id: api::DeviceId::from_base(e.label_author_id),
-            }))
+            })
         } else {
-            trace!(?graph, "queried label (none)");
-            Ok(None)
+            trace!(?graph, "queried label (not found)");
+            Err(api::Error::DoesNotExist("label not found".into()))
         }
     }
 
@@ -1464,7 +1466,7 @@ impl DaemonApi for Api {
             trace!(?graph, "queried rank");
             Ok(api::Rank::new(e.rank))
         } else {
-            Err(anyhow!("rank not found for object").into())
+            Err(api::Error::DoesNotExist("rank not found for object".into()))
         }
     }
 
