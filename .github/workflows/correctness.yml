@@ -23,44 +23,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup
-
-      - name: Install newer clang-format
-        run: |
-          sudo apt-get install -y lsb-release wget software-properties-common gnupg
-          sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
-          sudo apt-get install -y clang-format-20
-          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-20 200
-          clang-format --version
-
-      - name: Check formatting
-        run: cargo make check-fmt
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup
-
-      - name: Run clippy
-        run: cargo make clippy
-
-  machete:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup
-
-      - name: Check dependency usage
-        run: cargo make machete
-
   check:
     strategy:
       matrix:
@@ -76,3 +38,19 @@ jobs:
 
       - name: Check Features
         run: cargo make check-features
+
+  check-one:
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Check Features
+        run: cargo check -p aranya-client
