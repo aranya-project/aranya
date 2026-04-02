@@ -6,8 +6,10 @@
 //! separate process, it's impossible to fully remove the effect of measuring a process. See the
 //! [observer problem] for more details.
 //!
-//! Specifically, this uses `proc_pidinfo` on MacOS and `/proc/{PID}/stat` on Linux to collect CPU
-//! and memory usage, falling back to the `sysinfo` crate for disk usage stats.
+//! Specifically, this uses `proc_pidinfo` on macOS and `/proc/{PID}/stat` +
+//! `/proc/{PID}/smaps_rollup` on Linux to collect CPU and memory usage (with
+//! PSS-based detailed memory breakdown when available on kernel >= 4.14),
+//! falling back to the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
 use std::{collections::HashMap, fmt, time::Instant};
@@ -75,6 +77,20 @@ struct ProcessMetrics {
     disk_read_bytes: u64,
     /// The amount of data written from disk.
     disk_write_bytes: u64,
+    /// Proportional share size in bytes (from smaps_rollup; 0 if unavailable).
+    pss_bytes: u64,
+    /// PSS of anonymous (heap/stack) pages in bytes.
+    pss_anon_bytes: u64,
+    /// PSS of file-backed pages in bytes.
+    pss_file_bytes: u64,
+    /// PSS of shared memory pages in bytes.
+    pss_shmem_bytes: u64,
+    /// Bytes currently swapped out.
+    swap_bytes: u64,
+    /// Private dirty (non-reclaimable) pages in bytes.
+    private_dirty_bytes: u64,
+    /// Shared clean (freely reclaimable) pages in bytes.
+    shared_clean_bytes: u64,
     /// The number of processes this collection represents.
     process_count: usize,
     // TODO(nikki): these need to be collected inside aranya-daemon
@@ -92,6 +108,13 @@ impl Default for ProcessMetrics {
             virtual_memory_bytes: 0,
             disk_read_bytes: 0,
             disk_write_bytes: 0,
+            pss_bytes: 0,
+            pss_anon_bytes: 0,
+            pss_file_bytes: 0,
+            pss_shmem_bytes: 0,
+            swap_bytes: 0,
+            private_dirty_bytes: 0,
+            shared_clean_bytes: 0,
             process_count: 1,
         }
     }
@@ -102,10 +125,13 @@ impl fmt::Display for ProcessMetrics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "User Time: {}ms, System Time: {}ms, Physical Memory: {}, Disk Reads: {}, Disk Writes: {}",
+            "User Time: {}ms, System Time: {}ms, Physical Memory: {}, PSS: {}, Swap: {}, \
+             Disk Reads: {}, Disk Writes: {}",
             self.cpu_user_time_us as f64 / 1000.0,
             self.cpu_system_time_us as f64 / 1000.0,
             scale_bytes(self.physical_memory_bytes),
+            scale_bytes(self.pss_bytes),
+            scale_bytes(self.swap_bytes),
             scale_bytes(self.disk_read_bytes),
             scale_bytes(self.disk_write_bytes)
         )
@@ -195,6 +221,77 @@ fn parse_proc_stat(contents: &str, pid: u32) -> Result<ProcStat> {
     })
 }
 
+/// Raw fields parsed from `/proc/{PID}/smaps_rollup`.
+///
+/// All values are stored in bytes (the kernel reports them in kB).
+/// Fields default to zero so that missing entries (e.g. `Pss_Anon`
+/// on kernels older than 5.14) degrade gracefully.
+#[cfg(target_os = "linux")]
+#[derive(Debug, Default)]
+struct SmapsRollup {
+    /// Total resident set size in bytes.
+    rss_bytes: u64,
+    /// Proportional share size in bytes.
+    pss_bytes: u64,
+    /// PSS of anonymous (heap/stack) pages in bytes.
+    pss_anon_bytes: u64,
+    /// PSS of file-backed pages in bytes.
+    pss_file_bytes: u64,
+    /// PSS of shared memory pages in bytes.
+    pss_shmem_bytes: u64,
+    /// Bytes currently swapped out.
+    swap_bytes: u64,
+    /// Private pages that have been written (non-reclaimable) in bytes.
+    private_dirty_bytes: u64,
+    /// Shared pages that are unmodified (freely reclaimable) in bytes.
+    shared_clean_bytes: u64,
+}
+
+/// Parses the contents of `/proc/{PID}/smaps_rollup` into a [`SmapsRollup`].
+///
+/// The first line is a header (`00100000-ff709000 ---p ... [rollup]`) which is
+/// skipped. Subsequent lines have the form `Key:       <value> kB`. Unknown
+/// keys are silently ignored for forward compatibility with newer kernels.
+#[cfg(target_os = "linux")]
+fn parse_smaps_rollup(contents: &str, pid: u32) -> Result<SmapsRollup> {
+    let mut result = SmapsRollup::default();
+
+    for line in contents.lines().skip(1) {
+        let (key, value) = match line.split_once(':') {
+            Some(pair) => pair,
+            // Skip blank or malformed lines rather than hard-failing.
+            None => continue,
+        };
+
+        let key = key.trim();
+        let value_str = value
+            .trim()
+            .strip_suffix("kB")
+            .ok_or_else(|| anyhow!("Missing kB suffix in /proc/{pid}/smaps_rollup: {line}"))?
+            .trim();
+        let kb: u64 = value_str
+            .parse()
+            .map_err(|e| anyhow!("Bad value in /proc/{pid}/smaps_rollup field {key}: {e}"))?;
+        let bytes = kb
+            .checked_mul(1024)
+            .ok_or_else(|| anyhow!("Overflow converting {key} kB to bytes"))?;
+
+        match key {
+            "Rss" => result.rss_bytes = bytes,
+            "Pss" => result.pss_bytes = bytes,
+            "Pss_Anon" => result.pss_anon_bytes = bytes,
+            "Pss_File" => result.pss_file_bytes = bytes,
+            "Pss_Shmem" => result.pss_shmem_bytes = bytes,
+            "Swap" => result.swap_bytes = bytes,
+            "Private_Dirty" => result.private_dirty_bytes = bytes,
+            "Shared_Clean" => result.shared_clean_bytes = bytes,
+            _ => {} // silently ignore unknown fields
+        }
+    }
+
+    Ok(result)
+}
+
 impl ProcessMetricsCollector {
     /// Create a new instance to collect process metrics.
     pub fn new(config: MetricsConfig, pids: Vec<Pid>) -> Self {
@@ -238,6 +335,36 @@ impl ProcessMetricsCollector {
             "Total bytes written to disk by all monitored processes"
         );
 
+        // Detailed memory breakdown from /proc/PID/smaps_rollup (Linux >= 4.14).
+        describe_gauge!(
+            "pss_bytes_total",
+            "Total proportional share size in bytes (smaps_rollup)"
+        );
+        describe_gauge!(
+            "pss_anon_bytes_total",
+            "Total PSS of anonymous (heap/stack) pages in bytes"
+        );
+        describe_gauge!(
+            "pss_file_bytes_total",
+            "Total PSS of file-backed pages in bytes"
+        );
+        describe_gauge!(
+            "pss_shmem_bytes_total",
+            "Total PSS of shared memory pages in bytes"
+        );
+        describe_gauge!(
+            "swap_bytes_total",
+            "Total bytes swapped out to disk"
+        );
+        describe_gauge!(
+            "private_dirty_bytes_total",
+            "Total private dirty (non-reclaimable) pages in bytes"
+        );
+        describe_gauge!(
+            "shared_clean_bytes_total",
+            "Total shared clean (reclaimable) pages in bytes"
+        );
+
         // Other miscellaneous helpful datapoints
         describe_gauge!(
             "monitored_processes_count",
@@ -274,6 +401,14 @@ impl ProcessMetricsCollector {
                 .total_metrics
                 .disk_write_bytes
                 .saturating_add(current.disk_write_bytes),
+            // smaps_rollup fields are point-in-time snapshots (like RSS), not cumulative.
+            pss_bytes: current.pss_bytes,
+            pss_anon_bytes: current.pss_anon_bytes,
+            pss_file_bytes: current.pss_file_bytes,
+            pss_shmem_bytes: current.pss_shmem_bytes,
+            swap_bytes: current.swap_bytes,
+            private_dirty_bytes: current.private_dirty_bytes,
+            shared_clean_bytes: current.shared_clean_bytes,
         };
 
         debug!("Total Metrics: {}", self.total_metrics);
@@ -345,6 +480,28 @@ impl ProcessMetricsCollector {
         metrics.disk_write_bytes = metrics
             .disk_write_bytes
             .saturating_add(process_metrics.disk_write_bytes);
+        // smaps_rollup fields (always 0 on macOS, but aggregate for struct completeness).
+        metrics.pss_bytes = metrics
+            .pss_bytes
+            .saturating_add(process_metrics.pss_bytes);
+        metrics.pss_anon_bytes = metrics
+            .pss_anon_bytes
+            .saturating_add(process_metrics.pss_anon_bytes);
+        metrics.pss_file_bytes = metrics
+            .pss_file_bytes
+            .saturating_add(process_metrics.pss_file_bytes);
+        metrics.pss_shmem_bytes = metrics
+            .pss_shmem_bytes
+            .saturating_add(process_metrics.pss_shmem_bytes);
+        metrics.swap_bytes = metrics
+            .swap_bytes
+            .saturating_add(process_metrics.swap_bytes);
+        metrics.private_dirty_bytes = metrics
+            .private_dirty_bytes
+            .saturating_add(process_metrics.private_dirty_bytes);
+        metrics.shared_clean_bytes = metrics
+            .shared_clean_bytes
+            .saturating_add(process_metrics.shared_clean_bytes);
 
         // Store the latest per-process metrics
         let result = match self.individual_metrics.entry(pid) {
@@ -407,6 +564,28 @@ impl ProcessMetricsCollector {
         metrics.disk_write_bytes = metrics
             .disk_write_bytes
             .saturating_add(process_metrics.disk_write_bytes);
+        // smaps_rollup fields (0 when smaps_rollup is unavailable).
+        metrics.pss_bytes = metrics
+            .pss_bytes
+            .saturating_add(process_metrics.pss_bytes);
+        metrics.pss_anon_bytes = metrics
+            .pss_anon_bytes
+            .saturating_add(process_metrics.pss_anon_bytes);
+        metrics.pss_file_bytes = metrics
+            .pss_file_bytes
+            .saturating_add(process_metrics.pss_file_bytes);
+        metrics.pss_shmem_bytes = metrics
+            .pss_shmem_bytes
+            .saturating_add(process_metrics.pss_shmem_bytes);
+        metrics.swap_bytes = metrics
+            .swap_bytes
+            .saturating_add(process_metrics.swap_bytes);
+        metrics.private_dirty_bytes = metrics
+            .private_dirty_bytes
+            .saturating_add(process_metrics.private_dirty_bytes);
+        metrics.shared_clean_bytes = metrics
+            .shared_clean_bytes
+            .saturating_add(process_metrics.shared_clean_bytes);
 
         // Store the latest per-process metrics
         let result = match self.individual_metrics.entry(pid) {
@@ -448,8 +627,10 @@ impl ProcessMetricsCollector {
 
     /// Collects metrics for a specific process using the Linux `/proc` filesystem.
     ///
-    /// Reads `/proc/{PID}/stat` which contains CPU times (in clock ticks) and memory sizes.
-    /// Fields are documented in `proc(5)`.
+    /// Reads `/proc/{PID}/stat` for CPU times and virtual memory, and
+    /// `/proc/{PID}/smaps_rollup` (kernel >= 4.14) for detailed memory
+    /// breakdown (PSS, swap, etc.). Falls back to RSS from `/proc/stat`
+    /// when `smaps_rollup` is unavailable.
     #[cfg(target_os = "linux")]
     fn collect_native_linux_metrics(
         &self,
@@ -458,6 +639,7 @@ impl ProcessMetricsCollector {
     ) -> Result<()> {
         use std::fs;
 
+        // Always read /proc/stat for CPU times and vsize.
         let stat_path = format!("/proc/{}/stat", pid.pid);
         let stat_contents = fs::read_to_string(&stat_path)
             .map_err(|e| anyhow!("Failed to read {stat_path}: {e}"))?;
@@ -484,7 +666,7 @@ impl ProcessMetricsCollector {
         let ticks: u64 = clock_ticks_per_sec
             .try_into()
             .expect("clock_ticks_per_sec is positive");
-        let page_size: u64 = page_size.try_into().expect("page_size is positive");
+        let page_size_bytes: u64 = page_size.try_into().expect("page_size is positive");
 
         // Convert clock ticks to microseconds: value * 1_000_000 / ticks_per_sec
         process_metrics.cpu_user_time_us = parsed
@@ -497,11 +679,37 @@ impl ProcessMetricsCollector {
             .checked_mul(1_000_000)
             .and_then(|v| v.checked_div(ticks))
             .ok_or_else(|| anyhow!("overflow converting stime to microseconds"))?;
+
+        // Virtual memory is always from /proc/stat (smaps_rollup does not have it).
         process_metrics.virtual_memory_bytes = parsed.vsize;
-        process_metrics.physical_memory_bytes = parsed
-            .rss_pages
-            .checked_mul(page_size)
-            .ok_or_else(|| anyhow!("overflow converting rss pages to bytes"))?;
+
+        // Memory: prefer smaps_rollup for detailed breakdown, fall back to /proc/stat RSS.
+        let smaps_path = format!("/proc/{}/smaps_rollup", pid.pid);
+        match fs::read_to_string(&smaps_path) {
+            Ok(smaps_contents) => {
+                let smaps = parse_smaps_rollup(&smaps_contents, pid.pid)?;
+                process_metrics.physical_memory_bytes = smaps.rss_bytes;
+                process_metrics.pss_bytes = smaps.pss_bytes;
+                process_metrics.pss_anon_bytes = smaps.pss_anon_bytes;
+                process_metrics.pss_file_bytes = smaps.pss_file_bytes;
+                process_metrics.pss_shmem_bytes = smaps.pss_shmem_bytes;
+                process_metrics.swap_bytes = smaps.swap_bytes;
+                process_metrics.private_dirty_bytes = smaps.private_dirty_bytes;
+                process_metrics.shared_clean_bytes = smaps.shared_clean_bytes;
+            }
+            Err(_) => {
+                // Fallback: use RSS from /proc/stat (kernel < 4.14 or restricted access).
+                debug!(
+                    "smaps_rollup not available for PID {}, falling back to /proc/stat RSS",
+                    pid.pid
+                );
+                process_metrics.physical_memory_bytes = parsed
+                    .rss_pages
+                    .checked_mul(page_size_bytes)
+                    .ok_or_else(|| anyhow!("overflow converting rss pages to bytes"))?;
+                // All smaps fields remain at their Default (0).
+            }
+        }
 
         Ok(())
     }
@@ -592,6 +800,13 @@ impl ProcessMetricsCollector {
             gauge!("total_virtual_memory_usage").set(total.virtual_memory_bytes as f64);
             gauge!("disk_read_bytes_total").set(total.disk_read_bytes as f64);
             gauge!("disk_write_bytes_total").set(total.disk_write_bytes as f64);
+            gauge!("pss_bytes_total").set(total.pss_bytes as f64);
+            gauge!("pss_anon_bytes_total").set(total.pss_anon_bytes as f64);
+            gauge!("pss_file_bytes_total").set(total.pss_file_bytes as f64);
+            gauge!("pss_shmem_bytes_total").set(total.pss_shmem_bytes as f64);
+            gauge!("swap_bytes_total").set(total.swap_bytes as f64);
+            gauge!("private_dirty_bytes_total").set(total.private_dirty_bytes as f64);
+            gauge!("shared_clean_bytes_total").set(total.shared_clean_bytes as f64);
             gauge!("monitored_processes_count").set(total.process_count as f64);
         }
 
@@ -610,6 +825,20 @@ impl ProcessMetricsCollector {
                 .set(metrics.disk_read_bytes as f64);
             gauge!("disk_write_bytes_total", "pid" => format!("{pid}"))
                 .set(metrics.disk_write_bytes as f64);
+            gauge!("pss_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.pss_bytes as f64);
+            gauge!("pss_anon_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.pss_anon_bytes as f64);
+            gauge!("pss_file_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.pss_file_bytes as f64);
+            gauge!("pss_shmem_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.pss_shmem_bytes as f64);
+            gauge!("swap_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.swap_bytes as f64);
+            gauge!("private_dirty_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.private_dirty_bytes as f64);
+            gauge!("shared_clean_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.shared_clean_bytes as f64);
             gauge!("monitored_processes_count", "pid" => format!("{pid}"))
                 .set(metrics.process_count as f64);
         }
@@ -746,5 +975,127 @@ mod tests {
         assert_eq!(aggregated.process_count, 1);
         assert!(aggregated.physical_memory_bytes > 0);
         assert!(aggregated.virtual_memory_bytes > 0);
+    }
+
+    /// Verifies parse_smaps_rollup with realistic synthetic content.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_smaps_rollup_synthetic() {
+        let contents = "\
+00100000-ff709000 ---p 00000000 00:00 0         [rollup]
+Rss:                 884 kB
+Pss:                 385 kB
+Pss_Dirty:            68 kB
+Pss_Anon:            301 kB
+Pss_File:             80 kB
+Pss_Shmem:             4 kB
+Shared_Clean:        696 kB
+Shared_Dirty:          0 kB
+Private_Clean:       120 kB
+Private_Dirty:        68 kB
+Referenced:          884 kB
+Anonymous:            68 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:              385 kB";
+
+        let parsed = parse_smaps_rollup(contents, 42).expect("should parse synthetic smaps_rollup");
+        assert_eq!(parsed.rss_bytes, 884 * 1024);
+        assert_eq!(parsed.pss_bytes, 385 * 1024);
+        assert_eq!(parsed.pss_anon_bytes, 301 * 1024);
+        assert_eq!(parsed.pss_file_bytes, 80 * 1024);
+        assert_eq!(parsed.pss_shmem_bytes, 4 * 1024);
+        assert_eq!(parsed.swap_bytes, 0);
+        assert_eq!(parsed.private_dirty_bytes, 68 * 1024);
+        assert_eq!(parsed.shared_clean_bytes, 696 * 1024);
+    }
+
+    /// Verifies that unknown fields are silently ignored.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_smaps_rollup_unknown_fields() {
+        let contents = "\
+00100000-ff709000 ---p 00000000 00:00 0         [rollup]
+Rss:                 100 kB
+Pss:                  50 kB
+FutureNewField:       99 kB";
+
+        let parsed =
+            parse_smaps_rollup(contents, 1).expect("unknown fields should not cause errors");
+        assert_eq!(parsed.rss_bytes, 100 * 1024);
+        assert_eq!(parsed.pss_bytes, 50 * 1024);
+    }
+
+    /// Verifies that a minimal smaps_rollup with only a header produces all-zero defaults.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_smaps_rollup_header_only() {
+        let contents = "00100000-ff709000 ---p 00000000 00:00 0         [rollup]\n";
+        let parsed =
+            parse_smaps_rollup(contents, 1).expect("header-only should return defaults");
+        assert_eq!(parsed.rss_bytes, 0);
+        assert_eq!(parsed.pss_bytes, 0);
+        assert_eq!(parsed.swap_bytes, 0);
+    }
+
+    /// Verifies that malformed smaps_rollup lines produce errors.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_smaps_rollup_malformed() {
+        // Missing kB suffix
+        let contents = "\
+00100000-ff709000 ---p 00000000 00:00 0         [rollup]
+Rss:                 884 MB";
+        assert!(parse_smaps_rollup(contents, 1).is_err());
+
+        // Non-numeric value
+        let contents = "\
+00100000-ff709000 ---p 00000000 00:00 0         [rollup]
+Rss:                 abc kB";
+        assert!(parse_smaps_rollup(contents, 1).is_err());
+    }
+
+    /// Verifies live smaps_rollup collection produces sane values.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn collect_linux_smaps_rollup_for_self() {
+        let own_pid = std::process::id();
+        let smaps_path = format!("/proc/{own_pid}/smaps_rollup");
+
+        // Skip test if smaps_rollup is not available on this kernel.
+        if std::fs::metadata(&smaps_path).is_err() {
+            eprintln!("skipping: smaps_rollup not available");
+            return;
+        }
+
+        let pid = Pid::from_u32(own_pid, "self");
+        let mut collector = ProcessMetricsCollector::new(MetricsConfig::default(), vec![pid]);
+        let mut metrics = ProcessMetrics::default();
+
+        collector
+            .collect_process_metrics(pid, &mut metrics)
+            .expect("should collect metrics for our own process");
+
+        // PSS should be nonzero for any running process.
+        assert!(
+            metrics.pss_bytes > 0,
+            "expected nonzero PSS, got {}",
+            metrics.pss_bytes
+        );
+
+        // PSS <= RSS always holds (proportional accounting can only reduce, not inflate).
+        assert!(
+            metrics.pss_bytes <= metrics.physical_memory_bytes,
+            "PSS ({}) should not exceed RSS ({})",
+            metrics.pss_bytes,
+            metrics.physical_memory_bytes
+        );
+
+        // Pss_Anon should be nonzero (we have heap allocations).
+        assert!(
+            metrics.pss_anon_bytes > 0,
+            "expected nonzero PSS_Anon, got {}",
+            metrics.pss_anon_bytes
+        );
     }
 }
