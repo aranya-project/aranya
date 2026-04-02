@@ -1,6 +1,7 @@
 use core::mem::MaybeUninit;
+use std::{ffi::CString, str::FromStr};
 
-use aranya_client::PublicKeyBundle;
+use aranya_client::{PublicKeyBundle, Text};
 
 use crate::imp;
 
@@ -36,4 +37,42 @@ pub unsafe fn public_key_bundle_serialize(
 /// Deserializes key bundle buffer into a [`PublicKeyBundle`].
 pub fn public_key_bundle_deserialize(buf: &[u8]) -> Result<PublicKeyBundle, imp::Error> {
     Ok(postcard::from_bytes(buf)?)
+}
+
+#[derive(Debug)]
+pub struct Role {
+    pub id: aranya_client::RoleId,
+    pub name: CString,
+    pub author_id: aranya_client::DeviceId,
+    pub default: bool,
+}
+
+impl From<aranya_client::Role> for Role {
+    fn from(role: aranya_client::Role) -> Self {
+        let name = CString::from_str(Text::as_str(&role.name)).expect("text cannot contain nul");
+        Self {
+            id: role.id,
+            name,
+            author_id: role.author_id,
+            default: role.default,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Label {
+    pub id: aranya_client::LabelId,
+    pub name: CString,
+    pub author_id: aranya_client::DeviceId,
+}
+
+impl From<aranya_client::Label> for Label {
+    fn from(label: aranya_client::Label) -> Self {
+        let name = CString::from_str(Text::as_str(&label.name)).expect("text cannot contain nul");
+        Self {
+            id: label.id,
+            name,
+            author_id: label.author_id,
+        }
+    }
 }

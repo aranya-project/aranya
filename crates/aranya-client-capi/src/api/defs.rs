@@ -84,6 +84,10 @@ pub enum Error {
     #[capi(msg = "serialization")]
     Serialization,
 
+    /// The requested resource does not exist.
+    #[capi(msg = "does not exist")]
+    DoesNotExist,
+
     /// Some other error occurred.
     #[capi(msg = "other")]
     Other,
@@ -103,6 +107,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Aranya(_) => Self::Aranya,
+                aranya_client::Error::DoesNotExist => Self::DoesNotExist,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
                 aranya_client::Error::Other(_) => Self::Other,
@@ -350,7 +355,7 @@ impl From<&DeviceId> for aranya_client::DeviceId {
 /// A role.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type Role = Safe<aranya_client::Role>;
+pub type Role = Safe<imp::Role>;
 
 /// Uniquely identifies a [`Role`].
 #[repr(C)]
@@ -381,7 +386,7 @@ impl From<&RoleId> for aranya_client::RoleId {
 ///
 /// @relates AranyaRole
 pub fn role_get_id(role: &Role) -> RoleId {
-    role.deref().id.into()
+    role.id.into()
 }
 
 /// Get name of role.
@@ -393,7 +398,7 @@ pub fn role_get_id(role: &Role) -> RoleId {
 /// @relates AranyaRole
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
-    role.deref().name.as_ptr().cast()
+    role.name.as_ptr()
 }
 
 /// Get the author of a role.
@@ -402,7 +407,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 ///
 /// @relates AranyaRole
 pub fn role_get_author(role: &Role) -> DeviceId {
-    role.deref().author_id.into()
+    role.author_id.into()
 }
 
 /// Valid channel operations for a label assignment.
@@ -428,6 +433,43 @@ impl From<ChanOp> for aranya_client::ChanOp {
             ChanOp::SendRecv => Self::SendRecv,
         }
     }
+}
+
+/// A label.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 112, align = 8)]
+pub type Label = Safe<imp::Label>;
+
+/// Get ID of label.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
+pub fn label_get_id(label: &Label) -> LabelId {
+    label.id.into()
+}
+
+/// Get name of label.
+///
+/// The resulting string is null-terminated and must not be freed.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
+pub fn label_get_name(label: &Label) -> *const c_char {
+    label.name.as_ptr()
+}
+
+/// Get the author of a label.
+///
+/// @param[in] label the label
+///
+/// @relates AranyaLabel
+#[aranya_capi_core::no_ext_error]
+pub fn label_get_author(label: &Label) -> DeviceId {
+    label.author_id.into()
 }
 
 /// Label ID.
@@ -1311,7 +1353,7 @@ pub unsafe fn setup_default_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_len);
 
     for (dst, src) in out.iter_mut().zip(created_roles) {
-        Role::init(dst, src);
+        Role::init(dst, imp::Role::from(src));
     }
 
     Ok(())
@@ -1384,7 +1426,7 @@ pub unsafe fn team_roles(
     let out = aranya_capi_core::try_as_mut_slice!(roles_out, *roles_out_len);
 
     for (dst, src) in out.iter_mut().zip(roles) {
-        Role::init(dst, src);
+        Role::init(dst, imp::Role::from(src));
     }
 
     Ok(())
@@ -1418,7 +1460,7 @@ pub fn create_role(
             .team(team.into())
             .create_role(role_name, aranya_client::Rank::new(rank.0)),
     )?;
-    Role::init(role_out, role);
+    Role::init(role_out, imp::Role::from(role));
     Ok(())
 }
 
@@ -2137,7 +2179,7 @@ pub fn team_device_role(
 
     match maybe_role {
         Some(role) => {
-            Role::init(role_out, role);
+            Role::init(role_out, imp::Role::from(role));
             has_role.write(true);
         }
         None => {
@@ -2282,11 +2324,34 @@ pub unsafe fn team_labels(
     Ok(())
 }
 
+/// Query a label.
+///
+/// Returns the label metadata for the given label ID.
+/// Returns an error if the label does not exist.
+///
+/// @param[in] client the Aranya Client
+/// @param[in] team the team's ID
+/// @param[in] label_id the label ID to query
+/// @param[out] label_out returns the label
+///
+/// @relates AranyaClient.
+pub fn team_label(
+    client: &Client,
+    team: &TeamId,
+    label_id: &LabelId,
+    label_out: &mut MaybeUninit<Label>,
+) -> Result<(), imp::Error> {
+    let label = client
+        .rt
+        .block_on(client.inner.team(team.into()).label(label_id.into()))?;
+    Label::init(label_out, imp::Label::from(label));
+    Ok(())
+}
+
 /// Query if a label exists.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
-/// @param[in] device the device's ID
 /// @param[in] label the label
 /// @param[out] __output boolean indicating whether the label exists.
 ///
@@ -2296,11 +2361,14 @@ pub unsafe fn team_label_exists(
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
-    let label_result = client
+    match client
         .rt
-        .block_on(client.inner.team(team.into()).label(label.into()))?;
-    let exists = label_result.is_some();
-    Ok(exists)
+        .block_on(client.inner.team(team.into()).label(label.into()))
+    {
+        Ok(_) => Ok(true),
+        Err(aranya_client::Error::DoesNotExist) => Ok(false),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// An AFC Sending Channel Object.
