@@ -2,8 +2,10 @@
 use std::{collections::btree_map::Entry, sync::Arc};
 
 use anyhow::Context as _;
+use aranya_daemon_api::DeviceId;
 use aranya_util::{rustls::NoCertResolver, s2n_quic::get_conn_identity};
 use buggy::BugExt as _;
+use bytes::Bytes;
 use s2n_quic::{
     application::{self, Error as AppError},
     connection::StreamAcceptor,
@@ -19,7 +21,10 @@ use s2n_quic::{
 use tokio::{task::JoinSet, time::Duration};
 use tracing::{debug, error, trace, warn};
 
-use super::{connections::ListenerPool, Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
+use super::{
+    connections::ListenerPool, ConnectionInfo, Error, PskStore, QuicStream, SyncListener,
+    ALPN_QUIC_SYNC,
+};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
 /// The amount of time we wait trying to accept a bidirectional stream from the peer connecting to
@@ -150,16 +155,32 @@ impl QuicListener {
 
         debug!(?remote, ?active_team, "authenticated incoming connection");
 
-        let peer_addr =
-            tokio::time::timeout(RESOLVE_PEER_ADDR_TIMEOUT, extract_return_address(&mut conn))
-                .await
-                .context("timed out waiting for return address")?
-                .context("unable to extract return address")?;
+        let (peer_addr, remote_device_id) = match tokio::time::timeout(
+            RESOLVE_PEER_ADDR_TIMEOUT,
+            exchange_conn_info(&mut conn, self.pool.local_device_id),
+        )
+        .await
+        {
+            Ok(Ok(result)) => result,
+            Ok(Err(e)) => {
+                warn!(?remote, error = %e, "failed to exchange connection info, closing");
+                conn.close(application::Error::UNKNOWN);
+                return Err(e.into());
+            }
+            Err(_) => {
+                warn!(?remote, "timed out exchanging connection info, closing");
+                conn.close(application::Error::UNKNOWN);
+                return Err(anyhow::anyhow!("timed out waiting for connection info").into());
+            }
+        };
         let peer = SyncPeer::new(peer_addr, GraphId::transmute(active_team));
 
-        // Insert with tie-breaking. The peer initiated this connection,
-        // so it wins if peer.addr < local_addr.
+        // Insert with tie-breaking using device IDs. When both peers connect
+        // simultaneously, the peer with the lower device ID keeps its outbound
+        // connection. Device IDs are cryptographically unique, transport-agnostic,
+        // and work regardless of NAT or network topology.
         let (new_handle, new_acceptor) = conn.split();
+        let local_device_id = self.pool.local_device_id;
         let acceptor = {
             let mut map = self.pool.conns.lock().await;
             match map.entry(peer) {
@@ -169,7 +190,9 @@ impl QuicListener {
                 }
                 Entry::Occupied(mut e) => {
                     let existing_alive = e.get_mut().ping().is_ok();
-                    let inbound_wins = !existing_alive || peer.addr < self.local_addr;
+                    // The inbound connection wins if the remote peer has the lower
+                    // device ID (they keep their outbound, which is our inbound).
+                    let inbound_wins = !existing_alive || remote_device_id < local_device_id;
                     if inbound_wins {
                         if existing_alive {
                             debug!(?peer, "replacing existing connection (tie-break)");
@@ -252,11 +275,16 @@ impl SyncListener for QuicListener {
     }
 }
 
-/// Grabs the remote address of the connected peer, and accepts a message containing the port they
-/// want to be connected on.
-async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Result<Addr> {
+/// Exchanges connection info with the connecting peer.
+///
+/// Receives [`ConnectionInfo`] from the connector (containing return port and device ID),
+/// sends back the local device ID, and returns the peer's address and device ID.
+async fn exchange_conn_info(
+    conn: &mut s2n_quic::Connection,
+    local_device_id: DeviceId,
+) -> anyhow::Result<(Addr, DeviceId)> {
     let ip = conn.remote_addr().assume("valid connection")?.ip();
-    trace!(%ip, "extracting return address");
+    trace!(%ip, "exchanging connection info");
 
     let bytes = conn
         .accept_receive_stream()
@@ -264,9 +292,18 @@ async fn extract_return_address(conn: &mut s2n_quic::Connection) -> anyhow::Resu
         .context("unable to accept receive stream")?
         .receive()
         .await?
-        .context("peer didn't sent return port")?;
-    let port = u16::from_be_bytes(bytes.as_ref().try_into().context("invalid return port")?);
+        .context("peer didn't send connection info")?;
+    let info: ConnectionInfo =
+        postcard::from_bytes(bytes.as_ref()).context("invalid connection info")?;
 
-    debug!(%ip, %port, "resolved return address");
-    Ok(Addr::from((ip, port)))
+    // Send back our device ID so the connector can tie-break.
+    let id_bytes =
+        postcard::to_allocvec(&local_device_id).context("failed to serialize device ID")?;
+    conn.open_send_stream()
+        .await?
+        .send(Bytes::from(id_bytes))
+        .await?;
+
+    debug!(%ip, port = %info.port, "resolved peer connection info");
+    Ok((Addr::from((ip, info.port)), info.device_id))
 }
