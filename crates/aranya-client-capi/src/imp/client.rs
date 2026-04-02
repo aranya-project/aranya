@@ -58,3 +58,21 @@ impl From<aranya_client::Role> for Role {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct Label {
+    pub id: aranya_client::LabelId,
+    pub name: CString,
+    pub author_id: aranya_client::DeviceId,
+}
+
+impl From<aranya_client::Label> for Label {
+    fn from(label: aranya_client::Label) -> Self {
+        let name = CString::from_str(Text::as_str(&label.name)).expect("text cannot contain nul");
+        Self {
+            id: label.id,
+            name,
+            author_id: label.author_id,
+        }
+    }
+}
