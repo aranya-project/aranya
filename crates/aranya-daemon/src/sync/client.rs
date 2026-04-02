@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
-use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
+use aranya_runtime::{Address, Storage as _, SyncType};
 use aranya_runtime::{
     Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, TraversalBuffers,
 };
@@ -78,7 +78,6 @@ where
             schedule_delay,
             graph_id: peer.graph_id,
         });
-
         self.send_hello_request(peer, message, buffer).await
     }
 
