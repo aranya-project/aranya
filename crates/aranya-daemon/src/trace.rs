@@ -6,13 +6,24 @@
 pub use tarpc::trace::TraceId;
 use tracing::Span;
 
+use crate::observability;
+
 /// Extracts and records RPC trace context on the current span.
 ///
 /// Also emits a receive log with trace ID for client/daemon correlation.
 pub fn setup_trace_context(ctx: &tarpc::context::Context) {
     let trace_id = ctx.trace_context.trace_id;
+    let rpc_deadline = ctx.deadline;
     Span::current().record("trace_id", tracing::field::display(trace_id));
-    tracing::info!(rpc.trace_id = %trace_id, "RPC: ReceiveRequest");
+    let otel_name = Span::current()
+        .metadata()
+        .map_or("rpc.unknown", |meta| meta.name());
+    observability::log_rpc_receive_request(
+        trace_id,
+        rpc_deadline,
+        observability::OTEL_KIND_SERVER,
+        otel_name,
+    );
 }
 
 #[cfg(test)]

@@ -16,12 +16,127 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 #define ENABLE_ARANYA_AFC 1
 #define ENABLE_ARANYA_PREVIEW 1
 #define ENABLE_ARANYA_EXPERIMENTAL 1
 #include "aranya-client.h"
+
+static void example_format_timestamp(char *buf, size_t len) {
+    struct timeval tv;
+    struct tm tm;
+
+    gettimeofday(&tv, NULL);
+    gmtime_r(&tv.tv_sec, &tm);
+    snprintf(buf, len, "%04d-%02d-%02dT%02d:%02d:%02d.%06dZ", tm.tm_year + 1900,
+             tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+             (int)tv.tv_usec);
+}
+
+static void example_escape_json(char *dst, size_t dst_len, const char *src) {
+    size_t i = 0;
+
+    if (dst_len == 0) {
+        return;
+    }
+
+    while (*src != '\0' && i + 1 < dst_len) {
+        unsigned char c = (unsigned char)*src++;
+
+        switch (c) {
+        case '\\':
+        case '"':
+            if (i + 2 >= dst_len) {
+                goto done;
+            }
+            dst[i++] = '\\';
+            dst[i++] = (char)c;
+            break;
+        case '\n':
+            if (i + 2 >= dst_len) {
+                goto done;
+            }
+            dst[i++] = '\\';
+            dst[i++] = 'n';
+            break;
+        case '\r':
+            if (i + 2 >= dst_len) {
+                goto done;
+            }
+            dst[i++] = '\\';
+            dst[i++] = 'r';
+            break;
+        case '\t':
+            if (i + 2 >= dst_len) {
+                goto done;
+            }
+            dst[i++] = '\\';
+            dst[i++] = 't';
+            break;
+        default:
+            if (c < 0x20) {
+                if (i + 6 >= dst_len) {
+                    goto done;
+                }
+                snprintf(dst + i, dst_len - i, "\\u%04x", c);
+                i += 6;
+            } else {
+                dst[i++] = (char)c;
+            }
+            break;
+        }
+    }
+
+done:
+    dst[i] = '\0';
+}
+
+static void example_emit_json_log(FILE *stream, const char *level,
+                                  const char *message) {
+    char timestamp[32] = {0};
+    char escaped[8192] = {0};
+
+    example_format_timestamp(timestamp, sizeof(timestamp));
+    example_escape_json(escaped, sizeof(escaped), message);
+    fprintf(stream,
+            "{\"timestamp\":\"%s\",\"level\":\"%s\",\"fields\":{\"message\":\"%"
+            "s\"},\"target\":\"aranya_c_example\"}\n",
+            timestamp, level, escaped);
+    fflush(stream);
+}
+
+static void example_log_printf(const char *fmt, ...) {
+    char message[4096] = {0};
+    va_list args;
+
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+    example_emit_json_log(stdout, "INFO", message);
+}
+
+static void example_log_fprintf(FILE *stream, const char *fmt, ...) {
+    char message[4096] = {0};
+    const char *level = stream == stderr ? "ERROR" : "INFO";
+    va_list args;
+
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+    example_emit_json_log(stream, level, message);
+}
+
+#ifdef printf
+#undef printf
+#endif
+#ifdef fprintf
+#undef fprintf
+#endif
+#define printf(...) example_log_printf(__VA_ARGS__)
+#define fprintf(STREAM, ...) example_log_fprintf((STREAM), __VA_ARGS__)
 
 // Example updated rank for the device rank change demo.
 #define EXAMPLE_UPDATED_DEVICE_RANK 90

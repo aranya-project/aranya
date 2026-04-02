@@ -36,7 +36,7 @@ serde = { workspace = true, features = ["derive"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync", "process"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json"] }
 
 [dev-dependencies]
 serial_test = { workspace = true }

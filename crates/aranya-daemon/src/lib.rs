@@ -33,6 +33,7 @@
 pub mod actions;
 pub mod aranya;
 pub mod config;
+pub mod observability;
 pub mod policy;
 pub mod sync;
 pub mod trace;

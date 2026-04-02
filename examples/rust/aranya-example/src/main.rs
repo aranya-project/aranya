@@ -175,9 +175,9 @@ async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
+                .json()
                 .with_file(false)
                 .with_target(false)
-                .compact()
                 .with_filter(filter),
         )
         .init();

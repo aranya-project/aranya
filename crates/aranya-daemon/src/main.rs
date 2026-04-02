@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{config::Config, observability, Daemon};
 use aranya_util::error::ReportExt as _;
 use clap::Parser;
 use tokio::runtime::Runtime;
@@ -21,18 +21,23 @@ fn main() -> Result<()> {
     let flags = Args::parse();
 
     let cfg = Config::load(&flags.config)?;
+    let daemon_name = cfg.name.clone();
 
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
+                .json()
                 .with_writer(io::stderr)
                 .with_file(false)
-                .compact()
                 .with_filter(EnvFilter::from_env("ARANYA_DAEMON")),
         )
         .init();
 
-    info!("starting Aranya daemon");
+    observability::startup_event_check()
+        .map_err(anyhow::Error::msg)
+        .context("invalid observability event field")?;
+
+    observability::log_daemon_starting(&daemon_name);
 
     let pid = PidFile::create(cfg.pid_path()).context("unable to create PID file")?;
     info!(name = cfg.name, "wrote PID file to {pid}");
@@ -40,14 +45,14 @@ fn main() -> Result<()> {
     let rt = Runtime::new()?;
     rt.block_on(async {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
-        info!("loaded Aranya daemon");
+        observability::log_daemon_loaded(&daemon_name);
 
         let handle = daemon.spawn().await.context("unable to start daemon")?;
         handle.join().await?;
 
         Ok(())
     })
-    .inspect_err(|err| error!(error = ?err))
+    .inspect_err(|err| error!(error = %format!("{err:#}"), "daemon run failed"))
 }
 
 #[derive(Debug, Parser)]
