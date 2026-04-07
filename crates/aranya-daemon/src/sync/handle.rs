@@ -15,9 +15,7 @@ use aranya_runtime::Address;
 use tokio::sync::{mpsc, oneshot};
 use tracing::trace;
 
-#[cfg(feature = "preview")]
-use super::GraphId;
-use super::{Error, Result, SyncPeer};
+use super::{Error, GraphId, Result, SyncPeer};
 
 /// Holds all possible messages that the [`SyncManager`](super::SyncManager) can process.
 #[derive(Clone, Debug)]

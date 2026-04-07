@@ -8,23 +8,23 @@
     rust_2018_idioms
 )]
 
-use std::{collections::HashMap, fs, net::Ipv4Addr, sync::Arc};
+use std::{collections::HashMap, fs, net::Ipv4Addr};
 
 use anyhow::{bail, Context, Result};
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
     policy::{LabelId, RoleId},
     Csprng, DeviceId, Rng,
 };
-use aranya_daemon_api::{text, TeamId};
+use aranya_daemon_api::text;
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{ready, Addr};
-use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
 use serial_test::serial;
 use tempfile::{tempdir, TempDir};
 use test_log::test;
@@ -39,7 +39,7 @@ use crate::{
     policy::{Effect, Perm, PublicKeyBundle as DeviceKeyBundle},
     sync::{
         self,
-        quic::{ConnectionPool, PskStore, QuicConnector, QuicListener},
+        quic::{CertConfig, QuicConnector, QuicListener},
         SyncPeer,
     },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -90,7 +90,9 @@ impl TestDevice {
         effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
     ) -> Result<Self> {
         let buffer = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
-        let sync_local_addr = server.local_addr();
+        // TODO(mtls): necessary?
+        // Use "localhost" hostname to match the certificate's SAN, but with the actual port
+        let sync_local_addr = Addr::new("localhost", server.local_addr().port())?;
         let handle = task::spawn(server.serve(ready::Waiter::new(1).notifier())).abort_handle();
         Ok(Self {
             syncer,
@@ -178,24 +180,38 @@ struct TestCtx {
     // Per-client ID.
     // Incrementing counter is used to differentiate clients for test purposes.
     id: u64,
+    // Shared CA certificate used for all test clients
+    ca_cert: CaCert,
+    // Path to CA certificate directory
+    root_certs_dir: std::path::PathBuf,
 }
 
 impl TestCtx {
     /// Creates a new test context.
     pub fn new() -> Result<Self> {
+        let dir = tempdir()?;
+
+        // Create a shared CA for all test clients
+        let certs_dir = dir.path().join("certs");
+        let root_certs_dir = certs_dir.join("ca");
+        fs::create_dir_all(&root_certs_dir)?;
+
+        let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+        let ca_cert = CaCert::new("Test CA", 365).context("failed to create CA cert")?;
+        ca_cert
+            .save(&ca_paths, SaveOptions::default().create_parents())
+            .context("failed to save CA cert")?;
+
         Ok(Self {
-            dir: tempdir()?,
+            dir,
             id: 0,
+            ca_cert,
+            root_certs_dir,
         })
     }
 
     /// Creates a single client.
-    pub async fn new_client(
-        &mut self,
-        name: &str,
-        id: GraphId,
-        psk_store: Arc<PskStore>,
-    ) -> Result<TestDevice> {
+    pub async fn new_client(&mut self, name: &str, id: GraphId) -> Result<TestDevice> {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
@@ -228,18 +244,27 @@ impl TestCtx {
         let (send_effects, effect_recv) = mpsc::channel(1);
         let (handle, recv) = sync::SyncHandle::channel(128);
 
-        // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        let (connector_pool, listener_pool) = ConnectionPool::new(32).split();
+        // Generate a certificate for this client
+        let certs_dir = root.join("certs");
+        fs::create_dir_all(&certs_dir)?;
+        let device_paths = CertPaths::new(certs_dir.join("device"));
+        let device_cert = self
+            .ca_cert
+            .generate("localhost", 365)
+            .context("failed to generate device cert")?;
+        device_cert
+            .save(&device_paths, SaveOptions::default().create_parents())
+            .context("failed to save device cert")?;
 
-        let listener = QuicListener::new(any_local_addr, psk_store.clone(), listener_pool).await?;
+        let cert_config = CertConfig {
+            root_certs_dir: self.root_certs_dir.clone(),
+            device_cert: device_paths.cert().to_path_buf(),
+            device_key: device_paths.key().to_path_buf(),
+        };
+
+        let (connector, listener) = sync::quic::new(any_local_addr, &cert_config).await?;
+
         let server = TestServer::new(listener, client.clone(), handle);
-
-        let connector = QuicConnector::new(
-            any_local_addr,
-            server.local_addr(),
-            connector_pool,
-            psk_store.clone(),
-        )?;
         let sync_client = TestClient::new(client.clone(), connector, send_effects);
         let syncer = TestSyncer::new(sync_client, recv)?;
 
@@ -247,8 +272,9 @@ impl TestCtx {
     }
 
     /// Creates `n` members.
+    ///
+    /// With mTLS, all members share the same CA certificate for authentication.
     pub async fn new_group(&mut self, n: usize) -> Result<Vec<TestDevice>> {
-        let psk_store: Arc<PskStore> = Arc::default();
         let mut clients = Vec::<TestDevice>::new();
         for i in 0..n {
             let name = format!("client_{}", self.id);
@@ -260,7 +286,7 @@ impl TestCtx {
                 clients[0].graph_id
             };
             let mut client = self
-                .new_client(&name, id, Arc::clone(&psk_store))
+                .new_client(&name, id)
                 .await
                 .with_context(|| format!("unable to create client {name}"))?;
             // Eww, gross.
@@ -274,18 +300,6 @@ impl TestCtx {
             }
             clients.push(client)
         }
-
-        let test_psk = PresharedKey::external(b"test-identity", b"test-secret-key-32-bytes-long!!")
-            .context("failed to create test PSK")?
-            .with_hash_alg(
-                s2n_quic::provider::tls::rustls::rustls::crypto::hash::HashAlgorithm::SHA384,
-            )
-            .context("failed to set hash algorithm")?;
-        let team_id = TeamId::from(*clients[0].graph_id.as_array());
-        psk_store.insert(team_id, Arc::new(test_psk));
-        // OK to just set team and ignore guard since we only use one team in these tests.
-        _ = psk_store.set_team(team_id).await;
-
         Ok(clients)
     }
 
@@ -612,7 +626,7 @@ async fn test_add_device_requires_unique_id() -> Result<()> {
 
     let owner = team.owner;
     let extra = ctx
-        .new_client("extra", owner.graph_id, Arc::default())
+        .new_client("extra", owner.graph_id)
         .await
         .context("unable to create extra device")?;
 
@@ -674,7 +688,7 @@ async fn test_add_device_with_initial_role_requires_sufficient_rank() -> Result<
         .context("membera unable to sync owner state")?;
 
     let candidate = ctx
-        .new_client("candidate", owner.graph_id, Arc::default())
+        .new_client("candidate", owner.graph_id)
         .await
         .context("unable to create candidate device")?;
 
@@ -730,7 +744,7 @@ async fn test_assign_role_rejects_unknown_device() -> Result<()> {
     let member_role = role_id_by_name(&roles, "member");
 
     let extra = ctx
-        .new_client("unknown-device", owner.graph_id, Arc::default())
+        .new_client("unknown-device", owner.graph_id)
         .await
         .context("unable to create extra device")?;
     let bogus_device_id = extra.pk.ident_pk.id()?;
