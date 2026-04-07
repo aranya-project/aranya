@@ -37,8 +37,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.aranya-afc-util]]
-version = "0.22.0"
-when = "2026-03-18"
+version = "0.23.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -67,26 +67,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.20.0"
-when = "2026-03-18"
+version = "0.21.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.20.0"
-when = "2026-03-18"
+version = "0.21.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.20.0"
-when = "2026-03-18"
+version = "0.21.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.19.0"
-when = "2026-03-18"
+version = "0.19.1"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -97,8 +97,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.20.0"
-when = "2026-03-18"
+version = "0.21.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -127,8 +127,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.20.0"
-when = "2026-03-18"
+version = "0.21.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -139,26 +139,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.21.0"
-when = "2026-03-18"
+version = "0.22.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.15.0"
-when = "2026-03-18"
+version = "0.15.1"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.21.0"
-when = "2026-03-18"
+version = "0.22.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.14.0"
-when = "2026-03-18"
+version = "0.15.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -169,14 +169,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.14.0"
-when = "2026-03-18"
+version = "0.14.1"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.19.0"
-when = "2026-03-18"
+version = "0.20.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -193,14 +193,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.20.0"
-when = "2026-03-18"
+version = "0.21.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.21.0"
-when = "2026-03-18"
+version = "0.22.0"
+when = "2026-03-31"
 user-id = 293722
 user-login = "aranya-project-bot"
 
