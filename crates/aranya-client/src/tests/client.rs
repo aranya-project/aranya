@@ -47,7 +47,7 @@ async fn test_client_rand() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_trace_id_round_trip() -> Result<()> {
     let work_dir = tempfile::tempdir()?;
     let owner = DeviceCtx::new("trace-roundtrip", "owner", work_dir.path().join("owner")).await?;
