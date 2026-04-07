@@ -301,6 +301,12 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.93 -> 1.0.94"
 
+[[audits.quinn-proto]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.13 -> 0.11.14"
+notes = "Some trivial refactoring plus the RUSTSEC-2026-0037 unwrap fix."
+
 [[audits.quote]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
