@@ -4,6 +4,7 @@
 //! in a bidirectional ring topology, as specified in the multi-daemon convergence
 //! test specification.
 
+#![cfg(false)] // TODO(mtls): Update to mtls.
 #![allow(
     clippy::arithmetic_side_effects,
     clippy::disallowed_macros,

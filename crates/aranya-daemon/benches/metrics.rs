@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
 
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_daemon::{
     config::{Config, QuicSyncConfig, SyncConfig, Toggle},
     Daemon,
@@ -35,6 +36,28 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                 path
             };
 
+            // Generate mTLS certificates for realistic daemon startup
+            let certs_dir = work_dir.join("certs");
+            let root_certs_dir = certs_dir.join("ca");
+            std::fs::create_dir_all(&root_certs_dir)
+                .expect("should be able to create certs directory");
+
+            // Create CA certificate
+            let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+            let ca_cert = CaCert::new("Benchmark CA", 365).expect("failed to create CA cert");
+            ca_cert
+                .save(&ca_paths, SaveOptions::default().create_parents())
+                .expect("failed to save CA cert");
+
+            // Create device certificate signed by CA
+            let device_paths = CertPaths::new(certs_dir.join("device"));
+            let device_cert = ca_cert
+                .generate("127.0.0.1", 365)
+                .expect("failed to generate device cert");
+            device_cert
+                .save(&device_paths, SaveOptions::default().create_parents())
+                .expect("failed to save device cert");
+
             let cfg = Config {
                 name: "test-daemon-run".into(),
                 runtime_dir: work_dir.join("run"),
@@ -45,7 +68,9 @@ fn daemon_startup(bencher: divan::Bencher<'_, '_>) {
                 sync: SyncConfig {
                     quic: Toggle::Enabled(QuicSyncConfig {
                         addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
-                        client_addr: None,
+                        root_certs_dir,
+                        device_cert: device_paths.cert().to_path_buf(),
+                        device_key: device_paths.key().to_path_buf(),
                     }),
                 },
                 #[cfg(feature = "afc")]

@@ -5,134 +5,103 @@
 //! There are two main configuration types:
 //! - [`CreateTeamQuicSyncConfig`] - For creating new teams
 //! - [`AddTeamQuicSyncConfig`] - For adding members to existing teams
+//!
+//! Note: With mTLS authentication, PSK seeds are no longer used.
+//! These types exist for backward compatibility but are ignored internally.
 
-use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
-use tracing::error;
+#![expect(deprecated)]
 
-use crate::{error::InvalidArg, ConfigError, Result};
+use crate::Result;
+
+/// Size of the seed IKM (Input Keying Material) in bytes.
+const SEED_IKM_SIZE: usize = 32;
 
 /// Configuration for creating a new team with QUIC synchronization.
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
+#[non_exhaustive]
 #[derive(Clone, Debug)]
-pub struct CreateTeamQuicSyncConfig {
-    mode: CreateSeedMode,
-}
+pub struct CreateTeamQuicSyncConfig {}
 
 impl CreateTeamQuicSyncConfig {
     /// Creates a new builder for team creation configuration.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
         CreateTeamQuicSyncConfigBuilder::default()
     }
 }
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
+#[non_exhaustive]
 #[derive(Clone, Debug)]
-pub struct AddTeamQuicSyncConfig {
-    mode: AddSeedMode,
-}
+pub struct AddTeamQuicSyncConfig {}
 
+#[expect(deprecated)]
 impl AddTeamQuicSyncConfig {
     /// Creates a new builder for team member addition configuration.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         AddTeamQuicSyncConfigBuilder::default()
     }
 }
 
 /// Builder for [`CreateTeamQuicSyncConfig`]
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
+#[non_exhaustive]
 #[derive(Debug, Default)]
-pub struct CreateTeamQuicSyncConfigBuilder {
-    mode: CreateSeedMode,
-}
+pub struct CreateTeamQuicSyncConfigBuilder {}
 
 impl CreateTeamQuicSyncConfigBuilder {
-    /// Sets the PSK seed mode.
-    #[doc(hidden)]
-    pub fn mode(mut self, mode: CreateSeedMode) -> Self {
-        self.mode = mode;
-        self
-    }
-
     /// Sets the seed to be generated.
     ///
     /// Overwrites [`Self::seed_ikm`].
-    pub fn gen_seed(mut self) -> Self {
-        self.mode = CreateSeedMode::Generate;
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+    pub fn gen_seed(self) -> Self {
         self
     }
 
     /// Sets the seed mode to 'IKM'.
     ///
     /// Overwrites [`Self::gen_seed`].
-    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.mode = CreateSeedMode::IKM(ikm.into());
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+    pub fn seed_ikm(self, _ikm: [u8; SEED_IKM_SIZE]) -> Self {
         self
     }
 
     /// Builds the config.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn build(self) -> Result<CreateTeamQuicSyncConfig> {
-        Ok(CreateTeamQuicSyncConfig { mode: self.mode })
+        Ok(CreateTeamQuicSyncConfig {})
     }
 }
 
 /// Builder for [`AddTeamQuicSyncConfig`]
+#[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
+#[non_exhaustive]
 #[derive(Debug, Default)]
-pub struct AddTeamQuicSyncConfigBuilder {
-    mode: Option<AddSeedMode>,
-}
+pub struct AddTeamQuicSyncConfigBuilder {}
 
+#[expect(deprecated)]
 impl AddTeamQuicSyncConfigBuilder {
-    /// Sets the PSK seed mode.
-    #[doc(hidden)]
-    pub fn mode(mut self, mode: AddSeedMode) -> Self {
-        self.mode = Some(mode);
-        self
-    }
-
     /// Sets the seed mode to 'IKM'.
     ///
     /// Overwrites [`Self::wrapped_seed`].
-    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.mode = Some(AddSeedMode::IKM(ikm.into()));
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+    pub fn seed_ikm(self, _ikm: [u8; SEED_IKM_SIZE]) -> Self {
         self
     }
 
     /// Sets the seed mode to 'Wrapped'.
     ///
     /// Overwrites [`Self::seed_ikm`].
-    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
-        let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
-            error!(error = %err, "could not deserialize wrapped_seed");
-            ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
-        })?;
-        self.mode = Some(AddSeedMode::Wrapped(wrapped));
+    #[deprecated(note = "PSK seeds are no longer used with mTLS authentication")]
+    pub fn wrapped_seed(self, _wrapped_seed: &[u8]) -> Result<Self> {
         Ok(self)
     }
 
     /// Builds the config.
+    #[deprecated(note = "QUIC sync config is no longer needed with mTLS authentication")]
     pub fn build(self) -> Result<AddTeamQuicSyncConfig> {
-        let Some(mode) = self.mode else {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "mode",
-                "`mode` must be set in order to build an `AddQuicSyncConfig`",
-            ))
-            .into());
-        };
-
-        Ok(AddTeamQuicSyncConfig { mode })
-    }
-}
-
-impl From<CreateTeamQuicSyncConfig> for aranya_daemon_api::CreateTeamQuicSyncConfig {
-    fn from(value: CreateTeamQuicSyncConfig) -> Self {
-        aranya_daemon_api::CreateTeamQuicSyncConfig {
-            seed_mode: value.mode,
-        }
-    }
-}
-
-impl From<AddTeamQuicSyncConfig> for aranya_daemon_api::AddTeamQuicSyncConfig {
-    fn from(value: AddTeamQuicSyncConfig) -> Self {
-        aranya_daemon_api::AddTeamQuicSyncConfig {
-            seed_mode: value.mode,
-        }
+        Ok(AddTeamQuicSyncConfig {})
     }
 }

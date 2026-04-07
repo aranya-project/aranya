@@ -58,6 +58,9 @@ add_compile_options(
 	# These are because of cbindgen.
 	-Wno-gnu-anonymous-struct
 	-Wno-nested-anon-types
+
+	# Allow deprecated types (e.g., AranyaSeedIkm) during mTLS migration.
+	-Wno-deprecated-declarations
 )
 
 if(NOT WINDOWS)
@@ -110,7 +113,7 @@ function(add_capi_test TEST_NAME SOURCE_FILE)
     # Always use wrapper script for uniform test execution
     add_test(NAME ${TEST_NAME}
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/execute_test.sh
-        $<TARGET_FILE:${TEST_NAME}> $<TARGET_FILE:Aranya::Daemon> "${ARG_DAEMON_NAMES}")
+        $<TARGET_FILE:${TEST_NAME}> $<TARGET_FILE:Aranya::Daemon> $<TARGET_FILE:Aranya::Certgen> "${ARG_DAEMON_NAMES}")
 endfunction()
 
 # --- Test Executables ---

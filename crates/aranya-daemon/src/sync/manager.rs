@@ -263,6 +263,11 @@ where
     async fn handle_message(&mut self, msg: ManagerMessage, buffer: &mut [u8]) -> Result<()> {
         debug!(?msg, "processing handle message");
         match msg {
+            ManagerMessage::RemoveGraph { graph_id } => {
+                _ = graph_id;
+                // TODO(mtls): remove graph from sync manager
+                Ok(())
+            }
             ManagerMessage::AddPeer { peer, cfg } => {
                 self.add_peer(peer, cfg);
                 Ok(())
