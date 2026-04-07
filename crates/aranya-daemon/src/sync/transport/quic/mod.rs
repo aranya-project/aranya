@@ -5,6 +5,7 @@ mod connections;
 mod connector;
 mod listener;
 mod stream;
+mod tests;
 
 use std::{path::PathBuf, sync::Arc};
 
