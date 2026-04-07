@@ -12,7 +12,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
 };
-use aranya_util::ready;
+use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
@@ -28,7 +28,7 @@ use crate::{
     keystore::AranyaStore,
     policy,
     sync::{
-        quic::{CertConfig, ConnectionPool, QuicConnector, QuicListener},
+        quic::{CertConfig, QuicConnector, QuicListener},
         SyncClient, SyncHandle, SyncManager,
     },
     vm_policy::{PolicyEngine, POLICY_SOURCE},
@@ -129,7 +129,6 @@ impl Daemon {
                 &pks,
                 cert_config,
                 qs_config.addr,
-                qs_client_addr,
             )
             .await?;
 
@@ -153,9 +152,7 @@ impl Daemon {
 
             let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
-                local_addr: sync_server
-                    .local_addr()
-                    .context("unable to get sync server local address")?,
+                local_addr: sync_server.local_addr(),
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,
                 pk: pks,
@@ -248,8 +245,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         cert_config: CertConfig,
-        server_addr: Addr,
-        client_addr: Addr,
+        endpoint_addr: Addr,
     ) -> Result<(
         Client,
         SyncServer,
@@ -270,34 +266,9 @@ impl Daemon {
         let (send_effects, recv_effects) = mpsc::channel(256);
         let (handle, recv) = SyncHandle::channel(128);
 
-        // <<<<<<< HEAD
-        //         // Create a `SharedConnectionMap` to allow for reusing QUIC connections.
-        //         let (connector_pool, listener_pool) = ConnectionPool::new(32).split();
+        let (connector, listener) = crate::sync::quic::new(endpoint_addr, &cert_config).await?;
 
-        //         let listener = QuicListener::new(server_addr, Arc::clone(&psk_store), listener_pool)
-        //             .await
-        //             .context("unable to initialize QUIC sync listener")?;
-        //         let server = SyncServer::new(listener, client.clone(), handle.clone());
-        // =======
-        //         // Create the sync server with mTLS
-        //         let (server, peers, conns, syncer_recv, endpoint, client_config) =
-        //             SyncServer::new(client.clone(), &server_addr, &cert_config)
-        //                 .await
-        //                 .context("unable to initialize QUIC sync server")?;
-
-        //         // Initialize the syncer
-        //         let syncer = SyncManager::new(
-        //             client.clone(),
-        //             send_effects,
-        //             syncer_recv,
-        //             conns,
-        //             endpoint,
-        //             client_config,
-        //         );
-        // >>>>>>> 360b342a (mtls reference)
-
-        let connector =
-            QuicConnector::new(client_addr, server.local_addr(), connector_pool, psk_store)?;
+        let server = SyncServer::new(listener, client.clone(), handle.clone());
         let sync_client = SyncClient::new(client.clone(), connector, send_effects);
         let manager = SyncManager::new(sync_client, recv)?;
 

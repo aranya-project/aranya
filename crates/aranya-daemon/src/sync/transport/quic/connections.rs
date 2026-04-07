@@ -1,15 +1,15 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use s2n_quic::connection::{Handle, StreamAcceptor};
+use quinn::Connection;
 use tokio::sync::{mpsc, Mutex};
 
 use crate::sync::SyncPeer;
 
-type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Handle>>>;
-type ConnectionUpdate = (SyncPeer, StreamAcceptor);
+type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Connection>>>;
+type ConnectionUpdate = (SyncPeer, Connection);
 
 /// Shared state for coordinating QUIC connections between connector and listener.
-pub(crate) struct ConnectionPool {
+pub(super) struct ConnectionPool {
     conns: SharedConnectionMap,
     tx: mpsc::Sender<ConnectionUpdate>,
     rx: mpsc::Receiver<ConnectionUpdate>,
