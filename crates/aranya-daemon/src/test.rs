@@ -136,7 +136,7 @@ impl TestDevice {
         bail!("Channel closed or nothing to receive")
     }
 
-    pub fn actions(&self) -> impl Actions<crate::PS, crate::SP, crate::CE> {
+    pub fn actions(&self) -> impl Actions<crate::PS, crate::SP, crate::CE> + use<> {
         self.aranya().actions(self.graph_id)
     }
 }

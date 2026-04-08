@@ -304,13 +304,14 @@ fn save_cert_and_key(
     options: SaveOptions,
 ) -> Result<(), CertGenError> {
     // Check/create parent directory
-    if let Some(dir) = paths.cert.parent() {
-        if !dir.as_os_str().is_empty() && !dir.exists() {
-            if options.create_parents {
-                fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
-            } else {
-                return Err(CertGenError::DirNotFound(dir.display().to_string()));
-            }
+    if let Some(dir) = paths.cert.parent()
+        && !dir.as_os_str().is_empty()
+        && !dir.exists()
+    {
+        if options.create_parents {
+            fs::create_dir_all(dir).map_err(|e| CertGenError::io(dir, e))?;
+        } else {
+            return Err(CertGenError::DirNotFound(dir.display().to_string()));
         }
     }
 

@@ -180,10 +180,10 @@ impl SyncConnector for QuicConnector {
             Err(error) => {
                 error!(?peer, %error, "failed to open bidirectional stream");
                 let mut map = self.pool.conns.lock().await;
-                if let Entry::Occupied(e) = map.entry(peer) {
-                    if e.get().id() == handle.id() {
-                        e.remove().close(AppError::UNKNOWN);
-                    }
+                if let Entry::Occupied(e) = map.entry(peer)
+                    && e.get().id() == handle.id()
+                {
+                    e.remove().close(AppError::UNKNOWN);
                 }
                 return Err(Error::QuicConnection(error));
             }
