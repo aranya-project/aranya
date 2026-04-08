@@ -29,6 +29,14 @@ use tokio_util::time::{delay_queue, DelayQueue};
 use tracing::instrument;
 use tracing::{debug, error, info, trace, warn};
 
+/// Initial delay before retrying a failed hello subscribe request.
+#[cfg(feature = "preview")]
+const HELLO_SUBSCRIBE_INITIAL_RETRY_DELAY: Duration = Duration::from_millis(10);
+
+/// Maximum delay between hello subscribe retries.
+#[cfg(feature = "preview")]
+const HELLO_SUBSCRIBE_MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
+
 #[cfg(feature = "preview")]
 use super::GraphId;
 use super::{
@@ -46,6 +54,14 @@ pub(super) enum ScheduledTask {
     Sync(SyncPeer),
     #[cfg(feature = "preview")]
     HelloNotify(SyncPeer),
+    #[cfg(feature = "preview")]
+    HelloSubscribe {
+        peer: SyncPeer,
+        graph_change_debounce: Duration,
+        duration: Duration,
+        schedule_delay: Duration,
+        retry_delay: Duration,
+    },
 }
 
 /// Manages sync scheduling and sending/receiving data on a transport.
@@ -283,7 +299,8 @@ where
                 duration,
                 schedule_delay,
             } => {
-                self.client
+                if let Err(e) = self
+                    .client
                     .send_hello_subscribe(
                         peer,
                         graph_change_debounce,
@@ -292,6 +309,21 @@ where
                         buffer,
                     )
                     .await
+                {
+                    let retry_delay = HELLO_SUBSCRIBE_INITIAL_RETRY_DELAY;
+                    warn!(?peer, error = %e.report(), "hello subscribe failed, scheduling retry");
+                    self.queue.insert(
+                        ScheduledTask::HelloSubscribe {
+                            peer,
+                            graph_change_debounce,
+                            duration,
+                            schedule_delay,
+                            retry_delay,
+                        },
+                        retry_delay,
+                    );
+                }
+                Ok(())
             }
             #[cfg(feature = "preview")]
             ManagerMessage::HelloUnsubscribe { peer } => {
@@ -331,6 +363,41 @@ where
             ScheduledTask::HelloNotify(peer) => {
                 debug!(?peer, "scheduled hello triggered");
                 self.handle_scheduled_hello(peer, buffer).await
+            }
+            #[cfg(feature = "preview")]
+            ScheduledTask::HelloSubscribe {
+                peer,
+                graph_change_debounce,
+                duration,
+                schedule_delay,
+                retry_delay,
+            } => {
+                debug!(?peer, ?retry_delay, "scheduled hello subscribe attempt");
+                if let Err(e) = self
+                    .client
+                    .send_hello_subscribe(
+                        peer,
+                        graph_change_debounce,
+                        duration,
+                        schedule_delay,
+                        buffer,
+                    )
+                    .await
+                {
+                    let next_delay = (retry_delay * 2).min(HELLO_SUBSCRIBE_MAX_RETRY_DELAY);
+                    warn!(?peer, error = %e.report(), ?next_delay, "hello subscribe retry failed, backing off");
+                    self.queue.insert(
+                        ScheduledTask::HelloSubscribe {
+                            peer,
+                            graph_change_debounce,
+                            duration,
+                            schedule_delay,
+                            retry_delay: next_delay,
+                        },
+                        next_delay,
+                    );
+                }
+                Ok(())
             }
         }
     }
