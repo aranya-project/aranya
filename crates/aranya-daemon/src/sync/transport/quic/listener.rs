@@ -10,10 +10,6 @@ use tracing::{debug, error, trace, warn};
 use super::{connections::ListenerPool, Error, QuicStream, SyncListener};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
-/// The amount of time we wait trying to accept a bidirectional stream from the peer connecting to
-/// us before we time out (they may be really really slow, or busy doing other things).
-const PENDING_ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
-
 /// The amount of time we wait trying to resolve the connecting peer's address (and waiting for them
 /// to send the port they want) before we time out.
 const RESOLVE_GRAPH_ID_TIMEOUT: Duration = Duration::from_secs(5);
@@ -21,8 +17,6 @@ const RESOLVE_GRAPH_ID_TIMEOUT: Duration = Duration::from_secs(5);
 enum AcceptResult {
     /// Got a stream, acceptor is still live.
     Stream(SyncPeer, Connection, (SendStream, RecvStream)),
-    /// Transient error or timeout, acceptor is still live.
-    Retry(SyncPeer, Connection),
     /// Acceptor returned None, connection is finished.
     Done(SyncPeer),
 }
@@ -57,20 +51,14 @@ impl QuicListener {
     async fn accept_pending_stream(peer: SyncPeer, connection: Connection) -> AcceptResult {
         trace!(?peer, "waiting for bidirectional stream");
 
-        // TODO(mtls): why timeout here with retry?
-
-        match tokio::time::timeout(PENDING_ACCEPT_TIMEOUT, connection.accept_bi()).await {
-            Ok(Ok(stream)) => {
+        match connection.accept_bi().await {
+            Ok(stream) => {
                 debug!(?peer, "accepted bidirectional stream");
                 AcceptResult::Stream(peer, connection, stream)
             }
-            Ok(Err(error)) => {
-                warn!(?peer, %error, "error accepting bidirectional stream");
+            Err(error) => {
+                warn!(?peer, error = %error.report(), "error accepting bidirectional stream");
                 AcceptResult::Done(peer)
-            }
-            Err(_) => {
-                warn!(?peer, "timed out waiting for bidirectional stream");
-                AcceptResult::Retry(peer, connection)
             }
         }
     }
@@ -81,14 +69,6 @@ impl QuicListener {
         let remote = conn.remote_address();
         trace!(?remote, "received incoming QUIC connection");
 
-        // let identity = get_conn_identity(&mut conn)?;
-        // let active_team = self
-        //     .server_keys
-        //     .get_team_for_identity(&identity)
-        //     .context("no active team for accepted connection")?;
-
-        // debug!(?remote, ?active_team, "authenticated incoming connection");
-
         let graph_id = tokio::time::timeout(RESOLVE_GRAPH_ID_TIMEOUT, extract_graph_id(&mut conn))
             .await
             .context("timed out waiting for graph ID")?
@@ -98,13 +78,12 @@ impl QuicListener {
 
         // Insert with tie-breaking. The peer initiated this connection,
         // so it wins if peer.addr < local_addr.
-        let new_conn = conn;
         let acceptor = {
             let mut map = self.pool.conns.lock().await;
             match map.entry(peer) {
                 Entry::Vacant(e) => {
-                    e.insert(new_conn.clone());
-                    Some(new_conn)
+                    e.insert(conn.clone());
+                    Some(conn)
                 }
                 Entry::Occupied(mut e) => {
                     let existing_alive = e.get_mut().close_reason().is_none();
@@ -117,11 +96,11 @@ impl QuicListener {
                                 b"replacing existing connection (tie-break)",
                             );
                         }
-                        e.insert(new_conn.clone());
-                        Some(new_conn)
+                        e.insert(conn.clone());
+                        Some(conn)
                     } else {
                         debug!(?peer, "keeping existing outbound connection (tie-break)");
-                        new_conn.close(
+                        conn.close(
                             VarInt::from_u32(0),
                             b"keeping existing outbound connection (tie-break)",
                         );
@@ -162,13 +141,10 @@ impl SyncListener for QuicListener {
                             self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
                             return Some(QuicStream::new(peer, stream));
                         }
-                        Ok(AcceptResult::Retry(peer, acceptor)) => {
-                            self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
-                        }
                         Ok(AcceptResult::Done(peer)) => {
                             debug!(?peer, "connection finished, dropping acceptor");
                         }
-                        Err(error) => error!(%error, "stream acceptor task panicked"),
+                        Err(error) => error!(error = %error.report(), "stream acceptor task panicked"),
                     }
                 }
 

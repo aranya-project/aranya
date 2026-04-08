@@ -1,14 +1,18 @@
 //! Node initialization for scale convergence tests.
 
-use std::{net::Ipv4Addr, path::PathBuf};
+use std::{
+    net::Ipv4Addr,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{bail, Context, Result};
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::{client::Client, Addr};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon,
 };
-use aranya_daemon_api::{shm, SEED_IKM_SIZE};
+use aranya_daemon_api::shm;
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::fs;
@@ -23,8 +27,13 @@ impl NodeCtx {
     /// for identification and AFC shared memory path generation.
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#init-001
     //# Each node MUST be initialized with a unique daemon instance.
-    #[instrument(skip(work_dir), fields(node_index = index))]
-    pub(crate) async fn new(index: usize, work_dir: PathBuf, team_name: &str) -> Result<Self> {
+    #[instrument(skip(work_dir, ca), fields(node_index = index))]
+    pub(crate) async fn new(
+        index: usize,
+        work_dir: PathBuf,
+        team_name: &str,
+        ca: &TestCertAuthority,
+    ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Generate unique AFC shm path per node
@@ -37,6 +46,8 @@ impl NodeCtx {
             let _ = shm::unlink(&path);
             path
         };
+
+        let cert_paths = ca.generate_device_cert(&work_dir)?;
 
         // Setup daemon config
         let cfg = Config {
@@ -53,7 +64,9 @@ impl NodeCtx {
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
-                    client_addr: None,
+                    root_certs_dir: ca.root_certs_dir.clone(),
+                    device_cert: cert_paths.cert().into(),
+                    device_key: cert_paths.key().into(),
                 }),
             },
         };
@@ -128,6 +141,8 @@ impl TestCtx {
             "Initializing nodes"
         );
 
+        let ca = TestCertAuthority::new(work_dir.path())?;
+
         // Initialize nodes in batches
         for batch_start in (0..config.node_count).step_by(config.init_batch_size) {
             let batch_end = (batch_start + config.init_batch_size).min(config.node_count);
@@ -145,7 +160,7 @@ impl TestCtx {
             let batch_futures: Vec<_> = (batch_start..batch_end)
                 .map(|i| {
                     let node_dir = work_dir.path().join(format!("node_{i:03}"));
-                    NodeCtx::new(i, node_dir, &team_name)
+                    NodeCtx::new(i, node_dir, &team_name, &ca)
                 })
                 .collect();
 
@@ -182,13 +197,6 @@ impl TestCtx {
             "All nodes initialized successfully"
         );
 
-        // Generate shared seed IKM for QUIC sync
-        let seed_ikm = {
-            let mut buf = [0u8; SEED_IKM_SIZE];
-            nodes[0].client.rand(&mut buf).await;
-            buf
-        };
-
         Ok(Self {
             nodes,
             topology: Some(vec![config.topology.clone()]),
@@ -196,8 +204,49 @@ impl TestCtx {
             config: config.clone(),
             team_id: None,
             tracker: ConvergenceTracker::new(config.node_count, config.test_name.clone()),
-            seed_ikm,
             _work_dir: work_dir,
         })
+    }
+}
+
+/// Shared certificate authority for generating device certificates.
+struct TestCertAuthority {
+    ca: CaCert,
+    root_certs_dir: PathBuf,
+}
+
+impl TestCertAuthority {
+    /// Creates a new test CA in the given directory.
+    fn new(dir: &Path) -> Result<Self> {
+        let certs_dir = dir.join("certs");
+        let root_certs_dir = certs_dir.join("root_certs");
+        std::fs::create_dir_all(&root_certs_dir)?;
+
+        let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+        let ca = CaCert::new("Test CA", 365).context("failed to create CA cert")?;
+        ca.save(&ca_paths, SaveOptions::default().create_parents())
+            .context("failed to save CA cert")?;
+
+        Ok(Self { ca, root_certs_dir })
+    }
+
+    /// Generates a device certificate.
+    ///
+    /// The certificate uses `127.0.0.1` as the CN, which certgen auto-detects as an
+    /// IP address and creates an IP SAN for TLS connections.
+    fn generate_device_cert(&self, device_dir: &Path) -> Result<CertPaths> {
+        let certs_dir = device_dir.join("certs");
+        std::fs::create_dir_all(&certs_dir)?;
+
+        let device_paths = CertPaths::new(certs_dir.join("device"));
+        let device_cert = self
+            .ca
+            .generate("127.0.0.1", 365)
+            .context("failed to generate device cert")?;
+        device_cert
+            .save(&device_paths, SaveOptions::default().create_parents())
+            .context("failed to save device cert")?;
+
+        Ok(device_paths)
     }
 }

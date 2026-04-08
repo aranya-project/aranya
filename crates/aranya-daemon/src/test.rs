@@ -90,7 +90,6 @@ impl TestDevice {
         effect_recv: Receiver<(GraphId, Vec<crate::EF>)>,
     ) -> Result<Self> {
         let buffer = vec![0u8; MAX_SYNC_MESSAGE_SIZE].into_boxed_slice();
-        // TODO(mtls): necessary?
         // Use "localhost" hostname to match the certificate's SAN, but with the actual port
         let sync_local_addr = Addr::new("localhost", server.local_addr().port())?;
         let handle = task::spawn(server.serve(ready::Waiter::new(1).notifier())).abort_handle();
