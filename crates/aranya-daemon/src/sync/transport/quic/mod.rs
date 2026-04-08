@@ -6,6 +6,8 @@ mod listener;
 mod psk;
 mod stream;
 
+use aranya_daemon_api::DeviceId;
+
 use self::{
     super::{SyncConnector, SyncListener, SyncStream},
     stream::QuicStream,
@@ -19,6 +21,18 @@ pub(crate) use self::{
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
+
+/// Information exchanged between peers when establishing a QUIC connection.
+///
+/// Sent by the connector to the listener immediately after the QUIC handshake.
+/// Fields can be added here as needed without changing the exchange mechanism.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct ConnectionInfo {
+    /// The port the sender's listener is bound to.
+    port: u16,
+    /// The sender's device ID, used for deterministic connection tie-breaking.
+    device_id: DeviceId,
+}
 
 /// Errors specific to the QUIC transport.
 #[derive(Debug, thiserror::Error)]
