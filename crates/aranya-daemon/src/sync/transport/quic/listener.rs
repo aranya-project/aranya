@@ -1,11 +1,13 @@
 //! This module implements [`QuicListener`] to allow accepting connections from QUIC clients.
-use std::{collections::btree_map::Entry, net::SocketAddr};
+use std::{collections::btree_map::Entry, future::Future, net::SocketAddr, pin::Pin, task::Poll};
 
 use anyhow::Context as _;
 use aranya_util::error::ReportExt as _;
-use quinn::{Connection, RecvStream, SendStream, VarInt};
-use tokio::{task::JoinSet, time::Duration};
-use tracing::{debug, error, trace, warn};
+use derive_where::derive_where;
+use futures_util::{future::Fuse, stream::SelectAll, FutureExt as _, Stream, StreamExt as _};
+use quinn::{Connection, Incoming, VarInt};
+use tokio::time::Duration;
+use tracing::{debug, error, info_span, warn, Instrument as _};
 
 use super::{connections::ListenerPool, Error, QuicStream, SyncListener};
 use crate::sync::{Addr, GraphId, SyncPeer};
@@ -14,14 +16,7 @@ use crate::sync::{Addr, GraphId, SyncPeer};
 /// to send the port they want) before we time out.
 const RESOLVE_GRAPH_ID_TIMEOUT: Duration = Duration::from_secs(5);
 
-enum AcceptResult {
-    /// Got a stream, acceptor is still live.
-    Stream(SyncPeer, Connection, (SendStream, RecvStream)),
-    /// Acceptor returned None, connection is finished.
-    Done(SyncPeer),
-}
-
-#[derive(Debug)]
+#[derive_where(Debug)]
 pub(crate) struct QuicListener {
     /// The local address of the server, since it should be infallible.
     local_addr: SocketAddr,
@@ -30,7 +25,11 @@ pub(crate) struct QuicListener {
     /// Receiver to register new connections from the [`QuicConnector`](super::QuicConnector).
     pool: ListenerPool,
     /// Queue to allow awaiting a number of potential streams concurrently until one resolves.
-    pending_accepts: JoinSet<AcceptResult>,
+    #[derive_where(skip(Debug))]
+    accepting: SelectAll<Accepting>,
+    /// Set of incoming connections which have not yet completed.
+    #[derive_where(skip(Debug))]
+    connecting: SelectAll<Connecting>,
 }
 
 impl QuicListener {
@@ -43,23 +42,19 @@ impl QuicListener {
             local_addr,
             endpoint,
             pool,
-            pending_accepts: JoinSet::new(),
+            accepting: SelectAll::new(),
+            connecting: SelectAll::new(),
         }
     }
 
-    /// Accepts an incoming bidirectional stream from this [`SyncPeer`].
-    async fn accept_pending_stream(peer: SyncPeer, connection: Connection) -> AcceptResult {
-        trace!(?peer, "waiting for bidirectional stream");
-
-        match connection.accept_bi().await {
-            Ok(stream) => {
-                debug!(?peer, "accepted bidirectional stream");
-                AcceptResult::Stream(peer, connection, stream)
-            }
-            Err(error) => {
-                warn!(?peer, error = %error.report(), "error accepting bidirectional stream");
-                AcceptResult::Done(peer)
-            }
+    fn accept_incoming(&mut self, incoming: Incoming) {
+        let remote = incoming.remote_address();
+        match incoming.accept() {
+            Ok(connecting) => self.connecting.push(Connecting {
+                remote,
+                inner: connecting.fuse(),
+            }),
+            Err(error) => error!(%remote, error = %error.report(), "failed to accept connection"),
         }
     }
 
@@ -67,7 +62,6 @@ impl QuicListener {
     /// registers it as a new connection.
     async fn register_connection(&mut self, mut conn: Connection) -> Result<(), Error> {
         let remote = conn.remote_address();
-        trace!(?remote, "received incoming QUIC connection");
 
         let graph_id = tokio::time::timeout(RESOLVE_GRAPH_ID_TIMEOUT, extract_graph_id(&mut conn))
             .await
@@ -111,8 +105,7 @@ impl QuicListener {
         };
 
         if let Some(acceptor) = acceptor {
-            self.pending_accepts
-                .spawn(Self::accept_pending_stream(peer, acceptor));
+            self.accepting.push(accepting(peer, acceptor));
             debug!(?peer, "accepted and inserted QUIC connection");
         }
 
@@ -134,51 +127,81 @@ impl SyncListener for QuicListener {
     async fn accept(&mut self) -> Option<Self::Stream> {
         loop {
             tokio::select! {
-                Some(result) = self.pending_accepts.join_next() => {
-                    match result {
-                        Ok(AcceptResult::Stream(peer, acceptor, stream)) => {
-                            debug!(?peer, "accepted stream, re-queueing acceptor");
-                            self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
-                            return Some(QuicStream::new(peer, stream));
-                        }
-                        Ok(AcceptResult::Done(peer)) => {
-                            debug!(?peer, "connection finished, dropping acceptor");
-                        }
-                        Err(error) => error!(error = %error.report(), "stream acceptor task panicked"),
-                    }
+                Some(stream) = self.accepting.next() => {
+                    return Some(stream);
                 }
-
                 Some(incoming) = self.endpoint.accept() => {
-                    let remote = incoming.remote_address();
-
-                    // TODO(mtls): don't block here?
-                    let conn = match incoming.await {
-                        Ok(conn) => conn,
-                        Err(error) => {
-                            error!(?remote, error = %error.report(), "failed to accept incoming connection");
-                            continue;
-                        },
-                    };
-
-                    trace!(?remote, "raw connection accepted from server");
-
+                    self.accept_incoming(incoming);
+                }
+                Some(conn) = self.connecting.next() => {
                     if let Err(error) = self.register_connection(conn.clone()).await {
-                        error!(?remote, error = %error.report(), "failed to register connection");
+                        error!(
+                            remote = %conn.remote_address(),
+                            error = %error.report(),
+                            "failed to register connection",
+                        );
                         conn.close(VarInt::from_u32(0), b"failed to register connection");
                     }
                 }
-
                 Some((peer, acceptor)) = self.pool.rx.recv() => {
                     debug!(?peer, "registering connection for stream accepts");
-                    self.pending_accepts.spawn(Self::accept_pending_stream(peer, acceptor));
+                    self.accepting.push(accepting(peer, acceptor));
                 }
-
                 else => {
                     debug!("all accept sources exhausted, shutting down listener");
                     return None;
                 }
             }
         }
+    }
+}
+
+type Accepting = Pin<Box<dyn Stream<Item = QuicStream> + Send + Sync>>;
+
+/// Produce a [`Stream`] of accepted [`QuicStream`]s.
+fn accepting(peer: SyncPeer, conn: Connection) -> Accepting {
+    Box::pin(futures_util::stream::unfold(
+        (peer, conn),
+        |(peer, conn)| {
+            async move {
+                match conn.accept_bi().await {
+                    Ok(stream) => {
+                        debug!("accepted bidirectional stream");
+                        Some((QuicStream::new(peer, stream), (peer, conn)))
+                    }
+                    Err(error) => {
+                        warn!(error = %error.report(), "error accepting bidirectional stream");
+                        None
+                    }
+                }
+            }
+            .instrument(info_span!("accepting", ?peer))
+        },
+    ))
+}
+
+/// A [`Stream`] which may yield one [`Connection`].
+struct Connecting {
+    remote: SocketAddr,
+    inner: Fuse<quinn::Connecting>,
+}
+
+impl Stream for Connecting {
+    type Item = Connection;
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.inner).poll(cx).map(|r| {
+            r.inspect_err(|error| {
+                error!(
+                    remote = %self.remote,
+                    error = %error.report(),
+                    "failed to resolve connection",
+                );
+            })
+            .ok()
+        })
     }
 }
 

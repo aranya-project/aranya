@@ -31,9 +31,7 @@ impl SyncStream for QuicStream {
         trace!(peer = ?self.peer, bytes = len, "sending message");
 
         self.send.write_all(&len.to_be_bytes()).await?;
-        self.send.write_all(data).await.inspect_err(|error| {
-            warn!(peer = ?self.peer, %error, "send failed");
-        })?;
+        self.send.write_all(data).await?;
 
         Ok(())
     }
@@ -54,19 +52,14 @@ impl SyncStream for QuicStream {
             return Err(Error::MessageTooLarge);
         };
 
-        self.recv.read_exact(buf).await.inspect_err(|error| {
-            warn!(peer = ?self.peer, %error, "receive failed");
-        })?;
+        self.recv.read_exact(buf).await?;
 
         Ok(len)
     }
 
     async fn finish(&mut self) -> Result<(), Self::Error> {
         debug!(peer = ?self.peer, "closing stream");
-        self.send.finish().map_err(|error| {
-            warn!(peer = ?self.peer, %error, "stream finish failed");
-            Error::Finish(error)
-        })?;
+        self.send.finish().map_err(Error::Finish)?;
         Ok(())
     }
 }

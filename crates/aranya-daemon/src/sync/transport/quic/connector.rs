@@ -4,7 +4,7 @@ use std::{collections::btree_map::Entry, net::SocketAddr};
 use anyhow::Context as _;
 use aranya_util::error::ReportExt as _;
 use quinn::{ClientConfig, Endpoint, VarInt};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, instrument, trace, warn};
 
 use super::{connections::ConnectorPool, Error, QuicStream, SyncConnector};
 use crate::sync::SyncPeer;
@@ -43,8 +43,9 @@ impl SyncConnector for QuicConnector {
     type Error = Error;
     type Stream = QuicStream;
 
+    #[instrument(skip(self))]
     async fn connect(&self, peer: SyncPeer) -> Result<Self::Stream, Self::Error> {
-        debug!(?peer, "connecting to peer");
+        debug!("connecting to peer");
 
         // Obtain the address for the other peer.
         let addrs = tokio::net::lookup_host(peer.addr.to_socket_addrs())
@@ -52,7 +53,7 @@ impl SyncConnector for QuicConnector {
             .context("DNS lookup for peer address")?;
         let addr = find_matching_ip_version(addrs, self.local_addr)
             .context("no resolved address matches local endpoint IP version")?;
-        trace!(?peer, %addr, "resolved peer address");
+        trace!(%addr, "resolved peer address");
 
         // Check for an existing live connection, cleaning up dead ones.
         // Drops the lock before doing async connection work.
@@ -62,11 +63,12 @@ impl SyncConnector for QuicConnector {
             match map.entry(peer) {
                 Entry::Occupied(e) => match e.get().close_reason() {
                     None => {
-                        debug!(?peer, "reusing existing connection");
+                        debug!("reusing existing connection");
                         Some(e.get().clone())
                     }
                     Some(error) => {
-                        warn!(?peer, error = %error.report(), "existing connection dead, removing");
+                        warn!(error = %error.report(), "existing connection dead, removing");
+                        e.remove();
                         None
                     }
                 },
@@ -78,7 +80,7 @@ impl SyncConnector for QuicConnector {
             handle
         } else {
             // Create a new outbound connection.
-            trace!(?peer, "establishing new QUIC connection");
+            trace!("establishing new QUIC connection");
 
             // This is where we could create/select a per-team config.
             let config = self.config.clone();
@@ -94,7 +96,7 @@ impl SyncConnector for QuicConnector {
                 .write(peer.graph_id.as_bytes())
                 .await?;
 
-            debug!(?peer, "QUIC handshake complete and sent graph ID");
+            debug!("QUIC handshake complete and sent graph ID");
 
             // Re-acquire the lock and insert using tie-breaking logic. Between dropping the lock
             // above and now, the listener may have inserted an inbound connection for this peer.
@@ -115,7 +117,7 @@ impl SyncConnector for QuicConnector {
                         let outbound_wins = !existing_alive || self.local_addr < addr;
                         if outbound_wins {
                             if existing_alive {
-                                debug!(?peer, "replacing existing connection (tie-break)");
+                                debug!("replacing existing connection (tie-break)");
                                 e.get_mut().close(
                                     VarInt::from_u32(0),
                                     b"replacing existing connection (tie-break)",
@@ -125,7 +127,7 @@ impl SyncConnector for QuicConnector {
                             (new_conn.clone(), Some(new_conn))
                         } else {
                             // Existing inbound wins — discard ours.
-                            debug!(?peer, "keeping existing inbound connection (tie-break)");
+                            debug!("keeping existing inbound connection (tie-break)");
                             let existing = e.get().clone();
                             new_conn.close(
                                 VarInt::from_u32(0),
@@ -139,7 +141,7 @@ impl SyncConnector for QuicConnector {
 
             // Forward acceptor to the listener if we kept our connection.
             if let Some(acceptor) = acceptor {
-                trace!(?peer, "forwarding acceptor to listener");
+                trace!("forwarding acceptor to listener");
                 self.pool.tx.send((peer, acceptor)).await.ok();
             }
 
@@ -152,7 +154,7 @@ impl SyncConnector for QuicConnector {
         let stream = match handle.open_bi().await {
             Ok(stream) => stream,
             Err(error) => {
-                error!(?peer, %error, "failed to open bidirectional stream");
+                error!(error = %error.report(), "failed to open bidirectional stream");
                 let mut map = self.pool.conns.lock().await;
                 if let Entry::Occupied(e) = map.entry(peer) {
                     if e.get().stable_id() == handle.stable_id() {
@@ -164,7 +166,7 @@ impl SyncConnector for QuicConnector {
             }
         };
 
-        debug!(?peer, "connected and opened stream");
+        debug!("connected and opened stream");
 
         Ok(QuicStream::new(peer, stream))
     }

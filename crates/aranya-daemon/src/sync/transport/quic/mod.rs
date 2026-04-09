@@ -20,7 +20,6 @@ use self::{
     stream::QuicStream,
 };
 pub(crate) use self::{connector::QuicConnector, listener::QuicListener};
-use crate::sync::quic::connections::ConnectionPool;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
@@ -134,7 +133,7 @@ pub(crate) async fn new(
 
     debug!("created unified QUIC endpoint with mTLS at {}", local_addr);
 
-    let (connector_pool, listener_pool) = ConnectionPool::new(32).split();
+    let (connector_pool, listener_pool) = connections::pool(32);
 
     let connector = QuicConnector::new(local_addr, endpoint.clone(), client_config, connector_pool);
     let listener = QuicListener::new(local_addr, endpoint, listener_pool);

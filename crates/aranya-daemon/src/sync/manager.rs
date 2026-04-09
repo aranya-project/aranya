@@ -366,7 +366,7 @@ where
                 .send_hello_notification(peer, head, buffer)
                 .await
             {
-                warn!(?peer, %error, "failed to send hello notification");
+                warn!(?peer, error = %error.report(), "failed to send hello notification");
             }
         } else {
             warn!(?peer, "tried to send hello notification, no head exists!");
@@ -413,7 +413,7 @@ where
             match self.peers.get(&peer) {
                 Some((cfg, _)) if cfg.sync_on_hello => {
                     if let Err(error) = self.do_sync(peer, buffer).await {
-                        warn!(%error, ?peer, "failed to sync with peer");
+                        warn!(error = %error.report(), ?peer, "failed to sync with peer");
                     }
                 }
                 Some(_) => trace!(?peer, "SyncOnHello is not enabled, ignoring"),
@@ -463,7 +463,7 @@ where
                 .send_hello_notification(*peer, head, buffer)
                 .await
             {
-                warn!(?peer, %error, "failed to send hello notification");
+                warn!(?peer, error = %error.report(), "failed to send hello notification");
             }
             // Always update last_notified even if it fails so we respect the debounce.
             if let Some(sub) = self.hello_subscriptions.get_mut(peer) {

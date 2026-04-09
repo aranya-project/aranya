@@ -8,35 +8,17 @@ use crate::sync::SyncPeer;
 type SharedConnectionMap = Arc<Mutex<BTreeMap<SyncPeer, Connection>>>;
 type ConnectionUpdate = (SyncPeer, Connection);
 
-/// Shared state for coordinating QUIC connections between connector and listener.
-pub(super) struct ConnectionPool {
-    conns: SharedConnectionMap,
-    tx: mpsc::Sender<ConnectionUpdate>,
-    rx: mpsc::Receiver<ConnectionUpdate>,
-}
-
-impl ConnectionPool {
-    pub fn new(buffer: usize) -> Self {
-        let (tx, rx) = mpsc::channel(buffer);
-        Self {
-            conns: Arc::default(),
+/// Create shared state for coordinating QUIC connections between connector and listener.
+pub(super) fn pool(buffer: usize) -> (ConnectorPool, ListenerPool) {
+    let (tx, rx) = mpsc::channel(buffer);
+    let conns = Arc::default();
+    (
+        ConnectorPool {
+            conns: Arc::clone(&conns),
             tx,
-            rx,
-        }
-    }
-
-    pub fn split(self) -> (ConnectorPool, ListenerPool) {
-        (
-            ConnectorPool {
-                conns: Arc::clone(&self.conns),
-                tx: self.tx,
-            },
-            ListenerPool {
-                conns: self.conns,
-                rx: self.rx,
-            },
-        )
-    }
+        },
+        ListenerPool { conns, rx },
+    )
 }
 
 #[derive(Debug)]
