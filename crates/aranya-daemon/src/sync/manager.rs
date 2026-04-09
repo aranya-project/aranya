@@ -85,6 +85,23 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
         })
     }
 
+    /// Removes all data associated with the specified graph.
+    fn remove_graph(&mut self, graph_id: GraphId) {
+        self.peers.retain(|peer, (_, key)| {
+            let retain = peer.graph_id != graph_id;
+            if !retain {
+                if let Some(key) = key {
+                    self.queue.remove(key);
+                }
+            }
+            retain
+        });
+
+        #[cfg(feature = "preview")]
+        self.hello_subscriptions
+            .retain(|peer, _| peer.graph_id != graph_id);
+    }
+
     /// Registers a new peer with the manager, optionally adding it to the sync schedule.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         // Only insert into delay queue if interval is configured or `sync_now == true`
@@ -264,8 +281,7 @@ where
         debug!(?msg, "processing handle message");
         match msg {
             ManagerMessage::RemoveGraph { graph_id } => {
-                _ = graph_id;
-                // TODO(mtls): remove graph from sync manager
+                self.remove_graph(graph_id);
                 Ok(())
             }
             ManagerMessage::AddPeer { peer, cfg } => {

@@ -2,6 +2,7 @@
 // Allow deprecated types in this module - it contains the deprecated PSK sync types
 // that are kept for backward compatibility during the mTLS migration.
 #![expect(deprecated)]
+
 use core::{
     ffi::{c_char, CStr},
     ops::Deref,

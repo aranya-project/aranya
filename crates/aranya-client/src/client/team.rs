@@ -1,4 +1,4 @@
-use aranya_daemon_api::{self as api};
+use aranya_daemon_api as api;
 use aranya_id::custom_id;
 use aranya_policy_text::Text;
 use aranya_util::Addr;
