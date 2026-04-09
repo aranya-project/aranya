@@ -18,7 +18,7 @@ use std::time::Duration;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{PolicyStore, StorageProvider, MAX_SYNC_MESSAGE_SIZE};
+use aranya_runtime::{GraphId, PolicyStore, StorageProvider, MAX_SYNC_MESSAGE_SIZE};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use derive_where::derive_where;
@@ -30,16 +30,12 @@ use tracing::instrument;
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "preview")]
-use super::GraphId;
+use super::HelloSubscription;
 use super::{
     handle::{Callback, ManagerMessage},
-    Result, SyncClient, SyncPeer,
+    transport::SyncConnector,
+    Error, Result, SyncClient, SyncPeer,
 };
-#[cfg(test)]
-use crate::aranya::Client;
-#[cfg(feature = "preview")]
-use crate::sync::HelloSubscription;
-use crate::sync::{transport::SyncConnector, Error};
 
 #[derive(Debug)]
 pub(super) enum ScheduledTask {
@@ -218,7 +214,7 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
 
     /// Returns a reference to the Aranya client for tests that need it.
     #[cfg(test)]
-    pub(crate) const fn client(&self) -> &Client<PS, SP> {
+    pub(crate) const fn client(&self) -> &crate::aranya::Client<PS, SP> {
         &self.client.client
     }
 }
