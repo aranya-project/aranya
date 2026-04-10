@@ -1,14 +1,72 @@
-//! Utility for generating a daemon config file.
+//! Utility for generating a daemon config file and mTLS certificates.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_client::Addr;
 use tokio::fs;
 use tracing::info;
 
+/// Certificate authority for signing certificates.
+pub struct CertificateAuthority {
+    ca: CaCert,
+    root_certs_dir: PathBuf,
+}
+
+impl std::fmt::Debug for CertificateAuthority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CertificateAuthority")
+            .field("root_certs_dir", &self.root_certs_dir)
+            .finish_non_exhaustive()
+    }
+}
+
+impl CertificateAuthority {
+    /// Creates a new certificate authority and writes the CA cert to the root certs directory.
+    pub fn new(certs_dir: &Path) -> Result<Self> {
+        let root_certs_dir = certs_dir.join("root_certs");
+        std::fs::create_dir_all(&root_certs_dir)?;
+
+        // Generate CA certificate
+        let ca = CaCert::new("Aranya Example CA", 365).context("failed to generate CA")?;
+        let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+        ca.save(&ca_paths, SaveOptions::default())
+            .context("failed to write CA cert/key")?;
+
+        Ok(Self { ca, root_certs_dir })
+    }
+
+    /// Returns the path to the root certificates directory.
+    pub fn root_certs_dir(&self) -> &Path {
+        &self.root_certs_dir
+    }
+
+    /// Generates a signed certificate.
+    pub fn generate_signed_cert(&self, _name: &str, work_dir: &Path) -> Result<CertPaths> {
+        // Use 127.0.0.1 as CN to create IP SAN (certgen auto-detects IP vs hostname).
+        // This ensures TLS verification works with the actual socket address.
+        let signed = self
+            .ca
+            .generate("127.0.0.1", 365)
+            .context("failed to generate signed cert")?;
+
+        let device_paths = CertPaths::new(work_dir.join("device"));
+        signed
+            .save(&device_paths, SaveOptions::default())
+            .context("failed to write signed cert/key")?;
+
+        Ok(device_paths)
+    }
+}
+
 // Create a daemon config file.
-pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Result<PathBuf> {
+pub async fn create_config(
+    device: String,
+    sync_addr: Addr,
+    dir: &Path,
+    ca: &CertificateAuthority,
+) -> Result<PathBuf> {
     let device_dir = dir.join(&device);
     let work_dir = device_dir.join("daemon");
     fs::create_dir_all(&work_dir).await?;
@@ -30,6 +88,12 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
             .with_context(|| format!("unable to create directory: {}", dir.display()))?;
     }
 
+    // Generate signed certificate
+    let device_paths = ca.generate_signed_cert(&device, &work_dir)?;
+    let device_cert = device_paths.cert();
+    let device_key = device_paths.key();
+    let root_certs_dir = ca.root_certs_dir();
+
     let buf = format!(
         r#"
                 name = {device:?}
@@ -47,6 +111,9 @@ pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Resul
                 [sync.quic]
                 enable = true
                 addr = {sync_addr:?}
+                root_certs_dir = {root_certs_dir:?}
+                device_cert = {device_cert:?}
+                device_key = {device_key:?}
                 "#
     );
     fs::write(&cfg, buf).await?;

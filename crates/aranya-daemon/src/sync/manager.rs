@@ -18,7 +18,7 @@ use std::time::Duration;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{PolicyStore, StorageProvider, MAX_SYNC_MESSAGE_SIZE};
+use aranya_runtime::{GraphId, PolicyStore, StorageProvider, MAX_SYNC_MESSAGE_SIZE};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use derive_where::derive_where;
@@ -30,16 +30,12 @@ use tracing::instrument;
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "preview")]
-use super::GraphId;
+use super::HelloSubscription;
 use super::{
     handle::{Callback, ManagerMessage},
-    Result, SyncClient, SyncPeer,
+    transport::SyncConnector,
+    Error, Result, SyncClient, SyncPeer,
 };
-#[cfg(test)]
-use crate::aranya::Client;
-#[cfg(feature = "preview")]
-use crate::sync::HelloSubscription;
-use crate::sync::{transport::SyncConnector, Error};
 
 #[derive(Debug)]
 pub(super) enum ScheduledTask {
@@ -83,6 +79,23 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
             #[cfg(feature = "preview")]
             hello_subscriptions: HashMap::new(),
         })
+    }
+
+    /// Removes all data associated with the specified graph.
+    fn remove_graph(&mut self, graph_id: GraphId) {
+        self.peers.retain(|peer, (_, key)| {
+            let retain = peer.graph_id != graph_id;
+            if !retain {
+                if let Some(key) = key {
+                    self.queue.remove(key);
+                }
+            }
+            retain
+        });
+
+        #[cfg(feature = "preview")]
+        self.hello_subscriptions
+            .retain(|peer, _| peer.graph_id != graph_id);
     }
 
     /// Registers a new peer with the manager, optionally adding it to the sync schedule.
@@ -201,7 +214,7 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
 
     /// Returns a reference to the Aranya client for tests that need it.
     #[cfg(test)]
-    pub(crate) const fn client(&self) -> &Client<PS, SP> {
+    pub(crate) const fn client(&self) -> &crate::aranya::Client<PS, SP> {
         &self.client.client
     }
 }
@@ -263,6 +276,10 @@ where
     async fn handle_message(&mut self, msg: ManagerMessage, buffer: &mut [u8]) -> Result<()> {
         debug!(?msg, "processing handle message");
         match msg {
+            ManagerMessage::RemoveGraph { graph_id } => {
+                self.remove_graph(graph_id);
+                Ok(())
+            }
             ManagerMessage::AddPeer { peer, cfg } => {
                 self.add_peer(peer, cfg);
                 Ok(())
@@ -361,7 +378,7 @@ where
                 .send_hello_notification(peer, head, buffer)
                 .await
             {
-                warn!(?peer, %error, "failed to send hello notification");
+                warn!(?peer, error = %error.report(), "failed to send hello notification");
             }
         } else {
             warn!(?peer, "tried to send hello notification, no head exists!");
@@ -408,7 +425,7 @@ where
             match self.peers.get(&peer) {
                 Some((cfg, _)) if cfg.sync_on_hello => {
                     if let Err(error) = self.do_sync(peer, buffer).await {
-                        warn!(%error, ?peer, "failed to sync with peer");
+                        warn!(error = %error.report(), ?peer, "failed to sync with peer");
                     }
                 }
                 Some(_) => trace!(?peer, "SyncOnHello is not enabled, ignoring"),
@@ -458,7 +475,7 @@ where
                 .send_hello_notification(*peer, head, buffer)
                 .await
             {
-                warn!(?peer, %error, "failed to send hello notification");
+                warn!(?peer, error = %error.report(), "failed to send hello notification");
             }
             // Always update last_notified even if it fails so we respect the debounce.
             if let Some(sub) = self.hello_subscriptions.get_mut(peer) {
