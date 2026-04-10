@@ -228,7 +228,7 @@ pub fn load_device_cert(
 /// # Returns
 /// A rustls `ClientConfig` configured for mutual TLS
 pub fn build_client_config(
-    roots: rustls::RootCertStore,
+    roots: Arc<rustls::RootCertStore>,
     certs: Vec<CertificateDer<'static>>,
     key: PrivateKeyDer<'static>,
 ) -> Result<rustls::ClientConfig> {
@@ -255,12 +255,12 @@ pub fn build_client_config(
 /// # Returns
 /// A rustls `ServerConfig` configured for mutual TLS with required client authentication
 pub fn build_server_config(
-    roots: rustls::RootCertStore,
+    roots: Arc<rustls::RootCertStore>,
     certs: Vec<CertificateDer<'static>>,
     key: PrivateKeyDer<'static>,
 ) -> Result<rustls::ServerConfig> {
     // Build client certificate verifier that requires valid client certs
-    let client_verifier = rustls::server::WebPkiClientVerifier::builder(Arc::new(roots))
+    let client_verifier = rustls::server::WebPkiClientVerifier::builder(roots)
         .build()
         .map_err(CertError::BuildClientVerifier)?;
 
@@ -282,13 +282,13 @@ pub fn build_server_config(
 pub fn load_certs(
     config: &CertConfig,
 ) -> Result<(
-    rustls::RootCertStore,
+    Arc<rustls::RootCertStore>,
     Vec<CertificateDer<'static>>,
     PrivateKeyDer<'static>,
 )> {
     let root_store = load_root_certs(&config.root_certs_dir)?;
     let (device_certs, device_key) = load_device_cert(&config.device_cert, &config.device_key)?;
-    Ok((root_store, device_certs, device_key))
+    Ok((Arc::new(root_store), device_certs, device_key))
 }
 
 #[cfg(test)]
@@ -393,7 +393,8 @@ mod tests {
         let device_key_path = temp_dir.path().join("device.key.pem");
 
         // Load root certs
-        let root_store = load_root_certs(&root_certs_dir).expect("failed to load root certs");
+        let root_store =
+            Arc::new(load_root_certs(&root_certs_dir).expect("failed to load root certs"));
         assert!(!root_store.is_empty(), "root store should not be empty");
 
         // Load device cert

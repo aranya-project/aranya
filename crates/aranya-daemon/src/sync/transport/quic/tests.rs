@@ -61,7 +61,7 @@ impl QuicTestSetup {
         let client_paths = Self::save_device_cert(&client_cert, temp_dir.path(), "client");
 
         // Load certs - both trust the same CA
-        let root_store = load_root_certs(&ca_dir).expect("failed to load CA roots");
+        let root_store = Arc::new(load_root_certs(&ca_dir).expect("failed to load CA roots"));
         let (server_certs, server_key) = Self::load_device(&server_paths);
         let (client_certs, client_key) = Self::load_device(&client_paths);
 
@@ -122,10 +122,10 @@ impl QuicTestSetup {
 
         Self::build(
             temp_dir,
-            server_root_store,
+            Arc::new(server_root_store),
             server_certs,
             server_key,
-            client_root_store,
+            Arc::new(client_root_store),
             client_certs,
             client_key,
         )
@@ -154,10 +154,10 @@ impl QuicTestSetup {
     /// Builds QUIC endpoints with the specified TLS configurations.
     fn build(
         temp_dir: TempDir,
-        server_root_store: rustls::RootCertStore,
+        server_root_store: Arc<rustls::RootCertStore>,
         server_certs: Vec<CertificateDer<'static>>,
         server_key: PrivateKeyDer<'static>,
-        client_root_store: rustls::RootCertStore,
+        client_root_store: Arc<rustls::RootCertStore>,
         client_certs: Vec<CertificateDer<'static>>,
         client_key: PrivateKeyDer<'static>,
     ) -> Self {
