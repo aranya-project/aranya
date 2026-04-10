@@ -19,15 +19,16 @@ impl TryClone for fs_keystore::Store {
     }
 }
 
-// TODO(mtls): Persist?
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TeamConfigStore {
     set: RwLock<HashSet<TeamId>>,
 }
 
 impl TeamConfigStore {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(teams: HashSet<TeamId>) -> Self {
+        Self {
+            set: RwLock::new(teams),
+        }
     }
 
     #[must_use]

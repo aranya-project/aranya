@@ -7,10 +7,11 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
+use aranya_daemon_api::TeamId;
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId,
+    ClientState, GraphId, StorageProvider,
 };
 use aranya_util::{ready, Addr};
 use buggy::{bug, Bug, BugExt};
@@ -31,6 +32,7 @@ use crate::{
         quic::{CertConfig, QuicConnector, QuicListener},
         SyncClient, SyncHandle, SyncManager,
     },
+    util::TeamConfigStore,
     vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
@@ -132,6 +134,16 @@ impl Daemon {
             )
             .await?;
 
+            let teams = TeamConfigStore::new(
+                client
+                    .lock_aranya()
+                    .await
+                    .provider()
+                    .list_graph_ids()?
+                    .map(|r| r.map(TeamId::transmute))
+                    .collect::<Result<_, _>>()?,
+            );
+
             #[cfg(feature = "afc")]
             let afc = {
                 let Toggle::Enabled(afc_cfg) = &cfg.afc else {
@@ -152,6 +164,7 @@ impl Daemon {
 
             let api = DaemonApiServer::new(DaemonApiServerArgs {
                 client,
+                teams,
                 local_addr: sync_server.local_addr(),
                 uds_path: cfg.uds_api_sock(),
                 sk: api_sk,

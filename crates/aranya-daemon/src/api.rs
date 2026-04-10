@@ -81,6 +81,7 @@ pub(crate) struct DaemonApiServer {
 
 pub(crate) struct DaemonApiServerArgs {
     pub(crate) client: Client,
+    pub(crate) teams: TeamConfigStore,
     pub(crate) local_addr: Addr,
     pub(crate) uds_path: PathBuf,
     pub(crate) sk: ApiKey<CS>,
@@ -96,6 +97,7 @@ impl DaemonApiServer {
     #[instrument(skip_all)]
     pub(crate) fn new(
         DaemonApiServerArgs {
+            teams,
             client,
             local_addr,
             uds_path,
@@ -133,7 +135,7 @@ impl DaemonApiServer {
             effect_handler,
             #[cfg(feature = "afc")]
             afc,
-            teams: TeamConfigStore::new(),
+            teams,
         }));
         Ok(Self {
             uds_path,
