@@ -4,7 +4,10 @@ use std::{collections::btree_map::Entry, future::Future, net::SocketAddr, pin::P
 use anyhow::Context as _;
 use aranya_util::error::ReportExt as _;
 use derive_where::derive_where;
-use futures_util::{future::Fuse, stream::SelectAll, FutureExt as _, Stream, StreamExt as _};
+use futures_util::{
+    stream::{FuturesUnordered, SelectAll},
+    Stream, StreamExt as _,
+};
 use quinn::{Connection, Incoming, VarInt};
 use tokio::time::Duration;
 use tracing::{debug, error, info_span, warn, Instrument as _};
@@ -29,7 +32,7 @@ pub(crate) struct QuicListener {
     accepting: SelectAll<Accepting>,
     /// Set of incoming connections which have not yet completed.
     #[derive_where(skip(Debug))]
-    connecting: SelectAll<Connecting>,
+    connecting: FlattenOption<FuturesUnordered<Connecting>>,
 }
 
 impl QuicListener {
@@ -43,16 +46,16 @@ impl QuicListener {
             endpoint,
             pool,
             accepting: SelectAll::new(),
-            connecting: SelectAll::new(),
+            connecting: FlattenOption(FuturesUnordered::new()),
         }
     }
 
     fn accept_incoming(&mut self, incoming: Incoming) {
         let remote = incoming.remote_address();
         match incoming.accept() {
-            Ok(connecting) => self.connecting.push(Connecting {
+            Ok(connecting) => self.connecting.0.push(Connecting {
                 remote,
-                inner: connecting.fuse(),
+                inner: connecting,
             }),
             Err(error) => error!(%remote, error = %error.report(), "failed to accept connection"),
         }
@@ -180,18 +183,15 @@ fn accepting(peer: SyncPeer, conn: Connection) -> Accepting {
     ))
 }
 
-/// A [`Stream`] which may yield one [`Connection`].
+/// A pending QUIC connection.
 struct Connecting {
     remote: SocketAddr,
-    inner: Fuse<quinn::Connecting>,
+    inner: quinn::Connecting,
 }
 
-impl Stream for Connecting {
-    type Item = Connection;
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
+impl Future for Connecting {
+    type Output = Option<Connection>;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         Pin::new(&mut self.inner).poll(cx).map(|r| {
             r.inspect_err(|error| {
                 error!(
@@ -202,6 +202,28 @@ impl Stream for Connecting {
             })
             .ok()
         })
+    }
+}
+
+/// Flattens `Stream<Item=Option<T>>` to `Stream<Item=T>`.
+struct FlattenOption<St>(St);
+
+impl<St, T> Stream for FlattenOption<St>
+where
+    St: Stream<Item = Option<T>> + Unpin,
+{
+    type Item = T;
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        loop {
+            match std::task::ready!(self.0.poll_next_unpin(cx)) {
+                Some(Some(item)) => return Poll::Ready(Some(item)),
+                Some(None) => {}
+                None => return Poll::Ready(None),
+            }
+        }
     }
 }
 
