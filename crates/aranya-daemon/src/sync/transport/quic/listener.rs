@@ -15,8 +15,7 @@ use tracing::{debug, error, info_span, warn, Instrument as _};
 use super::{connections::ListenerPool, Error, QuicStream, SyncListener};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
-/// The amount of time we wait trying to resolve the connecting peer's address (and waiting for them
-/// to send the port they want) before we time out.
+/// The amount of time we wait to receive the connecting peer's graph ID.
 const RESOLVE_GRAPH_ID_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive_where(Debug)]
