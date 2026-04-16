@@ -1,7 +1,6 @@
 //! This module implements [`QuicListener`] to allow accepting connections from QUIC clients.
 use std::{collections::btree_map::Entry, future::Future, net::SocketAddr, pin::Pin, task::Poll};
 
-use anyhow::Context as _;
 use aranya_util::error::ReportExt as _;
 use derive_where::derive_where;
 use futures_util::{
@@ -12,7 +11,7 @@ use quinn::{Connection, Incoming, VarInt};
 use tokio::time::Duration;
 use tracing::{debug, error, info_span, warn, Instrument as _};
 
-use super::{connections::ListenerPool, Error, QuicStream, SyncListener};
+use super::{connections::ListenerPool, QuicStream, SyncListener};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
 /// The amount of time we wait to receive the connecting peer's graph ID.
@@ -52,23 +51,19 @@ impl QuicListener {
     fn accept_incoming(&mut self, incoming: Incoming) {
         let remote = incoming.remote_address();
         match incoming.accept() {
-            Ok(connecting) => self.connecting.0.push(Connecting {
-                remote,
-                inner: connecting,
-            }),
+            Ok(connecting) => self
+                .connecting
+                .0
+                .push(resolve_connecting(remote, connecting)),
             Err(error) => error!(%remote, error = %error.report(), "failed to accept connection"),
         }
     }
 
     /// Sets up the connection with a keep alive, constructs and validates a [`SyncPeer`], and
     /// registers it as a new connection.
-    async fn register_connection(&mut self, mut conn: Connection) -> Result<(), Error> {
+    async fn register_connection(&mut self, conn: Connection, graph_id: GraphId) {
         let remote = conn.remote_address();
 
-        let graph_id = tokio::time::timeout(RESOLVE_GRAPH_ID_TIMEOUT, extract_graph_id(&mut conn))
-            .await
-            .context("timed out waiting for graph ID")?
-            .context("unable to extract graph ID")?;
         // TODO(mtls): Key just on addr?
         let peer = SyncPeer::new(Addr::from(remote), graph_id);
 
@@ -110,8 +105,6 @@ impl QuicListener {
             self.accepting.push(accepting(peer, acceptor));
             debug!(?peer, "accepted and inserted QUIC connection");
         }
-
-        Ok(())
     }
 }
 
@@ -135,15 +128,8 @@ impl SyncListener for QuicListener {
                 Some(incoming) = self.endpoint.accept() => {
                     self.accept_incoming(incoming);
                 }
-                Some(conn) = self.connecting.next() => {
-                    if let Err(error) = self.register_connection(conn.clone()).await {
-                        error!(
-                            remote = %conn.remote_address(),
-                            error = %error.report(),
-                            "failed to register connection",
-                        );
-                        conn.close(VarInt::from_u32(0), b"failed to register connection");
-                    }
+                Some((conn, graph_id)) = self.connecting.next() => {
+                    self.register_connection(conn, graph_id).await;
                 }
                 Some((peer, acceptor)) = self.pool.rx.recv() => {
                     debug!(?peer, "registering connection for stream accepts");
@@ -182,26 +168,37 @@ fn accepting(peer: SyncPeer, conn: Connection) -> Accepting {
     ))
 }
 
-/// A pending QUIC connection.
-struct Connecting {
-    remote: SocketAddr,
-    inner: quinn::Connecting,
-}
+type Connecting = Pin<Box<dyn Future<Output = Option<(Connection, GraphId)>> + Send + Sync>>;
 
-impl Future for Connecting {
-    type Output = Option<Connection>;
-    fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.inner).poll(cx).map(|r| {
-            r.inspect_err(|error| {
-                error!(
-                    remote = %self.remote,
-                    error = %error.report(),
-                    "failed to resolve connection",
-                );
-            })
-            .ok()
-        })
-    }
+/// A pending QUIC connection.
+fn resolve_connecting(remote: SocketAddr, inner: quinn::Connecting) -> Connecting {
+    Box::pin(
+        async {
+            let mut conn = inner
+                .await
+                .inspect_err(|error| {
+                    error!(error = %error.report(), "failed to resolve connection");
+                })
+                .ok()?;
+
+            let graph_id =
+                tokio::time::timeout(RESOLVE_GRAPH_ID_TIMEOUT, extract_graph_id(&mut conn))
+                    .await
+                    .inspect_err(|_| {
+                        error!("timeout resolving graph ID");
+                        conn.close(VarInt::from_u32(0), b"timeout resolving graph ID");
+                    })
+                    .ok()?
+                    .inspect_err(|error| {
+                        error!(%error, "failed to read graph ID");
+                        conn.close(VarInt::from_u32(0), b"failed to read graph ID");
+                    })
+                    .ok()?;
+
+            Some((conn, graph_id))
+        }
+        .instrument(info_span!("resolve_connecting", %remote)),
+    )
 }
 
 /// Flattens `Stream<Item=Option<T>>` to `Stream<Item=T>`.
