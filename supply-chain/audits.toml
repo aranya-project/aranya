@@ -410,6 +410,11 @@ criteria = "safe-to-deploy"
 delta = "0.103.3 -> 0.103.10"
 notes = "Certificate/crypto fixes to solve reported CVE."
 
+[[audits.rustls-webpki]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.103.10 -> 0.103.12"
+
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
