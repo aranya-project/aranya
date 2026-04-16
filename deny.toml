@@ -76,9 +76,8 @@ yanked = "warn"
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
-    # The `paste` crate is unmaintained. There isn't anything we
-    # can do here.
-    "RUSTSEC-2024-0436",
+    { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained but finished" },
+    { id = "RUSTSEC-2026-0097", reason = "we don't use the features required to hit the bug" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
