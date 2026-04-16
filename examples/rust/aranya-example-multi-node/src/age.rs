@@ -5,7 +5,7 @@ use std::{
     iter,
 };
 
-use age::{scrypt::Identity, secrecy::SecretString, Decryptor, Encryptor};
+use age::{Decryptor, Encryptor, scrypt::Identity, secrecy::SecretString};
 use anyhow::Result;
 
 /// Encrypt/decrypt data with `age` tool and a passphrase.

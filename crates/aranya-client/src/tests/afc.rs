@@ -3,8 +3,8 @@
 use anyhow::{Context, Result};
 use aranya_daemon_api::text;
 
-use super::common::{sleep, DevicesCtx, SLEEP_INTERVAL};
-use crate::{afc::Channels, client::ChanOp, Rank};
+use super::common::{DevicesCtx, SLEEP_INTERVAL, sleep};
+use crate::{Rank, afc::Channels, client::ChanOp};
 
 /// Demonstrate assigning/revoking a label requires `CanUseAfc` permission.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]

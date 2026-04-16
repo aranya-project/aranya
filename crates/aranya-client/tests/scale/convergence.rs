@@ -2,8 +2,8 @@
 
 use std::time::Instant;
 
-use anyhow::{bail, Context, Result};
-use aranya_client::{client::TeamId, Rank};
+use anyhow::{Context, Result, bail};
+use aranya_client::{Rank, client::TeamId};
 use aranya_daemon_api::Text;
 use tracing::{debug, info, instrument};
 

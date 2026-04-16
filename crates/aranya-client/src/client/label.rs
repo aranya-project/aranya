@@ -6,7 +6,7 @@ use aranya_policy_text::Text;
 
 use crate::{
     client::DeviceId,
-    util::{impl_vec_into_iter_wrapper, ApiConv as _, ApiId},
+    util::{ApiConv as _, ApiId, impl_vec_into_iter_wrapper},
 };
 
 custom_id! {

@@ -7,7 +7,7 @@ use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
 use tokio::{
-    fs::{read, read_dir, remove_file, File},
+    fs::{File, read, read_dir, remove_file},
     io::AsyncWriteExt,
 };
 
@@ -119,7 +119,7 @@ mod tests {
     use std::collections::HashSet;
 
     use anyhow::Context as _;
-    use aranya_crypto::{id::IdExt, Rng};
+    use aranya_crypto::{Rng, id::IdExt};
     use tempfile::tempdir;
     use test_log::test;
 

@@ -7,10 +7,10 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use aranya_client::{
-    afc, text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, DeviceId, PublicKeyBundle, Rank,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, ChanOp, Client, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, DeviceId, PublicKeyBundle, Rank, afc, text,
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
@@ -18,11 +18,11 @@ use tokio::{
     fs,
     process::{Child, Command},
 };
-use tracing::{debug, info, warn, Metadata};
+use tracing::{Metadata, debug, info, warn};
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
-    EnvFilter,
 };
 
 use crate::{

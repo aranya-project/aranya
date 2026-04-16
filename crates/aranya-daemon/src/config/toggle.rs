@@ -1,4 +1,4 @@
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// Serde wrapper for an `enable` field on an optional.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -40,7 +40,7 @@ mod imp {
     )]
     #![expect(clippy::use_self, reason = "Explicit True/False is more clear")]
 
-    use serde::{de, ser, Deserialize, Serialize};
+    use serde::{Deserialize, Serialize, de, ser};
 
     use super::Toggle;
 

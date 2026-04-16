@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use aranya_capi_codegen::Config;
 use quote::format_ident;
 use syn::parse_quote;

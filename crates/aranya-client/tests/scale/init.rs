@@ -2,13 +2,13 @@
 
 use std::{net::Ipv4Addr, path::PathBuf};
 
-use anyhow::{bail, Context, Result};
-use aranya_client::{client::Client, Addr};
+use anyhow::{Context, Result, bail};
+use aranya_client::{Addr, client::Client};
 use aranya_daemon::{
-    config::{self as daemon_cfg, Config, Toggle},
     Daemon,
+    config::{self as daemon_cfg, Config, Toggle},
 };
-use aranya_daemon_api::{shm, SEED_IKM_SIZE};
+use aranya_daemon_api::{SEED_IKM_SIZE, shm};
 use backon::{ExponentialBuilder, Retryable as _};
 use tempfile::TempDir;
 use tokio::fs;

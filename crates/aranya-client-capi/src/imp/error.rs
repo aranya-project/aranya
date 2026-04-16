@@ -1,6 +1,6 @@
 use core::{ffi::c_char, mem::MaybeUninit};
 
-use aranya_capi_core::{write_c_str, ExtendedError, InvalidArg, WriteCStrError};
+use aranya_capi_core::{ExtendedError, InvalidArg, WriteCStrError, write_c_str};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
 use buggy::Bug;

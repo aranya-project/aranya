@@ -10,17 +10,17 @@
 #[cfg(feature = "preview")]
 use aranya_runtime::SyncHelloType;
 use aranya_runtime::{
-    PolicyStore, StorageError, StorageProvider, SyncRequestMessage, SyncResponder, SyncType,
-    TraversalBuffers, MAX_SYNC_MESSAGE_SIZE,
+    MAX_SYNC_MESSAGE_SIZE, PolicyStore, StorageError, StorageProvider, SyncRequestMessage,
+    SyncResponder, SyncType, TraversalBuffers,
 };
 use aranya_util::{error::ReportExt as _, ready};
-use buggy::{bug, BugExt as _};
+use buggy::{BugExt as _, bug};
 use derive_where::derive_where;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use super::{
-    transport::{SyncListener, SyncStream},
     Addr, Error, SyncHandle, SyncPeer,
+    transport::{SyncListener, SyncStream},
 };
 use crate::{aranya::Client, sync::SyncResponse};
 

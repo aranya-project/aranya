@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use s2n_quic::connection::{Handle, StreamAcceptor};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use crate::sync::SyncPeer;
 

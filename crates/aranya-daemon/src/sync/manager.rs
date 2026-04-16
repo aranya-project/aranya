@@ -18,13 +18,13 @@ use std::time::Duration;
 use aranya_daemon_api::SyncPeerConfig;
 #[cfg(feature = "preview")]
 use aranya_runtime::Address;
-use aranya_runtime::{PolicyStore, StorageProvider, MAX_SYNC_MESSAGE_SIZE};
+use aranya_runtime::{MAX_SYNC_MESSAGE_SIZE, PolicyStore, StorageProvider};
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::BugExt as _;
 use derive_where::derive_where;
 use futures_util::StreamExt as _;
 use tokio::{sync::mpsc, time::Instant};
-use tokio_util::time::{delay_queue, DelayQueue};
+use tokio_util::time::{DelayQueue, delay_queue};
 #[cfg(feature = "preview")]
 use tracing::instrument;
 use tracing::{debug, error, info, trace, warn};
@@ -32,14 +32,14 @@ use tracing::{debug, error, info, trace, warn};
 #[cfg(feature = "preview")]
 use super::GraphId;
 use super::{
-    handle::{Callback, ManagerMessage},
     Result, SyncClient, SyncPeer,
+    handle::{Callback, ManagerMessage},
 };
 #[cfg(test)]
 use crate::aranya::Client;
 #[cfg(feature = "preview")]
 use crate::sync::HelloSubscription;
-use crate::sync::{transport::SyncConnector, Error};
+use crate::sync::{Error, transport::SyncConnector};
 
 #[derive(Debug)]
 pub(super) enum ScheduledTask {

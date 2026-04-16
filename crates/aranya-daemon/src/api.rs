@@ -10,23 +10,22 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::{Context as _, anyhow};
 use aranya_crypto::{
+    Csprng, DeviceId, EncryptionKey, EncryptionPublicKey, KeyStore as _, KeyStoreExt as _, Rng,
     default::WrappedKey,
     policy::{GroupId, LabelId, RoleId},
-    Csprng, DeviceId, EncryptionKey, EncryptionPublicKey, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
-    self as api,
+    self as api, DaemonApi, Text, WrappedSeed,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage, StorageProvider};
-use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
+use aranya_util::{Addr, error::ReportExt as _, ready, task::scope};
 #[cfg(feature = "afc")]
 use buggy::bug;
 use derive_where::derive_where;
@@ -34,11 +33,11 @@ use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
 use tarpc::{
     context,
-    server::{incoming::Incoming, BaseChannel, Channel},
+    server::{BaseChannel, Channel, incoming::Incoming},
 };
 use tokio::{
     net::UnixListener,
-    sync::{mpsc, Mutex},
+    sync::{Mutex, mpsc},
 };
 use tracing::{debug, error, info, instrument, trace, warn};
 
@@ -47,13 +46,13 @@ use crate::actions::SessionData;
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
 use crate::{
+    AranyaStore, Client, EF,
     actions::Actions,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, Perm, PublicKeyBundle, RoleCreated},
-    sync::{quic as qs, SyncHandle, SyncPeer},
+    sync::{SyncHandle, SyncPeer, quic as qs},
     util::SeedDir,
-    AranyaStore, Client, EF,
 };
 
 mod quic_sync;

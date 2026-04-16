@@ -12,7 +12,7 @@ use s2n_quic::{
 use tracing::{debug, error, trace, warn};
 
 use super::{
-    connections::ConnectorPool, Error, PskStore, QuicStream, SyncConnector, ALPN_QUIC_SYNC,
+    ALPN_QUIC_SYNC, Error, PskStore, QuicStream, SyncConnector, connections::ConnectorPool,
 };
 use crate::sync::{Addr, SyncPeer};
 

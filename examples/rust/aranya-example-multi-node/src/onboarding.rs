@@ -5,8 +5,8 @@ use std::time::Duration;
 use age::secrecy::SecretString;
 use anyhow::Result;
 use aranya_client::{
-    client::{DeviceId, PublicKeyBundle, TeamId},
     Addr,
+    client::{DeviceId, PublicKeyBundle, TeamId},
 };
 use serde::{Deserialize, Serialize};
 

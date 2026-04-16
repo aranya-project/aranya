@@ -28,8 +28,8 @@ use std::{
 use anyhow::Result;
 use buggy::Bug;
 use serde::{
-    de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
+    de::{self, Visitor},
 };
 use tokio::net::{self, ToSocketAddrs};
 use tracing::{debug, instrument};
@@ -567,11 +567,7 @@ const fn base10(x: u8) -> u8 {
 const fn base16(x: u8) -> u8 {
     debug_assert!(x <= 15);
 
-    if x < 10 {
-        base10(x)
-    } else {
-        x - 10 + b'a'
-    }
+    if x < 10 { base10(x) } else { x - 10 + b'a' }
 }
 
 /// An error returned by [`Addr`].

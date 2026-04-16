@@ -4,7 +4,7 @@ use anyhow::Result;
 use aranya_crypto::{
     engine::WrappedKey,
     id::BaseId,
-    keystore::{self, fs_keystore, KeyStore, Occupied, Vacant},
+    keystore::{self, KeyStore, Occupied, Vacant, fs_keystore},
 };
 
 macro_rules! impl_typed_keystore {

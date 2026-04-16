@@ -2,10 +2,10 @@
 
 use std::time::Duration;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aranya_client::{
-    client::TeamId, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfig, Rank,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, Rank, client::TeamId,
+    config::CreateTeamConfig,
 };
 use tokio::time::sleep;
 use tracing::{info, instrument, warn};

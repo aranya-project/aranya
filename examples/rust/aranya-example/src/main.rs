@@ -4,14 +4,14 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 #[cfg(feature = "preview")]
 use aranya_client::HelloSubscriptionConfig;
 use aranya_client::{
-    afc,
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
+    Permission, Rank, SyncPeerConfig, afc,
     client::{ChanOp, Client, DeviceId, PublicKeyBundle},
-    text, AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamConfig, CreateTeamQuicSyncConfig,
-    Permission, Rank, SyncPeerConfig,
+    text,
 };
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
@@ -20,16 +20,16 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{debug, info, Metadata};
+use tracing::{Metadata, debug, info};
 
 /// Example updated rank for the device rank change demo.
 const EXAMPLE_UPDATED_DEVICE_RANK: i64 = 40;
 /// Example rank for the custom role demo.
 const EXAMPLE_ROLE_RANK: i64 = 50;
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
-    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
