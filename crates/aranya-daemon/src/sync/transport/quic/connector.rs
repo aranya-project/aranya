@@ -93,7 +93,7 @@ impl SyncConnector for QuicConnector {
             new_conn
                 .open_uni()
                 .await?
-                .write(peer.graph_id.as_bytes())
+                .write_all(peer.graph_id.as_bytes())
                 .await?;
 
             debug!("QUIC handshake complete and sent graph ID");
