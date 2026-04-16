@@ -85,10 +85,8 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
     fn remove_graph(&mut self, graph_id: GraphId) {
         self.peers.retain(|peer, (_, key)| {
             let retain = peer.graph_id != graph_id;
-            if !retain {
-                if let Some(key) = key {
-                    self.queue.remove(key);
-                }
+            if !retain && let Some(key) = key {
+                self.queue.remove(key);
             }
             retain
         });
