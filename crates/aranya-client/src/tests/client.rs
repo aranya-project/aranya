@@ -3032,12 +3032,12 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
     let label = owner_team.create_label(text!("label"), label_rank).await?;
 
     // Generation counter should start at 0.
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
-    assert_eq!(gen, Some(0), "initial generation should be 0");
+    assert_eq!(generation, Some(0), "initial generation should be 0");
 
     // Assign label to membera.
     owner_team
@@ -3059,12 +3059,12 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
         .await?;
 
     // Generation counter increments on removal.
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
-    assert_eq!(gen, Some(1), "generation should be 1 after removal");
+    assert_eq!(generation, Some(1), "generation should be 1 after removal");
 
     // Re-add membera with the member role.
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
@@ -3077,12 +3077,16 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
         .await?;
 
     // Generation counter should not change on re-add.
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
-    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
+    assert_eq!(
+        generation,
+        Some(1),
+        "generation should still be 1 after re-add"
+    );
 
     // Old label assignment should be stale (not visible).
     let labels = owner_team
@@ -3102,13 +3106,13 @@ async fn test_device_generation_counter_label_reassignment() -> Result<()> {
         .await?;
 
     // Generation counter should still be 1 (reassignment doesn't change it).
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
     assert_eq!(
-        gen,
+        generation,
         Some(1),
         "generation should still be 1 after reassignment"
     );
@@ -3178,12 +3182,12 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
     let label = owner_team.create_label(text!("label"), label_rank).await?;
 
     // Generation should start at 0.
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
-    assert_eq!(gen, Some(0), "initial generation should be 0");
+    assert_eq!(generation, Some(0), "initial generation should be 0");
 
     // Assign label to membera.
     owner_team
@@ -3200,12 +3204,12 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
         .expect("remove_from_team should succeed");
 
     // Generation counter increments on removal.
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
-    assert_eq!(gen, Some(1), "generation should be 1 after removal");
+    assert_eq!(generation, Some(1), "generation should be 1 after removal");
 
     // Revoking a label from a removed device should fail.
     let err = owner_team
@@ -3227,12 +3231,16 @@ async fn test_revoke_stale_label_assignment_rejected() -> Result<()> {
         .expect("re-adding device should succeed");
 
     // Generation counter should not change on re-add.
-    let gen = owner_team
+    let generation = owner_team
         .device(devices.membera.id)
         .generation()
         .await
         .expect("generation should succeed");
-    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
+    assert_eq!(
+        generation,
+        Some(1),
+        "generation should still be 1 after re-add"
+    );
 
     // Try to revoke the stale label assignment (generation mismatch).
     let err = owner_team
@@ -3288,10 +3296,18 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
     admin_team.sync_now(owner_addr, None).await?;
 
     // Verify initial generation is 0 on both devices.
-    let gen = owner_team.device(devices.membera.id).generation().await?;
-    assert_eq!(gen, Some(0), "initial generation should be 0 on owner");
-    let gen = admin_team.device(devices.membera.id).generation().await?;
-    assert_eq!(gen, Some(0), "initial generation should be 0 on admin");
+    let generation = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        generation,
+        Some(0),
+        "initial generation should be 0 on owner"
+    );
+    let generation = admin_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        generation,
+        Some(0),
+        "initial generation should be 0 on admin"
+    );
 
     // --- Concurrent operations without syncing ---
     // Owner assigns the label to membera (captures device_gen=0).
@@ -3311,9 +3327,9 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         1,
         "label should be assigned on owner before sync"
     );
-    let gen = owner_team.device(devices.membera.id).generation().await?;
+    let generation = owner_team.device(devices.membera.id).generation().await?;
     assert_eq!(
-        gen,
+        generation,
         Some(0),
         "generation should still be 0 on owner before sync"
     );
@@ -3328,17 +3344,17 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .expect("remove should succeed locally");
 
     // On admin, the generation was bumped to 1 by the removal.
-    let gen = admin_team.device(devices.membera.id).generation().await?;
+    let generation = admin_team.device(devices.membera.id).generation().await?;
     assert_eq!(
-        gen,
+        generation,
         Some(1),
         "generation should be 1 on admin after removal"
     );
 
     // Owner still sees gen=0 because it hasn't synced the removal yet.
-    let gen = owner_team.device(devices.membera.id).generation().await?;
+    let generation = owner_team.device(devices.membera.id).generation().await?;
     assert_eq!(
-        gen,
+        generation,
         Some(0),
         "generation should still be 0 on owner before sync"
     );
@@ -3357,8 +3373,12 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
 
     // After sync, both devices should agree: gen is 1 because the
     // remove was processed. The label assignment was rejected.
-    let gen = owner_team.device(devices.membera.id).generation().await?;
-    assert_eq!(gen, Some(1), "generation should be 1 on owner after sync");
+    let generation = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        generation,
+        Some(1),
+        "generation should be 1 on owner after sync"
+    );
 
     // Re-add membera so we can query label state for this device.
     let device_rank = Rank::new(member_role_rank.value().saturating_sub(1));
@@ -3372,8 +3392,12 @@ async fn test_concurrent_label_assign_and_device_removal() -> Result<()> {
         .context("re-adding device should succeed")?;
 
     // Generation stays at 1 after re-add (only removal increments it).
-    let gen = owner_team.device(devices.membera.id).generation().await?;
-    assert_eq!(gen, Some(1), "generation should still be 1 after re-add");
+    let generation = owner_team.device(devices.membera.id).generation().await?;
+    assert_eq!(
+        generation,
+        Some(1),
+        "generation should still be 1 after re-add"
+    );
 
     // The label that was previously assigned (and valid before sync)
     // should NOT be assigned now. The concurrent removal changed the

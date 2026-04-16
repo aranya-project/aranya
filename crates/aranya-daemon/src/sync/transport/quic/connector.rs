@@ -149,11 +149,11 @@ impl SyncConnector for QuicConnector {
             Err(error) => {
                 error!(error = %error.report(), "failed to open bidirectional stream");
                 self.pool.conns.with_map(|map| {
-                    if let Entry::Occupied(e) = map.entry(peer) {
-                        if e.get().stable_id() == handle.stable_id() {
-                            e.remove()
-                                .close(VarInt::from_u32(0), b"failed to open stream");
-                        }
+                    if let Entry::Occupied(e) = map.entry(peer)
+                        && e.get().stable_id() == handle.stable_id()
+                    {
+                        e.remove()
+                            .close(VarInt::from_u32(0), b"failed to open stream");
                     }
                 });
                 return Err(Error::Connection(error));

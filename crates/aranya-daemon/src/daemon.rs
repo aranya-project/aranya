@@ -241,10 +241,10 @@ impl Daemon {
         // Remove unix socket so we can re-bind after e.g. the process is killed.
         // (We could remove it at exit but can't guarantee that will happen.)
         let uds_api_sock = cfg.uds_api_sock();
-        if let Err(err) = fs::remove_file(&uds_api_sock).await {
-            if err.kind() != io::ErrorKind::NotFound {
-                return Err(err).context(format!("unable to remove api socket {uds_api_sock:?}"));
-            }
+        if let Err(err) = fs::remove_file(&uds_api_sock).await
+            && err.kind() != io::ErrorKind::NotFound
+        {
+            return Err(err).context(format!("unable to remove api socket {uds_api_sock:?}"));
         }
 
         info!("set up environment");

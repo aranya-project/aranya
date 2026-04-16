@@ -61,14 +61,14 @@ impl SyncPeerConfigBuilder {
     pub fn build(self) -> Result<SyncPeerConfig> {
         // Check that interval doesn't exceed 1 year to prevent overflow when adding to Instant::now()
         // in DelayQueue::insert() (which calculates deadline as current_time + interval)
-        if let Some(interval) = self.interval {
-            if interval > MAX_SYNC_INTERVAL {
-                return Err(ConfigError::InvalidArg(InvalidArg::new(
-                    "duration",
-                    "must not exceed 1 year to prevent overflow",
-                ))
-                .into());
-            }
+        if let Some(interval) = self.interval
+            && interval > MAX_SYNC_INTERVAL
+        {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "duration",
+                "must not exceed 1 year to prevent overflow",
+            ))
+            .into());
         }
 
         Ok(SyncPeerConfig {

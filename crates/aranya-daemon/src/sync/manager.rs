@@ -183,10 +183,8 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
             // Unregister all sync peers for the graph, and remove them from the `DelayQueue`.
             self.peers.retain(|p, (_, key)| {
                 let keep = p.graph_id != peer.graph_id;
-                if !keep {
-                    if let Some(k) = key {
-                        self.queue.remove(k);
-                    }
+                if !keep && let Some(k) = key {
+                    self.queue.remove(k);
                 }
                 keep
             });

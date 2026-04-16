@@ -87,10 +87,10 @@ async fn main() -> Result<()> {
 
     // Wait for admin to create label.
     let label1 = loop {
-        if let Ok(labels) = team.labels().await {
-            if let Some(label) = labels.iter().next() {
-                break label.clone();
-            }
+        if let Ok(labels) = team.labels().await
+            && let Some(label) = labels.iter().next()
+        {
+            break label.clone();
         }
         sleep(SLEEP_INTERVAL).await;
     };
@@ -98,10 +98,10 @@ async fn main() -> Result<()> {
     // Loop until this device has the `Operator` role assigned to it.
     info!("operator: waiting for all devices to be added to team and operator role assignment");
     loop {
-        if let Ok(devices) = team.devices().await {
-            if devices.iter().count() == 5 {
-                break;
-            }
+        if let Ok(devices) = team.devices().await
+            && devices.iter().count() == 5
+        {
+            break;
         }
         sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
@@ -113,10 +113,10 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no operator role"))?
         .clone();
     loop {
-        if let Ok(Some(r)) = team.device(device_id).role().await {
-            if r == operator_role {
-                break;
-            }
+        if let Ok(Some(r)) = team.device(device_id).role().await
+            && r == operator_role
+        {
+            break;
         }
         sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
