@@ -61,7 +61,7 @@ impl QuicListener {
 
     /// Sets up the connection with a keep alive, constructs and validates a [`SyncPeer`], and
     /// registers it as a new connection.
-    async fn register_connection(&mut self, conn: Connection, graph_id: GraphId) {
+    fn register_connection(&mut self, conn: Connection, graph_id: GraphId) {
         let remote = conn.remote_address();
 
         // TODO(mtls): Key just on addr?
@@ -69,37 +69,34 @@ impl QuicListener {
 
         // Insert with tie-breaking. The peer initiated this connection,
         // so it wins if peer.addr < local_addr.
-        let acceptor = {
-            let mut map = self.pool.conns.lock().await;
-            match map.entry(peer) {
-                Entry::Vacant(e) => {
+        let acceptor = self.pool.conns.with_map(|map| match map.entry(peer) {
+            Entry::Vacant(e) => {
+                e.insert(conn.clone());
+                Some(conn)
+            }
+            Entry::Occupied(mut e) => {
+                let existing_alive = e.get_mut().close_reason().is_none();
+                let inbound_wins = !existing_alive || remote < self.local_addr;
+                if inbound_wins {
+                    if existing_alive {
+                        debug!(?peer, "replacing existing connection (tie-break)");
+                        e.get().close(
+                            VarInt::from_u32(0),
+                            b"replacing existing connection (tie-break)",
+                        );
+                    }
                     e.insert(conn.clone());
                     Some(conn)
-                }
-                Entry::Occupied(mut e) => {
-                    let existing_alive = e.get_mut().close_reason().is_none();
-                    let inbound_wins = !existing_alive || remote < self.local_addr;
-                    if inbound_wins {
-                        if existing_alive {
-                            debug!(?peer, "replacing existing connection (tie-break)");
-                            e.get().close(
-                                VarInt::from_u32(0),
-                                b"replacing existing connection (tie-break)",
-                            );
-                        }
-                        e.insert(conn.clone());
-                        Some(conn)
-                    } else {
-                        debug!(?peer, "keeping existing outbound connection (tie-break)");
-                        conn.close(
-                            VarInt::from_u32(0),
-                            b"keeping existing outbound connection (tie-break)",
-                        );
-                        None
-                    }
+                } else {
+                    debug!(?peer, "keeping existing outbound connection (tie-break)");
+                    conn.close(
+                        VarInt::from_u32(0),
+                        b"keeping existing outbound connection (tie-break)",
+                    );
+                    None
                 }
             }
-        };
+        });
 
         if let Some(acceptor) = acceptor {
             self.accepting.push(accepting(peer, acceptor));
@@ -129,7 +126,7 @@ impl SyncListener for QuicListener {
                     self.accept_incoming(incoming);
                 }
                 Some((conn, graph_id)) = self.connecting.next() => {
-                    self.register_connection(conn, graph_id).await;
+                    self.register_connection(conn, graph_id);
                 }
                 Some((peer, acceptor)) = self.pool.rx.recv() => {
                     debug!(?peer, "registering connection for stream accepts");

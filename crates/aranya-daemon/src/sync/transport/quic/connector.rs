@@ -56,25 +56,20 @@ impl SyncConnector for QuicConnector {
         trace!(%addr, "resolved peer address");
 
         // Check for an existing live connection, cleaning up dead ones.
-        // Drops the lock before doing async connection work.
-        let reuse = {
-            // Hold the lock across this entire operation
-            let mut map = self.pool.conns.lock().await;
-            match map.entry(peer) {
-                Entry::Occupied(e) => match e.get().close_reason() {
-                    None => {
-                        debug!("reusing existing connection");
-                        Some(e.get().clone())
-                    }
-                    Some(error) => {
-                        warn!(error = %error.report(), "existing connection dead, removing");
-                        e.remove();
-                        None
-                    }
-                },
-                Entry::Vacant(_) => None,
-            }
-        };
+        let reuse = self.pool.conns.with_map(|map| match map.entry(peer) {
+            Entry::Occupied(e) => match e.get().close_reason() {
+                None => {
+                    debug!("reusing existing connection");
+                    Some(e.get().clone())
+                }
+                Some(error) => {
+                    warn!(error = %error.report(), "existing connection dead, removing");
+                    e.remove();
+                    None
+                }
+            },
+            Entry::Vacant(_) => None,
+        });
 
         let handle = if let Some(handle) = reuse {
             handle
@@ -100,9 +95,7 @@ impl SyncConnector for QuicConnector {
 
             // Re-acquire the lock and insert using tie-breaking logic. Between dropping the lock
             // above and now, the listener may have inserted an inbound connection for this peer.
-            let (handle, acceptor) = {
-                // Hold the lock across this entire operation
-                let mut map = self.pool.conns.lock().await;
+            let (handle, acceptor) = self.pool.conns.with_map(|map| {
                 match map.entry(peer) {
                     Entry::Vacant(e) => {
                         e.insert(new_conn.clone());
@@ -137,7 +130,7 @@ impl SyncConnector for QuicConnector {
                         }
                     }
                 }
-            };
+            });
 
             // Forward acceptor to the listener if we kept our connection.
             if let Some(acceptor) = acceptor {
@@ -155,13 +148,14 @@ impl SyncConnector for QuicConnector {
             Ok(stream) => stream,
             Err(error) => {
                 error!(error = %error.report(), "failed to open bidirectional stream");
-                let mut map = self.pool.conns.lock().await;
-                if let Entry::Occupied(e) = map.entry(peer) {
-                    if e.get().stable_id() == handle.stable_id() {
-                        e.remove()
-                            .close(VarInt::from_u32(0), b"failed to open stream");
+                self.pool.conns.with_map(|map| {
+                    if let Entry::Occupied(e) = map.entry(peer) {
+                        if e.get().stable_id() == handle.stable_id() {
+                            e.remove()
+                                .close(VarInt::from_u32(0), b"failed to open stream");
+                        }
                     }
-                }
+                });
                 return Err(Error::Connection(error));
             }
         };
