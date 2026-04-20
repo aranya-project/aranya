@@ -6,9 +6,9 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use aranya_example_multi_node::{
-    config::{create_config, CertificateAuthority},
+    config::{CertificateAuthority, create_config},
     env::EnvVars,
     tracing::init_tracing,
 };
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
 
     let mut args = env::args();
     args.next(); // skip executable name
-                 // Get release directory from input args.
+    // Get release directory from input args.
     let release = {
         let path = args.next().context("missing `release` path")?;
         PathBuf::from(path)

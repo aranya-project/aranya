@@ -4,14 +4,14 @@ use std::{collections::btree_map::Entry, future::Future, net::SocketAddr, pin::P
 use aranya_util::error::ReportExt as _;
 use derive_where::derive_where;
 use futures_util::{
-    stream::{FuturesUnordered, SelectAll},
     Stream, StreamExt as _,
+    stream::{FuturesUnordered, SelectAll},
 };
 use quinn::{Connection, Incoming, VarInt};
 use tokio::time::Duration;
-use tracing::{debug, error, info_span, warn, Instrument as _};
+use tracing::{Instrument as _, debug, error, info_span, warn};
 
-use super::{connections::ListenerPool, QuicStream, SyncListener};
+use super::{QuicStream, SyncListener, connections::ListenerPool};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
 /// The amount of time we wait to receive the connecting peer's graph ID.

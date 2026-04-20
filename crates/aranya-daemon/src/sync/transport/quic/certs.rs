@@ -11,7 +11,7 @@ use std::{
 
 use quinn::rustls::{
     self,
-    pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer},
+    pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
 };
 use thiserror::Error;
 use tracing::debug;

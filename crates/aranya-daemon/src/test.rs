@@ -10,23 +10,23 @@
 
 use std::{collections::HashMap, fs, net::Ipv4Addr};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_crypto::{
+    Csprng, DeviceId, Rng,
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
     policy::{LabelId, RoleId},
-    Csprng, DeviceId, Rng,
 };
 use aranya_daemon_api::text;
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
-    storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE,
+    storage::linear::{LinearStorageProvider, libc::FileManager},
 };
-use aranya_util::{ready, Addr};
+use aranya_util::{Addr, ready};
 use serial_test::serial;
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use test_log::test;
 use tokio::{
     sync::mpsc::{self, Receiver},
@@ -34,16 +34,15 @@ use tokio::{
 };
 
 use crate::{
+    AranyaStore,
     actions::Actions,
     aranya,
     policy::{Effect, Perm, PublicKeyBundle as DeviceKeyBundle},
     sync::{
-        self,
+        self, SyncPeer,
         quic::{CertConfig, QuicConnector, QuicListener},
-        SyncPeer,
     },
-    vm_policy::{PolicyEngine, POLICY_SOURCE},
-    AranyaStore,
+    vm_policy::{POLICY_SOURCE, PolicyEngine},
 };
 
 /// Queries the rank of an object via the policy engine, returning the raw i64 value.

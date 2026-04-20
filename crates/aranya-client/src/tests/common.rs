@@ -2,12 +2,12 @@ use std::{
     collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, sync::Arc, time::Duration,
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
-    config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
+    config::{self as daemon_cfg, Config, Toggle},
 };
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
@@ -16,14 +16,14 @@ use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
-use crate::{
-    client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
-    Addr, Rank, SyncPeerConfig,
-};
 // These deprecated types are only used in create_and_add_team for backward compatibility testing.
 #[expect(deprecated)]
 use crate::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, config::CreateTeamConfig,
+};
+use crate::{
+    Addr, Rank, SyncPeerConfig,
+    client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
 };
 
 /// Shared certificate authority for generating device certificates.

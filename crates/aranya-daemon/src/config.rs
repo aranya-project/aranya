@@ -10,8 +10,8 @@ use anyhow::{Context, Result};
 use aranya_fast_channels::shm;
 use aranya_util::Addr;
 use serde::{
-    de::{self, DeserializeOwned},
     Deserialize, Serialize,
+    de::{self, DeserializeOwned},
 };
 
 mod toggle;

@@ -3,10 +3,10 @@
 use std::path::PathBuf;
 
 use anyhow::{Context as _, Result};
-use aranya_client::{client::ChanOp, AddTeamConfig, Client, SyncPeerConfig};
+use aranya_client::{AddTeamConfig, Client, SyncPeerConfig, client::ChanOp};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
+    onboarding::{DeviceInfo, Onboard, SLEEP_INTERVAL, SYNC_INTERVAL, TeamInfo},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -120,7 +120,9 @@ async fn main() -> Result<()> {
         }
         sleep(SLEEP_INTERVAL.saturating_mul(3)).await;
     }
-    info!("operator: detected that all devices have been added to team and operator role has been assigned");
+    info!(
+        "operator: detected that all devices have been added to team and operator role has been assigned"
+    );
 
     // Remove admin sync peer.
     info!("operator: removing admin sync peer");

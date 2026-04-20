@@ -4,14 +4,14 @@
 #![expect(deprecated)]
 
 use core::{
-    ffi::{c_char, CStr},
+    ffi::{CStr, c_char},
     ops::Deref,
     ptr, slice,
 };
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
-use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_capi_core::{ErrorCode, InvalidArg, prelude::*};
 #[cfg(feature = "afc")]
 use aranya_client::afc;
 use aranya_client::config::MAX_SYNC_INTERVAL;
@@ -750,7 +750,7 @@ impl From<&AfcChannelId> for afc::ChannelId {
 /// E.g. `ARANYA_CAPI=debug`.
 // TODO(eric): don't make users use env vars.
 pub fn init_logging() -> Result<(), imp::Error> {
-    use tracing_subscriber::{prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, prelude::*};
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(EnvFilter::from_env("ARANYA_CAPI"))

@@ -4,16 +4,16 @@ use core::{error, fmt, hash::Hash, time::Duration};
 
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
+    Engine,
     dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Engine,
 };
 use aranya_id::custom_id;
-pub use aranya_policy_text::{text, InvalidText, Text};
-use aranya_util::{error::ReportExt, Addr};
+pub use aranya_policy_text::{InvalidText, Text, text};
+use aranya_util::{Addr, error::ReportExt};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -508,7 +508,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
     /// Revokes a label from a device.
     async fn revoke_label_from_device(team: TeamId, device: DeviceId, label: LabelId)
-        -> Result<()>;
+    -> Result<()>;
     /// Returns all labels assigned to the device.
     async fn labels_assigned_to_device(team: TeamId, device: DeviceId) -> Result<Box<[Label]>>;
 

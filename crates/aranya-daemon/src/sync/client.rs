@@ -14,8 +14,8 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use super::{
-    transport::{SyncConnector, SyncStream as _},
     Error, GraphId, Result, SyncPeer, SyncResponse,
+    transport::{SyncConnector, SyncStream as _},
 };
 use crate::{
     aranya::{Client, InvalidGraphs},

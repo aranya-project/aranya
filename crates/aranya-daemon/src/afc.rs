@@ -1,21 +1,21 @@
 //! Implementation of daemon's AFC handler.
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     fmt::Debug,
 };
 
 use anyhow::{Context, Result};
 use aranya_afc_util::{Handler, UniChannelCreated, UniChannelReceived};
 use aranya_crypto::{
-    afc::UniPeerEncap, policy::LabelId, CipherSuite, CmdId, DeviceId, EncryptionKeyId, Engine,
-    KeyStore, Rng,
+    CipherSuite, CmdId, DeviceId, EncryptionKeyId, Engine, KeyStore, Rng, afc::UniPeerEncap,
+    policy::LabelId,
 };
 use aranya_daemon_api::{self as api, AfcChannelId};
 pub use aranya_fast_channels::LocalChannelId as AfcLocalChannelId;
 use aranya_fast_channels::{
-    shm::{Flag, Mode, WriteState},
     AranyaState, ChannelDirection,
+    shm::{Flag, Mode, WriteState},
 };
 use aranya_runtime::GraphId;
 use derive_where::derive_where;
@@ -23,10 +23,10 @@ use tokio::sync::Mutex;
 use tracing::{debug, instrument, warn};
 
 use crate::{
+    Client,
     config::AfcConfig,
     keystore::AranyaStore,
     policy::{AfcUniChannelCreated, AfcUniChannelReceived},
-    Client,
 };
 
 /// AFC shared memory.

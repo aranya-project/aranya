@@ -10,11 +10,10 @@ use std::{
 };
 
 use anyhow::Context;
-use aranya_daemon_api::{AfcLocalChannelId, AfcShmInfo, DaemonApiClient, CS};
+use aranya_daemon_api::{AfcLocalChannelId, AfcShmInfo, CS, DaemonApiClient};
 use aranya_fast_channels::{
-    self as afc,
+    self as afc, AfcState, Client as AfcClient,
     shm::{Flag, Mode, ReadState},
-    AfcState, Client as AfcClient,
 };
 use aranya_id::custom_id;
 use derive_where::derive_where;
@@ -22,9 +21,9 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    error::{aranya_error, IpcError},
-    util::{rpc_context, ApiConv as _, ApiId},
     DeviceId, LabelId, Result, TeamId,
+    error::{IpcError, aranya_error},
+    util::{ApiConv as _, ApiId, rpc_context},
 };
 
 /// The sequence number (position) of a message sent in a channel.

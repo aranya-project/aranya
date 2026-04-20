@@ -33,7 +33,7 @@ pub mod error;
 mod tests;
 mod util;
 
-pub use aranya_policy_text::{text, Text};
+pub use aranya_policy_text::{Text, text};
 pub use aranya_util::Addr;
 
 #[expect(deprecated)]

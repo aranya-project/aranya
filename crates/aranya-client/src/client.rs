@@ -15,13 +15,13 @@ pub use aranya_daemon_api::ChanOp;
 #[doc(inline)]
 pub use aranya_daemon_api::Perm as Permission;
 use aranya_daemon_api::{
+    CS, DaemonApiClient, Version,
     crypto::{
-        txp::{self, LengthDelimitedCodec},
         PublicApiKey,
+        txp::{self, LengthDelimitedCodec},
     },
-    DaemonApiClient, Version, CS,
 };
-use aranya_util::{error::ReportExt, Addr};
+use aranya_util::{Addr, error::ReportExt};
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info};
 #[cfg(feature = "afc")]
@@ -43,8 +43,8 @@ pub use self::{
 };
 use crate::{
     config::{AddTeamConfig, CreateTeamConfig},
-    error::{self, aranya_error, InvalidArg, IpcError, Result},
-    util::{rpc_context, ApiConv as _},
+    error::{self, InvalidArg, IpcError, Result, aranya_error},
+    util::{ApiConv as _, rpc_context},
 };
 
 /// Builds a [`Client`].

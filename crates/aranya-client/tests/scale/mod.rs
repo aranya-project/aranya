@@ -8,10 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aranya_client::{
-    client::{Client, PublicKeyBundle, TeamId},
     Addr,
+    client::{Client, PublicKeyBundle, TeamId},
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::DaemonHandle;
@@ -395,7 +395,7 @@ impl ConvergenceTracker {
     }
 }
 
-pub use topology::{dual_ring_bridge_topology, Topology};
+pub use topology::{Topology, dual_ring_bridge_topology};
 
 /// Main context for scale convergence tests.
 ///

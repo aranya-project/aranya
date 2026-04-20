@@ -6,12 +6,12 @@ use tracing::instrument;
 
 use crate::{
     client::{
-        object::ToObjectId, Client, Device, DeviceId, Devices, Label, LabelId, Labels, Permission,
-        PublicKeyBundle, Rank, Role, RoleId, Roles,
+        Client, Device, DeviceId, Devices, Label, LabelId, Labels, Permission, PublicKeyBundle,
+        Rank, Role, RoleId, Roles, object::ToObjectId,
     },
     config::SyncPeerConfig,
-    error::{aranya_error, IpcError, Result},
-    util::{rpc_context, ApiConv as _, ApiId},
+    error::{IpcError, Result, aranya_error},
+    util::{ApiConv as _, ApiId, rpc_context},
 };
 
 custom_id! {

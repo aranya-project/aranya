@@ -1,7 +1,7 @@
 #![cfg(feature = "afc")]
 #![cfg_attr(docsrs, doc(cfg(feature = "afc")))]
 
-pub use aranya_fast_channels::{shm, LocalChannelId as AfcLocalChannelId};
+pub use aranya_fast_channels::{LocalChannelId as AfcLocalChannelId, shm};
 use aranya_id::custom_id;
 use serde::{Deserialize, Serialize};
 

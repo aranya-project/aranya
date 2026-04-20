@@ -3,10 +3,10 @@
 use std::path::PathBuf;
 
 use anyhow::{Context as _, Result};
-use aranya_client::{text, AddTeamConfig, Client, Rank, Role, SyncPeerConfig};
+use aranya_client::{AddTeamConfig, Client, Rank, Role, SyncPeerConfig, text};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
+    onboarding::{DeviceInfo, Onboard, SLEEP_INTERVAL, SYNC_INTERVAL, TeamInfo},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};

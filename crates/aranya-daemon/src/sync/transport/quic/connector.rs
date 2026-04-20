@@ -6,7 +6,7 @@ use aranya_util::error::ReportExt as _;
 use quinn::{ClientConfig, Endpoint, VarInt};
 use tracing::{debug, error, instrument, trace, warn};
 
-use super::{connections::ConnectorPool, Error, QuicStream, SyncConnector};
+use super::{Error, QuicStream, SyncConnector, connections::ConnectorPool};
 use crate::sync::SyncPeer;
 
 #[derive(Debug)]

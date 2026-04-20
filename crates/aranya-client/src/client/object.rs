@@ -1,7 +1,7 @@
 use core::fmt;
 
 use aranya_daemon_api as api;
-use aranya_id::{custom_id, Id, IdTag};
+use aranya_id::{Id, IdTag, custom_id};
 
 use crate::{
     client::{DeviceId, LabelId, RoleId, TeamId},

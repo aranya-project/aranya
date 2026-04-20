@@ -12,7 +12,7 @@
 //! [observer problem]: https://w.wiki/Ekxn
 use std::{collections::HashMap, fmt, time::Instant};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 use tracing::{debug, warn};

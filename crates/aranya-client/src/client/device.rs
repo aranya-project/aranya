@@ -7,8 +7,8 @@ use tracing::instrument;
 
 use crate::{
     client::{ChanOp, Client, Label, LabelId, Labels, Role, RoleId},
-    error::{aranya_error, IpcError, Result},
-    util::{impl_slice_iter_wrapper, rpc_context, ApiConv as _, ApiId},
+    error::{IpcError, Result, aranya_error},
+    util::{ApiConv as _, ApiId, impl_slice_iter_wrapper, rpc_context},
 };
 
 /// A device's public key bundle.

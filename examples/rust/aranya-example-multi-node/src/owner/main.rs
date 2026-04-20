@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 use aranya_client::{Client, CreateTeamConfig};
 use aranya_example_multi_node::{
     env::EnvVars,

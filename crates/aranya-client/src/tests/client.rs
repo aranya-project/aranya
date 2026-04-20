@@ -1,10 +1,10 @@
 use std::{ptr, time::Duration};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aranya_daemon_api::text;
 use tracing::{debug, info};
 
-use super::common::{sleep, DeviceCtx, DevicesCtx, SLEEP_INTERVAL};
+use super::common::{DeviceCtx, DevicesCtx, SLEEP_INTERVAL, sleep};
 #[cfg(feature = "preview")]
 use crate::config::HelloSubscriptionConfig;
 use crate::{
@@ -1241,7 +1241,9 @@ async fn test_hello_subscription() -> Result<()> {
         bail!("Sync on hello failed: the test label created by admin is not visible to membera");
     }
 
-    info!("sync_on_hello test succeeded - membera automatically synced after receiving hello notification");
+    info!(
+        "sync_on_hello test succeeded - membera automatically synced after receiving hello notification"
+    );
 
     // Test basic subscription/unsubscription functionality for completeness
     info!("testing basic subscription functionality");

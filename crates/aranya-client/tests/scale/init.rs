@@ -5,12 +5,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
-use aranya_client::{client::Client, Addr};
+use aranya_client::{Addr, client::Client};
 use aranya_daemon::{
-    config::{self as daemon_cfg, Config, Toggle},
     Daemon,
+    config::{self as daemon_cfg, Config, Toggle},
 };
 use aranya_daemon_api::shm;
 use backon::{ExponentialBuilder, Retryable as _};

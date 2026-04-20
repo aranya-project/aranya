@@ -8,29 +8,28 @@ use core::{future, ops::Deref, pin::pin};
 use std::{collections::HashMap, time::Duration};
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::{Context as _, anyhow};
 use aranya_crypto::{
-    policy::{LabelId, RoleId},
     Csprng, DeviceId, Rng,
+    policy::{LabelId, RoleId},
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
-    self as api,
+    self as api, DaemonApi, Text,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, Text,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage, StorageProvider};
-use aranya_util::{error::ReportExt as _, ready, task::scope, Addr};
+use aranya_util::{Addr, error::ReportExt as _, ready, task::scope};
 #[cfg(feature = "afc")]
 use buggy::bug;
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
-    server::{incoming::Incoming, BaseChannel, Channel},
+    server::{BaseChannel, Channel, incoming::Incoming},
 };
 #[cfg(feature = "preview")]
 use tokio::sync::Mutex;
@@ -38,12 +37,12 @@ use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
+    Client, EF,
     actions::Actions,
     daemon::CS,
     policy::{ChanOp, Effect, Perm, PublicKeyBundle, RoleCreated},
     sync::{SyncHandle, SyncPeer},
     util::TeamConfigStore,
-    Client, EF,
 };
 #[cfg(feature = "afc")]
 use crate::{
