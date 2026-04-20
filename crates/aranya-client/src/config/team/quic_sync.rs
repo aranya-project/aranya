@@ -9,7 +9,7 @@
 use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
-use crate::{error::InvalidArg, ConfigError, Result};
+use crate::{ConfigError, Result, error::InvalidArg};
 
 /// Configuration for creating a new team with QUIC synchronization.
 #[derive(Clone, Debug)]

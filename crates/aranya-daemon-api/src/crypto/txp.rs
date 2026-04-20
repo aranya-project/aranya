@@ -6,29 +6,29 @@ use core::{
     borrow::Borrow,
     error, fmt,
     marker::PhantomData,
-    pin::{pin, Pin},
+    pin::{Pin, pin},
     task::{Context, Poll},
 };
 use std::{iter, sync::Arc};
 
 use aranya_crypto::{
+    CipherSuite, Csprng,
     dangerous::spideroak_crypto::{
         aead::{Aead, Tag},
         hpke::{Hpke, HpkeError, Mode, OpenCtx, SealCtx, Seq},
         import::Import,
         kem::Kem,
     },
-    CipherSuite, Csprng,
 };
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use futures_util::{ready, Sink, Stream, TryStream};
+use futures_util::{Sink, Stream, TryStream, ready};
 use pin_project::pin_project;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use tarpc::tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
 use tarpc::{
     serde_transport::{self, Transport},
-    tokio_serde::{formats::MessagePack, Deserializer, Serializer},
+    tokio_serde::{Deserializer, Serializer, formats::MessagePack},
     tokio_util::codec::Framed,
 };
 use tokio::io::{self, AsyncRead, AsyncWrite};
@@ -673,7 +673,7 @@ pub mod unix {
         task::{Context, Poll},
     };
 
-    use futures_util::{ready, Stream};
+    use futures_util::{Stream, ready};
     use tokio::{
         io,
         net::{UnixListener, UnixStream},
@@ -710,8 +710,8 @@ mod tests {
     use std::panic;
 
     use aranya_crypto::{
-        default::{DefaultCipherSuite, DefaultEngine},
         Rng,
+        default::{DefaultCipherSuite, DefaultEngine},
     };
     use backon::{ExponentialBuilder, Retryable as _};
     use futures_util::{SinkExt, TryStreamExt};

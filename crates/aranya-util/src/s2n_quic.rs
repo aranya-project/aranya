@@ -1,6 +1,6 @@
 use buggy::{Bug, BugExt as _};
 use bytes::{Bytes, BytesMut};
-use s2n_quic::{stream, Connection};
+use s2n_quic::{Connection, stream};
 
 /// Read all of a stream until it has finished.
 ///

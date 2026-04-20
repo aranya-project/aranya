@@ -4,8 +4,8 @@ use std::{future::Future, marker::PhantomData};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
-    policy::{LabelId, RoleId},
     DeviceId, Random as _, Rng,
+    policy::{LabelId, RoleId},
 };
 use aranya_daemon_api::Rank;
 use aranya_keygen::PublicKeys;
@@ -15,7 +15,7 @@ use aranya_policy_text::Text;
 use aranya_runtime::NullSink;
 use aranya_runtime::{GraphId, PolicyStore, Session, StorageProvider, VmPolicy};
 use futures_util::TryFutureExt as _;
-use tracing::{debug, instrument, warn, Instrument};
+use tracing::{Instrument, debug, instrument, warn};
 
 use crate::{
     aranya::Client,

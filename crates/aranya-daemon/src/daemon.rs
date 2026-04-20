@@ -2,22 +2,22 @@ use std::{io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
+    Engine, Rng,
     dangerous::spideroak_crypto::{import::Import, keys::SecretKey},
     default::DefaultEngine,
-    keystore::{fs_keystore::Store, KeyStore},
-    Engine, Rng,
+    keystore::{KeyStore, fs_keystore::Store},
 };
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
-    storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
+    storage::linear::{LinearStorageProvider, libc::FileManager},
 };
-use aranya_util::{ready, Addr};
-use buggy::{bug, Bug, BugExt};
+use aranya_util::{Addr, ready};
+use buggy::{Bug, BugExt, bug};
 use ciborium as cbor;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use tokio::{fs, sync::mpsc, task::JoinSet};
-use tracing::{error, info, info_span, Instrument as _};
+use tracing::{Instrument as _, error, info, info_span};
 
 #[cfg(feature = "afc")]
 use crate::afc::Afc;
@@ -28,11 +28,11 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::{
-        quic::{ConnectionPool, PskStore, QuicConnector, QuicListener},
         SyncClient, SyncHandle, SyncManager,
+        quic::{ConnectionPool, PskStore, QuicConnector, QuicListener},
     },
-    util::{load_team_psk_pairs, SeedDir},
-    vm_policy::{PolicyEngine, POLICY_SOURCE},
+    util::{SeedDir, load_team_psk_pairs},
+    vm_policy::{POLICY_SOURCE, PolicyEngine},
 };
 
 // Use short names so that we can more easily add generics.

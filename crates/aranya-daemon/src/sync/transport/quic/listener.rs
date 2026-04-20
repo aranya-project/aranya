@@ -11,7 +11,7 @@ use s2n_quic::{
         congestion_controller::Bbr,
         tls::rustls::{
             self as rustls_provider,
-            rustls::{server::PresharedKeySelection, ServerConfig},
+            rustls::{ServerConfig, server::PresharedKeySelection},
         },
     },
     stream::BidirectionalStream,
@@ -19,7 +19,7 @@ use s2n_quic::{
 use tokio::{task::JoinSet, time::Duration};
 use tracing::{debug, error, trace, warn};
 
-use super::{connections::ListenerPool, Error, PskStore, QuicStream, SyncListener, ALPN_QUIC_SYNC};
+use super::{ALPN_QUIC_SYNC, Error, PskStore, QuicStream, SyncListener, connections::ListenerPool};
 use crate::sync::{Addr, GraphId, SyncPeer};
 
 /// The amount of time we wait trying to accept a bidirectional stream from the peer connecting to

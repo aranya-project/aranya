@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
-    config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
+    config::{self as daemon_cfg, Config, Toggle},
 };
 use aranya_daemon_api::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -15,9 +15,9 @@ use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
 use crate::{
+    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank,
     client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
     config::{CreateTeamConfig, SyncPeerConfig},
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank,
 };
 
 pub(super) const SYNC_INTERVAL: Duration = Duration::from_millis(100);

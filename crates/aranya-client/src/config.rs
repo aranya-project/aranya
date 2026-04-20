@@ -4,7 +4,7 @@
 
 use core::time::Duration;
 
-use crate::{error::InvalidArg, ConfigError, Result};
+use crate::{ConfigError, Result, error::InvalidArg};
 
 pub mod team;
 pub use team::*;

@@ -1,9 +1,9 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use aranya_crypto::{tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
+use aranya_crypto::{Encap, EncryptionPublicKey, tls::EncryptedPskSeed};
 use serde::{Deserialize, Serialize};
 
-use crate::{Ikm, CS};
+use crate::{CS, Ikm};
 
 pub const SEED_IKM_SIZE: usize = 32;
 

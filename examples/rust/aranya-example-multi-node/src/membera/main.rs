@@ -2,12 +2,12 @@
 
 use std::path::PathBuf;
 
-use anyhow::{ensure, Context as _, Result};
-use aranya_client::{afc::Channels, AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use anyhow::{Context as _, Result, ensure};
+use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig, afc::Channels};
 use aranya_example_multi_node::{
     env::EnvVars,
     get_member_peer,
-    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
+    onboarding::{DeviceInfo, Onboard, SLEEP_INTERVAL, SYNC_INTERVAL, TeamInfo},
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };

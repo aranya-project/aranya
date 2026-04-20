@@ -2,9 +2,9 @@
 
 use tracing::Metadata;
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
-    EnvFilter,
 };
 
 /// Example tracing filter.
