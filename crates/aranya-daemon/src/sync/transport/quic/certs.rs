@@ -166,7 +166,7 @@ pub fn load_root_certs(dir: &Path) -> Result<rustls::RootCertStore> {
 ///
 /// # Errors
 /// Returns an error if the files cannot be read or parsed.
-// TODO: Support loading multiple device certificates for devices that join multiple teams.
+// TODO(#788): Support loading multiple device certificates for devices that join multiple teams.
 // Each team may issue its own device certificate, so a device joining multiple teams
 // would need to load multiple cert/key pairs and select the appropriate one based on
 // which team is being synced.
