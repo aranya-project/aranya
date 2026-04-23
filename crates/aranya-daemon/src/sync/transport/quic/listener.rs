@@ -5,7 +5,7 @@ use anyhow::Context as _;
 use aranya_util::{rustls::NoCertResolver, s2n_quic::get_conn_identity};
 use buggy::BugExt as _;
 use s2n_quic::{
-    application::{self, Error as AppError},
+    application,
     connection::StreamAcceptor,
     provider::{
         congestion_controller::Bbr,
@@ -173,13 +173,16 @@ impl QuicListener {
                     if inbound_wins {
                         if existing_alive {
                             debug!(?peer, "replacing existing connection (tie-break)");
-                            e.get_mut().close(AppError::UNKNOWN);
                         }
+                        // The old handle is dropped by `insert`, allowing
+                        // in-flight streams to finish gracefully.
                         e.insert(new_handle.clone());
                         Some(new_acceptor)
                     } else {
+                        // Existing outbound wins — our handle falls out of
+                        // scope without closing abruptly, so in-flight
+                        // streams can finish.
                         debug!(?peer, "keeping existing outbound connection (tie-break)");
-                        new_handle.close(AppError::UNKNOWN);
                         None
                     }
                 }
