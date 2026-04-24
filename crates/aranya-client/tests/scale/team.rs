@@ -3,10 +3,7 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use aranya_client::{
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, Rank, client::TeamId,
-    config::CreateTeamConfig,
-};
+use aranya_client::{AddTeamConfig, Rank, client::TeamId, config::CreateTeamConfig};
 use tokio::time::sleep;
 use tracing::{info, instrument, warn};
 
@@ -34,13 +31,7 @@ impl TestCtx {
 
         //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#team-003
         //# A shared QUIC sync seed MUST be distributed to all nodes during team setup.
-        let owner_cfg = CreateTeamConfig::builder()
-            .quic_sync(
-                CreateTeamQuicSyncConfig::builder()
-                    .seed_ikm(self.seed_ikm)
-                    .build()?,
-            )
-            .build()?;
+        let owner_cfg = CreateTeamConfig::default();
 
         let team = self.nodes[0]
             .client
@@ -65,14 +56,7 @@ impl TestCtx {
             "Adding team to all nodes"
         );
 
-        let cfg = AddTeamConfig::builder()
-            .team_id(team_id)
-            .quic_sync(
-                AddTeamQuicSyncConfig::builder()
-                    .seed_ikm(self.seed_ikm)
-                    .build()?,
-            )
-            .build()?;
+        let cfg = AddTeamConfig::builder().team_id(team_id).build()?;
 
         // Add team to all nodes except node 0 (the owner)
         for node in &self.nodes[1..] {

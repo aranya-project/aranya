@@ -15,7 +15,6 @@ use aranya_client::{
 };
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::DaemonHandle;
-use aranya_daemon_api::SEED_IKM_SIZE;
 use spideroak_base58::ToBase58 as _;
 use tempfile::TempDir;
 
@@ -415,8 +414,6 @@ pub struct TestCtx {
     pub team_id: Option<TeamId>,
     /// Convergence tracker.
     pub tracker: ConvergenceTracker,
-    /// Seed IKM for QUIC sync (shared by all nodes).
-    seed_ikm: [u8; SEED_IKM_SIZE],
     /// Temporary working directory (RAII cleanup).
     //= https://raw.githubusercontent.com/aranya-project/aranya-docs/refs/heads/main/docs/multi-daemon-convergence-test.md#clean-002
     //# All temporary directories MUST be removed when the test completes.
