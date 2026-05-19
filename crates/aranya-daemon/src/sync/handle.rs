@@ -15,13 +15,17 @@ use aranya_runtime::Address;
 use tokio::sync::{mpsc, oneshot};
 use tracing::trace;
 
-#[cfg(feature = "preview")]
-use super::GraphId;
-use super::{Error, Result, SyncPeer};
+use super::{Error, GraphId, Result, SyncPeer};
 
 /// Holds all possible messages that the [`SyncManager`](super::SyncManager) can process.
 #[derive(Clone, Debug)]
 pub(crate) enum ManagerMessage {
+    /// Remove all data associated with this graph.
+    RemoveGraph {
+        /// The ID of the graph to remove.
+        graph_id: GraphId,
+    },
+
     /// Add a peer to the `SyncManager`'s schedule.
     AddPeer {
         /// The unique [`SyncPeer`] to send a message to.
@@ -115,6 +119,11 @@ impl SyncHandle {
     pub(crate) fn channel(buffer: usize) -> (Self, mpsc::Receiver<Callback>) {
         let (tx, rx) = mpsc::channel(buffer);
         (Self { sender: tx }, rx)
+    }
+
+    /// Remove all data associated with this graph.
+    pub(crate) async fn remove_graph(&self, graph_id: GraphId) -> Response {
+        self.send(ManagerMessage::RemoveGraph { graph_id }).await
     }
 
     /// Add a peer to the `SyncManager`'s schedule.

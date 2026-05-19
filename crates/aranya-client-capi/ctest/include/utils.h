@@ -59,7 +59,6 @@ typedef struct {
     Client owner;
     Client member1;
     Client member2;
-    AranyaSeedIkm team_ikm;
     /* Store default role IDs for use in tests */
     AranyaRoleId owner_role_id;
     AranyaRoleId admin_role_id;

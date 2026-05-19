@@ -24,6 +24,7 @@ preview = ["aranya-client/preview"]
 debug = []
 
 [dependencies]
+aranya-certgen = { workspace = true }
 aranya-client = { workspace = true, default-features = false }
 
 anyhow = { workspace = true }

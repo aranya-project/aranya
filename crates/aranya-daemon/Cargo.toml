@@ -54,13 +54,12 @@ buggy = { workspace = true }
 
 
 anyhow = { workspace = true }
-bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
 derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
-s2n-quic = { workspace = true }
+quinn = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
@@ -80,6 +79,7 @@ tracing-subscriber = { workspace = true }
 
 
 [dev-dependencies]
+aranya-certgen = { workspace = true }
 aranya-crypto = { workspace = true, features = ["memstore"] }
 divan = { workspace = true }
 pretty_assertions = { workspace = true }

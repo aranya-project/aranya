@@ -1,12 +1,14 @@
-use std::{collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, time::Duration};
+use std::{
+    collections::HashMap, iter, net::Ipv4Addr, path::PathBuf, ptr, sync::Arc, time::Duration,
+};
 
 use anyhow::{Context, Result, anyhow};
+use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_crypto::dangerous::spideroak_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     Daemon, DaemonHandle,
     config::{self as daemon_cfg, Config, Toggle},
 };
-use aranya_daemon_api::SEED_IKM_SIZE;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use spideroak_base58::ToBase58 as _;
@@ -14,11 +16,62 @@ use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
+// These deprecated types are only used in create_and_add_team for backward compatibility testing.
+#[expect(deprecated)]
 use crate::{
-    AddTeamConfig, AddTeamQuicSyncConfig, Addr, CreateTeamQuicSyncConfig, Rank,
-    client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
-    config::{CreateTeamConfig, SyncPeerConfig},
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, config::CreateTeamConfig,
 };
+use crate::{
+    Addr, Rank, SyncPeerConfig,
+    client::{Client, DeviceId, PublicKeyBundle, Role, TeamId},
+};
+
+/// Shared certificate authority for generating device certificates.
+pub struct TestCertAuthority {
+    ca: CaCert,
+    root_certs_dir: PathBuf,
+}
+
+impl TestCertAuthority {
+    /// Creates a new test CA in the given directory.
+    pub fn new(dir: &std::path::Path) -> Result<Self> {
+        let certs_dir = dir.join("certs");
+        let root_certs_dir = certs_dir.join("root_certs");
+        std::fs::create_dir_all(&root_certs_dir)?;
+
+        let ca_paths = CertPaths::new(root_certs_dir.join("ca"));
+        let ca = CaCert::new("Test CA", 365).context("failed to create CA cert")?;
+        ca.save(&ca_paths, SaveOptions::default().create_parents())
+            .context("failed to save CA cert")?;
+
+        Ok(Self { ca, root_certs_dir })
+    }
+
+    /// Generates a device certificate.
+    ///
+    /// The certificate uses `127.0.0.1` as the CN, which certgen auto-detects as an
+    /// IP address and creates an IP SAN for TLS connections.
+    pub fn generate_device_cert(&self, device_dir: &std::path::Path) -> Result<CertPaths> {
+        let certs_dir = device_dir.join("certs");
+        std::fs::create_dir_all(&certs_dir)?;
+
+        let device_paths = CertPaths::new(certs_dir.join("device"));
+        let device_cert = self
+            .ca
+            .generate("127.0.0.1", 365)
+            .context("failed to generate device cert")?;
+        device_cert
+            .save(&device_paths, SaveOptions::default().create_parents())
+            .context("failed to save device cert")?;
+
+        Ok(device_paths)
+    }
+
+    /// Returns the root certs directory.
+    pub fn root_certs_dir(&self) -> &PathBuf {
+        &self.root_certs_dir
+    }
+}
 
 pub(super) const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
@@ -36,20 +89,25 @@ pub(super) struct DevicesCtx {
     pub(super) operator: DeviceCtx,
     pub(super) membera: DeviceCtx,
     pub(super) memberb: DeviceCtx,
+    pub(super) ca: Arc<TestCertAuthority>,
     _work_dir: TempDir,
 }
 
+#[allow(dead_code)]
 impl DevicesCtx {
     pub(super) async fn new(name: &str) -> Result<Self> {
         let work_dir = tempfile::tempdir()?;
         let work_dir_path = work_dir.path();
 
+        // Create shared CA for mTLS
+        let ca = Arc::new(TestCertAuthority::new(work_dir_path)?);
+
         let (owner, admin, operator, membera, memberb) = try_join!(
-            DeviceCtx::new(name, "owner", work_dir_path.join("owner")),
-            DeviceCtx::new(name, "admin", work_dir_path.join("admin")),
-            DeviceCtx::new(name, "operator", work_dir_path.join("operator")),
-            DeviceCtx::new(name, "membera", work_dir_path.join("membera")),
-            DeviceCtx::new(name, "memberb", work_dir_path.join("memberb")),
+            DeviceCtx::new(name, "owner", work_dir_path.join("owner"), ca.clone()),
+            DeviceCtx::new(name, "admin", work_dir_path.join("admin"), ca.clone()),
+            DeviceCtx::new(name, "operator", work_dir_path.join("operator"), ca.clone()),
+            DeviceCtx::new(name, "membera", work_dir_path.join("membera"), ca.clone()),
+            DeviceCtx::new(name, "memberb", work_dir_path.join("memberb"), ca.clone()),
         )?;
 
         Ok(Self {
@@ -58,6 +116,7 @@ impl DevicesCtx {
             operator,
             membera,
             memberb,
+            ca,
             _work_dir: work_dir,
         })
     }
@@ -127,10 +186,15 @@ impl DevicesCtx {
         Ok(())
     }
 
+    /// Creates a team and adds it to all devices using deprecated PSK-based APIs.
+    ///
+    /// This function uses deprecated `add_team()`, `CreateTeamQuicSyncConfig`, and
+    /// `AddTeamQuicSyncConfig` APIs to test backward compatibility.
+    #[expect(deprecated)]
     pub(super) async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         let seed_ikm = {
-            let mut buf = [0; SEED_IKM_SIZE];
+            let mut buf = [0; _];
             self.owner.client.rand(&mut buf).await;
             buf
         };
@@ -215,7 +279,12 @@ pub(super) struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    pub(super) async fn new(team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub(super) async fn new(
+        team_name: &str,
+        name: &str,
+        work_dir: PathBuf,
+        ca: Arc<TestCertAuthority>,
+    ) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // TODO: only compile when 'afc' feature is enabled
@@ -230,6 +299,9 @@ impl DeviceCtx {
             let _ = shm::unlink(&path);
             path
         };
+
+        // Generate device certificate for mTLS
+        let device_paths = ca.generate_device_cert(&work_dir)?;
 
         // Setup daemon config.
         let cfg = Config {
@@ -246,7 +318,9 @@ impl DeviceCtx {
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig {
                     addr: addr_any,
-                    client_addr: None,
+                    root_certs_dir: ca.root_certs_dir().clone(),
+                    device_cert: device_paths.cert().to_path_buf(),
+                    device_key: device_paths.key().to_path_buf(),
                 }),
             },
         };

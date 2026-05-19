@@ -7,6 +7,7 @@ use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
 use aranya_runtime::{
     Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, TraversalBuffers,
 };
+use aranya_util::error::ReportExt as _;
 use buggy::BugExt as _;
 use derive_where::derive_where;
 use tokio::sync::mpsc;
@@ -249,7 +250,7 @@ where
 
         // Connect to the peer.
         let mut stream = self.connector.connect(peer).await.map_err(|error| {
-            warn!(?peer, %error, "failed to connect to peer");
+            warn!(?peer, error = %error.report(), "failed to connect to peer");
             Error::transport(error)
         })?;
 

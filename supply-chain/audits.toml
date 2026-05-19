@@ -301,6 +301,12 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.93 -> 1.0.94"
 
+[[audits.quinn-proto]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.13 -> 0.11.14"
+notes = "Some trivial refactoring plus the RUSTSEC-2026-0037 unwrap fix."
+
 [[audits.quote]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -399,10 +405,10 @@ criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
 [[audits.rustls-pki-types]]
-who = "gknopf-aranya <gknopf@spideroak.com>"
+who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.11.0 -> 1.14.0"
-notes = "Much of diff is deleted code. Adds new signature code."
+notes = "Makes zeroization of private keys part of `alloc` feature which we need. Minor updates to crypto algorithm and certificate parsing code. No new unsafe, networking, or file I/O code introduced."
 
 [[audits.rustls-webpki]]
 who = "gknopf-aranya <gknopf@spideroak.com>"
@@ -1063,7 +1069,7 @@ end = "2026-07-09"
 
 [[trusted.wasi]]
 criteria = "safe-to-deploy"
-user-id = 6825 # Dan Gohman (sunfishcode)
+user-id = 6825
 start = "2019-07-22"
 end = "2026-05-16"
 

@@ -1,72 +1,41 @@
 //! This module implements [`QuicConnector`] to allow connecting to other peers.
-use std::{collections::btree_map::Entry, sync::Arc};
+use std::{collections::btree_map::Entry, net::SocketAddr};
 
 use anyhow::Context as _;
-use aranya_daemon_api::TeamId;
-use aranya_util::rustls::SkipServerVerification;
-use buggy::BugExt as _;
-use bytes::Bytes;
-use s2n_quic::{
-    application::Error as AppError, client::Connect, provider::tls::rustls::rustls::ClientConfig,
-};
-use tracing::{debug, error, trace, warn};
+use aranya_util::error::ReportExt as _;
+use quinn::{ClientConfig, Endpoint, VarInt};
+use tracing::{debug, error, instrument, trace, warn};
 
-use super::{
-    ALPN_QUIC_SYNC, Error, PskStore, QuicStream, SyncConnector, connections::ConnectorPool,
-};
-use crate::sync::{Addr, SyncPeer};
+use super::{Error, QuicStream, SyncConnector, connections::ConnectorPool};
+use crate::sync::SyncPeer;
 
 #[derive(Debug)]
 pub(crate) struct QuicConnector {
+    /// The local address of the server, since it should be infallible.
+    local_addr: SocketAddr,
     /// The QUIC client we use to connect to other peers.
-    client: s2n_quic::Client,
+    endpoint: Endpoint,
+    /// Configuration for making connections.
+    ///
+    /// This is currently a single instance since we don't distinguish teams.
+    config: ClientConfig,
     /// Allows sending new connections to the [`QuicListener`].
     pool: ConnectorPool,
-    /// Allows authenticating the identity of a given `GraphId`.
-    psk_store: Arc<PskStore>,
-    /// The return port we want the peer to connect to us on.
-    return_port: Bytes,
-    /// The local address of the server, since it should be infallible.
-    local_addr: Addr,
 }
 
 impl QuicConnector {
-    /// Creates a new [`QuicConnector`].
-    pub(crate) fn new(
-        client_addr: Addr,
-        server_addr: Addr,
+    pub(super) fn new(
+        local_addr: SocketAddr,
+        endpoint: Endpoint,
+        config: ClientConfig,
         pool: ConnectorPool,
-        psk_store: Arc<PskStore>,
-    ) -> Result<Self, Error> {
-        // Build up the `ClientConfig` so we can initialize the TLS client.
-        let mut client_config = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(SkipServerVerification::new())
-            .with_no_client_auth();
-        client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        client_config.preshared_keys = Arc::<PskStore>::clone(&psk_store); // Pass the Arc<ClientPresharedKeys>
-
-        #[allow(deprecated)]
-        let provider = s2n_quic::provider::tls::rustls::Client::new(client_config);
-
-        // Start up a new QUIC client.
-        let client = s2n_quic::Client::builder()
-            .with_tls(provider)?
-            .with_io((client_addr.host(), client_addr.port()))
-            .assume("can set quic client address")?
-            .start()
-            .map_err(Error::ClientStart)?;
-
-        // Build up our return port to send to any peers we connect to.
-        let return_port = Bytes::copy_from_slice(&server_addr.port().to_be_bytes());
-
-        Ok(Self {
-            client,
+    ) -> Self {
+        Self {
+            local_addr,
+            endpoint,
+            config,
             pool,
-            psk_store,
-            return_port,
-            local_addr: server_addr,
-        })
+        }
     }
 }
 
@@ -74,98 +43,98 @@ impl SyncConnector for QuicConnector {
     type Error = Error;
     type Stream = QuicStream;
 
+    #[instrument(skip(self))]
     async fn connect(&self, peer: SyncPeer) -> Result<Self::Stream, Self::Error> {
-        debug!(?peer, "connecting to peer");
+        debug!("connecting to peer");
 
         // Obtain the address for the other peer.
-        let addr = tokio::net::lookup_host(peer.addr.to_socket_addrs())
+        let addrs = tokio::net::lookup_host(peer.addr.to_socket_addrs())
             .await
-            .context("DNS lookup on for peer address")?
-            .next()
-            .context("could not resolve peer address")?;
-        trace!(?peer, %addr, "resolved peer address");
+            .context("DNS lookup for peer address")?;
+        let addr = find_matching_ip_version(addrs, self.local_addr)
+            .context("no resolved address matches local endpoint IP version")?;
+        trace!(%addr, "resolved peer address");
 
         // Check for an existing live connection, cleaning up dead ones.
-        // Drops the lock before doing async connection work.
-        let reuse = {
-            // Hold the lock across this entire operation
-            let mut map = self.pool.conns.lock().await;
-            match map.entry(peer) {
-                Entry::Occupied(mut e) => {
-                    if e.get_mut().ping().is_ok() {
-                        debug!(?peer, "reusing existing connection");
-                        Some(e.get().clone())
-                    } else {
-                        warn!(?peer, "existing connection dead, removing");
-                        e.remove().close(AppError::UNKNOWN);
-                        None
-                    }
+        let reuse = self.pool.conns.with_map(|map| match map.entry(peer) {
+            Entry::Occupied(e) => match e.get().close_reason() {
+                None => {
+                    debug!("reusing existing connection");
+                    Some(e.get().clone())
                 }
-                Entry::Vacant(_) => None,
-            }
-        };
+                Some(error) => {
+                    warn!(error = %error.report(), "existing connection dead, removing");
+                    e.remove();
+                    None
+                }
+            },
+            Entry::Vacant(_) => None,
+        });
 
-        let mut handle = if let Some(handle) = reuse {
+        let handle = if let Some(handle) = reuse {
             handle
         } else {
             // Create a new outbound connection.
-            trace!(?peer, "establishing new QUIC connection");
-            let mut conn = {
-                // Set the current `GraphId` we're operating on in the PSK store.
-                let _guard = self
-                    .psk_store
-                    .set_team(TeamId::transmute(peer.graph_id))
-                    .await;
-                self.client
-                    .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                    .await?
-            };
-            conn.keep_alive(true)?;
-            conn.open_send_stream()
-                .await?
-                .send(self.return_port.clone())
+            trace!("establishing new QUIC connection");
+
+            // This is where we could create/select a per-team config.
+            let config = self.config.clone();
+
+            // TODO(mtls): timeout?
+            let new_conn = self
+                .endpoint
+                .connect_with(config, addr, peer.addr.host())?
                 .await?;
-            debug!(?peer, "QUIC handshake complete, sent return port");
+            new_conn
+                .open_uni()
+                .await?
+                .write_all(peer.graph_id.as_bytes())
+                .await?;
+
+            debug!("QUIC handshake complete and sent graph ID");
 
             // Re-acquire the lock and insert using tie-breaking logic. Between dropping the lock
             // above and now, the listener may have inserted an inbound connection for this peer.
-            let (new_handle, new_acceptor) = conn.split();
-            let (handle, acceptor) = {
-                // Hold the lock across this entire operation
-                let mut map = self.pool.conns.lock().await;
+            let (handle, acceptor) = self.pool.conns.with_map(|map| {
                 match map.entry(peer) {
                     Entry::Vacant(e) => {
-                        e.insert(new_handle.clone());
-                        (new_handle, Some(new_acceptor))
+                        e.insert(new_conn.clone());
+                        (new_conn.clone(), Some(new_conn))
                     }
                     Entry::Occupied(mut e) => {
-                        let existing_alive = e.get_mut().ping().is_ok();
+                        let existing_alive = e.get().close_reason().is_none();
                         // We initiated this connection, so it wins if we're the lower-addressed peer.
                         // TODO(nikki): This semi-fixes an existing bug, but we need a better way
                         // than raw addresses, this will break with NAT.
                         // https://github.com/aranya-project/aranya/issues/754
-                        let outbound_wins = !existing_alive || self.local_addr < peer.addr;
+                        let outbound_wins = !existing_alive || self.local_addr < addr;
                         if outbound_wins {
                             if existing_alive {
-                                debug!(?peer, "replacing existing connection (tie-break)");
-                                e.get_mut().close(AppError::UNKNOWN);
+                                debug!("replacing existing connection (tie-break)");
+                                e.get_mut().close(
+                                    VarInt::from_u32(0),
+                                    b"replacing existing connection (tie-break)",
+                                );
                             }
-                            e.insert(new_handle.clone());
-                            (new_handle, Some(new_acceptor))
+                            e.insert(new_conn.clone());
+                            (new_conn.clone(), Some(new_conn))
                         } else {
                             // Existing inbound wins — discard ours.
-                            debug!(?peer, "keeping existing inbound connection (tie-break)");
+                            debug!("keeping existing inbound connection (tie-break)");
                             let existing = e.get().clone();
-                            new_handle.close(AppError::UNKNOWN);
+                            new_conn.close(
+                                VarInt::from_u32(0),
+                                b"keeping existing inbound connection (tie-break)",
+                            );
                             (existing, None)
                         }
                     }
                 }
-            };
+            });
 
             // Forward acceptor to the listener if we kept our connection.
             if let Some(acceptor) = acceptor {
-                trace!(?peer, "forwarding acceptor to listener");
+                trace!("forwarding acceptor to listener");
                 self.pool.tx.send((peer, acceptor)).await.ok();
             }
 
@@ -175,22 +144,49 @@ impl SyncConnector for QuicConnector {
         trace!("client connected to QUIC sync server");
 
         // Open a new bidirectional stream on our new connection.
-        let stream = match handle.open_bidirectional_stream().await {
+        let stream = match handle.open_bi().await {
             Ok(stream) => stream,
             Err(error) => {
-                error!(?peer, %error, "failed to open bidirectional stream");
-                let mut map = self.pool.conns.lock().await;
-                if let Entry::Occupied(e) = map.entry(peer)
-                    && e.get().id() == handle.id()
-                {
-                    e.remove().close(AppError::UNKNOWN);
-                }
-                return Err(Error::QuicConnection(error));
+                error!(error = %error.report(), "failed to open bidirectional stream");
+                self.pool.conns.with_map(|map| {
+                    if let Entry::Occupied(e) = map.entry(peer)
+                        && e.get().stable_id() == handle.stable_id()
+                    {
+                        e.remove()
+                            .close(VarInt::from_u32(0), b"failed to open stream");
+                    }
+                });
+                return Err(Error::Connection(error));
             }
         };
 
-        debug!(?peer, "connected and opened stream");
+        debug!("connected and opened stream");
 
         Ok(QuicStream::new(peer, stream))
+    }
+}
+
+/// Finds a resolved address that matches the IP version of the local endpoint.
+///
+/// QUIC connections require both endpoints to use the same IP version - an IPv4-bound
+/// endpoint cannot connect to an IPv6 address and vice versa. When a hostname resolves
+/// to multiple addresses (both A and AAAA records), we must select one that matches
+/// our local endpoint's IP version.
+///
+/// # Arguments
+/// * `addrs` - List of resolved socket addresses from DNS lookup
+/// * `local_addr` - The local endpoint's bound address
+///
+/// # Returns
+/// * `Some(SocketAddr)` - A resolved address matching the local IP version
+/// * `None` - No matching address found
+fn find_matching_ip_version(
+    addrs: impl IntoIterator<Item = SocketAddr>,
+    local_addr: SocketAddr,
+) -> Option<SocketAddr> {
+    if local_addr.is_ipv4() {
+        addrs.into_iter().find(|a| a.is_ipv4())
+    } else {
+        addrs.into_iter().find(|a| a.is_ipv6())
     }
 }
