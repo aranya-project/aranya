@@ -105,10 +105,6 @@ criteria = "safe-to-run"
 version = "0.1.83"
 criteria = "safe-to-deploy"
 
-[[exemptions.atomic-polyfill]]
-version = "1.0.3"
-criteria = "safe-to-deploy"
-
 [[exemptions.aws-lc-rs]]
 version = "1.13.0"
 criteria = "safe-to-deploy"
@@ -208,10 +204,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.cpufeatures]]
 version = "0.2.16"
-criteria = "safe-to-deploy"
-
-[[exemptions.critical-section]]
-version = "1.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.crossbeam-channel]]
@@ -461,7 +453,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.lock_api]]
 version = "0.4.12"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.lru-slab]]
 version = "0.1.2"
@@ -779,20 +771,12 @@ criteria = "safe-to-deploy"
 version = "0.10.2"
 criteria = "safe-to-run"
 
-[[exemptions.scc]]
-version = "2.2.5"
-criteria = "safe-to-run"
-
 [[exemptions.schannel]]
 version = "0.1.27"
 criteria = "safe-to-deploy"
 
 [[exemptions.scrypt]]
 version = "0.11.0"
-criteria = "safe-to-run"
-
-[[exemptions.sdd]]
-version = "3.0.4"
 criteria = "safe-to-run"
 
 [[exemptions.sec1]]
