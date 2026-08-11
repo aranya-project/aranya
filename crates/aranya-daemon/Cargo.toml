@@ -79,7 +79,8 @@ tracing-subscriber = { workspace = true }
 
 
 [dev-dependencies]
-aranya-certgen = { workspace = true }
+aranya-certgen = { path = "../aranya-certgen" }
+
 aranya-crypto = { workspace = true, features = ["memstore"] }
 divan = { workspace = true }
 pretty_assertions = { workspace = true }
