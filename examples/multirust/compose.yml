@@ -1,0 +1,30 @@
+services:
+  operator:
+    image: aranya-multirust-operator
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: operator
+    init: true
+
+  member-a:
+    image: aranya-multirust-member-a
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: member-a
+    init: true
+    environment:
+      - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
+      - ARANYA_MEMBER_B_AFC_ADDR=member-b:1234
+
+  member-b:
+    image: aranya-multirust-member-b
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: member-b
+    init: true
+    environment:
+      - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
+      - ARANYA_MEMBER_B_AFC_ADDR=0.0.0.0:1234
