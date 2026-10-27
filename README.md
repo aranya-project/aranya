@@ -98,7 +98,7 @@ The following platforms are supported:
 - Linux/amd64
 - MacOS
 
-Aranya can be integrated into an existing project using the options below. See [Example Applications](#example-applications) to run a standalone Aranya app in C or Rust, or for a step-by-step tutorial on how to manually configure and integrate the example scenario, see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+Aranya can be integrated into an existing project using the options below. See [Example Applications](#example-applications) to run a standalone Aranya app in C or Rust, or for a step-by-step tutorial on how to manually configure and integrate the example scenario, see the [walkthrough](https://aranya-project.github.io/getting-started/walkthrough/).
 
 We currently provide the following integrations for Aranya:
 
@@ -130,19 +130,19 @@ the Rust client.
 An example of the Rust client library being used to create a team follows:
 
 ```rust
-// create team.
+// Create a team.
 info!("creating team");
-let team_id = team
-	.owner
-	.client
-	.create_team()
-	.await
-	.expect("expected to create team");
-info!(?team_id);
+let owner_team = owner
+    .client
+    .create_team(CreateTeamConfig::default())
+    .await
+    .context("expected to create team")?;
+let team_id = owner_team.team_id();
+info!(%team_id);
 ```
 
 This snippet can be found in the
-[Rust example](examples/rust/aranya-example/src/main.rs#L198).
+[Rust example](examples/rust/aranya-example/src/main.rs).
 
 Before starting your application, run the daemon by providing the path to a
 [configuration file](crates/aranya-daemon/example.toml). Find more details on
@@ -185,13 +185,23 @@ is provided to make it easier to build the library into an application.
 An example of the C API being used to create a team follows:
 
 ```C
-// have owner create the team.
-err = aranya_create_team(&team->clients.owner.client, &team->id);
+// Build the team config.
+AranyaCreateTeamConfigBuilder owner_build;
+err = aranya_create_team_config_builder_init(&owner_build);
+EXPECT("error initializing team config builder", err);
+
+// NB: `_build` consumes the builder; do not call `_cleanup` afterward.
+AranyaCreateTeamConfig owner_cfg;
+err = aranya_create_team_config_build(&owner_build, &owner_cfg);
+EXPECT("error building team config", err);
+
+// Have the owner create the team.
+err = aranya_create_team(&t->clients.owner.client, &owner_cfg, &t->id);
 EXPECT("error creating team", err);
 ```
 
 This snippet has been modified for simplicity. For actual usage,
-see the [C example](examples/c/example.c#L169).
+see `init_team` in the [C example](examples/c/example.c).
 
 Before starting your application, run the daemon by providing the path to a
 [configuration file](crates/aranya-daemon/example.toml). Find more details on
@@ -232,7 +242,7 @@ Step 8. `Member A` uses this channel to encrypt plaintext with `seal()` and send
 Step 9. `Member B` receives the ciphertext from `Member A` and decrypts it with `open()`.
 
 For more details on how Aranya starts and the steps performed in the examples,
-see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+see the [walkthrough](https://aranya-project.github.io/getting-started/walkthrough/).
 
 ## Contributing
 

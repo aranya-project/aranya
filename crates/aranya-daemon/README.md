@@ -23,7 +23,7 @@ The daemon's responsibilities include:
   available to your application through the [Rust Client library](../aranya-client/).
 - Invokes actions received from the client and handles effects from the
   [Aranya Core](https://github.com/aranya-project/aranya-core) library. See the
-  [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/)
+  [walkthrough](https://aranya-project.github.io/getting-started/walkthrough/)
   for more details.
 - Generates and maintains cryptographic keys for encrypting and decrypting data
   for Aranya and Fast Channels
@@ -38,10 +38,34 @@ this documentation on the TOML config file parameters:
 
 An example daemon configuration file can be found [here](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/example.toml).
 
+Things to know before starting the daemon:
+- `runtime_dir`, `state_dir`, `cache_dir`, `logs_dir` and `config_dir` must
+  already exist. The daemon does not create them and exits if any is missing.
+- The `[afc]` and `[sync.quic]` sections are required and must have
+  `enable = true`. The daemon will not start with either disabled.
+- `[sync.quic]` requires `root_certs_dir`, `device_cert` and `device_key`.
+  Peers authenticate each other with mTLS, so every device needs a certificate
+  signed by a CA in the other devices' `root_certs_dir`. Certificates are
+  loaded once at startup; restart the daemon after replacing them. See
+  [aranya-certgen](../aranya-certgen/README.md) for generating certificates.
+- Unknown keys at the top level of the config file are ignored, so check
+  spelling carefully.
+
 ## Running the daemon
 
 Build and run the daemon crate:
 ```shell
 $ cargo build --bin aranya-daemon --release
-$ ./target/release/aranya-daemon <path to config>
+$ ./target/release/aranya-daemon --config <path to config>
 ```
+
+The daemon writes logs to stderr. Set the log filter with the `ARANYA_DAEMON`
+environment variable, which uses
+[`EnvFilter`](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
+syntax:
+```shell
+$ ARANYA_DAEMON=info ./target/release/aranya-daemon --config <path to config>
+```
+
+Sync peers added by the client are held in memory only. After the daemon
+restarts, the application must add its sync peers again.

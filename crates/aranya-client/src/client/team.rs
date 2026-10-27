@@ -34,6 +34,11 @@ impl Team<'_> {
     }
 
     /// Closes the team, preventing any further operations on it.
+    ///
+    /// NB: Not yet implemented. Do not call this: the daemon
+    /// panics while handling it, which aborts the daemon process
+    /// in release builds. Use
+    /// [`Client::remove_team`] to remove the team from this device.
     #[instrument(skip(self))]
     pub async fn close_team(&self) -> Result<()> {
         self.client
@@ -56,6 +61,10 @@ impl Team<'_> {
     }
 
     /// Adds a peer for automatic periodic Aranya state syncing.
+    ///
+    /// Sync peers are held in the daemon's memory only and are
+    /// not persisted. The application must add its sync peers
+    /// again each time the daemon restarts.
     #[instrument(skip(self))]
     pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client

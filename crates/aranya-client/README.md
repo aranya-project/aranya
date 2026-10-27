@@ -25,7 +25,9 @@ by the [daemon](../aranya-daemon), which interacts directly with the
 The client provides the following functionality:
 - Add and remove sync peers. The daemon will periodically attempt to sync
   Aranya state with any peers (as long as it is able to communicate with the
-  peer over the network) in its configured sync peer list.
+  peer over the network) in its configured sync peer list. Sync peers are not
+  persisted, so the application must add them again after the daemon
+  restarts.
 - Add and remove devices from the team as determined by the implemented policy
 - Assign and revoke device roles as determined by the implemented policy
 - Create, delete, assign and revoke labels used for attribute based controls
@@ -33,8 +35,9 @@ The client provides the following functionality:
   Channels as determined by the implemented policy.
 - Create and delete Fast Channels channels as determined by the implemented
   policy
-- Send and receive encrypted data using Aranya Fast Channels. Fast Channels
-  supports encrypted data exchange over TCP transport.
+- Encrypt and decrypt data using Aranya Fast Channels. Fast Channels only
+  seals and opens messages; the application is responsible for sending the
+  ciphertext to the peer over its own transport.
 Note: The functionality noted 'as determined by the implemented policy' are
 defined in the [default policy](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/src/policy.md). As such, these
 may differ depending on the policy implemented in your application.
@@ -46,7 +49,7 @@ actions. Instructions for running an instance of the `daemon` binary can be
 found in the `aranya-daemon` [README](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/README.md).
 
 For a full demonstration of the client's capabilities, see the
-[walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+[walkthrough](https://aranya-project.github.io/getting-started/walkthrough/).
 This also includes explanations for the steps performed by the daemon and
 Aranya based on the client's actions.
 
