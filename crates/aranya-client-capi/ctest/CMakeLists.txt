@@ -52,7 +52,6 @@ add_compile_options(
     -Wpointer-arith -Wmissing-prototypes
     -Warray-bounds -Werror=array-bounds
     -Wunused-result
-	-march=native
     -pedantic
 
 	# These are because of cbindgen.
