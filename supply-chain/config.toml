@@ -60,10 +60,6 @@ audit-as-crates-io = false
 [policy.aranya-util]
 audit-as-crates-io = false
 
-[[exemptions.addr2line]]
-version = "0.24.2"
-criteria = "safe-to-deploy"
-
 [[exemptions.aead]]
 version = "0.5.2"
 criteria = "safe-to-deploy"
@@ -106,20 +102,16 @@ version = "0.1.83"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-rs]]
-version = "1.13.0"
+version = "1.19.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-sys]]
-version = "0.28.0"
+version = "0.47.0"
 criteria = "safe-to-deploy"
 notes = "Vendored C library (AWS-LC, fork of BoringSSL). Diffs are typically 100K+ lines, mostly auto-generated. See the large diff audit process in the cargo-vet docs for how to review updates to this crate. Aranya uses only the prebuilt-nasm feature (not all-bindings)."
 
 [[exemptions.backon]]
 version = "1.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.backtrace]]
-version = "0.3.74"
 criteria = "safe-to-deploy"
 
 [[exemptions.base16ct]]
@@ -351,10 +343,6 @@ criteria = "safe-to-deploy"
 version = "0.13.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.h2]]
-version = "0.4.11"
-criteria = "safe-to-deploy"
-
 [[exemptions.half]]
 version = "2.4.1"
 criteria = "safe-to-deploy"
@@ -435,10 +423,6 @@ criteria = "safe-to-deploy"
 version = "0.3.76"
 criteria = "safe-to-deploy"
 
-[[exemptions.libc]]
-version = "0.2.174"
-criteria = "safe-to-deploy"
-
 [[exemptions.libm]]
 version = "0.2.11"
 criteria = "safe-to-deploy"
@@ -491,10 +475,6 @@ criteria = "safe-to-deploy"
 version = "0.2.1"
 criteria = "safe-to-run"
 
-[[exemptions.mio]]
-version = "1.0.3"
-criteria = "safe-to-deploy"
-
 [[exemptions.multimap]]
 version = "0.10.1"
 criteria = "safe-to-deploy"
@@ -521,10 +501,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.objc2-io-kit]]
 version = "0.3.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.object]]
-version = "0.36.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.once_cell]]
@@ -675,8 +651,8 @@ criteria = "safe-to-deploy"
 version = "0.11.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.quinn-proto]]
-version = "0.11.13"
+[[exemptions.r-efi]]
+version = "5.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.radix_trie]]
@@ -747,10 +723,6 @@ criteria = "safe-to-deploy"
 version = "1.1.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.rustls]]
-version = "0.23.28"
-criteria = "safe-to-deploy"
-
 [[exemptions.rustls-native-certs]]
 version = "0.8.1"
 criteria = "safe-to-deploy"
@@ -815,10 +787,6 @@ criteria = "safe-to-run"
 version = "3.2.0"
 criteria = "safe-to-run"
 
-[[exemptions.simdutf8]]
-version = "0.1.5"
-criteria = "safe-to-deploy"
-
 [[exemptions.siphasher]]
 version = "1.0.1"
 criteria = "safe-to-deploy"
@@ -831,24 +799,12 @@ criteria = "safe-to-deploy"
 version = "0.4.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.socket2]]
-version = "0.5.8"
-criteria = "safe-to-deploy"
-
-[[exemptions.socket2]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.spin]]
 version = "0.9.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.spki]]
 version = "0.7.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.syn]]
-version = "2.0.90"
 criteria = "safe-to-deploy"
 
 [[exemptions.tarpc]]
@@ -873,14 +829,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.thiserror-impl]]
 version = "2.0.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.tokio]]
-version = "1.42.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.tokio-macros]]
-version = "2.4.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.tokio-rustls]]
@@ -923,10 +871,6 @@ criteria = "safe-to-deploy"
 version = "0.2.11"
 criteria = "safe-to-deploy"
 
-[[exemptions.untrusted]]
-version = "0.9.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.vec1]]
 version = "1.12.1"
 criteria = "safe-to-deploy"
@@ -965,10 +909,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.web-sys]]
 version = "0.3.77"
-criteria = "safe-to-deploy"
-
-[[exemptions.web-time]]
-version = "1.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.winapi]]

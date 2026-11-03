@@ -79,6 +79,10 @@ ignore = [
     { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained but finished" },
     { id = "RUSTSEC-2026-0097", reason = "we don't use the features required to hit the bug" },
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is an unmaintained build-time sub-dependency" },
+    { id = "RUSTSEC-2026-0374", reason = "basic-toml is an unmaintained example-only sub-dependency" },
+    { id = "RUSTSEC-2024-0449", reason = "unmaintained yaml dependencies will be replaced with aranya-core update" },
+
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint will be updated with aranya-core update" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -239,6 +243,8 @@ deny = [
 
 skip = [
     "base64@0.21.7",
+    "chacha20@0.9.1",
+    "cpufeatures@0.2.17",
     "generic-array@0.14.7",
     "getrandom@0.2.15",
     "getrandom@0.3.1",
@@ -246,16 +252,18 @@ skip = [
     "linux-raw-sys@0.4.15",
     "petgraph@0.7.1",
     "rand@0.8.5",
+    "rand@0.9.0",
     "rand_chacha@0.3.1",
     "rand_core@0.6.4",
+    "rand_core@0.9.3",
     "rustc-hash@1.1.0",
     "rustix@0.38.44",
-    "socket2@0.5.8",
+    "syn@2.0.99",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
     "toml@0.5.11",
-    "zerocopy@0.7.35",
     "zerocopy-derive@0.7.35",
+    "zerocopy@0.7.35",
 ] # Certain crates/versions that will be skipped when doing duplicate detection.
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
