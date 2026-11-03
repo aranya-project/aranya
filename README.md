@@ -72,7 +72,7 @@ A complete list of examples can be found at [examples](examples/):
 - [C examples](examples/c/)
 
 CICD checks:
-- `cargo make security` - runs security checks such as `cargo-audit`, `cargo-deny` and `cargo-vet`
+- `cargo make security` - runs security checks such as `cargo-deny` and `cargo-vet`
 - `cargo make correctness` - runs correctness checks such as `cargo fmt`, `cargo clippy`, and `cargo-machete`
 - `cargo make gen-docs` - generates `rustdocs`
 
