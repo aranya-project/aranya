@@ -2634,8 +2634,6 @@ AranyaError aranya_create_team_ext(const struct AranyaClient *client,
 /**
  * Return random bytes from Aranya's CSPRNG.
  *
- * This method can be used to generate a PSK seed IKM for the QUIC syncer.
- *
  * @param[in] client the Aranya Client
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
@@ -2648,8 +2646,6 @@ AranyaError aranya_rand(const struct AranyaClient *client,
 
 /**
  * Return random bytes from Aranya's CSPRNG.
- *
- * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
  * @param[in] client the Aranya Client
  * @param[out] buf buffer where random bytes are written to.
@@ -2768,6 +2764,11 @@ AranyaError aranya_remove_team_ext(const struct AranyaClient *client,
 /**
  * Close the team and stop all operations on the graph.
  *
+ * NB: Not yet implemented. Do not call this: the daemon
+ * panics while handling it, which aborts the daemon process
+ * in release builds. Use `aranya_remove_team` to
+ * remove the team from this device.
+ *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  *
@@ -2778,6 +2779,11 @@ AranyaError aranya_close_team(const struct AranyaClient *client,
 
 /**
  * Close the team and stop all operations on the graph.
+ *
+ * NB: Not yet implemented. Do not call this: the daemon
+ * panics while handling it, which aborts the daemon process
+ * in release builds. Use `aranya_remove_team` to
+ * remove the team from this device.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
@@ -2877,6 +2883,10 @@ AranyaError aranya_remove_device_from_team_ext(const struct AranyaClient *client
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
  *
+ * Sync peers are held in the daemon's memory only and are not
+ * persisted. The application must add its sync peers again
+ * each time the daemon restarts.
+ *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID
  * @param[in] addr the peer's Aranya network address
@@ -2895,6 +2905,10 @@ AranyaError aranya_add_sync_peer(const struct AranyaClient *client,
  * If a peer is not reachable on the network, sync errors
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
+ *
+ * Sync peers are held in the daemon's memory only and are not
+ * persisted. The application must add its sync peers again
+ * each time the daemon restarts.
  *
  * @param[in] client the Aranya Client
  * @param[in] team the team's ID

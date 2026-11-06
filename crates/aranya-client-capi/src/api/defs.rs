@@ -1866,8 +1866,6 @@ pub fn create_team(client: &Client, cfg: &CreateTeamConfig) -> Result<TeamId, im
 
 /// Return random bytes from Aranya's CSPRNG.
 ///
-/// This method can be used to generate a PSK seed IKM for the QUIC syncer.
-///
 /// @param[in] client the Aranya Client
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
@@ -1955,6 +1953,11 @@ pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 
 /// Close the team and stop all operations on the graph.
 ///
+/// NB: Not yet implemented. Do not call this: the daemon
+/// panics while handling it, which aborts the daemon process
+/// in release builds. Use `aranya_remove_team` to
+/// remove the team from this device.
+///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID
 ///
@@ -2030,6 +2033,10 @@ pub fn remove_device_from_team(
 /// If a peer is not reachable on the network, sync errors
 /// will appear in the tracing logs and
 /// Aranya will be unable to sync state with that peer.
+///
+/// Sync peers are held in the daemon's memory only and are not
+/// persisted. The application must add its sync peers again
+/// each time the daemon restarts.
 ///
 /// @param[in] client the Aranya Client
 /// @param[in] team the team's ID

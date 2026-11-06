@@ -19,7 +19,7 @@ For example, the `owner` device would copy the `aranya-example-multi-node-owner`
 Once the artifacts have been copied onto each machine, source the environment file into the current environment on each machine: `. example.env`
 
 Create a `config.toml` configuration file for each daemon before starting them:
-[example daemon config file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/src/example.toml)
+[example daemon config file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-daemon/example.toml)
 
 Start the Aranya daemon `aranya-daemon` executable and Aranya client executable on each machine on the network at the same time. E.g. on the owner machine run:
 `aranya-daemon --config <path to daemon config file>`

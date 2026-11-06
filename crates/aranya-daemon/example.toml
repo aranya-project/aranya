@@ -2,6 +2,10 @@
 # purposes.
 name = "my-aranya-daemon"
 
+# NB: All of the directories below must already exist. The
+# daemon does not create them and exits at startup if any are
+# missing.
+
 
 # The directory where the daemon stores non-essential
 # runtime files and other file objects (sockets etc.).
@@ -38,6 +42,9 @@ state_dir = "/var/lib/aranya"
 # The directory where the daemon stores non-essential data
 # files.
 #
+# NB: Currently reserved. The daemon checks that it exists but
+# does not write to it.
+#
 # # Multiple Daemon Support
 #
 # This directory should be unique for each instance of the
@@ -52,6 +59,10 @@ state_dir = "/var/lib/aranya"
 cache_dir = "/var/cache/aranya"
 
 # The directory where the daemon writes log files.
+#
+# NB: Currently reserved. The daemon checks that it exists but
+# logs are written to stderr, not this directory. Set the log
+# filter with the `ARANYA_DAEMON` environment variable.
 #
 # # Multiple Daemon Support
 #
@@ -68,6 +79,9 @@ logs_dir = "/var/log/aranya"
 # The directory where the daemon can find additional
 # configuration files.
 #
+# NB: Currently reserved. The daemon checks that it exists but
+# does not read from it.
+#
 # # Multiple Daemon Support
 #
 # This directory should be unique for each instance of the
@@ -81,18 +95,42 @@ logs_dir = "/var/log/aranya"
 # `$XDG_CONFIG_HOME`.
 config_dir = "/etc/aranya"
 
+# Aranya Fast Channels (AFC) configuration.
 [afc]
+# Required. The daemon will not start unless this is `true`.
 enable = true
+# POSIX shared memory object name. Must start with `/` and
+# contain no other `/`.
+#
+# # Multiple Daemon Support
+#
+# This must be unique for each instance of the daemon.
 shm_path = "/afc"
+# Maximum number of AFC channels the shared memory segment
+# can hold.
 max_chans = 100
 
+# QUIC sync configuration. Peers authenticate each other with
+# mTLS.
 [sync.quic]
+# Required. The daemon will not start unless this is `true`.
 enable = true
-# Aranya sync server address.
+# Aranya sync server address (QUIC over UDP).
 addr = "0.0.0.0:4321"
-# Directory containing trusted root CA certificates (PEM format).
+# Directory containing trusted root CA certificates (PEM
+# format). Only files ending in `.pem` are loaded, and files
+# ending in `.key.pem` are skipped.
 root_certs_dir = "/etc/aranya/certs/ca"
-# Path to the device's certificate file (PEM format).
+# Path to the device's certificate file (PEM format). May
+# contain a certificate chain.
+#
+# Peers use the address they dial as the TLS server name, so
+# the certificate's subject alternative name (SAN) must match
+# the IP address or DNS name other peers use to reach this
+# device.
+#
+# Certificates are loaded once at startup. Restart the
+# daemon after replacing them.
 device_cert = "/etc/aranya/certs/device.crt"
 # Path to the device's private key file (PEM format).
 device_key = "/etc/aranya/certs/device.key"

@@ -48,5 +48,5 @@ $ cargo make run-capi-example
 This starts the example and automatically runs through the aforementioned
 steps. This will also build local doxygen documentation for the
 [`aranya-client-capi`](../../crates/aranya-client-capi/docs/). Open the
-generated [`docs/index.html`](../../crates/aranya-client-c-api/docs/index.html)
+generated [`docs/index.html`](../../crates/aranya-client-capi/docs/index.html)
 file in a browser to view the docs.
