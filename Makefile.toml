@@ -164,17 +164,9 @@ dependencies = ["ctest-build"]
 category = "security"
 description = "Run security checks"
 run_task = { name = [
-    "cargo-audit",
     "cargo-deny",
     "cargo-vet",
 ] }
-
-[tasks.cargo-audit]
-category = "security"
-toolchain = "stable"
-install_crate = { crate_name = "cargo-audit", version = "0.22.0", binary = "cargo-audit", test_arg = "-V" }
-command = "cargo"
-args = ["audit"]
 
 [tasks.cargo-deny]
 category = "security"

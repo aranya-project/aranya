@@ -414,6 +414,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
+[[audits.rustls]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.23.38 -> 0.23.37"
+
 [[audits.rustls-pki-types]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -999,6 +1004,12 @@ start = "2024-02-02"
 end = "2026-07-28"
 notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
 
+[[trusted.h2]]
+criteria = "safe-to-deploy"
+user-id = 359 # Sean McArthur (seanmonstar)
+start = "2019-03-13"
+end = "2027-11-03"
+
 [[trusted.indexmap]]
 criteria = "safe-to-deploy"
 user-id = 539 # Josh Stone (cuviper)
@@ -1023,6 +1034,30 @@ user-id = 1 # Alex Crichton (alexcrichton)
 start = "2019-03-15"
 end = "2026-05-16"
 
+[[trusted.libc]]
+criteria = "safe-to-deploy"
+user-id = 55123 # rust-lang-owner
+start = "2024-08-15"
+end = "2027-11-03"
+
+[[trusted.mio]]
+criteria = "safe-to-deploy"
+user-id = 6025 # Thomas de Zeeuw (Thomasdezeeuw)
+start = "2019-12-17"
+end = "2027-11-03"
+
+[[trusted.quinn-proto]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2019-09-09"
+end = "2027-11-03"
+
+[[trusted.rustls]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2022-05-18"
+end = "2027-11-03"
+
 [[trusted.scopeguard]]
 criteria = "safe-to-deploy"
 user-id = 2915 # Amanieu d'Antras (Amanieu)
@@ -1034,6 +1069,12 @@ criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2023-01-20"
 end = "2026-07-09"
+
+[[trusted.socket2]]
+criteria = "safe-to-deploy"
+user-id = 6025 # Thomas de Zeeuw (Thomasdezeeuw)
+start = "2020-09-09"
+end = "2027-11-03"
 
 [[trusted.spideroak-base58]]
 criteria = "safe-to-deploy"
@@ -1052,6 +1093,24 @@ criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2025-01-23"
 end = "2026-06-13"
+
+[[trusted.syn]]
+criteria = "safe-to-deploy"
+user-id = 3618 # David Tolnay (dtolnay)
+start = "2019-03-01"
+end = "2027-11-03"
+
+[[trusted.tokio]]
+criteria = "safe-to-deploy"
+user-id = 6741 # Alice Ryhl (Darksonn)
+start = "2020-12-25"
+end = "2027-11-03"
+
+[[trusted.tokio-macros]]
+criteria = "safe-to-deploy"
+user-id = 6741 # Alice Ryhl (Darksonn)
+start = "2020-10-26"
+end = "2027-11-03"
 
 [[trusted.toml]]
 criteria = "safe-to-deploy"
