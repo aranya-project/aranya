@@ -11,7 +11,7 @@ use aranya_daemon_api::Rank;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_text::Text;
-use aranya_runtime::{GraphId, PolicyStore, StorageProvider, VmPolicy};
+use aranya_runtime::{GraphId, PolicyStore, RuntimeBuffers, StorageProvider, VmPolicy};
 #[cfg(feature = "afc")]
 use aranya_runtime::{NullSink, Session};
 use futures_util::TryFutureExt as _;
@@ -20,6 +20,7 @@ use tracing::{Instrument, debug, instrument, warn};
 use crate::{
     aranya::Client,
     policy::{self, ChanOp, Effect, Perm, PublicKeyBundle},
+    util::mem_spill,
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -123,7 +124,10 @@ where
         // Make sure we drop the lock as quickly as possible.
         {
             let mut client = self.client.lock_aranya().await;
-            act.with_action(|act| client.action(self.graph_id, &mut sink, act))?;
+            let mut buffers = RuntimeBuffers::new(); // TODO: hoist
+            act.with_action(|act| {
+                client.action(self.graph_id, &mut sink, act, &mut buffers, mem_spill)
+            })?;
         }
 
         let total = sink.effects.len();

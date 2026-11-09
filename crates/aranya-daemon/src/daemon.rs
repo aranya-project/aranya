@@ -84,7 +84,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    manager: SyncManager<QuicConnector, PS, SP, EF>,
+    manager: SyncManager<QuicConnector, PS, SP, <SP as StorageProvider>::Segment, EF>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -262,7 +262,7 @@ impl Daemon {
     ) -> Result<(
         Client,
         SyncServer,
-        SyncManager<QuicConnector, PS, SP, EF>,
+        SyncManager<QuicConnector, PS, SP, <SP as StorageProvider>::Segment, EF>,
         SyncHandle,
         mpsc::Receiver<(GraphId, Vec<EF>)>,
     )> {

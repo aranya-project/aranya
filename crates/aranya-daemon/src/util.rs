@@ -49,3 +49,37 @@ impl TeamConfigStore {
         self.set.write().unwrap().remove(&team)
     }
 }
+
+// TODO: Use upstream from next version.
+pub(crate) fn mem_spill() -> Result<impl aranya_runtime::Spill, aranya_runtime::StorageError> {
+    use aranya_runtime::{Spill, StorageError};
+
+    /// In-memory spill backed by a growable byte buffer.
+    pub struct MemSpill {
+        buf: Vec<u8>,
+    }
+
+    impl Spill for MemSpill {
+        fn write_at(&mut self, offset: usize, data: &[u8]) -> Result<(), StorageError> {
+            let end = offset
+                .checked_add(data.len())
+                .ok_or(StorageError::IoError)?;
+            if end > self.buf.len() {
+                self.buf.resize(end, 0);
+            }
+            self.buf[offset..end].copy_from_slice(data);
+            Ok(())
+        }
+
+        fn read_at(&mut self, offset: usize, data: &mut [u8]) -> Result<(), StorageError> {
+            let end = offset
+                .checked_add(data.len())
+                .ok_or(StorageError::IoError)?;
+            let src = self.buf.get(offset..end).ok_or(StorageError::IoError)?;
+            data.copy_from_slice(src);
+            Ok(())
+        }
+    }
+
+    Ok(MemSpill { buf: Vec::new() })
+}

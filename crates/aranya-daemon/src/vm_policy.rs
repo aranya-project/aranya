@@ -109,7 +109,7 @@ where
 
     fn add_policy(&mut self, policy: &[u8]) -> Result<PolicyId, PolicyError> {
         match policy.first() {
-            Some(id) => Ok(PolicyId::new(*id as usize)),
+            Some(&id) => Ok(PolicyId::new(u64::from(id))),
             None => Err(PolicyError::Panic),
         }
     }
