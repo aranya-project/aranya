@@ -38,6 +38,11 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
 
+      - name: Install cargo-all-features
+        uses: aranya-project/install-action@main
+        with:
+          tool: cargo-all-features@1.12.0
+
       - name: Unit Tests
         run: cargo make test
 
@@ -73,6 +78,12 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
+
+      - name: Install patchelf
+        run: |
+          sudo apt-get install -y patchelf \
+              --no-install-recommends
+          patchelf --version
 
       - name: C Example Application
         run: |
