@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
-use aranya_runtime::{Address, Storage as _, SyncHelloType, SyncType};
+use aranya_runtime::{Address, Storage as _, SyncHello};
 use aranya_runtime::{
-    Command as _, PolicyStore, Sink, StorageProvider, SyncRequester, TraversalBuffers,
+    CommandExt as _, PolicyStore, RuntimeBuffers, Sink, StorageProvider, SyncRequester,
 };
 use aranya_util::error::ReportExt as _;
 use buggy::BugExt as _;
@@ -19,12 +19,13 @@ use super::{
 };
 use crate::{
     aranya::{Client, InvalidGraphs},
+    util::mem_spill,
     vm_policy::VecSink,
 };
 
 /// Handles the actual syncing with other peers.
 #[derive_where(Debug; C)]
-pub(crate) struct SyncClient<C, PS, SP, EF> {
+pub(crate) struct SyncClient<C, PS, SP, Seg, EF> {
     /// The Aranya client and peer cache, alongside invalid graph tracking.
     pub(super) client: Client<PS, SP>,
     /// The connector used to create streams with peers.
@@ -33,21 +34,24 @@ pub(crate) struct SyncClient<C, PS, SP, EF> {
     send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
     /// Used for traversing the graph.
     #[derive_where(skip(Debug))]
-    traversal: TraversalBuffers,
+    rt_buffers: RuntimeBuffers<Seg>,
 }
 
-impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF> {
+impl<C, PS, SP, Seg, EF> SyncClient<C, PS, SP, Seg, EF> {
     /// Creates a new [`SyncClient`].
     pub(crate) fn new(
         client: Client<PS, SP>,
         connector: C,
         send_effects: mpsc::Sender<(GraphId, Vec<EF>)>,
-    ) -> Self {
+    ) -> Self
+    where
+        Seg: aranya_runtime::Segment,
+    {
         Self {
             client,
             connector,
             send_effects,
-            traversal: TraversalBuffers::new(),
+            rt_buffers: RuntimeBuffers::new(),
         }
     }
 
@@ -57,7 +61,7 @@ impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF> {
     }
 }
 
-impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF>
+impl<C, PS, SP, Seg, EF> SyncClient<C, PS, SP, Seg, EF>
 where
     C: SyncConnector,
 {
@@ -73,12 +77,13 @@ where
     ) -> Result<()> {
         trace!(?peer, "subscribing to hello notifications from peer");
         // TODO(nikki): update aranya_core with the new name.
-        let message = SyncType::Hello(SyncHelloType::Subscribe {
-            graph_change_delay: graph_change_debounce,
-            duration,
-            schedule_delay,
-            graph_id: peer.graph_id,
-        });
+        let message = todo!();
+        // let message = SyncType::Hello(SyncHelloType::Subscribe {
+        //     graph_change_delay: graph_change_debounce,
+        //     duration,
+        //     schedule_delay,
+        //     graph_id: peer.graph_id,
+        // });
 
         self.send_hello_request(peer, message, buffer).await
     }
@@ -91,9 +96,10 @@ where
         buffer: &mut [u8],
     ) -> Result<()> {
         trace!(?peer, "unsubscribing from hello notifications from peer");
-        let message = SyncType::Hello(SyncHelloType::Unsubscribe {
-            graph_id: peer.graph_id,
-        });
+        let message = todo!();
+        // let message = SyncType::Hello(SyncHelloType::Unsubscribe {
+        //     graph_id: peer.graph_id,
+        // });
 
         self.send_hello_request(peer, message, buffer).await
     }
@@ -107,12 +113,12 @@ where
         head: Address,
         buffer: &mut [u8],
     ) -> Result<()> {
+        use aranya_runtime::HelloNotification;
+
         trace!(?peer, "sending hello notifications to peer");
 
-        let message = SyncType::Hello(SyncHelloType::Hello {
-            head,
-            graph_id: peer.graph_id,
-        });
+        let message = todo!();
+        // let message = SyncHello::Hello(HelloNotification::new(peer.graph_id, head));
 
         // Connect to the peer
         let mut stream = self
@@ -122,7 +128,8 @@ where
             .map_err(Error::transport)?;
 
         // Send the message
-        let data = postcard::to_slice(&message, buffer)?;
+        let data = todo!();
+        // let data = message.encode_to(buffer)?;
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
@@ -134,7 +141,7 @@ where
     pub(super) async fn send_hello_request(
         &self,
         peer: SyncPeer,
-        sync_type: SyncType,
+        sync_type: SyncHello,
         buffer: &mut [u8],
     ) -> Result<()> {
         // Connect to the peer
@@ -145,7 +152,8 @@ where
             .map_err(Error::transport)?;
 
         // Send the message
-        let data = postcard::to_slice(&sync_type, buffer)?;
+        let data = todo!();
+        // let data = postcard::to_slice(&sync_type, buffer)?;
         stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
@@ -158,18 +166,19 @@ where
     }
 }
 
-impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF>
+impl<C, PS, SP, Seg, EF> SyncClient<C, PS, SP, Seg, EF>
 where
     PS: PolicyStore,
-    SP: StorageProvider,
+    SP: StorageProvider<Segment = Seg>,
 {
     /// Check whether a given command exists in a graph.
     #[cfg(feature = "preview")]
     pub(super) async fn command_exists(&mut self, graph_id: GraphId, head: Address) -> bool {
-        self.client
-            .lock_aranya()
-            .await
-            .command_exists(graph_id, head, &mut self.traversal.primary)
+        self.client.lock_aranya().await.command_exists(
+            graph_id,
+            head,
+            &mut self.rt_buffers.traversal.primary,
+        )
     }
 
     /// Get the current head address for a graph, if any.
@@ -215,15 +224,15 @@ where
         // Create a new transaction and add all received commands.
         let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
         let mut trx = aranya.transaction(peer.graph_id);
-        aranya.add_commands(&mut trx, sink, &cmds, &mut self.traversal.primary)?;
-        aranya.commit(trx, sink, &mut self.traversal.primary)?;
+        aranya.add_commands(&mut trx, sink, &cmds, &mut self.rt_buffers, mem_spill)?;
+        aranya.commit(trx, sink, &mut self.rt_buffers, mem_spill)?;
 
         // Update our peer cache with the new commands.
         aranya.update_heads(
             peer.graph_id,
             cmds.iter().filter_map(|cmd| cmd.address().ok()),
             caches.entry(peer).or_default(),
-            &mut self.traversal.primary,
+            &mut self.rt_buffers.traversal.primary,
         )?;
 
         debug!(
@@ -235,11 +244,11 @@ where
     }
 }
 
-impl<C, PS, SP, EF> SyncClient<C, PS, SP, EF>
+impl<C, PS, SP, Seg, EF> SyncClient<C, PS, SP, Seg, EF>
 where
     C: SyncConnector,
     PS: PolicyStore,
-    SP: StorageProvider,
+    SP: StorageProvider<Segment = Seg>,
     EF: Send + Sync + 'static + TryFrom<PS::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,
 {
@@ -259,11 +268,12 @@ where
         // Process a poll request, and get back the length/number of commands.
         let (len, _cmds) = {
             let (mut aranya, mut caches) = self.client.lock_aranya_and_caches().await;
+            let session_heads = caches.entry(peer).or_default().session_heads();
             requester.poll(
                 buffer,
                 aranya.provider(),
-                caches.entry(peer).or_default(),
-                &mut self.traversal.primary,
+                &session_heads,
+                &mut self.rt_buffers.traversal.primary,
             )
         }?;
 

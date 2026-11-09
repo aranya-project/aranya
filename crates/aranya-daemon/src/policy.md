@@ -32,7 +32,7 @@ which commands devices can publish to Aranya's distributed graph:
   "default roles" - `owner` (emergency access), `admin` (system
   administration), `operator` (user management), and `member` (basic
   usage). This policy has the capability to define custom roles as well.
-- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object. 
+- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object.
 Any object in the system with an Aranya ID can have a rank associated with it in the policy.
 Rank checks are only concerned with ranks associated with devices, roles, and labels specifically when determining if an object has permission to perform certain operations.
 The team does not need a rank associated with it since all operations implicitly occur within the context of a team.
@@ -213,7 +213,7 @@ with the following routes.
 function seal_command(payload bytes) struct Envelope {
     let parent_id = perspective::head_id()
     let author_id = device::current_device_id()
-    let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
+    let author_sign_pk = query DeviceSignPubKey[device_id: author_id] or todo()
     let author_sign_key_id = idam::derive_sign_key_id(author_sign_pk.key)
 
     let signed = crypto::sign(author_sign_key_id, payload)
@@ -234,7 +234,7 @@ function seal_command(payload bytes) struct Envelope {
 // a check error.
 function open_envelope(sealed_envelope struct Envelope) bytes {
     let author_id = envelope::author_id(sealed_envelope)
-    let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
+    let author_sign_pk = query DeviceSignPubKey[device_id: author_id] or todo()
 
     let verified_command = crypto::verify(
         author_sign_pk.key,
@@ -265,15 +265,15 @@ function valid_device_invariants(device_id id) bool {
     if device is None {
         // The device does not exist, so there should not be any
         // signing keys for it either.
-        check !exists DeviceIdentPubKey[device_id: device_id]
-        check !exists DeviceSignPubKey[device_id: device_id]
-        check !exists DeviceEncPubKey[device_id: device_id]
+        check !exists DeviceIdentPubKey[device_id: device_id] else todo()
+        check !exists DeviceSignPubKey[device_id: device_id] else todo()
+        check !exists DeviceEncPubKey[device_id: device_id] else todo()
     } else {
         // The device DOES exist, so the device keys MUST also exist.
 
-        check exists DeviceIdentPubKey[device_id: device_id]
-        check exists DeviceSignPubKey[device_id: device_id]
-        check exists DeviceEncPubKey[device_id: device_id]
+        check exists DeviceIdentPubKey[device_id: device_id] else todo()
+        check exists DeviceSignPubKey[device_id: device_id] else todo()
+        check exists DeviceEncPubKey[device_id: device_id] else todo()
     }
 
     // NB: Since this function uses `check` internally, it
@@ -353,7 +353,7 @@ function try_find_device(device_id id) optional struct Device {
 // Returns a device if it exists, or raises a check error
 // otherwise.
 function get_device(device_id id) struct Device {
-    return check_unwrap try_find_device(device_id)
+    return try_find_device(device_id) or todo()
 }
 
 // Returns the device corresponding with the author of the
@@ -387,9 +387,9 @@ function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let ident_key = check_unwrap query DeviceIdentPubKey[device_id: device_id]
-    let sign_key = check_unwrap query DeviceSignPubKey[device_id: device_id]
-    let enc_key = check_unwrap query DeviceEncPubKey[device_id: device_id]
+    let ident_key = query DeviceIdentPubKey[device_id: device_id] or todo()
+    let sign_key = query DeviceSignPubKey[device_id: device_id] or todo()
+    let enc_key = query DeviceEncPubKey[device_id: device_id] or todo()
 
     return PublicKeyBundle {
         ident_key: ident_key.key,
@@ -415,13 +415,13 @@ function get_enc_pk(device_id id) bytes {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
+    let device_enc_pk = query DeviceEncPubKey[device_id: device_id] or todo()
     return device_enc_pk.key
 }
 
 // Returns the device's encryption key ID.
 function get_enc_key_id(device_id id) id {
-    let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
+    let device_enc_pk = query DeviceEncPubKey[device_id: device_id] or todo()
     return idam::derive_enc_key_id(device_enc_pk.key)
 }
 ```
@@ -456,7 +456,7 @@ fact DeviceGeneration[device_id id]=>{generation int}
 //
 // Raises a check error if the generation fact does not exist.
 function get_device_gen(device_id id) int {
-    let f = check_unwrap query DeviceGeneration[device_id: device_id]
+    let f = query DeviceGeneration[device_id: device_id] or todo()
     return f.generation
 }
 ```
@@ -500,7 +500,7 @@ ephemeral command QueryDevicesOnTeam {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         finish {
             emit QueryDevicesOnTeamResult {
@@ -554,7 +554,7 @@ ephemeral command QueryAfcChannelIsValid {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         // Check that both devices have permission to create the AFC channel.
         let is_valid = afc_uni_channel_is_valid(this.sender_id, this.receiver_id, this.label_id)
@@ -608,18 +608,20 @@ ephemeral command QueryDeviceRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let device = get_device(this.device_id)
 
         let assigned_role = try_get_assigned_role(device.device_id)
-        if assigned_role is None {
-            finish {}
-        } else {
-            let role = unwrap assigned_role
-            let eff = role as QueryDeviceRoleResult
-            finish {
-                emit eff
+        match assigned_role {
+            None => {
+                finish {}
+            }
+            Some(role) => {
+                let eff = role as QueryDeviceRoleResult
+                finish {
+                    emit eff
+                }
             }
         }
     }
@@ -657,7 +659,7 @@ ephemeral command QueryDeviceKeyBundle {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         // NB: A device's keys exist iff `fact Device` exists, so
         // we don't need to use `get_device` or anything
@@ -811,7 +813,7 @@ Utility method for checking object ranks before allowing operations to be perfor
 // The command author's role must have permission to perform the operation.
 // The command author must have a higher rank than the object it is operating on.
 function author_has_perm_one_target(author_id id, perm enum Perm, target_id id) bool {
-    check device_has_perm(author_id, perm)
+    check device_has_perm(author_id, perm) else todo()
     let author_rank = get_object_rank(author_id)
     if !author_can_operate_on_target(author_rank, target_id) {
         return false
@@ -824,7 +826,7 @@ function author_has_perm_one_target(author_id id, perm enum Perm, target_id id) 
 // The command author's role must have permission to perform the operation.
 // The command author must have a higher rank than all the objects it is operating on.
 function author_has_perm_two_targets(author_id id, perm enum Perm, target_id1 id, target_id2 id) bool {
-    check device_has_perm(author_id, perm)
+    check device_has_perm(author_id, perm) else todo()
     let author_rank = get_object_rank(author_id)
     if !author_can_operate_on_target(author_rank, target_id1) {
         return false
@@ -858,7 +860,7 @@ Utility methods for getting/setting rank values on objects.
 ```policy
 // Get the rank of an object.
 function get_object_rank(object_id id) int {
-    let rank = check_unwrap query Rank[object_id: object_id]
+    let rank = query Rank[object_id: object_id] or todo()
 
     return rank.rank
 }
@@ -988,43 +990,45 @@ command ChangeRank {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Check that the object exists before changing its rank.
-        check object_exists(this.object_id)
+        check object_exists(this.object_id) else todo()
 
         // Changing the rank of a role is not supported. Role ranks are fixed
         // at creation time to maintain the invariant that role_rank > device_rank
         // for all devices assigned to the role.
         let is_role = query Role[role_id: this.object_id]
-        check is_role is None
+        check is_role is None else todo()
 
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
             // An object can always downgrade its own rank.
-            check device_has_perm(author.device_id, Perm::ChangeRank)
+            check device_has_perm(author.device_id, Perm::ChangeRank) else todo()
         } else {
-            check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id)
+            check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id) else todo()
         }
         // Check that author's rank is >= than the rank being set.
         // If the author is the current device, this prevents a device from upgrading its own rank.
         let author_rank = get_object_rank(author.device_id)
-        check author_rank >= this.new_rank
+        check author_rank >= this.new_rank else todo()
 
         // If the target is a device with an assigned role, the new rank
         // must not exceed the role's rank. This maintains the invariant
         // that role_rank >= device_rank after assignment.
-        let assigned_role = query AssignedRole[device_id: this.object_id]
-        if assigned_role is Some {
-            let role_rank = get_object_rank((unwrap assigned_role).role_id)
-            check this.new_rank <= role_rank
+        match query AssignedRole[device_id: this.object_id] {
+            Some(assigned_role) => {
+                let role_rank = get_object_rank(assigned_role.role_id)
+                check this.new_rank <= role_rank else todo()
+            }
+            None => {}
         }
 
         // Check that old_rank matches the object's current rank.
         // Implicitly checks that the rank exists before modifying it.
-        check this.old_rank == get_object_rank(this.object_id)
+        check this.old_rank == get_object_rank(this.object_id) else todo()
 
         finish {
             change_object_rank(this.object_id, this.old_rank, this.new_rank)
@@ -1070,17 +1074,19 @@ ephemeral command QueryRank {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let maybe_rank = query Rank[object_id: this.object_id]
-        if maybe_rank is None {
-            finish {}
-        } else {
-            let rank = unwrap maybe_rank
-            finish {
-                emit QueryRankResult {
-                    object_id: this.object_id,
-                    rank: rank.rank,
+        match maybe_rank {
+            None => {
+                finish {}
+            }
+            Some(rank) => {
+                finish {
+                    emit QueryRankResult {
+                        object_id: this.object_id,
+                        rank: rank.rank,
+                    }
                 }
             }
         }
@@ -1124,17 +1130,19 @@ ephemeral command QueryDeviceGeneration {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let maybe_gen = query DeviceGeneration[device_id: this.device_id]
-        if maybe_gen is None {
-            finish {}
-        } else {
-            let gen = unwrap maybe_gen
-            finish {
-                emit QueryDeviceGenerationResult {
-                    device_id: this.device_id,
-                    generation: gen.generation,
+        match maybe_gen {
+            None => {
+                finish {}
+            }
+            Some(gen) => {
+                finish {
+                    emit QueryDeviceGenerationResult {
+                        device_id: this.device_id,
+                        generation: gen.generation,
+                    }
                 }
             }
         }
@@ -1359,7 +1367,7 @@ finish function assign_perm_to_role(role_id id, perm enum Perm) {
 //
 // It raises a check failure if the role does not exist.
 function role_has_perm(role_id id, perm enum Perm) bool {
-    check exists Role[role_id: role_id]
+    check exists Role[role_id: role_id] else todo()
 
     return exists RoleHasPerm[
         role_id: role_id,
@@ -1373,7 +1381,7 @@ function role_has_perm(role_id id, perm enum Perm) bool {
 //
 // This function does NOT check whether the device exists.
 function device_has_perm(device_id id, perm enum Perm) bool {
-    let role = check_unwrap query AssignedRole[device_id: device_id]
+    let role = query AssignedRole[device_id: device_id] or todo()
     return role_has_perm(role.role_id, perm)
 }
 
@@ -1424,15 +1432,15 @@ command AddPermToRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // The author must have permission to change role perms.
-        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
+        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else todo()
 
         // The role must not already have the permission.
-        check !role_has_perm(this.role_id, this.perm)
+        check !role_has_perm(this.role_id, this.perm) else todo()
 
         finish {
             create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
@@ -1485,12 +1493,12 @@ command RemovePermFromRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // The author must have permission to change role perms.
-        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
+        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else todo()
 
         // The author does not need to hold the permission being removed.
         // The rank hierarchy already prevents abuse: a device can only
@@ -1500,7 +1508,7 @@ command RemovePermFromRole {
 
         // It is an error to remove a permission not assigned to
         // the role.
-        check role_has_perm(this.role_id, this.perm)
+        check role_has_perm(this.role_id, this.perm) else todo()
 
         // At this point we believe the following to be true:
         //
@@ -1609,15 +1617,15 @@ command CreateRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
-        
+
         // The author must have the permission to create a role
-        check device_has_perm(author.device_id, Perm::CreateRole)
+        check device_has_perm(author.device_id, Perm::CreateRole) else todo()
 
         // The author's rank must be greater than the rank of the role it is creating.
-        check get_object_rank(author.device_id) >= this.rank
+        check get_object_rank(author.device_id) >= this.rank else todo()
 
         let role_id = derive_role_id(envelope)
 
@@ -1718,14 +1726,14 @@ command SetupDefaultRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Author must have permission to setup the default roles.
-        check device_has_perm(author.device_id, Perm::SetupDefaultRole)
+        check device_has_perm(author.device_id, Perm::SetupDefaultRole) else todo()
 
-        check !exists DefaultRoleSeeded[name: this.name]
+        check !exists DefaultRoleSeeded[name: this.name] else todo()
 
         let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope)
@@ -1859,22 +1867,22 @@ command DeleteRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
         // The author must have the permission to delete the role
-        check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id)
+        check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id) else todo()
 
         // The role must exist
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else todo()
         // The role must not be assigned to any devices
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: ?,
-        ]
+        ] else todo()
 
         // we already checked that this exists
-        let role = check_unwrap query Role[role_id: this.role_id]
+        let role = query Role[role_id: this.role_id] or todo()
 
         finish {
             delete Role[role_id: this.role_id]
@@ -1964,11 +1972,8 @@ finish function update_role_assignment(
 //
 // - It does NOT check whether the device exists.
 function try_get_assigned_role(device_id id) optional struct Role {
-    let assigned_role = query AssignedRole[device_id: device_id]
-    if assigned_role is None {
-        return None
-    }
-    return query Role[role_id: (unwrap assigned_role).role_id]
+    let assigned_role = query AssignedRole[device_id: device_id] or return None
+    return query Role[role_id: assigned_role.role_id]
 }
 
 // Returns the role assigned to the device.
@@ -1985,7 +1990,7 @@ function get_assigned_role(device_id id) struct Role {
     // NB: We could implement this with `try_get_assigned_role`,
     // but the generated check errors would be much less
     // informative, so we manually implement it instead.
-    let assigned_role = check_unwrap query AssignedRole[device_id: device_id]
+    let assigned_role = query AssignedRole[device_id: device_id] or todo()
 
     // Verify that the assigned role exists.
     //
@@ -1998,7 +2003,7 @@ function get_assigned_role(device_id id) struct Role {
     //
     // Option (1) is the most likely and we can't really check
     // for (2) here.
-    let role = check_unwrap query Role[role_id: assigned_role.role_id]
+    let role = query Role[role_id: assigned_role.role_id] or todo()
 
     return role
 }
@@ -2028,11 +2033,8 @@ function get_assigned_role_id(device_id id) id {
 //
 // - It does NOT check whether the device exists.
 function try_get_assigned_role_id(device_id id) optional id {
-    let role = try_get_assigned_role(device_id)
-    if role is None {
-        return None
-    }
-    return Some((unwrap role).role_id)
+    let role = try_get_assigned_role(device_id) or return None
+    return Some(role.role_id)
 }
 
 // Assigns the specified role to the device.
@@ -2084,31 +2086,31 @@ command AssignRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // The author must have permission to assign the role to the target device.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id) else todo()
 
         // The role's rank must be >= the device's rank.
-        check role_rank_gte_device_rank(this.role_id, this.device_id)
+        check role_rank_gte_device_rank(this.role_id, this.device_id) else todo()
 
         // Ensure the target role exists.
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else todo()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else todo()
 
         // Device must not already have a role assigned.
         // If the device already has a role assigned, use `ChangeRole` instead.
-        check !exists AssignedRole[device_id: this.device_id]
+        check !exists AssignedRole[device_id: this.device_id] else todo()
 
         // Ensure the role index is also clear before creating a new assignment.
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: this.device_id,
-        ]
+        ] else todo()
 
         // At this point we believe the following to be true:
         //
@@ -2191,42 +2193,42 @@ command ChangeRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Attempting to change to the same role should fail since a state change is expected.
-        check this.old_role_id != this.new_role_id
+        check this.old_role_id != this.new_role_id else todo()
 
-        check exists Role[role_id: this.new_role_id]
+        check exists Role[role_id: this.new_role_id] else todo()
 
         // The author must have permission to revoke the old role from the device.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id) else todo()
 
         // The author must have permission to assign the new role to the device.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id) else todo()
 
         // The new role's rank must be >= the device's rank.
-        check role_rank_gte_device_rank(this.new_role_id, this.device_id)
+        check role_rank_gte_device_rank(this.new_role_id, this.device_id) else todo()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else todo()
 
-        let current_assignment = check_unwrap query AssignedRole[device_id: this.device_id]
-        check current_assignment.role_id == this.old_role_id
+        let current_assignment = query AssignedRole[device_id: this.device_id] or todo()
+        check current_assignment.role_id == this.old_role_id else todo()
 
         // Ensure the role index reflects the existing assignment before updating it.
         check exists RoleAssignmentIndex[
             role_id: this.old_role_id,
             device_id: this.device_id,
-        ]
+        ] else todo()
 
-        let old_role = check_unwrap query Role[role_id: this.old_role_id]
+        let old_role = query Role[role_id: this.old_role_id] or todo()
         if is_owner(old_role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.old_role_id,
                 device_id: ?,
-            ]=>{}
+            ]=>{} else todo()
         }
 
         // At this point we believe the following invariants to
@@ -2300,32 +2302,32 @@ command RevokeRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // The author must have permission to revoke the role from the device.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id) else todo()
 
-        let role = check_unwrap query Role[role_id: this.role_id]
+        let role = query Role[role_id: this.role_id] or todo()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else todo()
 
-        let assignment = check_unwrap query AssignedRole[device_id: this.device_id]
-        check assignment.role_id == this.role_id
+        let assignment = query AssignedRole[device_id: this.device_id] or todo()
+        check assignment.role_id == this.role_id else todo()
 
         // Ensure the assignment index entry exists so we can remove it.
         check exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: this.device_id,
-        ]
+        ] else todo()
 
         if is_owner(role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.role_id,
                 device_id: ?,
-            ]=>{}
+            ]=>{} else todo()
         }
 
         // At this point we believe the following to be true:
@@ -2392,7 +2394,7 @@ ephemeral command QueryTeamRoles {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let eff = this as QueryTeamRolesResult
         finish {
@@ -2437,7 +2439,7 @@ function team_exists() bool {
 //
 // This function raises a check error if the team does not exist.
 function team_id() id {
-    let f = check_unwrap query TeamStart[]=>{team_id: ?}
+    let f = query TeamStart[]=>{team_id: ?} or todo()
     return f.team_id
 }
 ```
@@ -2510,7 +2512,7 @@ command CreateTeam {
     policy {
         // NB: This is the only place in the policy file where we
         // invert this condition.
-        check !team_exists()
+        check !team_exists() else todo()
 
         // TODO: check that `this.nonce` length is like
         // 32 bytes or something? It *should* be cryptographically
@@ -2528,7 +2530,7 @@ command CreateTeam {
 
         // The author must have signed the command with the same
         // device keys.
-        check author_id == owner_device_id
+        check author_id == owner_device_id else todo()
 
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope)
@@ -2677,15 +2679,15 @@ command TerminateTeam {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Author must have permission to terminate the team.
-        check device_has_perm(author.device_id, Perm::TerminateTeam)
+        check device_has_perm(author.device_id, Perm::TerminateTeam) else todo()
 
         let current_team_id = team_id()
-        check this.team_id == current_team_id
+        check this.team_id == current_team_id else todo()
 
         // At this point we believe the following to be true:
         //
@@ -2720,13 +2722,15 @@ action add_device(device_keys struct PublicKeyBundle, initial_role_id optional i
         device_keys: device_keys,
         rank: rank,
     }
-    if initial_role_id is Some {
-        let role_id = unwrap initial_role_id
-        let device_id = idam::derive_device_id(device_keys.ident_key)
-        publish AssignRole {
-            device_id: device_id,
-            role_id: role_id,
+    match initial_role_id {
+        Some(role_id) => {
+            let device_id = idam::derive_device_id(device_keys.ident_key)
+            publish AssignRole {
+                device_id: device_id,
+                role_id: role_id,
+            }
         }
+        None => {}
     }
 }
 
@@ -2756,22 +2760,22 @@ command AddDevice {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Author must have permission to add a device to the team.
-        check device_has_perm(author.device_id, Perm::AddDevice)
+        check device_has_perm(author.device_id, Perm::AddDevice) else todo()
 
         // The author's rank must be greater than the rank of the device it is adding to the team.
-        check get_object_rank(author.device_id) >= this.rank
+        check get_object_rank(author.device_id) >= this.rank else todo()
 
         let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
-        check !exists Device[device_id: device_id]
-        check !exists DeviceIdentPubKey[device_id: device_id]
-        check !exists DeviceSignPubKey[device_id: device_id]
-        check !exists DeviceEncPubKey[device_id: device_id]
+        check !exists Device[device_id: device_id] else todo()
+        check !exists DeviceIdentPubKey[device_id: device_id] else todo()
+        check !exists DeviceSignPubKey[device_id: device_id] else todo()
+        check !exists DeviceEncPubKey[device_id: device_id] else todo()
 
         let existing_gen = query DeviceGeneration[device_id: device_id]
 
@@ -2857,73 +2861,76 @@ command RemoveDevice {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else todo()
 
         // Author must have permission to remove a device from the team.
         // Devices should always be allowed to remove themselves even without RemoveDevice permission.
         if author.device_id != this.device_id {
-            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
+            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id) else todo()
         }
 
         // Clean up optional per-device facts that may or may not
         // exist.
-        let assigned_role = query AssignedRole[device_id: this.device_id]
-        let device_gen = check_unwrap query DeviceGeneration[device_id: this.device_id]
-        let next_gen = check_unwrap add(device_gen.generation, 1)
+        let maybe_assigned_role = query AssignedRole[device_id: this.device_id]
+        let device_gen = query DeviceGeneration[device_id: this.device_id] or todo()
+        let next_gen = add(device_gen.generation, 1) or todo()
 
-        if assigned_role is Some {
-            let role_id = (unwrap assigned_role).role_id
+        match maybe_assigned_role {
+            Some(assigned_role) => {
+                let role_id = assigned_role.role_id
 
-            // Invariant check.
-            check exists RoleAssignmentIndex[
-                role_id: role_id,
-                device_id: this.device_id,
-            ]
-
-            // The assigned role must exist.
-            let role = check_unwrap query Role[role_id: role_id]
-
-            // Ensure that a team always has at least one owner.
-            if is_owner(role) {
-                check at_least 2 RoleAssignmentIndex[
+                // Invariant check.
+                check exists RoleAssignmentIndex[
                     role_id: role_id,
-                    device_id: ?,
-                ]=>{}
-            }
-
-            finish {
-                update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                    generation: next_gen
-                }
-                delete_role_assignment(this.device_id, role_id)
-                delete_device_core(this.device_id)
-
-                emit DeviceRemoved {
                     device_id: this.device_id,
-                    author_id: author.device_id,
-                }
-                emit CheckValidAfcChannels {}
-            }
-        } else {
-            // TODO: Consider adding an index on
-            // `device_id` so we can sanity-check that no stray
-            // role assignments remain.
-            finish {
-                update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                    generation: next_gen
-                }
-                delete_device_core(this.device_id)
+                ] else todo()
 
-                emit DeviceRemoved {
-                    device_id: this.device_id,
-                    author_id: author.device_id,
+                // The assigned role must exist.
+                let role = query Role[role_id: role_id] or todo()
+
+                // Ensure that a team always has at least one owner.
+                if is_owner(role) {
+                    check at_least 2 RoleAssignmentIndex[
+                        role_id: role_id,
+                        device_id: ?,
+                    ]=>{} else todo()
                 }
-                emit CheckValidAfcChannels {}
+
+                finish {
+                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
+                        generation: next_gen
+                    }
+                    delete_role_assignment(this.device_id, role_id)
+                    delete_device_core(this.device_id)
+
+                    emit DeviceRemoved {
+                        device_id: this.device_id,
+                        author_id: author.device_id,
+                    }
+                    emit CheckValidAfcChannels {}
+                }
+            }
+            None => {
+                // TODO: Consider adding an index on
+                // `device_id` so we can sanity-check that no stray
+                // role assignments remain.
+                finish {
+                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
+                        generation: next_gen
+                    }
+                    delete_device_core(this.device_id)
+
+                    emit DeviceRemoved {
+                        device_id: this.device_id,
+                        author_id: author.device_id,
+                    }
+                    emit CheckValidAfcChannels {}
+                }
             }
         }
     }
@@ -3024,15 +3031,15 @@ command CreateLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Author must have permission to create a label.
-        check device_has_perm(author.device_id, Perm::CreateLabel)
+        check device_has_perm(author.device_id, Perm::CreateLabel) else todo()
 
         // The author's rank must be greater than the rank of the label it is creating.
-        check get_object_rank(author.device_id) >= this.rank
+        check get_object_rank(author.device_id) >= this.rank else todo()
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
@@ -3104,17 +3111,17 @@ command DeleteLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Author must have permission to delete a label and outrank the label.
-        check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id)
+        check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id) else todo()
 
         // We can't query the label after it's been deleted, so
         // make sure we pull all of its info out of the fact
         // database.
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = query Label[label_id: this.label_id] or todo()
 
         // At this point we believe the following to be true:
         //
@@ -3231,86 +3238,88 @@ command AssignLabelToDevice {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
         // Author must have permission to assign a label and outrank the target device and label.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id) else todo()
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
-        check exists Device[device_id: this.device_id]
-        check exists Label[label_id: this.label_id]
+        check exists Device[device_id: this.device_id] else todo()
+        check exists Label[label_id: this.label_id] else todo()
 
         // The target device must be able to use AFC.
-        check device_has_perm(this.device_id, Perm::CanUseAfc)
+        check device_has_perm(this.device_id, Perm::CanUseAfc) else todo()
 
         // Reject if the device's membership epoch changed (e.g. reordered remove/re-add).
         let current_gen = get_device_gen(this.device_id)
-        check this.device_gen == current_gen
+        check this.device_gen == current_gen else todo()
 
         let existing_assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
         ]
 
-        if existing_assignment is Some {
-            // Only allow reuse when the stored assignment is
-            // from an older device generation.
-            let assignment = unwrap existing_assignment
-            check assignment.device_gen < current_gen
+        match existing_assignment {
+            Some(assignment) => {
+                // Only allow reuse when the stored assignment is
+                // from an older device generation.
+                check assignment.device_gen < current_gen else todo()
 
-            // At this point we believe the following to be true:
-            //
-            // - `author` has the `AssignLabel` permission
-            // - `author` outranks `this.label_id`
-            // - `author` outranks `this.device_id`
-            // - `this.device_id` refers to a device that exists
-            // - `this.label_id` refers to a label that exists
-            // - the command's generation matches the device's current generation
-            // - the existing assignment is stale because the device has
-            //   been re-provisioned
-            finish {
-                update LabelAssignedToDevice[
-                    label_id: this.label_id,
-                    device_id: this.device_id,
-                ]=>{
-                    op: assignment.op,
-                    device_gen: assignment.device_gen,
-                } to {
-                    op: this.op,
-                    device_gen: current_gen,
-                }
+                // At this point we believe the following to be true:
+                //
+                // - `author` has the `AssignLabel` permission
+                // - `author` outranks `this.label_id`
+                // - `author` outranks `this.device_id`
+                // - `this.device_id` refers to a device that exists
+                // - `this.label_id` refers to a label that exists
+                // - the command's generation matches the device's current generation
+                // - the existing assignment is stale because the device has
+                //   been re-provisioned
+                finish {
+                    update LabelAssignedToDevice[
+                        label_id: this.label_id,
+                        device_id: this.device_id,
+                    ]=>{
+                        op: assignment.op,
+                        device_gen: assignment.device_gen,
+                    } to {
+                        op: this.op,
+                        device_gen: current_gen,
+                    }
 
-                emit AssignedLabelToDevice {
-                    device: this.device_id,
-                    label_id: this.label_id,
-                    author_id: author.device_id,
+                    emit AssignedLabelToDevice {
+                        device: this.device_id,
+                        label_id: this.label_id,
+                        author_id: author.device_id,
+                    }
                 }
             }
-        } else {
-            // At this point we believe the following to be true:
-            //
-            // - `author` has the `AssignLabel` permission
-            // - `author` outranks `this.label_id`
-            // - `author` outranks `this.device_id`
-            // - `this.device_id` refers to a device that exists
-            // - `this.label_id` refers to a label that exists
-            // - the command's generation matches the device's current generation
-            finish {
-                create LabelAssignedToDevice[
-                    label_id: this.label_id,
-                    device_id: this.device_id,
-                ]=>{
-                    op: this.op,
-                    device_gen: this.device_gen,
-                }
+            None => {
+                // At this point we believe the following to be true:
+                //
+                // - `author` has the `AssignLabel` permission
+                // - `author` outranks `this.label_id`
+                // - `author` outranks `this.device_id`
+                // - `this.device_id` refers to a device that exists
+                // - `this.label_id` refers to a label that exists
+                // - the command's generation matches the device's current generation
+                finish {
+                    create LabelAssignedToDevice[
+                        label_id: this.label_id,
+                        device_id: this.device_id,
+                    ]=>{
+                        op: this.op,
+                        device_gen: this.device_gen,
+                    }
 
-                emit AssignedLabelToDevice {
-                    device: this.device_id,
-                    label_id: this.label_id,
-                    author_id: author.device_id,
+                    emit AssignedLabelToDevice {
+                        device: this.device_id,
+                        label_id: this.label_id,
+                        author_id: author.device_id,
+                    }
                 }
             }
         }
@@ -3369,7 +3378,7 @@ command RevokeLabelFromDevice {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let author = get_author(envelope)
 
@@ -3377,15 +3386,15 @@ command RevokeLabelFromDevice {
         let target = get_device(this.device_id)
 
         // The author device must have permission to revoke the label and outrank the target device and label.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id)
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id) else todo()
 
         // We need to get label info before deleting
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = query Label[label_id: this.label_id] or todo()
 
-        let assignment = check_unwrap query LabelAssignedToDevice[
+        let assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
-        ]
+        ] or todo()
         // Reject revocations of stale label assignments. When a
         // device is removed and re-added its generation counter is
         // incremented, which implicitly invalidates all prior label
@@ -3393,7 +3402,7 @@ command RevokeLabelFromDevice {
         // would delete the fact row and prevent a future (valid)
         // assign from reusing it via the `device_gen < current_gen`
         // update path.
-        check label_assignment_matches_gen(this.device_id, assignment.device_gen)
+        check label_assignment_matches_gen(this.device_id, assignment.device_gen) else todo()
 
         // At this point we believe the following to be true:
         //
@@ -3449,10 +3458,7 @@ function device_assignment_op(
     device_id id,
     assignment optional struct LabelAssignedToDevice,
 ) optional enum ChanOp {
-    if assignment is None {
-        return None
-    }
-    let assigned = unwrap assignment
+    let assigned = assignment or return None
     if label_assignment_matches_gen(
         device_id,
         assigned.device_gen,
@@ -3468,11 +3474,8 @@ function label_assignment_matches_gen(
     device_id id,
     assignment_gen int,
 ) bool {
-    let maybe_gen = query DeviceGeneration[device_id: device_id]
-    if maybe_gen is None {
-        return false
-    }
-    return (unwrap maybe_gen).generation == assignment_gen
+    let gen = query DeviceGeneration[device_id: device_id] or return false
+    return gen.generation == assignment_gen
 }
 ```
 
@@ -3512,10 +3515,10 @@ ephemeral command QueryRoleHasPerm {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         // Check that the role exists.
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else todo()
 
         let has_perm = exists RoleHasPerm[role_id: this.role_id, perm: this.perm]
 
@@ -3567,10 +3570,10 @@ ephemeral command QueryRolePerms {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         // Check that the role exists.
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else todo()
 
         finish {
             emit QueryRolePermsResult {
@@ -3620,18 +3623,20 @@ ephemeral command QueryLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let maybe_label = query Label[label_id: this.label_id]
-        if maybe_label is None {
-            finish {}
-        } else {
-            let label = unwrap maybe_label
-            finish {
-                emit QueryLabelResult {
-                    label_id: label.label_id,
-                    label_name: label.name,
-                    label_author_id: label.author_id,
+        match maybe_label {
+            None => {
+                finish {}
+            }
+            Some(label) => {
+                finish {
+                    emit QueryLabelResult {
+                        label_id: label.label_id,
+                        label_name: label.name,
+                        label_author_id: label.author_id,
+                    }
                 }
             }
         }
@@ -3678,7 +3683,7 @@ ephemeral command QueryLabels {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         finish {
             emit QueryLabelsResult {
@@ -3702,7 +3707,7 @@ ephemeral action query_labels_assigned_to_device(device_id id) {
     map LabelAssignedToDevice[label_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
             if label_assignment_matches_gen(f.device_id, f.device_gen) {
-                let label = check_unwrap query Label[label_id: f.label_id]
+                let label = query Label[label_id: f.label_id] or todo()
                 publish QueryLabelsAssignedToDevice {
                     device_id: f.device_id,
                     label_id: f.label_id,
@@ -3737,10 +3742,10 @@ ephemeral command QueryLabelsAssignedToDevice {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         // Check that the device exists.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else todo()
 
         finish {
             emit QueryLabelsAssignedToDeviceResult {
@@ -3868,16 +3873,16 @@ ephemeral command AfcCreateUniChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        check team_exists()
+        check team_exists() else todo()
 
         let sender = get_author(envelope)
         let sender_id = sender.device_id
 
         let receiver_id = this.receiver_id
-        let receiver = check_unwrap try_find_device(receiver_id)
+        let receiver = try_find_device(receiver_id) or todo()
 
         // Check that both devices have permission to create the AFC channel.
-        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id)
+        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else todo()
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -3916,7 +3921,7 @@ ephemeral command AfcCreateUniChannel {
         } else {
             // This is an off-graph session command, so only the
             // communicating peers should process this command.
-            check false
+            check false else todo()
         }
     }
 }
@@ -3956,22 +3961,16 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
     }
 
     // The writer must have permissions to write (send) data.
-    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
-    if writer_op is None {
-        return false
-    }
-    match unwrap writer_op {
+    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id) or return false
+    match writer_op {
         ChanOp::RecvOnly => { return false }
         ChanOp::SendOnly => {}
         ChanOp::SendRecv => {}
     }
 
     // The reader must have permission to read (receive) data.
-    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id)
-    if reader_op is None {
-        return false
-    }
-    match unwrap reader_op {
+    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id) or return false
+    match reader_op {
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
         ChanOp::SendRecv => {}

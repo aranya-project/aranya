@@ -21,7 +21,7 @@ use aranya_crypto::{
 use aranya_daemon_api::text;
 use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
-    ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE,
+    ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE, PolicyError, StorageProvider,
     storage::linear::{LinearStorageProvider, libc::FileManager},
 };
 use aranya_util::{Addr, ready};
@@ -62,8 +62,20 @@ type TestAranya = aranya::Client<crate::PS, crate::SP>;
 
 // Aranya sync types for testing.
 type TestServer = sync::SyncServer<QuicListener, crate::PS, crate::SP>;
-type TestClient = sync::SyncClient<QuicConnector, crate::PS, crate::SP, crate::EF>;
-type TestSyncer = sync::SyncManager<QuicConnector, crate::PS, crate::SP, crate::EF>;
+type TestClient = sync::SyncClient<
+    QuicConnector,
+    crate::PS,
+    crate::SP,
+    <crate::SP as StorageProvider>::Segment,
+    crate::EF,
+>;
+type TestSyncer = sync::SyncManager<
+    QuicConnector,
+    crate::PS,
+    crate::SP,
+    <crate::SP as StorageProvider>::Segment,
+    crate::EF,
+>;
 
 struct TestDevice {
     /// Aranya sync client.
@@ -610,7 +622,7 @@ fn expect_not_authorized(err: anyhow::Error) {
         .downcast::<ClientError>()
         .expect("error should downcast to ClientError");
     assert!(
-        matches!(err, ClientError::NotAuthorized),
+        matches!(err, ClientError::PolicyError(PolicyError::Rejected)),
         "unexpected error: {err}"
     );
 }
