@@ -5,6 +5,7 @@ runs:
   using: "composite"
   steps:
     - name: Install rust toolchain
+      shell: bash
       run: rustup install
 
     - name: Version info
