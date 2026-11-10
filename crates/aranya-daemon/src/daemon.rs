@@ -33,7 +33,7 @@ use crate::{
         quic::{CertConfig, QuicConnector, QuicListener},
     },
     util::TeamConfigStore,
-    vm_policy::{POLICY_SOURCE, PolicyEngine},
+    vm_policy::POLICY_SOURCE,
 };
 
 // Use short names so that we can more easily add generics.
@@ -44,7 +44,7 @@ pub(crate) type CS = <DefaultEngine as Engine>::CS;
 /// KS = Key Store
 pub(crate) type KS = Store;
 /// PS = Policy Store
-pub(crate) type PS = PolicyEngine<CE, KS>;
+pub(crate) type PS = aranya_runtime::vm_policy::VmPolicyStore<CE>;
 /// SP = Storage Provider
 pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
