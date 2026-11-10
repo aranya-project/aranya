@@ -5,7 +5,7 @@ use aranya_crypto::Rng;
 #[cfg(feature = "preview")]
 use aranya_runtime::{Address, Storage as _, SyncHello};
 use aranya_runtime::{
-    CommandExt as _, PolicyStore, RuntimeBuffers, Sink, StorageProvider, SyncRequester,
+    CommandExt as _, PolicyStore, RuntimeBuffers, Sink, StorageProvider, SyncRequester, mem_spill,
 };
 use aranya_util::error::ReportExt as _;
 use buggy::BugExt as _;
@@ -19,7 +19,6 @@ use super::{
 };
 use crate::{
     aranya::{Client, InvalidGraphs},
-    util::mem_spill,
     vm_policy::VecSink,
 };
 
@@ -127,10 +126,10 @@ where
 
         // Send the message
         let len = message.encode_to(buffer)?;
-        stream
-            .send(&buffer[..len])
-            .await
-            .map_err(Error::transport)?;
+        let data = buffer
+            .get(..len)
+            .assume("encoded message is within buffer")?;
+        stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         Ok(())
@@ -157,10 +156,10 @@ where
             SyncHello::Unsubscribe(unsub) => unsub.encode_to(buffer)?,
             SyncHello::Hello(hello) => hello.encode_to(buffer)?,
         };
-        stream
-            .send(&buffer[..len])
-            .await
-            .map_err(Error::transport)?;
+        let data = buffer
+            .get(..len)
+            .assume("encoded message is within buffer")?;
+        stream.send(data).await.map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         // Read the response to avoid a race condition with the server

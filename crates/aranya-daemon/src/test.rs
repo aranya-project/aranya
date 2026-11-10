@@ -43,7 +43,7 @@ use crate::{
         self, SyncPeer,
         quic::{CertConfig, QuicConnector, QuicListener},
     },
-    vm_policy::{POLICY_SOURCE, create_policy_store},
+    vm_policy::create_policy_store,
 };
 
 /// Queries the rank of an object via the policy engine, returning the raw i64 value.

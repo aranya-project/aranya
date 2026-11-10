@@ -11,7 +11,7 @@ use aranya_daemon_api::Rank;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actionable, VmEffect};
 use aranya_policy_text::Text;
-use aranya_runtime::{GraphId, PolicyStore, RuntimeBuffers, StorageProvider, VmPolicy};
+use aranya_runtime::{GraphId, PolicyStore, RuntimeBuffers, StorageProvider, VmPolicy, mem_spill};
 #[cfg(feature = "afc")]
 use aranya_runtime::{NullSink, Session};
 use futures_util::TryFutureExt as _;
@@ -20,8 +20,7 @@ use tracing::{Instrument, debug, instrument, warn};
 use crate::{
     aranya::Client,
     policy::{self, ChanOp, Effect, Perm, PublicKeyBundle},
-    util::mem_spill,
-    vm_policy::{MsgSink, VecSink},
+    vm_policy::{MsgSink, POLICY_SOURCE, VecSink, compile_policy},
 };
 
 /// Container for complex AQC channel creation results.
@@ -51,14 +50,14 @@ where
         nonce: Option<&[u8]>,
     ) -> Result<(GraphId, Vec<Effect>)> {
         let mut sink = VecSink::new();
-        let policy_data = &[0u8];
+        let policy_data = compile_policy(POLICY_SOURCE).context("compiling policy")?;
         let act = policy::create_team(
             owner_keys,
             nonce.unwrap_or(&<[u8; 16]>::random(Rng)).to_vec(),
         );
         let id = {
             let mut client = self.lock_aranya().await;
-            act.with_action(|act| client.new_graph(policy_data, act, &mut sink))
+            act.with_action(|act| client.new_graph(&policy_data, act, &mut sink))
                 .context("unable to create new team")?
         };
         Ok((id, sink.collect()?))
