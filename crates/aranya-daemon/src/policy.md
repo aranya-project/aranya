@@ -96,20 +96,16 @@ and `effect QueryFooResult`.
 
 ```policy
 use afc
-use crypto
 use device
-use envelope
 use idam
 use perspective
 ```
 
 - [`afc`][afc-ffi]: [AFC][afc] functionality, such as creating
   channels.
-- [`crypto`][crypto-ffi]: core cryptographic functionality, like
   command signing and verification.
 - [`device`][device-ffi]: provides information about the current
   device.
-- [`envelope`][evp-ffi]: provides access to the special
   [`Envelope`][envelope] type.
 - [`idam`][idam-ffi]: IDAM functionality, such as access to device
   keys.
@@ -496,9 +492,6 @@ ephemeral command QueryDevicesOnTeam {
         device_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -549,9 +542,6 @@ ephemeral command QueryAfcChannelIsValid {
         // The ID of the label.
         label_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -604,9 +594,6 @@ ephemeral command QueryDeviceRole {
         device_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -654,9 +641,6 @@ ephemeral command QueryDeviceKeyBundle {
         // The device whose key bundle is being queried.
         device_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -986,9 +970,6 @@ command ChangeRank {
         new_rank int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -1070,9 +1051,6 @@ ephemeral command QueryRank {
         object_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -1125,9 +1103,6 @@ ephemeral command QueryDeviceGeneration {
     fields {
         device_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -1428,9 +1403,6 @@ command AddPermToRole {
         perm enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -1488,9 +1460,6 @@ command RemovePermFromRole {
         // The permission being removed.
         perm enum Perm,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -1613,9 +1582,6 @@ command CreateRole {
         rank int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -1721,9 +1687,6 @@ command SetupDefaultRole {
         // The name of the default role.
         name enum DefaultRoleName,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -1862,9 +1825,6 @@ command DeleteRole {
     fields {
         role_id id
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -2082,9 +2042,6 @@ command AssignRole {
         role_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -2188,9 +2145,6 @@ command ChangeRole {
         // The new role being assigned to the device.
         new_role_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -2298,9 +2252,6 @@ command RevokeRole {
         role_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -2390,9 +2341,6 @@ ephemeral command QueryTeamRoles {
         default bool,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -2474,39 +2422,6 @@ command CreateTeam {
         owner_keys struct PublicKeyBundle,
         // Random nonce to enforce this team's uniqueness.
         nonce bytes,
-    }
-
-    // As the first command in the graph, the `CreateTeam`
-    // command is sealed and opened differently than other
-    // commands.
-    seal {
-        let parent_id = perspective::head_id()
-        let author_id = device::current_device_id()
-        let payload = serialize(this)
-        let author_sign_key_id = idam::derive_sign_key_id(this.owner_keys.sign_key)
-
-        let signed = crypto::sign(author_sign_key_id, payload)
-        return envelope::new(
-            parent_id,
-            author_id,
-            signed.command_id,
-            signed.signature,
-            payload,
-        )
-    }
-
-    open {
-        let payload = envelope::payload(envelope)
-        let author_sign_key = deserialize(payload).owner_keys.sign_key
-
-        let verified_command = crypto::verify(
-            author_sign_key,
-            envelope::parent_id(envelope),
-            payload,
-            envelope::command_id(envelope),
-            envelope::signature(envelope),
-        )
-        return deserialize(verified_command)
     }
 
     policy {
@@ -2675,9 +2590,6 @@ command TerminateTeam {
         team_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -2755,9 +2667,6 @@ command AddDevice {
         // Device rank.
         rank int,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -2856,9 +2765,6 @@ command RemoveDevice {
         // The ID of the device being removed from the team.
         device_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -3027,9 +2933,6 @@ command CreateLabel {
         rank int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -3106,9 +3009,6 @@ command DeleteLabel {
         // The unique ID of the label being deleted.
         label_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -3233,9 +3133,6 @@ command AssignLabelToDevice {
         // Device generation at authoring time; rejects stale epochs.
         device_gen int,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -3374,9 +3271,6 @@ command RevokeLabelFromDevice {
         label_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -3511,9 +3405,6 @@ ephemeral command QueryRoleHasPerm {
         perm enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -3566,9 +3457,6 @@ ephemeral command QueryRolePerms {
         perm enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -3618,9 +3506,6 @@ ephemeral command QueryLabel {
     fields {
         label_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -3679,9 +3564,6 @@ ephemeral command QueryLabels {
         label_author_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -3737,9 +3619,6 @@ ephemeral command QueryLabelsAssignedToDevice {
         label_name string,
         label_author_id id,
     }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists() else todo()
@@ -3869,9 +3748,6 @@ ephemeral command AfcCreateUniChannel {
         channel_key_id id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
         check team_exists() else todo()
 
@@ -3999,11 +3875,9 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
 [afc-ffi]: https://crates.io/crates/aranya-afc-util
 [all-the-way-down]: https://en.wikipedia.org/wiki/Turtles_all_the_way_down
 [commands]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html
-[crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi
 [device-ffi]: https://crates.io/crates/aranya-device-ffi
 [effects]: https://aranya-project.github.io/policy-book/reference/top-level/effects.html
 [envelope]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html#envelope-type
-[evp-ffi]: https://crates.io/crates/aranya-envelope-ffi
 [facts]: https://aranya-project.github.io/policy-book/reference/top-level/facts.html
 [idam-ffi]: https://crates.io/crates/aranya-idam-ffi
 [lp]: https://en.wikipedia.org/wiki/Literate_programming

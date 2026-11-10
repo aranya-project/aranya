@@ -793,12 +793,6 @@ user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
 end = "2030-12-19"
 
-[[trusted.aranya-crypto-ffi]]
-criteria = "safe-to-deploy"
-user-id = 293722 # aranya-project-bot
-start = "2024-10-16"
-end = "2030-12-19"
-
 [[trusted.aranya-daemon]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
@@ -812,12 +806,6 @@ start = "2024-10-16"
 end = "2030-12-19"
 
 [[trusted.aranya-device-ffi]]
-criteria = "safe-to-deploy"
-user-id = 293722 # aranya-project-bot
-start = "2024-10-16"
-end = "2030-12-19"
-
-[[trusted.aranya-envelope-ffi]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
