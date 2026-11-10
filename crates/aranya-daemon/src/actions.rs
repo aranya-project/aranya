@@ -118,7 +118,7 @@ where
 {
     async fn call_persistent_action(
         &self,
-        act: impl Actionable<Interface = policy::Persistent> + Send,
+        act: impl Actionable<Interface = policy::Basic> + Send,
     ) -> Result<Vec<Effect>> {
         let mut sink = VecSink::new();
         // Make sure we drop the lock as quickly as possible.
@@ -167,7 +167,7 @@ where
     /// Perform a persistent action.
     fn call_persistent_action(
         &self,
-        act: impl Actionable<Interface = policy::Persistent> + Send,
+        act: impl Actionable<Interface = policy::Basic> + Send,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send;
 
     #[allow(clippy::type_complexity)]
