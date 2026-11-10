@@ -13,7 +13,7 @@ use std::{collections::HashMap, fs, net::Ipv4Addr};
 use anyhow::{Context, Result, bail};
 use aranya_certgen::{CaCert, CertPaths, SaveOptions};
 use aranya_crypto::{
-    Csprng, DeviceId, Rng,
+    Csprng, DeviceId, KeyStoreExt, Rng,
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
     policy::{LabelId, RoleId},
@@ -23,6 +23,7 @@ use aranya_keygen::{PublicKeyBundle, PublicKeys};
 use aranya_runtime::{
     ClientError, ClientState, GraphId, MAX_SYNC_MESSAGE_SIZE, PolicyError, StorageProvider,
     storage::linear::{LinearStorageProvider, libc::FileManager},
+    vm_policy::SealCtx,
 };
 use aranya_util::{Addr, ready};
 use serial_test::serial;
@@ -42,7 +43,7 @@ use crate::{
         self, SyncPeer,
         quic::{CertConfig, QuicConnector, QuicListener},
     },
-    vm_policy::{POLICY_SOURCE, PolicyEngine},
+    vm_policy::{POLICY_SOURCE, create_policy_store},
 };
 
 /// Queries the rank of an object via the policy engine, returning the raw i64 value.
@@ -234,17 +235,24 @@ impl TestCtx {
         let bundle = PublicKeyBundle::generate(&eng, &mut store)
             .context("unable to generate `PublicKeyBundle`")?;
 
+        let sign_key = store
+            .get_key(&eng, bundle.sign_id)
+            .context("get sign key")?
+            .context("no sign key")?;
+
         let storage_dir = root.join("storage");
         fs::create_dir_all(&storage_dir)?;
 
         let pk = bundle.public_keys(&eng, &store)?;
 
         let client = aranya::Client::new(ClientState::new(
-            PolicyEngine::new(
-                POLICY_SOURCE,
+            create_policy_store(
                 eng,
                 store.try_clone().context("unable to clone keystore")?,
-                bundle.device_id,
+                SealCtx {
+                    author: bundle.device_id,
+                    key: sign_key,
+                },
             )?,
             LinearStorageProvider::new(FileManager::new(&storage_dir)?),
         ));
