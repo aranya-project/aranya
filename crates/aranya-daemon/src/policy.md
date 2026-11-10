@@ -207,7 +207,7 @@ base[init] BaseInit {
         owner_keys: struct PublicKeyBundle,
     }
     get_key {
-        return this.owner_keys
+        return Some(this.owner_keys.sign_key)
     }
 }
 
@@ -337,12 +337,6 @@ function try_find_device(device_id: id) option[struct Device] {
 // otherwise.
 function get_device(device_id: id) struct Device {
     return try_find_device(device_id) or todo()
-}
-
-// Returns the device corresponding with the author of the
-// envelope.
-function get_author(evp: struct Envelope) struct Device {
-    return get_device(envelope::author_id(evp))
 }
 
 // Collection of public Device Keys for a device.
@@ -960,7 +954,7 @@ command ChangeRank with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Check that the object exists before changing its rank.
         check object_exists(this.object_id) else todo()
@@ -1155,10 +1149,10 @@ about this situation. -->
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
-function derive_role_id(evp: struct Envelope) id {
+function derive_role_id(command_id: id) id {
     // The role ID is the ID of the command that created it.
     // TODO: Or we could use H(cmd_id, ...).
-    return envelope::command_id(evp)
+    return command_id
 }
 ```
 
@@ -1393,7 +1387,7 @@ command AddPermToRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else todo()
@@ -1451,7 +1445,7 @@ command RemovePermFromRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else todo()
@@ -1572,7 +1566,7 @@ command CreateRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // The author must have the permission to create a role
         check device_has_perm(author.device_id, Perm::CreateRole) else todo()
@@ -1580,7 +1574,7 @@ command CreateRole with Base {
         // The author's rank must be greater than the rank of the role it is creating.
         check get_object_rank(author.device_id) >= this.rank else todo()
 
-        let role_id = derive_role_id(envelope)
+        let role_id = derive_role_id(envelope.command_id)
 
         let role_info = RoleInfo {
             role_id: role_id,
@@ -1678,7 +1672,7 @@ command SetupDefaultRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Author must have permission to setup the default roles.
         check device_has_perm(author.device_id, Perm::SetupDefaultRole) else todo()
@@ -1686,7 +1680,7 @@ command SetupDefaultRole with Base {
         check !exists DefaultRoleSeeded[name: this.name] else todo()
 
         let name = default_role_name_to_str(this.name)
-        let role_id = derive_role_id(envelope)
+        let role_id = derive_role_id(envelope.command_id)
 
         let admin_role_rank = DEFAULT_ADMIN_ROLE_RANK
         let operator_role_rank = DEFAULT_OPERATOR_ROLE_RANK
@@ -1816,7 +1810,7 @@ command DeleteRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
         // The author must have the permission to delete the role
         check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id) else todo()
 
@@ -2032,7 +2026,7 @@ command AssignRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // The author must have permission to assign the role to the target device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id) else todo()
@@ -2136,7 +2130,7 @@ command ChangeRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Attempting to change to the same role should fail since a state change is expected.
         check this.old_role_id != this.new_role_id else todo()
@@ -2242,7 +2236,7 @@ command RevokeRole with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // The author must have permission to revoke the role from the device.
         check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id) else todo()
@@ -2420,20 +2414,20 @@ command CreateTeam with BaseInit {
         // yet. And I'm not sure we want to have policy generate
         // the nonce for CreateTeam.
 
-        let author_id = envelope::author_id(envelope)
+        let author_id = envelope.author_id
 
         let owner_device_id = idam::derive_device_id(this.owner_keys.ident_key)
 
         // The ID of a team is the ID of the command that created
         // it.
-        let team_id = envelope::command_id(envelope)
+        let team_id = envelope.command_id
 
         // The author must have signed the command with the same
         // device keys.
         check author_id == owner_device_id else todo()
 
         // The ID of the 'owner' role.
-        let owner_role_id = derive_role_id(envelope)
+        let owner_role_id = derive_role_id(envelope.command_id)
 
         let owner_rank = DEFAULT_OWNER_DEVICE_RANK
         let owner_role_rank = DEFAULT_OWNER_ROLE_RANK
@@ -2578,7 +2572,7 @@ command TerminateTeam with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Author must have permission to terminate the team.
         check device_has_perm(author.device_id, Perm::TerminateTeam) else todo()
@@ -2656,7 +2650,7 @@ command AddDevice with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Author must have permission to add a device to the team.
         check device_has_perm(author.device_id, Perm::AddDevice) else todo()
@@ -2754,7 +2748,7 @@ command RemoveDevice with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // The target device must exist.
         check exists Device[device_id: this.device_id] else todo()
@@ -2863,10 +2857,10 @@ branches, which could cause a fail-open security bug.
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
-function derive_label_id(evp: struct Envelope) id {
+function derive_label_id(evp: struct DefaultEnvelope) id {
     // The label ID is the ID of the command that created it.
     // TODO: Or we could use H(cmd_id, ...).
-    return envelope::command_id(evp)
+    return evp.command_id
 }
 ```
 
@@ -2921,7 +2915,7 @@ command CreateLabel with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Author must have permission to create a label.
         check device_has_perm(author.device_id, Perm::CreateLabel) else todo()
@@ -2998,7 +2992,7 @@ command DeleteLabel with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Author must have permission to delete a label and outrank the label.
         check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id) else todo()
@@ -3122,7 +3116,7 @@ command AssignLabelToDevice with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Author must have permission to assign a label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id) else todo()
@@ -3259,7 +3253,7 @@ command RevokeLabelFromDevice with Base {
     policy {
         check team_exists() else todo()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id)
 
         // Implicitly checks that the device exists.
         let target = get_device(this.device_id)
@@ -3736,7 +3730,7 @@ command AfcCreateUniChannel with BaseEphemeral {
     policy {
         check team_exists() else todo()
 
-        let sender = get_author(envelope)
+        let sender = get_device(envelope.author_id)
         let sender_id = sender.device_id
 
         let receiver_id = this.receiver_id
@@ -3745,7 +3739,7 @@ command AfcCreateUniChannel with BaseEphemeral {
         // Check that both devices have permission to create the AFC channel.
         check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else todo()
 
-        let parent_cmd_id = envelope::parent_id(envelope)
+        let parent_cmd_id = envelope.graph_id // TODO(jdygert): Propogate name to AFC
         let current_device_id = device::current_device_id()
 
         if current_device_id == sender_id {
