@@ -26,9 +26,11 @@ pub const DEFAULT_OWNER_ROLE_RANK: i64 = 999999i64;
 /// MAX_RANK constant.
 pub const MAX_RANK: i64 = 1000000i64;
 #[derive(Debug)]
-pub enum Persistent {}
+pub enum Basic {}
 #[derive(Debug)]
 pub enum Ephemeral {}
+#[derive(Debug)]
+pub enum Init {}
 /// PublicKeyBundle policy struct.
 #[value]
 pub struct PublicKeyBundle {
@@ -317,8 +319,8 @@ pub struct TeamTerminated {
     pub team_id: BaseId,
     pub owner_id: BaseId,
 }
-#[actions(interface = Persistent)]
-pub enum PersistentAction {
+#[actions(interface = Basic)]
+pub enum BasicAction {
     change_rank(change_rank),
     add_perm_to_role(add_perm_to_role),
     remove_perm_from_role(remove_perm_from_role),
@@ -328,7 +330,6 @@ pub enum PersistentAction {
     assign_role(assign_role),
     change_role(change_role),
     revoke_role(revoke_role),
-    create_team(create_team),
     terminate_team(terminate_team),
     add_device(add_device),
     remove_device(remove_device),
@@ -353,6 +354,10 @@ pub enum EphemeralAction {
     query_labels_assigned_to_device(query_labels_assigned_to_device),
     create_afc_uni_channel(create_afc_uni_channel),
 }
+#[actions(interface = Init)]
+pub enum InitAction {
+    create_team(create_team),
+}
 /// query_devices_on_team policy action.
 #[action(interface = Ephemeral)]
 pub struct query_devices_on_team {}
@@ -374,7 +379,7 @@ pub struct query_device_public_key_bundle {
     pub device_id: BaseId,
 }
 /// change_rank policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct change_rank {
     pub object_id: BaseId,
     pub old_rank: i64,
@@ -391,46 +396,46 @@ pub struct query_device_generation {
     pub device_id: BaseId,
 }
 /// add_perm_to_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct add_perm_to_role {
     pub role_id: BaseId,
     pub perm: Perm,
 }
 /// remove_perm_from_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct remove_perm_from_role {
     pub role_id: BaseId,
     pub perm: Perm,
 }
 /// create_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct create_role {
     pub role_name: Text,
     pub rank: i64,
 }
 /// setup_default_roles policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct setup_default_roles {}
 /// delete_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct delete_role {
     pub role_id: BaseId,
 }
 /// assign_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct assign_role {
     pub device_id: BaseId,
     pub role_id: BaseId,
 }
 /// change_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct change_role {
     pub device_id: BaseId,
     pub old_role_id: BaseId,
     pub new_role_id: BaseId,
 }
 /// revoke_role policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct revoke_role {
     pub device_id: BaseId,
     pub role_id: BaseId,
@@ -439,48 +444,48 @@ pub struct revoke_role {
 #[action(interface = Ephemeral)]
 pub struct query_team_roles {}
 /// create_team policy action.
-#[action(interface = Persistent)]
+#[action(interface = Init)]
 pub struct create_team {
     pub owner_keys: PublicKeyBundle,
     pub nonce: Vec<u8>,
 }
 /// terminate_team policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct terminate_team {
     pub team_id: BaseId,
 }
 /// add_device policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct add_device {
     pub device_keys: PublicKeyBundle,
     pub initial_role_id: Option<BaseId>,
     pub rank: i64,
 }
 /// remove_device policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct remove_device {
     pub device_id: BaseId,
 }
 /// create_label policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct create_label {
     pub name: Text,
     pub rank: i64,
 }
 /// delete_label policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct delete_label {
     pub label_id: BaseId,
 }
 /// assign_label_to_device policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct assign_label_to_device {
     pub device_id: BaseId,
     pub label_id: BaseId,
     pub op: ChanOp,
 }
 /// revoke_label_from_device policy action.
-#[action(interface = Persistent)]
+#[action(interface = Basic)]
 pub struct revoke_label_from_device {
     pub device_id: BaseId,
     pub label_id: BaseId,
