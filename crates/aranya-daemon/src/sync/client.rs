@@ -75,15 +75,15 @@ where
         schedule_delay: Duration,
         buffer: &mut [u8],
     ) -> Result<()> {
+        use aranya_runtime::HelloSubscribe;
+
         trace!(?peer, "subscribing to hello notifications from peer");
-        // TODO(nikki): update aranya_core with the new name.
-        let message = todo!();
-        // let message = SyncType::Hello(SyncHelloType::Subscribe {
-        //     graph_change_delay: graph_change_debounce,
-        //     duration,
-        //     schedule_delay,
-        //     graph_id: peer.graph_id,
-        // });
+        let message = SyncHello::Subscribe(HelloSubscribe::new(
+            peer.graph_id,
+            graph_change_debounce,
+            duration,
+            schedule_delay,
+        ));
 
         self.send_hello_request(peer, message, buffer).await
     }
@@ -95,11 +95,10 @@ where
         peer: SyncPeer,
         buffer: &mut [u8],
     ) -> Result<()> {
+        use aranya_runtime::HelloUnsubscribe;
+
         trace!(?peer, "unsubscribing from hello notifications from peer");
-        let message = todo!();
-        // let message = SyncType::Hello(SyncHelloType::Unsubscribe {
-        //     graph_id: peer.graph_id,
-        // });
+        let message = SyncHello::Unsubscribe(HelloUnsubscribe::new(peer.graph_id));
 
         self.send_hello_request(peer, message, buffer).await
     }
@@ -117,8 +116,7 @@ where
 
         trace!(?peer, "sending hello notifications to peer");
 
-        let message = todo!();
-        // let message = SyncHello::Hello(HelloNotification::new(peer.graph_id, head));
+        let message = HelloNotification::new(peer.graph_id, head);
 
         // Connect to the peer
         let mut stream = self
@@ -128,9 +126,11 @@ where
             .map_err(Error::transport)?;
 
         // Send the message
-        let data = todo!();
-        // let data = message.encode_to(buffer)?;
-        stream.send(data).await.map_err(Error::transport)?;
+        let len = message.encode_to(buffer)?;
+        stream
+            .send(&buffer[..len])
+            .await
+            .map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         Ok(())
@@ -152,9 +152,15 @@ where
             .map_err(Error::transport)?;
 
         // Send the message
-        let data = todo!();
-        // let data = postcard::to_slice(&sync_type, buffer)?;
-        stream.send(data).await.map_err(Error::transport)?;
+        let len = match sync_type {
+            SyncHello::Subscribe(sub) => sub.encode_to(buffer)?,
+            SyncHello::Unsubscribe(unsub) => unsub.encode_to(buffer)?,
+            SyncHello::Hello(hello) => hello.encode_to(buffer)?,
+        };
+        stream
+            .send(&buffer[..len])
+            .await
+            .map_err(Error::transport)?;
         stream.finish().await.map_err(Error::transport)?;
 
         // Read the response to avoid a race condition with the server
