@@ -62,6 +62,7 @@ where
 pub(crate) fn compile_policy(policy_doc: &str) -> Result<Vec<u8>> {
     let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
     let module = Compiler::new(&ast)
+        .flavors(&aranya_runtime::vm_policy::FLAVORS)
         .ffi_modules(&[
             AfcFfi::<Store>::SCHEMA,
             DeviceFfi::SCHEMA,
