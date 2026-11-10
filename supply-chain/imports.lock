@@ -66,19 +66,7 @@ when = "2026-03-18"
 user-id = 293722
 user-login = "aranya-project-bot"
 
-[[publisher.aranya-crypto-ffi]]
-version = "0.21.0"
-when = "2026-03-31"
-user-id = 293722
-user-login = "aranya-project-bot"
-
 [[publisher.aranya-device-ffi]]
-version = "0.21.0"
-when = "2026-03-31"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-envelope-ffi]]
 version = "0.21.0"
 when = "2026-03-31"
 user-id = 293722
