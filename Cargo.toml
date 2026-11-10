@@ -112,19 +112,19 @@ tag-message = ""
 tag-prefix = ""
 
 [patch.crates-io]
-aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-id = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-policy-text = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git" }
-aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git" }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-id = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-policy-text = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
+aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", branch = "jdygert/push-xmzpsrosrply" }
