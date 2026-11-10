@@ -33,7 +33,7 @@ use crate::{
         quic::{CertConfig, QuicConnector, QuicListener},
     },
     util::TeamConfigStore,
-    vm_policy::{POLICY_SOURCE, create_policy_store},
+    vm_policy::create_policy_store,
 };
 
 // Use short names so that we can more easily add generics.

@@ -87,6 +87,6 @@ impl Drop for PidFile {
 
 impl fmt::Display for PidFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.path.display())
+        write!(f, "{}", self.path.display())
     }
 }

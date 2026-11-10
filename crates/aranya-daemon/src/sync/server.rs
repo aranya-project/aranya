@@ -157,7 +157,8 @@ where
         request: PollIncoming,
         buf: &mut [u8],
     ) -> Result<usize, Error> {
-        // peer.check_request(graph_id)?; // TODO: Need to expose graph ID
+        let graph_id = request.graph_id().ok_or(Error::InvalidRequest)?;
+        peer.check_request(graph_id)?;
         let mut resp = SyncResponder::new();
         resp.receive(request)?;
         let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
