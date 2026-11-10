@@ -2,7 +2,7 @@ use std::{io, path::Path};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
-    Engine, Rng,
+    Engine, KeyStoreExt as _, Rng,
     dangerous::spideroak_crypto::{import::Import, keys::SecretKey},
     default::DefaultEngine,
     keystore::{KeyStore, fs_keystore::Store},
@@ -33,7 +33,7 @@ use crate::{
         quic::{CertConfig, QuicConnector, QuicListener},
     },
     util::TeamConfigStore,
-    vm_policy::POLICY_SOURCE,
+    vm_policy::{POLICY_SOURCE, create_policy_store},
 };
 
 // Use short names so that we can more easily add generics.
@@ -268,8 +268,20 @@ impl Daemon {
     )> {
         let device_id = pk.ident_pk.id()?;
 
+        let sign_key = store
+            .get_key(&eng, pk.sign_pk.id()?)
+            .context("get sign key")?
+            .context("no sign key")?;
+
         let client = Client::new(ClientState::new(
-            PS::new(POLICY_SOURCE, eng, store, device_id)?,
+            create_policy_store(
+                eng,
+                store,
+                aranya_runtime::vm_policy::SealCtx {
+                    author: device_id,
+                    key: sign_key,
+                },
+            )?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
