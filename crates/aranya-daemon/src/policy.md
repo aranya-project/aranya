@@ -474,7 +474,7 @@ command QueryDevicesOnTeam with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         finish {
             emit QueryDevicesOnTeamResult {
@@ -482,6 +482,8 @@ command QueryDevicesOnTeam with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -525,7 +527,7 @@ command QueryAfcChannelIsValid with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         // Check that both devices have permission to create the AFC channel.
         let is_valid = afc_uni_channel_is_valid(this.sender_id, this.receiver_id, this.label_id)
@@ -539,6 +541,8 @@ command QueryAfcChannelIsValid with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -576,7 +580,7 @@ command QueryDeviceRole with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let device = get_device(this.device_id)
 
@@ -593,6 +597,8 @@ command QueryDeviceRole with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -624,7 +630,7 @@ command QueryDeviceKeyBundle with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         // NB: A device's keys exist iff `fact Device` exists, so
         // we don't need to use `get_device` or anything
@@ -637,6 +643,8 @@ command QueryDeviceKeyBundle with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -952,30 +960,30 @@ command ChangeRank with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Check that the object exists before changing its rank.
-        check object_exists(this.object_id) else todo()
+        check object_exists(this.object_id) else recall default()
 
         // Changing the rank of a role is not supported. Role ranks are fixed
         // at creation time to maintain the invariant that role_rank > device_rank
         // for all devices assigned to the role.
         let is_role = query Role[role_id: this.object_id]
-        check is_role is None else todo()
+        check is_role is None else recall default()
 
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
             // An object can always downgrade its own rank.
-            check device_has_perm(author.device_id, Perm::ChangeRank) else todo()
+            check device_has_perm(author.device_id, Perm::ChangeRank) else recall default()
         } else {
-            check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id) else todo()
+            check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id) else recall default()
         }
         // Check that author's rank is >= than the rank being set.
         // If the author is the current device, this prevents a device from upgrading its own rank.
         let author_rank = get_object_rank(author.device_id)
-        check author_rank >= this.new_rank else todo()
+        check author_rank >= this.new_rank else recall default()
 
         // If the target is a device with an assigned role, the new rank
         // must not exceed the role's rank. This maintains the invariant
@@ -983,14 +991,14 @@ command ChangeRank with Base {
         match query AssignedRole[device_id: this.object_id] {
             Some(assigned_role) => {
                 let role_rank = get_object_rank(assigned_role.role_id)
-                check this.new_rank <= role_rank else todo()
+                check this.new_rank <= role_rank else recall default()
             }
             None => {}
         }
 
         // Check that old_rank matches the object's current rank.
         // Implicitly checks that the rank exists before modifying it.
-        check this.old_rank == get_object_rank(this.object_id) else todo()
+        check this.old_rank == get_object_rank(this.object_id) else recall default()
 
         finish {
             change_object_rank(this.object_id, this.old_rank, this.new_rank)
@@ -1002,6 +1010,8 @@ command ChangeRank with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -1033,7 +1043,7 @@ command QueryRank with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let maybe_rank = query Rank[object_id: this.object_id]
         match maybe_rank {
@@ -1050,6 +1060,8 @@ command QueryRank with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -1086,7 +1098,7 @@ command QueryDeviceGeneration with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let maybe_gen = query DeviceGeneration[device_id: this.device_id]
         match maybe_gen {
@@ -1103,6 +1115,8 @@ command QueryDeviceGeneration with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -1385,15 +1399,15 @@ command AddPermToRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // The author must have permission to change role perms.
-        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else todo()
+        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else recall default()
 
         // The role must not already have the permission.
-        check !role_has_perm(this.role_id, this.perm) else todo()
+        check !role_has_perm(this.role_id, this.perm) else recall default()
 
         finish {
             create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
@@ -1405,6 +1419,8 @@ command AddPermToRole with Base {
             }
         }
     }
+
+    recall default() {}
 }
 
 // Removes the permission from the role.
@@ -1443,12 +1459,12 @@ command RemovePermFromRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // The author must have permission to change role perms.
-        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else todo()
+        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else recall default()
 
         // The author does not need to hold the permission being removed.
         // The rank hierarchy already prevents abuse: a device can only
@@ -1458,7 +1474,7 @@ command RemovePermFromRole with Base {
 
         // It is an error to remove a permission not assigned to
         // the role.
-        check role_has_perm(this.role_id, this.perm) else todo()
+        check role_has_perm(this.role_id, this.perm) else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -1478,6 +1494,8 @@ command RemovePermFromRole with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -1564,15 +1582,15 @@ command CreateRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // The author must have the permission to create a role
-        check device_has_perm(author.device_id, Perm::CreateRole) else todo()
+        check device_has_perm(author.device_id, Perm::CreateRole) else recall default()
 
         // The author's rank must be greater than the rank of the role it is creating.
-        check get_object_rank(author.device_id) >= this.rank else todo()
+        check get_object_rank(author.device_id) >= this.rank else recall default()
 
         let role_id = derive_role_id(envelope.command_id)
 
@@ -1590,6 +1608,8 @@ command CreateRole with Base {
             emit role_created
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -1670,14 +1690,14 @@ command SetupDefaultRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Author must have permission to setup the default roles.
-        check device_has_perm(author.device_id, Perm::SetupDefaultRole) else todo()
+        check device_has_perm(author.device_id, Perm::SetupDefaultRole) else recall default()
 
-        check !exists DefaultRoleSeeded[name: this.name] else todo()
+        check !exists DefaultRoleSeeded[name: this.name] else recall default()
 
         let name = default_role_name_to_str(this.name)
         let role_id = derive_role_id(envelope.command_id)
@@ -1774,6 +1794,8 @@ command SetupDefaultRole with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -1808,22 +1830,22 @@ command DeleteRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
         // The author must have the permission to delete the role
-        check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id) else todo()
+        check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id) else recall default()
 
         // The role must exist
-        check exists Role[role_id: this.role_id] else todo()
+        check exists Role[role_id: this.role_id] else recall default()
         // The role must not be assigned to any devices
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: ?,
-        ] else todo()
+        ] else recall default()
 
         // we already checked that this exists
-        let role = query Role[role_id: this.role_id] or todo()
+        let role = query Role[role_id: this.role_id] or recall default()
 
         finish {
             delete Role[role_id: this.role_id]
@@ -1835,6 +1857,8 @@ command DeleteRole with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2024,31 +2048,31 @@ command AssignRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // The author must have permission to assign the role to the target device.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id) else todo()
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id) else recall default()
 
         // The role's rank must be >= the device's rank.
-        check role_rank_gte_device_rank(this.role_id, this.device_id) else todo()
+        check role_rank_gte_device_rank(this.role_id, this.device_id) else recall default()
 
         // Ensure the target role exists.
-        check exists Role[role_id: this.role_id] else todo()
+        check exists Role[role_id: this.role_id] else recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id] else todo()
+        check exists Device[device_id: this.device_id] else recall default()
 
         // Device must not already have a role assigned.
         // If the device already has a role assigned, use `ChangeRole` instead.
-        check !exists AssignedRole[device_id: this.device_id] else todo()
+        check !exists AssignedRole[device_id: this.device_id] else recall default()
 
         // Ensure the role index is also clear before creating a new assignment.
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: this.device_id,
-        ] else todo()
+        ] else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -2070,6 +2094,8 @@ command AssignRole with Base {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2128,42 +2154,42 @@ command ChangeRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Attempting to change to the same role should fail since a state change is expected.
-        check this.old_role_id != this.new_role_id else todo()
+        check this.old_role_id != this.new_role_id else recall default()
 
-        check exists Role[role_id: this.new_role_id] else todo()
+        check exists Role[role_id: this.new_role_id] else recall default()
 
         // The author must have permission to revoke the old role from the device.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id) else todo()
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id) else recall default()
 
         // The author must have permission to assign the new role to the device.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id) else todo()
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id) else recall default()
 
         // The new role's rank must be >= the device's rank.
-        check role_rank_gte_device_rank(this.new_role_id, this.device_id) else todo()
+        check role_rank_gte_device_rank(this.new_role_id, this.device_id) else recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id] else todo()
+        check exists Device[device_id: this.device_id] else recall default()
 
-        let current_assignment = query AssignedRole[device_id: this.device_id] or todo()
-        check current_assignment.role_id == this.old_role_id else todo()
+        let current_assignment = query AssignedRole[device_id: this.device_id] or recall default()
+        check current_assignment.role_id == this.old_role_id else recall default()
 
         // Ensure the role index reflects the existing assignment before updating it.
         check exists RoleAssignmentIndex[
             role_id: this.old_role_id,
             device_id: this.device_id,
-        ] else todo()
+        ] else recall default()
 
-        let old_role = query Role[role_id: this.old_role_id] or todo()
+        let old_role = query Role[role_id: this.old_role_id] or recall default()
         if is_owner(old_role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.old_role_id,
                 device_id: ?,
-            ]=>{} else todo()
+            ]=>{} else recall default()
         }
 
         // At this point we believe the following invariants to
@@ -2193,6 +2219,8 @@ command ChangeRole with Base {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2234,32 +2262,32 @@ command RevokeRole with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // The author must have permission to revoke the role from the device.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id) else todo()
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id) else recall default()
 
-        let role = query Role[role_id: this.role_id] or todo()
+        let role = query Role[role_id: this.role_id] or recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id] else todo()
+        check exists Device[device_id: this.device_id] else recall default()
 
-        let assignment = query AssignedRole[device_id: this.device_id] or todo()
-        check assignment.role_id == this.role_id else todo()
+        let assignment = query AssignedRole[device_id: this.device_id] or recall default()
+        check assignment.role_id == this.role_id else recall default()
 
         // Ensure the assignment index entry exists so we can remove it.
         check exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: this.device_id,
-        ] else todo()
+        ] else recall default()
 
         if is_owner(role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.role_id,
                 device_id: ?,
-            ]=>{} else todo()
+            ]=>{} else recall default()
         }
 
         // At this point we believe the following to be true:
@@ -2281,6 +2309,8 @@ command RevokeRole with Base {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2323,13 +2353,15 @@ command QueryTeamRoles with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let eff = this as QueryTeamRolesResult
         finish {
             emit eff
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2406,7 +2438,7 @@ command CreateTeam with BaseInit {
     policy {
         // NB: This is the only place in the policy file where we
         // invert this condition.
-        check !team_exists() else todo()
+        check !team_exists() else recall default()
 
         // TODO: check that `this.nonce` length is like
         // 32: bytes or something? It *should* be cryptographically
@@ -2424,7 +2456,7 @@ command CreateTeam with BaseInit {
 
         // The author must have signed the command with the same
         // device keys.
-        check author_id == owner_device_id else todo()
+        check author_id == owner_device_id else recall default()
 
         // The ID of the 'owner' role.
         let owner_role_id = derive_role_id(envelope.command_id)
@@ -2500,6 +2532,8 @@ command CreateTeam with BaseInit {
             }
         }
     }
+
+    recall default() {}
 }
 
 // Adds the device to the team.
@@ -2570,15 +2604,15 @@ command TerminateTeam with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Author must have permission to terminate the team.
-        check device_has_perm(author.device_id, Perm::TerminateTeam) else todo()
+        check device_has_perm(author.device_id, Perm::TerminateTeam) else recall default()
 
         let current_team_id = team_id()
-        check this.team_id == current_team_id else todo()
+        check this.team_id == current_team_id else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -2596,6 +2630,8 @@ command TerminateTeam with Base {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2648,22 +2684,22 @@ command AddDevice with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Author must have permission to add a device to the team.
-        check device_has_perm(author.device_id, Perm::AddDevice) else todo()
+        check device_has_perm(author.device_id, Perm::AddDevice) else recall default()
 
         // The author's rank must be greater than the rank of the device it is adding to the team.
-        check get_object_rank(author.device_id) >= this.rank else todo()
+        check get_object_rank(author.device_id) >= this.rank else recall default()
 
         let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
-        check !exists Device[device_id: device_id] else todo()
-        check !exists DeviceIdentPubKey[device_id: device_id] else todo()
-        check !exists DeviceSignPubKey[device_id: device_id] else todo()
-        check !exists DeviceEncPubKey[device_id: device_id] else todo()
+        check !exists Device[device_id: device_id] else recall default()
+        check !exists DeviceIdentPubKey[device_id: device_id] else recall default()
+        check !exists DeviceSignPubKey[device_id: device_id] else recall default()
+        check !exists DeviceEncPubKey[device_id: device_id] else recall default()
 
         let existing_gen = query DeviceGeneration[device_id: device_id]
 
@@ -2706,6 +2742,8 @@ command AddDevice with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2746,24 +2784,24 @@ command RemoveDevice with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id] else todo()
+        check exists Device[device_id: this.device_id] else recall default()
 
         // Author must have permission to remove a device from the team.
         // Devices should always be allowed to remove themselves even without RemoveDevice permission.
         if author.device_id != this.device_id {
-            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id) else todo()
+            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id) else recall default()
         }
 
         // Clean up optional per-device facts that may or may not
         // exist.
         let maybe_assigned_role = query AssignedRole[device_id: this.device_id]
-        let device_gen = query DeviceGeneration[device_id: this.device_id] or todo()
-        let next_gen = add(device_gen.generation, 1) or todo()
+        let device_gen = query DeviceGeneration[device_id: this.device_id] or recall default()
+        let next_gen = add(device_gen.generation, 1) or recall default()
 
         match maybe_assigned_role {
             Some(assigned_role) => {
@@ -2773,17 +2811,17 @@ command RemoveDevice with Base {
                 check exists RoleAssignmentIndex[
                     role_id: role_id,
                     device_id: this.device_id,
-                ] else todo()
+                ] else recall default()
 
                 // The assigned role must exist.
-                let role = query Role[role_id: role_id] or todo()
+                let role = query Role[role_id: role_id] or recall default()
 
                 // Ensure that a team always has at least one owner.
                 if is_owner(role) {
                     check at_least 2 RoleAssignmentIndex[
                         role_id: role_id,
                         device_id: ?,
-                    ]=>{} else todo()
+                    ]=>{} else recall default()
                 }
 
                 finish {
@@ -2819,6 +2857,8 @@ command RemoveDevice with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2913,15 +2953,15 @@ command CreateLabel with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Author must have permission to create a label.
-        check device_has_perm(author.device_id, Perm::CreateLabel) else todo()
+        check device_has_perm(author.device_id, Perm::CreateLabel) else recall default()
 
         // The author's rank must be greater than the rank of the label it is creating.
-        check get_object_rank(author.device_id) >= this.rank else todo()
+        check get_object_rank(author.device_id) >= this.rank else recall default()
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
@@ -2945,6 +2985,8 @@ command CreateLabel with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -2990,17 +3032,17 @@ command DeleteLabel with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Author must have permission to delete a label and outrank the label.
-        check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id) else todo()
+        check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id) else recall default()
 
         // We can't query the label after it's been deleted, so
         // make sure we pull all of its info out of the fact
         // database.
-        let label = query Label[label_id: this.label_id] or todo()
+        let label = query Label[label_id: this.label_id] or recall default()
 
         // At this point we believe the following to be true:
         //
@@ -3027,6 +3069,8 @@ command DeleteLabel with Base {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3114,24 +3158,24 @@ command AssignLabelToDevice with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
         // Author must have permission to assign a label and outrank the target device and label.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id) else todo()
+        check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id) else recall default()
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
-        check exists Device[device_id: this.device_id] else todo()
-        check exists Label[label_id: this.label_id] else todo()
+        check exists Device[device_id: this.device_id] else recall default()
+        check exists Label[label_id: this.label_id] else recall default()
 
         // The target device must be able to use AFC.
-        check device_has_perm(this.device_id, Perm::CanUseAfc) else todo()
+        check device_has_perm(this.device_id, Perm::CanUseAfc) else recall default()
 
         // Reject if the device's membership epoch changed (e.g. reordered remove/re-add).
         let current_gen = get_device_gen(this.device_id)
-        check this.device_gen == current_gen else todo()
+        check this.device_gen == current_gen else recall default()
 
         let existing_assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
@@ -3142,7 +3186,7 @@ command AssignLabelToDevice with Base {
             Some(assignment) => {
                 // Only allow reuse when the stored assignment is
                 // from an older device generation.
-                check assignment.device_gen < current_gen else todo()
+                check assignment.device_gen < current_gen else recall default()
 
                 // At this point we believe the following to be true:
                 //
@@ -3200,6 +3244,8 @@ command AssignLabelToDevice with Base {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3251,7 +3297,7 @@ command RevokeLabelFromDevice with Base {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let author = get_device(envelope.author_id)
 
@@ -3259,15 +3305,15 @@ command RevokeLabelFromDevice with Base {
         let target = get_device(this.device_id)
 
         // The author device must have permission to revoke the label and outrank the target device and label.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id) else todo()
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id) else recall default()
 
         // We need to get label info before deleting
-        let label = query Label[label_id: this.label_id] or todo()
+        let label = query Label[label_id: this.label_id] or recall default()
 
         let assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
-        ] or todo()
+        ] or recall default()
         // Reject revocations of stale label assignments. When a
         // device is removed and re-added its generation counter is
         // incremented, which implicitly invalidates all prior label
@@ -3275,7 +3321,7 @@ command RevokeLabelFromDevice with Base {
         // would delete the fact row and prevent a future (valid)
         // assign from reusing it via the `device_gen < current_gen`
         // update path.
-        check label_assignment_matches_gen(this.device_id, assignment.device_gen) else todo()
+        check label_assignment_matches_gen(this.device_id, assignment.device_gen) else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -3301,6 +3347,8 @@ command RevokeLabelFromDevice with Base {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3385,10 +3433,10 @@ command QueryRoleHasPerm with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         // Check that the role exists.
-        check exists Role[role_id: this.role_id] else todo()
+        check exists Role[role_id: this.role_id] else recall default()
 
         let has_perm = exists RoleHasPerm[role_id: this.role_id, perm: this.perm]
 
@@ -3403,6 +3451,8 @@ command QueryRoleHasPerm with BaseEphemeral {
             finish {}
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3437,10 +3487,10 @@ command QueryRolePerms with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         // Check that the role exists.
-        check exists Role[role_id: this.role_id] else todo()
+        check exists Role[role_id: this.role_id] else recall default()
 
         finish {
             emit QueryRolePermsResult {
@@ -3449,6 +3499,8 @@ command QueryRolePerms with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3487,7 +3539,7 @@ command QueryLabel with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let maybe_label = query Label[label_id: this.label_id]
         match maybe_label {
@@ -3505,6 +3557,8 @@ command QueryLabel with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3544,7 +3598,7 @@ command QueryLabels with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         finish {
             emit QueryLabelsResult {
@@ -3554,6 +3608,8 @@ command QueryLabels with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3600,10 +3656,10 @@ command QueryLabelsAssignedToDevice with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         // Check that the device exists.
-        check exists Device[device_id: this.device_id] else todo()
+        check exists Device[device_id: this.device_id] else recall default()
 
         finish {
             emit QueryLabelsAssignedToDeviceResult {
@@ -3614,6 +3670,8 @@ command QueryLabelsAssignedToDevice with BaseEphemeral {
             }
         }
     }
+
+    recall default() {}
 }
 ```
 
@@ -3728,16 +3786,16 @@ command AfcCreateUniChannel with BaseEphemeral {
     }
 
     policy {
-        check team_exists() else todo()
+        check team_exists() else recall default()
 
         let sender = get_device(envelope.author_id)
         let sender_id = sender.device_id
 
         let receiver_id = this.receiver_id
-        let receiver = try_find_device(receiver_id) or todo()
+        let receiver = try_find_device(receiver_id) or recall default()
 
         // Check that both devices have permission to create the AFC channel.
-        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else todo()
+        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else recall default()
 
         let parent_cmd_id = envelope.graph_id // TODO(jdygert): Propogate name to AFC
         let current_device_id = device::current_device_id()
@@ -3776,9 +3834,11 @@ command AfcCreateUniChannel with BaseEphemeral {
         } else {
             // This is an off-graph session command, so only the
             // communicating peers should process this command.
-            check false else todo()
+            recall default()
         }
     }
+
+    recall default() {}
 }
 
 // Reports whether an AFC channel is valid according to the policy.
