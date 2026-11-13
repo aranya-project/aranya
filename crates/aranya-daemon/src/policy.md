@@ -788,9 +788,7 @@ Utility method for checking object ranks before allowing operations to be perfor
 function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: id) bool {
     check device_has_perm(author_id, perm) else todo()
     let author_rank = get_object_rank(author_id)
-    if !author_can_operate_on_target(author_rank, target_id) {
-        return false
-    }
+    check author_can_operate_on_target(author_rank, target_id) else return false
 
     return true
 }
@@ -801,12 +799,8 @@ function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: i
 function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1: id, target_id2: id) bool {
     check device_has_perm(author_id, perm) else todo()
     let author_rank = get_object_rank(author_id)
-    if !author_can_operate_on_target(author_rank, target_id1) {
-        return false
-    }
-    if !author_can_operate_on_target(author_rank, target_id2) {
-        return false
-    }
+    check author_can_operate_on_target(author_rank, target_id1) else return false
+    check author_can_operate_on_target(author_rank, target_id2) else return false
 
     return true
 }
@@ -818,11 +812,7 @@ function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1:
 // modify objects below them in the rank hierarchy.
 function author_can_operate_on_target(author_rank: int, target_id: id) bool {
     let object_rank = get_object_rank(target_id)
-    if author_rank > object_rank {
-        return true
-    }
-
-    return false
+    return author_rank > object_rank
 }
 ```
 
@@ -3852,26 +3842,19 @@ command AfcCreateUniChannel with BaseEphemeral {
 //   - Have `CanUseAfc` permission assigned to their respective roles
 function afc_uni_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) bool {
     // The label must exist.
-    if !exists Label[label_id] {
-        return false
-    }
+    check exists Label[label_id] else return false
 
     // Devices cannot create channels with themselves.
     //
     // This should have been caught by the AFC FFI
-    if sender_id == receiver_id {
-        return false
-    }
+    check sender_id != receiver_id else return false
 
     // Devices must be members of the team
     let sender = try_find_device(sender_id)
-    if sender is None {
-        return false
-    }
+    check sender is Some else return false
+
     let receiver = try_find_device(receiver_id)
-    if receiver is None {
-        return false
-    }
+    check receiver is Some else return false
 
     // The writer must have permissions to write (send) data.
     let writer_op = get_allowed_chan_op_for_label(sender_id, label_id) or return false
@@ -3890,16 +3873,10 @@ function afc_uni_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) 
     }
 
     // Sender must have `CreateAfcUniChannel`, `CanUseAfc` permissions
-    if !device_has_perm(sender_id, Perm::CreateAfcUniChannel) {
-        return false
-    }
-    if !device_has_perm(sender_id, Perm::CanUseAfc) {
-        return false
-    }
+    check device_has_perm(sender_id, Perm::CreateAfcUniChannel) else return false
+    check device_has_perm(sender_id, Perm::CanUseAfc) else return false
     // Receiver must have `CanUseAfc` permission
-    if !device_has_perm(receiver_id, Perm::CanUseAfc) {
-        return false
-    }
+    check device_has_perm(receiver_id, Perm::CanUseAfc) else return false
 
     return true
 }
