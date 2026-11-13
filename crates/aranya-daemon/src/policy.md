@@ -315,7 +315,7 @@ fact DeviceEncPubKey[device_id: id]=>{key: bytes}
 
 ```policy
 // Returns a device if one exists, or `None` otherwise.
-function try_find_device(device_id: id) option[struct Device] {
+function get_device(device_id: id) option[struct Device] {
     // This function is a little too expensive to call every
     // time we need to get a device, so this is only checked
     // during debugging/developing by debug_assert().
@@ -330,12 +330,6 @@ function try_find_device(device_id: id) option[struct Device] {
     debug_assert(valid_device_invariants(device_id))
 
     return query Device[device_id]
-}
-
-// Returns a device if it exists, or raises a check error
-// otherwise.
-function get_device(device_id: id) struct Device {
-    return try_find_device(device_id) or todo()
 }
 
 // Collection of public Device Keys for a device.
@@ -359,7 +353,7 @@ function get_device_public_key_bundle(device_id: id) struct PublicKeyBundle {
     // time we need to get a device, so only uncomment this when
     // debugging/developing.
     //
-    // See the comment in `try_find_device`.
+    // See the comment in `get_device`.
     //
     debug_assert(valid_device_invariants(device_id))
 
@@ -387,7 +381,7 @@ function get_enc_pk(device_id: id) bytes {
     // time we need to get a device, so it is only checked during
     // debugging/developing.
     //
-    // See the comment in `try_find_device`.
+    // See the comment in `get_device`.
     //
     debug_assert(valid_device_invariants(device_id))
 
@@ -581,7 +575,7 @@ command QueryDeviceRole with BaseEphemeral {
     policy {
         check team_exists() else recall no_team()
 
-        let device = get_device(this.device_id)
+        let device = get_device(this.device_id) or recall default()
 
         let assigned_role = try_get_assigned_role(device.device_id)
         match assigned_role {
@@ -598,6 +592,7 @@ command QueryDeviceRole with BaseEphemeral {
     }
 
     recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -951,7 +946,7 @@ command ChangeRank with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Check that the object exists before changing its rank.
         check object_exists(this.object_id) else recall default()
@@ -1390,7 +1385,7 @@ command AddPermToRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else recall default()
@@ -1451,7 +1446,7 @@ command RemovePermFromRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to change role perms.
         check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else recall default()
@@ -1575,7 +1570,7 @@ command CreateRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have the permission to create a role
         check device_has_perm(author.device_id, Perm::CreateRole) else recall default()
@@ -1684,7 +1679,7 @@ command SetupDefaultRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to setup the default roles.
         check device_has_perm(author.device_id, Perm::SetupDefaultRole) else recall default()
@@ -1825,7 +1820,7 @@ command DeleteRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
         // The author must have the permission to delete the role
         check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id) else recall default()
 
@@ -2044,7 +2039,7 @@ command AssignRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to assign the role to the target device.
         check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id) else recall default()
@@ -2151,7 +2146,7 @@ command ChangeRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Attempting to change to the same role should fail since a state change is expected.
         check this.old_role_id != this.new_role_id else recall default()
@@ -2260,7 +2255,7 @@ command RevokeRole with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to revoke the role from the device.
         check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id) else recall default()
@@ -2604,7 +2599,7 @@ command TerminateTeam with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to terminate the team.
         check device_has_perm(author.device_id, Perm::TerminateTeam) else recall default()
@@ -2685,7 +2680,7 @@ command AddDevice with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to add a device to the team.
         check device_has_perm(author.device_id, Perm::AddDevice) else recall default()
@@ -2786,7 +2781,7 @@ command RemoveDevice with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The target device must exist.
         check exists Device[device_id: this.device_id] else recall default()
@@ -2956,7 +2951,7 @@ command CreateLabel with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to create a label.
         check device_has_perm(author.device_id, Perm::CreateLabel) else recall default()
@@ -3036,7 +3031,7 @@ command DeleteLabel with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to delete a label and outrank the label.
         check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id) else recall default()
@@ -3163,7 +3158,7 @@ command AssignLabelToDevice with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to assign a label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id) else recall default()
@@ -3303,10 +3298,10 @@ command RevokeLabelFromDevice with Base {
     policy {
         check team_exists() else recall no_team()
 
-        let author = get_device(envelope.author_id)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Implicitly checks that the device exists.
-        let target = get_device(this.device_id)
+        let target = get_device(this.device_id) or recall default()
 
         // The author device must have permission to revoke the label and outrank the target device and label.
         check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id) else recall default()
@@ -3796,11 +3791,11 @@ command AfcCreateUniChannel with BaseEphemeral {
     policy {
         check team_exists() else recall no_team()
 
-        let sender = get_device(envelope.author_id)
+        let sender = get_device(envelope.author_id) or recall default()
         let sender_id = sender.device_id
 
         let receiver_id = this.receiver_id
-        let receiver = try_find_device(receiver_id) or recall default()
+        let receiver = get_device(receiver_id) or recall default()
 
         // Check that both devices have permission to create the AFC channel.
         check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else recall default()
@@ -3870,10 +3865,10 @@ function afc_uni_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) 
     check sender_id != receiver_id else return false
 
     // Devices must be members of the team
-    let sender = try_find_device(sender_id)
+    let sender = get_device(sender_id)
     check sender is Some else return false
 
-    let receiver = try_find_device(receiver_id)
+    let receiver = get_device(receiver_id)
     check receiver is Some else return false
 
     // The writer must have permissions to write (send) data.
