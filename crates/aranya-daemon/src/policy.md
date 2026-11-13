@@ -970,8 +970,7 @@ command ChangeRank with Base {
         // Changing the rank of a role is not supported. Role ranks are fixed
         // at creation time to maintain the invariant that role_rank > device_rank
         // for all devices assigned to the role.
-        let is_role = query Role[role_id: this.object_id]
-        check is_role is None else recall default()
+        check exists Role[role_id: this.object_id] else recall default()
 
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
@@ -2701,7 +2700,7 @@ command AddDevice with Base {
         check !exists DeviceSignPubKey[device_id: device_id] else recall default()
         check !exists DeviceEncPubKey[device_id: device_id] else recall default()
 
-        let existing_gen = query DeviceGeneration[device_id: device_id]
+        let existing_gen = exists DeviceGeneration[device_id: device_id]
 
         // At this point we believe the following to be true:
         //
@@ -2712,7 +2711,7 @@ command AddDevice with Base {
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
-        if existing_gen is None {
+        if !existing_gen {
             finish {
                 create DeviceGeneration[device_id: device_id]=>{generation: 0}
 
@@ -3853,8 +3852,7 @@ command AfcCreateUniChannel with BaseEphemeral {
 //   - Have `CanUseAfc` permission assigned to their respective roles
 function afc_uni_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) bool {
     // The label must exist.
-    let label = query Label[label_id: label_id]
-    if label is None {
+    if !exists Label[label_id: label_id] {
         return false
     }
 
