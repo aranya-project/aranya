@@ -32,7 +32,7 @@ which commands devices can publish to Aranya's distributed graph:
   "default roles" - `owner` (emergency access), `admin` (system
   administration), `operator` (user management), and `member` (basic
   usage). This policy has the capability to define custom roles as well.
-- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object. 
+- **Rank** is an attribute associated with each object that determines whether a higher ranked object can operate on a lower ranked object.
 Any object in the system with an Aranya ID can have a rank associated with it in the policy.
 Rank checks are only concerned with ranks associated with devices, roles, and labels specifically when determining if an object has permission to perform certain operations.
 The team does not need a rank associated with it since all operations implicitly occur within the context of a team.
@@ -96,20 +96,16 @@ and `effect QueryFooResult`.
 
 ```policy
 use afc
-use crypto
 use device
-use envelope
 use idam
 use perspective
 ```
 
 - [`afc`][afc-ffi]: [AFC][afc] functionality, such as creating
   channels.
-- [`crypto`][crypto-ffi]: core cryptographic functionality, like
   command signing and verification.
 - [`device`][device-ffi]: provides information about the current
   device.
-- [`envelope`][evp-ffi]: provides access to the special
   [`Envelope`][envelope] type.
 - [`idam`][idam-ffi]: IDAM functionality, such as access to device
   keys.
@@ -144,7 +140,7 @@ Priorities can be defined for commands by specifying the `priority`
 attribute in the command's `attributes` block:
 
 ```
-command CommandFoo {
+command CommandFoo with Base {
     attributes {
         priority: 100
     }
@@ -191,9 +187,9 @@ Facts and commands are *not* part of a policy's public API.
 Fact definitions enforce uniqueness constraints through their key
 structure:
 
-- **Single-key facts** (e.g., `Fact[a id]`) allow
+- **Single-key facts** (e.g., `Fact[a: id]`) allow
   exactly one fact per key value.
-- **Composite-key facts** (e.g., `Fact[a id, b id]`)
+- **Composite-key facts** (e.g., `Fact[a: id, b: id]`)
   allow exactly one fact per key combination.
 - **Empty-key facts** (e.g., `TeamStart[]`) allow exactly one
   instance, implementing a singleton pattern.
@@ -202,48 +198,35 @@ These constraints are enforced at the storage layer - `create`
 operations fail if a fact already exists with the same key, and
 `delete` operations fail if the fact doesn't exist.
 
-## Base Cryptography
-
-All commands (except for `CreateTeam`) are signed and verified
-with the following routes.
+## Base Commands
 
 ```policy
-// Signs the payload using the current device's Device Signing
-// Key, then packages the data and signature into an `Envelope`.
-function seal_command(payload bytes) struct Envelope {
-    let parent_id = perspective::head_id()
-    let author_id = device::current_device_id()
-    let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
-    let author_sign_key_id = idam::derive_sign_key_id(author_sign_pk.key)
-
-    let signed = crypto::sign(author_sign_key_id, payload)
-    return envelope::new(
-        parent_id,
-        author_id,
-        signed.command_id,
-        signed.signature,
-        payload,
-    )
+base[init] BaseInit {
+    fields {
+        // The initial owner's public Device Keys.
+        owner_keys: struct PublicKeyBundle,
+    }
+    get_key {
+        return Some(this.owner_keys.sign_key)
+    }
 }
 
-// Opens an envelope using the author's public Device Signing
-// Key.
-//
-// If verification succeeds, it returns the serialized basic
-// command data. Otherwise, if verification fails, it raises
-// a check error.
-function open_envelope(sealed_envelope struct Envelope) bytes {
-    let author_id = envelope::author_id(sealed_envelope)
-    let author_sign_pk = check_unwrap query DeviceSignPubKey[device_id: author_id]
+base[basic] Base {
+    get_key {
+        return match query DeviceSignPubKey[device_id: author_id] {
+            Some(f) => Some(f.key)
+            None => None
+        }
+    }
+}
 
-    let verified_command = crypto::verify(
-        author_sign_pk.key,
-        envelope::parent_id(sealed_envelope),
-        envelope::payload(sealed_envelope),
-        envelope::command_id(sealed_envelope),
-        envelope::signature(sealed_envelope),
-    )
-    return verified_command
+base[ephemeral] BaseEphemeral {
+    get_key {
+        return match query DeviceSignPubKey[device_id: author_id] {
+            Some(f) => Some(f.key)
+            None => None
+        }
+    }
 }
 ```
 
@@ -257,23 +240,22 @@ A device can operate on other objects within the system as long as it has the pr
 
 ```policy
 // Records the existence of a device.
-fact Device[device_id id]=>{}
+fact Device[device_id: id]=>{}
 
 // Reports whether the invariants for the device are being upheld.
-function valid_device_invariants(device_id id) bool {
-    let device = query Device[device_id: device_id]
+function valid_device_invariants(device_id: id) bool {
+    let device = query Device[device_id]
     if device is None {
         // The device does not exist, so there should not be any
         // signing keys for it either.
-        check !exists DeviceIdentPubKey[device_id: device_id]
-        check !exists DeviceSignPubKey[device_id: device_id]
-        check !exists DeviceEncPubKey[device_id: device_id]
+        debug_assert(!exists DeviceIdentPubKey[device_id])
+        debug_assert(!exists DeviceSignPubKey[device_id])
+        debug_assert(!exists DeviceEncPubKey[device_id])
     } else {
         // The device DOES exist, so the device keys MUST also exist.
-
-        check exists DeviceIdentPubKey[device_id: device_id]
-        check exists DeviceSignPubKey[device_id: device_id]
-        check exists DeviceEncPubKey[device_id: device_id]
+        debug_assert(exists DeviceIdentPubKey[device_id])
+        debug_assert(exists DeviceSignPubKey[device_id])
+        debug_assert(exists DeviceEncPubKey[device_id])
     }
 
     // NB: Since this function uses `check` internally, it
@@ -306,7 +288,7 @@ Identity Key.
 
 ```policy
 // Records the public half of a device's Identity Key.
-fact DeviceIdentPubKey[device_id id]=>{key bytes}
+fact DeviceIdentPubKey[device_id: id]=>{key: bytes}
 ```
 
 #### Device Signing Key
@@ -316,7 +298,7 @@ that the device publishes to the graph.
 
 ```policy
 // Records the public half of the device's Signing Key.
-fact DeviceSignPubKey[device_id id]=>{key bytes}
+fact DeviceSignPubKey[device_id: id]=>{key: bytes}
 ```
 
 #### Device Encryption Key
@@ -326,14 +308,14 @@ encapsulated secret keys to other devices. It is primarily used to securely tran
 
 ```policy
 // Records the public half of the device's Encryption Key.
-fact DeviceEncPubKey[device_id id]=>{key bytes}
+fact DeviceEncPubKey[device_id: id]=>{key: bytes}
 ```
 
 ### Device Functions
 
 ```policy
 // Returns a device if one exists, or `None` otherwise.
-function try_find_device(device_id id) optional struct Device {
+function get_device(device_id: id) option[struct Device] {
     // This function is a little too expensive to call every
     // time we need to get a device, so this is only checked
     // during debugging/developing by debug_assert().
@@ -347,26 +329,14 @@ function try_find_device(device_id id) optional struct Device {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    return query Device[device_id: device_id]
-}
-
-// Returns a device if it exists, or raises a check error
-// otherwise.
-function get_device(device_id id) struct Device {
-    return check_unwrap try_find_device(device_id)
-}
-
-// Returns the device corresponding with the author of the
-// envelope.
-function get_author(evp struct Envelope) struct Device {
-    return get_device(envelope::author_id(evp))
+    return query Device[device_id]
 }
 
 // Collection of public Device Keys for a device.
 struct PublicKeyBundle {
-    ident_key bytes,
-    sign_key bytes,
-    enc_key bytes,
+    ident_key: bytes,
+    sign_key: bytes,
+    enc_key: bytes,
 }
 
 // Returns the device's public key bundle.
@@ -378,24 +348,24 @@ struct PublicKeyBundle {
 // between devices and keys so it would be a very significant
 // violation if a device's key existed without the device also
 // existing. See `valid_device_invariants`.
-function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
+function get_device_public_key_bundle(device_id: id) option[struct PublicKeyBundle] {
     // This function is a little too expensive to call every
     // time we need to get a device, so only uncomment this when
     // debugging/developing.
     //
-    // See the comment in `try_find_device`.
+    // See the comment in `get_device`.
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let ident_key = check_unwrap query DeviceIdentPubKey[device_id: device_id]
-    let sign_key = check_unwrap query DeviceSignPubKey[device_id: device_id]
-    let enc_key = check_unwrap query DeviceEncPubKey[device_id: device_id]
+    let ident_key = (query DeviceIdentPubKey[device_id] or return None).key
+    let sign_key = (query DeviceSignPubKey[device_id] or return None).key
+    let enc_key = (query DeviceEncPubKey[device_id] or return None).key
 
-    return PublicKeyBundle {
-        ident_key: ident_key.key,
-        sign_key: sign_key.key,
-        enc_key: enc_key.key,
-    }
+    return Some(PublicKeyBundle {
+        ident_key,
+        sign_key,
+        enc_key,
+    })
 }
 
 // Returns the device's encoded public Encryption Key.
@@ -406,23 +376,23 @@ function get_device_public_key_bundle(device_id id) struct PublicKeyBundle {
 // exists. However, it would be a very significant invariant
 // violation if a device's key existed without the device also
 // existing. See `valid_device_invariants`.
-function get_enc_pk(device_id id) bytes {
+function get_enc_pk(device_id: id) option[bytes] {
     // This function is a little too expensive to call every
     // time we need to get a device, so it is only checked during
     // debugging/developing.
     //
-    // See the comment in `try_find_device`.
+    // See the comment in `get_device`.
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
-    return device_enc_pk.key
+    let device_enc_pk = (query DeviceEncPubKey[device_id] or return None).key
+    return Some(device_enc_pk)
 }
 
 // Returns the device's encryption key ID.
-function get_enc_key_id(device_id id) id {
-    let device_enc_pk = check_unwrap query DeviceEncPubKey[device_id: device_id]
-    return idam::derive_enc_key_id(device_enc_pk.key)
+function get_enc_key_id(device_id: id) option[id] {
+    let device_enc_pk = (query DeviceEncPubKey[device_id] or return None).key
+    return Some(idam::derive_enc_key_id(device_enc_pk))
 }
 ```
 
@@ -444,7 +414,7 @@ incremented each time the device is removed from the team.
 // # Foreign Keys
 //
 // - `device_id` refers to the `Device` fact
-fact DeviceGeneration[device_id id]=>{generation int}
+fact DeviceGeneration[device_id: id]=>{generation: int}
 
 // Returns the device's current generation counter.
 
@@ -455,9 +425,9 @@ fact DeviceGeneration[device_id id]=>{generation int}
 // # Errors
 //
 // Raises a check error if the generation fact does not exist.
-function get_device_gen(device_id id) int {
-    let f = check_unwrap query DeviceGeneration[device_id: device_id]
-    return f.generation
+function get_device_gen(device_id: id) option[int] {
+    let f = query DeviceGeneration[device_id] or return None
+    return Some(f.generation)
 }
 ```
 
@@ -474,7 +444,7 @@ Returns all devices on the team.
 
 ```policy
 // Emits `QueryDevicesOnTeamResult` for each device on the team.
-ephemeral action query_devices_on_team() {
+action[ephemeral] query_devices_on_team() {
     // Publishing `QueryDevicesOnTeam` emits
     // `QueryDevicesOnTeamResult`.
     map Device[device_id: ?] as f {
@@ -487,20 +457,17 @@ ephemeral action query_devices_on_team() {
 // Emitted when a device is queried by `query_devices_on_team`.
 effect QueryDevicesOnTeamResult {
     // The ID of a device on the team.
-    device_id id,
+    device_id: id,
 }
 
 // A trampoline that forwards `device_id` to the effect.
-ephemeral command QueryDevicesOnTeam {
+command QueryDevicesOnTeam with BaseEphemeral {
     fields {
-        device_id id,
+        device_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         finish {
             emit QueryDevicesOnTeamResult {
@@ -508,6 +475,8 @@ ephemeral command QueryDevicesOnTeam {
             }
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -517,44 +486,41 @@ Returns whether an AFC channel is valid.
 
 ```policy
 // Emits `QueryAfcChannelIsValid` indicating whether the specified AFC channel is valid.
-ephemeral action query_afc_channel_is_valid(sender_id id, receiver_id id, label_id id) {
+action[ephemeral] query_afc_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) {
     // Publishing `QueryAfcChannelIsValid` emits
     // `QueryAfcChannelIsValidResult`.
     publish QueryAfcChannelIsValid {
-        sender_id: sender_id,
-        receiver_id: receiver_id,
-        label_id: label_id,
+        sender_id,
+        receiver_id,
+        label_id,
     }
 }
 
 // Emitted when an AFC channel is queried by `query_afc_channel_is_valid`.
 effect QueryAfcChannelIsValidResult {
     // The ID of the sender device.
-    sender_id id,
+    sender_id: id,
     // The ID of the receiver device.
-    receiver_id id,
+    receiver_id: id,
     // The ID of the label.
-    label_id id,
+    label_id: id,
     // Whether the AFC channel is valid.
-    is_valid bool,
+    is_valid: bool,
 }
 
 // Returns a `QueryAfcChannelIsValidResult` effect indicating whether the AFC channel is valid.
-ephemeral command QueryAfcChannelIsValid {
+command QueryAfcChannelIsValid with BaseEphemeral {
     fields {
         // The ID of the sender device.
-        sender_id id,
+        sender_id: id,
         // The ID of the receiver device.
-        receiver_id id,
+        receiver_id: id,
         // The ID of the label.
-        label_id id,
+        label_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         // Check that both devices have permission to create the AFC channel.
         let is_valid = afc_uni_channel_is_valid(this.sender_id, this.receiver_id, this.label_id)
@@ -564,10 +530,12 @@ ephemeral command QueryAfcChannelIsValid {
                 sender_id: this.sender_id,
                 receiver_id: this.receiver_id,
                 label_id: this.label_id,
-                is_valid: is_valid
+                is_valid
             }
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -579,9 +547,9 @@ Returns the role assigned to a device.
 // Emits `QueryDeviceRoleResult` if a role is assigned to the
 // device.
 // If the device does not have a role assigned to it, then no effect is emitted.
-ephemeral action query_device_role(device_id id) {
+action[ephemeral] query_device_role(device_id: id) {
     publish QueryDeviceRole {
-        device_id: device_id,
+        device_id,
     }
 }
 
@@ -590,39 +558,41 @@ ephemeral action query_device_role(device_id id) {
 // `Role` fact.
 effect QueryDeviceRoleResult {
     // The role's ID.
-    role_id id,
+    role_id: id,
     // The role's name.
-    name string,
+    name: string,
     // The ID of the device that created the role.
-    author_id id,
+    author_id: id,
     // Is this a default role?
-    default bool,
+    default: bool,
 }
 
-ephemeral command QueryDeviceRole {
+command QueryDeviceRole with BaseEphemeral {
     fields {
-        device_id id,
+        device_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let device = get_device(this.device_id)
+        let device = get_device(this.device_id) or recall default()
 
-        let assigned_role = try_get_assigned_role(device.device_id)
-        if assigned_role is None {
-            finish {}
-        } else {
-            let role = unwrap assigned_role
-            let eff = role as QueryDeviceRoleResult
-            finish {
-                emit eff
+        let assigned_role = get_assigned_role(device.device_id)
+        match assigned_role {
+            None => {
+                finish {}
+            }
+            Some(role) => {
+                let eff = role as QueryDeviceRoleResult
+                finish {
+                    emit eff
+                }
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -633,9 +603,9 @@ Returns a device's `PublicKeyBundle`.
 ```policy
 // Emits `QueryDeviceKeyBundleResult` with the device's key
 // bundle.
-ephemeral action query_device_public_key_bundle(device_id id) {
+action[ephemeral] query_device_public_key_bundle(device_id: id) {
     publish QueryDeviceKeyBundle {
-        device_id: device_id,
+        device_id,
     }
 }
 
@@ -644,32 +614,32 @@ ephemeral action query_device_public_key_bundle(device_id id) {
 effect QueryDeviceKeyBundleResult {
     // NB: We don't include the device ID here since the caller
     // must already know it as it was provided to the action.
-    device_keys struct PublicKeyBundle,
+    device_keys: struct PublicKeyBundle,
 }
 
-ephemeral command QueryDeviceKeyBundle {
+command QueryDeviceKeyBundle with BaseEphemeral {
     fields {
         // The device whose key bundle is being queried.
-        device_id id,
+        device_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         // NB: A device's keys exist iff `fact Device` exists, so
         // we don't need to use `get_device` or anything
         // like that.
-        let device_keys = get_device_public_key_bundle(this.device_id)
+        let device_keys = get_device_public_key_bundle(this.device_id) or recall default()
 
         finish {
             emit QueryDeviceKeyBundleResult {
-                device_keys: device_keys,
+                device_keys,
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -799,7 +769,7 @@ Each object in Aranya's RBAC system has at most one rank associated with its Ara
 
 ```policy
 // An object rank.
-fact Rank[object_id id]=>{rank int}
+fact Rank[object_id: id]=>{rank: int}
 ```
 
 ### Rank Comparison
@@ -810,12 +780,10 @@ Utility method for checking object ranks before allowing operations to be perfor
 // Returns whether the command author object has permission to perform an operation on the target object.
 // The command author's role must have permission to perform the operation.
 // The command author must have a higher rank than the object it is operating on.
-function author_has_perm_one_target(author_id id, perm enum Perm, target_id id) bool {
-    check device_has_perm(author_id, perm)
-    let author_rank = get_object_rank(author_id)
-    if !author_can_operate_on_target(author_rank, target_id) {
-        return false
-    }
+function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: id) bool {
+    check device_has_perm(author_id, perm) else todo()
+    let author_rank = get_object_rank(author_id) or todo()
+    check author_can_operate_on_target(author_rank, target_id) else return false
 
     return true
 }
@@ -823,15 +791,11 @@ function author_has_perm_one_target(author_id id, perm enum Perm, target_id id) 
 // Returns whether the command author object has permission to perform an operation on a set of two target objects.
 // The command author's role must have permission to perform the operation.
 // The command author must have a higher rank than all the objects it is operating on.
-function author_has_perm_two_targets(author_id id, perm enum Perm, target_id1 id, target_id2 id) bool {
-    check device_has_perm(author_id, perm)
-    let author_rank = get_object_rank(author_id)
-    if !author_can_operate_on_target(author_rank, target_id1) {
-        return false
-    }
-    if !author_can_operate_on_target(author_rank, target_id2) {
-        return false
-    }
+function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1: id, target_id2: id) bool {
+    check device_has_perm(author_id, perm) else todo()
+    let author_rank = get_object_rank(author_id) or todo()
+    check author_can_operate_on_target(author_rank, target_id1) else return false
+    check author_can_operate_on_target(author_rank, target_id2) else return false
 
     return true
 }
@@ -841,13 +805,9 @@ function author_has_perm_two_targets(author_id id, perm enum Perm, target_id1 id
 // Note: Uses strict greater-than (>) comparison. A device cannot operate on
 // objects of equal rank, enforcing a strict hierarchy where devices can only
 // modify objects below them in the rank hierarchy.
-function author_can_operate_on_target(author_rank int, target_id id) bool {
-    let object_rank = get_object_rank(target_id)
-    if author_rank > object_rank {
-        return true
-    }
-
-    return false
+function author_can_operate_on_target(author_rank: int, target_id: id) bool {
+    let object_rank = get_object_rank(target_id) or todo()
+    return author_rank > object_rank
 }
 ```
 
@@ -857,10 +817,9 @@ Utility methods for getting/setting rank values on objects.
 
 ```policy
 // Get the rank of an object.
-function get_object_rank(object_id id) int {
-    let rank = check_unwrap query Rank[object_id: object_id]
-
-    return rank.rank
+function get_object_rank(object_id: id) option[int] {
+    let rank = query Rank[object_id] or return None
+    return Some(rank.rank)
 }
 
 // Set the rank of an object.
@@ -868,9 +827,9 @@ function get_object_rank(object_id id) int {
 // Assumptions:
 // - Object rank must not exist yet.
 // - Author must have rank >= rank it is setting.
-finish function set_object_rank(object_id id, rank int) {
+finish function set_object_rank(object_id: id, rank: int) {
     // Create new rank fact.
-    create Rank[object_id: object_id]=>{rank: rank}
+    create Rank[object_id]=>{rank}
 }
 
 // Returns whether a role's rank is >= a device's rank.
@@ -885,14 +844,14 @@ finish function set_object_rank(object_id id, rank int) {
 //
 // The owner device is exempt from this check because its role is assigned
 // directly during team creation (see CreateTeam), bypassing AssignRole.
-function role_rank_gte_device_rank(role_id id, device_id id) bool {
-    let role_rank = get_object_rank(role_id)
-    let device_rank = get_object_rank(device_id)
+function role_rank_gte_device_rank(role_id: id, device_id: id) bool {
+    let role_rank = get_object_rank(role_id) or todo()
+    let device_rank = get_object_rank(device_id) or todo()
     return role_rank >= device_rank
 }
 
 // Returns whether an object exists.
-function object_exists(object_id id) bool {
+function object_exists(object_id: id) bool {
     let device_exists = exists Device[device_id: object_id]
     let role_exists = exists Role[role_id: object_id]
     let label_exists = exists Label[label_id: object_id]
@@ -949,82 +908,80 @@ let DEFAULT_MEMBER_ROLE_RANK = 600
 // - The command author must have rank > the old rank.
 // - The command author must have rank >= the new rank.
 // - The command author must know the current rank before setting the new rank (to prevent an accidental race condition).
-finish function change_object_rank(object_id id, old_rank int, new_rank int) {
-    update Rank[object_id: object_id]=>{rank: old_rank} to {rank: new_rank}
+finish function change_object_rank(object_id: id, old_rank: int, new_rank: int) {
+    update Rank[object_id]=>{rank: old_rank} to {rank: new_rank}
 }
 
-action change_rank(object_id id, old_rank int, new_rank int) {
+action[basic] change_rank(object_id: id, old_rank: int, new_rank: int) {
     publish ChangeRank {
-        object_id: object_id,
-        old_rank: old_rank,
-        new_rank: new_rank,
+        object_id,
+        old_rank,
+        new_rank,
     }
 }
 
 effect RankChanged {
     // The ID of the object rank was set on.
-    object_id id,
+    object_id: id,
     // The old rank associated with the object.
-    old_rank int,
+    old_rank: int,
     // The new rank associated with the object.
-    new_rank int,
+    new_rank: int,
 }
 
-command ChangeRank {
+command ChangeRank with Base {
     attributes {
         priority: 100
     }
 
     fields {
         // The ID of the object to set the rank on.
-        object_id id,
+        object_id: id,
         // The old rank associated with the object.
-        old_rank int,
+        old_rank: int,
         // The new rank to associate with the object.
-        new_rank int,
+        new_rank: int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Check that the object exists before changing its rank.
-        check object_exists(this.object_id)
+        check object_exists(this.object_id) else recall default()
 
         // Changing the rank of a role is not supported. Role ranks are fixed
         // at creation time to maintain the invariant that role_rank > device_rank
         // for all devices assigned to the role.
-        let is_role = query Role[role_id: this.object_id]
-        check is_role is None
+        check exists Role[role_id: this.object_id] else recall default()
 
         // The author must have permission to change the rank.
         if author.device_id == this.object_id {
             // An object can always downgrade its own rank.
-            check device_has_perm(author.device_id, Perm::ChangeRank)
+            check device_has_perm(author.device_id, Perm::ChangeRank) else recall default()
         } else {
-            check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id)
+            check author_has_perm_one_target(author.device_id, Perm::ChangeRank, this.object_id) else recall default()
         }
         // Check that author's rank is >= than the rank being set.
         // If the author is the current device, this prevents a device from upgrading its own rank.
-        let author_rank = get_object_rank(author.device_id)
-        check author_rank >= this.new_rank
+        let author_rank = get_object_rank(author.device_id) or recall default()
+        check author_rank >= this.new_rank else recall default()
 
         // If the target is a device with an assigned role, the new rank
         // must not exceed the role's rank. This maintains the invariant
         // that role_rank >= device_rank after assignment.
-        let assigned_role = query AssignedRole[device_id: this.object_id]
-        if assigned_role is Some {
-            let role_rank = get_object_rank((unwrap assigned_role).role_id)
-            check this.new_rank <= role_rank
+        match query AssignedRole[device_id: this.object_id] {
+            Some(assigned_role) => {
+                let role_rank = get_object_rank(assigned_role.role_id) or recall default()
+                check this.new_rank <= role_rank else recall default()
+            }
+            None => {}
         }
 
         // Check that old_rank matches the object's current rank.
         // Implicitly checks that the rank exists before modifying it.
-        check this.old_rank == get_object_rank(this.object_id)
+        check this.old_rank == (get_object_rank(this.object_id) or recall default()) else recall default()
 
         finish {
             change_object_rank(this.object_id, this.old_rank, this.new_rank)
@@ -1036,6 +993,9 @@ command ChangeRank {
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -1048,43 +1008,44 @@ Returns the rank of an object.
 ```policy
 // Emits `QueryRankResult` with the rank of the object.
 // If the object does not have a rank, then no effect is emitted.
-ephemeral action query_rank(object_id id) {
+action[ephemeral] query_rank(object_id: id) {
     publish QueryRank {
-        object_id: object_id,
+        object_id,
     }
 }
 
 effect QueryRankResult {
     // The object's unique ID.
-    object_id id,
+    object_id: id,
     // The rank of the object.
-    rank int,
+    rank: int,
 }
 
-ephemeral command QueryRank {
+command QueryRank with BaseEphemeral {
     fields {
-        object_id id,
+        object_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         let maybe_rank = query Rank[object_id: this.object_id]
-        if maybe_rank is None {
-            finish {}
-        } else {
-            let rank = unwrap maybe_rank
-            finish {
-                emit QueryRankResult {
-                    object_id: this.object_id,
-                    rank: rank.rank,
+        match maybe_rank {
+            None => {
+                finish {}
+            }
+            Some(rank) => {
+                finish {
+                    emit QueryRankResult {
+                        object_id: this.object_id,
+                        rank: rank.rank,
+                    }
                 }
             }
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -1102,43 +1063,44 @@ for testing only and should not be exposed via any public APIs.
 // Emits `QueryDeviceGenerationResult` with the generation counter
 // for the device. If the device does not have a generation counter,
 // then no effect is emitted.
-ephemeral action query_device_generation(device_id id) {
+action[ephemeral] query_device_generation(device_id: id) {
     publish QueryDeviceGeneration {
-        device_id: device_id,
+        device_id,
     }
 }
 
 effect QueryDeviceGenerationResult {
     // The device's unique ID.
-    device_id id,
+    device_id: id,
     // The device's generation counter.
-    generation int,
+    generation: int,
 }
 
-ephemeral command QueryDeviceGeneration {
+command QueryDeviceGeneration with BaseEphemeral {
     fields {
-        device_id id,
+        device_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         let maybe_gen = query DeviceGeneration[device_id: this.device_id]
-        if maybe_gen is None {
-            finish {}
-        } else {
-            let gen = unwrap maybe_gen
-            finish {
-                emit QueryDeviceGenerationResult {
-                    device_id: this.device_id,
-                    generation: gen.generation,
+        match maybe_gen {
+            None => {
+                finish {}
+            }
+            Some(gen) => {
+                finish {
+                    emit QueryDeviceGenerationResult {
+                        device_id: this.device_id,
+                        generation: gen.generation,
+                    }
                 }
             }
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -1168,7 +1130,7 @@ where
 
 ```policy
 // An RBAC role.
-fact Role[role_id id]=>{name string, author_id id, default bool}
+fact Role[role_id: id]=>{name: string, author_id: id, default: bool}
 ```
 
 Generating a role's ID from its originating command prevents
@@ -1185,10 +1147,10 @@ about this situation. -->
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
-function derive_role_id(evp struct Envelope) id {
+function derive_role_id(command_id: id) id {
     // The role ID is the ID of the command that created it.
     // TODO: Or we could use H(cmd_id, ...).
-    return envelope::command_id(evp)
+    return command_id
 }
 ```
 
@@ -1343,13 +1305,13 @@ enum Perm {
 // verify whether a role grants a permission and use
 // `device_has_perm` to verify whether a device has
 // a permission.
-fact RoleHasPerm[role_id id, perm enum Perm]=>{}
+fact RoleHasPerm[role_id: id, perm: enum Perm]=>{}
 
 // A wrapper for `create RoleHasPerm`.
-finish function assign_perm_to_role(role_id id, perm enum Perm) {
+finish function assign_perm_to_role(role_id: id, perm: enum Perm) {
     create RoleHasPerm[
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     ]=>{}
 }
 
@@ -1358,12 +1320,12 @@ finish function assign_perm_to_role(role_id id, perm enum Perm) {
 // # Errors
 //
 // It raises a check failure if the role does not exist.
-function role_has_perm(role_id id, perm enum Perm) bool {
-    check exists Role[role_id: role_id]
+function role_has_perm(role_id: id, perm: enum Perm) bool {
+    check exists Role[role_id] else todo()
 
     return exists RoleHasPerm[
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     ]
 }
 
@@ -1372,8 +1334,8 @@ function role_has_perm(role_id id, perm enum Perm) bool {
 // # Caveats
 //
 // This function does NOT check whether the device exists.
-function device_has_perm(device_id id, perm enum Perm) bool {
-    let role = check_unwrap query AssignedRole[device_id: device_id]
+function device_has_perm(device_id: id, perm: enum Perm) bool {
+    let role = query AssignedRole[device_id] or todo()
     return role_has_perm(role.role_id, perm)
 }
 
@@ -1390,24 +1352,24 @@ function device_has_perm(device_id id, perm enum Perm) bool {
 //
 // 1. The author has the `ChangeRolePerms` permission.
 // 2. The target role does not already have the permission.
-action add_perm_to_role(role_id id, perm enum Perm) {
+action[basic] add_perm_to_role(role_id: id, perm: enum Perm) {
     publish AddPermToRole {
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     }
 }
 
 // Emitted when a permission is added to a role.
 effect PermAddedToRole {
     // The role that was updated.
-    role_id id,
+    role_id: id,
     // The permission that was added to the role.
-    perm enum Perm,
+    perm: enum Perm,
     // The device that added the permission to the role.
-    author_id id,
+    author_id: id,
 }
 
-command AddPermToRole {
+command AddPermToRole with Base {
     attributes {
         priority: 100
     }
@@ -1415,24 +1377,21 @@ command AddPermToRole {
     fields {
         // The ID of the role to which the permission is being
         // added.
-        role_id id,
+        role_id: id,
         // The permission being added.
-        perm enum Perm,
+        perm: enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to change role perms.
-        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
+        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else recall default()
 
         // The role must not already have the permission.
-        check !role_has_perm(this.role_id, this.perm)
+        check !role_has_perm(this.role_id, this.perm) else recall default()
 
         finish {
             create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
@@ -1444,6 +1403,9 @@ command AddPermToRole {
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 
 // Removes the permission from the role.
@@ -1451,24 +1413,24 @@ command AddPermToRole {
 // Assumptions:
 // 1. The author has the `ChangeRolePerms` permission.
 // 2. The target role has the permission that is being removed.
-action remove_perm_from_role(role_id id, perm enum Perm) {
+action[basic] remove_perm_from_role(role_id: id, perm: enum Perm) {
     publish RemovePermFromRole {
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     }
 }
 
 // Emitted when a permission is removed from a role.
 effect PermRemovedFromRole {
     // The role from which the permission was removed.
-    role_id id,
+    role_id: id,
     // The permission that was removed from the role.
-    perm enum Perm,
+    perm: enum Perm,
     // The device that removed the permission from the role.
-    author_id id,
+    author_id: id,
 }
 
-command RemovePermFromRole {
+command RemovePermFromRole with Base {
     attributes {
         priority: 300
     }
@@ -1476,21 +1438,18 @@ command RemovePermFromRole {
     fields {
         // The ID of the role from which the permission is being
         // removed.
-        role_id id,
+        role_id: id,
         // The permission being removed.
-        perm enum Perm,
+        perm: enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to change role perms.
-        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id)
+        check author_has_perm_one_target(author.device_id, Perm::ChangeRolePerms, this.role_id) else recall default()
 
         // The author does not need to hold the permission being removed.
         // The rank hierarchy already prevents abuse: a device can only
@@ -1500,7 +1459,7 @@ command RemovePermFromRole {
 
         // It is an error to remove a permission not assigned to
         // the role.
-        check role_has_perm(this.role_id, this.perm)
+        check role_has_perm(this.role_id, this.perm) else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -1508,7 +1467,7 @@ command RemovePermFromRole {
         // - `author` is authorized to remove permissions from
         //   the role
         // - `this.role_id` refers to a role that exists
-        // - `this.perm` is a valid permission string
+        // - `this.perm` is a valid permission: string
         // - `this.role_id` currently has the permission `this.perm`
         finish {
             delete RoleHasPerm[role_id: this.role_id, perm: this.perm]
@@ -1520,6 +1479,9 @@ command RemovePermFromRole {
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -1537,21 +1499,21 @@ effect.
 // has neither named args nor good IDE support.
 struct RoleInfo {
     // The ID of the role.
-    role_id id,
+    role_id: id,
     // The name of the role.
-    name string,
+    name: string,
     // The ID of the device that created the role.
-    author_id id,
+    author_id: id,
     // The rank of the role object.
-    rank int,
+    rank: int,
     // Is this a default role?
-    default bool,
+    default: bool,
 }
 
 // Creates the following facts for a role
 //
 // - Role
-finish function create_role_facts(role struct RoleInfo) {
+finish function create_role_facts(role: struct RoleInfo) {
     create Role[role_id: role.role_id]=>{
         name: role.name,
         author_id: role.author_id,
@@ -1563,15 +1525,15 @@ finish function create_role_facts(role struct RoleInfo) {
 // Emitted when a role is created.
 effect RoleCreated {
     // ID of the role.
-    role_id id,
+    role_id: id,
     // Name of the role.
-    name string,
+    name: string,
     // ID of device that created the role.
-    author_id id,
+    author_id: id,
     // The rank of the role object.
-    rank int,
+    rank: int,
     // Is this a "default" role?
-    default bool,
+    default: bool,
 }
 ```
 
@@ -1588,41 +1550,38 @@ effect RoleCreated {
 // # Required Permissions
 //
 // - `CreateRole`
-action create_role(role_name string, rank int) {
+action[basic] create_role(role_name: string, rank: int) {
     publish CreateRole {
-        role_name: role_name,
-        rank: rank,
+        role_name,
+        rank,
     }
 }
 
-command CreateRole {
+command CreateRole with Base {
     attributes {
         priority: 200
     }
 
     fields {
-        role_name string,
-        rank int,
+        role_name: string,
+        rank: int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
-        
+        let author = get_device(envelope.author_id) or recall default()
+
         // The author must have the permission to create a role
-        check device_has_perm(author.device_id, Perm::CreateRole)
+        check device_has_perm(author.device_id, Perm::CreateRole) else recall default()
 
         // The author's rank must be greater than the rank of the role it is creating.
-        check get_object_rank(author.device_id) >= this.rank
+        check (get_object_rank(author.device_id) or recall default()) >= this.rank else recall default()
 
-        let role_id = derive_role_id(envelope)
+        let role_id = derive_role_id(envelope.command_id)
 
         let role_info = RoleInfo {
-            role_id: role_id,
+            role_id,
             name: this.role_name,
             author_id: author.device_id,
             rank: this.rank,
@@ -1635,6 +1594,9 @@ command CreateRole {
             emit role_created
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -1675,7 +1637,7 @@ Default role permissions:
 | Member | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ```policy
-fact DefaultRoleSeeded[name enum DefaultRoleName]=>{role_id id}
+fact DefaultRoleSeeded[name: enum DefaultRoleName]=>{role_id: id}
 
 enum DefaultRoleName {
     Admin,
@@ -1683,7 +1645,7 @@ enum DefaultRoleName {
     Member,
 }
 
-function default_role_name_to_str(name enum DefaultRoleName) string {
+function default_role_name_to_str(name: enum DefaultRoleName) string {
     match name {
         DefaultRoleName::Admin => { return "admin" }
         DefaultRoleName::Operator => { return "operator" }
@@ -1692,7 +1654,7 @@ function default_role_name_to_str(name enum DefaultRoleName) string {
 }
 
 // Setup default roles on a team.
-action setup_default_roles() {
+action[basic] setup_default_roles() {
     publish SetupDefaultRole {
         name: DefaultRoleName::Admin,
     }
@@ -1704,31 +1666,28 @@ action setup_default_roles() {
     }
 }
 
-command SetupDefaultRole {
+command SetupDefaultRole with Base {
     attributes {
         priority: 200
     }
 
     fields {
         // The name of the default role.
-        name enum DefaultRoleName,
+        name: enum DefaultRoleName,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to setup the default roles.
-        check device_has_perm(author.device_id, Perm::SetupDefaultRole)
+        check device_has_perm(author.device_id, Perm::SetupDefaultRole) else recall default()
 
-        check !exists DefaultRoleSeeded[name: this.name]
+        check !exists DefaultRoleSeeded[name: this.name] else recall default()
 
         let name = default_role_name_to_str(this.name)
-        let role_id = derive_role_id(envelope)
+        let role_id = derive_role_id(envelope.command_id)
 
         let admin_role_rank = DEFAULT_ADMIN_ROLE_RANK
         let operator_role_rank = DEFAULT_OPERATOR_ROLE_RANK
@@ -1737,8 +1696,8 @@ command SetupDefaultRole {
             DefaultRoleName::Admin => {
                 finish {
                     create_role_facts(RoleInfo {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: admin_role_rank,
                         default: true,
@@ -1754,8 +1713,8 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, Perm::ChangeRolePerms)
 
                     emit RoleCreated {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: admin_role_rank,
                         default: true,
@@ -1763,14 +1722,14 @@ command SetupDefaultRole {
 
                     create DefaultRoleSeeded[
                         name: this.name,
-                    ]=>{role_id: role_id}
+                    ]=>{role_id}
                 }
             }
             DefaultRoleName::Operator => {
                 finish {
                     create_role_facts(RoleInfo {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: operator_role_rank,
                         default: true,
@@ -1782,8 +1741,8 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, Perm::RevokeRole)
 
                     emit RoleCreated {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: operator_role_rank,
                         default: true,
@@ -1791,14 +1750,14 @@ command SetupDefaultRole {
 
                     create DefaultRoleSeeded[
                         name: this.name,
-                    ]=>{role_id: role_id}
+                    ]=>{role_id}
                 }
             }
             DefaultRoleName::Member => {
                 finish {
                     create_role_facts(RoleInfo {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: member_role_rank,
                         default: true,
@@ -1808,8 +1767,8 @@ command SetupDefaultRole {
                     assign_perm_to_role(role_id, Perm::CreateAfcUniChannel)
 
                     emit RoleCreated {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: member_role_rank,
                         default: true,
@@ -1817,11 +1776,14 @@ command SetupDefaultRole {
 
                     create DefaultRoleSeeded[
                         name: this.name,
-                    ]=>{role_id: role_id}
+                    ]=>{role_id}
                 }
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -1835,46 +1797,43 @@ command SetupDefaultRole {
 // # Required Permissions
 //
 // - `DeleteRole`
-action delete_role(role_id id) {
+action[basic] delete_role(role_id: id) {
     publish DeleteRole {
-        role_id: role_id
+        role_id
     }
 }
 
 effect RoleDeleted {
-    name string,
-    role_id id,
+    name: string,
+    role_id: id,
 }
 
-command DeleteRole {
+command DeleteRole with Base {
     attributes {
         priority: 400,
     }
 
     fields {
-        role_id id
+        role_id: id
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
         // The author must have the permission to delete the role
-        check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id)
+        check author_has_perm_one_target(author.device_id, Perm::DeleteRole, this.role_id) else recall default()
 
         // The role must exist
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else recall default()
         // The role must not be assigned to any devices
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: ?,
-        ]
+        ] else recall default()
 
         // we already checked that this exists
-        let role = check_unwrap query Role[role_id: this.role_id]
+        let role = query Role[role_id: this.role_id] or recall default()
 
         finish {
             delete Role[role_id: this.role_id]
@@ -1886,6 +1845,9 @@ command DeleteRole {
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -1906,10 +1868,9 @@ A device can be assigned zero or one roles.
 // This fact is NOT deleted when a role is deleted. Use one of
 // the following functions to retrieve the role assigned to
 // a device:
-// - `try_get_assigned_role`
 // - `get_assigned_role`
 // - `get_assigned_role_id`
-fact AssignedRole[device_id id]=>{role_id id}
+fact AssignedRole[device_id: id]=>{role_id: id}
 
 // Secondary index over role assignments to support efficient
 // queries keyed by `role_id`.
@@ -1923,116 +1884,54 @@ fact AssignedRole[device_id id]=>{role_id id}
 //
 // - `role_id` refers to the `Role` fact
 // - `device_id` refers to the `Device` fact
-fact RoleAssignmentIndex[role_id id, device_id id]=>{}
+fact RoleAssignmentIndex[role_id: id, device_id: id]=>{}
 
 // Records a new role assignment while keeping the index in sync.
-finish function create_role_assignment(device_id id, role_id id) {
-    create AssignedRole[device_id: device_id]=>{role_id: role_id}
-    create RoleAssignmentIndex[role_id: role_id, device_id: device_id]=>{}
+finish function create_role_assignment(device_id: id, role_id: id) {
+    create AssignedRole[device_id]=>{role_id}
+    create RoleAssignmentIndex[role_id, device_id]=>{}
 }
 
 // Deletes an existing role assignment and its index entry.
-finish function delete_role_assignment(device_id id, role_id id) {
-    delete AssignedRole[device_id: device_id]
-    delete RoleAssignmentIndex[role_id: role_id, device_id: device_id]
+finish function delete_role_assignment(device_id: id, role_id: id) {
+    delete AssignedRole[device_id]
+    delete RoleAssignmentIndex[role_id, device_id]
 }
 
 // Updates a device's role assignment and corresponding index entry.
 finish function update_role_assignment(
-    device_id id,
-    old_role_id id,
-    new_role_id id,
+    device_id: id,
+    old_role_id: id,
+    new_role_id: id,
 ) {
-    update AssignedRole[device_id: device_id]=>{role_id: old_role_id} to {
+    update AssignedRole[device_id]=>{role_id: old_role_id} to {
         role_id: new_role_id,
     }
 
     delete RoleAssignmentIndex[
         role_id: old_role_id,
-        device_id: device_id,
+        device_id,
     ]
 
     create RoleAssignmentIndex[
         role_id: new_role_id,
-        device_id: device_id,
+        device_id,
     ]=>{}
-}
-
-// Returns the role assigned to the device if it exists.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function try_get_assigned_role(device_id id) optional struct Role {
-    let assigned_role = query AssignedRole[device_id: device_id]
-    if assigned_role is None {
-        return None
-    }
-    return query Role[role_id: (unwrap assigned_role).role_id]
 }
 
 // Returns the role assigned to the device.
 //
-// # Errors
-//
-// This function raises a check error if the device has not been
-// assigned a role or if the assigned role does not exist.
-//
 // # Caveats
 //
 // - It does NOT check whether the device exists.
-function get_assigned_role(device_id id) struct Role {
-    // NB: We could implement this with `try_get_assigned_role`,
-    // but the generated check errors would be much less
-    // informative, so we manually implement it instead.
-    let assigned_role = check_unwrap query AssignedRole[device_id: device_id]
-
-    // Verify that the assigned role exists.
-    //
-    // There are two reasons the role might not exist:
-    //
-    // 1. The role was deleted and the `AssignedRole` fact was
-    //    not also deleted (which is currently acceptable since
-    //    we do not support prefix deletion).
-    // 2. We have an internal consistency error.
-    //
-    // Option (1) is the most likely and we can't really check
-    // for (2) here.
-    let role = check_unwrap query Role[role_id: assigned_role.role_id]
-
-    return role
+function get_assigned_role(device_id: id) option[struct Role] {
+    let assigned_role = query AssignedRole[device_id] or return None
+    return query Role[role_id: assigned_role.role_id]
 }
 
 // Reports whether the provided role represents the default owner role.
-function is_owner(role struct Role) bool {
+function is_owner(role: struct Role) bool {
     return role.default && role.name == "owner"
-}
-
-// Returns the ID of the role assigned to the device.
-//
-// # Errors
-//
-// This function raises a check error if the device has not been
-// assigned a role.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function get_assigned_role_id(device_id id) id {
-    return get_assigned_role(device_id).role_id
-}
-
-// Returns the ID of the role assigned to the device if it exists.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function try_get_assigned_role_id(device_id id) optional id {
-    let role = try_get_assigned_role(device_id)
-    if role is None {
-        return None
-    }
-    return Some((unwrap role).role_id)
 }
 
 // Assigns the specified role to the device.
@@ -2051,64 +1950,61 @@ function try_get_assigned_role_id(device_id id) optional id {
 // # Required Permissions
 //
 // - `AssignRole`
-action assign_role(device_id id, role_id id) {
+action[basic] assign_role(device_id: id, role_id: id) {
     publish AssignRole {
-        device_id: device_id,
-        role_id: role_id,
+        device_id,
+        role_id,
     }
 }
 
 // Emitted when a device is assigned a role.
 effect RoleAssigned {
     // The ID of the device that was assigned a role.
-    device_id id,
+    device_id: id,
     // The ID of the role that was assigned.
-    role_id id,
+    role_id: id,
     // The ID of the device that assigned the role.
-    author_id id,
+    author_id: id,
 }
 
-command AssignRole {
+command AssignRole with Base {
     attributes {
         priority: 100
     }
 
     fields {
         // The ID of the device being assigned the role.
-        device_id id,
+        device_id: id,
         // The ID of the role being assigned to the device.
-        role_id id,
+        role_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to assign the role to the target device.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.role_id, this.device_id) else recall default()
 
         // The role's rank must be >= the device's rank.
-        check role_rank_gte_device_rank(this.role_id, this.device_id)
+        check role_rank_gte_device_rank(this.role_id, this.device_id) else recall default()
 
         // Ensure the target role exists.
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else recall default()
 
         // Device must not already have a role assigned.
         // If the device already has a role assigned, use `ChangeRole` instead.
-        check !exists AssignedRole[device_id: this.device_id]
+        check !exists AssignedRole[device_id: this.device_id] else recall default()
 
         // Ensure the role index is also clear before creating a new assignment.
         check !exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: this.device_id,
-        ]
+        ] else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -2130,6 +2026,9 @@ command AssignRole {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -2149,84 +2048,81 @@ command AssignRole {
 //
 // - `RevokeRole` for the old role
 // - `AssignRole` for the new role
-action change_role(
-    device_id id,
-    old_role_id id,
-    new_role_id id,
+action[basic] change_role(
+    device_id: id,
+    old_role_id: id,
+    new_role_id: id,
 ) {
     publish ChangeRole {
-        device_id: device_id,
-        old_role_id: old_role_id,
-        new_role_id: new_role_id,
+        device_id,
+        old_role_id,
+        new_role_id,
     }
 }
 
 // Emitted when a device's role is changed.
 effect RoleChanged {
     // The ID of the device whose role is being changed.
-    device_id id,
+    device_id: id,
     // The ID of the device's old role.
-    old_role_id id,
+    old_role_id: id,
     // The ID of the device's new role.
-    new_role_id id,
+    new_role_id: id,
     // The ID of the device that changed the device's role.
-    author_id id,
+    author_id: id,
 }
 
-command ChangeRole {
+command ChangeRole with Base {
     attributes {
         priority: 100
     }
 
     fields {
         // The ID of the device being assigned the role.
-        device_id id,
+        device_id: id,
         // The ID of the device's old role.
-        old_role_id id,
+        old_role_id: id,
         // The new role being assigned to the device.
-        new_role_id id,
+        new_role_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Attempting to change to the same role should fail since a state change is expected.
-        check this.old_role_id != this.new_role_id
+        check this.old_role_id != this.new_role_id else recall default()
 
-        check exists Role[role_id: this.new_role_id]
+        check exists Role[role_id: this.new_role_id] else recall default()
 
         // The author must have permission to revoke the old role from the device.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.old_role_id) else recall default()
 
         // The author must have permission to assign the new role to the device.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignRole, this.device_id, this.new_role_id) else recall default()
 
         // The new role's rank must be >= the device's rank.
-        check role_rank_gte_device_rank(this.new_role_id, this.device_id)
+        check role_rank_gte_device_rank(this.new_role_id, this.device_id) else recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else recall default()
 
-        let current_assignment = check_unwrap query AssignedRole[device_id: this.device_id]
-        check current_assignment.role_id == this.old_role_id
+        let current_assignment = query AssignedRole[device_id: this.device_id] or recall default()
+        check current_assignment.role_id == this.old_role_id else recall default()
 
         // Ensure the role index reflects the existing assignment before updating it.
         check exists RoleAssignmentIndex[
             role_id: this.old_role_id,
             device_id: this.device_id,
-        ]
+        ] else recall default()
 
-        let old_role = check_unwrap query Role[role_id: this.old_role_id]
+        let old_role = query Role[role_id: this.old_role_id] or recall default()
         if is_owner(old_role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.old_role_id,
                 device_id: ?,
-            ]=>{}
+            ] else recall default()
         }
 
         // At this point we believe the following invariants to
@@ -2256,6 +2152,9 @@ command ChangeRole {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -2267,65 +2166,62 @@ command ChangeRole {
 // # Required Permissions
 //
 // - `RevokeRole`
-action revoke_role(device_id id, role_id id) {
+action[basic] revoke_role(device_id: id, role_id: id) {
     publish RevokeRole {
-        device_id: device_id,
-        role_id: role_id,
+        device_id,
+        role_id,
     }
 }
 
 // Emitted when a device has its role revoked.
 effect RoleRevoked {
     // The ID of the device that had its role revoked.
-    device_id id,
+    device_id: id,
     // The ID of the role that was revoked.
-    role_id id,
+    role_id: id,
     // The ID of the device that revoked the role.
-    author_id id,
+    author_id: id,
 }
 
-command RevokeRole {
+command RevokeRole with Base {
     attributes {
         priority: 300
     }
 
     fields {
         // The ID of the device having its role revoked.
-        device_id id,
+        device_id: id,
         // The ID of the role being revoked.
-        role_id id,
+        role_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The author must have permission to revoke the role from the device.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id)
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeRole, this.device_id, this.role_id) else recall default()
 
-        let role = check_unwrap query Role[role_id: this.role_id]
+        let role = query Role[role_id: this.role_id] or recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else recall default()
 
-        let assignment = check_unwrap query AssignedRole[device_id: this.device_id]
-        check assignment.role_id == this.role_id
+        let assignment = query AssignedRole[device_id: this.device_id] or recall default()
+        check assignment.role_id == this.role_id else recall default()
 
         // Ensure the assignment index entry exists so we can remove it.
         check exists RoleAssignmentIndex[
             role_id: this.role_id,
             device_id: this.device_id,
-        ]
+        ] else recall default()
 
         if is_owner(role) {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.role_id,
                 device_id: ?,
-            ]=>{}
+            ] else recall default()
         }
 
         // At this point we believe the following to be true:
@@ -2347,6 +2243,9 @@ command RevokeRole {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -2356,7 +2255,7 @@ command RevokeRole {
 
 ```policy
 // Emits `QueryTeamRolesResult` for each role on the team.
-ephemeral action query_team_roles() {
+action[ephemeral] query_team_roles() {
     map Role[role_id: ?] as f {
         publish QueryTeamRoles {
             role_id: f.role_id,
@@ -2370,35 +2269,34 @@ ephemeral action query_team_roles() {
 // Emitted when a role is queried by `query_team_roles`.
 effect QueryTeamRolesResult {
     // The ID of the role.
-    role_id id,
+    role_id: id,
     // The name of the role.
-    name string,
+    name: string,
     // The ID of the device that created the role.
-    author_id id,
+    author_id: id,
     // Is this a default role?
-    default bool,
+    default: bool,
 }
 
 // A trampoline command to forward data to `QueryTeamRolesResult`.
-ephemeral command QueryTeamRoles {
+command QueryTeamRoles with BaseEphemeral {
     fields {
-        role_id id,
-        name string,
-        author_id id,
-        default bool,
+        role_id: id,
+        name: string,
+        author_id: id,
+        default: bool,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         let eff = this as QueryTeamRolesResult
         finish {
             emit eff
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -2420,7 +2318,7 @@ is associated with exactly one team.
 //
 // However, this fact is required to ensure that we reject all
 // subsequent `CreateTeam` commands.
-fact TeamStart[]=>{team_id id}
+fact TeamStart[]=>{team_id: id}
 
 // Reports whether the team exists.
 //
@@ -2436,9 +2334,9 @@ function team_exists() bool {
 // # Errors
 //
 // This function raises a check error if the team does not exist.
-function team_id() id {
-    let f = check_unwrap query TeamStart[]=>{team_id: ?}
-    return f.team_id
+function team_id() option[id] {
+    let f = query TeamStart[]=>{team_id: ?} or return None
+    return Some(f.team_id)
 }
 ```
 
@@ -2447,96 +2345,61 @@ which creates the `TeamStart` fact.
 
 ```policy
 // Creates a Team.
-action create_team(owner_keys struct PublicKeyBundle, nonce bytes) {
+action[init] create_team(owner_keys: struct PublicKeyBundle, nonce: bytes) {
     publish CreateTeam {
-        owner_keys: owner_keys,
-        nonce: nonce,
+        owner_keys,
+        nonce,
     }
 }
 
 // Emitted when a team is created.
 effect TeamCreated {
     // The ID of the team.
-    team_id id,
+    team_id: id,
     // The ID of the device that owns the team.
-    owner_id id,
+    owner_id: id,
 }
 
-command CreateTeam {
+command CreateTeam with BaseInit {
     attributes {
         init: true
     }
 
     fields {
-        // The initial owner's public Device Keys.
-        owner_keys struct PublicKeyBundle,
         // Random nonce to enforce this team's uniqueness.
-        nonce bytes,
-    }
-
-    // As the first command in the graph, the `CreateTeam`
-    // command is sealed and opened differently than other
-    // commands.
-    seal {
-        let parent_id = perspective::head_id()
-        let author_id = device::current_device_id()
-        let payload = serialize(this)
-        let author_sign_key_id = idam::derive_sign_key_id(this.owner_keys.sign_key)
-
-        let signed = crypto::sign(author_sign_key_id, payload)
-        return envelope::new(
-            parent_id,
-            author_id,
-            signed.command_id,
-            signed.signature,
-            payload,
-        )
-    }
-
-    open {
-        let payload = envelope::payload(envelope)
-        let author_sign_key = deserialize(payload).owner_keys.sign_key
-
-        let verified_command = crypto::verify(
-            author_sign_key,
-            envelope::parent_id(envelope),
-            payload,
-            envelope::command_id(envelope),
-            envelope::signature(envelope),
-        )
-        return deserialize(verified_command)
+        nonce: bytes,
     }
 
     policy {
         // NB: This is the only place in the policy file where we
         // invert this condition.
-        check !team_exists()
+        check !team_exists() else recall default()
 
         // TODO: check that `this.nonce` length is like
-        // 32 bytes or something? It *should* be cryptographically
+        // 32: bytes or something? It *should* be cryptographically
         // secure, but we don't really have a way to check that
         // yet. And I'm not sure we want to have policy generate
         // the nonce for CreateTeam.
 
-        let author_id = envelope::author_id(envelope)
+        let author_id = envelope.author_id
 
         let owner_device_id = idam::derive_device_id(this.owner_keys.ident_key)
 
         // The ID of a team is the ID of the command that created
         // it.
-        let team_id = envelope::command_id(envelope)
+        let team_id = envelope.command_id
 
         // The author must have signed the command with the same
         // device keys.
-        check author_id == owner_device_id
+        check author_id == owner_device_id else recall default()
 
         // The ID of the 'owner' role.
-        let owner_role_id = derive_role_id(envelope)
+        let owner_role_id = derive_role_id(envelope.command_id)
 
         let owner_rank = DEFAULT_OWNER_DEVICE_RANK
         let owner_role_rank = DEFAULT_OWNER_ROLE_RANK
         finish {
-            create TeamStart[]=>{team_id: team_id}
+            create TeamStart[]=>{team_id}
 
             create DeviceGeneration[device_id: owner_device_id]=>{generation: 0}
 
@@ -2545,7 +2408,7 @@ command CreateTeam {
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
                 name: "owner",
-                author_id: author_id,
+                author_id,
                 rank: owner_role_rank,
                 default: true,
             })
@@ -2582,7 +2445,7 @@ command CreateTeam {
             // We don't have to emit the effects in a particular
             // order, but try to make it intuitive.
             emit TeamCreated {
-                team_id: team_id,
+                team_id,
                 owner_id: author_id,
             }
             emit DeviceAdded {
@@ -2593,33 +2456,36 @@ command CreateTeam {
             emit RoleCreated {
                 role_id: owner_role_id,
                 name: "owner",
-                author_id: author_id,
+                author_id,
                 default: true,
                 rank: owner_role_rank,
             }
             emit RoleAssigned {
                 device_id: author_id,
                 role_id: owner_role_id,
-                author_id: author_id,
+                author_id,
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 
 // Adds the device to the team.
 finish function add_new_device(
-    device_id id,
-    kb struct PublicKeyBundle,
-    rank int,
+    device_id: id,
+    kb: struct PublicKeyBundle,
+    rank: int,
 ) {
-    create Device[device_id: device_id]=>{}
-    create DeviceIdentPubKey[device_id: device_id]=>{
+    create Device[device_id]=>{}
+    create DeviceIdentPubKey[device_id]=>{
         key: kb.ident_key,
     }
-    create DeviceSignPubKey[device_id: device_id]=>{
+    create DeviceSignPubKey[device_id]=>{
         key: kb.sign_key,
     }
-    create DeviceEncPubKey[device_id: device_id]=>{
+    create DeviceEncPubKey[device_id]=>{
         key: kb.enc_key,
     }
 
@@ -2627,11 +2493,11 @@ finish function add_new_device(
 }
 
 // Deletes the core device facts for `device_id`.
-finish function delete_device_core(device_id id) {
-    delete Device[device_id: device_id]
-    delete DeviceIdentPubKey[device_id: device_id]
-    delete DeviceSignPubKey[device_id: device_id]
-    delete DeviceEncPubKey[device_id: device_id]
+finish function delete_device_core(device_id: id) {
+    delete Device[device_id]
+    delete DeviceIdentPubKey[device_id]
+    delete DeviceSignPubKey[device_id]
+    delete DeviceEncPubKey[device_id]
     delete Rank[object_id: device_id]
 }
 ```
@@ -2646,46 +2512,43 @@ Teams can also be terminated with the `TerminateTeam` command.
 // # Required Permissions
 //
 // - `TerminateTeam`
-action terminate_team(team_id id) {
+action[basic] terminate_team(team_id: id) {
     publish TerminateTeam {
-        team_id: team_id,
+        team_id,
     }
 }
 
 effect TeamTerminated {
     // The ID of the team that was terminated.
-    team_id id,
+    team_id: id,
     // The ID of the device that terminated the team.
-    owner_id id,
+    owner_id: id,
 }
 
 // This effect is emitted when a command could cause certain AFC channels to be invalidated.
 // When the effect is handled, the user should run the `query_afc_channel_is_valid()` query to determine which of its AFC channels are still valid.
 effect CheckValidAfcChannels{}
 
-command TerminateTeam {
+command TerminateTeam with Base {
     attributes {
         priority: 500
     }
 
     fields {
         // The ID of the team being terminated.
-        team_id id,
+        team_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to terminate the team.
-        check device_has_perm(author.device_id, Perm::TerminateTeam)
+        check device_has_perm(author.device_id, Perm::TerminateTeam) else recall default()
 
-        let current_team_id = team_id()
-        check this.team_id == current_team_id
+        let current_team_id = team_id() or recall default()
+        check this.team_id == current_team_id else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -2703,6 +2566,9 @@ command TerminateTeam {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -2715,65 +2581,64 @@ command TerminateTeam {
 //
 // - `AddDevice`
 // - `AssignRole` (if assigned an initial role)
-action add_device(device_keys struct PublicKeyBundle, initial_role_id optional id, rank int) {
+action[basic] add_device(device_keys: struct PublicKeyBundle, initial_role_id: option[id], rank: int) {
     publish AddDevice {
-        device_keys: device_keys,
-        rank: rank,
+        device_keys,
+        rank,
     }
-    if initial_role_id is Some {
-        let role_id = unwrap initial_role_id
-        let device_id = idam::derive_device_id(device_keys.ident_key)
-        publish AssignRole {
-            device_id: device_id,
-            role_id: role_id,
+    match initial_role_id {
+        Some(role_id) => {
+            let device_id = idam::derive_device_id(device_keys.ident_key)
+            publish AssignRole {
+                device_id,
+                role_id,
+            }
         }
+        None => {}
     }
 }
 
 // Emitted when a device is added to the team.
 effect DeviceAdded {
     // Uniquely identifies the device.
-    device_id id,
+    device_id: id,
     // The device's set of public Device Keys.
-    device_keys struct PublicKeyBundle,
+    device_keys: struct PublicKeyBundle,
     // The rank of the device object.
-    rank int,
+    rank: int,
 }
 
-command AddDevice {
+command AddDevice with Base {
     attributes {
         priority: 100
     }
 
     fields {
         // The new device's public Device Keys.
-        device_keys struct PublicKeyBundle,
+        device_keys: struct PublicKeyBundle,
         // Device rank.
-        rank int,
+        rank: int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to add a device to the team.
-        check device_has_perm(author.device_id, Perm::AddDevice)
+        check device_has_perm(author.device_id, Perm::AddDevice) else recall default()
 
         // The author's rank must be greater than the rank of the device it is adding to the team.
-        check get_object_rank(author.device_id) >= this.rank
+        check (get_object_rank(author.device_id) or recall default()) >= this.rank else recall default()
 
         let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
-        check !exists Device[device_id: device_id]
-        check !exists DeviceIdentPubKey[device_id: device_id]
-        check !exists DeviceSignPubKey[device_id: device_id]
-        check !exists DeviceEncPubKey[device_id: device_id]
+        check !exists Device[device_id] else recall default()
+        check !exists DeviceIdentPubKey[device_id] else recall default()
+        check !exists DeviceSignPubKey[device_id] else recall default()
+        check !exists DeviceEncPubKey[device_id] else recall default()
 
-        let existing_gen = query DeviceGeneration[device_id: device_id]
+        let existing_gen = exists DeviceGeneration[device_id]
 
         // At this point we believe the following to be true:
         //
@@ -2784,9 +2649,9 @@ command AddDevice {
         // Depending on whether the device has been seen before,
         // we either seed a new generation counter or reuse the
         // existing one.
-        if existing_gen is None {
+        if !existing_gen {
             finish {
-                create DeviceGeneration[device_id: device_id]=>{generation: 0}
+                create DeviceGeneration[device_id]=>{generation: 0}
 
                 add_new_device(
                     device_id,
@@ -2794,7 +2659,7 @@ command AddDevice {
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: device_id,
+                    device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
@@ -2807,13 +2672,16 @@ command AddDevice {
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: device_id,
+                    device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -2829,104 +2697,107 @@ initiated by another device.
 // # Required Permissions
 //
 // - `RemoveDevice`
-action remove_device(device_id id) {
+action[basic] remove_device(device_id: id) {
     publish RemoveDevice {
-        device_id: device_id,
+        device_id,
     }
 }
 
 // Emitted when a device is removed from the team.
 effect DeviceRemoved {
     // The ID of the device that was removed from the team.
-    device_id id,
+    device_id: id,
     // The ID of the device that removed `device_id`.
-    author_id id,
+    author_id: id,
 }
 
-command RemoveDevice {
+command RemoveDevice with Base {
     attributes {
         priority: 400
     }
 
     fields {
         // The ID of the device being removed from the team.
-        device_id id,
+        device_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // The target device must exist.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else recall default()
 
         // Author must have permission to remove a device from the team.
         // Devices should always be allowed to remove themselves even without RemoveDevice permission.
         if author.device_id != this.device_id {
-            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id)
+            check author_has_perm_one_target(author.device_id, Perm::RemoveDevice, this.device_id) else recall default()
         }
 
         // Clean up optional per-device facts that may or may not
         // exist.
-        let assigned_role = query AssignedRole[device_id: this.device_id]
-        let device_gen = check_unwrap query DeviceGeneration[device_id: this.device_id]
-        let next_gen = check_unwrap add(device_gen.generation, 1)
+        let maybe_assigned_role = query AssignedRole[device_id: this.device_id]
+        let device_gen = query DeviceGeneration[device_id: this.device_id] or recall default()
+        let next_gen = add(device_gen.generation, 1) or recall default()
 
-        if assigned_role is Some {
-            let role_id = (unwrap assigned_role).role_id
+        match maybe_assigned_role {
+            Some(assigned_role) => {
+                let role_id = assigned_role.role_id
 
-            // Invariant check.
-            check exists RoleAssignmentIndex[
-                role_id: role_id,
-                device_id: this.device_id,
-            ]
-
-            // The assigned role must exist.
-            let role = check_unwrap query Role[role_id: role_id]
-
-            // Ensure that a team always has at least one owner.
-            if is_owner(role) {
-                check at_least 2 RoleAssignmentIndex[
-                    role_id: role_id,
-                    device_id: ?,
-                ]=>{}
-            }
-
-            finish {
-                update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                    generation: next_gen
-                }
-                delete_role_assignment(this.device_id, role_id)
-                delete_device_core(this.device_id)
-
-                emit DeviceRemoved {
+                // Invariant check.
+                check exists RoleAssignmentIndex[
+                    role_id,
                     device_id: this.device_id,
-                    author_id: author.device_id,
-                }
-                emit CheckValidAfcChannels {}
-            }
-        } else {
-            // TODO: Consider adding an index on
-            // `device_id` so we can sanity-check that no stray
-            // role assignments remain.
-            finish {
-                update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
-                    generation: next_gen
-                }
-                delete_device_core(this.device_id)
+                ] else recall default()
 
-                emit DeviceRemoved {
-                    device_id: this.device_id,
-                    author_id: author.device_id,
+                // The assigned role must exist.
+                let role = query Role[role_id] or recall default()
+
+                // Ensure that a team always has at least one owner.
+                if is_owner(role) {
+                    check at_least 2 RoleAssignmentIndex[
+                        role_id,
+                        device_id: ?,
+                    ] else recall default()
                 }
-                emit CheckValidAfcChannels {}
+
+                finish {
+                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
+                        generation: next_gen
+                    }
+                    delete_role_assignment(this.device_id, role_id)
+                    delete_device_core(this.device_id)
+
+                    emit DeviceRemoved {
+                        device_id: this.device_id,
+                        author_id: author.device_id,
+                    }
+                    emit CheckValidAfcChannels {}
+                }
+            }
+            None => {
+                // TODO: Consider adding an index on
+                // `device_id` so we can sanity-check that no stray
+                // role assignments remain.
+                finish {
+                    update DeviceGeneration[device_id: this.device_id]=>{generation: device_gen.generation} to {
+                        generation: next_gen
+                    }
+                    delete_device_core(this.device_id)
+
+                    emit DeviceRemoved {
+                        device_id: this.device_id,
+                        author_id: author.device_id,
+                    }
+                    emit CheckValidAfcChannels {}
+                }
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -2941,7 +2812,7 @@ labels.
 
 ```policy
 // Records a label.
-fact Label[label_id id]=>{name string, author_id id}
+fact Label[label_id: id]=>{name: string, author_id: id}
 ```
 
 - `label_id` is a globally unique ID for the label,
@@ -2965,10 +2836,10 @@ branches, which could cause a fail-open security bug.
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
-function derive_label_id(evp struct Envelope) id {
+function derive_label_id(evp: struct DefaultEnvelope) id {
     // The label ID is the ID of the command that created it.
     // TODO: Or we could use H(cmd_id, ...).
-    return envelope::command_id(evp)
+    return evp.command_id
 }
 ```
 
@@ -2988,10 +2859,10 @@ function derive_label_id(evp struct Envelope) id {
 // # Required Permissions
 //
 // - `CreateLabel`
-action create_label(name string, rank int) {
+action[basic] create_label(name: string, rank: int) {
     publish CreateLabel {
         label_name: name,
-        rank: rank,
+        rank,
     }
 }
 
@@ -2999,40 +2870,37 @@ action create_label(name string, rank int) {
 // processed.
 effect LabelCreated {
     // Uniquely identifies the label.
-    label_id id,
+    label_id: id,
     // The label name.
-    label_name string,
+    label_name: string,
     // The rank of the label.
-    rank int,
+    rank: int,
     // The ID of the device that created the label.
-    label_author_id id,
+    label_author_id: id,
 }
 
-command CreateLabel {
+command CreateLabel with Base {
     attributes {
         priority: 200
     }
 
     fields {
         // The label name.
-        label_name string,
+        label_name: string,
         // The initial rank of the label.
-        rank int,
+        rank: int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to create a label.
-        check device_has_perm(author.device_id, Perm::CreateLabel)
+        check device_has_perm(author.device_id, Perm::CreateLabel) else recall default()
 
         // The author's rank must be greater than the rank of the label it is creating.
-        check get_object_rank(author.device_id) >= this.rank
+        check (get_object_rank(author.device_id) or recall default()) >= this.rank else recall default()
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
@@ -3042,20 +2910,23 @@ command CreateLabel {
         // - the team is active
         // - `author` has the `CreateLabel` permission
         finish {
-            create Label[label_id: label_id]=>{
+            create Label[label_id]=>{
                 name: this.label_name,
                 author_id: author.device_id,
             }
             set_object_rank(label_id, this.rank)
 
             emit LabelCreated {
-                label_id: label_id,
+                label_id,
                 label_name: this.label_name,
                 rank: this.rank,
                 label_author_id: author.device_id,
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3070,10 +2941,10 @@ granted permission to use it.
 // # Required Permissions
 //
 // - `DeleteLabel`
-action delete_label(label_id id) {
+action[basic] delete_label(label_id: id) {
     // TODO: Should we add a `reason` field?
     publish DeleteLabel {
-        label_id: label_id,
+        label_id,
     }
 }
 
@@ -3081,40 +2952,37 @@ action delete_label(label_id id) {
 // processed.
 effect LabelDeleted {
     // The label name.
-    label_name string,
+    label_name: string,
     // The label author's device ID.
-    label_author_id id,
+    label_author_id: id,
     // Uniquely identifies the label.
-    label_id id,
+    label_id: id,
     // The ID of the device that deleted the label.
-    author_id id,
+    author_id: id,
 }
 
-command DeleteLabel {
+command DeleteLabel with Base {
     attributes {
         priority: 400
     }
 
     fields {
         // The unique ID of the label being deleted.
-        label_id id,
+        label_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to delete a label and outrank the label.
-        check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id)
+        check author_has_perm_one_target(author.device_id, Perm::DeleteLabel, this.label_id) else recall default()
 
         // We can't query the label after it's been deleted, so
         // make sure we pull all of its info out of the fact
         // database.
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = query Label[label_id: this.label_id] or recall default()
 
         // At this point we believe the following to be true:
         //
@@ -3141,6 +3009,9 @@ command DeleteLabel {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3167,7 +3038,7 @@ is used.
 // TODO: https://github.com/aranya-project/aranya-core/issues/229
 // We do not yet support prefix deletion, so this fact is NOT
 // deleted when the label is deleted.
-fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_gen int}
+fact LabelAssignedToDevice[label_id: id, device_id: id]=>{op: enum ChanOp, device_gen: int}
 
 // Grants the device permission to use the label.
 //
@@ -3188,13 +3059,13 @@ fact LabelAssignedToDevice[label_id id, device_id id]=>{op enum ChanOp, device_g
 // - `AssignLabel`
 //
 // Additionally, the target device must have `CanUseAfc` permissions
-action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
+action[basic] assign_label_to_device(device_id: id, label_id: id, op: enum ChanOp) result[unit, string] {
     // Bind the command to this membership epoch.
-    let gen = get_device_gen(device_id)
+    let gen = get_device_gen(device_id) or return Err("no device generation")
     publish AssignLabelToDevice {
-        device_id: device_id,
-        label_id: label_id,
-        op: op,
+        device_id,
+        label_id,
+        op,
         device_gen: gen,
     }
 }
@@ -3203,118 +3074,120 @@ action assign_label_to_device(device_id id, label_id id, op enum ChanOp) {
 // processed.
 effect AssignedLabelToDevice {
     // The ID of the device that was assigned the label.
-    device id,
+    device: id,
     // The ID of the label that was assigned.
-    label_id id,
+    label_id: id,
     // The ID of the device that assigned the label.
-    author_id id,
+    author_id: id,
 }
 
-command AssignLabelToDevice {
+command AssignLabelToDevice with Base {
     attributes {
         priority: 100
     }
 
     fields {
         // The target device.
-        device_id id,
+        device_id: id,
         // The label being assigned to the target device.
-        label_id id,
+        label_id: id,
         // The channel operations the device is allowed to use
         // the label for.
-        op enum ChanOp,
+        op: enum ChanOp,
         // Device generation at authoring time; rejects stale epochs.
-        device_gen int,
+        device_gen: int,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Author must have permission to assign a label and outrank the target device and label.
-        check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id)
+        check author_has_perm_two_targets(author.device_id, Perm::AssignLabel, this.device_id, this.label_id) else recall default()
 
         // Make sure we uphold `AssignedLabelToDevice`'s foreign
         // keys.
-        check exists Device[device_id: this.device_id]
-        check exists Label[label_id: this.label_id]
+        check exists Device[device_id: this.device_id] else recall default()
+        check exists Label[label_id: this.label_id] else recall default()
 
         // The target device must be able to use AFC.
-        check device_has_perm(this.device_id, Perm::CanUseAfc)
+        check device_has_perm(this.device_id, Perm::CanUseAfc) else recall default()
 
         // Reject if the device's membership epoch changed (e.g. reordered remove/re-add).
-        let current_gen = get_device_gen(this.device_id)
-        check this.device_gen == current_gen
+        let current_gen = get_device_gen(this.device_id) or recall default()
+        check this.device_gen == current_gen else recall default()
 
         let existing_assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
         ]
 
-        if existing_assignment is Some {
-            // Only allow reuse when the stored assignment is
-            // from an older device generation.
-            let assignment = unwrap existing_assignment
-            check assignment.device_gen < current_gen
+        match existing_assignment {
+            Some(assignment) => {
+                // Only allow reuse when the stored assignment is
+                // from an older device generation.
+                check assignment.device_gen < current_gen else recall default()
 
-            // At this point we believe the following to be true:
-            //
-            // - `author` has the `AssignLabel` permission
-            // - `author` outranks `this.label_id`
-            // - `author` outranks `this.device_id`
-            // - `this.device_id` refers to a device that exists
-            // - `this.label_id` refers to a label that exists
-            // - the command's generation matches the device's current generation
-            // - the existing assignment is stale because the device has
-            //   been re-provisioned
-            finish {
-                update LabelAssignedToDevice[
-                    label_id: this.label_id,
-                    device_id: this.device_id,
-                ]=>{
-                    op: assignment.op,
-                    device_gen: assignment.device_gen,
-                } to {
-                    op: this.op,
-                    device_gen: current_gen,
-                }
+                // At this point we believe the following to be true:
+                //
+                // - `author` has the `AssignLabel` permission
+                // - `author` outranks `this.label_id`
+                // - `author` outranks `this.device_id`
+                // - `this.device_id` refers to a device that exists
+                // - `this.label_id` refers to a label that exists
+                // - the command's generation matches the device's current generation
+                // - the existing assignment is stale because the device has
+                //   been re-provisioned
+                finish {
+                    update LabelAssignedToDevice[
+                        label_id: this.label_id,
+                        device_id: this.device_id,
+                    ]=>{
+                        op: assignment.op,
+                        device_gen: assignment.device_gen,
+                    } to {
+                        op: this.op,
+                        device_gen: current_gen,
+                    }
 
-                emit AssignedLabelToDevice {
-                    device: this.device_id,
-                    label_id: this.label_id,
-                    author_id: author.device_id,
+                    emit AssignedLabelToDevice {
+                        device: this.device_id,
+                        label_id: this.label_id,
+                        author_id: author.device_id,
+                    }
                 }
             }
-        } else {
-            // At this point we believe the following to be true:
-            //
-            // - `author` has the `AssignLabel` permission
-            // - `author` outranks `this.label_id`
-            // - `author` outranks `this.device_id`
-            // - `this.device_id` refers to a device that exists
-            // - `this.label_id` refers to a label that exists
-            // - the command's generation matches the device's current generation
-            finish {
-                create LabelAssignedToDevice[
-                    label_id: this.label_id,
-                    device_id: this.device_id,
-                ]=>{
-                    op: this.op,
-                    device_gen: this.device_gen,
-                }
+            None => {
+                // At this point we believe the following to be true:
+                //
+                // - `author` has the `AssignLabel` permission
+                // - `author` outranks `this.label_id`
+                // - `author` outranks `this.device_id`
+                // - `this.device_id` refers to a device that exists
+                // - `this.label_id` refers to a label that exists
+                // - the command's generation matches the device's current generation
+                finish {
+                    create LabelAssignedToDevice[
+                        label_id: this.label_id,
+                        device_id: this.device_id,
+                    ]=>{
+                        op: this.op,
+                        device_gen: this.device_gen,
+                    }
 
-                emit AssignedLabelToDevice {
-                    device: this.device_id,
-                    label_id: this.label_id,
-                    author_id: author.device_id,
+                    emit AssignedLabelToDevice {
+                        device: this.device_id,
+                        label_id: this.label_id,
+                        author_id: author.device_id,
+                    }
                 }
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3331,10 +3204,10 @@ command AssignLabelToDevice {
 // # Required Permissions
 //
 // - `RevokeLabel`
-action revoke_label_from_device(device_id id, label_id id) {
+action[basic] revoke_label_from_device(device_id: id, label_id: id) {
     publish RevokeLabelFromDevice {
-        device_id: device_id,
-        label_id: label_id,
+        device_id,
+        label_id,
     }
 }
 
@@ -3342,50 +3215,47 @@ action revoke_label_from_device(device_id id, label_id id) {
 // successfully processed.
 effect LabelRevokedFromDevice {
     // The ID of the device the label was removed from.
-    device_id id,
+    device_id: id,
     // The ID of the label that was revoked.
-    label_id id,
+    label_id: id,
     // The name of the label that was revoked.
-    label_name string,
+    label_name: string,
     // The ID of the author of the label.
-    label_author_id id,
+    label_author_id: id,
     // The ID of the device that revoked the label.
-    author_id id,
+    author_id: id,
 }
 
-command RevokeLabelFromDevice {
+command RevokeLabelFromDevice with Base {
     attributes {
         priority: 300
     }
 
     fields {
         // The target device.
-        device_id id,
+        device_id: id,
         // The label being revoked from the target device.
-        label_id id,
+        label_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let author = get_author(envelope)
+        let author = get_device(envelope.author_id) or recall default()
 
         // Implicitly checks that the device exists.
-        let target = get_device(this.device_id)
+        let target = get_device(this.device_id) or recall default()
 
         // The author device must have permission to revoke the label and outrank the target device and label.
-        check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id)
+        check author_has_perm_two_targets(author.device_id, Perm::RevokeLabel, this.device_id, this.label_id) else recall default()
 
         // We need to get label info before deleting
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = query Label[label_id: this.label_id] or recall default()
 
-        let assignment = check_unwrap query LabelAssignedToDevice[
+        let assignment = query LabelAssignedToDevice[
             label_id: this.label_id,
             device_id: this.device_id,
-        ]
+        ] or recall default()
         // Reject revocations of stale label assignments. When a
         // device is removed and re-added its generation counter is
         // incremented, which implicitly invalidates all prior label
@@ -3393,7 +3263,7 @@ command RevokeLabelFromDevice {
         // would delete the fact row and prevent a future (valid)
         // assign from reusing it via the `device_gen < current_gen`
         // update path.
-        check label_assignment_matches_gen(this.device_id, assignment.device_gen)
+        check label_assignment_matches_gen(this.device_id, assignment.device_gen) else recall default()
 
         // At this point we believe the following to be true:
         //
@@ -3419,6 +3289,9 @@ command RevokeLabelFromDevice {
             emit CheckValidAfcChannels {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3431,13 +3304,13 @@ command RevokeLabelFromDevice {
 // # Caveats
 //
 // - It does NOT check whether the device exists.
-function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum ChanOp {
+function get_allowed_chan_op_for_label(device_id: id, label_id: id) option[enum ChanOp] {
 
     // Now see if the device was directly granted permission
     // to use the label.
     let assigned_to_dev = query LabelAssignedToDevice[
-        label_id: label_id,
-        device_id: device_id,
+        label_id,
+        device_id,
     ]
     let device_op = device_assignment_op(device_id, assigned_to_dev)
     return device_op
@@ -3446,13 +3319,10 @@ function get_allowed_chan_op_for_label(device_id id, label_id id) optional enum 
 // Returns the channel operation for a device-specific label
 // assignment if it matches the device's current generation.
 function device_assignment_op(
-    device_id id,
-    assignment optional struct LabelAssignedToDevice,
-) optional enum ChanOp {
-    if assignment is None {
-        return None
-    }
-    let assigned = unwrap assignment
+    device_id: id,
+    assignment: option[struct LabelAssignedToDevice],
+) option[enum ChanOp] {
+    let assigned = assignment or return None
     if label_assignment_matches_gen(
         device_id,
         assigned.device_gen,
@@ -3465,14 +3335,11 @@ function device_assignment_op(
 // Reports whether a device's direct label assignment generation
 // matches the device's current generation counter.
 function label_assignment_matches_gen(
-    device_id id,
-    assignment_gen int,
+    device_id: id,
+    assignment_gen: int,
 ) bool {
-    let maybe_gen = query DeviceGeneration[device_id: device_id]
-    if maybe_gen is None {
-        return false
-    }
-    return (unwrap maybe_gen).generation == assignment_gen
+    let gen = query DeviceGeneration[device_id] or return false
+    return gen.generation == assignment_gen
 }
 ```
 
@@ -3488,34 +3355,31 @@ If the role does not have the permission, no effect is emitted.
 ```policy
 // Emits `QueryRoleHasPermResult` if the role has the permission.
 // If the role does not have the permission, no effect is emitted.
-ephemeral action query_role_has_perm(role_id id, perm enum Perm) {
+action[ephemeral] query_role_has_perm(role_id: id, perm: enum Perm) {
     publish QueryRoleHasPerm {
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     }
 }
 
 effect QueryRoleHasPermResult {
     // The role's unique ID.
-    role_id id,
+    role_id: id,
     // The permission the role has.
-    perm enum Perm,
+    perm: enum Perm,
 }
 
-ephemeral command QueryRoleHasPerm {
+command QueryRoleHasPerm with BaseEphemeral {
     fields {
-        role_id id,
-        perm enum Perm,
+        role_id: id,
+        perm: enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         // Check that the role exists.
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else recall default()
 
         let has_perm = exists RoleHasPerm[role_id: this.role_id, perm: this.perm]
 
@@ -3530,6 +3394,9 @@ ephemeral command QueryRoleHasPerm {
             finish {}
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3541,8 +3408,8 @@ If the role does not have any permissions, no effects are emitted.
 ```policy
 // Emits `QueryRolePermsResult` for each permission assigned to the role.
 // If the role does not have any permissions, no effects are emitted.
-ephemeral action query_role_perms(role_id id) {
-    map RoleHasPerm[role_id: role_id, perm: ?] as f {
+action[ephemeral] query_role_perms(role_id: id) {
+    map RoleHasPerm[role_id, perm: ?] as f {
         publish QueryRolePerms {
             role_id: f.role_id,
             perm: f.perm,
@@ -3552,25 +3419,22 @@ ephemeral action query_role_perms(role_id id) {
 
 effect QueryRolePermsResult {
     // The role's unique ID.
-    role_id id,
+    role_id: id,
     // The permission assigned to the role.
-    perm enum Perm,
+    perm: enum Perm,
 }
 
-ephemeral command QueryRolePerms {
+command QueryRolePerms with BaseEphemeral {
     fields {
-        role_id id,
-        perm enum Perm,
+        role_id: id,
+        perm: enum Perm,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         // Check that the role exists.
-        check exists Role[role_id: this.role_id]
+        check exists Role[role_id: this.role_id] else recall default()
 
         finish {
             emit QueryRolePermsResult {
@@ -3579,6 +3443,9 @@ ephemeral command QueryRolePerms {
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3596,46 +3463,47 @@ Returns a specific label if it exists.
 ```policy
 // Emits `QueryLabelResult` for the label if it exists.
 // If the label does not exist then no effect is emitted.
-ephemeral action query_label(label_id id) {
+action[ephemeral] query_label(label_id: id) {
     publish QueryLabel {
-        label_id: label_id,
+        label_id,
     }
 }
 
 effect QueryLabelResult {
     // The label's unique ID.
-    label_id id,
+    label_id: id,
     // The label name.
-    label_name string,
+    label_name: string,
     // The ID of the device that created the label.
-    label_author_id id,
+    label_author_id: id,
 }
 
-ephemeral command QueryLabel {
+command QueryLabel with BaseEphemeral {
     fields {
-        label_id id,
+        label_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         let maybe_label = query Label[label_id: this.label_id]
-        if maybe_label is None {
-            finish {}
-        } else {
-            let label = unwrap maybe_label
-            finish {
-                emit QueryLabelResult {
-                    label_id: label.label_id,
-                    label_name: label.name,
-                    label_author_id: label.author_id,
+        match maybe_label {
+            None => {
+                finish {}
+            }
+            Some(label) => {
+                finish {
+                    emit QueryLabelResult {
+                        label_id: label.label_id,
+                        label_name: label.name,
+                        label_author_id: label.author_id,
+                    }
                 }
             }
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -3647,7 +3515,7 @@ Returns a list of all labels that exist in the team.
 // Emits one `QueryLabelsResult` for each label in the team.
 // If the team does not have any labels then no effects are
 // emitted.
-ephemeral action query_labels() {
+action[ephemeral] query_labels() {
     map Label[label_id: ?] as f {
         publish QueryLabels {
             label_id: f.label_id,
@@ -3659,26 +3527,23 @@ ephemeral action query_labels() {
 
 effect QueryLabelsResult {
     // The label's unique ID.
-    label_id id,
+    label_id: id,
     // The label name.
-    label_name string,
+    label_name: string,
     // The ID of the device that created the label.
-    label_author_id id,
+    label_author_id: id,
 }
 
 // Trampoline to forward info to `QueryLabelsResult`.
-ephemeral command QueryLabels {
+command QueryLabels with BaseEphemeral {
     fields {
-        label_id id,
-        label_name string,
-        label_author_id id,
+        label_id: id,
+        label_name: string,
+        label_author_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         finish {
             emit QueryLabelsResult {
@@ -3688,6 +3553,8 @@ ephemeral command QueryLabels {
             }
         }
     }
+
+    recall no_team() {}
 }
 ```
 
@@ -3696,13 +3563,13 @@ ephemeral command QueryLabels {
 ```policy
 // Emits `QueryLabelsAssignedToDeviceResult` for all labels the
 // device has been granted permission to use.
-ephemeral action query_labels_assigned_to_device(device_id id) {
+action[ephemeral] query_labels_assigned_to_device(device_id: id) {
     // TODO: make this query more efficient when policy supports
     // it. The key order is optimized for `delete`.
     map LabelAssignedToDevice[label_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
             if label_assignment_matches_gen(f.device_id, f.device_gen) {
-                let label = check_unwrap query Label[label_id: f.label_id]
+                let label = query Label[label_id: f.label_id] or todo()
                 publish QueryLabelsAssignedToDevice {
                     device_id: f.device_id,
                     label_id: f.label_id,
@@ -3716,31 +3583,28 @@ ephemeral action query_labels_assigned_to_device(device_id id) {
 
 effect QueryLabelsAssignedToDeviceResult {
     // The device's unique ID.
-    device_id id,
+    device_id: id,
     // The label's unique ID.
-    label_id id,
+    label_id: id,
     // The label name.
-    label_name string,
+    label_name: string,
     // The ID of the device that created the label.
-    label_author_id id,
+    label_author_id: id,
 }
 
-ephemeral command QueryLabelsAssignedToDevice {
+command QueryLabelsAssignedToDevice with BaseEphemeral {
     fields {
-        device_id id,
-        label_id id,
-        label_name string,
-        label_author_id id,
+        device_id: id,
+        label_id: id,
+        label_name: string,
+        label_author_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
         // Check that the device exists.
-        check exists Device[device_id: this.device_id]
+        check exists Device[device_id: this.device_id] else recall default()
 
         finish {
             emit QueryLabelsAssignedToDeviceResult {
@@ -3751,6 +3615,9 @@ ephemeral command QueryLabelsAssignedToDevice {
             }
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -3792,11 +3659,11 @@ corresponding recipient will decapsulate their key and store it in the
 shared memory DB.
 
 ```policy
-ephemeral action create_afc_uni_channel(receiver_id id, label_id id) {
+action[ephemeral] create_afc_uni_channel(receiver_id: id, label_id: id) result[unit, string] {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
-    let author_enc_key_id = get_enc_key_id(author_id)
-    let peer_enc_pk = get_enc_pk(receiver_id)
+    let author_enc_key_id = get_enc_key_id(author_id) or return Err("can't get author's key ID")
+    let peer_enc_pk = get_enc_pk(receiver_id) or return Err("can't get peer's public key")
 
     let ch = afc::create_uni_channel(
         parent_cmd_id,
@@ -3808,91 +3675,90 @@ ephemeral action create_afc_uni_channel(receiver_id id, label_id id) {
     )
 
     publish AfcCreateUniChannel {
-        receiver_id: receiver_id,
-        label_id: label_id,
+        receiver_id,
+        label_id,
         peer_encap: ch.peer_encap,
         channel_key_id: ch.key_id,
     }
+
+    return Ok(Unit)
 }
 
 // Emitted when the author of a unidirectional AFC channel
 // successfully processes the `AfcCreateUniChannel` command.
 effect AfcUniChannelCreated {
     // The unique ID of the previous command.
-    parent_cmd_id id,
+    parent_cmd_id: id,
     // The device ID of the participant that can receive data.
-    receiver_id id,
+    receiver_id: id,
     // The channel author's encryption key ID.
-    author_enc_key_id id,
+    author_enc_key_id: id,
     // The channel peer's encoded public encryption key.
-    peer_enc_pk bytes,
+    peer_enc_pk: bytes,
     // The channel label.
-    label_id id,
+    label_id: id,
     // The channel key ID.
-    channel_key_id id,
+    channel_key_id: id,
     // The channel peer's encapsulated KEM shared secret.
-    encap bytes,
+    encap: bytes,
 }
 
 // Emitted when the peer of a unidirectional AFC channel
 // successfully processes the `AfcCreateUniChannel` command.
 effect AfcUniChannelReceived {
     // The unique ID of the previous command.
-    parent_cmd_id id,
+    parent_cmd_id: id,
     // The device ID of the participant that can send data.
-    sender_id id,
+    sender_id: id,
     // The channel author's encryption key ID.
-    author_enc_pk bytes,
+    author_enc_pk: bytes,
     // The channel peer's encryption key ID.
-    peer_enc_key_id id,
+    peer_enc_key_id: id,
     // The channel label.
-    label_id id,
+    label_id: id,
     // The channel peer's encapsulated KEM shared secret.
-    encap bytes,
+    encap: bytes,
 }
 
-ephemeral command AfcCreateUniChannel {
+command AfcCreateUniChannel with BaseEphemeral {
     fields {
         // The device ID of the participant that can receive
         // data.
-        receiver_id id,
+        receiver_id: id,
         // The label applied to the channel.
-        label_id id,
+        label_id: id,
         // The channel peer's encapsulated KEM shared secret.
-        peer_encap bytes,
+        peer_encap: bytes,
         // The ID of the AFC channel key.
-        channel_key_id id,
+        channel_key_id: id,
     }
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
     policy {
-        check team_exists()
+        check team_exists() else recall no_team()
 
-        let sender = get_author(envelope)
+        let sender = get_device(envelope.author_id) or recall default()
         let sender_id = sender.device_id
 
         let receiver_id = this.receiver_id
-        let receiver = check_unwrap try_find_device(receiver_id)
+        let receiver = get_device(receiver_id) or recall default()
 
         // Check that both devices have permission to create the AFC channel.
-        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id)
+        check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else recall default()
 
-        let parent_cmd_id = envelope::parent_id(envelope)
+        let parent_cmd_id = envelope.graph_id // TODO(jdygert): Propogate name to AFC
         let current_device_id = device::current_device_id()
 
         if current_device_id == sender_id {
             // We authored this command.
-            let peer_enc_pk = get_enc_pk(receiver_id)
-            let sender_enc_key_id = get_enc_key_id(sender_id)
+            let peer_enc_pk = get_enc_pk(receiver_id) or recall default()
+            let sender_enc_key_id = get_enc_key_id(sender_id) or recall default()
 
             finish {
                 emit AfcUniChannelCreated {
-                    parent_cmd_id: parent_cmd_id,
-                    receiver_id: receiver_id,
+                    parent_cmd_id,
+                    receiver_id,
                     author_enc_key_id: sender_enc_key_id,
-                    peer_enc_pk: peer_enc_pk,
+                    peer_enc_pk,
                     label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                     encap: this.peer_encap,
@@ -3900,14 +3766,14 @@ ephemeral command AfcCreateUniChannel {
             }
         } else if current_device_id == receiver_id {
             // We're the intended recipient of this command.
-            let author_enc_pk = get_enc_pk(sender_id)
-            let receiver_enc_key_id = get_enc_key_id(receiver_id)
+            let author_enc_pk = get_enc_pk(sender_id) or recall default()
+            let receiver_enc_key_id = get_enc_key_id(receiver_id) or recall default()
 
             finish {
                 emit AfcUniChannelReceived {
-                    parent_cmd_id: parent_cmd_id,
-                    sender_id: sender_id,
-                    author_enc_pk: author_enc_pk,
+                    parent_cmd_id,
+                    sender_id,
+                    author_enc_pk,
                     peer_enc_key_id: receiver_enc_key_id,
                     label_id: this.label_id,
                     encap: this.peer_encap,
@@ -3916,9 +3782,12 @@ ephemeral command AfcCreateUniChannel {
         } else {
             // This is an off-graph session command, so only the
             // communicating peers should process this command.
-            check false
+            recall default()
         }
     }
+
+    recall no_team() {}
+    recall default() {}
 }
 
 // Reports whether an AFC channel is valid according to the policy.
@@ -3931,63 +3800,43 @@ ephemeral command AfcCreateUniChannel {
 //   - Be members of the team
 //   - Not have matching device IDs
 //   - Have `CanUseAfc` permission assigned to their respective roles
-function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) bool {
+function afc_uni_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) bool {
     // The label must exist.
-    let label = query Label[label_id: label_id]
-    if label is None {
-        return false
-    }
+    check exists Label[label_id] else return false
 
     // Devices cannot create channels with themselves.
     //
     // This should have been caught by the AFC FFI
-    if sender_id == receiver_id {
-        return false
-    }
+    check sender_id != receiver_id else return false
 
     // Devices must be members of the team
-    let sender = try_find_device(sender_id)
-    if sender is None {
-        return false
-    }
-    let receiver = try_find_device(receiver_id)
-    if receiver is None {
-        return false
-    }
+    let sender = get_device(sender_id)
+    check sender is Some else return false
+
+    let receiver = get_device(receiver_id)
+    check receiver is Some else return false
 
     // The writer must have permissions to write (send) data.
-    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
-    if writer_op is None {
-        return false
-    }
-    match unwrap writer_op {
+    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id) or return false
+    match writer_op {
         ChanOp::RecvOnly => { return false }
         ChanOp::SendOnly => {}
         ChanOp::SendRecv => {}
     }
 
     // The reader must have permission to read (receive) data.
-    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id)
-    if reader_op is None {
-        return false
-    }
-    match unwrap reader_op {
+    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id) or return false
+    match reader_op {
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
         ChanOp::SendRecv => {}
     }
 
     // Sender must have `CreateAfcUniChannel`, `CanUseAfc` permissions
-    if !device_has_perm(sender_id, Perm::CreateAfcUniChannel) {
-        return false
-    }
-    if !device_has_perm(sender_id, Perm::CanUseAfc) {
-        return false
-    }
+    check device_has_perm(sender_id, Perm::CreateAfcUniChannel) else return false
+    check device_has_perm(sender_id, Perm::CanUseAfc) else return false
     // Receiver must have `CanUseAfc` permission
-    if !device_has_perm(receiver_id, Perm::CanUseAfc) {
-        return false
-    }
+    check device_has_perm(receiver_id, Perm::CanUseAfc) else return false
 
     return true
 }
@@ -4000,11 +3849,9 @@ function afc_uni_channel_is_valid(sender_id id, receiver_id id, label_id id) boo
 [afc-ffi]: https://crates.io/crates/aranya-afc-util
 [all-the-way-down]: https://en.wikipedia.org/wiki/Turtles_all_the_way_down
 [commands]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html
-[crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi
 [device-ffi]: https://crates.io/crates/aranya-device-ffi
 [effects]: https://aranya-project.github.io/policy-book/reference/top-level/effects.html
 [envelope]: https://aranya-project.github.io/policy-book/reference/top-level/commands.html#envelope-type
-[evp-ffi]: https://crates.io/crates/aranya-envelope-ffi
 [facts]: https://aranya-project.github.io/policy-book/reference/top-level/facts.html
 [idam-ffi]: https://crates.io/crates/aranya-idam-ffi
 [lp]: https://en.wikipedia.org/wiki/Literate_programming

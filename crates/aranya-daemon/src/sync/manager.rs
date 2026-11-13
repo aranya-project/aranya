@@ -49,8 +49,8 @@ pub(super) enum ScheduledTask {
 /// Uses a [`DelayQueue`] to handle scheduling sync tasks, and uses
 /// [`SyncHandle`](super::SyncHandle) to receive requests from the server and any clients.
 #[derive_where(Debug; C)]
-pub(crate) struct SyncManager<C, PS, SP, EF> {
-    pub(crate) client: SyncClient<C, PS, SP, EF>,
+pub(crate) struct SyncManager<C, PS, SP, Seg, EF> {
+    pub(crate) client: SyncClient<C, PS, SP, Seg, EF>,
 
     /// Receives requests from the `SyncHandle`.
     pub(super) recv: mpsc::Receiver<Callback>,
@@ -65,10 +65,10 @@ pub(crate) struct SyncManager<C, PS, SP, EF> {
     pub(super) hello_subscriptions: HashMap<SyncPeer, HelloSubscription>,
 }
 
-impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
+impl<C, PS, SP, Seg, EF> SyncManager<C, PS, SP, Seg, EF> {
     /// Creates a new [`SyncManager`].
     pub(crate) fn new(
-        client: SyncClient<C, PS, SP, EF>,
+        client: SyncClient<C, PS, SP, Seg, EF>,
         recv: mpsc::Receiver<Callback>,
     ) -> Result<Self> {
         Ok(Self {
@@ -215,11 +215,11 @@ impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF> {
     }
 }
 
-impl<C, PS, SP, EF> SyncManager<C, PS, SP, EF>
+impl<C, PS, SP, Seg, EF> SyncManager<C, PS, SP, Seg, EF>
 where
     C: SyncConnector,
     PS: PolicyStore,
-    SP: StorageProvider,
+    SP: StorageProvider<Segment = Seg>,
     EF: Send + Sync + 'static + TryFrom<PS::Effect>,
     EF::Error: Send + Sync + 'static + std::error::Error,
 {

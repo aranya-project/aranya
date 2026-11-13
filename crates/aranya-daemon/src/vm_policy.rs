@@ -1,24 +1,19 @@
 #![allow(missing_docs)]
 
-use std::{fmt, marker::PhantomData};
+use std::fmt;
 
 use anyhow::{Context, Result};
 use aranya_afc_util::Ffi as AfcFfi;
-use aranya_crypto::{
-    DeviceId,
-    keystore::{KeyStore, fs_keystore::Store},
-};
-use aranya_crypto_ffi::Ffi as CryptoFfi;
+use aranya_crypto::keystore::{KeyStore, fs_keystore::Store};
 use aranya_device_ffi::FfiDevice as DeviceFfi;
-use aranya_envelope_ffi::Ffi as EnvelopeFfi;
 use aranya_idam_ffi::Ffi as IdamFfi;
 use aranya_perspective_ffi::FfiPerspective as PerspectiveFfi;
 use aranya_policy_compiler::Compiler;
 use aranya_policy_lang::lang::parse_policy_document;
-use aranya_policy_vm::{Machine, ffi::FfiModule};
+use aranya_policy_vm::ffi::FfiModule;
 use aranya_runtime::{
-    FfiCallable, Sink, VmEffect, VmPolicy,
-    policy::{PolicyError, PolicyId, PolicyStore},
+    Sink,
+    vm_policy::{FfiSet, SealCtx, VmPolicyStore},
 };
 use tracing::instrument;
 
@@ -45,88 +40,38 @@ impl fmt::Display for Perm {
     }
 }
 
-/// Engine using policy from [`policy.md`].
-pub struct PolicyEngine<CE, KS> {
-    /// The underlying policy.
-    pub(crate) policy: VmPolicy<CE>,
-    _eng: PhantomData<CE>,
-    _ks: PhantomData<KS>,
-}
-
-impl<CE, KS> PolicyEngine<CE, KS>
+pub(crate) fn create_policy_store<CE, KS>(
+    eng: CE,
+    keystore: AranyaStore<KS>,
+    seal_ctx: SealCtx<CE>,
+) -> Result<VmPolicyStore<CE>>
 where
     CE: aranya_crypto::Engine,
-    KS: KeyStore + TryClone + Send + 'static,
+    KS: KeyStore + TryClone + Send + Sync + 'static,
 {
-    /// Creates a `PolicyEngine` from a policy document.
-    pub fn new(
-        policy_doc: &str,
-        eng: CE,
-        store: AranyaStore<KS>,
-        device_id: DeviceId,
-    ) -> Result<Self> {
-        // compile the policy.
-        let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
-        let module = Compiler::new(&ast)
-            .ffi_modules(&[
-                AfcFfi::<Store>::SCHEMA,
-                CryptoFfi::<Store>::SCHEMA,
-                DeviceFfi::SCHEMA,
-                EnvelopeFfi::SCHEMA,
-                IdamFfi::<Store>::SCHEMA,
-                PerspectiveFfi::SCHEMA,
-            ])
-            .compile()
-            .context("should be able to compile policy")?;
-        let machine = Machine::from_module(module).context("should be able to create machine")?;
+    // select which FFI modules to use.
+    let ffis = FfiSet::new()
+        .with(AfcFfi::new(keystore.try_clone()?))?
+        .with(DeviceFfi::new(seal_ctx.author))?
+        .with(IdamFfi::new(keystore))?
+        .with(PerspectiveFfi)?;
 
-        // select which FFI modules to use.
-        let ffis: Vec<Box<dyn FfiCallable<CE> + Send + 'static>> = vec![
-            Box::from(AfcFfi::new(store.try_clone()?)),
-            Box::from(CryptoFfi::new(store.try_clone()?)),
-            Box::from(DeviceFfi::new(device_id)),
-            Box::from(EnvelopeFfi),
-            Box::from(IdamFfi::new(store)),
-            Box::from(PerspectiveFfi),
-        ];
-
-        // create an instance of the policy VM.
-        let policy = VmPolicy::new(machine, eng, ffis).context("unable to create `VmPolicy`")?;
-        Ok(Self {
-            policy,
-            _eng: PhantomData,
-            _ks: PhantomData,
-        })
-    }
+    Ok(VmPolicyStore::new(eng, ffis, seal_ctx))
 }
 
-impl<CE, KS> PolicyStore for PolicyEngine<CE, KS>
-where
-    CE: aranya_crypto::Engine,
-{
-    type Policy = VmPolicy<CE>;
-    type Effect = VmEffect;
-
-    fn add_policy(&mut self, policy: &[u8]) -> Result<PolicyId, PolicyError> {
-        match policy.first() {
-            Some(id) => Ok(PolicyId::new(*id as usize)),
-            None => Err(PolicyError::Panic),
-        }
-    }
-
-    fn get_policy(&self, _id: PolicyId) -> Result<&Self::Policy, PolicyError> {
-        Ok(&self.policy)
-    }
-}
-
-impl<CE, KS> fmt::Debug for PolicyEngine<CE, KS>
-where
-    CE: fmt::Debug,
-    KS: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PolicyEngine").finish_non_exhaustive()
-    }
+pub(crate) fn compile_policy(policy_doc: &str) -> Result<Vec<u8>> {
+    let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
+    let module = Compiler::new(&ast)
+        .flavors(&aranya_runtime::vm_policy::FLAVORS)
+        .ffi_modules(&[
+            AfcFfi::<Store>::SCHEMA,
+            DeviceFfi::SCHEMA,
+            IdamFfi::<Store>::SCHEMA,
+            PerspectiveFfi::SCHEMA,
+        ])
+        .compile()
+        .context("should be able to compile policy")?;
+    Ok(module.write_to_vec()?)
 }
 
 /// Sink for effects.
@@ -210,10 +155,12 @@ mod tests {
     use core::convert::Infallible;
 
     use aranya_crypto::{
-        Rng,
+        DeviceId, Rng, SigningKey,
         default::{DefaultCipherSuite, DefaultEngine},
+        id::IdExt as _,
         keystore::memstore::MemStore,
     };
+    use aranya_runtime::{PolicyStore, VmPolicy};
 
     use super::*;
 
@@ -229,8 +176,14 @@ mod tests {
     #[test]
     fn test_policy_compile() {
         let (eng, _) = DefaultEngine::<_, DefaultCipherSuite>::from_entropy(Rng);
-        let store = AranyaStore::new(MemStore::new());
-        let device_id = DeviceId::default();
-        PolicyEngine::<_, _>::new(POLICY_SOURCE, eng, store, device_id).unwrap();
+        let keystore = AranyaStore::new(MemStore::new());
+        let seal_ctx = SealCtx {
+            author: DeviceId::random(Rng),
+            key: SigningKey::new(Rng),
+        };
+        let mut policy_store = create_policy_store(eng, keystore, seal_ctx).unwrap();
+        let policy = compile_policy(POLICY_SOURCE).unwrap();
+        let id = policy_store.add_policy(&policy).unwrap();
+        let _: &VmPolicy<_> = policy_store.get_policy(id).unwrap();
     }
 }

@@ -8,10 +8,10 @@
 //! See the [`SyncManager`](super::SyncManager) for the other half of the syncer, which is
 //! responsible for initiating syncs.
 #[cfg(feature = "preview")]
-use aranya_runtime::SyncHelloType;
+use aranya_runtime::SyncHello;
 use aranya_runtime::{
-    MAX_SYNC_MESSAGE_SIZE, PolicyStore, StorageError, StorageProvider, SyncRequestMessage,
-    SyncResponder, SyncType, TraversalBuffers,
+    MAX_SYNC_MESSAGE_SIZE, PolicyStore, PollIncoming, StorageError, StorageProvider, SyncIncoming,
+    SyncResponder, TraversalBuffers,
 };
 use aranya_util::{error::ReportExt as _, ready};
 use buggy::{BugExt as _, bug};
@@ -98,12 +98,12 @@ where
         trace!(len, "received request bytes");
 
         let buffer = buf.get(..len).assume("valid offset")?;
-        let sync_type = postcard::from_bytes(buffer)?;
+        let sync_type = SyncIncoming::decode(buffer)?;
 
         debug!(sync_type = ?std::mem::discriminant(&sync_type), "processing request");
 
         let response = match sync_type {
-            SyncType::Poll { request } => {
+            SyncIncoming::Poll(request) => {
                 match Self::process_poll_request(&client, stream.peer(), request, &mut buf).await {
                     Ok(len) => {
                         debug!(response_bytes = len, "poll request succeeded");
@@ -115,7 +115,7 @@ where
                     }
                 }
             }
-            SyncType::Hello(hello_msg) => {
+            SyncIncoming::Hello(hello_msg) => {
                 #[cfg(not(feature = "preview"))]
                 {
                     let _ = hello_msg;
@@ -135,7 +135,9 @@ where
                     }
                 }
             }
-            SyncType::Subscribe { .. } | SyncType::Unsubscribe { .. } | SyncType::Push { .. } => {
+            SyncIncoming::Subscribe { .. }
+            | SyncIncoming::Unsubscribe { .. }
+            | SyncIncoming::Push { .. } => {
                 bug!("message type not currently implemented!")
             }
         };
@@ -152,45 +154,33 @@ where
     async fn process_poll_request(
         client: &Client<PS, SP>,
         peer: SyncPeer,
-        request: SyncRequestMessage,
+        request: PollIncoming,
         buf: &mut [u8],
     ) -> Result<usize, Error> {
-        match request {
-            SyncRequestMessage::SyncRequest { graph_id, .. } => {
-                peer.check_request(graph_id)?;
+        let graph_id = request.graph_id().ok_or(Error::InvalidRequest)?;
+        peer.check_request(graph_id)?;
+        let mut resp = SyncResponder::new();
+        resp.receive(request)?;
+        let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
+        let cache = caches.entry(peer).or_default();
 
-                let mut resp = SyncResponder::new();
-                resp.receive(request)?;
+        let len = resp
+            .poll(buf, aranya.provider(), cache, &mut TraversalBuffers::new())
+            .or_else(|err| {
+                if matches!(
+                    err,
+                    aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                ) {
+                    warn!(team = %peer.graph_id, "missing requested graph");
+                    Ok(0)
+                } else {
+                    Err(err)
+                }
+            })
+            .map_err(Error::Runtime)?;
 
-                let (mut aranya, mut caches) = client.lock_aranya_and_caches().await;
-                let cache = caches.entry(peer).or_default();
-
-                let len = resp
-                    .poll(buf, aranya.provider(), cache, &mut TraversalBuffers::new())
-                    .or_else(|err| {
-                        if matches!(
-                            err,
-                            aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
-                        ) {
-                            warn!(team = %peer.graph_id, "missing requested graph");
-                            Ok(0)
-                        } else {
-                            Err(err)
-                        }
-                    })
-                    .map_err(Error::Runtime)?;
-
-                trace!(response_bytes = len, "generated poll response");
-                Ok(len)
-            }
-            other => {
-                warn!(
-                    variant = ?std::mem::discriminant(&other),
-                    "received an unexpected SyncRequestMessage variant"
-                );
-                Err(Error::InvalidRequest)
-            }
-        }
+        trace!(response_bytes = len, "generated poll response");
+        Ok(len)
     }
 
     /// Processes a hello request, dispatching an internal message to the
@@ -199,27 +189,27 @@ where
     pub(super) async fn process_hello_request(
         handle: &SyncHandle,
         peer: SyncPeer,
-        hello_msg: SyncHelloType,
+        hello_msg: SyncHello,
     ) -> Result<(), Error> {
         match hello_msg {
-            SyncHelloType::Subscribe {
-                graph_change_delay,
-                duration,
-                schedule_delay,
-                graph_id,
-            } => {
-                peer.check_request(graph_id)?;
+            SyncHello::Subscribe(sub) => {
+                peer.check_request(sub.graph_id())?;
                 handle
-                    .hello_subscribe_request(peer, graph_change_delay, duration, schedule_delay)
+                    .hello_subscribe_request(
+                        peer,
+                        sub.graph_change_delay(),
+                        sub.duration(),
+                        sub.schedule_delay(),
+                    )
                     .await?;
             }
-            SyncHelloType::Unsubscribe { graph_id } => {
-                peer.check_request(graph_id)?;
+            SyncHello::Unsubscribe(unsub) => {
+                peer.check_request(unsub.graph_id())?;
                 handle.hello_unsubscribe_request(peer).await?;
             }
-            SyncHelloType::Hello { head, graph_id } => {
-                peer.check_request(graph_id)?;
-                handle.sync_on_hello(peer, head).await?;
+            SyncHello::Hello(hello) => {
+                peer.check_request(hello.graph_id())?;
+                handle.sync_on_hello(peer, hello.head()).await?;
             }
         }
 
