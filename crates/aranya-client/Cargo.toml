@@ -19,9 +19,6 @@ default = [
     "aranya-daemon-api/default",
 ]
 
-# Enable debugging.
-debug = []
-
 # Preview features
 preview = ["aranya-daemon-api/preview"]
 # Aranya Fast Channels

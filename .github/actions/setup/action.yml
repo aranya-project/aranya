@@ -4,6 +4,10 @@ description: "Action for setting up build tools"
 runs:
   using: "composite"
   steps:
+    - name: Install rust toolchain
+      shell: bash
+      run: rustup install
+
     - name: Version info
       shell: bash
       run: |
@@ -21,24 +25,6 @@ runs:
         echo "CXX=$(which clang++)" >> $GITHUB_ENV
         echo "LD=$(which lld)" >> $GITHUB_ENV
 
-    - name: Update dependencies
-      shell: bash
-      run: sudo apt-get update
-
-    - name: patchelf
-      shell: bash
-      run: |
-        sudo apt-get install -y patchelf \
-            --no-install-recommends
-        patchelf --version
-
-    - name: doxygen
-      shell: bash
-      run: |
-        sudo apt-get install -y doxygen \
-            --no-install-recommends
-        doxygen --version
-
     - name: Install sccache
       uses: aranya-project/sccache-action@main
       with:
@@ -52,8 +38,9 @@ runs:
       shell: bash
 
     - name: Install cargo-make
-      run: cargo install --version '0.37.23' --locked cargo-make
-      shell: bash
+      uses: aranya-project/install-action@main
+      with:
+        tool: cargo-make@0.37.24
 
     - name: Install Protoc
       shell: bash

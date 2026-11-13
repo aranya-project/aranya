@@ -20,8 +20,6 @@ default = [
 afc = ["aranya-client/afc"]
 preview = ["aranya-client/preview"]
 
-# Enable debugging.
-debug = []
 
 [dependencies]
 aranya-certgen = { workspace = true }
