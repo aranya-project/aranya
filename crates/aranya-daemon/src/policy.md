@@ -348,7 +348,7 @@ struct PublicKeyBundle {
 // between devices and keys so it would be a very significant
 // violation if a device's key existed without the device also
 // existing. See `valid_device_invariants`.
-function get_device_public_key_bundle(device_id: id) struct PublicKeyBundle {
+function get_device_public_key_bundle(device_id: id) option[struct PublicKeyBundle] {
     // This function is a little too expensive to call every
     // time we need to get a device, so only uncomment this when
     // debugging/developing.
@@ -357,15 +357,15 @@ function get_device_public_key_bundle(device_id: id) struct PublicKeyBundle {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let ident_key = query DeviceIdentPubKey[device_id] or todo()
-    let sign_key = query DeviceSignPubKey[device_id] or todo()
-    let enc_key = query DeviceEncPubKey[device_id] or todo()
+    let ident_key = (query DeviceIdentPubKey[device_id] or return None).key
+    let sign_key = (query DeviceSignPubKey[device_id] or return None).key
+    let enc_key = (query DeviceEncPubKey[device_id] or return None).key
 
-    return PublicKeyBundle {
-        ident_key: ident_key.key,
-        sign_key: sign_key.key,
-        enc_key: enc_key.key,
-    }
+    return Some(PublicKeyBundle {
+        ident_key,
+        sign_key,
+        enc_key,
+    })
 }
 
 // Returns the device's encoded public Encryption Key.
@@ -376,7 +376,7 @@ function get_device_public_key_bundle(device_id: id) struct PublicKeyBundle {
 // exists. However, it would be a very significant invariant
 // violation if a device's key existed without the device also
 // existing. See `valid_device_invariants`.
-function get_enc_pk(device_id: id) bytes {
+function get_enc_pk(device_id: id) option[bytes] {
     // This function is a little too expensive to call every
     // time we need to get a device, so it is only checked during
     // debugging/developing.
@@ -385,14 +385,14 @@ function get_enc_pk(device_id: id) bytes {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let device_enc_pk = query DeviceEncPubKey[device_id] or todo()
-    return device_enc_pk.key
+    let device_enc_pk = (query DeviceEncPubKey[device_id] or return None).key
+    return Some(device_enc_pk)
 }
 
 // Returns the device's encryption key ID.
-function get_enc_key_id(device_id: id) id {
-    let device_enc_pk = query DeviceEncPubKey[device_id] or todo()
-    return idam::derive_enc_key_id(device_enc_pk.key)
+function get_enc_key_id(device_id: id) option[id] {
+    let device_enc_pk = (query DeviceEncPubKey[device_id] or return None).key
+    return Some(idam::derive_enc_key_id(device_enc_pk))
 }
 ```
 
@@ -425,9 +425,9 @@ fact DeviceGeneration[device_id: id]=>{generation: int}
 // # Errors
 //
 // Raises a check error if the generation fact does not exist.
-function get_device_gen(device_id: id) int {
-    let f = query DeviceGeneration[device_id] or todo()
-    return f.generation
+function get_device_gen(device_id: id) option[int] {
+    let f = query DeviceGeneration[device_id] or return None
+    return Some(f.generation)
 }
 ```
 
@@ -629,7 +629,7 @@ command QueryDeviceKeyBundle with BaseEphemeral {
         // NB: A device's keys exist iff `fact Device` exists, so
         // we don't need to use `get_device` or anything
         // like that.
-        let device_keys = get_device_public_key_bundle(this.device_id)
+        let device_keys = get_device_public_key_bundle(this.device_id) or recall default()
 
         finish {
             emit QueryDeviceKeyBundleResult {
@@ -639,6 +639,7 @@ command QueryDeviceKeyBundle with BaseEphemeral {
     }
 
     recall no_team() {}
+    recall default() {}
 }
 ```
 
@@ -781,7 +782,7 @@ Utility method for checking object ranks before allowing operations to be perfor
 // The command author must have a higher rank than the object it is operating on.
 function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: id) bool {
     check device_has_perm(author_id, perm) else todo()
-    let author_rank = get_object_rank(author_id)
+    let author_rank = get_object_rank(author_id) or todo()
     check author_can_operate_on_target(author_rank, target_id) else return false
 
     return true
@@ -792,7 +793,7 @@ function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: i
 // The command author must have a higher rank than all the objects it is operating on.
 function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1: id, target_id2: id) bool {
     check device_has_perm(author_id, perm) else todo()
-    let author_rank = get_object_rank(author_id)
+    let author_rank = get_object_rank(author_id) or todo()
     check author_can_operate_on_target(author_rank, target_id1) else return false
     check author_can_operate_on_target(author_rank, target_id2) else return false
 
@@ -805,7 +806,7 @@ function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1:
 // objects of equal rank, enforcing a strict hierarchy where devices can only
 // modify objects below them in the rank hierarchy.
 function author_can_operate_on_target(author_rank: int, target_id: id) bool {
-    let object_rank = get_object_rank(target_id)
+    let object_rank = get_object_rank(target_id) or todo()
     return author_rank > object_rank
 }
 ```
@@ -816,10 +817,9 @@ Utility methods for getting/setting rank values on objects.
 
 ```policy
 // Get the rank of an object.
-function get_object_rank(object_id: id) int {
-    let rank = query Rank[object_id] or todo()
-
-    return rank.rank
+function get_object_rank(object_id: id) option[int] {
+    let rank = query Rank[object_id] or return None
+    return Some(rank.rank)
 }
 
 // Set the rank of an object.
@@ -845,8 +845,8 @@ finish function set_object_rank(object_id: id, rank: int) {
 // The owner device is exempt from this check because its role is assigned
 // directly during team creation (see CreateTeam), bypassing AssignRole.
 function role_rank_gte_device_rank(role_id: id, device_id: id) bool {
-    let role_rank = get_object_rank(role_id)
-    let device_rank = get_object_rank(device_id)
+    let role_rank = get_object_rank(role_id) or todo()
+    let device_rank = get_object_rank(device_id) or todo()
     return role_rank >= device_rank
 }
 
@@ -965,7 +965,7 @@ command ChangeRank with Base {
         }
         // Check that author's rank is >= than the rank being set.
         // If the author is the current device, this prevents a device from upgrading its own rank.
-        let author_rank = get_object_rank(author.device_id)
+        let author_rank = get_object_rank(author.device_id) or recall default()
         check author_rank >= this.new_rank else recall default()
 
         // If the target is a device with an assigned role, the new rank
@@ -973,7 +973,7 @@ command ChangeRank with Base {
         // that role_rank >= device_rank after assignment.
         match query AssignedRole[device_id: this.object_id] {
             Some(assigned_role) => {
-                let role_rank = get_object_rank(assigned_role.role_id)
+                let role_rank = get_object_rank(assigned_role.role_id) or recall default()
                 check this.new_rank <= role_rank else recall default()
             }
             None => {}
@@ -981,7 +981,7 @@ command ChangeRank with Base {
 
         // Check that old_rank matches the object's current rank.
         // Implicitly checks that the rank exists before modifying it.
-        check this.old_rank == get_object_rank(this.object_id) else recall default()
+        check this.old_rank == (get_object_rank(this.object_id) or recall default()) else recall default()
 
         finish {
             change_object_rank(this.object_id, this.old_rank, this.new_rank)
@@ -1576,7 +1576,7 @@ command CreateRole with Base {
         check device_has_perm(author.device_id, Perm::CreateRole) else recall default()
 
         // The author's rank must be greater than the rank of the role it is creating.
-        check get_object_rank(author.device_id) >= this.rank else recall default()
+        check (get_object_rank(author.device_id) or recall default()) >= this.rank else recall default()
 
         let role_id = derive_role_id(envelope.command_id)
 
@@ -2686,7 +2686,7 @@ command AddDevice with Base {
         check device_has_perm(author.device_id, Perm::AddDevice) else recall default()
 
         // The author's rank must be greater than the rank of the device it is adding to the team.
-        check get_object_rank(author.device_id) >= this.rank else recall default()
+        check (get_object_rank(author.device_id) or recall default()) >= this.rank else recall default()
 
         let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
@@ -2957,7 +2957,7 @@ command CreateLabel with Base {
         check device_has_perm(author.device_id, Perm::CreateLabel) else recall default()
 
         // The author's rank must be greater than the rank of the label it is creating.
-        check get_object_rank(author.device_id) >= this.rank else recall default()
+        check (get_object_rank(author.device_id) or recall default()) >= this.rank else recall default()
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
@@ -3118,7 +3118,7 @@ fact LabelAssignedToDevice[label_id: id, device_id: id]=>{op: enum ChanOp, devic
 // Additionally, the target device must have `CanUseAfc` permissions
 action[basic] assign_label_to_device(device_id: id, label_id: id, op: enum ChanOp) {
     // Bind the command to this membership epoch.
-    let gen = get_device_gen(device_id)
+    let gen = get_device_gen(device_id) or todo()
     publish AssignLabelToDevice {
         device_id,
         label_id,
@@ -3172,7 +3172,7 @@ command AssignLabelToDevice with Base {
         check device_has_perm(this.device_id, Perm::CanUseAfc) else recall default()
 
         // Reject if the device's membership epoch changed (e.g. reordered remove/re-add).
-        let current_gen = get_device_gen(this.device_id)
+        let current_gen = get_device_gen(this.device_id) or recall default()
         check this.device_gen == current_gen else recall default()
 
         let existing_assignment = query LabelAssignedToDevice[
@@ -3719,8 +3719,8 @@ shared memory DB.
 action[ephemeral] create_afc_uni_channel(receiver_id: id, label_id: id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
-    let author_enc_key_id = get_enc_key_id(author_id)
-    let peer_enc_pk = get_enc_pk(receiver_id)
+    let author_enc_key_id = get_enc_key_id(author_id) or todo()
+    let peer_enc_pk = get_enc_pk(receiver_id) or todo()
 
     let ch = afc::create_uni_channel(
         parent_cmd_id,
@@ -3805,8 +3805,8 @@ command AfcCreateUniChannel with BaseEphemeral {
 
         if current_device_id == sender_id {
             // We authored this command.
-            let peer_enc_pk = get_enc_pk(receiver_id)
-            let sender_enc_key_id = get_enc_key_id(sender_id)
+            let peer_enc_pk = get_enc_pk(receiver_id) or recall default()
+            let sender_enc_key_id = get_enc_key_id(sender_id) or recall default()
 
             finish {
                 emit AfcUniChannelCreated {
@@ -3821,8 +3821,8 @@ command AfcCreateUniChannel with BaseEphemeral {
             }
         } else if current_device_id == receiver_id {
             // We're the intended recipient of this command.
-            let author_enc_pk = get_enc_pk(sender_id)
-            let receiver_enc_key_id = get_enc_key_id(receiver_id)
+            let author_enc_pk = get_enc_pk(sender_id) or recall default()
+            let receiver_enc_key_id = get_enc_key_id(receiver_id) or recall default()
 
             finish {
                 emit AfcUniChannelReceived {
