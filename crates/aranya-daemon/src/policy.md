@@ -2188,7 +2188,7 @@ command ChangeRole with Base {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.old_role_id,
                 device_id: ?,
-            ]=>{} else recall default()
+            ] else recall default()
         }
 
         // At this point we believe the following invariants to
@@ -2286,7 +2286,7 @@ command RevokeRole with Base {
             check at_least 2 RoleAssignmentIndex[
                 role_id: this.role_id,
                 device_id: ?,
-            ]=>{} else recall default()
+            ] else recall default()
         }
 
         // At this point we believe the following to be true:
@@ -2820,7 +2820,7 @@ command RemoveDevice with Base {
                     check at_least 2 RoleAssignmentIndex[
                         role_id,
                         device_id: ?,
-                    ]=>{} else recall default()
+                    ] else recall default()
                 }
 
                 finish {
