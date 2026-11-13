@@ -248,15 +248,14 @@ function valid_device_invariants(device_id: id) bool {
     if device is None {
         // The device does not exist, so there should not be any
         // signing keys for it either.
-        check !exists DeviceIdentPubKey[device_id] else todo()
-        check !exists DeviceSignPubKey[device_id] else todo()
-        check !exists DeviceEncPubKey[device_id] else todo()
+        debug_assert(!exists DeviceIdentPubKey[device_id])
+        debug_assert(!exists DeviceSignPubKey[device_id])
+        debug_assert(!exists DeviceEncPubKey[device_id])
     } else {
         // The device DOES exist, so the device keys MUST also exist.
-
-        check exists DeviceIdentPubKey[device_id] else todo()
-        check exists DeviceSignPubKey[device_id] else todo()
-        check exists DeviceEncPubKey[device_id] else todo()
+        debug_assert(exists DeviceIdentPubKey[device_id])
+        debug_assert(exists DeviceSignPubKey[device_id])
+        debug_assert(exists DeviceEncPubKey[device_id])
     }
 
     // NB: Since this function uses `check` internally, it
