@@ -244,19 +244,19 @@ fact Device[device_id: id]=>{}
 
 // Reports whether the invariants for the device are being upheld.
 function valid_device_invariants(device_id: id) bool {
-    let device = query Device[device_id: device_id]
+    let device = query Device[device_id]
     if device is None {
         // The device does not exist, so there should not be any
         // signing keys for it either.
-        check !exists DeviceIdentPubKey[device_id: device_id] else todo()
-        check !exists DeviceSignPubKey[device_id: device_id] else todo()
-        check !exists DeviceEncPubKey[device_id: device_id] else todo()
+        check !exists DeviceIdentPubKey[device_id] else todo()
+        check !exists DeviceSignPubKey[device_id] else todo()
+        check !exists DeviceEncPubKey[device_id] else todo()
     } else {
         // The device DOES exist, so the device keys MUST also exist.
 
-        check exists DeviceIdentPubKey[device_id: device_id] else todo()
-        check exists DeviceSignPubKey[device_id: device_id] else todo()
-        check exists DeviceEncPubKey[device_id: device_id] else todo()
+        check exists DeviceIdentPubKey[device_id] else todo()
+        check exists DeviceSignPubKey[device_id] else todo()
+        check exists DeviceEncPubKey[device_id] else todo()
     }
 
     // NB: Since this function uses `check` internally, it
@@ -330,7 +330,7 @@ function try_find_device(device_id: id) option[struct Device] {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    return query Device[device_id: device_id]
+    return query Device[device_id]
 }
 
 // Returns a device if it exists, or raises a check error
@@ -364,9 +364,9 @@ function get_device_public_key_bundle(device_id: id) struct PublicKeyBundle {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let ident_key = query DeviceIdentPubKey[device_id: device_id] or todo()
-    let sign_key = query DeviceSignPubKey[device_id: device_id] or todo()
-    let enc_key = query DeviceEncPubKey[device_id: device_id] or todo()
+    let ident_key = query DeviceIdentPubKey[device_id] or todo()
+    let sign_key = query DeviceSignPubKey[device_id] or todo()
+    let enc_key = query DeviceEncPubKey[device_id] or todo()
 
     return PublicKeyBundle {
         ident_key: ident_key.key,
@@ -392,13 +392,13 @@ function get_enc_pk(device_id: id) bytes {
     //
     debug_assert(valid_device_invariants(device_id))
 
-    let device_enc_pk = query DeviceEncPubKey[device_id: device_id] or todo()
+    let device_enc_pk = query DeviceEncPubKey[device_id] or todo()
     return device_enc_pk.key
 }
 
 // Returns the device's encryption key ID.
 function get_enc_key_id(device_id: id) id {
-    let device_enc_pk = query DeviceEncPubKey[device_id: device_id] or todo()
+    let device_enc_pk = query DeviceEncPubKey[device_id] or todo()
     return idam::derive_enc_key_id(device_enc_pk.key)
 }
 ```
@@ -433,7 +433,7 @@ fact DeviceGeneration[device_id: id]=>{generation: int}
 //
 // Raises a check error if the generation fact does not exist.
 function get_device_gen(device_id: id) int {
-    let f = query DeviceGeneration[device_id: device_id] or todo()
+    let f = query DeviceGeneration[device_id] or todo()
     return f.generation
 }
 ```
@@ -497,9 +497,9 @@ action[ephemeral] query_afc_channel_is_valid(sender_id: id, receiver_id: id, lab
     // Publishing `QueryAfcChannelIsValid` emits
     // `QueryAfcChannelIsValidResult`.
     publish QueryAfcChannelIsValid {
-        sender_id: sender_id,
-        receiver_id: receiver_id,
-        label_id: label_id,
+        sender_id,
+        receiver_id,
+        label_id,
     }
 }
 
@@ -537,7 +537,7 @@ command QueryAfcChannelIsValid with BaseEphemeral {
                 sender_id: this.sender_id,
                 receiver_id: this.receiver_id,
                 label_id: this.label_id,
-                is_valid: is_valid
+                is_valid
             }
         }
     }
@@ -556,7 +556,7 @@ Returns the role assigned to a device.
 // If the device does not have a role assigned to it, then no effect is emitted.
 action[ephemeral] query_device_role(device_id: id) {
     publish QueryDeviceRole {
-        device_id: device_id,
+        device_id,
     }
 }
 
@@ -611,7 +611,7 @@ Returns a device's `PublicKeyBundle`.
 // bundle.
 action[ephemeral] query_device_public_key_bundle(device_id: id) {
     publish QueryDeviceKeyBundle {
-        device_id: device_id,
+        device_id,
     }
 }
 
@@ -639,7 +639,7 @@ command QueryDeviceKeyBundle with BaseEphemeral {
 
         finish {
             emit QueryDeviceKeyBundleResult {
-                device_keys: device_keys,
+                device_keys,
             }
         }
     }
@@ -833,7 +833,7 @@ Utility methods for getting/setting rank values on objects.
 ```policy
 // Get the rank of an object.
 function get_object_rank(object_id: id) int {
-    let rank = query Rank[object_id: object_id] or todo()
+    let rank = query Rank[object_id] or todo()
 
     return rank.rank
 }
@@ -845,7 +845,7 @@ function get_object_rank(object_id: id) int {
 // - Author must have rank >= rank it is setting.
 finish function set_object_rank(object_id: id, rank: int) {
     // Create new rank fact.
-    create Rank[object_id: object_id]=>{rank: rank}
+    create Rank[object_id]=>{rank}
 }
 
 // Returns whether a role's rank is >= a device's rank.
@@ -925,14 +925,14 @@ let DEFAULT_MEMBER_ROLE_RANK = 600
 // - The command author must have rank >= the new rank.
 // - The command author must know the current rank before setting the new rank (to prevent an accidental race condition).
 finish function change_object_rank(object_id: id, old_rank: int, new_rank: int) {
-    update Rank[object_id: object_id]=>{rank: old_rank} to {rank: new_rank}
+    update Rank[object_id]=>{rank: old_rank} to {rank: new_rank}
 }
 
 action[basic] change_rank(object_id: id, old_rank: int, new_rank: int) {
     publish ChangeRank {
-        object_id: object_id,
-        old_rank: old_rank,
-        new_rank: new_rank,
+        object_id,
+        old_rank,
+        new_rank,
     }
 }
 
@@ -1025,7 +1025,7 @@ Returns the rank of an object.
 // If the object does not have a rank, then no effect is emitted.
 action[ephemeral] query_rank(object_id: id) {
     publish QueryRank {
-        object_id: object_id,
+        object_id,
     }
 }
 
@@ -1080,7 +1080,7 @@ for testing only and should not be exposed via any public APIs.
 // then no effect is emitted.
 action[ephemeral] query_device_generation(device_id: id) {
     publish QueryDeviceGeneration {
-        device_id: device_id,
+        device_id,
     }
 }
 
@@ -1325,8 +1325,8 @@ fact RoleHasPerm[role_id: id, perm: enum Perm]=>{}
 // A wrapper for `create RoleHasPerm`.
 finish function assign_perm_to_role(role_id: id, perm: enum Perm) {
     create RoleHasPerm[
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     ]=>{}
 }
 
@@ -1336,11 +1336,11 @@ finish function assign_perm_to_role(role_id: id, perm: enum Perm) {
 //
 // It raises a check failure if the role does not exist.
 function role_has_perm(role_id: id, perm: enum Perm) bool {
-    check exists Role[role_id: role_id] else todo()
+    check exists Role[role_id] else todo()
 
     return exists RoleHasPerm[
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     ]
 }
 
@@ -1350,7 +1350,7 @@ function role_has_perm(role_id: id, perm: enum Perm) bool {
 //
 // This function does NOT check whether the device exists.
 function device_has_perm(device_id: id, perm: enum Perm) bool {
-    let role = query AssignedRole[device_id: device_id] or todo()
+    let role = query AssignedRole[device_id] or todo()
     return role_has_perm(role.role_id, perm)
 }
 
@@ -1369,8 +1369,8 @@ function device_has_perm(device_id: id, perm: enum Perm) bool {
 // 2. The target role does not already have the permission.
 action[basic] add_perm_to_role(role_id: id, perm: enum Perm) {
     publish AddPermToRole {
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     }
 }
 
@@ -1429,8 +1429,8 @@ command AddPermToRole with Base {
 // 2. The target role has the permission that is being removed.
 action[basic] remove_perm_from_role(role_id: id, perm: enum Perm) {
     publish RemovePermFromRole {
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     }
 }
 
@@ -1565,8 +1565,8 @@ effect RoleCreated {
 // - `CreateRole`
 action[basic] create_role(role_name: string, rank: int) {
     publish CreateRole {
-        role_name: role_name,
-        rank: rank,
+        role_name,
+        rank,
     }
 }
 
@@ -1594,7 +1594,7 @@ command CreateRole with Base {
         let role_id = derive_role_id(envelope.command_id)
 
         let role_info = RoleInfo {
-            role_id: role_id,
+            role_id,
             name: this.role_name,
             author_id: author.device_id,
             rank: this.rank,
@@ -1708,8 +1708,8 @@ command SetupDefaultRole with Base {
             DefaultRoleName::Admin => {
                 finish {
                     create_role_facts(RoleInfo {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: admin_role_rank,
                         default: true,
@@ -1725,8 +1725,8 @@ command SetupDefaultRole with Base {
                     assign_perm_to_role(role_id, Perm::ChangeRolePerms)
 
                     emit RoleCreated {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: admin_role_rank,
                         default: true,
@@ -1734,14 +1734,14 @@ command SetupDefaultRole with Base {
 
                     create DefaultRoleSeeded[
                         name: this.name,
-                    ]=>{role_id: role_id}
+                    ]=>{role_id}
                 }
             }
             DefaultRoleName::Operator => {
                 finish {
                     create_role_facts(RoleInfo {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: operator_role_rank,
                         default: true,
@@ -1753,8 +1753,8 @@ command SetupDefaultRole with Base {
                     assign_perm_to_role(role_id, Perm::RevokeRole)
 
                     emit RoleCreated {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: operator_role_rank,
                         default: true,
@@ -1762,14 +1762,14 @@ command SetupDefaultRole with Base {
 
                     create DefaultRoleSeeded[
                         name: this.name,
-                    ]=>{role_id: role_id}
+                    ]=>{role_id}
                 }
             }
             DefaultRoleName::Member => {
                 finish {
                     create_role_facts(RoleInfo {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: member_role_rank,
                         default: true,
@@ -1779,8 +1779,8 @@ command SetupDefaultRole with Base {
                     assign_perm_to_role(role_id, Perm::CreateAfcUniChannel)
 
                     emit RoleCreated {
-                        role_id: role_id,
-                        name: name,
+                        role_id,
+                        name,
                         author_id: author.device_id,
                         rank: member_role_rank,
                         default: true,
@@ -1788,7 +1788,7 @@ command SetupDefaultRole with Base {
 
                     create DefaultRoleSeeded[
                         name: this.name,
-                    ]=>{role_id: role_id}
+                    ]=>{role_id}
                 }
             }
         }
@@ -1810,7 +1810,7 @@ command SetupDefaultRole with Base {
 // - `DeleteRole`
 action[basic] delete_role(role_id: id) {
     publish DeleteRole {
-        role_id: role_id
+        role_id
     }
 }
 
@@ -1899,14 +1899,14 @@ fact RoleAssignmentIndex[role_id: id, device_id: id]=>{}
 
 // Records a new role assignment while keeping the index in sync.
 finish function create_role_assignment(device_id: id, role_id: id) {
-    create AssignedRole[device_id: device_id]=>{role_id: role_id}
-    create RoleAssignmentIndex[role_id: role_id, device_id: device_id]=>{}
+    create AssignedRole[device_id]=>{role_id}
+    create RoleAssignmentIndex[role_id, device_id]=>{}
 }
 
 // Deletes an existing role assignment and its index entry.
 finish function delete_role_assignment(device_id: id, role_id: id) {
-    delete AssignedRole[device_id: device_id]
-    delete RoleAssignmentIndex[role_id: role_id, device_id: device_id]
+    delete AssignedRole[device_id]
+    delete RoleAssignmentIndex[role_id, device_id]
 }
 
 // Updates a device's role assignment and corresponding index entry.
@@ -1915,18 +1915,18 @@ finish function update_role_assignment(
     old_role_id: id,
     new_role_id: id,
 ) {
-    update AssignedRole[device_id: device_id]=>{role_id: old_role_id} to {
+    update AssignedRole[device_id]=>{role_id: old_role_id} to {
         role_id: new_role_id,
     }
 
     delete RoleAssignmentIndex[
         role_id: old_role_id,
-        device_id: device_id,
+        device_id,
     ]
 
     create RoleAssignmentIndex[
         role_id: new_role_id,
-        device_id: device_id,
+        device_id,
     ]=>{}
 }
 
@@ -1936,7 +1936,7 @@ finish function update_role_assignment(
 //
 // - It does NOT check whether the device exists.
 function try_get_assigned_role(device_id: id) option[struct Role] {
-    let assigned_role = query AssignedRole[device_id: device_id] or return None
+    let assigned_role = query AssignedRole[device_id] or return None
     return query Role[role_id: assigned_role.role_id]
 }
 
@@ -1954,7 +1954,7 @@ function get_assigned_role(device_id: id) struct Role {
     // NB: We could implement this with `try_get_assigned_role`,
     // but the generated check errors would be much less
     // informative, so we manually implement it instead.
-    let assigned_role = query AssignedRole[device_id: device_id] or todo()
+    let assigned_role = query AssignedRole[device_id] or todo()
 
     // Verify that the assigned role exists.
     //
@@ -2019,8 +2019,8 @@ function try_get_assigned_role_id(device_id: id) option[id] {
 // - `AssignRole`
 action[basic] assign_role(device_id: id, role_id: id) {
     publish AssignRole {
-        device_id: device_id,
-        role_id: role_id,
+        device_id,
+        role_id,
     }
 }
 
@@ -2120,9 +2120,9 @@ action[basic] change_role(
     new_role_id: id,
 ) {
     publish ChangeRole {
-        device_id: device_id,
-        old_role_id: old_role_id,
-        new_role_id: new_role_id,
+        device_id,
+        old_role_id,
+        new_role_id,
     }
 }
 
@@ -2233,8 +2233,8 @@ command ChangeRole with Base {
 // - `RevokeRole`
 action[basic] revoke_role(device_id: id, role_id: id) {
     publish RevokeRole {
-        device_id: device_id,
-        role_id: role_id,
+        device_id,
+        role_id,
     }
 }
 
@@ -2411,8 +2411,8 @@ which creates the `TeamStart` fact.
 // Creates a Team.
 action[init] create_team(owner_keys: struct PublicKeyBundle, nonce: bytes) {
     publish CreateTeam {
-        owner_keys: owner_keys,
-        nonce: nonce,
+        owner_keys,
+        nonce,
     }
 }
 
@@ -2463,7 +2463,7 @@ command CreateTeam with BaseInit {
         let owner_rank = DEFAULT_OWNER_DEVICE_RANK
         let owner_role_rank = DEFAULT_OWNER_ROLE_RANK
         finish {
-            create TeamStart[]=>{team_id: team_id}
+            create TeamStart[]=>{team_id}
 
             create DeviceGeneration[device_id: owner_device_id]=>{generation: 0}
 
@@ -2472,7 +2472,7 @@ command CreateTeam with BaseInit {
             create_role_facts(RoleInfo {
                 role_id: owner_role_id,
                 name: "owner",
-                author_id: author_id,
+                author_id,
                 rank: owner_role_rank,
                 default: true,
             })
@@ -2509,7 +2509,7 @@ command CreateTeam with BaseInit {
             // We don't have to emit the effects in a particular
             // order, but try to make it intuitive.
             emit TeamCreated {
-                team_id: team_id,
+                team_id,
                 owner_id: author_id,
             }
             emit DeviceAdded {
@@ -2520,14 +2520,14 @@ command CreateTeam with BaseInit {
             emit RoleCreated {
                 role_id: owner_role_id,
                 name: "owner",
-                author_id: author_id,
+                author_id,
                 default: true,
                 rank: owner_role_rank,
             }
             emit RoleAssigned {
                 device_id: author_id,
                 role_id: owner_role_id,
-                author_id: author_id,
+                author_id,
             }
         }
     }
@@ -2541,14 +2541,14 @@ finish function add_new_device(
     kb: struct PublicKeyBundle,
     rank: int,
 ) {
-    create Device[device_id: device_id]=>{}
-    create DeviceIdentPubKey[device_id: device_id]=>{
+    create Device[device_id]=>{}
+    create DeviceIdentPubKey[device_id]=>{
         key: kb.ident_key,
     }
-    create DeviceSignPubKey[device_id: device_id]=>{
+    create DeviceSignPubKey[device_id]=>{
         key: kb.sign_key,
     }
-    create DeviceEncPubKey[device_id: device_id]=>{
+    create DeviceEncPubKey[device_id]=>{
         key: kb.enc_key,
     }
 
@@ -2557,10 +2557,10 @@ finish function add_new_device(
 
 // Deletes the core device facts for `device_id`.
 finish function delete_device_core(device_id: id) {
-    delete Device[device_id: device_id]
-    delete DeviceIdentPubKey[device_id: device_id]
-    delete DeviceSignPubKey[device_id: device_id]
-    delete DeviceEncPubKey[device_id: device_id]
+    delete Device[device_id]
+    delete DeviceIdentPubKey[device_id]
+    delete DeviceSignPubKey[device_id]
+    delete DeviceEncPubKey[device_id]
     delete Rank[object_id: device_id]
 }
 ```
@@ -2577,7 +2577,7 @@ Teams can also be terminated with the `TerminateTeam` command.
 // - `TerminateTeam`
 action[basic] terminate_team(team_id: id) {
     publish TerminateTeam {
-        team_id: team_id,
+        team_id,
     }
 }
 
@@ -2645,15 +2645,15 @@ command TerminateTeam with Base {
 // - `AssignRole` (if assigned an initial role)
 action[basic] add_device(device_keys: struct PublicKeyBundle, initial_role_id: option[id], rank: int) {
     publish AddDevice {
-        device_keys: device_keys,
-        rank: rank,
+        device_keys,
+        rank,
     }
     match initial_role_id {
         Some(role_id) => {
             let device_id = idam::derive_device_id(device_keys.ident_key)
             publish AssignRole {
-                device_id: device_id,
-                role_id: role_id,
+                device_id,
+                role_id,
             }
         }
         None => {}
@@ -2695,12 +2695,12 @@ command AddDevice with Base {
 
         let device_id = idam::derive_device_id(this.device_keys.ident_key)
 
-        check !exists Device[device_id: device_id] else recall default()
-        check !exists DeviceIdentPubKey[device_id: device_id] else recall default()
-        check !exists DeviceSignPubKey[device_id: device_id] else recall default()
-        check !exists DeviceEncPubKey[device_id: device_id] else recall default()
+        check !exists Device[device_id] else recall default()
+        check !exists DeviceIdentPubKey[device_id] else recall default()
+        check !exists DeviceSignPubKey[device_id] else recall default()
+        check !exists DeviceEncPubKey[device_id] else recall default()
 
-        let existing_gen = exists DeviceGeneration[device_id: device_id]
+        let existing_gen = exists DeviceGeneration[device_id]
 
         // At this point we believe the following to be true:
         //
@@ -2713,7 +2713,7 @@ command AddDevice with Base {
         // existing one.
         if !existing_gen {
             finish {
-                create DeviceGeneration[device_id: device_id]=>{generation: 0}
+                create DeviceGeneration[device_id]=>{generation: 0}
 
                 add_new_device(
                     device_id,
@@ -2721,7 +2721,7 @@ command AddDevice with Base {
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: device_id,
+                    device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
@@ -2734,7 +2734,7 @@ command AddDevice with Base {
                     this.rank,
                 )
                 emit DeviceAdded {
-                    device_id: device_id,
+                    device_id,
                     device_keys: this.device_keys,
                     rank: this.rank,
                 }
@@ -2760,7 +2760,7 @@ initiated by another device.
 // - `RemoveDevice`
 action[basic] remove_device(device_id: id) {
     publish RemoveDevice {
-        device_id: device_id,
+        device_id,
     }
 }
 
@@ -2808,17 +2808,17 @@ command RemoveDevice with Base {
 
                 // Invariant check.
                 check exists RoleAssignmentIndex[
-                    role_id: role_id,
+                    role_id,
                     device_id: this.device_id,
                 ] else recall default()
 
                 // The assigned role must exist.
-                let role = query Role[role_id: role_id] or recall default()
+                let role = query Role[role_id] or recall default()
 
                 // Ensure that a team always has at least one owner.
                 if is_owner(role) {
                     check at_least 2 RoleAssignmentIndex[
-                        role_id: role_id,
+                        role_id,
                         device_id: ?,
                     ]=>{} else recall default()
                 }
@@ -2922,7 +2922,7 @@ function derive_label_id(evp: struct DefaultEnvelope) id {
 action[basic] create_label(name: string, rank: int) {
     publish CreateLabel {
         label_name: name,
-        rank: rank,
+        rank,
     }
 }
 
@@ -2970,14 +2970,14 @@ command CreateLabel with Base {
         // - the team is active
         // - `author` has the `CreateLabel` permission
         finish {
-            create Label[label_id: label_id]=>{
+            create Label[label_id]=>{
                 name: this.label_name,
                 author_id: author.device_id,
             }
             set_object_rank(label_id, this.rank)
 
             emit LabelCreated {
-                label_id: label_id,
+                label_id,
                 label_name: this.label_name,
                 rank: this.rank,
                 label_author_id: author.device_id,
@@ -3003,7 +3003,7 @@ granted permission to use it.
 action[basic] delete_label(label_id: id) {
     // TODO: Should we add a `reason` field?
     publish DeleteLabel {
-        label_id: label_id,
+        label_id,
     }
 }
 
@@ -3121,9 +3121,9 @@ action[basic] assign_label_to_device(device_id: id, label_id: id, op: enum ChanO
     // Bind the command to this membership epoch.
     let gen = get_device_gen(device_id)
     publish AssignLabelToDevice {
-        device_id: device_id,
-        label_id: label_id,
-        op: op,
+        device_id,
+        label_id,
+        op,
         device_gen: gen,
     }
 }
@@ -3263,8 +3263,8 @@ command AssignLabelToDevice with Base {
 // - `RevokeLabel`
 action[basic] revoke_label_from_device(device_id: id, label_id: id) {
     publish RevokeLabelFromDevice {
-        device_id: device_id,
-        label_id: label_id,
+        device_id,
+        label_id,
     }
 }
 
@@ -3365,8 +3365,8 @@ function get_allowed_chan_op_for_label(device_id: id, label_id: id) option[enum 
     // Now see if the device was directly granted permission
     // to use the label.
     let assigned_to_dev = query LabelAssignedToDevice[
-        label_id: label_id,
-        device_id: device_id,
+        label_id,
+        device_id,
     ]
     let device_op = device_assignment_op(device_id, assigned_to_dev)
     return device_op
@@ -3394,7 +3394,7 @@ function label_assignment_matches_gen(
     device_id: id,
     assignment_gen: int,
 ) bool {
-    let gen = query DeviceGeneration[device_id: device_id] or return false
+    let gen = query DeviceGeneration[device_id] or return false
     return gen.generation == assignment_gen
 }
 ```
@@ -3413,8 +3413,8 @@ If the role does not have the permission, no effect is emitted.
 // If the role does not have the permission, no effect is emitted.
 action[ephemeral] query_role_has_perm(role_id: id, perm: enum Perm) {
     publish QueryRoleHasPerm {
-        role_id: role_id,
-        perm: perm,
+        role_id,
+        perm,
     }
 }
 
@@ -3464,7 +3464,7 @@ If the role does not have any permissions, no effects are emitted.
 // Emits `QueryRolePermsResult` for each permission assigned to the role.
 // If the role does not have any permissions, no effects are emitted.
 action[ephemeral] query_role_perms(role_id: id) {
-    map RoleHasPerm[role_id: role_id, perm: ?] as f {
+    map RoleHasPerm[role_id, perm: ?] as f {
         publish QueryRolePerms {
             role_id: f.role_id,
             perm: f.perm,
@@ -3519,7 +3519,7 @@ Returns a specific label if it exists.
 // If the label does not exist then no effect is emitted.
 action[ephemeral] query_label(label_id: id) {
     publish QueryLabel {
-        label_id: label_id,
+        label_id,
     }
 }
 
@@ -3728,8 +3728,8 @@ action[ephemeral] create_afc_uni_channel(receiver_id: id, label_id: id) {
     )
 
     publish AfcCreateUniChannel {
-        receiver_id: receiver_id,
-        label_id: label_id,
+        receiver_id,
+        label_id,
         peer_encap: ch.peer_encap,
         channel_key_id: ch.key_id,
     }
@@ -3806,10 +3806,10 @@ command AfcCreateUniChannel with BaseEphemeral {
 
             finish {
                 emit AfcUniChannelCreated {
-                    parent_cmd_id: parent_cmd_id,
-                    receiver_id: receiver_id,
+                    parent_cmd_id,
+                    receiver_id,
                     author_enc_key_id: sender_enc_key_id,
-                    peer_enc_pk: peer_enc_pk,
+                    peer_enc_pk,
                     label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                     encap: this.peer_encap,
@@ -3822,9 +3822,9 @@ command AfcCreateUniChannel with BaseEphemeral {
 
             finish {
                 emit AfcUniChannelReceived {
-                    parent_cmd_id: parent_cmd_id,
-                    sender_id: sender_id,
-                    author_enc_pk: author_enc_pk,
+                    parent_cmd_id,
+                    sender_id,
+                    author_enc_pk,
                     peer_enc_key_id: receiver_enc_key_id,
                     label_id: this.label_id,
                     encap: this.peer_encap,
@@ -3852,7 +3852,7 @@ command AfcCreateUniChannel with BaseEphemeral {
 //   - Have `CanUseAfc` permission assigned to their respective roles
 function afc_uni_channel_is_valid(sender_id: id, receiver_id: id, label_id: id) bool {
     // The label must exist.
-    if !exists Label[label_id: label_id] {
+    if !exists Label[label_id] {
         return false
     }
 
