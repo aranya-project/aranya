@@ -577,7 +577,7 @@ command QueryDeviceRole with BaseEphemeral {
 
         let device = get_device(this.device_id) or recall default()
 
-        let assigned_role = try_get_assigned_role(device.device_id)
+        let assigned_role = get_assigned_role(device.device_id)
         match assigned_role {
             None => {
                 finish {}
@@ -1868,7 +1868,6 @@ A device can be assigned zero or one roles.
 // This fact is NOT deleted when a role is deleted. Use one of
 // the following functions to retrieve the role assigned to
 // a device:
-// - `try_get_assigned_role`
 // - `get_assigned_role`
 // - `get_assigned_role_id`
 fact AssignedRole[device_id: id]=>{role_id: id}
@@ -1920,75 +1919,19 @@ finish function update_role_assignment(
     ]=>{}
 }
 
-// Returns the role assigned to the device if it exists.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function try_get_assigned_role(device_id: id) option[struct Role] {
-    let assigned_role = query AssignedRole[device_id] or return None
-    return query Role[role_id: assigned_role.role_id]
-}
-
 // Returns the role assigned to the device.
 //
-// # Errors
-//
-// This function raises a check error if the device has not been
-// assigned a role or if the assigned role does not exist.
-//
 // # Caveats
 //
 // - It does NOT check whether the device exists.
-function get_assigned_role(device_id: id) struct Role {
-    // NB: We could implement this with `try_get_assigned_role`,
-    // but the generated check errors would be much less
-    // informative, so we manually implement it instead.
-    let assigned_role = query AssignedRole[device_id] or todo()
-
-    // Verify that the assigned role exists.
-    //
-    // There are two reasons the role might not exist:
-    //
-    // 1. The role was deleted and the `AssignedRole` fact was
-    //    not also deleted (which is currently acceptable since
-    //    we do not support prefix deletion).
-    // 2. We have an internal consistency error.
-    //
-    // Option (1) is the most likely and we can't really check
-    // for (2) here.
-    let role = query Role[role_id: assigned_role.role_id] or todo()
-
-    return role
+function get_assigned_role(device_id: id) option[struct Role] {
+    let assigned_role = query AssignedRole[device_id] or return None
+    return query Role[role_id: assigned_role.role_id]
 }
 
 // Reports whether the provided role represents the default owner role.
 function is_owner(role: struct Role) bool {
     return role.default && role.name == "owner"
-}
-
-// Returns the ID of the role assigned to the device.
-//
-// # Errors
-//
-// This function raises a check error if the device has not been
-// assigned a role.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function get_assigned_role_id(device_id: id) id {
-    return get_assigned_role(device_id).role_id
-}
-
-// Returns the ID of the role assigned to the device if it exists.
-//
-// # Caveats
-//
-// - It does NOT check whether the device exists.
-function try_get_assigned_role_id(device_id: id) option[id] {
-    let role = try_get_assigned_role(device_id) or return None
-    return Some(role.role_id)
 }
 
 // Assigns the specified role to the device.
@@ -2391,9 +2334,9 @@ function team_exists() bool {
 // # Errors
 //
 // This function raises a check error if the team does not exist.
-function team_id() id {
-    let f = query TeamStart[]=>{team_id: ?} or todo()
-    return f.team_id
+function team_id() option[id] {
+    let f = query TeamStart[]=>{team_id: ?} or return None
+    return Some(f.team_id)
 }
 ```
 
@@ -2604,7 +2547,7 @@ command TerminateTeam with Base {
         // Author must have permission to terminate the team.
         check device_has_perm(author.device_id, Perm::TerminateTeam) else recall default()
 
-        let current_team_id = team_id()
+        let current_team_id = team_id() or recall default()
         check this.team_id == current_team_id else recall default()
 
         // At this point we believe the following to be true:
@@ -3116,9 +3059,9 @@ fact LabelAssignedToDevice[label_id: id, device_id: id]=>{op: enum ChanOp, devic
 // - `AssignLabel`
 //
 // Additionally, the target device must have `CanUseAfc` permissions
-action[basic] assign_label_to_device(device_id: id, label_id: id, op: enum ChanOp) {
+action[basic] assign_label_to_device(device_id: id, label_id: id, op: enum ChanOp) result[unit, string] {
     // Bind the command to this membership epoch.
-    let gen = get_device_gen(device_id) or todo()
+    let gen = get_device_gen(device_id) or return Err("no device generation")
     publish AssignLabelToDevice {
         device_id,
         label_id,
@@ -3716,11 +3659,11 @@ corresponding recipient will decapsulate their key and store it in the
 shared memory DB.
 
 ```policy
-action[ephemeral] create_afc_uni_channel(receiver_id: id, label_id: id) {
+action[ephemeral] create_afc_uni_channel(receiver_id: id, label_id: id) result[unit, string] {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
-    let author_enc_key_id = get_enc_key_id(author_id) or todo()
-    let peer_enc_pk = get_enc_pk(receiver_id) or todo()
+    let author_enc_key_id = get_enc_key_id(author_id) or return Err("can't get author's key ID")
+    let peer_enc_pk = get_enc_pk(receiver_id) or return Err("can't get peer's public key")
 
     let ch = afc::create_uni_channel(
         parent_cmd_id,
@@ -3737,6 +3680,8 @@ action[ephemeral] create_afc_uni_channel(receiver_id: id, label_id: id) {
         peer_encap: ch.peer_encap,
         channel_key_id: ch.key_id,
     }
+
+    return Ok(Unit)
 }
 
 // Emitted when the author of a unidirectional AFC channel
