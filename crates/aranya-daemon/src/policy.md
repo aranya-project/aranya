@@ -2836,7 +2836,7 @@ branches, which could cause a fail-open security bug.
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
-function derive_label_id(evp: struct DefaultEnvelope) id {
+function derive_label_id(evp: struct BasicEnvelope) id {
     // The label ID is the ID of the command that created it.
     // TODO: Or we could use H(cmd_id, ...).
     return evp.command_id
