@@ -781,8 +781,8 @@ Utility method for checking object ranks before allowing operations to be perfor
 // The command author's role must have permission to perform the operation.
 // The command author must have a higher rank than the object it is operating on.
 function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: id) bool {
-    check device_has_perm(author_id, perm) else todo()
-    let author_rank = get_object_rank(author_id) or todo()
+    check device_has_perm(author_id, perm) else return false
+    let author_rank = get_object_rank(author_id) or return false
     check author_can_operate_on_target(author_rank, target_id) else return false
 
     return true
@@ -792,8 +792,8 @@ function author_has_perm_one_target(author_id: id, perm: enum Perm, target_id: i
 // The command author's role must have permission to perform the operation.
 // The command author must have a higher rank than all the objects it is operating on.
 function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1: id, target_id2: id) bool {
-    check device_has_perm(author_id, perm) else todo()
-    let author_rank = get_object_rank(author_id) or todo()
+    check device_has_perm(author_id, perm) else return false
+    let author_rank = get_object_rank(author_id) or return false
     check author_can_operate_on_target(author_rank, target_id1) else return false
     check author_can_operate_on_target(author_rank, target_id2) else return false
 
@@ -806,7 +806,7 @@ function author_has_perm_two_targets(author_id: id, perm: enum Perm, target_id1:
 // objects of equal rank, enforcing a strict hierarchy where devices can only
 // modify objects below them in the rank hierarchy.
 function author_can_operate_on_target(author_rank: int, target_id: id) bool {
-    let object_rank = get_object_rank(target_id) or todo()
+    let object_rank = get_object_rank(target_id) or return false
     return author_rank > object_rank
 }
 ```
@@ -845,8 +845,8 @@ finish function set_object_rank(object_id: id, rank: int) {
 // The owner device is exempt from this check because its role is assigned
 // directly during team creation (see CreateTeam), bypassing AssignRole.
 function role_rank_gte_device_rank(role_id: id, device_id: id) bool {
-    let role_rank = get_object_rank(role_id) or todo()
-    let device_rank = get_object_rank(device_id) or todo()
+    let role_rank = get_object_rank(role_id) or return false
+    let device_rank = get_object_rank(device_id) or return false
     return role_rank >= device_rank
 }
 
@@ -1321,7 +1321,7 @@ finish function assign_perm_to_role(role_id: id, perm: enum Perm) {
 //
 // It raises a check failure if the role does not exist.
 function role_has_perm(role_id: id, perm: enum Perm) bool {
-    check exists Role[role_id] else todo()
+    check exists Role[role_id] else return false
 
     return exists RoleHasPerm[
         role_id,
@@ -1335,7 +1335,7 @@ function role_has_perm(role_id: id, perm: enum Perm) bool {
 //
 // This function does NOT check whether the device exists.
 function device_has_perm(device_id: id, perm: enum Perm) bool {
-    let role = query AssignedRole[device_id] or todo()
+    let role = query AssignedRole[device_id] or return false
     return role_has_perm(role.role_id, perm)
 }
 
@@ -3570,12 +3570,16 @@ action[ephemeral] query_labels_assigned_to_device(device_id: id) {
     map LabelAssignedToDevice[label_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
             if label_assignment_matches_gen(f.device_id, f.device_gen) {
-                let label = query Label[label_id: f.label_id] or todo()
-                publish QueryLabelsAssignedToDevice {
-                    device_id: f.device_id,
-                    label_id: f.label_id,
-                    label_name: label.name,
-                    label_author_id: label.author_id,
+                match query Label[label_id: f.label_id] {
+                    Some(label) => {
+                        publish QueryLabelsAssignedToDevice {
+                            device_id: f.device_id,
+                            label_id: f.label_id,
+                            label_name: label.name,
+                            label_author_id: label.author_id,
+                        }
+                    }
+                    None => {}
                 }
             }
         }
