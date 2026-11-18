@@ -1040,6 +1040,12 @@ user-id = 55123 # rust-lang-owner
 start = "2024-08-15"
 end = "2027-11-03"
 
+[[trusted.linux-raw-sys]]
+criteria = "safe-to-deploy"
+user-id = 6825 # Dan Gohman (sunfishcode)
+start = "2021-06-12"
+end = "2027-11-18"
+
 [[trusted.mio]]
 criteria = "safe-to-deploy"
 user-id = 6025 # Thomas de Zeeuw (Thomasdezeeuw)
@@ -1051,6 +1057,12 @@ criteria = "safe-to-deploy"
 user-id = 4556 # Dirkjan Ochtman (djc)
 start = "2019-09-09"
 end = "2027-11-03"
+
+[[trusted.rustix]]
+criteria = "safe-to-deploy"
+user-id = 6825 # Dan Gohman (sunfishcode)
+start = "2021-10-29"
+end = "2027-11-18"
 
 [[trusted.rustls]]
 criteria = "safe-to-deploy"
@@ -1138,7 +1150,7 @@ end = "2026-07-09"
 
 [[trusted.wasi]]
 criteria = "safe-to-deploy"
-user-id = 6825
+user-id = 6825 # Dan Gohman (sunfishcode)
 start = "2019-07-22"
 end = "2026-05-16"
 
