@@ -276,6 +276,13 @@ user-id = 6025
 user-login = "Thomasdezeeuw"
 user-name = "Thomas de Zeeuw"
 
+[[publisher.proc-macro2]]
+version = "1.0.107"
+when = "2026-07-19"
+user-id = 3618
+user-login = "dtolnay"
+user-name = "David Tolnay"
+
 [[publisher.quinn-proto]]
 version = "0.11.19"
 when = "2026-09-30"
@@ -1611,112 +1618,6 @@ criteria = "safe-to-deploy"
 delta = "0.2.9 -> 0.2.13"
 notes = "Audited at https://fxrev.dev/946396"
 aggregated-from = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/rust_crates/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-version = "1.0.78"
-notes = """
-Grepped for "crypt", "cipher", "fs", "net" - there were no hits
-(except for a benign "fs" hit in a doc comment)
-
-Notes from the `unsafe` review can be found in https://crrev.com/c/5385745.
-"""
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Adrian Taylor <adetaylor@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.78 -> 1.0.79"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Adrian Taylor <adetaylor@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.79 -> 1.0.80"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Dustin J. Mitchell <djmitche@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.80 -> 1.0.81"
-notes = "Comment changes only"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "danakj <danakj@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.81 -> 1.0.82"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Dustin J. Mitchell <djmitche@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.82 -> 1.0.83"
-notes = "Substantive change is replacing String with Box<str>, saving memory."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.83 -> 1.0.84"
-notes = "Only doc comment changes in `src/lib.rs`."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "danakj@chromium.org"
-criteria = "safe-to-deploy"
-delta = "1.0.84 -> 1.0.85"
-notes = "Test-only changes."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.85 -> 1.0.86"
-notes = """
-Comment-only changes in `build.rs`.
-Reordering of `Cargo.toml` entries.
-Just bumping up the version number in `lib.rs`.
-Config-related changes in `test_size.rs`.
-"""
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "danakj <danakj@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.86 -> 1.0.87"
-notes = "No new unsafe interactions."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Liza Burakova <liza@chromium.org"
-criteria = "safe-to-deploy"
-delta = "1.0.87 -> 1.0.89"
-notes = """
-Biggest change is adding error handling in build.rs.
-Some config related changes in wrapper.rs.
-"""
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.89 -> 1.0.92"
-notes = """
-I looked at the delta and the previous discussion at
-https://chromium-review.googlesource.com/c/chromium/src/+/5385745/3#message-a8e2813129fa3779dab15acede408ee26d67b7f3
-and the changes look okay to me (including the `unsafe fn from_str_unchecked`
-changes in `wrapper.rs`).
-"""
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.proc-macro2]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.0.92 -> 1.0.93"
-notes = "No `unsafe`-related changes."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.quote]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
