@@ -3744,8 +3744,8 @@ command AfcCreateUniChannel with BaseEphemeral {
         let sender = get_device(envelope.author_id) or recall default()
         let sender_id = sender.device_id
 
-        let receiver_id = this.receiver_id
-        let receiver = get_device(receiver_id) or recall default()
+        let receiver = get_device(this.receiver_id) or recall default()
+        let receiver_id = receiver.device_id
 
         // Check that both devices have permission to create the AFC channel.
         check afc_uni_channel_is_valid(sender_id, receiver_id, this.label_id) else recall default()
