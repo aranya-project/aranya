@@ -61,7 +61,6 @@ spideroak-base58 = { version = "0.2.0" }
 
 aranya-certgen = { version = "7.0.1", path = "crates/aranya-certgen", default-features = false }
 aranya-client = { version = "7.0.1", path = "crates/aranya-client", default-features = false }
-aranya-daemon = { version = "7.0.1", path = "crates/aranya-daemon", default-features = false }
 aranya-daemon-api = { version = "7.0.1", path = "crates/aranya-daemon-api", default-features = false }
 aranya-keygen = { version = "7.0.1", path = "crates/aranya-keygen", default-features = false }
 aranya-util = { version = "7.0.1", path = "crates/aranya-util", default-features = false }
