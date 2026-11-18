@@ -13,7 +13,7 @@ authors = ["SpiderOak, Inc."]
 edition = "2024"
 license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
-rust-version = "1.90"
+rust-version = "1.97"
 
 
 [workspace.lints.rust]
