@@ -206,14 +206,14 @@ base[init] BaseInit {
         // The initial owner's public Device Keys.
         owner_keys: struct PublicKeyBundle,
     }
-    get_key {
+    get_key(this, _device_id: id) option[bytes] {
         return Some(this.owner_keys.sign_key)
     }
 }
 
 base[basic] Base {
-    get_key {
-        return match query DeviceSignPubKey[device_id: author_id] {
+    get_key(device_id: id) option[bytes] {
+        return match query DeviceSignPubKey[device_id] {
             Some(f) => Some(f.key)
             None => None
         }
@@ -221,8 +221,8 @@ base[basic] Base {
 }
 
 base[ephemeral] BaseEphemeral {
-    get_key {
-        return match query DeviceSignPubKey[device_id: author_id] {
+    get_key(device_id: id) option[bytes] {
+        return match query DeviceSignPubKey[device_id] {
             Some(f) => Some(f.key)
             None => None
         }
@@ -466,7 +466,7 @@ command QueryDevicesOnTeam with BaseEphemeral {
         device_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         finish {
@@ -519,7 +519,7 @@ command QueryAfcChannelIsValid with BaseEphemeral {
         label_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         // Check that both devices have permission to create the AFC channel.
@@ -572,7 +572,7 @@ command QueryDeviceRole with BaseEphemeral {
         device_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         let device = get_device(this.device_id) or recall default()
@@ -623,7 +623,7 @@ command QueryDeviceKeyBundle with BaseEphemeral {
         device_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         // NB: A device's keys exist iff `fact Device` exists, so
@@ -943,7 +943,7 @@ command ChangeRank with Base {
         new_rank: int,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -1026,7 +1026,7 @@ command QueryRank with BaseEphemeral {
         object_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         let maybe_rank = query Rank[object_id: this.object_id]
@@ -1081,7 +1081,7 @@ command QueryDeviceGeneration with BaseEphemeral {
         device_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         let maybe_gen = query DeviceGeneration[device_id: this.device_id]
@@ -1382,7 +1382,7 @@ command AddPermToRole with Base {
         perm: enum Perm,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -1443,7 +1443,7 @@ command RemovePermFromRole with Base {
         perm: enum Perm,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -1567,7 +1567,7 @@ command CreateRole with Base {
         rank: int,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -1676,7 +1676,7 @@ command SetupDefaultRole with Base {
         name: enum DefaultRoleName,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -1817,7 +1817,7 @@ command DeleteRole with Base {
         role_id: id
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -1979,7 +1979,7 @@ command AssignRole with Base {
         role_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2086,7 +2086,7 @@ command ChangeRole with Base {
         new_role_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2195,7 +2195,7 @@ command RevokeRole with Base {
         role_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2287,7 +2287,7 @@ command QueryTeamRoles with BaseEphemeral {
         default: bool,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         let eff = this as QueryTeamRolesResult
@@ -2370,7 +2370,7 @@ command CreateTeam with BaseInit {
         nonce: bytes,
     }
 
-    policy {
+    policy(this, envelope) {
         // NB: This is the only place in the policy file where we
         // invert this condition.
         check !team_exists() else recall default()
@@ -2539,7 +2539,7 @@ command TerminateTeam with Base {
         team_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2620,7 +2620,7 @@ command AddDevice with Base {
         rank: int,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2721,7 +2721,7 @@ command RemoveDevice with Base {
         device_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2891,7 +2891,7 @@ command CreateLabel with Base {
         rank: int,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -2971,7 +2971,7 @@ command DeleteLabel with Base {
         label_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -3099,7 +3099,7 @@ command AssignLabelToDevice with Base {
         device_gen: int,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -3239,7 +3239,7 @@ command RevokeLabelFromDevice with Base {
         label_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let author = get_device(envelope.author_id) or recall default()
@@ -3376,7 +3376,7 @@ command QueryRoleHasPerm with BaseEphemeral {
         perm: enum Perm,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         // Check that the role exists.
@@ -3431,7 +3431,7 @@ command QueryRolePerms with BaseEphemeral {
         perm: enum Perm,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         // Check that the role exists.
@@ -3484,7 +3484,7 @@ command QueryLabel with BaseEphemeral {
         label_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         let maybe_label = query Label[label_id: this.label_id]
@@ -3543,7 +3543,7 @@ command QueryLabels with BaseEphemeral {
         label_author_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         finish {
@@ -3601,7 +3601,7 @@ command QueryLabelsAssignedToDevice with BaseEphemeral {
         label_author_id: id,
     }
 
-    policy {
+    policy(this) {
         check team_exists() else recall no_team()
 
         // Check that the device exists.
@@ -3734,7 +3734,7 @@ command AfcCreateUniChannel with BaseEphemeral {
         channel_key_id: id,
     }
 
-    policy {
+    policy(this, envelope) {
         check team_exists() else recall no_team()
 
         let sender = get_device(envelope.author_id) or recall default()
