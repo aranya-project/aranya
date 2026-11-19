@@ -280,9 +280,8 @@ install_crate = { crate_name = "cargo-machete", version = "0.9.1", binary = "car
 category = "docs"
 description = "Generate docs"
 env.RUSTC_BOOTSTRAP = "1"
-env.RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}"
-command = "cargo"
-args = ["doc", "--all-features"]
+command = "scripts/docs-rs.py"
+install_crate = { crate_name = "cargo-docs-rs", version = "1.0.4", binary = "cargo-docs-rs", test_arg = "-V" }
 
 [tasks.tgz-docs]
 category = "docs"

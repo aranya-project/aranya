@@ -1052,6 +1052,12 @@ user-id = 6025 # Thomas de Zeeuw (Thomasdezeeuw)
 start = "2019-12-17"
 end = "2027-11-03"
 
+[[trusted.proc-macro2]]
+criteria = "safe-to-deploy"
+user-id = 3618 # David Tolnay (dtolnay)
+start = "2019-04-23"
+end = "2027-11-18"
+
 [[trusted.quinn-proto]]
 criteria = "safe-to-deploy"
 user-id = 4556 # Dirkjan Ochtman (djc)

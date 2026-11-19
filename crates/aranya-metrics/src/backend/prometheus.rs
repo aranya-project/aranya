@@ -41,6 +41,7 @@ pub struct PrometheusConfig {
     global_labels: Option<Vec<(String, String)>>,
 }
 
+/// Default push gateway url.
 const PUSHGATEWAY_URL: &str = "localhost:9091";
 
 impl PrometheusConfig {
@@ -177,6 +178,7 @@ enum PrometheusMode {
     },
 }
 
+/// Mask for configuring which metrics are enabled.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum MetricsKindMask {
     None = 0,

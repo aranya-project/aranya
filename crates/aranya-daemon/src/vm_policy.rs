@@ -45,7 +45,7 @@ impl fmt::Display for Perm {
     }
 }
 
-/// Engine using policy from [`policy.md`].
+/// Engine using policy from `policy.md`.
 pub struct PolicyEngine<CE, KS> {
     /// The underlying policy.
     pub(crate) policy: VmPolicy<CE>,
