@@ -80,9 +80,20 @@ ignore = [
     { id = "RUSTSEC-2026-0097", reason = "we don't use the features required to hit the bug" },
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is an unmaintained build-time sub-dependency" },
     { id = "RUSTSEC-2026-0374", reason = "basic-toml is an unmaintained example-only sub-dependency" },
+    { id = "RUSTSEC-2026-0542", reason = "humantime is an unmaintained sub-dependency of tarpc" },
     { id = "RUSTSEC-2024-0449", reason = "unmaintained yaml dependencies will be replaced with aranya-core update" },
 
     { id = "RUSTSEC-2026-0387", reason = "crypto-bigint will be updated with aranya-core update" },
+
+    { id = "RUSTSEC-2026-0574", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0575", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0576", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0577", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0578", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0579", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0580", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0581", reason = "heapless will be updated with aranya-core update" },
+    { id = "RUSTSEC-2026-0582", reason = "heapless will be updated with aranya-core update" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.

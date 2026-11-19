@@ -255,6 +255,20 @@ when = "2026-07-21"
 user-id = 55123
 user-login = "rust-lang-owner"
 
+[[publisher.linux-raw-sys]]
+version = "0.4.15"
+when = "2025-01-08"
+user-id = 6825
+user-login = "sunfishcode"
+user-name = "Dan Gohman"
+
+[[publisher.linux-raw-sys]]
+version = "0.12.1"
+when = "2025-12-23"
+user-id = 6825
+user-login = "sunfishcode"
+user-name = "Dan Gohman"
+
 [[publisher.mio]]
 version = "1.2.4"
 when = "2026-10-03"
@@ -268,6 +282,20 @@ when = "2026-09-30"
 user-id = 4556
 user-login = "djc"
 user-name = "Dirkjan Ochtman"
+
+[[publisher.rustix]]
+version = "0.38.44"
+when = "2025-01-21"
+user-id = 6825
+user-login = "sunfishcode"
+user-name = "Dan Gohman"
+
+[[publisher.rustix]]
+version = "1.1.6"
+when = "2026-10-27"
+user-id = 6825
+user-login = "sunfishcode"
+user-name = "Dan Gohman"
 
 [[publisher.rustls]]
 version = "0.23.38"
@@ -707,6 +735,18 @@ notes = """
 Changes in how macros are invoked and various bits and pieces of macro-fu.
 Otherwise no major changes and nothing dealing with `unsafe`.
 """
+
+[[audits.bytecode-alliance.audits.bitflags]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "2.7.0 -> 2.9.4"
+notes = "Tweaks to the macro, nothing out of order."
+
+[[audits.bytecode-alliance.audits.bitflags]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "2.10.0 -> 2.11.1"
+notes = "Minor updates, nothing awry here."
 
 [[audits.bytecode-alliance.audits.block-buffer]]
 who = "Benjamin Bouvier <public@benj.me>"
@@ -1215,6 +1255,11 @@ Only functional change is to work around a bug in the negative_impls feature
 (https://github.com/taiki-e/pin-project/issues/340#issuecomment-2432146009)
 """
 
+[[audits.cargo-vet.audits.quinn-udp]]
+who = "Alex Franchuk <afranchuk@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.5.13 -> 0.5.16"
+
 [[audits.cargo-vet.audits.r-efi]]
 who = "Alex Franchuk <afranchuk@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -1328,13 +1373,6 @@ think this justifies marking this crate as `ub-risk-1`.
 
 Additional review comments can be found at https://crrev.com/c/4723145/31
 """
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.bitflags]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "2.6.0 -> 2.8.0"
-notes = "No changes related to `unsafe impl ... bytemuck` pieces from `src/external.rs`."
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.byteorder]]
@@ -2599,6 +2637,21 @@ delta = "2.4.0 -> 2.4.1"
 notes = "Only allowing new clippy lints"
 aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.bitflags]]
+who = [
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+]
+criteria = "safe-to-deploy"
+delta = "2.6.0 -> 2.7.0"
+aggregated-from = "https://raw.githubusercontent.com/mozilla-firefox/firefox/main/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.bitflags]]
+who = "Benjamin VanderSloot <bvandersloot@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "2.9.4 -> 2.10.0"
+aggregated-from = "https://raw.githubusercontent.com/mozilla-firefox/firefox/main/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.block-buffer]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
@@ -3627,12 +3680,6 @@ aggregated-from = "https://raw.githubusercontent.com/zcash/librustzcash/main/sup
 who = "Jack Grigg <jack@electriccoin.co>"
 criteria = "safe-to-deploy"
 delta = "0.13.4 -> 0.13.5"
-aggregated-from = "https://raw.githubusercontent.com/zcash/wallet/main/supply-chain/audits.toml"
-
-[[audits.zcash.audits.quinn-udp]]
-who = "Jack Grigg <jack@electriccoin.co>"
-criteria = "safe-to-deploy"
-delta = "0.5.13 -> 0.5.14"
 aggregated-from = "https://raw.githubusercontent.com/zcash/wallet/main/supply-chain/audits.toml"
 
 [[audits.zcash.audits.rand_xorshift]]
