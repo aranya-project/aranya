@@ -5,10 +5,10 @@ use core::{error, fmt, hash::Hash, time::Duration};
 pub use aranya_crypto::tls::CipherSuiteId;
 use aranya_crypto::{
     Engine,
+    ctutils::{Choice, CtEq},
     dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
-    subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 use aranya_id::custom_id;
@@ -216,7 +216,7 @@ where
     }
 }
 
-impl ConstantTimeEq for Secret {
+impl CtEq for Secret {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
